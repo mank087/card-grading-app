@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabaseServer'
 import { verifyAuth } from '@/lib/serverAuth'
+import { isUuid } from '@/lib/uuid'
 
 // Delete card
 export async function DELETE(
@@ -9,6 +10,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+    }
 
     // Verify authentication - get user ID from token, not query params
     const auth = await verifyAuth(request)

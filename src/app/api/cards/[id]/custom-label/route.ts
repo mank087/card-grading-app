@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
+import { isUuid } from "@/lib/uuid";
 
 /**
  * Custom Label Data API
@@ -56,6 +57,9 @@ export async function PUT(
 ) {
   try {
     const { id: cardId } = await params;
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
     const auth = await verifyAuth(request);
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
@@ -140,6 +144,9 @@ export async function DELETE(
 ) {
   try {
     const { id: cardId } = await params;
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
     const auth = await verifyAuth(request);
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });

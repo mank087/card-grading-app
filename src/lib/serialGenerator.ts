@@ -11,6 +11,13 @@
  * - Database check ensures no duplicates
  * - No category prefixes - category is tracked separately in database
  *
+ * Uniqueness: each candidate is checked with a targeted query (the previous
+ * fetch-all-serials approach silently capped at supabase-js's default 1000
+ * rows, so serials beyond the first 1000 cards were invisible to the dedup
+ * check — the source of production `cards_serial_key` violations). A
+ * check-then-insert race is still possible across concurrent uploads, so
+ * callers MUST retry their insert with a fresh serial on a 23505 conflict.
+ *
  * Future expansion:
  * - When approaching 900,000 cards, expand to 7 digits (9,999,999 combinations)
  * - System automatically handles mixed-length serials
@@ -24,6 +31,28 @@ const MIN_SERIAL = 1;
 const MAX_RETRIES = 10; // Max attempts to find unique serial
 
 /**
+ * Returns true if a card already uses this serial.
+ * Throws on database error so the caller can fall back.
+ */
+async function serialExists(serial: string): Promise<boolean> {
+  const { count, error } = await supabaseAdmin
+    .from('cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('serial', serial);
+
+  if (error) {
+    console.error('[SerialGenerator] Database error checking serial:', error);
+    throw error;
+  }
+  return (count ?? 0) > 0;
+}
+
+function randomSerial(min: number, max: number, length: number): string {
+  const n = Math.floor(Math.random() * (max - min + 1)) + min;
+  return n.toString().padStart(length, '0');
+}
+
+/**
  * Generates a random 6-digit DCM serial number.
  * Checks database to ensure uniqueness - no duplicates allowed.
  *
@@ -31,55 +60,27 @@ const MAX_RETRIES = 10; // Max attempts to find unique serial
  */
 export async function generateNextSerial(): Promise<string> {
   try {
-    // Get all existing numeric serials for duplicate checking
-    const { data: existingCards, error } = await supabaseAdmin
-      .from('cards')
-      .select('serial');
+    for (let attempts = 0; attempts < MAX_RETRIES; attempts++) {
+      const candidate = randomSerial(MIN_SERIAL, MAX_SERIAL, SERIAL_LENGTH);
 
-    if (error) {
-      console.error('[SerialGenerator] Database error:', error);
-      throw error;
-    }
-
-    // Build a Set of existing numeric serials for fast lookup
-    const existingSerials = new Set<string>();
-    if (existingCards) {
-      for (const card of existingCards) {
-        if (card.serial && /^\d+$/.test(card.serial)) {
-          existingSerials.add(card.serial);
-        }
+      if (!(await serialExists(candidate))) {
+        console.log(`[SerialGenerator] Generated unique serial: ${candidate} (attempt ${attempts + 1})`);
+        return candidate;
       }
-    }
-
-    console.log(`[SerialGenerator] Found ${existingSerials.size} existing numeric serials`);
-
-    // Generate random serial, retry if duplicate
-    let attempts = 0;
-    while (attempts < MAX_RETRIES) {
-      // Generate random number between MIN_SERIAL and MAX_SERIAL
-      const randomNum = Math.floor(Math.random() * (MAX_SERIAL - MIN_SERIAL + 1)) + MIN_SERIAL;
-      const paddedSerial = randomNum.toString().padStart(SERIAL_LENGTH, '0');
-
-      if (!existingSerials.has(paddedSerial)) {
-        console.log(`[SerialGenerator] Generated unique serial: ${paddedSerial} (attempt ${attempts + 1})`);
-        return paddedSerial;
-      }
-
-      attempts++;
-      console.log(`[SerialGenerator] Serial ${paddedSerial} already exists, retrying...`);
+      console.log(`[SerialGenerator] Serial ${candidate} already exists, retrying...`);
     }
 
     // If we couldn't find a unique 6-digit serial after MAX_RETRIES,
     // expand to 7 digits (this means we're approaching capacity)
     console.warn(`[SerialGenerator] 6-digit space congested, expanding to 7 digits`);
-    const expandedSerial = generateExpandedSerial(existingSerials);
-    return expandedSerial;
-
+    return await generateExpandedSerial();
   } catch (error) {
     console.error('[SerialGenerator] Failed to generate serial:', error);
-    // Fallback to timestamp-based serial if database fails
-    const timestamp = Date.now();
-    const fallbackSerial = timestamp.toString().slice(-SERIAL_LENGTH).padStart(SERIAL_LENGTH, '0');
+    // Fallback if database checks fail: timestamp tail + random suffix.
+    // (A plain timestamp tail collided under concurrent uploads.)
+    const timestamp = Date.now().toString().slice(-SERIAL_LENGTH);
+    const suffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const fallbackSerial = `${timestamp}${suffix}`;
     console.warn(`[SerialGenerator] Using fallback serial: ${fallbackSerial}`);
     return fallbackSerial;
   }
@@ -88,18 +89,17 @@ export async function generateNextSerial(): Promise<string> {
 /**
  * Generates an expanded (7+ digit) serial when 6-digit space is congested.
  */
-function generateExpandedSerial(existingSerials: Set<string>): string {
+async function generateExpandedSerial(): Promise<string> {
   const EXPANDED_LENGTH = 7;
   const EXPANDED_MAX = 9999999;
   const EXPANDED_MIN = 1000000; // Start at 1M to distinguish from 6-digit
 
   for (let i = 0; i < MAX_RETRIES; i++) {
-    const randomNum = Math.floor(Math.random() * (EXPANDED_MAX - EXPANDED_MIN + 1)) + EXPANDED_MIN;
-    const paddedSerial = randomNum.toString().padStart(EXPANDED_LENGTH, '0');
+    const candidate = randomSerial(EXPANDED_MIN, EXPANDED_MAX, EXPANDED_LENGTH);
 
-    if (!existingSerials.has(paddedSerial)) {
-      console.log(`[SerialGenerator] Generated expanded serial: ${paddedSerial}`);
-      return paddedSerial;
+    if (!(await serialExists(candidate))) {
+      console.log(`[SerialGenerator] Generated expanded serial: ${candidate}`);
+      return candidate;
     }
   }
 

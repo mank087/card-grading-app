@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
+import { isUuid } from '@/lib/uuid'
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
@@ -106,7 +107,9 @@ export default function ProcessingScreen() {
   // effect just to bail out. The 5-min timeout uses isCompleteRef
   // (not state) to avoid the same stale-closure issue.
   useEffect(() => {
-    if (!params.cardId) return
+    // Route params are strings — a null id arrives as the literal "null",
+    // which passes a truthy check but breaks the uuid query (22P02).
+    if (!isUuid(params.cardId)) return
 
     if (__DEV__) console.log('[Processing] Starting poll for card:', params.cardId)
 
@@ -122,6 +125,9 @@ export default function ProcessingScreen() {
     pollRef.current = setInterval(async () => {
       if (isCompleteRef.current) return
       try {
+        // cards denies anon (RLS) — skip ticks until the session token is
+        // attached, otherwise the poll fails with 42501 as anon.
+        if (!(await hasActiveSession())) return
         pollCountRef.current += 1
         const { data, error } = await supabase
           .from('cards')

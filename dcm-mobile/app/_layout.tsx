@@ -25,7 +25,7 @@ import { WelcomeTourProvider, useWelcomeTour } from '@/contexts/WelcomeTourConte
 import WelcomeTour from '@/components/onboarding/WelcomeTour'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
 // Lazy-load the welcome carousel — its module evaluates 27 require()d
 // PNGs (welcome card strips, slabs, label studio shots, eBay listings)
 // at module-load time. Static-importing here means every authenticated
@@ -118,16 +118,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === '(auth)'
     if (!user || !inAuthGroup) return
     let cancelled = false
-    supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .not('conversational_whole_grade', 'is', null)
-      .then(({ count, error }) => {
-        if (cancelled) return
-        const hasGraded = !error && (count ?? 0) > 0
-        router.replace(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
-      })
+    ;(async () => {
+      // cards denies anon (RLS) — skip the count query until the client has
+      // its token attached; querying as anon fails with 42501. Fall back to
+      // the grade tab, matching the no-graded-cards path.
+      if (!(await hasActiveSession())) {
+        if (!cancelled) router.replace('/(tabs)/grade')
+        return
+      }
+      const { count, error } = await supabase
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .not('conversational_whole_grade', 'is', null)
+      if (cancelled) return
+      const hasGraded = !error && (count ?? 0) > 0
+      router.replace(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
+    })()
     return () => { cancelled = true }
   }, [user, isLoading, segments, router])
 

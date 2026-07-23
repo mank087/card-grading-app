@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { isUuid } from "@/lib/uuid";
 
 /**
  * Helper: Create a temporary signed URL for a storage object.
@@ -31,6 +32,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const cardId = params.id;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const supabase = supabaseServer();
 
   try {

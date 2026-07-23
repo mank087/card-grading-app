@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabaseServer'
 import { verifyAuth } from '@/lib/serverAuth'
 import { extractAndSaveCardColors } from '@/lib/serverColorExtractor'
+import { isUuid } from '@/lib/uuid'
 
 /**
  * POST /api/cards/[id]/extract-colors
@@ -22,6 +23,9 @@ export async function POST(
 ) {
   try {
     const { id: cardId } = await params
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+    }
     const auth = await verifyAuth(request)
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: auth.error || 'Authentication required' }, { status: 401 })

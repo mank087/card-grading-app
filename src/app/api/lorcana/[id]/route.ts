@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -164,6 +165,9 @@ function extractLorcanaFieldsFromConversational(conversationalJSON: any) {
 // Main GET handler for Lorcana cards
 export async function GET(request: NextRequest, { params }: LorcanaCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters
@@ -1320,6 +1324,9 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
 // PATCH handler for updating Lorcana card data (e.g., clearing cached grading)
 export async function PATCH(request: NextRequest, { params }: LorcanaCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[PATCH /api/lorcana/${cardId}] Starting Lorcana card update request`);
 
@@ -1379,6 +1386,9 @@ export async function PATCH(request: NextRequest, { params }: LorcanaCardGrading
 // DELETE handler for removing Lorcana cards
 export async function DELETE(request: NextRequest, { params }: LorcanaCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[DELETE /api/lorcana/${cardId}] Starting Lorcana card deletion request`);
 

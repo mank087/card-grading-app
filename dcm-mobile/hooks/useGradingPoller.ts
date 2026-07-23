@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { AppState } from 'react-native'
 import { useGradingQueue, calculateStage } from '@/contexts/GradingQueueContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
+import { isUuid } from '@/lib/uuid'
 
 const POLL_INTERVAL_MS = 4_000
 
@@ -24,8 +25,26 @@ export function useGradingPoller() {
     let timer: ReturnType<typeof setInterval> | null = null
 
     const tick = async () => {
-      const inFlight = queueRef.current.filter(c => c.status === 'processing' || c.status === 'uploading')
+      const allInFlight = queueRef.current.filter(c => c.status === 'processing' || c.status === 'uploading')
+      if (allInFlight.length === 0) return
+
+      // Entries with a missing/corrupt cardId can never resolve — fail them
+      // instead of poisoning the .in() filter with "null" (Postgres 22P02).
+      const inFlight = allInFlight.filter(c => isUuid(c.cardId))
+      for (const bad of allInFlight) {
+        if (!isUuid(bad.cardId)) {
+          updateCardStatus(bad.id, {
+            status: 'error',
+            stage: 'error',
+            errorMessage: 'This upload is corrupted. Please re-upload the card.',
+          })
+        }
+      }
       if (inFlight.length === 0) return
+
+      // `cards` denies anon (RLS, no anon grant). Skip this tick if no
+      // signed-in session is attached yet — querying would 42501.
+      if (!(await hasActiveSession())) return
 
       const ids = inFlight.map(c => c.cardId)
       try {

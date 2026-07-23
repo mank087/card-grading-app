@@ -29,6 +29,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { supabase } from '@/lib/supabase'
+import { isUuid } from '@/lib/uuid'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors, GradeColors, ConfidenceColors } from '@/lib/constants'
 import { formatDate } from '@/lib/locale'
@@ -342,7 +343,9 @@ export default function CardDetailScreen() {
   }, [])
 
   const fetchCard = useCallback(async () => {
-    if (!id) return
+    // A null id arrives as the literal string "null" — truthy, but invalid
+    // for the uuid column (22P02). Bail to the not-found state instead.
+    if (!isUuid(id)) { setIsLoading(false); setRefreshing(false); return }
     const { data, error } = await supabase.from('cards').select('*').eq('id', id).single()
     if (!isMountedRef.current) return
     if (error || !data) { setIsLoading(false); setRefreshing(false); return }
@@ -367,7 +370,7 @@ export default function CardDetailScreen() {
   // per-card cool-down all live server-side, so this is a cheap no-op on
   // fresh cards. Fresh numbers show on the next fetch/visit.
   useEffect(() => {
-    if (!id || !session?.access_token) return
+    if (!isUuid(id) || !session?.access_token) return
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
     fetch(`${API_BASE}/api/cards/${id}/refresh-price`, {
       method: 'POST',

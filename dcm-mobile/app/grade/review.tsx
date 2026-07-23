@@ -133,8 +133,12 @@ export default function ReviewScreen() {
         ? (notes ? { noDefectsConfirmed: true, cardDescription: notes } : null)
         : { ...conditionReport, notes }
 
-      // Insert card record
-      const { error: dbError } = await supabase.from('cards').insert({
+      // Insert card record. Serial assignment is check-then-insert, so a
+      // concurrent upload can grab the same serial — on a serial unique
+      // violation (23505), regenerate and retry instead of failing the grade.
+      let dbError: any = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error: insertError } = await supabase.from('cards').insert({
         id: cardId,
         user_id: user.id,
         serial,
@@ -155,7 +159,24 @@ export default function ReviewScreen() {
           user_condition_processed: null,
           has_user_condition_report: true,
         } : {}),
-      })
+        })
+
+        dbError = insertError
+        if (!insertError) break
+
+        const isSerialConflict = insertError.code === '23505' && (insertError.message || '').includes('cards_serial_key')
+        if (!isSerialConflict) break
+
+        if (__DEV__) console.log(`[Upload] Serial ${serial} collided, regenerating (attempt ${attempt + 1})`)
+        serial = String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+        try {
+          const res = await fetch(`${API_BASE}/api/serial`)
+          if (res.ok) {
+            const data = await res.json()
+            serial = data.serial || serial
+          }
+        } catch { /* use regenerated fallback serial */ }
+      }
 
       if (dbError) {
         console.error('[Upload] DB insert error:', dbError)

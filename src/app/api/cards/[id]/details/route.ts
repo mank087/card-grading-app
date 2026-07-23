@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
+import { isUuid } from "@/lib/uuid";
 
 // Fields that are protected and cannot be edited
 const PROTECTED_FIELDS = [
@@ -281,6 +282,10 @@ export async function PATCH(
 ) {
   try {
     const { id: cardId } = await params;
+
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
 
     // 1. Verify authentication
     const auth = await verifyAuth(request);

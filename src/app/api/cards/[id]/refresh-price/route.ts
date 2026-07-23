@@ -18,6 +18,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import {
   refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
 } from '@/lib/pricing/batchPriceRefresh';
+import { isUuid } from '@/lib/uuid';
 
 // One card = at most a few upstream PriceCharting/eBay calls (~1-3s).
 export const maxDuration = 60;
@@ -36,6 +37,9 @@ export async function POST(
     }
 
     const cardId = params.id;
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ success: false, error: 'Card not found' }, { status: 404 });
+    }
     const last = lastRefreshByCard.get(cardId);
     if (last && Date.now() - last < CARD_COOLDOWN_MS) {
       return NextResponse.json({ success: true, refreshed: false, reason: 'cooldown' });

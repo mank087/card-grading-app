@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { isUuid } from '@/lib/uuid';
 import LorcanaCardDetails from './CardDetailClient';
 
 interface PageProps {
@@ -207,8 +208,33 @@ function buildDescription(card: any): string {
   return desc;
 }
 
+// Fallback metadata for missing or invalid card ids
+function notFoundMetadata(): Metadata {
+  return {
+    title: 'Lorcana Card Not Found | DCM Grading',
+    description: 'Professional Disney Lorcana card grading and authentication by DCM',
+    keywords: 'lorcana card grading, disney lorcana, professional grading, DCM, authentication',
+    openGraph: {
+      title: 'Lorcana Card Not Found | DCM Grading',
+      description: 'Professional Disney Lorcana card grading and authentication by DCM',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: 'Lorcana Card Not Found | DCM Grading',
+      description: 'Professional Disney Lorcana card grading and authentication by DCM',
+    },
+  };
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+
+  // Non-UUID ids (e.g. /lorcana/null from bots or stale links) would fail in Postgres with 22P02
+  if (!isUuid(id)) {
+    return notFoundMetadata();
+  }
+
   const supabase = supabaseServer();
 
   // Fetch card data server-side
@@ -220,21 +246,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   // Default metadata if card not found
   if (error || !card) {
-    return {
-      title: 'Lorcana Card Not Found | DCM Grading',
-      description: 'Professional Disney Lorcana card grading and authentication by DCM',
-      keywords: 'lorcana card grading, disney lorcana, professional grading, DCM, authentication',
-      openGraph: {
-        title: 'Lorcana Card Not Found | DCM Grading',
-        description: 'Professional Disney Lorcana card grading and authentication by DCM',
-        type: 'website',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: 'Lorcana Card Not Found | DCM Grading',
-        description: 'Professional Disney Lorcana card grading and authentication by DCM',
-      },
-    };
+    return notFoundMetadata();
   }
 
   // Build enhanced SEO components

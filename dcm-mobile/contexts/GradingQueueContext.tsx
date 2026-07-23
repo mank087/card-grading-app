@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { isUuid } from '@/lib/uuid'
 
 const STORAGE_KEY = 'dcm_grading_queue'
 const STALE_THRESHOLD_MS = 15 * 60 * 1000 // 15 min
@@ -70,7 +71,10 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
         try {
           const parsed: GradingCard[] = JSON.parse(raw)
           const now = Date.now()
-          const cleaned = parsed.map(card => {
+          // Drop entries with a missing/corrupt cardId — they can never
+          // resolve and would poison the poller's uuid queries (22P02).
+          const valid = parsed.filter(card => isUuid(card.cardId))
+          const cleaned = valid.map(card => {
             if ((card.status === 'processing' || card.status === 'uploading') && now - card.uploadedAt > STALE_THRESHOLD_MS) {
               return { ...card, status: 'error' as const, stage: 'error' as const, errorMessage: 'Card may need extra time. Check My Collection.' }
             }

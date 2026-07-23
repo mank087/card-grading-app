@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 // PRIMARY: Conversational grading system (matches sports card flow)
@@ -99,6 +100,9 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
 // Main GET handler for Other cards
 export async function GET(request: NextRequest, { params }: OtherCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters

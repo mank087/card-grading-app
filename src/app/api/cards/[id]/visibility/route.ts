@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
+import { isUuid } from "@/lib/uuid";
 
 type VisibilityToggleRequest = {
   params: Promise<{ id: string }>;
@@ -33,6 +34,13 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Card ID is required" },
         { status: 400 }
+      );
+    }
+
+    if (!isUuid(cardId)) {
+      return NextResponse.json(
+        { error: "Card not found" },
+        { status: 404 }
       );
     }
 
@@ -140,6 +148,13 @@ export async function GET(
       return NextResponse.json(
         { error: "Card ID is required" },
         { status: 400 }
+      );
+    }
+
+    if (!isUuid(cardId)) {
+      return NextResponse.json(
+        { error: "Card not found" },
+        { status: 404 }
       );
     }
 

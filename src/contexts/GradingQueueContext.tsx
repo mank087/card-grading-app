@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { isUuid } from '@/lib/uuid'
 
 export type GradingStage =
   | 'uploading'    // 0-15%: Images being uploaded
@@ -57,8 +58,18 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
         const now = Date.now()
         const STALE_THRESHOLD = 15 * 60 * 1000 // 15 minutes
 
+        // Drop corrupt entries whose cardId is not a valid UUID - they would
+        // otherwise poll /api/<type>/null repeatedly and trigger DB errors
+        const validEntries = parsed.filter(card => {
+          if (!isUuid(card.cardId)) {
+            console.warn(`[GradingQueue] Dropping corrupt queue entry with invalid cardId "${card.cardId}"`)
+            return false
+          }
+          return true
+        })
+
         // Mark stale processing/uploading cards as errors
-        const cleanedQueue = parsed.map(card => {
+        const cleanedQueue = validEntries.map(card => {
           if ((card.status === 'processing' || card.status === 'uploading') &&
               (now - card.uploadedAt) > STALE_THRESHOLD) {
             console.log(`[GradingQueue] Marking stale card ${card.cardId} as error (uploaded ${Math.floor((now - card.uploadedAt) / 1000)}s ago)`)

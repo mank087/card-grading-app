@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { isUuid } from '@/lib/uuid';
 import { PokemonCardDetails } from './CardDetailClient';
 
 interface PageProps {
@@ -301,9 +302,34 @@ function buildDescription(card: any): string {
   return desc;
 }
 
+// Fallback metadata for missing or invalid card ids
+function notFoundMetadata(): Metadata {
+  return {
+    title: 'Pokemon Card Not Found - DCM Grading',
+    description: 'Professional Pokemon card grading and authentication by DCM',
+    keywords: 'pokemon card grading, pokemon tcg, professional grading, DCM, authentication',
+    openGraph: {
+      title: 'Pokemon Card Not Found - DCM Grading',
+      description: 'Professional Pokemon card grading and authentication by DCM',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: 'Pokemon Card Not Found - DCM Grading',
+      description: 'Professional Pokemon card grading and authentication by DCM',
+    },
+  };
+}
+
 // Server-side metadata generation for SEO
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+
+  // Non-UUID ids (e.g. /pokemon/null from bots or stale links) would fail in Postgres with 22P02
+  if (!isUuid(id)) {
+    return notFoundMetadata();
+  }
+
   const supabase = supabaseServer();
 
   // Fetch card data server-side
@@ -315,21 +341,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   // Default metadata if card not found
   if (error || !card) {
-    return {
-      title: 'Pokemon Card Not Found - DCM Grading',
-      description: 'Professional Pokemon card grading and authentication by DCM',
-      keywords: 'pokemon card grading, pokemon tcg, professional grading, DCM, authentication',
-      openGraph: {
-        title: 'Pokemon Card Not Found - DCM Grading',
-        description: 'Professional Pokemon card grading and authentication by DCM',
-        type: 'website',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: 'Pokemon Card Not Found - DCM Grading',
-        description: 'Professional Pokemon card grading and authentication by DCM',
-      },
-    };
+    return notFoundMetadata();
   }
 
   // Build enhanced SEO components

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
 import {
   gradeCardWithVision,
@@ -114,6 +115,9 @@ type VisionGradeRequest = {
  */
 export async function GET(request: NextRequest, { params }: VisionGradeRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for force_regrade query parameter

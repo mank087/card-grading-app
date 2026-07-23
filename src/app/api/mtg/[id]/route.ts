@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -166,6 +167,9 @@ function extractMTGFieldsFromConversational(conversationalJSON: any) {
 // Main GET handler for MTG cards
 export async function GET(request: NextRequest, { params }: MTGCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters
@@ -1294,6 +1298,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 // PATCH handler for updating MTG card data (e.g., clearing cached grading)
 export async function PATCH(request: NextRequest, { params }: MTGCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[PATCH /api/mtg/${cardId}] Starting MTG card update request`);
 
@@ -1353,6 +1360,9 @@ export async function PATCH(request: NextRequest, { params }: MTGCardGradingRequ
 // DELETE handler for removing MTG cards
 export async function DELETE(request: NextRequest, { params }: MTGCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[DELETE /api/mtg/${cardId}] Starting MTG card deletion request`);
 

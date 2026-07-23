@@ -28,3 +28,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 })
+
+/**
+ * Resolves true only when a signed-in session is loaded and attached to the
+ * client. `cards` has RLS with no anon grants (42501 for anon requests), so
+ * queries fired before session hydration completes — or after sign-out — must
+ * be skipped. getSession() awaits the AsyncStorage hydration internally.
+ */
+export async function hasActiveSession(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    return !!data.session
+  } catch {
+    return false
+  }
+}

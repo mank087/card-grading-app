@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { resolveCardValue } from '@/lib/resolveCardValue'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
@@ -168,6 +168,9 @@ export default function CollectionScreen() {
 
   const fetchCollection = useCallback(async () => {
     if (!session?.user?.id) return
+    // cards denies anon (RLS): skip until the client has its token attached,
+    // otherwise the request goes out as anon and fails with 42501.
+    if (!(await hasActiveSession())) return
     setFetchError(null)
     try {
       const { data, error } = await supabase

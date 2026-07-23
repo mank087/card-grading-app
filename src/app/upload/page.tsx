@@ -749,21 +749,43 @@ function UniversalUploadPageContent() {
         console.log('[Upload] User condition report provided:', processedConditionReport?.total_defects_reported, 'defects reported')
       }
 
-      // Save record in DB with selected category (use authenticated client)
-      const { error: dbError } = await authClient.from('cards').insert({
-        id: cardId,
-        user_id: user.id,
-        serial: serialNumber,
-        front_path: frontPath,
-        back_path: backPath,
-        category: config.category,
-        ...(config.category === 'Other' && subCategory ? { sub_category: subCategory } : {}),
-        visibility: 'public', // Cards are public by default so grading API can access them
-        // User condition report fields
-        user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
-        user_condition_processed: processedConditionReport,
-        has_user_condition_report: hasConditionData || hasCardDescription,
-      })
+      // Save record in DB with selected category (use authenticated client).
+      // Serial assignment is check-then-insert, so a concurrent upload can
+      // grab the same serial — on a serial unique violation (23505), fetch a
+      // fresh serial and retry instead of failing the whole upload.
+      let dbError: any = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error: insertError } = await authClient.from('cards').insert({
+          id: cardId,
+          user_id: user.id,
+          serial: serialNumber,
+          front_path: frontPath,
+          back_path: backPath,
+          category: config.category,
+          ...(config.category === 'Other' && subCategory ? { sub_category: subCategory } : {}),
+          visibility: 'public', // Cards are public by default so grading API can access them
+          // User condition report fields
+          user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
+          user_condition_processed: processedConditionReport,
+          has_user_condition_report: hasConditionData || hasCardDescription,
+        })
+
+        dbError = insertError
+        if (!insertError) break
+
+        const isSerialConflict = insertError.code === '23505' && (insertError.message || '').includes('cards_serial_key')
+        if (!isSerialConflict) break
+
+        console.warn(`[Upload] Serial ${serialNumber} collided, fetching a new one (attempt ${attempt + 1})`)
+        try {
+          const retryResponse = await fetch('/api/serial')
+          if (retryResponse.ok) {
+            serialNumber = (await retryResponse.json()).serial
+            continue
+          }
+        } catch { /* fall through to timestamp fallback below */ }
+        serialNumber = Date.now().toString().slice(-6) + Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+      }
 
       if (dbError) {
         console.error('[Upload] Database error:', dbError)

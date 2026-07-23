@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -155,6 +156,9 @@ function extractOnePieceFieldsFromConversational(conversationalJSON: any) {
 // Main GET handler for One Piece cards
 export async function GET(request: NextRequest, { params }: OnePieceCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters
@@ -1141,6 +1145,9 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
 // PATCH handler for updating One Piece card data (e.g., clearing cached grading)
 export async function PATCH(request: NextRequest, { params }: OnePieceCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[PATCH /api/onepiece/${cardId}] Starting One Piece card update request`);
 
@@ -1200,6 +1207,9 @@ export async function PATCH(request: NextRequest, { params }: OnePieceCardGradin
 // DELETE handler for removing One Piece cards
 export async function DELETE(request: NextRequest, { params }: OnePieceCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[DELETE /api/onepiece/${cardId}] Starting One Piece card deletion request`);
 

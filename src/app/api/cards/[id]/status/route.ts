@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { isUuid } from "@/lib/uuid";
 
 /**
  * Grading stages for progress tracking
@@ -29,6 +30,13 @@ export async function GET(
       return NextResponse.json(
         { error: "Card ID is required" },
         { status: 400 }
+      );
+    }
+
+    if (!isUuid(id)) {
+      return NextResponse.json(
+        { error: "Card not found" },
+        { status: 404 }
       );
     }
 

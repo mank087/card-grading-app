@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useGradingQueue, GradingStage } from '@/contexts/GradingQueueContext'
+import { isUuid } from '@/lib/uuid'
 
 const CARD_TYPES_CONFIG = {
   Sports: { apiEndpoint: '/api/sports', route: '/sports' },
@@ -74,6 +75,18 @@ export function useBackgroundGrading() {
   const checkSingleCardStatus = useCallback(async (card: any) => {
     const config = CARD_TYPES_CONFIG[card.category as keyof typeof CARD_TYPES_CONFIG]
     if (!config) return
+
+    // Corrupt queue entries (cardId null/"null"/undefined) would poll the API
+    // with an invalid id for up to 10 minutes - fail them immediately instead
+    if (!isUuid(card.cardId)) {
+      console.error(`[BackgroundGrading] ⚠️ Card ${card.id} has invalid cardId "${card.cardId}", marking as error`)
+      updateCardStatus(card.id, {
+        status: 'error',
+        stage: 'error',
+        errorMessage: 'This upload is corrupted. Please re-upload the card.'
+      })
+      return
+    }
 
     const elapsed = Date.now() - card.uploadedAt
 

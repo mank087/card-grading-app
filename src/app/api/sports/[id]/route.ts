@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -78,6 +79,9 @@ async function createSignedUrl(supabase: any, bucket: string, path: string): Pro
 // Main GET handler for sports cards
 export async function GET(request: NextRequest, { params }: SportsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters
@@ -1218,6 +1222,9 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 // PATCH handler for updating card data (e.g., clearing cached grading)
 export async function PATCH(request: NextRequest, { params }: SportsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[PATCH /api/sports/${cardId}] Starting card update request`);
 
@@ -1277,6 +1284,9 @@ export async function PATCH(request: NextRequest, { params }: SportsCardGradingR
 // DELETE handler for removing cards
 export async function DELETE(request: NextRequest, { params }: SportsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[DELETE /api/sports/${cardId}] Starting card deletion request`);
 

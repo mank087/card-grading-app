@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { Redirect } from 'expo-router'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
 import { Colors } from '@/lib/constants'
 
 export default function TabsIndex() {
@@ -25,16 +25,22 @@ export default function TabsIndex() {
   useEffect(() => {
     if (isLoading || !user?.id) return
     let cancelled = false
-    supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .not('conversational_whole_grade', 'is', null)
-      .then(({ count, error }) => {
-        if (cancelled) return
-        const hasGraded = !error && (count ?? 0) > 0
-        setTarget(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
-      })
+    ;(async () => {
+      // cards denies anon (RLS) — wait for the token to be attached so the
+      // query doesn't go out as anon (42501). No session = default to grade tab.
+      if (!(await hasActiveSession())) {
+        if (!cancelled) setTarget('/(tabs)/grade')
+        return
+      }
+      const { count, error } = await supabase
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .not('conversational_whole_grade', 'is', null)
+      if (cancelled) return
+      const hasGraded = !error && (count ?? 0) > 0
+      setTarget(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
+    })()
     return () => { cancelled = true }
   }, [user?.id, isLoading])
 

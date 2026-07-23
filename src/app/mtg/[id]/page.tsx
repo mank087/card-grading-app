@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { isUuid } from '@/lib/uuid';
 import MTGCardDetails from './CardDetailClient';
 
 interface PageProps {
@@ -193,8 +194,33 @@ function buildDescription(card: any): string {
   return desc;
 }
 
+// Fallback metadata for missing or invalid card ids
+function notFoundMetadata(): Metadata {
+  return {
+    title: 'MTG Card Not Found | DCM Grading',
+    description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+    keywords: 'mtg card grading, magic the gathering, professional grading, DCM, authentication',
+    openGraph: {
+      title: 'MTG Card Not Found | DCM Grading',
+      description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: 'MTG Card Not Found | DCM Grading',
+      description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+    },
+  };
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+
+  // Non-UUID ids (e.g. /mtg/null from bots or stale links) would fail in Postgres with 22P02
+  if (!isUuid(id)) {
+    return notFoundMetadata();
+  }
+
   const supabase = supabaseServer();
 
   // Fetch card data server-side
@@ -206,21 +232,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   // Default metadata if card not found
   if (error || !card) {
-    return {
-      title: 'MTG Card Not Found | DCM Grading',
-      description: 'Professional Magic: The Gathering card grading and authentication by DCM',
-      keywords: 'mtg card grading, magic the gathering, professional grading, DCM, authentication',
-      openGraph: {
-        title: 'MTG Card Not Found | DCM Grading',
-        description: 'Professional Magic: The Gathering card grading and authentication by DCM',
-        type: 'website',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: 'MTG Card Not Found | DCM Grading',
-        description: 'Professional Magic: The Gathering card grading and authentication by DCM',
-      },
-    };
+    return notFoundMetadata();
   }
 
   // Build enhanced SEO components

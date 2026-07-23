@@ -38,7 +38,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useRouter } from 'expo-router'
 import { useAuth } from './AuthContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, hasActiveSession } from '@/lib/supabase'
 import {
   TOUR_SCREEN_ORDER,
   TOUR_SCREEN_ROUTE,
@@ -95,6 +95,11 @@ export function WelcomeTourProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     ;(async () => {
       try {
+        // cards/user_credits deny anon (RLS) — don't run the eligibility
+        // queries until the client's token is attached (42501 otherwise).
+        // Leave eligibilityChecked false so a later auth event retries.
+        if (!(await hasActiveSession())) return
+
         // 1. Read the persisted completion flag.
         const { data: credits } = await supabase
           .from('user_credits')

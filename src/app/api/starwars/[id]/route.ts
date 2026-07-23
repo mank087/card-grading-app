@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -145,6 +146,9 @@ function extractStarWarsFieldsFromConversational(conversationalJSON: any) {
 // Main GET handler for Star Wars cards
 export async function GET(request: NextRequest, { params }: StarWarsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
   const startTime = Date.now();
 
   // Check for query parameters
@@ -1184,6 +1188,9 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
 // PATCH handler for updating Star Wars card data (e.g., clearing cached grading)
 export async function PATCH(request: NextRequest, { params }: StarWarsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[PATCH /api/starwars/${cardId}] Starting Star Wars card update request`);
 
@@ -1243,6 +1250,9 @@ export async function PATCH(request: NextRequest, { params }: StarWarsCardGradin
 // DELETE handler for removing Star Wars cards
 export async function DELETE(request: NextRequest, { params }: StarWarsCardGradingRequest) {
   const { id: cardId } = await params;
+  if (!isUuid(cardId)) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
 
   console.log(`[DELETE /api/starwars/${cardId}] Starting Star Wars card deletion request`);
 
