@@ -4,10 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { deductCredit, hasCredits } from '@/lib/credits';
+import { deductCredit } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { scheduleFirstGradeEmails } from '@/lib/emailScheduler';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { isUuid } from '@/lib/uuid';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +27,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { cardId, isRegrade } = body as { cardId?: string; isRegrade?: boolean };
 
-    // Check if user has credits
-    const hasSufficientCredits = await hasCredits(userId, 1);
-    if (!hasSufficientCredits) {
-      return NextResponse.json(
-        { error: 'Insufficient credits', code: 'INSUFFICIENT_CREDITS' },
-        { status: 402 }
-      );
+    // A charge must reference a real card owned by the caller. Without this,
+    // the per-card idempotency (one 'grade' charge per card_id) can be
+    // bypassed by omitting/mangling cardId — and null-card charges have no
+    // audit trail to refund against.
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: 'Valid cardId is required' }, { status: 400 });
+    }
+    const { data: card } = await supabaseAdmin
+      .from('cards')
+      .select('id, user_id')
+      .eq('id', cardId)
+      .maybeSingle();
+    if (!card) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 });
+    }
+    if (card.user_id !== userId) {
+      return NextResponse.json({ error: 'Card does not belong to this user' }, { status: 403 });
     }
 
-    // Deduct credit
+    // Deduct credit. No separate hasCredits pre-check: deductCredit resolves
+    // the duplicate-charge case first (a card already charged returns success
+    // without deducting, even at zero balance) and reports insufficiency
+    // itself — a pre-check would 402 those duplicates.
     const result = await deductCredit(userId, {
       cardId,
       isRegrade: isRegrade || false,
@@ -43,6 +57,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
+      if (result.error === 'Insufficient credits') {
+        return NextResponse.json(
+          { error: 'Insufficient credits', code: 'INSUFFICIENT_CREDITS' },
+          { status: 402 }
+        );
+      }
       return NextResponse.json(
         { error: result.error || 'Failed to deduct credit' },
         { status: 500 }
@@ -53,7 +73,7 @@ export async function POST(request: NextRequest) {
     // grades their first card (totalUsed transitions 0 → 1). Fire-and-forget —
     // we don't block the grade deduction on email scheduling.
     // Skip for re-grades since those don't represent a new conversion event.
-    if (!isRegrade && result.totalUsed === 1) {
+    if (!isRegrade && !result.alreadyCharged && result.totalUsed === 1) {
       (async () => {
         try {
           let userEmail = authResult.user?.email;
@@ -78,6 +98,7 @@ export async function POST(request: NextRequest) {
       newBalance: result.newBalance,
       totalUsed: result.totalUsed,
       totalPurchased: result.totalPurchased,
+      alreadyCharged: result.alreadyCharged || false,
     });
   } catch (error) {
     console.error('Credit deduction error:', error);

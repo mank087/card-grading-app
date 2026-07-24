@@ -247,13 +247,38 @@ export async function deductCredit(
     isRegrade?: boolean;
     description?: string;
   } = {}
-): Promise<{ success: boolean; newBalance: number; error?: string; totalUsed?: number; totalPurchased?: number }> {
+): Promise<{ success: boolean; newBalance: number; error?: string; totalUsed?: number; totalPurchased?: number; alreadyCharged?: boolean }> {
   const supabase = getServiceClient();
 
   // Get current credits
   const credits = await getUserCredits(userId);
   if (!credits) {
     return { success: false, newBalance: 0, error: 'User credits not found', totalUsed: 0, totalPurchased: 0 };
+  }
+
+  // Idempotency: a card row is charged its first-grade credit at most once.
+  // Duplicate submissions (stalled-network retry storms, double-fired
+  // requests) arrive with the same cardId — return the prior success instead
+  // of charging again. Regrades are intentionally exempt: they record
+  // type 'regrade' and may repeat per explicit user action.
+  if (!options.isRegrade && options.cardId) {
+    const { data: priorCharge } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('card_id', options.cardId)
+      .eq('type', 'grade')
+      .limit(1)
+      .maybeSingle();
+    if (priorCharge) {
+      console.warn(`[deductCredit] Card ${options.cardId} already charged (tx ${priorCharge.id}) — skipping duplicate deduction`);
+      return {
+        success: true,
+        newBalance: credits.balance,
+        totalUsed: credits.total_used,
+        totalPurchased: credits.total_purchased,
+        alreadyCharged: true,
+      };
+    }
   }
 
   if (credits.balance < 1) {
@@ -292,6 +317,23 @@ export async function deductCredit(
   });
 
   if (transactionError) {
+    // 23505 = the partial unique index on (card_id) WHERE type='grade' fired:
+    // a concurrent duplicate won the race. Restore the balance we just took
+    // and report the prior charge as the success.
+    if (transactionError.code === '23505' && !options.isRegrade) {
+      console.warn(`[deductCredit] Concurrent duplicate charge for card ${options.cardId} — restoring balance`);
+      await supabase
+        .from('user_credits')
+        .update({ balance: credits.balance, total_used: credits.total_used })
+        .eq('user_id', userId);
+      return {
+        success: true,
+        newBalance: credits.balance,
+        totalUsed: credits.total_used,
+        totalPurchased: credits.total_purchased,
+        alreadyCharged: true,
+      };
+    }
     console.error('Failed to record grade transaction:', transactionError);
     // Don't fail - credit was deducted, just audit log is incomplete
   }

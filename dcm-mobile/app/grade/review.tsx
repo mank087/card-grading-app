@@ -28,6 +28,14 @@ const API_ENDPOINTS: Record<string, string> = {
   Lorcana: '/api/lorcana', 'One Piece': '/api/onepiece', 'Yu-Gi-Oh': '/api/yugioh', Other: '/api/other',
 }
 
+// Module scope, NOT component state: `isSubmitting` dies when the user backs
+// out mid-upload and the screen remounts, but the stalled upload keeps running
+// in the background. On a bad connection each retry then queues another full
+// submission and they all land (and each charge a credit) when the network
+// recovers — a customer got 4 charges in 0.72s this way (Jul 24 2026). This
+// flag outlives the screen for the life of the JS runtime.
+let submissionInFlight = false
+
 function generateUUID(): string {
   const bytes = Crypto.getRandomBytes(16)
   const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
@@ -61,7 +69,15 @@ export default function ReviewScreen() {
       Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
       return
     }
+    if (isSubmitting || submissionInFlight) {
+      Alert.alert(
+        'Upload In Progress',
+        'Your previous submission is still uploading — it can take a while on a slow connection. It will appear in your collection when done; please don’t resubmit.'
+      )
+      return
+    }
 
+    submissionInFlight = true
     setIsSubmitting(true)
     try {
       const cardId = generateUUID()
@@ -199,19 +215,13 @@ export default function ReviewScreen() {
         })
         if (__DEV__) console.log('[Upload] Credit deducted via API')
       } catch (creditErr) {
-        console.warn('[Upload] API credit deduction failed, falling back to direct:', creditErr)
-        // Fallback: direct Supabase update
-        const { data: currentCredits } = await supabase
-          .from('user_credits')
-          .select('balance, total_used')
-          .eq('user_id', user.id)
-          .single()
-        if (currentCredits) {
-          await supabase.from('user_credits').update({
-            balance: Math.max(0, currentCredits.balance - 1),
-            total_used: (currentCredits.total_used || 0) + 1,
-          }).eq('user_id', user.id)
-        }
+        // Do NOT fall back to decrementing user_credits directly: a network
+        // timeout can fire AFTER the server already deducted, so a client-side
+        // decrement double-charges — and it bypasses the server's per-card
+        // idempotency and leaves no credit_transactions audit row. If the API
+        // call truly failed, the server reconciles; worst case is one
+        // uncharged grade, never a double charge.
+        console.warn('[Upload] API credit deduction failed (server will reconcile):', creditErr)
       }
       refreshCredits()
 
@@ -236,6 +246,7 @@ export default function ReviewScreen() {
       console.error('[Upload] Submit error:', err)
       Alert.alert('Submission Failed', err.message || 'Please try again.')
     } finally {
+      submissionInFlight = false
       setIsSubmitting(false)
     }
   }

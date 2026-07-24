@@ -174,6 +174,15 @@ const OTHER_SUB_CATEGORIES = {
 
 type CardType = keyof typeof CARD_TYPES;
 
+// Module scope, NOT component state: the nav-reset effect flips isUploading
+// back to false when the user clicks "grade another card" mid-upload, but the
+// original handleUpload keeps running in the background. On a stalled
+// connection each retry then queues a full extra submission — and every one
+// charges a credit when the network recovers (customer got 4 charges in
+// 0.72s this way, Jul 24 2026). This flag outlives state resets; it releases
+// only when the in-flight submission's insert + charge actually finish.
+let submissionInFlight = false;
+
 function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -650,7 +659,15 @@ function UniversalUploadPageContent() {
 
     const user = session.user
 
+    if (submissionInFlight) {
+      console.warn('[Upload] Submission already in flight — blocking duplicate')
+      setStatus('⏳ Your previous card is still uploading — please wait for it to finish.')
+      toast.error('Your previous submission is still uploading. It will appear in your collection when done — please don’t resubmit.')
+      return
+    }
+
     try {
+      submissionInFlight = true
       setIsUploading(true)
       setStatus(`⏳ Uploading ${config.label}...`)
 
@@ -911,6 +928,10 @@ function UniversalUploadPageContent() {
       setStatus(`❌ Upload failed: ${err.message}`)
       toast.error(`Upload failed: ${err.message}`)
       setIsUploading(false)
+    } finally {
+      // By here the insert + credit charge have either completed or failed —
+      // the double-charge window is closed, so a new submission is legitimate.
+      submissionInFlight = false
     }
   }
 
