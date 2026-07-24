@@ -36,7 +36,13 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.5';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.7';
+// v9.7 (2026-07-24): OUTPUT ECONOMY — negative-finding notes fields (autograph,
+// reprint, marking, trimming, image_completeness, card_presence, slab-when-absent,
+// case-when-none, image_quality one-sentence cap, processing_notes) emit empty
+// strings / fixed phrases instead of "nothing found" prose. Checks still run in
+// full; POSITIVE findings keep full detail. Deliberately does NOT touch
+// corner/edge/centering/surface prose (see v9.6 note below). Harness-gated.
 // v9.6 corners/edges output diet was built, harness-gated, and ROLLED BACK
 // 2026-07-20: removing the mandated per-corner/edge prose regressed the
 // Saddam vintage-texture FP anchor (corners/edges 10 → 7, reproducible ×3,

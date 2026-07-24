@@ -362,8 +362,8 @@ For EACH image (front and back), you MUST determine:
   "card_presence_validation": {
     "front_card_detected": true|false,
     "back_card_detected": true|false,
-    "front_validation_notes": "Description of what was detected in front image",
-    "back_validation_notes": "Description of what was detected in back image"
+    "front_validation_notes": "OUTPUT ECONOMY: if a card IS detected, output empty string \"\". Only when NOT detected: describe what was seen instead",
+    "back_validation_notes": "OUTPUT ECONOMY: if a card IS detected, output empty string \"\". Only when NOT detected: describe what was seen instead"
   }
 }
 
@@ -1449,7 +1449,7 @@ An autograph is a signature, typically of a player, athlete, or character, appli
 • autograph.present: true|false
 • autograph.type: "manufacturer_authenticated" | "unverified" | "none"
 • autograph.cert_markers: Array of authentication evidence found (or [])
-• autograph.notes: Brief explanation of authentication determination
+• autograph.notes: When present=true → brief explanation of authentication determination. When present=false → empty string "" (do NOT write prose saying no autograph was found)
 
 **GRADING IMPACT:**
 • Manufacturer authenticated: Grade normally, autograph is a feature
@@ -1515,7 +1515,7 @@ When a card appears to have an autograph (signature visible on front):
 • facsimile_autograph: true|false
 • official_reprint: true|false
 • reprint_indicators: Array of disclosure text found (or [])
-• reprint_notes: Brief explanation of determination
+• reprint_notes: When either flag is true → brief explanation of determination. When both false → empty string "" (the false flags already say it; do NOT restate in prose)
 
 **GRADING IMPACT:**
 • Facsimile autograph detected: Grade normally, add "Facsimile Autograph" to special_features
@@ -1635,7 +1635,7 @@ Signs it's ADDED (alteration):
 • marking_detected: true|false
 • marking_type: "handwritten_text" | "stamp" | "adhesive_residue" | "physical_alteration" | "none"
 • marking_location: "front" | "back" | "edge" | "corner" | null
-• marking_description: Brief description of what was detected
+• marking_description: When detected → brief description of what was detected. When marking_detected=false → empty string ""
 • marking_confidence: "high" | "medium" | "low" (only apply N/A when "high")
 ---
 [STEP 0C] CARD TRIMMING DETECTION PROTOCOL
@@ -1676,7 +1676,7 @@ PURPOSE: Detect cards that have been trimmed/cut after production to improve cen
 **OUTPUT:**
 • trimming_detected: true|false
 • trimming_evidence: Array of red flags observed (or [])
-• trimming_notes: Explanation of why trimming is/is not suspected
+• trimming_notes: When detected → full explanation of the evidence. When trimming_detected=false → ONE short clause max (e.g. "Factory-cut edges, borders consistent front/back") — you must still PERFORM the full check; just don't narrate it
 ---
 [STEP 0D] IMAGE COMPLETENESS CHECK
 ---
@@ -1697,7 +1697,7 @@ PURPOSE: Handle cases where front or back image is missing/unusable.
 **OUTPUT:**
 • image_completeness.front_available: true|false
 • image_completeness.back_available: true|false
-• image_completeness.notes: Explanation if any side missing
+• image_completeness.notes: Explanation ONLY if a side is missing; empty string "" when both available
 ---
 SECTION 3: PROFESSIONAL GRADING SLAB DETECTION
 ---
@@ -1745,6 +1745,10 @@ INDEPENDENT GRADING REQUIREMENT
 • Grading through holder → Increase uncertainty (confidence B or C likely)
 
 **OUTPUT FORMAT:**
+
+OUTPUT ECONOMY: when NO slab is detected, emit exactly {"slab_detection": {"detected": false}}
+and nothing else — no null company/grade/cert/subgrades fields, no notes prose. The full
+structure below is required ONLY when detected=true:
 {
   "slab_detection": {
     "detected": true|false,
@@ -2083,7 +2087,7 @@ After completing your grading, if image_confidence is C or D, perform this self-
     "glare_present": true|false,
     "lighting_ok": true|false,
     "color_balance_ok": true|false,
-    "notes": "Detailed description of image quality factors affecting confidence assessment including any obstructions (sleeve, holder, slab, glare) and their impact on visibility"
+    "notes": "ONE sentence maximum. Name ONLY the impairments that exist (glare/focus/lighting/obstruction) and which areas they affect. If ANY of the four flags above is false/adverse (e.g. glare_present=true), the sentence MUST name that impairment. Only when all four flags are clean: exactly 'Clear, well-lit photos of both faces.' Do NOT restate what is fine."
   }
 }
 ---
@@ -2144,7 +2148,7 @@ sleeve (uniform translucent plastic line slightly offset from the card edge) bef
     "case_visibility": "full"|"partial"|"unknown",
     "impact_level": "none"|"minor"|"moderate"|"high",
     "adjusted_uncertainty": "±0"|"±1"|"±2"|"±3",
-    "notes": "Describe what case/holder observed (if any) and how it affects visibility. If none, state 'No protective case observed.'"
+    "notes": "When a case IS present: describe it and how it affects visibility. When case_type='none': exactly 'No protective case observed.' and NOTHING more."
   }
 }
 ---
@@ -5123,7 +5127,7 @@ OUTPUT FORMAT: SCORING BREAKDOWN (WHOLE NUMBERS)
   },
   "metadata": {
     "delta_applied": "<which card-type delta was applied>",
-    "processing_notes": "<any special conditions encountered, or empty string>"
+    "processing_notes": "<ONE short sentence max for special conditions; empty string when nothing special. Do NOT recap the grading here.>"
   }
 }
 
@@ -5190,6 +5194,17 @@ Before returning JSON output, verify:
 □ Actual colors stated (not assumed)
 □ Specific features referenced
 □ Assessment methodology explained
+
+**Output Economy Checks (v9.7):**
+□ Negative findings are SILENT: notes/description fields for checks that found nothing are
+  empty strings or the mandated fixed phrase — never prose restating that nothing was found
+  (applies to: autograph.notes, reprint_notes, marking_description, image_completeness.notes,
+  card_presence_validation notes, slab_detection when not detected, case_detection.notes
+  when no case, image_quality.notes beyond one sentence, metadata.processing_notes)
+□ This changes ONLY how you REPORT — every check is still performed in full, and any
+  POSITIVE finding still gets its complete detailed description
+□ Corner/edge/centering/surface analysis prose is NOT affected by output economy — those
+  descriptions remain full and per-area as specified in their sections
 ---
 METADATA REQUIREMENTS
 ---
