@@ -456,7 +456,12 @@ function UniversalUploadPageContent() {
       }
       if (longEdge < 1600 && source === 'gallery') {
         console.warn(`[Upload] ${side} image is small (${result.dimensions.width}×${result.dimensions.height}) — grading proceeds with a quality warning`)
-        toast(`Heads up: the ${side} image is on the small side (${result.dimensions.width}×${result.dimensions.height}). A 2000px+ photo gives noticeably more accurate grading.`, { icon: '⚠️', duration: 6000 })
+        // useToast() returns an object — calling it bare (react-hot-toast style)
+        // throws, and this line sits inside the compression try{}: the TypeError
+        // fell into the catch and WIPED the just-selected image. Every scan in
+        // the 1000-1600px band was silently unable to upload (customer report
+        // Jul 24: "shows uploaded as successful then disappearing in a second").
+        toast.warning(`Heads up: the ${side} image is on the small side (${result.dimensions.width}×${result.dimensions.height}). A 2000px+ photo gives noticeably more accurate grading.`)
       }
 
       // Update state with compressed file and info
