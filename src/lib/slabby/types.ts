@@ -11,9 +11,26 @@ export type SlabbyMotion =
   | 'wave'       // right arm raised + waving
   | 'jump'       // single hop with squash
   | 'shake'      // anticipation/nervous rumble
-  | 'celebrate'; // both arms up
+  | 'celebrate'  // both arms up
+  | 'point';     // right arm pointing up toward the image/page
 
-export type BgAnimation = 'fade' | 'slide-left' | 'slide-right' | 'pop';
+/** 'static' = no entrance — image sits in place (use to hold one image across beats) */
+export type BgAnimation = 'fade' | 'slide-left' | 'slide-right' | 'pop' | 'static';
+
+/** A real graded card rendered as a slab mockup (label data + image inline). */
+export interface SlabCardData {
+  image: string;
+  name: string;
+  contextLine: string;
+  featuresLine?: string | null;
+  serial: string;
+  gradeFormatted: string;
+  condition: string;
+  /** extras used by the scrolling details-page background */
+  category?: string;
+  subgrades?: { centering?: number | null; corners?: number | null; edges?: number | null; surface?: number | null } | null;
+  summary?: string | null;
+}
 
 export interface SlabbyBeat {
   /** seconds this beat lasts */
@@ -30,6 +47,24 @@ export interface SlabbyBeat {
   /** image shown behind/beside Slabby (card photo, news screenshot, …) */
   backgroundImage?: string;
   bgAnimation?: BgAnimation;
+  /** real graded-card slab mockup (takes the background slot when set) */
+  slabCard?: SlabCardData;
+  /** full mobile-style card details page scrolling behind Slabby */
+  detailsPage?: SlabCardData;
+  /** scroll position (0-1) at the start/end of this beat (defaults 0→1).
+      Chain across beats for one continuous scroll: 0→0.5, then 0.5→1. */
+  scrollFrom?: number;
+  scrollTo?: number;
+  /** voiceover script for this beat (generate audio in the Lab) */
+  voiceover?: string;
+  /** generated TTS audio as a data URL — plays from the beat's start */
+  voiceoverAudio?: string;
+  /** measured seconds of the generated audio (drives "fit beat to audio") */
+  voiceoverDuration?: number;
+  /** karaoke captions: animate the voiceover script word by word (TikTok style) */
+  karaoke?: boolean;
+  /** motion-matched sound effect at beat start (default true) */
+  sfx?: boolean;
 }
 
 export interface SlabbyScene {
@@ -46,5 +81,5 @@ export const DEFAULT_BEAT: SlabbyBeat = {
 };
 
 export const EXPRESSIONS: SlabbyExpression[] = ['happy', 'excited', 'shocked', 'thinking', 'sad', 'wink'];
-export const MOTIONS: SlabbyMotion[] = ['enter', 'idle', 'wave', 'jump', 'shake', 'celebrate'];
-export const BG_ANIMATIONS: BgAnimation[] = ['fade', 'slide-left', 'slide-right', 'pop'];
+export const MOTIONS: SlabbyMotion[] = ['enter', 'idle', 'wave', 'jump', 'shake', 'celebrate', 'point'];
+export const BG_ANIMATIONS: BgAnimation[] = ['fade', 'slide-left', 'slide-right', 'pop', 'static'];

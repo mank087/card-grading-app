@@ -1,6 +1,8 @@
 import React from 'react';
-import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SlabbyRig } from './SlabbyRig';
+import { SlabCard } from './SlabCard';
+import { DetailsPageScroll } from './DetailsPageScroll';
 import { SlabbyBeat, SlabbyScene } from './types';
 
 /**
@@ -17,7 +19,22 @@ import { SlabbyBeat, SlabbyScene } from './types';
 export interface ComposerProps {
   scene: SlabbyScene;
   logoHref?: string;
+  /** sound-effect asset URLs (strings so props stay serializable for renders) */
+  sfxPop?: string;
+  sfxWhoosh?: string;
+  sfxDing?: string;
 }
+
+/** Which SFX (if any) fires at a beat's start. */
+const sfxForBeat = (beat: SlabbyBeat): 'pop' | 'whoosh' | 'ding' | null => {
+  if (beat.sfx === false) return null;
+  if (beat.motion === 'celebrate') return 'ding';
+  if (beat.motion === 'jump') return 'pop';
+  if (beat.motion === 'enter') return 'whoosh';
+  if (beat.bgAnimation === 'pop') return 'pop';
+  if (beat.bgAnimation === 'slide-left' || beat.bgAnimation === 'slide-right') return 'whoosh';
+  return null;
+};
 
 interface ActiveBeat {
   beat: SlabbyBeat;
@@ -43,7 +60,13 @@ const findActiveBeat = (beats: SlabbyBeat[], frame: number, fps: number): Active
 export const sceneDurationInFrames = (scene: SlabbyScene, fps: number): number =>
   Math.max(1, scene.beats.reduce((sum, b) => sum + Math.max(1, Math.round(b.duration * fps)), 0));
 
-export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
+export const ComposerScene: React.FC<ComposerProps> = ({
+  scene,
+  logoHref,
+  sfxPop = '/sfx/pop.wav',
+  sfxWhoosh = '/sfx/whoosh.wav',
+  sfxDing = '/sfx/ding.wav',
+}) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -51,8 +74,8 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
     return <AbsoluteFill style={{ background: '#1a1625' }} />;
   }
 
-  const { beat, index, localFrame } = findActiveBeat(scene.beats, frame, fps);
-  const hasBg = Boolean(beat.backgroundImage);
+  const { beat, index, localFrame, beatFrames } = findActiveBeat(scene.beats, frame, fps);
+  const hasBg = Boolean(beat.backgroundImage || beat.slabCard || beat.detailsPage);
 
   // ---- motion presets (beat-local springs) ----
   let bob = Math.sin(frame / 14) * 8; // continuous idle breathing across beats
@@ -92,6 +115,13 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
       shiftY = -Math.sin(Math.min(s * 1.2, 1) * Math.PI) * height * 0.04;
       break;
     }
+    case 'point': {
+      // right mitt gestures up toward the image/page with a light emphasis bob
+      const s = spring({ frame: localFrame, fps, config: { damping: 10 } });
+      rightArm = interpolate(s, [0, 1], [0, -72]) + Math.sin(frame / 9) * 5;
+      shiftX = interpolate(s, [0, 1], [0, width * 0.012]);
+      break;
+    }
     case 'idle':
     default:
       break;
@@ -104,19 +134,24 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
   const slabbyScale = (short * (hasBg ? 0.5 : 0.92)) / 1000;
 
   // ---- background image entrance ----
+  // 'static' = no entrance at all: use it to hold the same image perfectly
+  // still across consecutive beats while Slabby/text change around it.
   const bgIn = spring({ frame: localFrame, fps, config: { damping: 13 } });
   const anim = beat.bgAnimation || 'fade';
-  const bgStyle: React.CSSProperties = {
-    opacity: anim === 'fade' || anim === 'pop' ? bgIn : 1,
-    transform:
-      anim === 'slide-left'
-        ? `translateX(${interpolate(bgIn, [0, 1], [width * 0.6, 0])}px)`
-        : anim === 'slide-right'
-          ? `translateX(${interpolate(bgIn, [0, 1], [-width * 0.6, 0])}px)`
-          : anim === 'pop'
-            ? `scale(${interpolate(bgIn, [0, 1], [0.6, 1])})`
-            : undefined,
-  };
+  const bgStyle: React.CSSProperties =
+    anim === 'static'
+      ? { opacity: 1 }
+      : {
+          opacity: anim === 'fade' || anim === 'pop' ? bgIn : 1,
+          transform:
+            anim === 'slide-left'
+              ? `translateX(${interpolate(bgIn, [0, 1], [width * 0.6, 0])}px)`
+              : anim === 'slide-right'
+                ? `translateX(${interpolate(bgIn, [0, 1], [-width * 0.6, 0])}px)`
+                : anim === 'pop'
+                  ? `scale(${interpolate(bgIn, [0, 1], [0.6, 1])})`
+                  : undefined,
+        };
 
   // ---- text entrances ----
   const textIn = spring({ frame: localFrame - 4, fps, config: { damping: 13 } });
@@ -150,15 +185,41 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
             ...bgStyle,
           }}
         >
-          <Img
-            src={beat.backgroundImage!}
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              borderRadius: 18,
-              boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 0 0 6px rgba(255,255,255,0.08)',
-            }}
-          />
+          {beat.detailsPage ? (
+            <div
+              style={{
+                borderRadius: 26,
+                overflow: 'hidden',
+                border: '5px solid rgba(255,255,255,0.16)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.55)',
+              }}
+            >
+              <DetailsPageScroll
+                card={beat.detailsPage}
+                width={Math.min(short * 0.52, width * 0.6)}
+                viewportHeight={height * (beat.headline ? 0.52 : 0.6)}
+                progress={interpolate(
+                  localFrame,
+                  [0, beatFrames],
+                  [beat.scrollFrom ?? 0, beat.scrollTo ?? 1],
+                  { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+                )}
+                logoHref={logoHref}
+              />
+            </div>
+          ) : beat.slabCard ? (
+            <SlabCard card={beat.slabCard} width={Math.min(short * 0.46, (height * 0.5) / 1.9)} logoHref={logoHref} />
+          ) : (
+            <Img
+              src={beat.backgroundImage!}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                borderRadius: 18,
+                boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 0 0 6px rgba(255,255,255,0.08)',
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -208,6 +269,34 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
         </div>
       )}
 
+      {/* karaoke captions: one word at a time from the voiceover script */}
+      {beat.karaoke && beat.voiceover && (() => {
+        const words = beat.voiceover.trim().split(/\s+/);
+        const voFrames = Math.max(1, Math.round((beat.voiceoverDuration || beat.duration) * fps));
+        const wordIdx = Math.min(words.length - 1, Math.floor((localFrame / voFrames) * words.length));
+        const wordLocal = (localFrame - (wordIdx * voFrames) / words.length) / (voFrames / words.length);
+        const popIn = interpolate(Math.min(1, wordLocal * 3), [0, 1], [0.7, 1]);
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: height * (hasBg ? 0.16 : 0.13),
+              width: '100%',
+              textAlign: 'center',
+              fontFamily: 'Arial Black, Arial, sans-serif',
+              fontWeight: 900,
+              fontSize: short * 0.085,
+              color: '#ffffff',
+              textShadow: '0 6px 28px rgba(0,0,0,0.75), 0 0 24px rgba(124,58,237,0.6)',
+              transform: `scale(${popIn})`,
+              textTransform: 'uppercase',
+            }}
+          >
+            {words[wordIdx]}
+          </div>
+        );
+      })()}
+
       {/* caption (bottom) */}
       {beat.caption && (
         <div
@@ -228,6 +317,32 @@ export const ComposerScene: React.FC<ComposerProps> = ({ scene, logoHref }) => {
           {beat.caption}
         </div>
       )}
+
+      {/* audio track: per-beat voiceover + motion-matched SFX at beat starts */}
+      {(() => {
+        const sfxSrc = { pop: sfxPop, whoosh: sfxWhoosh, ding: sfxDing };
+        let start = 0;
+        return scene.beats.map((b, i) => {
+          const from = start;
+          const frames = Math.max(1, Math.round(b.duration * fps));
+          start += frames;
+          const sfx = sfxForBeat(b);
+          return (
+            <React.Fragment key={`audio-${i}`}>
+              {b.voiceoverAudio && (
+                <Sequence from={from} durationInFrames={Math.max(frames, Math.round((b.voiceoverDuration || 0) * fps) + 1)}>
+                  <Audio src={b.voiceoverAudio} />
+                </Sequence>
+              )}
+              {sfx && (
+                <Sequence from={from} durationInFrames={Math.round(fps * 0.8)}>
+                  <Audio src={sfxSrc[sfx]} volume={0.55} />
+                </Sequence>
+              )}
+            </React.Fragment>
+          );
+        });
+      })()}
 
       {/* beat progress dots (subtle, useful in preview and harmless in renders) */}
       {scene.beats.length > 1 && (

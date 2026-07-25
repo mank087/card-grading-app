@@ -55,7 +55,21 @@ Background images turn Slabby into a commentator — he shrinks to the bottom
 corner while the image (a graded card, a comparison, a news screenshot) takes
 the stage. Use any public image URL, e.g. a card photo from its detail page.
 
-To render a designed scene to MP4:
+**One-click rendering:** keep the local render server running and use the
+Lab's green **Render MP4** button:
+
+```bash
+cd slabby && npm run serve
+```
+
+The Lab also supports: 🎙️ per-beat **voiceover** (OpenAI TTS, audio embeds
+into the scene and bakes into the MP4; "Fit beat to audio" paces the beat to
+the spoken line), **karaoke captions** (word-by-word from the script),
+motion-matched **sound effects** (whoosh/pop/ding — regenerate assets with
+`node scripts/generate-slabby-sfx.mjs`), a **card picker** (browse/search
+your graded cards), and **scene templates** (built-ins + save your own).
+
+To render a designed scene to MP4 manually:
 
 1. Save the downloaded JSON into `slabby/scenes/`
 2. ```bash
