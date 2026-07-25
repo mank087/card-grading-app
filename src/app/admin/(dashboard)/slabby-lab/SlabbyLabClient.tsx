@@ -245,6 +245,76 @@ export default function SlabbyLabClient() {
     try { localStorage.setItem(TEMPLATE_STORE_KEY, JSON.stringify(next)) } catch { alert('Template too large to store in the browser — download the scene JSON instead.') }
   }
 
+  // ---- cloud drafts (Supabase storage via admin API) ----
+  const [drafts, setDrafts] = useState<{ name: string; updated_at: string; size_bytes: number | null }[]>([])
+  const [draftBusy, setDraftBusy] = useState<string | null>(null)
+  const [draftError, setDraftError] = useState<string | null>(null)
+
+  const refreshDrafts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/slabby/drafts')
+      const json = await res.json()
+      if (res.ok) setDrafts(json.drafts || [])
+    } catch { /* leave list as-is */ }
+  }, [])
+
+  useEffect(() => { void refreshDrafts() }, [refreshDrafts])
+
+  const saveDraft = useCallback(async () => {
+    setDraftBusy('save')
+    setDraftError(null)
+    try {
+      const res = await fetch('/api/admin/slabby/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: scene.name }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not save draft')
+      const put = await fetch(json.url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-upsert': 'true' },
+        body: JSON.stringify({ scene }),
+      })
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`)
+      await refreshDrafts()
+    } catch (e: any) {
+      setDraftError(e.message)
+    } finally {
+      setDraftBusy(null)
+    }
+  }, [scene, refreshDrafts])
+
+  const loadDraft = useCallback(async (name: string) => {
+    setDraftBusy(`load-${name}`)
+    setDraftError(null)
+    try {
+      const res = await fetch(`/api/admin/slabby/drafts?name=${encodeURIComponent(name)}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not load draft')
+      const file = await fetch(json.url).then((r) => r.json())
+      const loaded = file.scene || file
+      if (!loaded?.beats?.length) throw new Error('Draft file is not a valid scene')
+      setScene(loaded)
+      setSelectedBeat(0)
+    } catch (e: any) {
+      setDraftError(e.message)
+    } finally {
+      setDraftBusy(null)
+    }
+  }, [])
+
+  const deleteDraft = useCallback(async (name: string) => {
+    if (!confirm(`Delete draft "${name}"?`)) return
+    setDraftBusy(`del-${name}`)
+    try {
+      await fetch(`/api/admin/slabby/drafts?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+      await refreshDrafts()
+    } finally {
+      setDraftBusy(null)
+    }
+  }, [refreshDrafts])
+
   // ---- one-click render (local render server) ----
   const [renderState, setRenderState] = useState<'idle' | 'rendering' | 'done' | 'offline' | 'error'>('idle')
   const [renderInfo, setRenderInfo] = useState('')
@@ -388,6 +458,52 @@ export default function SlabbyLabClient() {
                   <input type="file" accept=".json" className="hidden" onChange={(e) => e.target.files?.[0] && loadSceneFile(e.target.files[0])} />
                 </label>
               </div>
+              {/* cloud drafts */}
+              <div className="border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-700">💾 Drafts (saved to cloud)</span>
+                  <button
+                    onClick={saveDraft}
+                    disabled={draftBusy === 'save'}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-lg text-xs font-semibold"
+                  >
+                    {draftBusy === 'save' ? 'Saving…' : `Save "${scene.name}"`}
+                  </button>
+                </div>
+                {draftError && <div className="text-[11px] text-red-600 mb-1">{draftError}</div>}
+                {drafts.length === 0 ? (
+                  <div className="text-[11px] text-gray-400">No drafts yet — Save stores the whole scene (voices and images included) under its name.</div>
+                ) : (
+                  <div className="space-y-1 max-h-44 overflow-y-auto">
+                    {drafts.map((d) => (
+                      <div key={d.name} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-gray-800 truncate block">{d.name}</span>
+                          <span className="text-[10px] text-gray-400">
+                            {d.updated_at ? new Date(d.updated_at).toLocaleString() : ''}
+                            {d.size_bytes ? ` · ${(d.size_bytes / 1024 / 1024).toFixed(1)}MB` : ''}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => loadDraft(d.name)}
+                          disabled={draftBusy === `load-${d.name}`}
+                          className="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-semibold shrink-0"
+                        >
+                          {draftBusy === `load-${d.name}` ? '…' : 'Load'}
+                        </button>
+                        <button
+                          onClick={() => deleteDraft(d.name)}
+                          disabled={draftBusy === `del-${d.name}`}
+                          className="px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 shrink-0"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="bg-gray-900 rounded-lg p-3">
                 <div className="text-[10px] text-gray-400 mb-1">
                   To render: save the JSON into <code className="text-purple-300">slabby/scenes/</code>, then run in <code className="text-purple-300">slabby/</code>:
