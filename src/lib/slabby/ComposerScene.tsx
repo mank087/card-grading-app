@@ -247,20 +247,35 @@ export const ComposerScene: React.FC<ComposerProps> = ({
         />
       </div>
 
-      {/* speech bubble anchored to Slabby (position adapts to layout mode) */}
+      {/* speech bubble anchored to Slabby's MOUTH — tracks his position through
+          every motion (jump, bob, shake, enter) in both layout modes */}
       {beat.speechBubble && (() => {
         const bubbleIn = spring({ frame: localFrame - 3, fps, config: { damping: 11 } });
         const fontSize = short * 0.036;
+        const rigSize = 1000 * slabbyScale;
+
+        // Slabby's wrapper origin (must mirror the positioning styles below)
+        const originLeft = hasBg ? -rigSize * 0.12 : width / 2 - rigSize / 2;
+        const originTop = hasBg ? height + rigSize * 0.04 - rigSize : height / 2 - rigSize / 2;
+
+        // Mouth sits at ~(500, 615) in the 1000-viewBox rig; bob translates
+        // inside the SVG, shiftX/shiftY translate the wrapper.
+        const mouthX = originLeft + 500 * slabbyScale + shiftX;
+        const mouthY = originTop + (615 + bob) * slabbyScale + shiftY;
+
+        const tailH = fontSize * 1.35;
+        const gap = fontSize * 0.4;
+
         return (
           <div
             style={{
               position: 'absolute',
-              ...(hasBg
-                ? { left: '3%', bottom: height * 0.30, maxWidth: '42%' }
-                : { right: '5%', top: height * (beat.headline ? 0.16 : 0.1), maxWidth: '44%' }),
+              left: mouthX + fontSize * 1.1,
+              bottom: height - mouthY + tailH + gap,
+              maxWidth: Math.min(width * 0.46, width - mouthX - fontSize * 2),
               opacity: bubbleIn,
-              transform: `scale(${interpolate(bubbleIn, [0, 1], [0.5, 1])})`,
-              transformOrigin: hasBg ? 'bottom left' : 'bottom right',
+              transform: `scale(${interpolate(bubbleIn, [0, 1], [0.4, 1])})`,
+              transformOrigin: 'bottom left',
             }}
           >
             <div
@@ -268,6 +283,7 @@ export const ComposerScene: React.FC<ComposerProps> = ({
                 background: '#ffffff',
                 color: '#1a1625',
                 borderRadius: fontSize * 0.9,
+                borderBottomLeftRadius: fontSize * 0.25,
                 padding: `${fontSize * 0.55}px ${fontSize * 0.8}px`,
                 fontFamily: 'Arial, sans-serif',
                 fontWeight: 700,
@@ -275,22 +291,24 @@ export const ComposerScene: React.FC<ComposerProps> = ({
                 lineHeight: 1.3,
                 boxShadow: '0 10px 32px rgba(0,0,0,0.4)',
                 textAlign: 'center',
+                display: 'inline-block',
               }}
             >
               {beat.speechBubble}
             </div>
-            {/* tail pointing toward Slabby */}
+            {/* tail: apex reaches down-left to the mouth */}
             <div
               style={{
                 position: 'absolute',
-                bottom: -fontSize * 0.75,
-                ...(hasBg ? { left: '18%' } : { right: '20%' }),
+                bottom: -tailH + 1,
+                left: fontSize * 0.15,
                 width: 0,
                 height: 0,
-                borderLeft: `${fontSize * 0.55}px solid transparent`,
-                borderRight: `${fontSize * 0.55}px solid transparent`,
-                borderTop: `${fontSize * 0.85}px solid #ffffff`,
-                transform: hasBg ? 'skewX(-18deg)' : 'skewX(18deg)',
+                borderLeft: `${fontSize * 0.12}px solid transparent`,
+                borderRight: `${fontSize * 0.8}px solid transparent`,
+                borderTop: `${tailH}px solid #ffffff`,
+                transform: 'skewX(-38deg)',
+                transformOrigin: 'top left',
               }}
             />
           </div>
