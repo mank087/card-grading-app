@@ -263,55 +263,62 @@ export const ComposerScene: React.FC<ComposerProps> = ({
         const mouthX = originLeft + 500 * slabbyScale + shiftX;
         const mouthY = originTop + (615 + bob) * slabbyScale + shiftY;
 
-        const tailH = fontSize * 1.35;
-        const gap = fontSize * 0.4;
+        // Bubble sits BESIDE Slabby's head — left edge just right of the face
+        // window (viewBox x≈642), bottom just above mouth level — so wrapped
+        // text grows upward without covering him, and a SHORT tail hops from
+        // the corner of his smile to the bubble.
+        const bubbleAnchorY = originTop + (585 + bob) * slabbyScale + shiftY;
+        const bubbleLeft = originLeft + 660 * slabbyScale + shiftX;
+        const bubbleBottomCss = height - bubbleAnchorY;
+        const tailBaseY = bubbleAnchorY;
+        const tailBaseX1 = bubbleLeft + fontSize * 0.15;
+        const tailBaseX2 = bubbleLeft + fontSize * 1.35;
 
         return (
-          <div
-            style={{
-              position: 'absolute',
-              left: mouthX + fontSize * 1.1,
-              bottom: height - mouthY + tailH + gap,
-              maxWidth: Math.min(width * 0.46, width - mouthX - fontSize * 2),
-              opacity: bubbleIn,
-              transform: `scale(${interpolate(bubbleIn, [0, 1], [0.4, 1])})`,
-              transformOrigin: 'bottom left',
-            }}
-          >
-            <div
-              style={{
-                background: '#ffffff',
-                color: '#1a1625',
-                borderRadius: fontSize * 0.9,
-                borderBottomLeftRadius: fontSize * 0.25,
-                padding: `${fontSize * 0.55}px ${fontSize * 0.8}px`,
-                fontFamily: 'Arial, sans-serif',
-                fontWeight: 700,
-                fontSize,
-                lineHeight: 1.3,
-                boxShadow: '0 10px 32px rgba(0,0,0,0.4)',
-                textAlign: 'center',
-                display: 'inline-block',
-              }}
+          <>
+            {/* tail (under the bubble): apex at the mouth */}
+            <svg
+              width={width}
+              height={height}
+              viewBox={`0 0 ${width} ${height}`}
+              style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: bubbleIn }}
             >
-              {beat.speechBubble}
-            </div>
-            {/* tail: apex reaches down-left to the mouth */}
+              <polygon
+                points={`${mouthX + fontSize * 0.5},${mouthY - fontSize * 0.1} ${tailBaseX1},${tailBaseY - 2} ${tailBaseX2},${tailBaseY - 2}`}
+                fill="#ffffff"
+              />
+            </svg>
             <div
               style={{
                 position: 'absolute',
-                bottom: -tailH + 1,
-                left: fontSize * 0.15,
-                width: 0,
-                height: 0,
-                borderLeft: `${fontSize * 0.12}px solid transparent`,
-                borderRight: `${fontSize * 0.8}px solid transparent`,
-                borderTop: `${tailH}px solid #ffffff`,
-                transform: 'skewX(-38deg)',
-                transformOrigin: 'top left',
+                left: bubbleLeft,
+                bottom: bubbleBottomCss,
+                maxWidth: Math.min(width * 0.5, width - bubbleLeft - fontSize),
+                opacity: bubbleIn,
+                transform: `scale(${interpolate(bubbleIn, [0, 1], [0.4, 1])})`,
+                transformOrigin: 'bottom left',
               }}
-            />
-          </div>
+            >
+              <div
+                style={{
+                  background: '#ffffff',
+                  color: '#1a1625',
+                  borderRadius: fontSize * 0.9,
+                  borderBottomLeftRadius: fontSize * 0.25,
+                  padding: `${fontSize * 0.55}px ${fontSize * 0.8}px`,
+                  fontFamily: 'Arial, sans-serif',
+                  fontWeight: 700,
+                  fontSize,
+                  lineHeight: 1.3,
+                  boxShadow: '0 10px 32px rgba(0,0,0,0.4)',
+                  textAlign: 'center',
+                  display: 'inline-block',
+                }}
+              >
+                {beat.speechBubble}
+              </div>
+            </div>
+          </>
         );
       })()}
 
