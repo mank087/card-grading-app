@@ -55,6 +55,9 @@ export interface SlabbyBeat {
       Chain across beats for one continuous scroll: 0→0.5, then 0.5→1. */
   scrollFrom?: number;
   scrollTo?: number;
+  /** scroll speed multiplier (1 = spread across the whole beat; 2/4 =
+      finish the scroll in 1/2 / 1/4 of the beat, then hold) */
+  scrollSpeed?: 1 | 2 | 4;
   /** voiceover script for this beat (generate audio in the Lab) */
   voiceover?: string;
   /** generated TTS audio as a data URL — plays from the beat's start */
@@ -65,6 +68,8 @@ export interface SlabbyBeat {
   karaoke?: boolean;
   /** motion-matched sound effect at beat start (default true) */
   sfx?: boolean;
+  /** comic-style speech bubble anchored to Slabby */
+  speechBubble?: string;
 }
 
 export interface SlabbyScene {

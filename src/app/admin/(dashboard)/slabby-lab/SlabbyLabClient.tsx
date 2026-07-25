@@ -504,6 +504,9 @@ export default function SlabbyLabClient() {
                 <label className={labelCls}>Caption (bottom text)</label>
                 <input value={beat.caption || ''} onChange={(e) => updateBeat(selectedBeat, { caption: e.target.value })} className={inputCls} placeholder="e.g. This Charizard is INSANE" />
 
+                <label className={labelCls}>💬 Speech bubble (spoken by Slabby, on screen)</label>
+                <input value={beat.speechBubble || ''} onChange={(e) => updateBeat(selectedBeat, { speechBubble: e.target.value || undefined })} className={inputCls} placeholder="e.g. No way that's a 10…" />
+
                 {/* voiceover */}
                 <label className={labelCls}>🎙️ Voiceover script</label>
                 <textarea
@@ -645,7 +648,19 @@ export default function SlabbyLabClient() {
                 )}
 
                 {beat.detailsPage && (
-                  <div className="grid grid-cols-2 gap-x-4">
+                  <div className="grid grid-cols-3 gap-x-4">
+                    <div>
+                      <label className={labelCls}>Scroll speed</label>
+                      <select
+                        value={beat.scrollSpeed ?? 1}
+                        onChange={(e) => updateBeat(selectedBeat, { scrollSpeed: Number(e.target.value) as 1 | 2 | 4 })}
+                        className={inputCls}
+                      >
+                        <option value={1}>Standard</option>
+                        <option value={2}>Double (2×)</option>
+                        <option value={4}>4×</option>
+                      </select>
+                    </div>
                     <div>
                       <label className={labelCls}>Scroll from (%)</label>
                       <input
@@ -664,8 +679,9 @@ export default function SlabbyLabClient() {
                         className={inputCls}
                       />
                     </div>
-                    <div className="col-span-2 text-[10px] text-gray-500 mt-1">
+                    <div className="col-span-3 text-[10px] text-gray-500 mt-1">
                       Chain a continuous scroll across beats: beat 1 scrolls 0→50%, beat 2 scrolls 50→100% (use the same loaded card).
+                      Speed 2×/4× finishes the scroll early in the beat, then holds.
                     </div>
                   </div>
                 )}

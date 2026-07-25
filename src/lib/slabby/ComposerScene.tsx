@@ -199,7 +199,7 @@ export const ComposerScene: React.FC<ComposerProps> = ({
                 width={Math.min(short * 0.52, width * 0.6)}
                 viewportHeight={height * (beat.headline ? 0.52 : 0.6)}
                 progress={interpolate(
-                  localFrame,
+                  localFrame * (beat.scrollSpeed ?? 1),
                   [0, beatFrames],
                   [beat.scrollFrom ?? 0, beat.scrollTo ?? 1],
                   { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
@@ -246,6 +246,56 @@ export const ComposerScene: React.FC<ComposerProps> = ({
           logoHref={logoHref}
         />
       </div>
+
+      {/* speech bubble anchored to Slabby (position adapts to layout mode) */}
+      {beat.speechBubble && (() => {
+        const bubbleIn = spring({ frame: localFrame - 3, fps, config: { damping: 11 } });
+        const fontSize = short * 0.036;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              ...(hasBg
+                ? { left: '3%', bottom: height * 0.30, maxWidth: '42%' }
+                : { right: '5%', top: height * (beat.headline ? 0.16 : 0.1), maxWidth: '44%' }),
+              opacity: bubbleIn,
+              transform: `scale(${interpolate(bubbleIn, [0, 1], [0.5, 1])})`,
+              transformOrigin: hasBg ? 'bottom left' : 'bottom right',
+            }}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                color: '#1a1625',
+                borderRadius: fontSize * 0.9,
+                padding: `${fontSize * 0.55}px ${fontSize * 0.8}px`,
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 700,
+                fontSize,
+                lineHeight: 1.3,
+                boxShadow: '0 10px 32px rgba(0,0,0,0.4)',
+                textAlign: 'center',
+              }}
+            >
+              {beat.speechBubble}
+            </div>
+            {/* tail pointing toward Slabby */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: -fontSize * 0.75,
+                ...(hasBg ? { left: '18%' } : { right: '20%' }),
+                width: 0,
+                height: 0,
+                borderLeft: `${fontSize * 0.55}px solid transparent`,
+                borderRight: `${fontSize * 0.55}px solid transparent`,
+                borderTop: `${fontSize * 0.85}px solid #ffffff`,
+                transform: hasBg ? 'skewX(-18deg)' : 'skewX(18deg)',
+              }}
+            />
+          </div>
+        );
+      })()}
 
       {/* headline (top) */}
       {beat.headline && (
