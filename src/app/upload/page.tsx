@@ -13,6 +13,7 @@ declare global {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
+import { reportUploadEvent } from '@/lib/uploadTelemetry'
 import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage, getImageDimensions } from '@/lib/imageCompression'
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality'
 import { ImageQualityValidation } from '@/types/camera'
@@ -369,6 +370,7 @@ function UniversalUploadPageContent() {
         }
       } catch (convertErr: any) {
         console.error(`[Upload] HEIC conversion failed for ${side}:`, convertErr)
+        reportUploadEvent({ event: 'heic_convert_error', side, reason: convertErr?.message, file_type: originalFile.type, file_size_bytes: originalFile.size }, getStoredSession()?.access_token)
         setStatus(`❌ Could not read ${side} image. iPhone HEIC photos sometimes fail — try saving as JPEG (Settings → Camera → Formats → Most Compatible) and re-upload.`)
         // Clear any prior state for this side so the green check disappears.
         if (side === 'front') { setFrontFile(null); setFrontHash(null); setFrontCompressed(null); setFrontCompressionInfo(null) }
@@ -395,6 +397,7 @@ function UniversalUploadPageContent() {
       const currentBackHash = side === 'back' ? fileHash : backHash;
 
       if (currentFrontHash && currentBackHash && currentFrontHash === currentBackHash) {
+        reportUploadEvent({ event: 'identical_images_reject', side, file_type: file.type, file_size_bytes: file.size }, getStoredSession()?.access_token)
         setStatus('❌ Error: Front and back images are identical. Please upload different images of the front and back of your card.')
         // setIsCompressing is a derived const, not a setter — use the
         // per-side setter that this function already has via setCompressingState.
@@ -445,9 +448,9 @@ function UniversalUploadPageContent() {
       if (longEdge < 1000) {
         console.warn(`[Upload] ${side} image REJECTED by minimum-resolution gate: ${result.dimensions.width}×${result.dimensions.height} (need 1000px+ long edge)`)
         toast.error(
-          `This ${side} image is too small to grade accurately (${result.dimensions.width}×${result.dimensions.height}). Please use the original photo — at least 1000px on the long side. Screenshots and thumbnails lose the detail needed for corner and edge inspection.`,
-          { duration: 8000 }
+          `This ${side} image is too small to grade accurately (${result.dimensions.width}×${result.dimensions.height}). Please use the original photo — at least 1000px on the long side. Screenshots and thumbnails lose the detail needed for corner and edge inspection.`
         )
+        reportUploadEvent({ event: 'min_res_reject', side, image_width: result.dimensions.width, image_height: result.dimensions.height, file_type: file.type, file_size_bytes: file.size }, getStoredSession()?.access_token)
         setStatus(`❌ ${side} image rejected: ${result.dimensions.width}×${result.dimensions.height} is below the 1000px minimum for accurate grading.`)
         setCompressingState(false)
         if (side === 'front') { setFrontFile(null); setFrontHash(null); setFrontCompressed(null); setFrontCompressionInfo(null) }
@@ -462,6 +465,7 @@ function UniversalUploadPageContent() {
         // the 1000-1600px band was silently unable to upload (customer report
         // Jul 24: "shows uploaded as successful then disappearing in a second").
         toast.warning(`Heads up: the ${side} image is on the small side (${result.dimensions.width}×${result.dimensions.height}). A 2000px+ photo gives noticeably more accurate grading.`)
+        reportUploadEvent({ event: 'small_image_advisory', side, image_width: result.dimensions.width, image_height: result.dimensions.height, file_type: file.type, file_size_bytes: file.size }, getStoredSession()?.access_token)
       }
 
       // Update state with compressed file and info
@@ -498,6 +502,9 @@ function UniversalUploadPageContent() {
           if (imageData) {
             const quality = validateImageQuality(imageData)
             console.log(`[Upload] ${side} image quality: ${quality.confidenceLetter} (score ${quality.overallScore})`)
+            if (quality.confidenceLetter === 'C' || quality.confidenceLetter === 'D') {
+              reportUploadEvent({ event: 'quality_advisory_cd', side, reason: `grade ${quality.confidenceLetter} score ${quality.overallScore}` }, getStoredSession()?.access_token)
+            }
             if (side === 'front') setFrontQuality(quality)
             else setBackQuality(quality)
           }
@@ -507,6 +514,7 @@ function UniversalUploadPageContent() {
       }
     } catch (error: any) {
       console.error(`Failed to compress ${side} image:`, error)
+      reportUploadEvent({ event: 'compress_error', side, reason: error?.message, file_type: originalFile.type, file_size_bytes: originalFile.size }, getStoredSession()?.access_token)
       // Clear file + hash so the green check disappears and the submit button
       // doesn't stay grayed out with the user thinking the image is uploaded.
       // Without this clearing, the user sees green check + broken preview +
@@ -930,6 +938,7 @@ function UniversalUploadPageContent() {
       // isUploading stays true to show CardAnalysisAnimation
     } catch (err: any) {
       console.error('[Upload] Upload failed:', err)
+      reportUploadEvent({ event: 'submit_error', reason: err?.message }, session?.access_token)
       setStatus(`❌ Upload failed: ${err.message}`)
       toast.error(`Upload failed: ${err.message}`)
       setIsUploading(false)
