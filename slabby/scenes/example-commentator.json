@@ -1,0 +1,28 @@
+{
+  "scene": {
+    "name": "example-commentator",
+    "beats": [
+      {
+        "duration": 2.5,
+        "expression": "excited",
+        "motion": "jump",
+        "gradeText": "10",
+        "gradeLabel": "GEM MINT",
+        "headline": "FRESH GRADE JUST DROPPED",
+        "caption": "Umbreon ex came back a 10!",
+        "backgroundImage": "https://www.dcmgrading.com/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg",
+        "bgAnimation": "pop"
+      },
+      {
+        "duration": 2.5,
+        "expression": "thinking",
+        "motion": "idle",
+        "gradeText": "?",
+        "gradeLabel": "HMMM",
+        "caption": "But is it worth more than the LeBron?",
+        "backgroundImage": "https://www.dcmgrading.com/Sports/DCM-Card-LeBron-James-547249-front.jpg",
+        "bgAnimation": "slide-left"
+      }
+    ]
+  }
+}

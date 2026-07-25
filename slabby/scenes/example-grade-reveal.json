@@ -1,0 +1,32 @@
+{
+  "scene": {
+    "name": "example-grade-reveal",
+    "beats": [
+      {
+        "duration": 2,
+        "expression": "happy",
+        "motion": "enter",
+        "gradeText": "?",
+        "gradeLabel": "GRADING…",
+        "caption": "Today's submission just came back…"
+      },
+      {
+        "duration": 2.5,
+        "expression": "thinking",
+        "motion": "shake",
+        "gradeText": "?",
+        "gradeLabel": "GRADING…",
+        "headline": "THE MOMENT OF TRUTH"
+      },
+      {
+        "duration": 3,
+        "expression": "excited",
+        "motion": "celebrate",
+        "gradeText": "10",
+        "gradeLabel": "GEM MINT",
+        "headline": "GEM MINT 10!",
+        "caption": "Grade yours at dcmgrading.com"
+      }
+    ]
+  }
+}

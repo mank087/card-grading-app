@@ -1,0 +1,21 @@
+{
+  "name": "slabby",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Slabby — DCM's animated slab mascot. Remotion workspace for rendering social video snippets.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "still": "remotion still"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.245",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.245"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  }
+}
