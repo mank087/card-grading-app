@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { recordGradingFailure } from "@/lib/gradingFailure";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
@@ -622,9 +623,12 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         }
       } catch (error: any) {
         console.error(`[GET /api/lorcana/${cardId}] ⚠️ Conversational grading failed:`, error.message);
+        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: 'Lorcana', errorMessage: error.message });
         return NextResponse.json({
           error: "Failed to grade Lorcana card. Please try again or contact support.",
-          details: error.message
+          details: error.message,
+          grading_failed: true,
+          credit_refunded: failure.refunded
         }, { status: 500 });
       }
     }

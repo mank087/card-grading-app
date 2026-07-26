@@ -347,6 +347,85 @@ export async function deductCredit(
 }
 
 /**
+ * Refund the grade credit for a card whose grading failed.
+ *
+ * Idempotent per card:
+ * - Only refunds if the card was actually charged (a 'grade' transaction exists)
+ * - Never refunds the same card twice (skips if a 'refund' transaction exists)
+ *
+ * A successful retry after a refund intentionally does NOT re-charge — the
+ * grading failure was our fault, so the retry is on the house.
+ */
+export async function refundGradeCredit(
+  userId: string,
+  cardId: string,
+  reason: string
+): Promise<{ refunded: boolean; newBalance: number; error?: string }> {
+  const supabase = getServiceClient();
+
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { refunded: false, newBalance: 0, error: 'User credits not found' };
+  }
+
+  // Must have been charged for this card
+  const { data: charge } = await supabase
+    .from('credit_transactions')
+    .select('id')
+    .eq('card_id', cardId)
+    .eq('type', 'grade')
+    .limit(1)
+    .maybeSingle();
+  if (!charge) {
+    console.log(`[refundGradeCredit] Card ${cardId} was never charged — nothing to refund`);
+    return { refunded: false, newBalance: credits.balance };
+  }
+
+  // Never refund twice
+  const { data: priorRefund } = await supabase
+    .from('credit_transactions')
+    .select('id')
+    .eq('card_id', cardId)
+    .eq('type', 'refund')
+    .limit(1)
+    .maybeSingle();
+  if (priorRefund) {
+    console.log(`[refundGradeCredit] Card ${cardId} already refunded (tx ${priorRefund.id}) — skipping`);
+    return { refunded: false, newBalance: credits.balance };
+  }
+
+  const newBalance = credits.balance + 1;
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      balance: newBalance,
+      total_used: Math.max(0, credits.total_used - 1),
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('[refundGradeCredit] Error restoring balance:', updateError);
+    return { refunded: false, newBalance: credits.balance, error: 'Database error' };
+  }
+
+  const { error: transactionError } = await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'refund',
+    amount: 1,
+    balance_after: newBalance,
+    description: `Grading failed — credit refunded (${reason})`.slice(0, 250),
+    card_id: cardId,
+  });
+  if (transactionError) {
+    console.error('[refundGradeCredit] Failed to record refund transaction:', transactionError);
+    // Balance was restored; audit log incomplete but do not double-refund by retrying
+  }
+
+  console.log(`[refundGradeCredit] ✅ Refunded 1 credit to ${userId} for card ${cardId}`);
+  return { refunded: true, newBalance };
+}
+
+/**
  * Get user's transaction history
  */
 export async function getTransactionHistory(

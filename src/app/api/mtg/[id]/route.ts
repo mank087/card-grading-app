@@ -20,6 +20,8 @@ import { getConditionFromGrade } from "@/lib/conditionAssessment";
 import { getUserCredits } from "@/lib/credits";
 // 🃏 CARD IDENTIFICATION: Local Supabase database lookup for MTG cards
 import { lookupMtgCard, type MtgCard } from "@/lib/mtgCardMatcher";
+import { disambiguateMtgPrint } from "@/lib/mtgPrintDisambiguator";
+import { recordGradingFailure, acquireGradingLock } from "@/lib/gradingFailure";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
 
@@ -607,6 +609,17 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       console.log(`[GET /api/mtg/${cardId}] 🔄 Force re-grade requested, bypassing cache`);
     }
 
+    // 🔐 Cross-instance grading lock (the in-memory map above only guards one
+    // serverless instance; this CAS on cards.grade_status guards all of them)
+    const gradingLock = await acquireGradingLock(cardId, card.grade_status);
+    if (!gradingLock.acquired) {
+      console.log(`[GET /api/mtg/${cardId}] Another instance holds the grading lock, returning 429`);
+      return NextResponse.json(
+        { error: "MTG card is being processed by another request. Please wait and refresh." },
+        { status: 429 }
+      );
+    }
+
     // 🎯 PRIMARY: Conversational AI grading (v4.2 JSON format)
     console.log(`[GET /api/mtg/${cardId}] Starting MTG card conversational AI grading (v4.2)...`);
     let conversationalGradingResult = null;
@@ -659,9 +672,18 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         }
       } catch (error: any) {
         console.error(`[GET /api/mtg/${cardId}] ⚠️ Conversational grading failed:`, error.message);
+        // Mark the card as failed (releases the grading lock) and refund the credit
+        const failure = await recordGradingFailure({
+          cardId,
+          userId: card.user_id,
+          category: 'MTG',
+          errorMessage: error.message
+        });
         return NextResponse.json({
           error: "Failed to grade MTG card. Please try again or contact support.",
-          details: error.message
+          details: error.message,
+          grading_failed: true,
+          credit_refunded: failure.refunded
         }, { status: 500 });
       }
     }
@@ -934,12 +956,40 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
             console.log(`[GET /api/mtg/${cardId}] 🔍 Looking up card in internal MTG database...`);
             const aiCardInfo = conversationalGradingData.card_info;
 
-            const matchResult = await lookupMtgCard({
+            let matchResult = await lookupMtgCard({
               card_name: aiCardInfo.card_name,
               expansion_code: aiCardInfo.expansion_code,
               card_number: aiCardInfo.collector_number || aiCardInfo.card_number,
               set_name: aiCardInfo.set_name
             });
+
+            // Name matched but the specific print is ambiguous (reprints/vintage):
+            // pick the print visually against reference images before giving up
+            if (
+              matchResult.confidence.overallConfidence === 'low' &&
+              matchResult.printCandidates &&
+              matchResult.printCandidates.length > 1 &&
+              frontUrl
+            ) {
+              console.log(`[GET /api/mtg/${cardId}] 🔎 Print ambiguous (${matchResult.printCandidates.length} candidates) — running visual disambiguation...`);
+              const disambiguation = await disambiguateMtgPrint(frontUrl, matchResult.printCandidates);
+              if (disambiguation.card) {
+                matchResult = {
+                  card: disambiguation.card,
+                  score: 0.8,
+                  confidence: {
+                    ...matchResult.confidence,
+                    overallConfidence: 'medium',
+                    warnings: [
+                      ...matchResult.confidence.warnings,
+                      `Print selected visually from ${disambiguation.candidatesShown} candidates: ${disambiguation.reason}`
+                    ]
+                  }
+                };
+              } else {
+                console.log(`[GET /api/mtg/${cardId}] ⚠️ Visual disambiguation declined to pick: ${disambiguation.reason}`);
+              }
+            }
 
             if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
               matchedDatabaseCard = matchResult.card;
@@ -1087,6 +1137,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
     // Update database with comprehensive MTG card data
     const updateData = {
+      // 🔐 Release the grading lock and clear any prior failure marker
+      grade_status: 'complete',
+      error_message: null,
+
       // Full AI grading JSON for comprehensive display
       ai_grading: gradingResult,
 

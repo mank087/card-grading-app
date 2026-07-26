@@ -1580,6 +1580,18 @@ export function MTGCardDetails() {
           await retryWithBackoff();
           return;
         }
+
+        // Grading pipeline failure: server marked the card failed and (usually) refunded the credit
+        if (res.status === 500) {
+          try {
+            const errorData = await res.json();
+            if (errorData.grading_failed) {
+              setError(errorData.credit_refunded ? 'GRADING_FAILED_REFUNDED' : 'GRADING_FAILED');
+              setLoading(false);
+              return;
+            }
+          } catch { /* fall through to generic error */ }
+        }
         throw new Error(`Failed to load sports card: ${res.status}`);
       }
 
@@ -2027,6 +2039,35 @@ export function MTGCardDetails() {
                 </Link>
               </div>
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ⚠️ Grading failed: card is safe, credit refunded, retry available
+    if (error === 'GRADING_FAILED_REFUNDED' || error === 'GRADING_FAILED') {
+      return (
+        <div className="container mx-auto p-6 max-w-2xl">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-4 border-amber-400 rounded-2xl shadow-2xl p-12 text-center">
+            <div className="text-8xl mb-6">⚠️</div>
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">Grading Didn&apos;t Complete</h1>
+            <p className="text-xl text-gray-700 mb-4 leading-relaxed">
+              Something went wrong while analyzing this card. Your photos are saved — you don&apos;t need to re-upload.
+            </p>
+            <p className="text-lg font-semibold text-green-700 mb-8">
+              {error === 'GRADING_FAILED_REFUNDED'
+                ? '✅ Your credit was automatically refunded. Retrying is free.'
+                : 'You will not be charged again for retrying this card.'}
+            </p>
+            <button
+              onClick={() => fetchMTGCardDetails()}
+              className="px-10 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition-colors shadow-lg"
+            >
+              🔄 Retry Grading
+            </button>
+            <p className="text-gray-500 mt-6 text-sm">
+              If this keeps happening, please contact support.
+            </p>
           </div>
         </div>
       );

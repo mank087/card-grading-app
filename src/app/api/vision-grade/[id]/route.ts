@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { recordGradingFailure } from "@/lib/gradingFailure";
 import {
   gradeCardWithVision,
   extractGradeMetrics,
@@ -1530,9 +1531,10 @@ EXTRACTION RULES:
         console.error(`[CONVERSATIONAL AI] ❌ Conversational grading failed:`, error.message);
         conversationalGradingResult = null;
         conversationalGradingData = null;
+        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: card.category || 'Card', errorMessage: error.message });
         // Return error since this is now the primary grading system
         return NextResponse.json(
-          { error: `Conversational AI grading failed: ${error.message}` },
+          { error: `Conversational AI grading failed: ${error.message}`, grading_failed: true, credit_refunded: failure.refunded },
           { status: 500 }
         );
       }

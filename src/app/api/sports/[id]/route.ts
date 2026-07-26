@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { recordGradingFailure } from "@/lib/gradingFailure";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches other card type flows)
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
@@ -856,9 +857,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
       } catch (error: any) {
         console.error(`[GET /api/sports/${cardId}] ⚠️ Conversational grading failed:`, error.message);
+        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: 'Sports', errorMessage: error.message });
         // Return error response - we can't grade without conversational grading
         return NextResponse.json(
-          { error: "Failed to grade sports card: " + error.message },
+          { error: "Failed to grade sports card: " + error.message, grading_failed: true, credit_refunded: failure.refunded },
           { status: 500 }
         );
       }

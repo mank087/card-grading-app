@@ -681,6 +681,9 @@ export async function gradeCardWithVision(
   // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    // Burst uploads run several gradings concurrently; transient 429s/timeouts
+    // from OpenAI were killing whole gradings (SDK default is 2 retries).
+    maxRetries: 4,
   });
 
   // Load grading prompt as system message
@@ -926,6 +929,9 @@ export async function estimateProfessionalGrades(
   // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    // Burst uploads run several gradings concurrently; transient 429s/timeouts
+    // from OpenAI were killing whole gradings (SDK default is 2 retries).
+    maxRetries: 4,
   });
 
   // Load professional grading prompt
@@ -1169,6 +1175,9 @@ export async function performDetailedInspection(
   // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    // Burst uploads run several gradings concurrently; transient 429s/timeouts
+    // from OpenAI were killing whole gradings (SDK default is 2 retries).
+    maxRetries: 4,
   });
 
   // Load detailed inspection prompt
@@ -1712,6 +1721,9 @@ export async function gradeCardConversational(
   // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    // Burst uploads run several gradings concurrently; transient 429s/timeouts
+    // from OpenAI were killing whole gradings (SDK default is 2 retries).
+    maxRetries: 4,
   });
 
   // Load conversational prompt (supports both markdown and JSON formats, card-type specific)
