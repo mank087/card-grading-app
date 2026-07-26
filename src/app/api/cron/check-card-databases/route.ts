@@ -155,6 +155,20 @@ async function checkNaruto(issues: string[], summary: string[]) {
   summary.push(`Naruto: checked ${(sets || []).length} narutodb.com sets`);
 }
 
+/** Generic TCG DB (Digimon/DBF/Union Arena/Gundam/Riftbound): presence check per game */
+async function checkTcg(issues: string[], summary: string[]) {
+  const games = ['digimon', 'dragon-ball-fusion', 'union-arena', 'gundam', 'riftbound'];
+  const counts: string[] = [];
+  for (const game of games) {
+    const count = await internalCount('tcg_cards', q => q.eq('game', game));
+    counts.push(`${game}:${count}`);
+    if (count === 0) {
+      issues.push(`TCG DB: game "${game}" has no cards → run: node scripts/import-tcg-database.js ${game}`);
+    }
+  }
+  summary.push(`TCG DB: ${counts.join(' ')}`);
+}
+
 async function sendAlert(issues: string[]) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -199,6 +213,7 @@ export async function GET(request: NextRequest) {
     ['yugioh', checkYugioh],
     ['pokemon', checkPokemon],
     ['naruto', checkNaruto],
+    ['tcg', checkTcg],
   ];
   for (const [name, fn] of checks) {
     try {

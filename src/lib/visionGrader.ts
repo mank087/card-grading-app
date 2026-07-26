@@ -1693,6 +1693,7 @@ export async function gradeCardConversational(
     seed?: number;
     top_p?: number;
     userConditionReport?: ProcessedConditionReport; // Optional user-reported condition hints
+    categoryHint?: string; // Owner-selected franchise/sub-category (e.g. "Weiss Schwarz") — identification context for generic card types
   }
 ): Promise<ConversationalGradeResultV3_3> {
   const {
@@ -1703,8 +1704,16 @@ export async function gradeCardConversational(
     max_tokens = 16000, // 🔧 Increased to 16K - v5.11 rubric requires extensive JSON output
     top_p = 0.9,        // v8.9: widened with the median ensemble (was 0.5 in v8.8)
     seed = 7,           // 🔒 v8.8: Fixed seed restored (best-effort determinism; removed in v8.5)
-    userConditionReport = undefined // Optional user-reported condition hints
+    userConditionReport = undefined, // Optional user-reported condition hints
+    categoryHint = undefined // Owner-selected franchise (identification context, not condition info)
   } = options || {};
+
+  // Owner-provided franchise context: goes in the per-card USER message (the
+  // cached system-prompt prefix is untouched). Identification only — it must
+  // never influence condition scoring.
+  const categoryHintSection = categoryHint
+    ? `\n📋 OWNER-PROVIDED CARD TYPE: The owner identified this card as: "${categoryHint}". Use that franchise's naming, set, and card-number conventions when extracting card_info (do NOT let it influence condition scoring). If the card visibly contradicts this, trust what is printed on the card.\n`
+    : '';
 
   // Format user condition report for prompt injection (if provided)
   const conditionReportSection = userConditionReport
@@ -1799,7 +1808,7 @@ export async function gradeCardConversational(
 - If the card appears clean after thorough inspection, Grade 10 is the correct result
 - Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
-${conditionReportSection?.has_user_hints ? `
+${categoryHintSection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
@@ -1811,7 +1820,7 @@ Return ONLY the JSON object with all required fields filled.`
 - If the card appears clean after thorough inspection, Grade 10 is the correct result
 - Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
-${conditionReportSection?.has_user_hints ? `
+${categoryHintSection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
 Provide detailed analysis as markdown with all required sections.`
             }

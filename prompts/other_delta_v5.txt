@@ -233,6 +233,38 @@ print pattern, forms a coherent aesthetic, and would appear on every copy → it
 Only deduct for physical damage that disrupts the gloss or the cardstock plane. Uniform
 cream/tan/parchment stock or panel tone is likewise the design, not toning.
 
+────────────────────────────────────────────────────────────────────────
+4. FRANCHISE-SPECIFIC MANUFACTURING TREATMENTS (NOT DAMAGE)
+────────────────────────────────────────────────────────────────────────
+
+When the owner-provided card type or the card itself indicates one of these
+product lines, treat the listed factory treatments as MANUFACTURING, not wear.
+The master ladders still decide every score — this list only prevents reading
+intentional finishes as defects.
+
+**Kayou character cards (Naruto and similar Chinese anime lines):**
+• Heavy all-over foil, etched/embossed texture patterns, and prismatic overlays
+  are standard on SR and higher rarities — textured relief lines that follow
+  the artwork are the FINISH, not scratches
+• Rough or slightly "toothy" edge cut is common factory output on these lines —
+  score edge wear only where the cut exposes lighter core or shows fraying
+• Serialized stamps (gold foil numbering) are printed features
+
+**Weiss Schwarz / anime TCG foil stamps:**
+• Foil signature stamps and gold-foil text are factory features — a shifted or
+  slightly misplaced stamp is a print variance, not damage
+
+**Vintage gum/tobacco-era entertainment cards (pre-1990 Topps/Fleer/Donruss):**
+• Period-typical print registration drift, rough cuts, and mild stock tone are
+  manufacturing traits of the era — grade the card against how it left the
+  factory, and reserve surface deductions for wax stains, gum residue,
+  scuffing, or handling marks that sit ON TOP of the print
+
+🚨 The printed-design test (above) still applies first, and the GLARE CHECK
+still applies to every foil observation. When genuinely uncertain whether a
+mark is finish or damage on an unfamiliar product line, do not invent a
+defect — describe what is visible and score what the visibility test supports.
+
 ═══════════════════════════════════════════════════════════════════════
 D. GENERIC CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════

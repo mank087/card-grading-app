@@ -4,6 +4,7 @@ import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { recordGradingFailure } from "@/lib/gradingFailure";
 import { lookupNarutoCard, looksLikeKayouNumber } from "@/lib/narutoCardMatcher";
+import { lookupTcgCard, looksLikeTcgCode, SUB_CATEGORY_TO_GAME, GAME_DISPLAY } from "@/lib/tcgCardMatcher";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
@@ -79,6 +80,9 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
 
       // Other-specific fields
       manufacturer: cardInfo.manufacturer || null,
+      // manufacturer_name is what labels/display/exports actually read — Other
+      // was writing only `manufacturer`, leaving 94% of rows blank in the UI
+      manufacturer_name: cardInfo.manufacturer || null,
       card_date: cardInfo.card_date || null,
       special_features: cardInfo.special_features || null,
       front_text: cardInfo.front_text || null,
@@ -91,6 +95,7 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
       card_set: 'Unknown',
       card_number: null,
       manufacturer: null,
+      manufacturer_name: null,
       card_date: null,
       special_features: null,
       front_text: null,
@@ -473,7 +478,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         }
 
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'other', {
-          userConditionReport: userConditionReport
+          userConditionReport: userConditionReport,
+          // The owner told us the franchise at upload — the model was previously
+          // identifying every "Other" card completely blind
+          categoryHint: card.sub_category || undefined
         });
         conversationalGradingResult = conversationalResult.markdown_report;
 
@@ -498,6 +506,27 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     if (conversationalGradingResult) {
       try {
         const jsonData = JSON.parse(conversationalGradingResult);
+
+        // 🧹 NUMBER-SHAPED-NAME SANITY PASS: the model sometimes puts the card
+        // NUMBER in card_name (seen shipped: card_name "NRT01-CP-02"). If the
+        // name looks like a card code and not a title, move it to card_number
+        // and fall back to the featured character/subject for the name.
+        try {
+          const ci0 = jsonData.card_info || {};
+          const nameLooksLikeCode = typeof ci0.card_name === 'string' &&
+            /^[A-Z]{1,6}\d{0,4}[-·—/][A-Z0-9]{1,6}([-·—/][A-Z0-9]{1,8})*$/i.test(ci0.card_name.trim()) &&
+            /\d/.test(ci0.card_name);
+          if (nameLooksLikeCode) {
+            const code = ci0.card_name.trim();
+            jsonData.card_info = {
+              ...ci0,
+              card_name: ci0.player_or_character || null,
+              card_number: ci0.card_number || code
+            };
+            conversationalGradingResult = JSON.stringify(jsonData);
+            console.log(`[GET /api/other/${cardId}] 🧹 card_name "${code}" looks like a card number — moved to card_number, name → "${jsonData.card_info.card_name ?? 'null'}"`);
+          }
+        } catch { /* never fail grading over sanitation */ }
 
         // 🍥 KAYOU NARUTO IDENTIFICATION: "Other" cards with a Kayou-style
         // card number (NRSA01-SE-001L5, NR-BP-016, ...) get validated and
@@ -545,6 +574,47 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         } catch (narutoError: any) {
           // Table may not exist yet (migration pending) — never fail grading over enrichment
           console.log(`[GET /api/other/${cardId}] ⚠️ Naruto DB lookup skipped: ${narutoError.message}`);
+        }
+
+        // 🎮 GENERIC TCG IDENTIFICATION (Digimon / Dragon Ball Fusion /
+        // Union Arena / Gundam / Riftbound): code-first lookup against
+        // tcg_cards. Runs only if the Naruto pass didn't already verify.
+        try {
+          const ci = jsonData.card_info || {};
+          const alreadyVerified = !!ci.naruto_database_number;
+          const candidateNumber = ci.card_number || null;
+          const gameFromSub = card.sub_category ? SUB_CATEGORY_TO_GAME[card.sub_category] ?? null : null;
+          if (!alreadyVerified && (gameFromSub || looksLikeTcgCode(candidateNumber))) {
+            console.log(`[GET /api/other/${cardId}] 🎮 TCG code pattern${gameFromSub ? ` / sub-category "${card.sub_category}"` : ''} detected, querying tcg_cards...`);
+            const tcgMatch = await lookupTcgCard({
+              card_number: candidateNumber,
+              card_name: ci.card_name || null,
+              game: gameFromSub
+            });
+            if (tcgMatch.card && tcgMatch.confidence !== 'low') {
+              const tc = tcgMatch.card;
+              const gameLabel = GAME_DISPLAY[tc.game] || tc.game;
+              jsonData.card_info = {
+                ...ci,
+                card_name: tc.name || ci.card_name,
+                set_name: tc.set_name ? `${gameLabel} — ${tc.set_name}` : (ci.set_name || gameLabel),
+                card_number: tc.code,
+                rarity_or_variant: tc.rarity || ci.rarity_or_variant || null,
+                tcg_database_game: tc.game,
+                tcg_database_code: tc.code,
+                tcg_match_confidence: tcgMatch.confidence,
+                tcg_reference_image: tc.image_large || tc.image_small
+              };
+              conversationalGradingResult = JSON.stringify(jsonData);
+              console.log(`[GET /api/other/${cardId}] ✅ TCG DB match (${tcgMatch.confidence}, ${tcgMatch.matchedBy}): [${tc.game}] ${tc.name} ${tc.code}`);
+              tcgMatch.warnings.forEach(w => console.log(`[GET /api/other/${cardId}]    ${w}`));
+            } else if (tcgMatch.warnings.length) {
+              tcgMatch.warnings.forEach(w => console.log(`[GET /api/other/${cardId}] ⚠️ TCG lookup: ${w}`));
+            }
+          }
+        } catch (tcgError: any) {
+          // Table may not exist yet (migration pending) — never fail grading over enrichment
+          console.log(`[GET /api/other/${cardId}] ⚠️ TCG DB lookup skipped: ${tcgError.message}`);
         }
 
         // Extract card-specific fields
