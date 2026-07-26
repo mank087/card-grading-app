@@ -15,11 +15,16 @@ import { Ionicons } from '@expo/vector-icons'
 import { Colors, CardCategories } from '@/lib/constants'
 
 const OTHER_SUB_CATEGORIES_GROUPED: Record<string, string[]> = {
-  'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG', 'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'],
+  'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG', 'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena', 'Naruto / Kayou'],
   'Entertainment': ['Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids', 'Wacky Packages', 'WWE / Wrestling', 'Movie / TV', 'Music', 'Anime'],
   'Vintage': ['Non-Sport Vintage', 'Art Cards', 'Promotional', 'Racing', 'Historical'],
   'Other': ['Other'],
 }
+
+// Naruto (Kayou) is a first-class picker choice but NOT a real category:
+// selecting it stores category 'Other' + this sub-category, so the entire
+// grade flow / API routing is unchanged (matches the web upload page).
+const NARUTO_SUB = 'Naruto / Kayou'
 
 interface CategoryPickerProps {
   category: string
@@ -41,7 +46,17 @@ export default function CategoryPicker({
   const [mainOpen, setMainOpen] = useState(false)
   const [subOpen, setSubOpen] = useState(false)
 
-  const selectedLabel = CardCategories.find(c => c.key === category)?.label
+  const isNaruto = category === 'Other' && subCategory === NARUTO_SUB
+  const selectedLabel = isNaruto
+    ? 'Naruto (Kayou)'
+    : CardCategories.find(c => c.key === category)?.label
+
+  // Virtual "Naruto (Kayou)" entry rendered above "Other" in the modal
+  const pickerEntries: { key: string; label: string }[] = [
+    ...CardCategories.filter(c => c.key !== 'Other').map(c => ({ key: c.key, label: c.label })),
+    { key: 'Naruto', label: 'Naruto (Kayou)' },
+    { key: 'Other', label: 'Other' },
+  ]
 
   return (
     <View>
@@ -87,16 +102,28 @@ export default function CategoryPicker({
             <View style={s.handle} />
             <Text style={s.sheetTitle}>Select Card Type</Text>
             <ScrollView style={{ maxHeight: 480 }}>
-              {CardCategories.map(cat => {
-                const sel = category === cat.key
+              {pickerEntries.map(cat => {
+                const sel = cat.key === 'Naruto'
+                  ? isNaruto
+                  : cat.key === 'Other'
+                    ? category === 'Other' && !isNaruto
+                    : category === cat.key
                 return (
                   <TouchableOpacity
                     key={cat.key}
                     style={[s.item, sel && s.itemSelected]}
                     onPress={() => {
-                      onCategoryChange(cat.key)
-                      // Reset sub-category if switching away from Other
-                      if (cat.key !== 'Other' && subCategory) onSubCategoryChange('')
+                      if (cat.key === 'Naruto') {
+                        // Virtual entry: real category is Other + fixed sub-category
+                        onCategoryChange('Other')
+                        onSubCategoryChange(NARUTO_SUB)
+                      } else {
+                        onCategoryChange(cat.key)
+                        // Reset sub-category if switching away from Other, or if it
+                        // still holds the Naruto auto-fill after picking plain Other
+                        if (cat.key !== 'Other' && subCategory) onSubCategoryChange('')
+                        if (cat.key === 'Other' && subCategory === NARUTO_SUB) onSubCategoryChange('')
+                      }
                       setMainOpen(false)
                     }}
                   >
