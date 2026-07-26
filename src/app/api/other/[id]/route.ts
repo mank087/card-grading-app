@@ -3,6 +3,7 @@ import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { recordGradingFailure } from "@/lib/gradingFailure";
+import { lookupNarutoCard, looksLikeKayouNumber } from "@/lib/narutoCardMatcher";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
@@ -497,6 +498,52 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     if (conversationalGradingResult) {
       try {
         const jsonData = JSON.parse(conversationalGradingResult);
+
+        // 🍥 KAYOU NARUTO IDENTIFICATION: "Other" cards with a Kayou-style
+        // card number (NRSA01-SE-001L5, NR-BP-016, ...) get validated and
+        // enriched against the local naruto_cards database. Mutates
+        // jsonData.card_info BEFORE field extraction so the DB row, label,
+        // and card_info all inherit the verified identity.
+        try {
+          const ci = jsonData.card_info || {};
+          const candidateNumber = ci.card_number || null;
+          const candidateName = ci.card_name || ci.player_or_character || null;
+          const mentionsNaruto = /naruto|kayou/i.test(`${ci.set_name ?? ''} ${ci.manufacturer ?? ''} ${candidateName ?? ''}`);
+          if (looksLikeKayouNumber(candidateNumber) || mentionsNaruto) {
+            console.log(`[GET /api/other/${cardId}] 🍥 Kayou Naruto pattern detected, querying naruto_cards...`);
+            const narutoMatch = await lookupNarutoCard({
+              card_number: candidateNumber,
+              card_name: candidateName,
+              character_name: ci.player_or_character || null
+            });
+            if (narutoMatch.card && narutoMatch.confidence !== 'low') {
+              const nc = narutoMatch.card;
+              const setLabel = narutoMatch.set
+                ? `Naruto Kayou — ${narutoMatch.set.name}${narutoMatch.set.subtitle ? ` ${narutoMatch.set.subtitle}` : ''}`
+                : 'Naruto Kayou';
+              jsonData.card_info = {
+                ...ci,
+                card_name: nc.character_name || ci.card_name,
+                set_name: setLabel,
+                card_number: nc.card_number,
+                manufacturer: 'Kayou',
+                rarity_or_variant: [nc.rarity_code, nc.l_tier].filter(Boolean).join(' ') || ci.rarity_or_variant || null,
+                year: narutoMatch.set?.release_instore ? new Date(narutoMatch.set.release_instore).getFullYear().toString() : ci.year || null,
+                naruto_database_number: nc.card_number,
+                naruto_match_confidence: narutoMatch.confidence,
+                naruto_reference_image: nc.image_is_stand_in ? null : (nc.image_front_url || nc.image_thumb_url)
+              };
+              conversationalGradingResult = JSON.stringify(jsonData);
+              console.log(`[GET /api/other/${cardId}] ✅ Naruto DB match (${narutoMatch.confidence}, ${narutoMatch.matchedBy}): ${nc.character_name} ${nc.card_number}`);
+              narutoMatch.warnings.forEach(w => console.log(`[GET /api/other/${cardId}]    ${w}`));
+            } else if (narutoMatch.warnings.length) {
+              narutoMatch.warnings.forEach(w => console.log(`[GET /api/other/${cardId}] ⚠️ Naruto lookup: ${w}`));
+            }
+          }
+        } catch (narutoError: any) {
+          // Table may not exist yet (migration pending) — never fail grading over enrichment
+          console.log(`[GET /api/other/${cardId}] ⚠️ Naruto DB lookup skipped: ${narutoError.message}`);
+        }
 
         // Extract card-specific fields
         otherFields = extractOtherFieldsFromConversational(jsonData);

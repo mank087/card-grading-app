@@ -141,6 +141,20 @@ async function checkPokemon(issues: string[], summary: string[]) {
   summary.push(`Pokemon: checked ${(sets.data || []).length} newest pokemontcg.io sets`);
 }
 
+/** Naruto (Kayou): every narutodb.com set must exist internally with full counts */
+async function checkNaruto(issues: string[], summary: string[]) {
+  const sets = await fetchJson('https://api.narutodb.com/api/sets');
+  for (const s of sets || []) {
+    const count = await internalCount('naruto_cards', q => q.eq('set_id', s.id));
+    if (count === 0) {
+      issues.push(`Naruto: set "${s.name}" (${s.id}, ${s.total_cards} cards) is MISSING → run: node scripts/import-naruto-database.js`);
+    } else if (count < s.total_cards) {
+      issues.push(`Naruto: set "${s.name}" (${s.id}) is PARTIAL — ${count}/${s.total_cards} cards → run: node scripts/import-naruto-database.js`);
+    }
+  }
+  summary.push(`Naruto: checked ${(sets || []).length} narutodb.com sets`);
+}
+
 async function sendAlert(issues: string[]) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -184,6 +198,7 @@ export async function GET(request: NextRequest) {
     ['onepiece', checkOnePiece],
     ['yugioh', checkYugioh],
     ['pokemon', checkPokemon],
+    ['naruto', checkNaruto],
   ];
   for (const [name, fn] of checks) {
     try {
