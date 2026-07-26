@@ -54,8 +54,11 @@ export function looksLikeTcgCode(value: string | null | undefined): boolean {
   if (!value) return false;
   const v = normalizeTcgCode(value);
   // BT2-001 / ST1-05 / EX4-012 (digimon), FB01-001 / FS01-01 (dbf),
-  // UA01BT-001 (union arena), GD01-001 (gundam), OGN-001 etc. (riftbound)
-  return /^(BT|ST|EX|P|RB|FB|FS|FP|UA\d{2}[A-Z]{2}|GD|EXB|OGN|OGS)\d*-\d+/i.test(v);
+  // UA01BT/HTR-1-001 compound or HTR-1-001 series style (union arena),
+  // GD01-001 (gundam), OGN-001 etc. (riftbound)
+  return /^(BT|ST|EX|P|RB|FB|FS|FP|GD|EXB|OGN|OGS)\d*-\d+/i.test(v) ||
+    /^UA\d{2}[A-Z]{2}[/-]/i.test(v) ||
+    /^[A-Z]{2,4}-\d{1,2}-(AP)?\d{1,3}/i.test(v);
 }
 
 /**
@@ -76,36 +79,43 @@ export async function lookupTcgCard(aiInfo: {
 
   if (rawNumber) {
     const code = normalizeTcgCode(rawNumber);
+    // Union Arena prints compound codes ("UA01BT/HTR-1-001") while the DB
+    // stores the series segment ("HTR-1-001") — try each slash segment too.
+    const candidates = [code, ...(code.includes('/') ? code.split('/').map(s => s.trim()).filter(Boolean) : [])];
 
-    // Code within the known game — definitive
-    if (game) {
-      const { data } = await supabase
+    for (const candidate of candidates) {
+      // Code within the known game — definitive
+      if (game) {
+        const { data } = await supabase
+          .from('tcg_cards')
+          .select('*')
+          .eq('game', game)
+          .eq('code', candidate)
+          .maybeSingle();
+        if (data) {
+          if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
+          return { card: data as TcgCard, confidence: 'high', matchedBy: 'code_in_game', warnings };
+        }
+      }
+
+      // Code across all games — accept only if globally unique
+      const { data: global } = await supabase
         .from('tcg_cards')
         .select('*')
-        .eq('game', game)
-        .eq('code', code)
-        .maybeSingle();
-      if (data) {
-        return { card: data as TcgCard, confidence: 'high', matchedBy: 'code_in_game', warnings };
+        .eq('code', candidate)
+        .limit(2);
+      if (global && global.length === 1) {
+        if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
+        if (game && global[0].game !== game) {
+          warnings.push(`Code found in ${global[0].game}, not the selected ${game} — trusting the code`);
+        }
+        return { card: global[0] as TcgCard, confidence: game && global[0].game === game ? 'high' : 'medium', matchedBy: 'code_unique_global', warnings };
       }
-      warnings.push(`Code "${code}" not found in ${game}`);
-    }
-
-    // Code across all games — accept only if globally unique
-    const { data: global } = await supabase
-      .from('tcg_cards')
-      .select('*')
-      .eq('code', code)
-      .limit(2);
-    if (global && global.length === 1) {
-      if (game && global[0].game !== game) {
-        warnings.push(`Code found in ${global[0].game}, not the selected ${game} — trusting the code`);
+      if (global && global.length > 1) {
+        warnings.push(`Code "${candidate}" exists in multiple games — game selection required`);
       }
-      return { card: global[0] as TcgCard, confidence: game && global[0].game === game ? 'high' : 'medium', matchedBy: 'code_unique_global', warnings };
     }
-    if (global && global.length > 1) {
-      warnings.push(`Code "${code}" exists in multiple games — game selection required`);
-    }
+    if (game) warnings.push(`Code "${code}" not found in ${game}`);
   }
 
   // Name within a known game — accept only if unique
