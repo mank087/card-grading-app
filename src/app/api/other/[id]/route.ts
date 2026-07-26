@@ -508,7 +508,9 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           const ci = jsonData.card_info || {};
           const candidateNumber = ci.card_number || null;
           const candidateName = ci.card_name || ci.player_or_character || null;
-          const mentionsNaruto = /naruto|kayou/i.test(`${ci.set_name ?? ''} ${ci.manufacturer ?? ''} ${candidateName ?? ''}`);
+          // sub_category is set by the upload dropdown ("Naruto / Kayou"), so an
+          // explicit user selection always triggers the DB lookup
+          const mentionsNaruto = /naruto|kayou/i.test(`${ci.set_name ?? ''} ${ci.manufacturer ?? ''} ${candidateName ?? ''} ${card.sub_category ?? ''}`);
           if (looksLikeKayouNumber(candidateNumber) || mentionsNaruto) {
             console.log(`[GET /api/other/${cardId}] 🍥 Kayou Naruto pattern detected, querying naruto_cards...`);
             const narutoMatch = await lookupNarutoCard({

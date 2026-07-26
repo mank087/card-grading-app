@@ -136,6 +136,25 @@ const CARD_TYPES = {
       ]
     }
   },
+  // Naruto is a first-class dropdown choice but NOT a navigation category:
+  // cards grade through the Other pipeline (category 'Other', sub_category
+  // 'Naruto / Kayou'), where the Kayou identification enrichment picks them up.
+  Naruto: {
+    label: 'Naruto Card (Kayou)',
+    icon: '',
+    category: 'Other',
+    apiEndpoint: '/api/other',
+    route: '/other',
+    description: {
+      title: 'Naruto (Kayou) Cards',
+      items: [
+        'Kayou Naruto trading cards (NA releases)',
+        'Heaven Scroll, Earth Scroll, Chapter Jin series',
+        'Automatic identification by card number',
+        'Rarity tier and character verification'
+      ]
+    }
+  },
   Other: {
     label: 'Other Collectible Card',
     icon: '',
@@ -159,7 +178,8 @@ const OTHER_SUB_CATEGORIES = {
   TCG: [
     'Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard',
     'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG',
-    'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'
+    'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena',
+    'Naruto / Kayou'
   ],
   Entertainment: [
     'Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids',
@@ -792,7 +812,12 @@ function UniversalUploadPageContent() {
           front_path: frontPath,
           back_path: backPath,
           category: config.category,
-          ...(config.category === 'Other' && subCategory ? { sub_category: subCategory } : {}),
+          // Naruto is a fixed sub-category (its dropdown entry skips the manual picker)
+          ...(config.category === 'Other'
+            ? (selectedType === 'Naruto'
+                ? { sub_category: 'Naruto / Kayou' }
+                : (subCategory ? { sub_category: subCategory } : {}))
+            : {}),
           visibility: 'public', // Cards are public by default so grading API can access them
           // User condition report fields
           user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
@@ -1507,6 +1532,7 @@ function UniversalUploadPageContent() {
         case 'MTG': return '🔮';
         case 'Sports': return '🏆';
         case 'Lorcana': return '✨';
+        case 'Naruto': return '🍥';
         case 'Other': return '🎴';
         default: return '🎴';
       }
