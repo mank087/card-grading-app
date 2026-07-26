@@ -229,6 +229,15 @@ export async function lookupBySetAndNumber(
 }
 
 /**
+ * Quote a value for use inside a PostgREST .or() filter list.
+ * .or() splits conditions on commas, so unquoted names containing
+ * commas produce a malformed query that errors out.
+ */
+function orPattern(value: string): string {
+  return `"%${value.replace(/[\\"]/g, '')}%"`;
+}
+
+/**
  * Search for Lorcana cards by name
  */
 export async function searchByName(name: string, limit: number = 10): Promise<LorcanaCard[]> {
@@ -238,7 +247,7 @@ export async function searchByName(name: string, limit: number = 10): Promise<Lo
   const { data, error } = await supabase
     .from('lorcana_cards')
     .select('*')
-    .or(`name.ilike.%${name}%,full_name.ilike.%${name}%`)
+    .or(`name.ilike.${orPattern(name)},full_name.ilike.${orPattern(name)}`)
     .limit(limit);
 
   if (error) {
@@ -262,7 +271,7 @@ export async function searchByNameAndSet(
   const { data, error } = await supabase
     .from('lorcana_cards')
     .select('*')
-    .or(`name.ilike.%${name}%,full_name.ilike.%${name}%`)
+    .or(`name.ilike.${orPattern(name)},full_name.ilike.${orPattern(name)}`)
     .ilike('set_name', `%${setName}%`)
     .limit(limit);
 

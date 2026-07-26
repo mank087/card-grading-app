@@ -101,6 +101,10 @@ export interface MatchResult {
   card: MtgCard | null;
   score: number;
   confidence: MatchConfidenceFlags;
+  // Set when the card NAME matched strongly but the specific PRINT is ambiguous
+  // (heavily reprinted card with no usable set/number info). The caller can run
+  // visual disambiguation against these to pick the right print.
+  printCandidates?: MtgCard[];
 }
 
 /**
@@ -256,6 +260,15 @@ export async function lookupBySetAndNumber(
 }
 
 /**
+ * Quote a value for use inside a PostgREST .or() filter list.
+ * .or() splits conditions on commas, so unquoted names like
+ * "Jace, the Mind Sculptor" produce a malformed query that errors out.
+ */
+function orPattern(value: string): string {
+  return `"%${value.replace(/[\\"]/g, '')}%"`;
+}
+
+/**
  * Search for MTG cards by name
  */
 export async function searchByName(name: string, limit: number = 10): Promise<MtgCard[]> {
@@ -265,7 +278,7 @@ export async function searchByName(name: string, limit: number = 10): Promise<Mt
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
+    .or(`name.ilike.${orPattern(name)},flavor_name.ilike.${orPattern(name)}`)
     .order('released_at', { ascending: false })
     .limit(limit);
 
@@ -290,7 +303,7 @@ export async function searchByNameAndSet(
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
+    .or(`name.ilike.${orPattern(name)},flavor_name.ilike.${orPattern(name)}`)
     .ilike('set_name', `%${setName}%`)
     .order('released_at', { ascending: false })
     .limit(limit);
@@ -317,7 +330,7 @@ export async function searchByNameAndSetCode(
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
+    .or(`name.ilike.${orPattern(name)},flavor_name.ilike.${orPattern(name)}`)
     .eq('set_code', normalizedCode)
     .order('collector_number', { ascending: true })
     .limit(limit);
@@ -328,6 +341,32 @@ export async function searchByNameAndSetCode(
   }
 
   return (data || []) as MtgCard[];
+}
+
+/**
+ * Get every print of a card (all sets), preferring oracle_id grouping.
+ * Ordered oldest-first so vintage prints are never cut off by the limit.
+ */
+export async function getAllPrints(card: MtgCard, limit: number = 50): Promise<MtgCard[]> {
+  const supabase = supabaseServer();
+
+  let query = supabase.from('mtg_cards').select('*');
+  if (card.oracle_id) {
+    query = query.eq('oracle_id', card.oracle_id);
+  } else {
+    query = query.eq('name', card.name);
+  }
+
+  const { data, error } = await query
+    .order('released_at', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error('[MTG Matcher] getAllPrints error:', error.message);
+    return [card];
+  }
+
+  return (data && data.length > 0 ? data : [card]) as MtgCard[];
 }
 
 /**
@@ -689,12 +728,51 @@ export async function lookupMtgCard(
   }
 
   // Find best match with confidence scoring
-  return findBestMatchWithConfidence(searchResults, {
+  const best = findBestMatchWithConfidence(searchResults, {
     setCode,
     collectorNumber,
     name,
     set: setName
   });
+
+  // Name-only rescue: the name matched strongly but nothing (set/number) confirms
+  // the specific PRINT. Vintage cards (no printed collector info) and comma-name
+  // legends land here. Resolve via print count instead of discarding the match.
+  if (
+    best.card &&
+    best.confidence.overallConfidence === 'low' &&
+    best.confidence.nameScore >= 0.9
+  ) {
+    const prints = await getAllPrints(best.card);
+
+    if (prints.length === 1) {
+      // Only one print exists — the name alone identifies the card completely
+      console.log(`[MTG Matcher] Name-only match accepted (single print): ${prints[0].name} (${prints[0].set_name})`);
+      return {
+        card: prints[0],
+        score: 0.8,
+        confidence: {
+          ...best.confidence,
+          overallConfidence: 'medium',
+          warnings: [...best.confidence.warnings, 'Matched by name only — single known print']
+        }
+      };
+    }
+
+    // Multiple prints — leave confidence low but surface the candidates so the
+    // caller can run visual print disambiguation.
+    console.log(`[MTG Matcher] Name matched but print ambiguous: ${best.card.name} has ${prints.length} prints`);
+    return {
+      ...best,
+      printCandidates: prints,
+      confidence: {
+        ...best.confidence,
+        warnings: [...best.confidence.warnings, `Name matched but print ambiguous (${prints.length} prints)`]
+      }
+    };
+  }
+
+  return best;
 }
 
 /**
