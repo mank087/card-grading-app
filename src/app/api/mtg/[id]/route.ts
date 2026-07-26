@@ -157,13 +157,26 @@ function extractMTGFieldsFromConversational(conversationalJSON: any) {
       frame_version: cardInfo.frame_version || null,
       is_double_faced: cardInfo.is_double_faced !== undefined ? cardInfo.is_double_faced : false,
       language: cardInfo.language || 'English',
-      keywords: cardInfo.keywords || null,
+      keywords: coerceKeywordsArray(cardInfo.keywords),
       scryfall_id: cardInfo.scryfall_id || null
     };
   } catch (error) {
     console.error('[MTG Field Extraction] Error parsing conversational JSON:', error);
     return {};
   }
+}
+
+/**
+ * cards.keywords is a Postgres text[] column. The AI usually emits an array,
+ * but enrichment/legacy paths have produced comma-joined strings, which fail
+ * the save with 22P02 "malformed array literal". Coerce to array or null.
+ */
+function coerceKeywordsArray(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.length > 0 ? value.map(String) : null;
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return null;
 }
 
 // Main GET handler for MTG cards
@@ -1050,7 +1063,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                 power_toughness: powerToughness,
                 rarity_or_variant: dbCard.rarity,
                 artist_name: dbCard.artist,
-                keywords: dbCard.keywords?.join(', ') || null,
+                // cards.keywords is a Postgres text[] — must stay an array.
+                // join(', ') here produced "malformed array literal" (22P02) on
+                // save for any enriched card that had keywords.
+                keywords: dbCard.keywords && dbCard.keywords.length > 0 ? dbCard.keywords : null,
                 // === CARD VARIANT INFO (from database) ===
                 is_promo: dbCard.promo || false,
                 is_reprint: dbCard.reprint || false,
@@ -1120,7 +1136,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           frame_version: conversationalGradingData.card_info.frame_version || null,
           is_double_faced: conversationalGradingData.card_info.is_double_faced !== undefined ? conversationalGradingData.card_info.is_double_faced : false,
           language: conversationalGradingData.card_info.language || 'English',
-          keywords: conversationalGradingData.card_info.keywords || null,
+          keywords: coerceKeywordsArray(conversationalGradingData.card_info.keywords),
           scryfall_id: conversationalGradingData.card_info.scryfall_id || null,
           rarity_description: conversationalGradingData.card_info.rarity_or_variant || null,
           autographed: conversationalGradingData.card_info.autographed !== undefined ? conversationalGradingData.card_info.autographed : null,
@@ -1269,7 +1285,18 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
     if (updateError) {
       console.error(`[GET /api/mtg/${cardId}] Database update failed:`, updateError);
-      return NextResponse.json({ error: "Failed to save MTG card grading results" }, { status: 500 });
+      // Releases the grading lock (grade_status='failed') and refunds the credit
+      const failure = await recordGradingFailure({
+        cardId,
+        userId: card.user_id,
+        category: 'MTG',
+        errorMessage: `Save failed: ${updateError.message}`
+      });
+      return NextResponse.json({
+        error: "Failed to save MTG card grading results",
+        grading_failed: true,
+        credit_refunded: failure.refunded
+      }, { status: 500 });
     }
 
     // 🎨 Color Extraction (Post-Grading, fire-and-forget)
