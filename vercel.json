@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/update-card-prices",
       "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/check-card-databases",
+      "schedule": "0 4 * * 1"
     }
   ]
 }
