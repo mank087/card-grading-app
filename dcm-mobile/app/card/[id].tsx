@@ -1073,26 +1073,35 @@ export default function CardDetailScreen() {
                   onPress={async () => {
                     setSavingEdit(true)
                     try {
-                      const mergedCi = {
-                        ...(card.conversational_card_info || {}),
-                        card_name: editForm.card_name || null,
-                        set_name: editForm.card_set || null,
-                        card_number: editForm.card_number || null,
-                        year: editForm.release_date || null,
-                        player_or_character: editForm.player_or_character || null,
-                        manufacturer: editForm.manufacturer || null,
-                        rarity_tier: editForm.rarity || null,
-                      }
-                      const update = {
-                        card_name: editForm.card_name || null,
-                        card_set: editForm.card_set || null,
-                        card_number: editForm.card_number || null,
-                        release_date: editForm.release_date || null,
-                        conversational_card_info: mergedCi,
-                      }
-                      const { error } = await supabase.from('cards').update(update).eq('id', card.id)
-                      if (error) throw error
-                      setCard((prev: any) => prev ? { ...prev, ...update } : prev)
+                      // Route through the same edit API the web uses. A direct
+                      // supabase.update() here used to leave the stored label_data
+                      // snapshot stale — the collection showed the corrected number
+                      // while the printed label kept the old one (customer-reported
+                      // Jul 27: label printed "227" after correcting to "127").
+                      // The API validates fields, updates both the columns and
+                      // conversational_card_info, and regenerates label_data.
+                      const { data: { session } } = await supabase.auth.getSession()
+                      if (!session?.access_token) throw new Error('Not authenticated')
+                      const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                      const res = await fetch(`${apiBase}/api/cards/${card.id}/details`, {
+                        method: 'PATCH',
+                        headers: {
+                          Authorization: `Bearer ${session.access_token}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          card_name: editForm.card_name || '',
+                          featured: editForm.player_or_character || '',
+                          card_set: editForm.card_set || '',
+                          card_number: editForm.card_number || '',
+                          release_date: editForm.release_date || '',
+                          manufacturer_name: editForm.manufacturer || '',
+                          rarity_tier: editForm.rarity || '',
+                        }),
+                      })
+                      const result = await res.json().catch(() => ({}))
+                      if (!res.ok) throw new Error(result?.error || 'Could not update card.')
+                      setCard((prev: any) => prev ? { ...prev, ...(result.card || {}) } : prev)
                       setEditOpen(false)
                     } catch (err: any) {
                       Alert.alert('Save failed', err?.message || 'Could not update card.')

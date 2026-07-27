@@ -1246,7 +1246,51 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 cardInfo.validated_source = 'pokemon_cards';
               }
             } else {
-              console.log(`[GET /api/pokemon/${cardId}] ⚠️ No DB match for "${pokemonName}" #${cardNumber}, using AI values`);
+              // 🔢 SINGLE-DIGIT MISREAD RESCUE: the model occasionally misreads one
+              // digit of the card number (customer case Jul 27: "227" for a card
+              // printed 127/094 — Mega Sharpedo ex, Phantasmal Flames me2-127).
+              // If the name (+ OCR denominator when available) matches cards in the
+              // DB and EXACTLY ONE of them differs from the AI number by a single
+              // digit in the same position, that is overwhelmingly an OCR-class
+              // misread — correct to the DB number. Ambiguity (0 or 2+ candidates)
+              // keeps the AI value.
+              let rescued = false;
+              try {
+                let nameQuery = supabase
+                  .from('pokemon_cards')
+                  .select('name, number, set_printed_total, set_name, set_id, set_release_date')
+                  .ilike('name', `%${pokemonName}%`);
+                if (ocrDerivedTotal && !isNaN(parseInt(ocrDerivedTotal))) {
+                  nameQuery = nameQuery.eq('set_printed_total', parseInt(ocrDerivedTotal));
+                }
+                const { data: nameMatches } = await nameQuery.limit(25);
+                const aiNum = String(cardNumber).trim();
+                const oneDigitOff = (a: string, b: string) =>
+                  a.length === b.length && a !== b &&
+                  [...a].filter((ch, i) => ch !== b[i]).length === 1;
+                const candidates = (nameMatches || []).filter(m => oneDigitOff(aiNum, String(m.number).trim()));
+                if (candidates.length === 1) {
+                  const fix = candidates[0];
+                  const fixedTotal = fix.set_printed_total?.toString();
+                  console.log(`[GET /api/pokemon/${cardId}] 🔢 DIGIT-MISREAD CORRECTED: "${aiNum}" → "${fix.number}" (${fix.name}, ${fix.set_name})`);
+                  cardInfo.card_number = String(fix.number);
+                  if (fixedTotal) {
+                    cardInfo.set_total = fixedTotal;
+                    cardInfo.card_number_raw = `${fix.number}/${fixedTotal}`;
+                  }
+                  cardInfo.set_name = fix.set_name;
+                  const yr = fix.set_release_date?.toString().match(/^(\d{4})/)?.[1];
+                  if (yr) cardInfo.year = yr;
+                  cardInfo.needs_api_lookup = false;
+                  cardInfo.validated_source = 'pokemon_cards';
+                  cardInfo.number_corrected_from = aiNum;
+                  dbValidationApplied = true;
+                  rescued = true;
+                }
+              } catch { /* rescue is best-effort */ }
+              if (!rescued) {
+                console.log(`[GET /api/pokemon/${cardId}] ⚠️ No DB match for "${pokemonName}" #${cardNumber}, using AI values`);
+              }
             }
           } catch (dbValidationError) {
             console.error(`[GET /api/pokemon/${cardId}] ⚠️ DB validation error:`, dbValidationError);
@@ -1262,9 +1306,13 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
             if (updatedJson.card_info) {
               updatedJson.card_info.set_name = cardInfo.set_name;
               updatedJson.card_info.set_total = cardInfo.set_total;
+              updatedJson.card_info.card_number = cardInfo.card_number; // digit-misread rescue can change the numerator
               updatedJson.card_info.card_number_raw = cardInfo.card_number_raw;
               updatedJson.card_info.year = cardInfo.year;
               updatedJson.card_info.needs_api_lookup = false;
+              if (cardInfo.number_corrected_from) {
+                updatedJson.card_info.number_corrected_from = cardInfo.number_corrected_from;
+              }
               // 🔒 WS7.2: Persist validation provenance in the raw JSON (EN and JA paths)
               if (cardInfo.validated_source) {
                 updatedJson.card_info.validated_source = cardInfo.validated_source;
