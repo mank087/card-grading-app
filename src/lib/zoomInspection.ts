@@ -110,14 +110,16 @@ export async function verifyStructuralClaim(
      *  claim then needs UNANIMOUS verifier confirmation, not a majority. */
     requireUnanimous?: boolean;
   }
-): Promise<{ ok: boolean; confirmed: boolean; reason: string }> {
+): Promise<{ ok: boolean; confirmed: boolean; reason: string; strongEvidence: boolean }> {
   try {
-    // Tears / missing pieces are unambiguous — only line-type claims need this.
-    const lineClaims = findings.filter(f => ['crease', 'bend', 'fold', 'warp'].includes(String(f.type || '').toLowerCase()));
-    if (lineClaims.length === 0) return { ok: true, confirmed: true, reason: 'non-line structural damage (tear/missing) — no verification needed' };
+    // v9.8: tears are verified too — zoom crops have called sleeve edges and
+    // background artifacts "tears", and tear claims used to skip verification
+    // entirely. Only claims with no type at all pass through unverified.
+    const lineClaims = findings.filter(f => ['crease', 'bend', 'fold', 'warp', 'tear'].includes(String(f.type || '').toLowerCase()));
+    if (lineClaims.length === 0) return { ok: true, confirmed: true, reason: 'untyped structural damage — no verification available', strongEvidence: false };
 
     const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
-    if (!frontRes.ok || !backRes.ok) return { ok: false, confirmed: true, reason: 'image fetch failed — cap stands (fail-safe)' };
+    if (!frontRes.ok || !backRes.ok) return { ok: false, confirmed: true, reason: 'image fetch failed — cap stands (fail-safe)', strongEvidence: false };
     const bufs: Record<string, Buffer> = {
       front: Buffer.from(await frontRes.arrayBuffer()),
       back: Buffer.from(await backRes.arrayBuffer()),
@@ -154,7 +156,10 @@ THE DISCRIMINATOR:
 - CREASE/FOLD (damage): a THIN line or ridge — the brightness disturbance is confined to the line itself (often a paired highlight+shadow along a ridge, may break ink or show fiber). The surface tone on BOTH sides of the line MATCHES.
 - LIGHTING/REFLECTION BAND (not damage): a BROAD tonal step — one ENTIRE side of the boundary is uniformly brighter or darker than the other (glossy/metallic cards reflect room lighting as straight bands). No ridge, no ink break, no fiber.
 - PRINTED DESIGN LINE (not damage): part of the card's artwork — e.g. the light streaks and wave lines inside the swirl pattern of a Pokemon card back, comic speed-lines, borders. These follow the ARTWORK's geometry and colors, do not disturb the gloss, and are perfectly reproduced (no fiber, no ridge).
+- TEAR (damage): actual paper separation — torn fiber edge, missing material, or a jagged split in the card outline. A sleeve edge, case edge, or background boundary near the card is NOT a tear.
 - Also NOT damage: foil patterns, sleeve edges.
+
+⚠️ KNOWN FALSE POSITIVE — POKEMON CARD BACKS: the standard Pokemon back prints faint wavy arc lines in the pale swirl areas (especially around the inverted logo in the lower quadrants). These arcs appear on EVERY genuine copy — they are ink, not damage. Because printed arcs there also mimic a highlight/shadow pair, "ridge_shadow" is NOT acceptable evidence for a claim inside the swirl artwork of a Pokemon back — such a claim needs ink_break_or_fiber, edge_deformation, or matching_line_opposite_face.
 
 A verdict of physical_damage=true REQUIRES at least one piece of stated evidence:
 - "ink_break_or_fiber": the line visibly breaks the printed ink or shows white paper fiber
@@ -222,28 +227,38 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
     // false-crease on a Pokemon back swirl was "confirmed" with no evidence at all).
     let damageVotes = 0, parsed = 0;
     const reasons: string[] = [];
+    const evidenceCited = new Set<string>();
     const VALID_EVIDENCE = new Set(['ink_break_or_fiber', 'ridge_shadow', 'edge_deformation', 'matching_line_opposite_face']);
+    // v9.8: through-print evidence — physically necessary consequences of a real
+    // crease/tear that printed artwork cannot mimic. ridge_shadow alone is the
+    // weak category (printed swirl arcs satisfy it — measured 3/3 false confirms).
+    const STRONG_EVIDENCE = new Set(['ink_break_or_fiber', 'edge_deformation', 'matching_line_opposite_face']);
     for (const choice of response.choices) {
       try {
         const v = JSON.parse(choice.message?.content || '');
         parsed++;
-        const anyDamage = (v.verdicts || []).some((x: any) => x.physical_damage === true && VALID_EVIDENCE.has(String(x.evidence || '')));
-        if (anyDamage) damageVotes++;
-        else reasons.push((v.verdicts || []).map((x: any) => x.reason).filter(Boolean)[0] || 'no damage evidence');
+        const damaged = (v.verdicts || []).filter((x: any) => x.physical_damage === true && VALID_EVIDENCE.has(String(x.evidence || '')));
+        if (damaged.length > 0) {
+          damageVotes++;
+          damaged.forEach((x: any) => evidenceCited.add(String(x.evidence)));
+        } else {
+          reasons.push((v.verdicts || []).map((x: any) => x.reason).filter(Boolean)[0] || 'no damage evidence');
+        }
       } catch { /* skip unparseable */ }
     }
-    if (parsed === 0) return { ok: false, confirmed: true, reason: 'verification unparseable — cap stands (fail-safe)' };
+    if (parsed === 0) return { ok: false, confirmed: true, reason: 'verification unparseable — cap stands (fail-safe)', strongEvidence: false };
     const confirmed = opts?.requireUnanimous ? damageVotes === parsed : damageVotes >= Math.ceil(parsed / 2);
+    const strongEvidence = confirmed && [...evidenceCited].some(e => STRONG_EVIDENCE.has(e));
     const reason = confirmed
-      ? `verified as physical damage (${damageVotes}/${parsed} verifier votes)`
-      : `verified as lighting/reflection, not damage (${parsed - damageVotes}/${parsed} votes: ${reasons[0] || ''})`;
+      ? `verified as physical damage (${damageVotes}/${parsed} verifier votes; evidence: ${[...evidenceCited].join(', ') || 'unspecified'})`
+      : `verified as lighting/reflection/printed design, not damage (${parsed - damageVotes}/${parsed} votes: ${reasons[0] || ''})`;
     console.log(`[ZOOM] structural verification: ${reason}`);
-    return { ok: true, confirmed, reason };
+    return { ok: true, confirmed, reason, strongEvidence };
   } catch (err: any) {
     // Fail-safe: if verification errors, the cap stands (never let an outage
     // silently un-cap genuinely creased cards).
     console.error('[ZOOM] structural verification failed:', err?.message);
-    return { ok: false, confirmed: true, reason: `verification error — cap stands (${err?.message})` };
+    return { ok: false, confirmed: true, reason: `verification error — cap stands (${err?.message})`, strongEvidence: false };
   }
 }
 
@@ -873,7 +888,13 @@ export async function runZoomInspection(
       // dispute a large share — 2-vote minors from partially-correlated samples are
       // the noise floor. A real minor defect that 3+ samples independently report
       // still caps; borderline two-vote flecks no longer generate disputed report text.
-      const required = severity === 'minor' ? Math.min(3, samples.length) : voteThreshold;
+      // v9.8: STRUCTURAL types also need 3 votes regardless of severity — a structural
+      // cap is catastrophic (grade 4), and correlated samples repeatedly co-voted the
+      // printed swirl arcs on Pokemon backs as a 2-vote "crease" (9 clean cards graded
+      // 4 at the same "back lower-left quadrant" region, Jul 19-27).
+      const required = (severity === 'minor' || STRUCTURAL_TYPES.has(v.type))
+        ? Math.min(3, samples.length)
+        : voteThreshold;
       if (v.severities.length < required) { minorityDropped++; continue; }
       const region = key.split('|')[0];
       if (STRUCTURAL_TYPES.has(v.type)) {

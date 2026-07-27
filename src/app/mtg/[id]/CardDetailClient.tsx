@@ -36,6 +36,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
+import SectionDefects from '@/components/reports/SectionDefects';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
@@ -4659,6 +4660,7 @@ export function MTGCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(frontCorners as any).defects} />
                         {frontCorners.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-blue-300 bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4704,6 +4706,7 @@ export function MTGCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(frontEdges as any).defects} />
                         {frontEdges.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-blue-300 bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4811,6 +4814,7 @@ export function MTGCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(backCorners as any).defects} accent="purple" />
                         {backCorners.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-purple-300 bg-purple-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4856,6 +4860,7 @@ export function MTGCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(backEdges as any).defects} accent="purple" />
                         {backEdges.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-purple-300 bg-purple-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">

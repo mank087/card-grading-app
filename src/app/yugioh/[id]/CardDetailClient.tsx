@@ -4565,6 +4565,7 @@ export function YugiohCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(frontCorners as any).defects} />
                         {frontCorners.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-blue-300 bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4610,6 +4611,7 @@ export function YugiohCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(frontEdges as any).defects} />
                         {frontEdges.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-blue-300 bg-blue-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4717,6 +4719,7 @@ export function YugiohCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(backCorners as any).defects} accent="purple" />
                         {backCorners.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-purple-300 bg-purple-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">
@@ -4762,6 +4765,7 @@ export function YugiohCardDetails() {
                           )}
                         </div>
 
+                        <SectionDefects defects={(backEdges as any).defects} accent="purple" />
                         {backEdges.summary && (
                           <div className="pt-3 mt-auto border-t-2 border-purple-300 bg-purple-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
                             <p className="text-sm text-gray-800 font-medium">

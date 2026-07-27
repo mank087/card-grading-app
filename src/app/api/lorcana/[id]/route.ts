@@ -417,6 +417,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
               },
               // Front corners
               front_corners: {
+                defects: jsonData.corners?.front?.defects || [],
                 top_left: jsonData.corners?.front?.top_left?.condition || 'N/A',
                 top_right: jsonData.corners?.front?.top_right?.condition || 'N/A',
                 bottom_left: jsonData.corners?.front?.bottom_left?.condition || 'N/A',
@@ -426,6 +427,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
               },
               // Back corners
               back_corners: {
+                defects: jsonData.corners?.back?.defects || [],
                 top_left: jsonData.corners?.back?.top_left?.condition || 'N/A',
                 top_right: jsonData.corners?.back?.top_right?.condition || 'N/A',
                 bottom_left: jsonData.corners?.back?.bottom_left?.condition || 'N/A',
@@ -435,6 +437,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
               },
               // Front edges
               front_edges: {
+                defects: jsonData.edges?.front?.defects || [],
                 top: jsonData.edges?.front?.top?.condition || 'N/A',
                 bottom: jsonData.edges?.front?.bottom?.condition || 'N/A',
                 left: jsonData.edges?.front?.left?.condition || 'N/A',
@@ -444,6 +447,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
               },
               // Back edges
               back_edges: {
+                defects: jsonData.edges?.back?.defects || [],
                 top: jsonData.edges?.back?.top?.condition || 'N/A',
                 bottom: jsonData.edges?.back?.bottom?.condition || 'N/A',
                 left: jsonData.edges?.back?.left?.condition || 'N/A',
@@ -698,6 +702,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
             },
             // Front corners
             front_corners: {
+              defects: jsonData.corners?.front?.defects || [],
               top_left: jsonData.corners?.front?.top_left?.condition || 'N/A',
               top_right: jsonData.corners?.front?.top_right?.condition || 'N/A',
               bottom_left: jsonData.corners?.front?.bottom_left?.condition || 'N/A',
@@ -707,6 +712,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
             },
             // Back corners
             back_corners: {
+              defects: jsonData.corners?.back?.defects || [],
               top_left: jsonData.corners?.back?.top_left?.condition || 'N/A',
               top_right: jsonData.corners?.back?.top_right?.condition || 'N/A',
               bottom_left: jsonData.corners?.back?.bottom_left?.condition || 'N/A',
@@ -716,6 +722,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
             },
             // Front edges
             front_edges: {
+              defects: jsonData.edges?.front?.defects || [],
               top: jsonData.edges?.front?.top?.condition || 'N/A',
               bottom: jsonData.edges?.front?.bottom?.condition || 'N/A',
               left: jsonData.edges?.front?.left?.condition || 'N/A',
@@ -725,6 +732,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
             },
             // Back edges
             back_edges: {
+              defects: jsonData.edges?.back?.defects || [],
               top: jsonData.edges?.back?.top?.condition || 'N/A',
               bottom: jsonData.edges?.back?.bottom?.condition || 'N/A',
               left: jsonData.edges?.back?.left?.condition || 'N/A',

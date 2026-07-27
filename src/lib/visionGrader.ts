@@ -36,7 +36,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.7';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.8';
 // v9.7 (2026-07-24): OUTPUT ECONOMY — negative-finding notes fields (autograph,
 // reprint, marking, trimming, image_completeness, card_presence, slab-when-absent,
 // case-when-none, image_quality one-sentence cap, processing_notes) emit empty
@@ -2163,7 +2163,32 @@ Provide detailed analysis as markdown with all required sections.`
                 serverRounded[cat] = effectiveCap;
                 capLoweredSomething = true;
               }
-              if (capLoweredSomething) appliedFaceCaps[rawKey] = effectiveCap;
+              if (capLoweredSomething) {
+                appliedFaceCaps[rawKey] = effectiveCap;
+                // v9.8: write the zoom findings INTO the face's displayed prose. The
+                // model authored the face summary BEFORE the zoom merge, so a capped
+                // score used to sit beside prose claiming the face was clean, with the
+                // actual findings visible only in the consensus notes ("details are
+                // above" pointing at nothing — customer-reported Jul 27).
+                const faceDefects = zoom.defects.filter(d => d.category === cat && d.face === face);
+                if (faceDefects.length > 0) {
+                  const facePhrases = faceDefects.slice(0, 3)
+                    .map(d => d.severity === 'minor'
+                      ? `faint ${d.type} visible only under magnification (${humanizeZoomRegion(d.region)})`
+                      : `${d.severity} ${d.type} (${humanizeZoomRegion(d.region)})`)
+                    .join('; ') + (faceDefects.length > 3 ? ` +${faceDefects.length - 3} more` : '');
+                  const addendum = ` Magnified zoom inspection subsequently found: ${facePhrases} — this score reflects those findings.`;
+                  const summaryKey = `${face}_summary`;
+                  const catSection = jsonData[cat];
+                  if (catSection && typeof catSection[summaryKey] === 'string') {
+                    catSection[summaryKey] += addendum;
+                  } else if (catSection?.[face] && typeof catSection[face].summary === 'string') {
+                    catSection[face].summary += addendum;
+                  } else if (catSection?.[face] && typeof catSection[face] === 'object') {
+                    catSection[face].summary = addendum.trim();
+                  }
+                }
+              }
             }
             if (serverRounded[cat] < before) {
               // v9.1: list ALL findings (was slice(0,2), which under-justified caps)
@@ -2438,11 +2463,49 @@ Provide detailed analysis as markdown with all required sections.`
           const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural });
           structuralVerified = verdict.confirmed;
           structuralVerifyReason = verdict.reason;
+
+          // v9.8 ZOOM-ONLY EVIDENCE GATE: when NO holistic completion saw the damage
+          // (the claim exists only because one magnified crop voted it), a grade-4 cap
+          // additionally requires through-print evidence (ink break / edge deformation /
+          // matching line on the opposite face). Printed swirl arcs on Pokemon backs
+          // passed the verifier 3/3 on "ridge_shadow" alone — 9 clean cards graded 4 at
+          // the identical region, Jul 19-27. A real crease that three whole-card passes
+          // cannot see at all, with no through-print consequence, does not cap.
+          if (structuralVerified && structuralVotes === 0 && zoomStructural && !verdict.strongEvidence) {
+            structuralVerified = false;
+            structuralVerifyReason = `zoom-only structural claim without through-print evidence (${verdict.reason}) — cap withheld`;
+            console.log(`[GRADE RECALC] ⚠️ structural cap withheld: ${structuralVerifyReason}`);
+          }
+
+          // v9.8 POKEMON-BACK GUARD (deterministic): the standard Pokemon back prints
+          // faint wavy arcs in its swirl that magnified crops repeatedly vote "crease",
+          // and the LLM verifier confirms them with whatever evidence category is
+          // available (measured: 3/3 "ridge_shadow" pre-warning, then 3/3 hallucinated
+          // "matching_line_opposite_face" after). Two documented incidents (Gengar
+          // Jul 16; nine clean cards graded 4 at the same region Jul 19-27). Hard rule:
+          // a structural claim that (a) ONLY the zoom saw (0/3 holistic passes — each of
+          // which also inspects magnified), and (b) sits entirely on a Pokemon BACK,
+          // does not cap. A real back crease either gets a holistic vote or shows on
+          // the front; the finding still surfaces as an unconfirmed note.
+          if (structuralVerified && structuralVotes === 0 && zoomStructural && cardType === 'pokemon') {
+            const allOnBack = findings.length > 0 && findings.every((f: any) => String(f.location || '').toLowerCase().includes('back'));
+            if (allOnBack) {
+              structuralVerified = false;
+              structuralVerifyReason = 'zoom-only claim confined to the Pokemon card back (printed swirl false-positive guard) — cap withheld';
+              console.log(`[GRADE RECALC] ⚠️ structural cap withheld: ${structuralVerifyReason}`);
+            }
+          }
+
+          // Persist the verification outcome — previously console-only, which blinded
+          // production investigations into false structural caps.
+          if (jsonData.structural_damage) {
+            jsonData.structural_damage.verification = structuralVerifyReason;
+          }
           if (!structuralVerified && jsonData.structural_damage) {
             console.log(`[GRADE RECALC] ⚠️ structural claim REJECTED by verification: ${verdict.reason}`);
             jsonData.structural_damage.detected = false;
             jsonData.structural_damage.unconfirmed = true;
-            jsonData.structural_damage.unconfirmed_note = `A straight line was flagged as a possible crease, but magnified verification identified it as a lighting/reflection band on the card's glossy surface — not physical damage. Grade not capped. (${verdict.reason})`;
+            jsonData.structural_damage.unconfirmed_note = `A line was flagged as possible structural damage, but magnified verification could not confirm physical damage — such lines are usually a lighting/reflection band or part of the card's printed artwork (e.g. the wave lines on a Pokemon card back). Grade not capped. (${structuralVerifyReason})`;
           }
         }
 

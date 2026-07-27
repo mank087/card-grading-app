@@ -349,6 +349,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 summary: jsonData.centering?.back_summary || jsonData.centering?.back?.summary || jsonData.centering?.back?.analysis || 'Centering analysis not available.'
               },
               front_corners: {
+                defects: jsonData.corners?.front?.defects || [],
                 top_left: jsonData.corners?.front?.top_left?.condition || 'N/A',
                 top_right: jsonData.corners?.front?.top_right?.condition || 'N/A',
                 bottom_left: jsonData.corners?.front?.bottom_left?.condition || 'N/A',
@@ -357,6 +358,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 summary: jsonData.corners?.front_summary || jsonData.corners?.front?.summary || 'Corner analysis not available'
               },
               back_corners: {
+                defects: jsonData.corners?.back?.defects || [],
                 top_left: jsonData.corners?.back?.top_left?.condition || 'N/A',
                 top_right: jsonData.corners?.back?.top_right?.condition || 'N/A',
                 bottom_left: jsonData.corners?.back?.bottom_left?.condition || 'N/A',
@@ -365,6 +367,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 summary: jsonData.corners?.back_summary || jsonData.corners?.back?.summary || 'Corner analysis not available'
               },
               front_edges: {
+                defects: jsonData.edges?.front?.defects || [],
                 top: jsonData.edges?.front?.top?.condition || 'N/A',
                 bottom: jsonData.edges?.front?.bottom?.condition || 'N/A',
                 left: jsonData.edges?.front?.left?.condition || 'N/A',
@@ -373,6 +376,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 summary: jsonData.edges?.front_summary || jsonData.edges?.front?.summary || 'Edge analysis not available'
               },
               back_edges: {
+                defects: jsonData.edges?.back?.defects || [],
                 top: jsonData.edges?.back?.top?.condition || 'N/A',
                 bottom: jsonData.edges?.back?.bottom?.condition || 'N/A',
                 left: jsonData.edges?.back?.left?.condition || 'N/A',
@@ -677,6 +681,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 },
                 // Front corners
                 front_corners: {
+                  defects: parsedJSONData.corners?.front?.defects || [],
                   top_left: parsedJSONData.corners?.front?.top_left?.condition || 'N/A',
                   top_right: parsedJSONData.corners?.front?.top_right?.condition || 'N/A',
                   bottom_left: parsedJSONData.corners?.front?.bottom_left?.condition || 'N/A',
@@ -686,6 +691,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 },
                 // Back corners
                 back_corners: {
+                  defects: parsedJSONData.corners?.back?.defects || [],
                   top_left: parsedJSONData.corners?.back?.top_left?.condition || 'N/A',
                   top_right: parsedJSONData.corners?.back?.top_right?.condition || 'N/A',
                   bottom_left: parsedJSONData.corners?.back?.bottom_left?.condition || 'N/A',
@@ -695,6 +701,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 },
                 // Front edges
                 front_edges: {
+                  defects: parsedJSONData.edges?.front?.defects || [],
                   top: parsedJSONData.edges?.front?.top?.condition || 'N/A',
                   bottom: parsedJSONData.edges?.front?.bottom?.condition || 'N/A',
                   left: parsedJSONData.edges?.front?.left?.condition || 'N/A',
@@ -704,6 +711,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 },
                 // Back edges
                 back_edges: {
+                  defects: parsedJSONData.edges?.back?.defects || [],
                   top: parsedJSONData.edges?.back?.top?.condition || 'N/A',
                   bottom: parsedJSONData.edges?.back?.bottom?.condition || 'N/A',
                   left: parsedJSONData.edges?.back?.left?.condition || 'N/A',

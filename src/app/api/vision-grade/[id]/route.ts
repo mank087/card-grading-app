@@ -1467,6 +1467,7 @@ EXTRACTION RULES:
             },
             // Front corners
             front_corners: {
+              defects: parsedJSONData.corners?.front?.defects || [],
               top_left: parsedJSONData.corners?.front?.top_left?.condition || 'N/A',
               top_right: parsedJSONData.corners?.front?.top_right?.condition || 'N/A',
               bottom_left: parsedJSONData.corners?.front?.bottom_left?.condition || 'N/A',
@@ -1476,6 +1477,7 @@ EXTRACTION RULES:
             },
             // Back corners
             back_corners: {
+              defects: parsedJSONData.corners?.back?.defects || [],
               top_left: parsedJSONData.corners?.back?.top_left?.condition || 'N/A',
               top_right: parsedJSONData.corners?.back?.top_right?.condition || 'N/A',
               bottom_left: parsedJSONData.corners?.back?.bottom_left?.condition || 'N/A',
@@ -1485,6 +1487,7 @@ EXTRACTION RULES:
             },
             // Front edges
             front_edges: {
+              defects: parsedJSONData.edges?.front?.defects || [],
               top: parsedJSONData.edges?.front?.top?.condition || 'N/A',
               bottom: parsedJSONData.edges?.front?.bottom?.condition || 'N/A',
               left: parsedJSONData.edges?.front?.left?.condition || 'N/A',
@@ -1494,6 +1497,7 @@ EXTRACTION RULES:
             },
             // Back edges
             back_edges: {
+              defects: parsedJSONData.edges?.back?.defects || [],
               top: parsedJSONData.edges?.back?.top?.condition || 'N/A',
               bottom: parsedJSONData.edges?.back?.bottom?.condition || 'N/A',
               left: parsedJSONData.edges?.back?.left?.condition || 'N/A',
