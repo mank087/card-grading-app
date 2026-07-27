@@ -1,3 +1,5 @@
+import { resolveTextPolarity } from './contrastWCAG'
+
 // Color theme presets
 export interface ColorPreset {
   id: string
@@ -80,19 +82,30 @@ function mixHex(hex1: string, hex2: string, ratio: number): string {
   return `#${mix(0)}${mix(1)}${mix(2)}`
 }
 
-// The 5 card color styles with their getColors functions (same as web)
+// The 5 card color styles with their getColors functions.
+// Jul 27 2026: text polarity now matches web — WCAG worst-case contrast
+// against the style's REAL background stops (resolveTextPolarity), replacing
+// the Rec.601 isDark flag which chose illegible white text on mid-tone cards.
+function polarityTextColors(polarity: 'light' | 'dark'): { textColor: string; accentColor: string } {
+  return polarity === 'light'
+    ? { textColor: '#ffffff', accentColor: '#ffffff' }
+    : { textColor: '#1f2937', accentColor: '#1a1625' }
+}
+
 export const CARD_COLOR_STYLES: CardColorStyle[] = [
   {
     id: 'color-gradient',
     name: 'Color Gradient',
     description: 'Smooth gradient from primary to secondary',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: primary,
-      gradientEnd: secondary,
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: isDark ? '#ffffff' : '#1f2937',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      const polarity = resolveTextPolarity([primary, secondary])
+      return {
+        gradientStart: primary,
+        gradientEnd: secondary,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      }
+    },
   },
   {
     id: 'card-extension',
@@ -102,11 +115,12 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
       const topGradient = topEdgeColors && topEdgeColors.length >= 4
         ? topEdgeColors
         : [primary, mixHex(primary, secondary, 0.5), secondary]
+      const polarity = resolveTextPolarity(topGradient)
       return {
         gradientStart: topGradient[0],
         gradientEnd: topGradient[topGradient.length - 1],
-        accentColor: secondary,
-        textColor: '#ffffff',
+        accentColor: polarity === 'light' ? '#ffffff' : '#1a1625',
+        textColor: polarityTextColors(polarity).textColor,
         style: 'modern',
         topEdgeGradient: topGradient,
       }
@@ -117,6 +131,7 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     name: 'Neon Outline',
     description: 'Dark background with glowing neon border',
     getColors: ({ primary }) => ({
+      // Fixed near-black background — white text always wins here.
       gradientStart: '#0a0a0a',
       gradientEnd: '#1a1a2e',
       accentColor: primary,
@@ -128,25 +143,33 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     id: 'geometric',
     name: 'Geometric',
     description: 'Hard-line geometric dividers between colors',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: primary,
-      gradientEnd: secondary,
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: '#ffffff',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      // Hard-edged regions + the renderer's 10% darken overlay
+      const regions = [primary, secondary].map(c => mixHex(c, '#000000', 0.1))
+      const polarity = resolveTextPolarity(regions, { discrete: true })
+      return {
+        gradientStart: primary,
+        gradientEnd: secondary,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      }
+    },
   },
   {
     id: 'team-colors',
     name: 'Split',
     description: 'Bold split of two dominant colors',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: mixHex(primary, '#000000', 0.2),
-      gradientEnd: mixHex(secondary, '#000000', 0.2),
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: '#ffffff',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      const start = mixHex(primary, '#000000', 0.2)
+      const end = mixHex(secondary, '#000000', 0.2)
+      const polarity = resolveTextPolarity([start, end], { discrete: true })
+      return {
+        gradientStart: start,
+        gradientEnd: end,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      }
+    },
   },
 ]
 

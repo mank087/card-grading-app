@@ -187,6 +187,32 @@ function DimensionInput({
 // Main Screen
 // ============================================================================
 
+/**
+ * Field label row with an explicit "custom override" state: when the value
+ * differs from the AI-generated baseline it shows an amber chip that resets
+ * the field on tap (parity with web's DetailField, Jul 27).
+ */
+function FieldHeader({ label, value, baseline, onReset }: {
+  label: string
+  value: string
+  baseline: string | null
+  onReset: (baselineValue: string) => void
+}) {
+  const overridden = baseline != null && value.trim() !== baseline.trim()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      {overridden && (
+        <TouchableOpacity onPress={() => onReset(baseline!)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Text style={{ fontSize: 9, color: '#b45309', backgroundColor: '#fef3c7', borderWidth: StyleSheet.hairlineWidth, borderColor: '#fcd34d', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' }}>
+            custom · reset ⟲
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
 export default function LabelStudioScreen() {
   const params = useLocalSearchParams<{ cardId?: string }>()
   const router = useRouter()
@@ -224,6 +250,8 @@ export default function LabelStudioScreen() {
   const [labelNumber, setLabelNumber] = useState('')
   const [labelYear, setLabelYear] = useState('')
   const [labelFeatures, setLabelFeatures] = useState('')
+  const labelBaselineRef = useRef<{ name: string; set: string; subset: string; number: string; year: string; features: string } | null>(null)
+  const [staleDismissed, setStaleDismissed] = useState(false)
   const [fieldsInitialized, setFieldsInitialized] = useState<string | null>(null)
   const [savingLabelFields, setSavingLabelFields] = useState(false)
 
@@ -278,14 +306,82 @@ export default function LabelStudioScreen() {
     if (!selectedCard || fieldsInitialized === selectedCard.id) return
     const ci = selectedCard.conversational_card_info
     const custom = selectedCard.custom_label_data || {}
-    setLabelName(custom.primaryName ?? (selectedCard.card_name || ci?.card_name || selectedCard.featured || ''))
-    setLabelSet(custom.setName ?? (selectedCard.card_set || ci?.set_name || ''))
-    setLabelSubset(custom.subset ?? (ci?.subset || ''))
-    setLabelNumber(custom.cardNumber ?? (selectedCard.card_number || ci?.card_number || ''))
-    setLabelYear(custom.year ?? (selectedCard.release_date || ci?.year || ''))
+    // Generated (AI) values — the baseline that edits are diffed against, so
+    // untouched fields are never frozen as permanent overrides on save and
+    // the "custom · reset" chips know what to revert to.
+    const baseline = {
+      name: selectedCard.card_name || ci?.card_name || selectedCard.featured || '',
+      set: selectedCard.card_set || ci?.set_name || '',
+      subset: ci?.subset || '',
+      number: selectedCard.card_number || ci?.card_number || '',
+      year: selectedCard.release_date || ci?.year || '',
+      features: '',
+    }
+    labelBaselineRef.current = baseline
+    setLabelName(custom.primaryName ?? baseline.name)
+    setLabelSet(custom.setName ?? baseline.set)
+    setLabelSubset(custom.subset ?? baseline.subset)
+    setLabelNumber(custom.cardNumber ?? baseline.number)
+    setLabelYear(custom.year ?? baseline.year)
     setLabelFeatures(Array.isArray(custom.features) ? custom.features.join(', ') : '')
     setFieldsInitialized(selectedCard.id)
+    // Stale-override banner dismissal is remembered per card
+    setStaleDismissed(false)
+    AsyncStorage.getItem(`labelStudio_staleDismissed_${selectedCard.id}`)
+      .then(v => { if (v === '1') setStaleDismissed(true) })
+      .catch(() => { /* ignore */ })
   }, [selectedCard, fieldsInitialized])
+
+  // Saved custom label text that differs from the card's CURRENT data —
+  // either deliberate customization or a leftover from before the card's
+  // data was corrected. Surfaced once per card (dismissal persists).
+  const staleOverrideKeys = useMemo(() => {
+    const b = labelBaselineRef.current
+    const custom = selectedCard?.custom_label_data
+    if (!b || !custom || fieldsInitialized !== selectedCard?.id) return [] as string[]
+    const checks: Array<[string, unknown, string]> = [
+      ['card number', custom.cardNumber, b.number],
+      ['set', custom.setName, b.set],
+      ['year', custom.year, b.year],
+    ]
+    return checks
+      .filter(([, c, base]) => c != null && String(c).trim() !== '' && base && String(c).trim() !== base.trim())
+      .map(([k]) => k)
+  }, [selectedCard, fieldsInitialized])
+
+  const dismissStaleBanner = useCallback(() => {
+    setStaleDismissed(true)
+    if (selectedCard?.id) {
+      AsyncStorage.setItem(`labelStudio_staleDismissed_${selectedCard.id}`, '1').catch(() => { /* ignore */ })
+    }
+  }, [selectedCard?.id])
+
+  const adoptCardData = useCallback(async () => {
+    const b = labelBaselineRef.current
+    if (!b || !selectedCard?.id || !session?.access_token) return
+    setLabelNumber(b.number)
+    setLabelSet(b.set)
+    setLabelYear(b.year)
+    // Persist: drop those keys from the stored override, keep other customizations
+    const existing: Record<string, any> = { ...(selectedCard.custom_label_data || {}) }
+    delete existing.cardNumber
+    delete existing.setName
+    delete existing.year
+    const hasRemaining = Object.values(existing).some(v => v != null && (!Array.isArray(v) || v.length > 0))
+    try {
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const res = await fetch(`${API_BASE}/api/cards/${selectedCard.id}/custom-label`, {
+        method: hasRemaining ? 'PUT' : 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        ...(hasRemaining ? { body: JSON.stringify({ customFields: existing }) } : {}),
+      })
+      if (!res.ok) throw new Error('Could not update the saved label')
+      setSelectedCard((prev: any) => prev ? { ...prev, custom_label_data: hasRemaining ? existing : null } : prev)
+      dismissStaleBanner()
+    } catch (err: any) {
+      Alert.alert('Update failed', err?.message || 'Could not update the saved label.')
+    }
+  }, [selectedCard, session?.access_token, dismissStaleBanner])
 
   // Load card image when selected — both front and back so the gallery's
   // side toggle can flip the card photo too.
@@ -709,34 +805,48 @@ export default function LabelStudioScreen() {
     setSavingLabelFields(true)
     try {
       const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      // Diff against the AI-generated baseline (matches web): only edited
+      // fields become overrides. Previously every field was saved wholesale,
+      // freezing untouched values — so later data corrections never reached
+      // the label (the Jul 27 wrong-card-number case).
+      const b = labelBaselineRef.current
+      const eq = (a: string, c: string | undefined) => a.trim() === (c ?? '').trim()
       const features = labelFeatures
         .split(',')
         .map(f => f.trim())
         .filter(Boolean)
         .slice(0, 10)
-      const payload = {
-        primaryName: labelName.trim() || null,
-        setName: labelSet.trim() || null,
-        subset: labelSubset.trim() || null,
-        cardNumber: labelNumber.trim() || null,
-        year: labelYear.trim() || null,
-        features,
+      const payload: Record<string, any> = {}
+      if (labelName.trim() && (!b || !eq(labelName, b.name))) payload.primaryName = labelName.trim()
+      if (!b || !eq(labelSet, b.set)) payload.setName = labelSet.trim() || null
+      if (!b || !eq(labelSubset, b.subset)) payload.subset = labelSubset.trim() || null
+      if (!b || !eq(labelNumber, b.number)) payload.cardNumber = labelNumber.trim() || null
+      if (!b || !eq(labelYear, b.year)) payload.year = labelYear.trim() || null
+      if (!b || labelFeatures.trim() !== b.features.trim()) payload.features = features
+
+      const hadOverrides = !!selectedCard.custom_label_data && Object.keys(selectedCard.custom_label_data).length > 0
+      const hasPayload = Object.keys(payload).length > 0
+      if (!hasPayload && !hadOverrides) {
+        Alert.alert('Nothing to save', 'All fields match the AI-generated label.')
+        return
       }
       const res = await fetch(`${API_BASE}/api/cards/${selectedCard.id}/custom-label`, {
-        method: 'PUT',
+        method: hasPayload ? 'PUT' : 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ customFields: payload }),
+        ...(hasPayload ? { body: JSON.stringify({ customFields: payload }) } : {}),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as any))
         throw new Error(body.error || `Save failed (HTTP ${res.status})`)
       }
       // Patch the cached selectedCard so re-renders reuse the new values
-      setSelectedCard((prev: any) => prev ? { ...prev, custom_label_data: payload } : prev)
-      Alert.alert('Saved', 'Custom label text saved to this card. It will show up on slabs, collection thumbnails, and downloadable labels everywhere.')
+      setSelectedCard((prev: any) => prev ? { ...prev, custom_label_data: hasPayload ? payload : null } : prev)
+      Alert.alert('Saved', hasPayload
+        ? 'Custom label text saved to this card. It will show up on slabs, collection thumbnails, and downloadable labels everywhere.'
+        : 'All fields match the AI-generated label — custom overrides removed.')
     } catch (err: any) {
       Alert.alert('Save failed', err?.message || 'Could not save custom label text.')
     } finally {
@@ -1667,34 +1777,71 @@ export default function LabelStudioScreen() {
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={s.sectionTitle}>Label Text</Text>
-                <Text style={{ fontSize: 10, color: Colors.gray[400] }}>Edits override AI values</Text>
+                {(() => {
+                  const b = labelBaselineRef.current
+                  const anyOverride = !!b && (
+                    labelName.trim() !== b.name.trim() || labelSet.trim() !== b.set.trim() ||
+                    labelSubset.trim() !== b.subset.trim() || labelNumber.trim() !== b.number.trim() ||
+                    labelYear.trim() !== b.year.trim() || labelFeatures.trim() !== b.features.trim()
+                  )
+                  return anyOverride ? (
+                    <TouchableOpacity onPress={() => {
+                      const base = labelBaselineRef.current
+                      if (!base) return
+                      setLabelName(base.name); setLabelSet(base.set); setLabelSubset(base.subset)
+                      setLabelNumber(base.number); setLabelYear(base.year); setLabelFeatures(base.features)
+                    }}>
+                      <Text style={{ fontSize: 10, color: Colors.gray[500], borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.gray[300], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>Reset all ⟲</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={{ fontSize: 10, color: Colors.gray[400] }}>Edits override AI values</Text>
+                  )
+                })()}
               </View>
+
+              {/* Saved custom text that no longer matches the card's data */}
+              {staleOverrideKeys.length > 0 && !staleDismissed && (
+                <View style={{ backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, color: '#92400e', fontWeight: '600', marginBottom: 6 }}>
+                    This card&apos;s saved label text ({staleOverrideKeys.join(', ')}) no longer matches the card&apos;s current data.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={adoptCardData} style={{ backgroundColor: '#d97706', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
+                      <Text style={{ fontSize: 11, color: '#fff', fontWeight: '600' }}>Use card data</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={dismissStaleBanner} style={{ borderWidth: 1, borderColor: '#fcd34d', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
+                      <Text style={{ fontSize: 11, color: '#92400e', fontWeight: '600' }}>Keep my custom text</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               <View style={{ gap: 8 }}>
                 <View>
-                  <Text style={s.fieldLabel}>Card Name</Text>
+                  <FieldHeader label="Card Name" value={labelName} baseline={labelBaselineRef.current?.name ?? null} onReset={(v) => setLabelName(v)} />
                   <TextInput style={s.fieldInput} value={labelName} onChangeText={setLabelName} placeholder="Card name" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.fieldLabel}>Set</Text>
+                    <FieldHeader label="Set" value={labelSet} baseline={labelBaselineRef.current?.set ?? null} onReset={(v) => setLabelSet(v)} />
                     <TextInput style={s.fieldInput} value={labelSet} onChangeText={setLabelSet} placeholder="Set name" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                   </View>
                   <View style={{ flex: 0.5 }}>
-                    <Text style={s.fieldLabel}>Year</Text>
+                    <FieldHeader label="Year" value={labelYear} baseline={labelBaselineRef.current?.year ?? null} onReset={(v) => setLabelYear(v)} />
                     <TextInput style={s.fieldInput} value={labelYear} onChangeText={setLabelYear} placeholder="Year" placeholderTextColor={Colors.gray[400]} maxLength={20} />
                   </View>
                 </View>
                 <View>
-                  <Text style={s.fieldLabel}>Subset</Text>
+                  <FieldHeader label="Subset" value={labelSubset} baseline={labelBaselineRef.current?.subset ?? null} onReset={(v) => setLabelSubset(v)} />
                   <TextInput style={s.fieldInput} value={labelSubset} onChangeText={setLabelSubset} placeholder="Insert / parallel name (e.g. Power Players)" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 0.5 }}>
-                    <Text style={s.fieldLabel}>Card #</Text>
+                    <FieldHeader label="Card #" value={labelNumber} baseline={labelBaselineRef.current?.number ?? null} onReset={(v) => setLabelNumber(v)} />
                     <TextInput style={s.fieldInput} value={labelNumber} onChangeText={setLabelNumber} placeholder="#" placeholderTextColor={Colors.gray[400]} maxLength={50} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.fieldLabel}>Features (comma-separated, max 10)</Text>
+                    <FieldHeader label="Features (comma-separated, max 10)" value={labelFeatures} baseline={labelBaselineRef.current?.features ?? null} onReset={(v) => setLabelFeatures(v)} />
                     <TextInput style={s.fieldInput} value={labelFeatures} onChangeText={setLabelFeatures} placeholder="RC, Auto, /99" placeholderTextColor={Colors.gray[400]} />
                   </View>
                 </View>
