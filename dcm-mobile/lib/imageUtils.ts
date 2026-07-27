@@ -50,30 +50,41 @@ export async function compressImage(
   uri: string,
   knownDims?: { width: number; height: number }
 ): Promise<CompressedImage> {
+  // v9.10: the old dimension "probe" was a full manipulateAsync([], ...) —
+  // a complete decode + JPEG re-encode of the image just to read its size,
+  // adding a whole lossy generation to every gallery pick. Callers now pass
+  // dimensions from the picker/camera asset; when they genuinely can't, we
+  // skip the pre-computed resize and clamp inside the single final pass.
   let probedW = knownDims?.width
   let probedH = knownDims?.height
-  if (probedW == null || probedH == null) {
-    const original = await ImageManipulator.manipulateAsync(uri, [], {
-      format: ImageManipulator.SaveFormat.JPEG,
-    })
-    probedW = original.width
-    probedH = original.height
-  }
 
   // Resize so the long edge is no more than MAX_LONG_EDGE. Resize on the
   // longer dimension preserves aspect; ImageManipulator's `resize:{width}`
   // / `resize:{height}` keeps the other dimension proportional.
   const actions: ImageManipulator.Action[] = []
-  if (probedW >= probedH && probedW > MAX_LONG_EDGE) {
-    actions.push({ resize: { width: MAX_LONG_EDGE } })
-  } else if (probedH > probedW && probedH > MAX_LONG_EDGE) {
-    actions.push({ resize: { height: MAX_LONG_EDGE } })
+  if (probedW != null && probedH != null) {
+    if (probedW >= probedH && probedW > MAX_LONG_EDGE) {
+      actions.push({ resize: { width: MAX_LONG_EDGE } })
+    } else if (probedH > probedW && probedH > MAX_LONG_EDGE) {
+      actions.push({ resize: { height: MAX_LONG_EDGE } })
+    }
   }
 
-  const result = await ImageManipulator.manipulateAsync(uri, actions, {
-    compress: 0.85,
+  let result = await ImageManipulator.manipulateAsync(uri, actions, {
+    compress: 0.9,
     format: ImageManipulator.SaveFormat.JPEG,
   })
+
+  // Unknown-dimension fallback: if the single pass came back oversized,
+  // one extra resize pass brings it into bounds. Only hits the rare caller
+  // with no dims AND an over-3000px source — never the normal paths.
+  if (probedW == null && Math.max(result.width, result.height) > MAX_LONG_EDGE) {
+    result = await ImageManipulator.manipulateAsync(
+      result.uri,
+      [result.width >= result.height ? { resize: { width: MAX_LONG_EDGE } } : { resize: { height: MAX_LONG_EDGE } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+    )
+  }
 
   // Estimate file size from dimensions and compression ratio
   const fileSize = Math.round(result.width * result.height * 0.15)
@@ -139,10 +150,19 @@ export async function cropToCardAspect(
  * Caller still gets back the same CompressedImage shape so the capture
  * screen needs almost no other change.
  */
+export interface PreviewViewInfo {
+  /** Measured layout size of the camera preview container (dp). */
+  containerW: number
+  containerH: number
+  /** Guide box width as a fraction of the container width (styles.guide width: '70%'). */
+  guideWidthFraction: number
+}
+
 export async function processCardCapture(
   uri: string,
   orientation: 'portrait' | 'landscape' = 'portrait',
   sensorHints?: { width: number; height: number },
+  viewInfo?: PreviewViewInfo,
 ): Promise<CompressedImage> {
   // Read dimensions if the caller didn't already know them. Most camera
   // and gallery results expose width/height directly so we avoid the
@@ -157,7 +177,12 @@ export async function processCardCapture(
     sensorH = probe.height
   }
 
-  const { originX, originY, finalW, finalH } = computeCardCrop(sensorW, sensorH, orientation)
+  // v9.10 geometry-aware crop: when the capture screen measured its preview
+  // container, derive the crop from the REAL on-screen guide box via the
+  // aspect-fill mapping, instead of the legacy hardcoded 85%-band guess.
+  const { originX, originY, finalW, finalH } = viewInfo
+    ? computeGuideCrop(sensorW, sensorH, orientation, viewInfo)
+    : computeCardCrop(sensorW, sensorH, orientation)
 
   // Decide whether to resize too. If the post-crop dimensions are over
   // MAX_LONG_EDGE on the long axis, append a resize action. Otherwise
@@ -173,7 +198,7 @@ export async function processCardCapture(
   }
 
   const result = await ImageManipulator.manipulateAsync(uri, actions, {
-    compress: 0.85,
+    compress: 0.9,
     format: ImageManipulator.SaveFormat.JPEG,
   })
 
@@ -184,6 +209,72 @@ export async function processCardCapture(
     height: result.height,
     fileSize,
   }
+}
+
+/**
+ * Map the on-screen guide box into photo pixel coordinates.
+ *
+ * CameraView renders the sensor stream with aspect-fill (cover): the frame is
+ * uniformly scaled to cover the preview container and center-cropped.
+ * Inverting that mapping takes the guide box — width guideWidthFraction of
+ * the container, card aspect, centered — from container dp into photo pixels.
+ * An 8%-per-side pad absorbs small preview/still field-of-view differences
+ * and cards framed slightly over the guide line.
+ *
+ * Assumes the still photo shares the preview stream's aspect (true when both
+ * come from the same session preset, which is how expo-camera configures
+ * capture). If the aspects diverge wildly the clamps below keep the crop
+ * in-bounds rather than slicing the card.
+ */
+function computeGuideCrop(
+  photoW: number,
+  photoH: number,
+  orientation: 'portrait' | 'landscape',
+  view: PreviewViewInfo,
+): { originX: number; originY: number; finalW: number; finalH: number } {
+  const { containerW, containerH, guideWidthFraction } = view
+  if (containerW <= 0 || containerH <= 0) {
+    return computeCardCrop(photoW, photoH, orientation)
+  }
+
+  const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
+
+  // Guide box in container coordinates (centered; width: '70%', aspect card)
+  const guideW = containerW * guideWidthFraction
+  const guideH = guideW / cardAspect
+  const guideX = (containerW - guideW) / 2
+  const guideY = (containerH - guideH) / 2
+
+  // aspect-fill: photo scaled to cover the container, centered
+  const coverScale = Math.max(containerW / photoW, containerH / photoH)
+  const dispX = (containerW - photoW * coverScale) / 2 // <= 0
+  const dispY = (containerH - photoH * coverScale) / 2 // <= 0
+
+  // Container -> photo pixels
+  let cropX = (guideX - dispX) / coverScale
+  let cropY = (guideY - dispY) / coverScale
+  let cropW = guideW / coverScale
+  let cropH = guideH / coverScale
+
+  // Pad 8% per side beyond the guide
+  const PAD = 0.08
+  cropX -= cropW * PAD
+  cropY -= cropH * PAD
+  cropW *= 1 + PAD * 2
+  cropH *= 1 + PAD * 2
+
+  // Clamp to photo bounds
+  const originX = Math.max(0, Math.round(cropX))
+  const originY = Math.max(0, Math.round(cropY))
+  const finalW = Math.min(Math.round(cropW), photoW - originX)
+  const finalH = Math.min(Math.round(cropH), photoH - originY)
+
+  // Degenerate result (bad layout data) — fall back to the legacy crop
+  if (finalW < 200 || finalH < 200) {
+    return computeCardCrop(photoW, photoH, orientation)
+  }
+
+  return { originX, originY, finalW, finalH }
 }
 
 /**

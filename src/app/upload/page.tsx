@@ -369,7 +369,7 @@ function UniversalUploadPageContent() {
   };
 
   // Handle file selection and compression
-  const handleFileSelect = async (originalFile: File, side: 'front' | 'back', source: 'camera' | 'gallery' = 'gallery') => {
+  const handleFileSelect = async (originalFile: File, side: 'front' | 'back', source: 'camera' | 'gallery' | 'crop' = 'gallery') => {
     console.log('[Upload] handleFileSelect started:', side, 'size:', originalFile.size, 'type:', originalFile.type)
     const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
@@ -442,8 +442,10 @@ function UniversalUploadPageContent() {
       // (≤3000px) and JPEG-encoded exactly once by the capture pipeline —
       // re-compressing here would add a second lossy generation, so we only
       // read their dimensions for the resolution gate below.
+      // v9.10: manual crops likewise arrive as a fresh q0.95 JPEG (≤4096px)
+      // from the crop canvas — re-compressing them was a second lossy pass.
       let result: { compressedFile: File; originalSize: number; compressedSize: number; compressionRatio: number; dimensions: { width: number; height: number } }
-      if (source === 'camera') {
+      if (source === 'camera' || source === 'crop') {
         const dimensions = await getImageDimensions(file)
         result = {
           compressedFile: file,
@@ -477,7 +479,7 @@ function UniversalUploadPageContent() {
         else { setBackFile(null); setBackHash(null); setBackCompressed(null); setBackCompressionInfo(null) }
         return
       }
-      if (longEdge < 1600 && source === 'gallery') {
+      if (longEdge < 1600 && source !== 'camera') {
         console.warn(`[Upload] ${side} image is small (${result.dimensions.width}×${result.dimensions.height}) — grading proceeds with a quality warning`)
         // useToast() returns an object — calling it bare (react-hot-toast style)
         // throws, and this line sits inside the compression try{}: the TypeError
@@ -508,15 +510,15 @@ function UniversalUploadPageContent() {
       }
 
       console.log('[Upload] handleFileSelect completed:', side, 'compressed size:', result.compressedSize)
-      setStatus(source === 'camera'
-        ? `✅ ${side} image ready`
-        : `✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`)
+      setStatus(source === 'gallery'
+        ? `✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`
+        : `✅ ${side} image ready`)
 
-      // Advisory quality check (blur + brightness) for gallery/desktop uploads.
-      // Camera captures already surfaced this in the capture preview. This never
-      // blocks the upload — C/D results just render a warning panel with a
-      // "Use anyway" escape hatch.
-      if (source === 'gallery') {
+      // Advisory quality check (blur + brightness) for gallery/desktop uploads
+      // and manual crops. Camera captures already surfaced this in the capture
+      // preview. This never blocks the upload — C/D results just render a
+      // warning panel with a "Use anyway" escape hatch.
+      if (source !== 'camera') {
         try {
           const imageData = await getImageDataFromFile(result.compressedFile)
           if (imageData) {
@@ -654,8 +656,10 @@ function UniversalUploadPageContent() {
     setCrop(undefined);
     setCompletedCrop(undefined);
     toast.success(`✂️ ${side === 'front' ? 'Front' : 'Back'} cropped to ${outW}×${outH}px — recompressing…`);
-    // Re-run compression pipeline with cropped image
-    handleFileSelect(croppedFile, side);
+    // Re-enter the pipeline as source 'crop': the file is already a fresh
+    // q0.95 JPEG from the crop canvas — compressing it AGAIN (as the old
+    // default-'gallery' re-entry did) added a second lossy generation.
+    handleFileSelect(croppedFile, side, 'crop');
   }, [completedCrop, frontFile, backFile, getCroppedFile]);
 
   const handleUpload = async () => {

@@ -6,6 +6,7 @@ import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality } from '@/utils/imageQuality';
 import { cropCanvasToGuideFrame, canvasToJpegFile } from '@/utils/guideCrop';
+import { computeGuideSizePx } from '@/utils/cameraGuideGeometry';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
@@ -22,6 +23,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     stream,
     error,
     hasPermission,
+    streamResolution,
     startCamera,
     stopCamera,
     captureImage,
@@ -108,11 +110,32 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       let qualityCanvas: HTMLCanvasElement;
 
       try {
+        // v9.10 geometry-aware crop: measure the real video element and guide
+        // box so the crop is exactly what the user framed (plus padding),
+        // instead of the old fixed-percentage assumption that ignored the
+        // video's object-cover letterboxing.
+        const videoEl = videoRef.current;
+        const rect = videoEl?.getBoundingClientRect();
+        const viewContext = rect && rect.width > 0 && rect.height > 0
+          ? {
+              viewW: rect.width,
+              viewH: rect.height,
+              ...(() => {
+                const g = computeGuideSizePx(rect.width, rect.height, orientation);
+                return { guideW: g.width, guideH: g.height };
+              })(),
+              streamW: captured.streamSize.width,
+              streamH: captured.streamSize.height,
+              streamTransform: captured.streamTransform,
+            }
+          : undefined;
+
         const cropResult = await cropCanvasToGuideFrame(captured.canvas, {
           paddingPercent: 0.05, // 5% padding around the card guide
           orientation: orientation,
           maxDimension: 3000, // matches the old compression pipeline's max size
           quality: 0.9,
+          viewContext,
         });
         previewUrl = cropResult.croppedDataUrl;
         file = cropResult.croppedFile;
@@ -316,6 +339,16 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
       {/* Overlaid Capture Controls - bottom, compact design */}
       <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-4">
+        {/* Low-resolution stream warning — the fallback constraint ladder can
+            silently negotiate 1080p or worse; card crops from those streams sit
+            at or below the 1000px grading minimum. Warn BEFORE the shutter. */}
+        {streamResolution && Math.max(streamResolution.width, streamResolution.height) < 1920 && (
+          <div className="flex justify-center mb-2 px-4">
+            <div className="bg-amber-500/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded-full text-xs font-medium text-center">
+              ⚠️ Camera opened at low resolution ({streamResolution.width}×{streamResolution.height}). Photos may be too small to grade — try the gallery upload with your phone&apos;s camera app instead.
+            </div>
+          </div>
+        )}
         {/* Tips row - compact */}
         <div className="flex justify-center gap-1.5 mb-3 px-2">
           <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">

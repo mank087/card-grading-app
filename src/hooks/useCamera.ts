@@ -34,11 +34,44 @@ const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStream
   { video: true },
 ];
 
+/**
+ * Apply continuous focus/exposure/white-balance where the camera supports it.
+ * Advisory constraints only — every branch is a graceful no-op on browsers or
+ * cameras that don't expose these capabilities (e.g. iOS Safari, webcams).
+ */
+const applyFocusConstraints = async (mediaStream: MediaStream): Promise<void> => {
+  try {
+    const track = mediaStream.getVideoTracks()[0];
+    if (!track?.getCapabilities || !track.applyConstraints) return;
+    const caps = track.getCapabilities() as MediaTrackCapabilities & {
+      focusMode?: string[];
+      exposureMode?: string[];
+      whiteBalanceMode?: string[];
+    };
+    const advanced: MediaTrackConstraintSet[] = [];
+    if (caps.focusMode?.includes('continuous')) {
+      advanced.push({ focusMode: 'continuous' } as MediaTrackConstraintSet);
+    }
+    if (caps.exposureMode?.includes('continuous')) {
+      advanced.push({ exposureMode: 'continuous' } as MediaTrackConstraintSet);
+    }
+    if (caps.whiteBalanceMode?.includes('continuous')) {
+      advanced.push({ whiteBalanceMode: 'continuous' } as MediaTrackConstraintSet);
+    }
+    if (advanced.length > 0) {
+      await track.applyConstraints({ advanced });
+    }
+  } catch (err) {
+    console.warn('[Camera] Focus constraint tuning skipped:', err);
+  }
+};
+
 export const useCamera = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [streamResolution, setStreamResolution] = useState<{ width: number; height: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -92,6 +125,23 @@ export const useCamera = () => {
       setStream(mediaStream);
       setHasPermission(true);
 
+      // Nudge the camera into continuous AF/AE/AWB where supported.
+      await applyFocusConstraints(mediaStream);
+
+      // Record what resolution was ACTUALLY negotiated — the fallback ladder can
+      // silently land on 1080p or the device default, and the UI warns before
+      // capture instead of hard-rejecting after the shutter.
+      try {
+        const settings = mediaStream.getVideoTracks()[0]?.getSettings?.();
+        if (settings?.width && settings?.height) {
+          setStreamResolution({ width: settings.width, height: settings.height });
+        } else {
+          setStreamResolution(null);
+        }
+      } catch {
+        setStreamResolution(null);
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         await videoRef.current.play().catch(() => {
@@ -133,31 +183,100 @@ export const useCamera = () => {
     }
     setError(null);
     setIsStarting(false);
+    setStreamResolution(null);
   }, []);
 
-  // v9.1 single-pass encode: capture returns the raw canvas frame with NO JPEG
-  // encode. The downstream crop step performs the one and only crop+resize+encode,
-  // so the camera path no longer re-encodes the image three times (capture 0.92 →
-  // crop 0.95 → compress 0.8-0.9), which compounded JPEG generation loss.
+  // v9.1 single-pass encode: capture returns the raw canvas frame with NO extra
+  // JPEG encode. The downstream crop step performs the one and only
+  // crop+resize+encode on our side.
+  //
+  // v9.10 still capture: prefer ImageCapture.takePhoto() (Chrome/Edge/Android),
+  // which asks the camera for a TRUE still — full sensor resolution and the
+  // photo processing pipeline — instead of grabbing a preview video frame
+  // capped at the negotiated stream mode. Falls back to the frame grab on
+  // browsers without ImageCapture (iOS Safari), on timeout, or when the
+  // returned photo isn't actually larger than the stream.
+  //
+  // The returned streamTransform maps PREVIEW-STREAM coordinates onto the
+  // capture canvas: identity for a frame grab; for a still photo we assume the
+  // preview field of view is a centered crop of the photo (the standard
+  // relationship between a 16:9 stream and a 4:3 sensor still), i.e. uniform
+  // scale min(pW/sW, pH/sH), centered. The guide crop computes its rectangle
+  // in stream coordinates (what the user actually saw) and converts.
   const captureImage = useCallback(async (): Promise<CapturedFrame | null> => {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return null;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const streamW = video.videoWidth;
+    const streamH = video.videoHeight;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.drawImage(video, 0, 0);
-
-    return {
-      canvas,
-      width: canvas.width,
-      height: canvas.height,
-      timestamp: Date.now()
+    const frameGrab = (): CapturedFrame | null => {
+      const canvas = document.createElement('canvas');
+      canvas.width = streamW;
+      canvas.height = streamH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(video, 0, 0);
+      return {
+        canvas,
+        width: canvas.width,
+        height: canvas.height,
+        timestamp: Date.now(),
+        captureSource: 'frame',
+        streamSize: { width: streamW, height: streamH },
+        streamTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+      };
     };
+
+    // Attempt a true still capture where the API exists.
+    const ImageCaptureCtor = (window as any).ImageCapture;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (ImageCaptureCtor && track && track.readyState === 'live') {
+      try {
+        const imageCapture = new ImageCaptureCtor(track);
+        // takePhoto can hang on some devices — race it against a timeout and
+        // fall back to the instant frame grab rather than blocking the shutter.
+        const blob: Blob = await Promise.race([
+          imageCapture.takePhoto(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('takePhoto timeout')), 4000)),
+        ]);
+        const bitmap = await createImageBitmap(blob);
+        try {
+          // Sanity: only use the still if it genuinely beats the preview stream.
+          // Some devices return stills at or below stream resolution — the frame
+          // grab is then equivalent and its geometry is exactly WYSIWYG.
+          if (bitmap.width * bitmap.height > streamW * streamH * 1.05) {
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(bitmap, 0, 0);
+              const scale = Math.min(bitmap.width / streamW, bitmap.height / streamH);
+              return {
+                canvas,
+                width: canvas.width,
+                height: canvas.height,
+                timestamp: Date.now(),
+                captureSource: 'photo',
+                streamSize: { width: streamW, height: streamH },
+                streamTransform: {
+                  scale,
+                  offsetX: (bitmap.width - streamW * scale) / 2,
+                  offsetY: (bitmap.height - streamH * scale) / 2,
+                },
+              };
+            }
+          }
+        } finally {
+          bitmap.close();
+        }
+      } catch (err) {
+        console.warn('[Camera] takePhoto failed, using frame grab:', err);
+      }
+    }
+
+    return frameGrab();
   }, []);
 
   // Cleanup on unmount
@@ -175,6 +294,7 @@ export const useCamera = () => {
     error,
     hasPermission,
     isStarting,
+    streamResolution,
     startCamera,
     stopCamera,
     captureImage,

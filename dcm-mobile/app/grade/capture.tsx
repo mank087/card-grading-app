@@ -35,6 +35,11 @@ export default function CaptureScreen() {
   // onCameraReady fires.
   const [pictureSize, setPictureSize] = useState<string | undefined>(undefined)
 
+  // Measured size of the camera preview container. Feeds the geometry-aware
+  // capture crop (lib/imageUtils computeGuideCrop) so the crop matches the
+  // on-screen guide box instead of the legacy hardcoded 85% band.
+  const cameraLayoutRef = useRef<{ containerW: number; containerH: number } | null>(null)
+
   // Captured images
   const [frontUri, setFrontUri] = useState<string | null>(null)
   const [backUri, setBackUri] = useState<string | null>(null)
@@ -77,7 +82,7 @@ export default function CaptureScreen() {
   // Run a picked image through the compress → quality → hash pipeline
   // and stash it as the current side. GALLERY PATH ONLY — the camera path
   // uses processCardCapture directly in handleCapture.
-  const processImage = async (rawUri: string) => {
+  const processImage = async (rawUri: string, knownDims?: { width: number; height: number }) => {
     setIsProcessing(true)
     try {
       // Gallery images are NEVER auto-cropped. The center-band + card-aspect
@@ -86,7 +91,9 @@ export default function CaptureScreen() {
       // (e.g. a DSLR shot transferred to the phone) it slices off parts of
       // the card — especially when the photo's aspect differs from 2.5:3.5.
       // Resize + compress only, exactly like the web gallery path.
-      const compressed = await compressImage(rawUri)
+      // v9.10: pass the picker asset's dimensions so compressImage skips its
+      // probe pass (which was a full extra JPEG re-encode just to read size).
+      const compressed = await compressImage(rawUri, knownDims)
 
       // v8.9 MINIMUM-RESOLUTION GATE (matches web): below ~1000px the grading AI
       // physically cannot resolve edge whitening, corner wear, or fine print.
@@ -148,7 +155,10 @@ export default function CaptureScreen() {
       const asset = result.assets?.[0]
       if (!asset?.uri) return
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      await processImage(asset.uri)
+      await processImage(
+        asset.uri,
+        asset.width && asset.height ? { width: asset.width, height: asset.height } : undefined,
+      )
     } catch (err) {
       console.warn('[capture] picker error:', err)
       Alert.alert('Picker failed', String((err as any)?.message || err))
@@ -183,6 +193,14 @@ export default function CaptureScreen() {
     try {
       const sizes = await cameraRef.current.getAvailablePictureSizesAsync()
       if (!sizes || sizes.length === 0) return
+      // v9.10: on iOS the list is preset NAMES, and "Photo" is the full-sensor
+      // still preset (~12MP 4:3 on iPhone). The numeric ranking below scored it
+      // 0 and picked "3840x2160" (8.3MP, 16:9) on every iPhone — losing ~31%
+      // of pixels AND cropping the 4:3 field of view. Prefer "Photo" outright.
+      if (sizes.includes('Photo')) {
+        setPictureSize('Photo')
+        return
+      }
       const ranked = sizes
         .map(label => {
           const m = /^(\d+)x(\d+)$/.exec(label)
@@ -238,6 +256,9 @@ export default function CaptureScreen() {
         photo.uri,
         orientation,
         photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
+        cameraLayoutRef.current
+          ? { ...cameraLayoutRef.current, guideWidthFraction: 0.7 }
+          : undefined,
       )
 
       // v8.9 MINIMUM-RESOLUTION GATE (matches web/gallery)
@@ -486,7 +507,13 @@ export default function CaptureScreen() {
            preview and aiming at a giant guide rectangle. The black sides
            give the cropped look intentionally. */
         <View style={styles.cameraOuter}>
-          <View style={[styles.cameraContainer, isTablet && styles.cameraContainerTablet]}>
+          <View
+            style={[styles.cameraContainer, isTablet && styles.cameraContainerTablet]}
+            onLayout={e => {
+              const { width, height } = e.nativeEvent.layout
+              cameraLayoutRef.current = { containerW: width, containerH: height }
+            }}
+          >
             <CameraView
               ref={cameraRef}
               style={styles.camera}

@@ -28,6 +28,16 @@ export interface CapturedFrame {
   width: number;
   height: number;
   timestamp: number;
+  /** 'photo' = true still via ImageCapture.takePhoto(); 'frame' = preview video frame grab. */
+  captureSource: 'photo' | 'frame';
+  /** Pixel dimensions of the preview stream the user framed against. */
+  streamSize: { width: number; height: number };
+  /**
+   * Maps preview-stream coordinates onto this capture canvas:
+   * canvasX = streamX * scale + offsetX. Identity for frame grabs; for stills
+   * the preview FoV is assumed to be a centered crop of the photo.
+   */
+  streamTransform: { scale: number; offsetX: number; offsetY: number };
 }
 
 /**

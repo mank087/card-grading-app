@@ -31,6 +31,88 @@ export interface CropOptions {
   quality?: number;
   /** Output file name (default: card-<timestamp>.jpg). */
   fileName?: string;
+  /**
+   * v9.10 geometry-aware crop: when provided, the crop rectangle is derived
+   * from the REAL on-screen guide box instead of the legacy fixed-96%
+   * assumption. Describes the viewport the user framed in, the guide box
+   * (centered in that viewport), the preview stream size, and the transform
+   * from stream coordinates onto the capture canvas.
+   */
+  viewContext?: ViewportGuideContext;
+}
+
+export interface ViewportGuideContext {
+  /** CSS pixel size of the video element (object-cover, fills the viewport). */
+  viewW: number;
+  viewH: number;
+  /** CSS pixel size of the guide box, centered in the viewport. */
+  guideW: number;
+  guideH: number;
+  /** Pixel dimensions of the preview stream. */
+  streamW: number;
+  streamH: number;
+  /** Maps stream coordinates onto the capture canvas (identity for frame grabs). */
+  streamTransform: { scale: number; offsetX: number; offsetY: number };
+}
+
+/**
+ * Compute the crop rect on the capture canvas from the actual on-screen guide.
+ *
+ * The video element renders the stream with CSS object-cover: the stream is
+ * uniformly scaled to COVER the viewport and center-cropped. Inverting that
+ * mapping takes the guide box from viewport CSS pixels to stream pixels; the
+ * capture's streamTransform then takes stream pixels to canvas pixels (identity
+ * for frame grabs, centered-crop mapping for true stills).
+ */
+function computeViewportCropRect(
+  W: number,
+  H: number,
+  ctx: ViewportGuideContext,
+  paddingPercent: number
+): { cropX: number; cropY: number; cropW: number; cropH: number } {
+  const { viewW, viewH, guideW, guideH, streamW, streamH, streamTransform } = ctx;
+
+  // object-cover: scale to cover, center the overflow
+  const coverScale = Math.max(viewW / streamW, viewH / streamH);
+  const dispX = (viewW - streamW * coverScale) / 2; // <= 0
+  const dispY = (viewH - streamH * coverScale) / 2; // <= 0
+
+  // Guide box is centered in the viewport
+  const guideX = (viewW - guideW) / 2;
+  const guideY = (viewH - guideH) / 2;
+
+  // Viewport -> stream coordinates
+  const sX = (guideX - dispX) / coverScale;
+  const sY = (guideY - dispY) / coverScale;
+  const sW = guideW / coverScale;
+  const sH = guideH / coverScale;
+
+  // Stream -> canvas coordinates
+  const { scale, offsetX, offsetY } = streamTransform;
+  let cropX = sX * scale + offsetX;
+  let cropY = sY * scale + offsetY;
+  let cropW = sW * scale;
+  let cropH = sH * scale;
+
+  // Padding beyond the guide so a card slightly over the line isn't clipped
+  const padX = cropW * paddingPercent;
+  const padY = cropH * paddingPercent;
+  cropX -= padX;
+  cropY -= padY;
+  cropW += padX * 2;
+  cropH += padY * 2;
+
+  // Clamp to canvas bounds
+  cropX = Math.max(0, Math.round(cropX));
+  cropY = Math.max(0, Math.round(cropY));
+  cropW = Math.min(Math.round(cropW), W - cropX);
+  cropH = Math.min(Math.round(cropH), H - cropY);
+
+  if (cropW < 16 || cropH < 16) {
+    throw new Error(`Computed guide crop degenerate: ${cropW}x${cropH}`);
+  }
+
+  return { cropX, cropY, cropW, cropH };
 }
 
 /**
@@ -105,7 +187,11 @@ function cropSourceToGuideFrame(
 
   return new Promise((resolve, reject) => {
     try {
-      const { cropX, cropY, cropW, cropH } = computeGuideCropRect(W, H, paddingPercent, orientation);
+      // Geometry-aware crop when the caller supplies real view/guide/stream
+      // measurements; legacy proportional fallback otherwise (e.g. old callers).
+      const { cropX, cropY, cropW, cropH } = options.viewContext
+        ? computeViewportCropRect(W, H, options.viewContext, paddingPercent)
+        : computeGuideCropRect(W, H, paddingPercent, orientation);
 
       // Resize during the same draw so we never re-sample a second time
       const scale = Math.min(1, maxDimension / Math.max(cropW, cropH));

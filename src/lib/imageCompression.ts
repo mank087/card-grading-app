@@ -211,30 +211,20 @@ export function supportsWebP(): boolean {
 }
 
 /**
- * Get optimal compression settings based on file size and browser support
+ * Get compression settings for gallery/desktop uploads.
+ *
+ * v9.10: flattened. The old size-tiered ladder (q0.80 above 5MB, q0.85 above
+ * 2MB) applied the HARSHEST quantization to the largest, highest-detail
+ * originals — exactly the uploads with the most grading signal — and chose
+ * WebP output while the storage path and content-type are hardcoded JPEG
+ * (files landed in the bucket as WebP bytes named front.jpg). The 3000px
+ * resize already bounds file size; a flat q0.90 JPEG costs a little storage
+ * and preserves corner/edge detail for zoom inspection.
  */
-export function getOptimalCompressionSettings(fileSize: number): CompressionOptions {
-  const supportsWebp = supportsWebP();
-
-  // Adjust compression based on file size
-  // 🆕 Increased maxWidth to 3000px to allow Grade A image quality (1200+ DPI equivalent)
-  if (fileSize > 5 * 1024 * 1024) { // >5MB
-    return {
-      maxWidth: 3000,
-      quality: 0.80,
-      format: supportsWebp ? 'webp' : 'jpeg'
-    };
-  } else if (fileSize > 2 * 1024 * 1024) { // >2MB
-    return {
-      maxWidth: 3000,
-      quality: 0.85,
-      format: supportsWebp ? 'webp' : 'jpeg'
-    };
-  } else {
-    return {
-      maxWidth: 3000,
-      quality: 0.90,
-      format: supportsWebp ? 'webp' : 'jpeg'
-    };
-  }
+export function getOptimalCompressionSettings(_fileSize: number): CompressionOptions {
+  return {
+    maxWidth: 3000,
+    quality: 0.90,
+    format: 'jpeg'
+  };
 }
