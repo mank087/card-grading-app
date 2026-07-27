@@ -26,6 +26,10 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  // Chrome Private Network Access: an HTTPS page (the admin Lab on
+  // dcmgrading.com) calling a localhost server must receive this header on
+  // the preflight or the browser blocks the request entirely.
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   if (req.method === 'GET' && req.url === '/health') {
