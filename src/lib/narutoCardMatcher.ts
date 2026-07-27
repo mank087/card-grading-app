@@ -9,6 +9,7 @@
 // far more reliable here than name-based matching.
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 export interface NarutoCard {
   card_number: string;
@@ -160,6 +161,33 @@ export async function lookupNarutoCard(aiInfo: {
           set: await getSet(bySlot[0].set_id),
           confidence: 'medium',
           matchedBy: 'set_slot',
+          warnings,
+        };
+      }
+    }
+
+    // Single-digit misread rescue: if the character name matches cards and
+    // EXACTLY ONE has a card number one character off from the AI's number,
+    // correct to it (OCR-class misread).
+    const rescueName = aiInfo.character_name || aiInfo.card_name;
+    if (rescueName && rescueName.trim().length >= 3) {
+      const { data: charCards } = await supabase
+        .from('naruto_cards')
+        .select('*')
+        .ilike('character_name', `%${rescueName.replace(/[\\"]/g, '')}%`)
+        .limit(25);
+      const variant = findUniqueDigitVariant(
+        (charCards || []) as NarutoCard[],
+        c => normalizeKayouNumber(c.card_number),
+        normalizeKayouNumber(rawNumber)
+      );
+      if (variant) {
+        warnings.push(`Card number corrected from "${rawNumber}" to "${variant.card_number}" (single-digit misread; character matched)`);
+        return {
+          card: variant,
+          set: await getSet(variant.set_id),
+          confidence: 'high',
+          matchedBy: 'number_no_tier',
           warnings,
         };
       }

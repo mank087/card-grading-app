@@ -9,6 +9,7 @@
 // sub-category names one.
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 export interface TcgCard {
   game: string;
@@ -84,7 +85,18 @@ export async function lookupTcgCard(aiInfo: {
     const candidates = [code, ...(code.includes('/') ? code.split('/').map(s => s.trim()).filter(Boolean) : [])];
 
     for (const candidate of candidates) {
-      // Code within the known game — definitive
+      // Name guard: a misread code can land exactly on a DIFFERENT real card.
+      // When the AI extracted a name, an exact-code match whose DB name is
+      // completely incompatible is not trusted (mirrors the MTG name check) —
+      // the digit-misread rescue below then gets a chance to fix the code.
+      const nameCompatible = (dbName: string | null | undefined): boolean => {
+        const ai = (aiInfo.card_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!ai || ai.length < 3) return true; // nothing to validate against
+        const db = (dbName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return db.includes(ai.slice(0, 5)) || ai.includes(db.slice(0, 5));
+      };
+
+      // Code within the known game — definitive when the name agrees
       if (game) {
         const { data } = await supabase
           .from('tcg_cards')
@@ -93,28 +105,58 @@ export async function lookupTcgCard(aiInfo: {
           .eq('code', candidate)
           .maybeSingle();
         if (data) {
-          if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
-          return { card: data as TcgCard, confidence: 'high', matchedBy: 'code_in_game', warnings };
+          if (!nameCompatible((data as TcgCard).name)) {
+            warnings.push(`Code "${candidate}" matches "${(data as TcgCard).name}" but AI read "${aiInfo.card_name}" — code not trusted`);
+          } else {
+            if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
+            return { card: data as TcgCard, confidence: 'high', matchedBy: 'code_in_game', warnings };
+          }
         }
       }
 
-      // Code across all games — accept only if globally unique
+      // Code across all games — accept only if globally unique and name-compatible
       const { data: global } = await supabase
         .from('tcg_cards')
         .select('*')
         .eq('code', candidate)
         .limit(2);
       if (global && global.length === 1) {
-        if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
-        if (game && global[0].game !== game) {
-          warnings.push(`Code found in ${global[0].game}, not the selected ${game} — trusting the code`);
+        if (!nameCompatible((global[0] as TcgCard).name)) {
+          warnings.push(`Code "${candidate}" matches "${(global[0] as TcgCard).name}" but AI read "${aiInfo.card_name}" — code not trusted`);
+        } else {
+          if (candidate !== code) warnings.push(`Matched code segment "${candidate}" of "${rawNumber}"`);
+          if (game && global[0].game !== game) {
+            warnings.push(`Code found in ${global[0].game}, not the selected ${game} — trusting the code`);
+          }
+          return { card: global[0] as TcgCard, confidence: game && global[0].game === game ? 'high' : 'medium', matchedBy: 'code_unique_global', warnings };
         }
-        return { card: global[0] as TcgCard, confidence: game && global[0].game === game ? 'high' : 'medium', matchedBy: 'code_unique_global', warnings };
       }
       if (global && global.length > 1) {
         warnings.push(`Code "${candidate}" exists in multiple games — game selection required`);
       }
     }
+    // Single-digit misread rescue: if the card NAME matches cards in the
+    // known game and EXACTLY ONE has a code one character off from the AI's
+    // code, correct to it (OCR-class misread).
+    if (game && aiInfo.card_name && aiInfo.card_name.trim().length >= 3) {
+      const sanitized = aiInfo.card_name.replace(/[\\"]/g, '');
+      const { data: nameCards } = await supabase
+        .from('tcg_cards')
+        .select('*')
+        .eq('game', game)
+        .ilike('name', `%${sanitized}%`)
+        .limit(25);
+      const variant = findUniqueDigitVariant(
+        (nameCards || []) as TcgCard[],
+        c => normalizeTcgCode(c.code),
+        code
+      );
+      if (variant) {
+        warnings.push(`Code corrected from "${rawNumber}" to "${variant.code}" (single-digit misread; name matched)`);
+        return { card: variant, confidence: 'high', matchedBy: 'code_in_game', warnings };
+      }
+    }
+
     if (game) warnings.push(`Code "${code}" not found in ${game}`);
   }
 

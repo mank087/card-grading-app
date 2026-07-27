@@ -3,6 +3,7 @@
 // Used when AI scans a card and we need to verify/enhance with database info
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 /**
  * Yu-Gi-Oh! card data from our local database
@@ -243,12 +244,50 @@ export async function lookupYugiohCard(
 
       if (nameSim < 0.3) {
         warnings.push(`Set code ${setCode} found "${directMatch.name}" but AI identified "${cardName}" — name mismatch`);
+        // The misread code may have landed on a DIFFERENT real printing.
+        // If the NAME matches printings and exactly one has a set code one
+        // character off from the AI's, correct to that printing.
+        const nameResults = await searchByName(cardName);
+        const strongNameResults = nameResults.filter(r => calculateSimilarity(cardName, r.name) >= 0.9);
+        const variant = findUniqueDigitVariant(strongNameResults, r => r.set_code, setCode);
+        if (variant) {
+          console.log(`[YGO Matcher] 🔢 Set-code misread corrected: "${setCode}" → "${variant.set_code}" (${variant.name})`);
+          warnings.push(`Set code corrected from "${setCode}" to "${variant.set_code}" (single-character misread; name matched)`);
+          flags.setCodeMatched = true;
+          flags.setCodeScore = 90;
+          flags.nameMatched = true;
+          flags.nameScore = 100;
+          bestCard = variant;
+          bestScore = 92;
+        } else {
+          bestCard = directMatch;
+          bestScore = 80;
+        }
+      } else {
+        bestCard = directMatch;
+        bestScore = nameSim > 0.5 ? 100 : 80;
       }
-
-      bestCard = directMatch;
-      bestScore = nameSim > 0.5 ? 100 : 80;
     } else {
       warnings.push(`Set code "${setCode}" not found in database`);
+
+      // Strategy 1a-rescue: single-digit/char misread. If the card NAME matches
+      // printings and EXACTLY ONE has a set code one character off from the
+      // AI's set code (e.g. "LOB-EN001" vs "LOB-EN007"), correct to it.
+      if (cardName) {
+        const nameResults = await searchByName(cardName);
+        const strongNameResults = nameResults.filter(r => calculateSimilarity(cardName, r.name) >= 0.9);
+        const variant = findUniqueDigitVariant(strongNameResults, r => r.set_code, setCode);
+        if (variant) {
+          console.log(`[YGO Matcher] 🔢 Set-code misread corrected: "${setCode}" → "${variant.set_code}" (${variant.name})`);
+          warnings.push(`Set code corrected from "${setCode}" to "${variant.set_code}" (single-character misread; name matched)`);
+          flags.setCodeMatched = true;
+          flags.setCodeScore = 90;
+          flags.nameMatched = true;
+          flags.nameScore = 100;
+          bestCard = variant;
+          bestScore = 92;
+        }
+      }
     }
   }
 

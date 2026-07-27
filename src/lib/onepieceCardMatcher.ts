@@ -3,6 +3,7 @@
 // Used when AI scans a card and we need to verify/enhance with database info
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 /**
  * One Piece card data from our local database
@@ -597,6 +598,41 @@ export async function lookupOnePieceCard(
           family
         };
       }
+    }
+  }
+
+  // Strategy 1a-rescue: single-digit misread. Card ids are highly structured
+  // (OP10-092) — if the name matches DB cards and EXACTLY ONE has an id one
+  // character off from the AI's id, correct to it (OCR-class misread).
+  // Runs both when the id found nothing AND when it found a different card
+  // that failed name validation (misread id landing on another real card).
+  if (aiIdentification.cardId && aiIdentification.name) {
+    const nameCandidates = await searchByName(aiIdentification.name, 25);
+    const variant = findUniqueDigitVariant(
+      nameCandidates,
+      c => normalizeCardId(c.id),
+      normalizeCardId(aiIdentification.cardId)
+    );
+    if (variant) {
+      console.log(`[OnePiece Matcher] 🔢 Digit-misread corrected: "${aiIdentification.cardId}" → "${variant.id}" (${variant.card_name})`);
+      const { family, selected } = await buildFamilyAndSelect(variant, variantHint);
+      return {
+        card: selected,
+        score: 0.9,
+        confidence: {
+          cardIdMatched: true,
+          cardIdScore: 0.9,
+          nameMatched: true,
+          nameScore: 1.0,
+          setMatched: false,
+          setScore: 0,
+          overallConfidence: 'high',
+          matchedFeatures: 2,
+          totalFeatures: 3,
+          warnings: [`Card ID corrected from "${aiIdentification.cardId}" to "${variant.id}" (single-digit misread; name matched)`]
+        },
+        family
+      };
     }
   }
 

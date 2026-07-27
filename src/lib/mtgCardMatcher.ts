@@ -3,6 +3,7 @@
 // Used when AI scans a card and we need to verify/enhance with database info
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 /**
  * MTG card data from our local database (Scryfall data)
@@ -614,6 +615,37 @@ export async function lookupMtgCard(
         };
       }
     }
+    // Strategy 1a-rescue: single-digit misread. If the name matches cards in
+    // the claimed set and EXACTLY ONE of them has a collector number one
+    // character off from the AI's number, correct to it (OCR-class misread).
+    if (name) {
+      const setCandidates = await searchByNameAndSetCode(name, setCode, 25);
+      const variant = findUniqueDigitVariant(
+        setCandidates,
+        c => normalizeCollectorNumber(c.collector_number),
+        normalizeCollectorNumber(collectorNumber)
+      );
+      if (variant) {
+        console.log(`[MTG Matcher] 🔢 Digit-misread corrected: "${collectorNumber}" → "${variant.collector_number}" (${variant.name}, ${variant.set_name})`);
+        return {
+          card: variant,
+          score: 0.9,
+          confidence: {
+            setCodeMatched: true,
+            setCodeScore: 1.0,
+            numberMatched: true,
+            numberScore: 0.9,
+            nameMatched: true,
+            nameScore: 1.0,
+            overallConfidence: 'high',
+            matchedFeatures: 3,
+            totalFeatures: 3,
+            warnings: [`Collector number corrected from "${collectorNumber}" to "${variant.collector_number}" (single-digit misread; name and set matched)`]
+          }
+        };
+      }
+    }
+
     // Strategy 1b: Set+number failed, try just collector number across ALL sets
     // This handles AI misidentifying the set code
     console.log('[MTG Matcher] Set/number lookup failed, trying collector number across all sets...');

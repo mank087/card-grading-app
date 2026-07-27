@@ -3,6 +3,7 @@
 // Used when AI scans a card and we need to verify/enhance with database info
 
 import { supabaseServer } from './supabaseServer';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 /**
  * Lorcana card data from our local database
@@ -522,6 +523,37 @@ export async function lookupLorcanaCard(
         };
       }
     }
+    // Strategy 1a-rescue: single-digit misread. If the name matches cards in
+    // the DB and EXACTLY ONE has a collector number one character off from
+    // the AI's number, correct to it (OCR-class misread).
+    if (aiIdentification.name) {
+      const nameCandidates = await searchByName(aiIdentification.name, 25);
+      const variant = findUniqueDigitVariant(
+        nameCandidates,
+        c => normalizeCollectorNumber(c.collector_number),
+        normalizeCollectorNumber(aiIdentification.collectorNumber)
+      );
+      if (variant) {
+        console.log(`[Lorcana Matcher] 🔢 Digit-misread corrected: "${aiIdentification.collectorNumber}" → "${variant.collector_number}" (${variant.full_name}, ${variant.set_name})`);
+        return {
+          card: variant,
+          score: 0.9,
+          confidence: {
+            setCodeMatched: false,
+            setCodeScore: 0,
+            numberMatched: true,
+            numberScore: 0.9,
+            nameMatched: true,
+            nameScore: 1.0,
+            overallConfidence: 'high',
+            matchedFeatures: 2,
+            totalFeatures: 3,
+            warnings: [`Collector number corrected from "${aiIdentification.collectorNumber}" to "${variant.collector_number}" (single-digit misread; name matched)`]
+          }
+        };
+      }
+    }
+
     // Strategy 1b: Set+number failed, try just collector number across ALL sets
     // This handles AI misidentifying the set name
     console.log('[Lorcana Matcher] Set/number lookup failed, trying collector number across all sets...');

@@ -414,6 +414,44 @@ export async function PATCH(
       // Continue even if label generation fails
     }
 
+    // 10b. Sync identity fields into an existing custom-label override.
+    // Custom labels win over label_data at render time, so a customer who
+    // customized their label and LATER corrects a wrong field kept printing
+    // the old value (customer-reported Jul 27: corrected card number showed
+    // everywhere except the label, which had a pre-correction custom label).
+    // Only the fields this edit actually changed are synced; the customer's
+    // other customizations are preserved. primaryName is synced only when it
+    // still matched the pre-edit card name (i.e., was never hand-customized).
+    try {
+      if (card.custom_label_data && typeof card.custom_label_data === 'object') {
+        const custom: Record<string, any> = { ...card.custom_label_data };
+        let customChanged = false;
+        if ('card_number' in body && custom.cardNumber != null) {
+          custom.cardNumber = body.card_number === '' ? null : body.card_number;
+          customChanged = true;
+        }
+        if ('card_set' in body && custom.setName != null) {
+          custom.setName = body.card_set === '' ? null : body.card_set;
+          customChanged = true;
+        }
+        if ('release_date' in body && custom.year != null) {
+          custom.year = body.release_date === '' ? null : body.release_date;
+          customChanged = true;
+        }
+        if ('card_name' in body && custom.primaryName != null && custom.primaryName === card.card_name) {
+          custom.primaryName = body.card_name === '' ? null : body.card_name;
+          customChanged = true;
+        }
+        if (customChanged) {
+          await supabase.from('cards').update({ custom_label_data: custom }).eq('id', cardId);
+          console.log('[Edit Card Details] Synced edited identity fields into custom_label_data');
+        }
+      }
+    } catch (customSyncError) {
+      console.error('[Edit Card Details] Custom label sync error:', customSyncError);
+      // Non-fatal
+    }
+
     // 11. Return success response
     return NextResponse.json({
       success: true,
