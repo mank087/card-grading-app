@@ -2650,8 +2650,41 @@ Provide detailed analysis as markdown with all required sections.`
             gradeCapNote = `The card presents at Gem Mint level, but it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
             console.log(`[GRADE RECALC] ⚖️ case gate: 10 → 9 (case_type=${caseInfo.case_type}, impact=${caseInfo.impact_level})`);
           } else {
-            gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
-            console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3})`);
+            // v9.9 DISSENT REFLECTION: don't show four 10 tiles under a 9 — surface
+            // the dissenting evaluation's score in the responsible subgrade tile(s)
+            // so the held grade explains itself (customer-reported Jul 27: "the card
+            // says perfect everywhere, but came back a 9"). For each category where
+            // any pass scored below 10, the tile shows that pass's score (floored at
+            // the final grade so weakest-link display is never violated), and the
+            // face scores/prose follow via the reconciliation below.
+            const dissentCats: string[] = [];
+            for (const cat of ['centering', 'corners', 'edges', 'surface'] as const) {
+              const minAcross = Math.min(pass1[cat] ?? 10, pass2[cat] ?? 10, pass3[cat] ?? 10);
+              if (minAcross < serverRounded[cat]) {
+                const shown = Math.max(minAcross, finalGrade);
+                serverRounded[cat] = shown;
+                dissentCats.push(cat);
+                for (const face of ['front', 'back'] as const) {
+                  const key = `${cat}_${face}`;
+                  if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > shown) {
+                    jsonData.raw_sub_scores[key] = shown;
+                  }
+                }
+              }
+            }
+            threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+            if (dissentCats.length > 0) {
+              const catList = dissentCats.join(' and ');
+              gradeCapNote = `The card presents at Gem Mint level, but one of the three independent evaluations scored the ${catList} at ${finalGrade} - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+              if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+                jsonData.grading_passes.consensus_notes.push(
+                  `Gem Mint unanimity: pass finals ${f1}/${f2}/${f3} — the ${catList} subgrade shows the dissenting evaluation's score.`
+                );
+              }
+            } else {
+              gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+            }
+            console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}; dissent shown in: ${dissentCats.join(',') || 'none identified'})`);
           }
         }
 
