@@ -32,6 +32,72 @@ interface Props {
 }
 
 // ============================================================================
+// PRINT FORMAT PREFERENCE — remembered across sessions so the main download
+// button is one click; the chooser stays reachable via the ▾ split button.
+// ============================================================================
+
+type SlabPrintFormat = 'duplex' | 'foldover'
+const PRINT_FORMAT_KEY = 'labelStudio_slabPrintFormat'
+
+function getStoredPrintFormat(): SlabPrintFormat | null {
+  if (typeof window === 'undefined') return null
+  const v = localStorage.getItem(PRINT_FORMAT_KEY)
+  return v === 'duplex' || v === 'foldover' ? v : null
+}
+function storePrintFormat(f: SlabPrintFormat) {
+  try { localStorage.setItem(PRINT_FORMAT_KEY, f) } catch { /* ignore */ }
+}
+const PRINT_FORMAT_LABEL: Record<SlabPrintFormat, string> = {
+  duplex: 'Front + Back (Duplex)',
+  foldover: 'Fold-Over (Single-Sided)',
+}
+
+// ============================================================================
+// DETAIL FIELD — label text input with an explicit "custom override" state.
+// When the value differs from the AI-generated baseline it shows an amber
+// "custom" chip with a one-click reset, so overrides are visible and
+// reversible (previously, reverting required knowing to clear the field).
+// ============================================================================
+
+function DetailField({
+  label,
+  value,
+  baseline,
+  onChange,
+}: {
+  label: string
+  value: string
+  baseline: string | null
+  onChange: (next: string) => void
+}) {
+  const overridden = baseline != null && value.trim() !== baseline.trim()
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] text-gray-500">{label}</label>
+        {overridden && (
+          <button
+            onClick={() => onChange(baseline!)}
+            title={`Reset to generated value: "${baseline}"`}
+            className="text-[9px] leading-none px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 transition-colors"
+          >
+            custom · reset ⟲
+          </button>
+        )}
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-purple-500 outline-none ${
+          overridden ? 'border-amber-300 bg-amber-50/50' : 'border-gray-300'
+        }`}
+      />
+    </div>
+  )
+}
+
+// ============================================================================
 // CARD SELECTOR
 // ============================================================================
 
@@ -695,7 +761,14 @@ function LabelGallery({
       const style = labelType.style || 'modern'
 
       if (labelType.downloadType === 'slab') {
-        // Show format choice — actual download handled by handleGallerySlabDownload
+        // Use the remembered print format when set; otherwise show the choice
+        // (handled by handleGallerySlabDownload)
+        const pref = getStoredPrintFormat()
+        if (pref) {
+          setDownloading(null)
+          await handleGallerySlabDownload(labelType.id, pref)
+          return
+        }
         setGalleryPrintChoice(labelType.id)
         setDownloading(null)
         return
@@ -794,6 +867,7 @@ function LabelGallery({
   }
 
   const handleGallerySlabDownload = async (labelTypeId: string, format: 'duplex' | 'foldover') => {
+    storePrintFormat(format) // remembered for one-click downloads everywhere
     if (!slabData) return
     setGalleryPrintChoice(null)
     setDownloading(labelTypeId)
@@ -1181,6 +1255,81 @@ function CustomDesigner({
     setFieldsInitialized(selectedCard.id)
   }, [slabData, selectedCard, fieldsInitialized])
 
+  // ── Override visibility & reconciliation ─────────────────────────────────
+  const hasAnyOverride = useMemo(() => {
+    const b = generatedBaselineRef.current
+    if (!b || fieldsInitialized !== selectedCard?.id) return false
+    return (Object.keys(b) as (keyof LabelFields)[]).some(
+      (k) => (labelFields[k] || '').trim() !== (b[k] || '').trim()
+    )
+  }, [labelFields, fieldsInitialized, selectedCard])
+
+  const handleResetAllFields = () => {
+    const b = generatedBaselineRef.current
+    if (b) setLabelFields({ ...b })
+  }
+
+  // Saved custom text that differs from the card's CURRENT generated data —
+  // either a deliberate customization or a leftover from before the card's
+  // data was corrected. Surface it once per card; the dismissal persists.
+  const staleDismissKey = selectedCard ? `labelStudio_staleDismissed_${selectedCard.id}` : null
+  const [staleOverrideDismissed, setStaleOverrideDismissedRaw] = useState(false)
+  useEffect(() => {
+    if (!staleDismissKey) return
+    try { setStaleOverrideDismissedRaw(localStorage.getItem(staleDismissKey) === '1') } catch { setStaleOverrideDismissedRaw(false) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCard?.id])
+  const setStaleOverrideDismissed = (v: boolean) => {
+    setStaleOverrideDismissedRaw(v)
+    if (staleDismissKey && v) { try { localStorage.setItem(staleDismissKey, '1') } catch { /* ignore */ } }
+  }
+
+  const staleOverrideKeys = useMemo(() => {
+    const b = generatedBaselineRef.current
+    const custom = selectedCard?.custom_label_data
+    if (!b || !custom || fieldsInitialized !== selectedCard?.id) return [] as string[]
+    const checks: Array<[string, unknown, string]> = [
+      ['card number', custom.cardNumber, b.cardNumber],
+      ['set', custom.setName, b.setName],
+      ['year', custom.year, b.year],
+    ]
+    return checks
+      .filter(([, c, base]) => c != null && String(c).trim() !== '' && base && String(c).trim() !== base.trim())
+      .map(([k]) => k)
+  }, [selectedCard, fieldsInitialized])
+
+  const handleAdoptCardData = async () => {
+    const b = generatedBaselineRef.current
+    if (!b || !selectedCard) return
+    // Show the card's generated values in the fields
+    setLabelFields((prev) => ({ ...prev, cardNumber: b.cardNumber, setName: b.setName, year: b.year }))
+    // Persist: drop those keys from the stored override, keep other customizations
+    const existing: Record<string, any> = { ...(selectedCard.custom_label_data || {}) }
+    delete existing.cardNumber
+    delete existing.setName
+    delete existing.year
+    setIsSaving(true)
+    try {
+      const session = (await import('@/lib/directAuth')).getStoredSession()
+      const hasRemaining = Object.values(existing).some((v) => v != null && (!Array.isArray(v) || v.length > 0))
+      const res = await fetch(`/api/cards/${selectedCard.id}/custom-label`, {
+        method: hasRemaining ? 'PUT' : 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        ...(hasRemaining ? { body: JSON.stringify({ customFields: existing }) } : {}),
+      })
+      if (!res.ok) throw new Error('Could not update the saved label')
+      selectedCard.custom_label_data = hasRemaining ? existing : null
+      setStaleOverrideDismissed(true)
+      setSaveResult('saved')
+      setTimeout(() => setSaveResult((s) => (s === 'saved' ? null : s)), 2500)
+    } catch (err: any) {
+      setSaveResult('error')
+      setSaveError(err?.message || 'Save failed')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Build previewData from current field values
   // Only merge label fields when they've been initialized for the current card
   const previewData = useMemo(() => {
@@ -1303,6 +1452,8 @@ function CustomDesigner({
   }
 
   const [showCustomPrintChoice, setShowCustomPrintChoice] = useState(false)
+  const [printFormatPref, setPrintFormatPref] = useState<SlabPrintFormat | null>(null)
+  useEffect(() => { setPrintFormatPref(getStoredPrintFormat()) }, [])
 
   const handleDownload = async (format: 'duplex' | 'foldover' = 'duplex') => {
     if (!previewData) return
@@ -1392,7 +1543,8 @@ function CustomDesigner({
 
   return (
     <section id="custom-designer" className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Custom Label Designer</h2>
+      <h2 className="text-lg font-bold text-gray-900">Slab Label Designer</h2>
+      <p className="text-sm text-gray-500 mb-4">Customize the label that goes in your graded slab — colors, layout, and text</p>
 
       {!selectedCard && (
         <p className="text-gray-400 text-sm py-8 text-center">
@@ -2116,66 +2268,63 @@ function CustomDesigner({
 
             {/* Label Details */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Label Details</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-700">Label Details</h3>
+                {hasAnyOverride && (
+                  <button
+                    onClick={handleResetAllFields}
+                    title="Reset every field to the AI-generated values (click Save to Card to make it permanent)"
+                    className="text-[9px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50"
+                  >
+                    Reset all ⟲
+                  </button>
+                )}
+              </div>
+
+              {/* Stale-override reconcile: saved custom text that no longer
+                  matches the card's current data (e.g. the card number was
+                  corrected after the label was customized) */}
+              {staleOverrideKeys.length > 0 && !staleOverrideDismissed && (
+                <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                  <p className="text-[10px] text-amber-800 font-medium mb-1.5">
+                    This card&apos;s saved label text ({staleOverrideKeys.join(', ')}) no longer matches the card&apos;s current data.
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={handleAdoptCardData}
+                      disabled={isSaving}
+                      className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-medium hover:bg-amber-700"
+                    >
+                      Use card data
+                    </button>
+                    <button
+                      onClick={() => setStaleOverrideDismissed(true)}
+                      className="text-[10px] px-2 py-1 rounded border border-amber-300 text-amber-700 hover:bg-amber-100"
+                    >
+                      Keep my custom text
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
-                <div>
-                  <label className="text-[10px] text-gray-500">Card Name</label>
-                  <input
-                    type="text"
-                    value={labelFields.primaryName}
-                    onChange={(e) => setLabelFields((prev) => ({ ...prev, primaryName: e.target.value }))}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                  />
+                <DetailField label="Card Name" value={labelFields.primaryName} baseline={generatedBaselineRef.current?.primaryName ?? null}
+                  onChange={(v) => setLabelFields((prev) => ({ ...prev, primaryName: v }))} />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <DetailField label="Set" value={labelFields.setName} baseline={generatedBaselineRef.current?.setName ?? null}
+                    onChange={(v) => setLabelFields((prev) => ({ ...prev, setName: v }))} />
+                  <DetailField label="Subset" value={labelFields.subset} baseline={generatedBaselineRef.current?.subset ?? null}
+                    onChange={(v) => setLabelFields((prev) => ({ ...prev, subset: v }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="text-[10px] text-gray-500">Set</label>
-                    <input
-                      type="text"
-                      value={labelFields.setName}
-                      onChange={(e) => setLabelFields((prev) => ({ ...prev, setName: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500">Subset</label>
-                    <input
-                      type="text"
-                      value={labelFields.subset}
-                      onChange={(e) => setLabelFields((prev) => ({ ...prev, subset: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                    />
-                  </div>
+                  <DetailField label="Card Number" value={labelFields.cardNumber} baseline={generatedBaselineRef.current?.cardNumber ?? null}
+                    onChange={(v) => setLabelFields((prev) => ({ ...prev, cardNumber: v }))} />
+                  <DetailField label="Year" value={labelFields.year} baseline={generatedBaselineRef.current?.year ?? null}
+                    onChange={(v) => setLabelFields((prev) => ({ ...prev, year: v }))} />
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="text-[10px] text-gray-500">Card Number</label>
-                    <input
-                      type="text"
-                      value={labelFields.cardNumber}
-                      onChange={(e) => setLabelFields((prev) => ({ ...prev, cardNumber: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500">Year</label>
-                    <input
-                      type="text"
-                      value={labelFields.year}
-                      onChange={(e) => setLabelFields((prev) => ({ ...prev, year: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-500">Features (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={labelFields.features}
-                    onChange={(e) => setLabelFields((prev) => ({ ...prev, features: e.target.value }))}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                  />
-                </div>
+                <DetailField label="Features (comma-separated)" value={labelFields.features} baseline={generatedBaselineRef.current?.features ?? null}
+                  onChange={(v) => setLabelFields((prev) => ({ ...prev, features: v }))} />
+
                 <button
                   onClick={handleSaveToCard}
                   disabled={isSaving}
@@ -2187,34 +2336,66 @@ function CustomDesigner({
                 >
                   {isSaving ? 'Saving...' : saveResult === 'saved' ? 'Saved ✓' : 'Save to Card'}
                 </button>
+                <p className="text-[9px] text-gray-400 leading-snug">
+                  Text changes save to this card and apply everywhere its label appears.
+                  Colors &amp; layout are saved separately as reusable styles below.
+                </p>
                 {saveResult === 'error' && saveError && (
                   <p className="text-[10px] text-red-600" role="alert">{saveError}</p>
                 )}
               </div>
             </div>
 
-            {/* Download */}
+            {/* Download — one click with the remembered format; ▾ opens the chooser */}
             <div className="relative">
-              <button
-                onClick={() => setShowCustomPrintChoice(!showCustomPrintChoice)}
-                disabled={isDownloading || !previewData}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold text-sm hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow"
-              >
-                {isDownloading ? 'Generating PDF...' : 'Download Custom Label (PDF)'}
-              </button>
+              <div className="flex">
+                <button
+                  onClick={() => {
+                    const pref = getStoredPrintFormat()
+                    if (pref) handleDownload(pref)
+                    else setShowCustomPrintChoice(true)
+                  }}
+                  disabled={isDownloading || !previewData}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-l-lg font-semibold text-sm hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow"
+                >
+                  {isDownloading
+                    ? 'Generating PDF...'
+                    : printFormatPref
+                      ? `Download — ${PRINT_FORMAT_LABEL[printFormatPref]}`
+                      : 'Download Label (PDF)'}
+                </button>
+                <button
+                  onClick={() => setShowCustomPrintChoice(!showCustomPrintChoice)}
+                  disabled={isDownloading || !previewData}
+                  title="Choose print format"
+                  className="px-3 py-2.5 bg-purple-800 text-white rounded-r-lg text-sm font-bold hover:bg-purple-900 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all shadow border-l border-purple-500/40"
+                >
+                  ▾
+                </button>
+              </div>
               {showCustomPrintChoice && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-20">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Print Format</p>
-                  <button onClick={() => handleDownload('duplex')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Print Format <span className="font-normal text-gray-400">(remembered for next time)</span></p>
+                  <button onClick={() => { storePrintFormat('duplex'); setPrintFormatPref('duplex'); handleDownload('duplex') }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
                     <span className="font-medium text-gray-900">Front + Back (Duplex)</span>
                     <span className="block text-xs text-gray-500">2-page PDF — requires double-sided printing</span>
                   </button>
-                  <button onClick={() => handleDownload('foldover')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                  <button onClick={() => { storePrintFormat('foldover'); setPrintFormatPref('foldover'); handleDownload('foldover') }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
                     <span className="font-medium text-gray-900">Fold-Over (Single-Sided)</span>
                     <span className="block text-xs text-gray-500">1-page PDF — cut and fold, no duplex needed</span>
                   </button>
                 </div>
               )}
+              <p className="text-[9px] text-gray-400 mt-1.5 text-center leading-snug">
+                Print at <span className="font-semibold text-gray-500">100% scale / Actual Size</span> (not &quot;fit to page&quot;).{' '}
+                First time?{' '}
+                <button
+                  onClick={() => import('@/lib/calibrationSheet').then((m) => m.downloadCalibrationSheet())}
+                  className="underline text-purple-500 hover:text-purple-700"
+                >
+                  Print the calibration sheet
+                </button>
+              </p>
             </div>
 
             {/* Mobile bottom preview */}
@@ -2584,6 +2765,20 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
     setCustomPreviewData(null)
   }, [])
 
+  // "More Label Formats" (Avery/card-image gallery) — collapsed by default,
+  // expansion remembered across visits
+  const [showMoreFormats, setShowMoreFormatsRaw] = useState(false)
+  useEffect(() => {
+    try { setShowMoreFormatsRaw(localStorage.getItem('labelStudio_showMoreFormats') === '1') } catch { /* ignore */ }
+  }, [])
+  const setShowMoreFormats = (updater: (v: boolean) => boolean) => {
+    setShowMoreFormatsRaw((v) => {
+      const next = updater(v)
+      try { localStorage.setItem('labelStudio_showMoreFormats', next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }
+
   // Batch selection state
   const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(new Set())
   const [isBatchSlabModalOpen, setIsBatchSlabModalOpen] = useState(false)
@@ -2765,22 +2960,22 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
               </p>
               <p className="text-xs text-purple-600">Download labels for all selected cards at once</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <button
                 onClick={() => setIsBatchSlabModalOpen(true)}
-                className="text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
+                className="text-xs px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold shadow-sm"
               >
-                Slab Labels
+                Print Slab Labels ({batchSelectedIds.size})
               </button>
               <button
                 onClick={() => setIsBatchAveryModalOpen(true)}
-                className="text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
+                className="text-xs px-3 py-1.5 bg-white text-purple-700 border border-purple-300 rounded hover:bg-purple-50 transition-colors font-medium"
               >
                 One-Touch (Avery 6871)
               </button>
               <button
                 onClick={() => setIsBatchAvery8167ModalOpen(true)}
-                className="text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
+                className="text-xs px-3 py-1.5 bg-white text-purple-700 border border-purple-300 rounded hover:bg-purple-50 transition-colors font-medium"
               >
                 Toploader (Avery 8167)
               </button>
@@ -2919,10 +3114,9 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
           )
         })()}
 
-        {/* Section 2: Label Gallery */}
-        <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} />
-
-        {/* Section 3: Custom Designer */}
+        {/* Section 2: Slab Label Designer — the main event: most users are
+            here to customize their graded slab label, so it leads the page.
+            Other formats (Avery, card images) live in "More Label Formats". */}
         <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} />
 
         {/* Section 4: Save & Manage Custom Styles */}
@@ -2940,6 +3134,27 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
             }}
           />
         )}
+
+        {/* More Label Formats — Avery one-touch/toploader, fold-over, and
+            card-image downloads. Collapsed by default: the primary audience
+            customizes the slab label above. */}
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <button
+            onClick={() => setShowMoreFormats((v) => !v)}
+            className="w-full flex items-center justify-between px-4 sm:px-6 py-4 text-left"
+          >
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">More Label Formats</h2>
+              <p className="text-sm text-gray-500">One-Touch (Avery 6871), Toploader (Avery 8167), fold-over, and card image downloads</p>
+            </div>
+            <span className={`text-gray-400 text-xl transition-transform ${showMoreFormats ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+          {showMoreFormats && (
+            <div className="px-0 pb-2">
+              <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} />
+            </div>
+          )}
+        </section>
 
         {/* Affiliate: Amazon Graded Card Slabs */}
         <section className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl shadow-sm p-5 sm:p-6">
