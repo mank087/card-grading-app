@@ -12,6 +12,7 @@ import GradeDistributionChart from '@/components/market-pricing/GradeDistributio
 import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart'
 import TopSetsChart from '@/components/market-pricing/TopSetsChart'
 import PriceSourceChart from '@/components/market-pricing/PriceSourceChart'
+import EbayListingMonitor from '@/components/EbayListingMonitor'
 
 // Static mock data for decorative background charts
 const MOCK_CATEGORIES = [
@@ -214,7 +215,7 @@ function FloatingCtaBar({
 
   // Rotating CTA messages
   const ctaMessages = [
-    { main: 'First grade free + bonus credits' },
+    { main: '2 free grades + bonus credits' },
     { main: 'Grade cards in minutes, not weeks' },
     { main: 'Labels, pricing & eBay listing' },
     { main: 'From $0.50/card — credits never expire' },
@@ -539,6 +540,19 @@ export default function WhyDcmPage() {
 
   const isAuthenticated = !!user
 
+  // Live graded-card count — same endpoint as the /pop page and homepage
+  // trust bar (totals.totalGraded), so the numbers always agree.
+  const [popTotal, setPopTotal] = useState<number | null>(null)
+  useEffect(() => {
+    fetch('/api/pop/categories')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const total = data?.totals?.totalGraded
+        if (typeof total === 'number' && total > 0) setPopTotal(total)
+      })
+      .catch(() => { /* strip falls back to non-numeric copy */ })
+  }, [])
+
   // Inline signup for hero section
   const [heroEmail, setHeroEmail] = useState('')
   const [heroPassword, setHeroPassword] = useState('')
@@ -624,7 +638,7 @@ export default function WhyDcmPage() {
             <div className="flex-1 text-center xl:text-left">
               <div className="inline-flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/25 rounded-full px-4 py-1.5 mb-6">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-emerald-300 text-sm font-medium">First Grade Free</span>
+                <span className="text-emerald-300 text-sm font-medium">2 Free Grades</span>
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6">
                 Card Grading,<br />
@@ -661,7 +675,7 @@ export default function WhyDcmPage() {
                 <div className="bg-white rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
                   <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
                     <h2 className="text-white font-bold text-lg">Start Grading for Free</h2>
-                    <p className="text-emerald-100 text-sm">Your first grade is on us + bonus credits with first purchase</p>
+                    <p className="text-emerald-100 text-sm">Your first 2 grades are on us + bonus credits with first purchase</p>
                   </div>
                   <div className="p-6">
                     {heroSuccess ? (
@@ -727,6 +741,30 @@ export default function WhyDcmPage() {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* LIVE TRUST STRIP — real numbers from the same endpoint as /pop  */}
+      {/* ================================================================ */}
+      <section className="bg-slate-950 border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm">
+            <Link href="/pop" className="flex items-center gap-2 text-gray-300 hover:text-emerald-300 transition-colors">
+              <span className="text-emerald-400 font-bold text-base tabular-nums">
+                {popTotal != null ? popTotal.toLocaleString('en-US') : 'Thousands of'}
+              </span>
+              <span>cards graded</span>
+            </Link>
+            <span className="flex items-center gap-2 text-gray-300">
+              <span className="text-emerald-400 font-bold text-base">8</span>
+              <span>card types supported</span>
+            </span>
+            <span className="flex items-center gap-2 text-gray-300">
+              <span className="text-emerald-400 font-bold text-base">Every grade</span>
+              <span>publicly verifiable by serial</span>
+            </span>
           </div>
         </div>
       </section>
@@ -1407,27 +1445,43 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="List to eBay in Seconds" subtitle="Auto-generated listings with photos, title, and condition report. Connect your account and post in one click." />
+          <SectionHeading title="Grade It. List It. Sell It." subtitle="InstaList turns any graded card into a complete eBay listing — photos, title, condition, and the full DCM report — in one click." />
           <div className="grid md:grid-cols-2 gap-10 items-center">
-            <div className="space-y-4">
-              {[
-                'Professional HTML description auto-generated with grade details',
-                '5 images auto-created: labeled front/back, raw front/back, and mini-report',
-                'Grade automatically mapped to eBay\'s condition system',
-                'Built-in shipping calculator with domestic and international options',
-                'Supports fixed price and auction formats',
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3">
-                  <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-gray-700 text-sm">{item}</p>
-                </div>
-              ))}
+            <div>
+              <div className="space-y-4 mb-8">
+                {[
+                  'Professional HTML description auto-generated with grade details',
+                  '5 images auto-created: labeled front/back, raw front/back, and mini-report',
+                  'Grade automatically mapped to eBay\'s condition system',
+                  'Built-in shipping calculator with domestic and international options',
+                  'Supports fixed price and auction formats',
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-3">
+                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <p className="text-gray-700 text-sm">{item}</p>
+                  </div>
+                ))}
+              </div>
+              {isAuthenticated ? (
+                <Link
+                  href="/instalist-marketplace"
+                  className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                >
+                  Open InstaList
+                </Link>
+              ) : (
+                <Link
+                  href="/login?mode=signup"
+                  onClick={() => trackSignupClick('instalist_section')}
+                  className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
+                >
+                  Start with 2 Free Grades
+                </Link>
+              )}
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
-              <Image src="/why-dcm/insta-list-to-ebay-DCM.png" alt="DCM InstaList to eBay — listing details view" width={600} height={800} className="w-full h-auto" />
-            </div>
+            <EbayListingMonitor />
           </div>
         </div>
       </section>
@@ -1452,6 +1506,45 @@ export default function WhyDcmPage() {
           </div>
         </section>
       )}
+
+      {/* ================================================================ */}
+      {/* FAQ — the three objections that stall a first signup            */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="Fair Questions" subtitle="The things collectors ask before their first grade" />
+          <div className="space-y-8">
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">How accurate is AI grading?</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Every card is evaluated by three independent grading passes plus a magnified inspection of
+                each corner, edge, and surface region, and the consensus becomes your grade. The engine is
+                continuously calibrated against reference cards with known grades, and every report states
+                its own confidence range instead of pretending certainty. You also get estimated equivalents
+                on the PSA, BGS, SGC, and CGC scales so you can put the number in familiar terms.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Will buyers take a DCM grade seriously?</h3>
+              <p className="text-gray-600 leading-relaxed">
+                A DCM grade is not an opinion buyers have to trust, it is a report they can read. Every graded
+                card gets a public report page and a serial number anyone can verify, and InstaList embeds the
+                full condition breakdown right in your eBay listing. Buyers see the sub-grades and the evidence,
+                not just a number, and DCM graded cards are selling on eBay today.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">What if I disagree with my grade?</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Open the report and you can see exactly what was found, down to magnified evidence photos of
+                specific findings. Photo quality matters: if your report shows a wide confidence range, better
+                lighting and a re-shoot often resolve it. And if something still looks wrong, contact support
+                and a human will review it.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ================================================================ */}
       {/* PRICING */}
