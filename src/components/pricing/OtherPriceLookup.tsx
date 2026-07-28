@@ -28,6 +28,7 @@ interface NormalizedOtherPrices {
   salesVolume: string | null;
   isFallback?: boolean;
   exactMatchName?: string;
+  setName?: string;
 }
 
 interface AvailableVariant {

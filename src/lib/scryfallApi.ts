@@ -51,6 +51,8 @@ export interface ScryfallCard {
   cmc: number;
   type_line: string;
   oracle_text?: string;
+  power?: string;  // Creature power (can be "*" etc.)
+  toughness?: string;  // Creature toughness (can be "*" etc.)
   colors?: string[];
   color_identity: string[];
   keywords: string[];

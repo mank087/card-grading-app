@@ -551,7 +551,7 @@ function parseEvaluationStep(stepContent: string, side: 'FRONT' | 'BACK') {
   // Extract subsections: ### A. Centering, ### B. Corners, etc.
   const subsections = stepContent.split(/(?=### [A-D]\. )/g);
 
-  let centering = { lr: '50/50', tb: '50/50', score: 10 };
+  let centering: { lr: string; tb: string; score: number; summary?: string | null } = { lr: '50/50', tb: '50/50', score: 10 };
   let corners = { top_left: '', top_right: '', bottom_left: '', bottom_right: '', score: 10 };
   let edges = { left: '', right: '', top: '', bottom: '', score: 10 };
   let surface = { defects: '', score: 10 };

@@ -29,9 +29,9 @@ async function signUrl(
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const cardId = params.id;
+  const cardId = (await params).id;
   if (!isUuid(cardId)) {
     return NextResponse.json({ error: "Card not found" }, { status: 404 });
   }

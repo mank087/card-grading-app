@@ -80,14 +80,16 @@ export interface ReportCardData {
     isDoubleFaced?: boolean;
     rarity?: string;
   };
-  aiConfidence: string;
-  imageQuality: string;
-  generatedDate: string;
-  reportId: string;
-  cardDetails: string;          // DEPRECATED - use contextLine
-  specialFeaturesString: string; // DEPRECATED - use featuresLine
-  cardUrl: string;
+  aiConfidence?: string;
+  imageQuality?: string;
+  generatedDate?: string;
+  reportId?: string;
+  cardDetails?: string;          // DEPRECATED - use contextLine
+  specialFeaturesString?: string; // DEPRECATED - use featuresLine
+  cardUrl?: string;
   qrCodeDataUrl?: string;
+  qrCodeUrl?: string;
+  gradedAt?: string;
   overallSummary?: string;
 }
 

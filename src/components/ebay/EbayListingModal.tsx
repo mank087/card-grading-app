@@ -1014,7 +1014,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       }
 
       // Generate QR code
-      const qrCodeDataUrl = await generateQRCodeWithLogo(
+      const qrCodeDataUrl = await (generateQRCodeWithLogo as (url: string, logo?: string) => Promise<string>)(
         `https://dcmgrading.com/verify/${card.serial}`,
         await loadLogoAsBase64()
       );
@@ -1028,9 +1028,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // Prepare report data matching ReportCardData interface
       const reportData: ReportCardData = {
         // Unified label data
-        primaryName: labelData.primaryName || labelData.line1 || '',
-        contextLine: labelData.line2 || '',
-        featuresLine: labelData.line3 || null,
+        primaryName: labelData.primaryName || (labelData as any).line1 || '',
+        contextLine: (labelData as any).line2 || '',
+        featuresLine: (labelData as any).line3 || null,
         serial: card.serial,
         grade: grade,
         gradeFormatted: grade % 1 === 0 ? grade.toString() : grade.toFixed(1),

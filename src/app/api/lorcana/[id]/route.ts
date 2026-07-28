@@ -8,7 +8,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
@@ -509,7 +509,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -824,7 +824,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
                 front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                 back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                 back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
               edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,

@@ -8,7 +8,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
@@ -485,7 +485,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -571,7 +571,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
           console.log(`[GET /api/onepiece/${cardId}] User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }
 
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'onepiece', {
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'onepiece' as any, {
           userConditionReport: userConditionReport
         });
         conversationalGradingResult = conversationalResult.markdown_report;
@@ -780,7 +780,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
                 front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                 back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                 back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
               edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,

@@ -707,7 +707,7 @@ export async function generateBatchFoldableLabels(dataArray: FoldableLabelData[]
   }
 
   const mergedBytes = await mergedPdf.save();
-  return new Blob([mergedBytes], { type: 'application/pdf' });
+  return new Blob([mergedBytes as unknown as BlobPart], { type: 'application/pdf' });
 }
 
 /**

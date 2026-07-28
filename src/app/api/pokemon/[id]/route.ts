@@ -8,7 +8,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 // Label data generation for consistent display across all contexts
@@ -644,7 +644,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -1013,7 +1013,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                 back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                 back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
               edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
@@ -1576,7 +1576,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       release_date: cardFields.release_date || card.release_date,
       serial_numbering: conversationalGradingData?.card_info?.serial_number || card.serial_numbering,
       first_print_rookie: conversationalGradingData?.card_info?.rookie_or_first === true ? 'true' : card.first_print_rookie,
-      holofoil: cardFields.holofoil || card.holofoil,
+      holofoil: (cardFields as any).holofoil || card.holofoil,
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;

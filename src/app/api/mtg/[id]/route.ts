@@ -7,7 +7,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Scryfall API imports (for future use when ENABLE_SCRYFALL_API = true)
 // import { searchCardByFuzzyName, getCardBySetAndNumber } from "@/lib/scryfallApi";
 // Label data generation for consistent display across all contexts
@@ -530,7 +530,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -899,7 +899,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                 front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                 back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                 back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
               edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
@@ -1265,7 +1265,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       is_foil: conversationalGradingData?.card_info?.is_foil ?? card.is_foil,
       foil_type: conversationalGradingData?.card_info?.foil_type || card.foil_type,
       is_double_faced: conversationalGradingData?.card_info?.is_double_faced ?? card.is_double_faced,
-      mtg_rarity: cardFields.mtg_rarity || card.mtg_rarity,
+      mtg_rarity: (cardFields as any).mtg_rarity || card.mtg_rarity,
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;

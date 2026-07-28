@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       cardTypes,
     } = body;
 
-    console.log(`[Price Tracker API] Admin ${admin.username} triggered batch job`);
+    console.log(`[Price Tracker API] Admin ${(admin as any).username} triggered batch job`);
     console.log(`[Price Tracker API] Options: limit=${limit}, batchSize=${batchSize}, cardTypes=${cardTypes?.join(',') || 'all'}`);
 
     // Run the batch job

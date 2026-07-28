@@ -622,7 +622,7 @@ export async function getCardLoverStatus(userId: string): Promise<{
     new Date(credits.card_lover_current_period_end) > new Date();
 
   return {
-    isActive,
+    isActive: isActive as boolean,
     plan: credits.card_lover_plan,
     monthsActive: credits.card_lover_months_active,
     currentPeriodEnd: credits.card_lover_current_period_end

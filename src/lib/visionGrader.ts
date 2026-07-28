@@ -253,12 +253,14 @@ interface DefectSection {
     top_right: Defect;
     bottom_left: Defect;
     bottom_right: Defect;
+    severity?: 'none' | 'minor' | 'moderate' | 'heavy'; // Legacy aggregate shape read by gradeValidator
   };
   edges: {
     top: Defect;
     bottom: Defect;
     left: Defect;
     right: Defect;
+    severity?: 'none' | 'minor' | 'moderate' | 'heavy'; // Legacy aggregate shape read by gradeValidator
   };
   surface: {
     scratches: Defect;

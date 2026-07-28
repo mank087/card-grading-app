@@ -106,7 +106,7 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
       const legacyResult = await gradeCardConversationalV4(
         frontImageUrl,
         backImageUrl,
-        cardType,
+        cardType as 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other',
         { model, temperature, max_tokens, seed, top_p }
       );
 
@@ -148,7 +148,7 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
         const legacyResult = await gradeCardConversationalV4(
           frontImageUrl,
           backImageUrl,
-          cardType,
+          cardType as 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other',
           { model, temperature, max_tokens, seed, top_p }
         );
 
@@ -357,7 +357,7 @@ Return complete JSON response following the v5.5 schema with three-pass consensu
         const legacyResult = await gradeCardConversationalV4(
           frontImageUrl,
           backImageUrl,
-          cardType,
+          cardType as 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other',
           { model, temperature, max_tokens, seed, top_p }
         );
 
@@ -466,7 +466,7 @@ export async function gradeCardABTest(options: GradeCardOptionsV5): Promise<{
 
   if (bothSucceeded && v5Result.data && v4Result.legacyData) {
     const v5Grade = v5Result.data.final_grade.decimal_grade;
-    const v4Grade = v4Result.legacyData.grade?.decimal_grade;
+    const v4Grade = (v4Result.legacyData as any).grade?.decimal_grade;
 
     if (v5Grade !== null && v4Grade !== null) {
       gradeDiff = Math.abs(v5Grade - v4Grade);

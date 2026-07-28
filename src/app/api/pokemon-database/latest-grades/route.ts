@@ -56,7 +56,7 @@ export async function GET() {
     const urlMap = new Map<string, string>()
     signedUrls?.forEach(item => {
       if (item.signedUrl) {
-        urlMap.set(item.path, item.signedUrl)
+        urlMap.set(item.path as string, item.signedUrl)
       }
     })
 

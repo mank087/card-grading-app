@@ -472,7 +472,7 @@ export async function gradeCardParallelPipeline(
 
   // Get Stage 2 response
   const stage2Messages = await openai.beta.threads.messages.list(stage2Thread.id);
-  const stage2Message = stage2Messages.data.find((msg) => msg.role === "assistant");
+  const stage2Message = stage2Messages.data.find((msg: any) => msg.role === "assistant");
 
   if (!stage2Message) {
     throw new Error("No response from Stage 2 scoring assistant");

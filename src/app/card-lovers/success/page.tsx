@@ -9,9 +9,9 @@ import { getStoredSession } from '@/lib/directAuth'
 // Declare tracking pixels for TypeScript
 declare global {
   interface Window {
-    rdt: (...args: unknown[]) => void
-    gtag: (...args: unknown[]) => void
-    fbq: (...args: unknown[]) => void
+    rdt: (...args: any[]) => void
+    gtag: (...args: any[]) => void
+    fbq: (...args: any[]) => void
   }
 }
 

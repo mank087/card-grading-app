@@ -132,7 +132,7 @@ export default function AccountPage() {
         const totalCards = cards.length
         // Priority: visibility field (if set) takes precedence over is_public
         // visibility='private' means private, visibility='public' or (no visibility + is_public=true) means public
-        const publicCards = cards.filter(c => {
+        const publicCards = cards.filter((c: any) => {
           // If visibility field is set, use it
           if (c.visibility === 'private') return false;
           if (c.visibility === 'public') return true;
@@ -143,14 +143,14 @@ export default function AccountPage() {
 
         // Cards by category
         const cardsByCategory: { [key: string]: number } = {}
-        cards.forEach(card => {
+        cards.forEach((card: any) => {
           const category = card.category || 'Other'
           cardsByCategory[category] = (cardsByCategory[category] || 0) + 1
         })
 
         // Get grades (prefer conversational_decimal_grade, fallback to dvg_decimal_grade, then dcm_grade_whole)
         const grades = cards
-          .map(card => {
+          .map((card: any) => {
             if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
               return card.conversational_decimal_grade
             }
@@ -165,7 +165,7 @@ export default function AccountPage() {
             }
             return null
           })
-          .filter(grade => grade !== null) as number[]
+          .filter((grade: any) => grade !== null) as number[]
 
         const averageGrade = grades.length > 0
           ? Math.round((grades.reduce((sum, g) => sum + g, 0) / grades.length) * 10) / 10
@@ -176,7 +176,7 @@ export default function AccountPage() {
         let highestGradeCardId: string | null = null
         let highestGradeCategory: string | null = null
 
-        cards.forEach(card => {
+        cards.forEach((card: any) => {
           const grade = card.conversational_decimal_grade ?? card.dvg_decimal_grade ?? card.dcm_grade_whole ?? card.grade_numeric
           if (grade !== null && grade !== undefined) {
             if (highestGrade === null || grade > highestGrade) {
@@ -197,7 +197,7 @@ export default function AccountPage() {
         // Recent uploads (last 30 days)
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        const recentUploads = cards.filter(card => {
+        const recentUploads = cards.filter((card: any) => {
           if (!card.created_at) return false
           return new Date(card.created_at) > thirtyDaysAgo
         }).length

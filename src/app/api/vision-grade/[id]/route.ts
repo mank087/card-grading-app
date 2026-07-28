@@ -197,7 +197,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
       }
 
       // Parse conversational grading data from cached response (JSON v4.0 or markdown v3.8)
-      let parsedConversationalData = null;
+      let parsedConversationalData: any = null;
       if (card.conversational_grading) {
         try {
           // 🔄 v4.0: Check if this is JSON format first
@@ -417,7 +417,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
       card_text_blocks: [],
       grading_status: "DVG v2 disabled - conversational AI only",
       meta: { model_name: "disabled", version: "disabled", timestamp: new Date().toISOString() }
-    } as VisionGradeResult;
+    } as unknown as VisionGradeResult;
 
     console.log(`[CONVERSATIONAL AI] Stub visionResult created, skipping DVG v2 grading`);
 
@@ -441,7 +441,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
     // 🎯 PRIMARY GRADING SYSTEM: Conversational AI v3.5 PATCHED v2 (2025-10-24)
     // Conversational AI calculates independent grade with 10 critical patches
     let conversationalGradingResult: string | null = null;
-    let conversationalGradingData: ConversationalGradingDataV3 | null = null;
+    let conversationalGradingData: any = null;
     let conversationalResultV3_3: any = null; // Store full result for enhanced data
     let isJSONMode = false; // 🆕 v4.0: Track if we're using JSON format
 
@@ -845,7 +845,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
           recommended_whole_grade: conversationalGradingData.whole_grade,
           grade_uncertainty: conversationalGradingData.grade_uncertainty || "N/A",
           grading_notes: conversationalGradingData.condition_label || "Graded by conversational AI v3.5 PATCHED v2"
-        };
+        } as any;
 
         // Update centering ratios from conversational AI
         if (conversationalGradingData.centering_ratios) {
@@ -854,8 +854,8 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
             front_top_bottom_ratio_text: conversationalGradingData.centering_ratios.front_tb || "N/A",
             back_left_right_ratio_text: conversationalGradingData.centering_ratios.back_lr || "N/A",
             back_top_bottom_ratio_text: conversationalGradingData.centering_ratios.back_tb || "N/A",
-            method_front: "conversational AI v3.5",
-            method_back: "conversational AI v3.5"
+            method_front: "conversational AI v3.5" as any,
+            method_back: "conversational AI v3.5" as any
           };
           console.log(`[CONVERSATIONAL AI v3.5] Centering ratios updated:`, visionResult.centering);
         }
@@ -1327,7 +1327,7 @@ CRITICAL INSTRUCTIONS:
               recommended_whole_grade: conversationalGradingData.whole_grade,
               grade_uncertainty: conversationalGradingData.grade_uncertainty || "N/A",
               grading_notes: conversationalGradingData.condition_label || "Graded by conversational AI v3.5 PATCHED v2"
-            };
+            } as any;
           } else {
             console.log(`[JSON GRADE] ⚠️ No grade found in JSON, using parsed markdown data`);
           }

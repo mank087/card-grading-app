@@ -9,7 +9,7 @@ import { lookupTcgCard, looksLikeTcgCode, SUB_CATEGORY_TO_GAME, GAME_DISPLAY } f
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
@@ -403,7 +403,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -504,8 +504,8 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     }
 
     // Extract Other-specific fields and grading data from conversational JSON
-    let otherFields = {};
-    let gradingData = {};
+    let otherFields: any = {};
+    let gradingData: any = {};
 
     if (conversationalGradingResult) {
       try {
@@ -850,7 +850,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
                 front_tb: parseCentering(centeringRatios.front_tb),
                 back_lr: parseCentering(centeringRatios.back_lr),
                 back_tb: parseCentering(centeringRatios.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: gradingData.conversational_sub_scores?.corners?.weighted,
               edges_score: gradingData.conversational_sub_scores?.edges?.weighted,
               surface_score: gradingData.conversational_sub_scores?.surface?.weighted,

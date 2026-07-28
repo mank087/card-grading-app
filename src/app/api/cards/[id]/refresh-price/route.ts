@@ -28,7 +28,7 @@ const CARD_COOLDOWN_MS = 60_000;
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await verifyAuth(request);
@@ -36,7 +36,7 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
 
-    const cardId = params.id;
+    const cardId = (await params).id;
     if (!isUuid(cardId)) {
       return NextResponse.json({ success: false, error: 'Card not found' }, { status: 404 });
     }

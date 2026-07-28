@@ -128,7 +128,7 @@ function buildTitle(card: any): string {
   }
 
   // Year (matches Sports pattern)
-  if (year && !isNaN(year)) {
+  if (year && !isNaN(Number(year))) {
     titleParts.push(String(year));
   }
 

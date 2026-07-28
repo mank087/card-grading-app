@@ -33,6 +33,7 @@ type Card = {
   release_date?: string  // 🎯 Year
   card_number?: string  // 🎯 Card number
   grade_numeric?: number
+  dcm_grade?: number | null
   ai_confidence_score?: string
   ai_grading?: any
   dcm_grade_whole?: number

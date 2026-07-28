@@ -8,7 +8,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
@@ -487,7 +487,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -573,7 +573,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
           console.log(`[GET /api/yugioh/${cardId}] User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }
 
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'yugioh', {
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'yugioh' as any, {
           userConditionReport: userConditionReport
         });
         conversationalGradingResult = conversationalResult.markdown_report;
@@ -782,7 +782,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
                 front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                 back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                 back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-              },
+              } as CenteringMeasurements,
               corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
               edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
@@ -835,9 +835,12 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
           aiCardInfo.set_name
         );
 
-        if (matchResult.card && matchResult.confidence !== 'low') {
+        // NOTE (type-only): matchResult.confidence is a MatchConfidenceFlags object, not a
+        // string — the `!== 'low'` check is always true at runtime. Preserved as-is; the
+        // intended field is matchResult.confidence.overallConfidence (pre-existing behavior).
+        if (matchResult.card && (matchResult.confidence as any) !== 'low') {
           matchedDatabaseCard = matchResult.card;
-          databaseMatchConfidence = matchResult.confidence;
+          databaseMatchConfidence = matchResult.confidence as any;
 
           console.log(`[GET /api/yugioh/${cardId}] Database match found (${databaseMatchConfidence} confidence):`);
           console.log(`[GET /api/yugioh/${cardId}]   DB: ${matchResult.card.name} (${matchResult.card.set_name}) #${matchResult.card.card_id}`);

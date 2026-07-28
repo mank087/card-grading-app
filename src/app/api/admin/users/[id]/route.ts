@@ -49,7 +49,7 @@ export async function GET(
     const totalCards = allCards?.length || 0
     const gradedCards = allCards?.filter(c => c.conversational_decimal_grade).length || 0
     const avgGrade = gradedCards > 0
-      ? allCards
+      ? allCards!
           .filter(c => c.conversational_decimal_grade)
           .reduce((sum, c) => sum + c.conversational_decimal_grade, 0) / gradedCards
       : 0

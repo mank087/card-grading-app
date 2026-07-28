@@ -39,7 +39,7 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
     case 'error':
       return 'This is taking longer than expected. Your card may be ready in My Collection.'
     default:
-      return STAGE_CONFIG[stage]?.label || 'Processing...'
+      return STAGE_CONFIG[stage as GradingStage]?.label || 'Processing...'
   }
 }
 
