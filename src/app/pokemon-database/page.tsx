@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
-import { CardSlabGrid } from '@/components/CardSlab'
-import { getCardLabelData } from '@/lib/useLabelData'
+import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
 
 interface PokemonCard {
   id: string
@@ -102,20 +101,8 @@ export default function PokemonDatabasePage() {
   const [selectedCard, setSelectedCard] = useState<PokemonCard | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
 
-  // Latest DCM grades state
-  const [latestGrades, setLatestGrades] = useState<any[]>([])
-  const [isLoadingGrades, setIsLoadingGrades] = useState(true)
-
-  // Auto-scroll state for latest grades
-  const [isScrollPaused, setIsScrollPaused] = useState(false)
-  const [scrollPosition, setScrollPosition] = useState(0)
-  const animationRef = useRef<number | null>(null)
-  const lastTimeRef = useRef<number>(0)
-  const isTouchingRef = useRef(false)
-
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const latestGradesRef = useRef<HTMLDivElement>(null)
   const searchSectionRef = useRef<HTMLElement>(null)
 
   // Mobile filter toggle
@@ -159,79 +146,6 @@ export default function PokemonDatabasePage() {
     }
     loadSets()
   }, [searchLanguage])
-
-  // Load latest DCM Pokemon grades on mount
-  useEffect(() => {
-    const loadLatestGrades = async () => {
-      try {
-        const res = await fetch('/api/pokemon-database/latest-grades')
-        const data = await res.json()
-        setLatestGrades(data.cards || [])
-      } catch (err) {
-        console.error('Failed to fetch latest grades:', err)
-      } finally {
-        setIsLoadingGrades(false)
-      }
-    }
-    loadLatestGrades()
-  }, [])
-
-  // Auto-scroll animation for latest grades
-  const scrollSpeed = 30 // pixels per second
-
-  useEffect(() => {
-    const container = latestGradesRef.current
-    if (!container || latestGrades.length === 0) return
-
-    const animate = (currentTime: number) => {
-      // Don't animate if paused or touching
-      if (isScrollPaused || isTouchingRef.current) {
-        lastTimeRef.current = 0
-        animationRef.current = requestAnimationFrame(animate)
-        return
-      }
-
-      if (lastTimeRef.current === 0) {
-        lastTimeRef.current = currentTime
-      }
-
-      const deltaTime = (currentTime - lastTimeRef.current) / 1000
-      lastTimeRef.current = currentTime
-
-      const scrollAmount = scrollSpeed * deltaTime
-      const maxScroll = container.scrollWidth - container.clientWidth
-
-      // Only scroll if there's content to scroll
-      if (maxScroll > 0) {
-        setScrollPosition(prev => {
-          let newPosition = prev + scrollAmount
-          // Loop back to start when reaching the end
-          if (newPosition >= maxScroll) {
-            newPosition = 0
-          }
-          return newPosition
-        })
-      }
-
-      animationRef.current = requestAnimationFrame(animate)
-    }
-
-    animationRef.current = requestAnimationFrame(animate)
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-    }
-  }, [isScrollPaused, latestGrades.length])
-
-  // Apply scroll position to container
-  useEffect(() => {
-    const container = latestGradesRef.current
-    if (container && !isTouchingRef.current) {
-      container.scrollLeft = scrollPosition
-    }
-  }, [scrollPosition])
 
   // Debounce name search
   useEffect(() => {
@@ -321,49 +235,6 @@ export default function PokemonDatabasePage() {
   const getYear = (dateStr: string) => {
     if (!dateStr) return ''
     return dateStr.split('-')[0]
-  }
-
-  // Scroll handlers for latest grades carousel
-  const scrollLatestGrades = (direction: 'left' | 'right') => {
-    const container = latestGradesRef.current
-    if (!container) return
-    const cardWidth = 280 + 24 // card width + gap
-    const maxScroll = container.scrollWidth - container.clientWidth
-    if (direction === 'left') {
-      const newPosition = Math.max(0, scrollPosition - cardWidth * 2)
-      setScrollPosition(newPosition)
-    } else {
-      const newPosition = Math.min(maxScroll, scrollPosition + cardWidth * 2)
-      setScrollPosition(newPosition)
-    }
-  }
-
-  // Pause/resume handlers for auto-scroll
-  const handleScrollMouseEnter = () => {
-    setIsScrollPaused(true)
-    lastTimeRef.current = 0
-  }
-
-  const handleScrollMouseLeave = () => {
-    setIsScrollPaused(false)
-    lastTimeRef.current = 0
-  }
-
-  const handleScrollTouchStart = () => {
-    isTouchingRef.current = true
-    lastTimeRef.current = 0
-  }
-
-  const handleScrollTouchEnd = () => {
-    const container = latestGradesRef.current
-    if (container) {
-      setScrollPosition(container.scrollLeft)
-    }
-    // Resume auto-scroll after 2 seconds
-    setTimeout(() => {
-      isTouchingRef.current = false
-      lastTimeRef.current = 0
-    }, 2000)
   }
 
   // Get type color
@@ -967,98 +838,13 @@ export default function PokemonDatabasePage() {
         )}
       </div>
 
-      {/* Latest DCM Pokemon Grades Section */}
-      {latestGrades.length > 0 && (
-        <section className="py-12 bg-gradient-to-br from-purple-900/30 via-gray-900 to-blue-900/30">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-bold text-white">Latest DCM Pokemon Grades</h2>
-                <p className="text-gray-400 mt-2">Recently graded Pokemon cards from our community</p>
-              </div>
-              {/* Navigation Arrows */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => scrollLatestGrades('left')}
-                  className="p-2 rounded-full bg-purple-900/50 hover:bg-purple-800 text-white transition-colors border border-purple-700"
-                  aria-label="Scroll left"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => scrollLatestGrades('right')}
-                  className="p-2 rounded-full bg-purple-900/50 hover:bg-purple-800 text-white transition-colors border border-purple-700"
-                  aria-label="Scroll right"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Scrolling Container */}
-            <div
-              ref={latestGradesRef}
-              onMouseEnter={handleScrollMouseEnter}
-              onMouseLeave={handleScrollMouseLeave}
-              onTouchStart={handleScrollTouchStart}
-              onTouchEnd={handleScrollTouchEnd}
-              className="flex flex-nowrap gap-6 overflow-x-auto pb-4 -mx-4 px-4"
-              style={{
-                scrollBehavior: 'auto',
-                WebkitOverflowScrolling: 'touch',
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none'
-              }}
-            >
-              {isLoadingGrades ? (
-                // Loading skeletons
-                [...Array(5)].map((_, i) => (
-                  <div key={i} className="flex-shrink-0 w-[280px] min-w-[280px] animate-pulse">
-                    <div className="bg-gray-800 rounded-xl h-[420px]" />
-                  </div>
-                ))
-              ) : (
-                latestGrades.map((card) => {
-                  const labelData = getCardLabelData(card)
-                  return (
-                    <Link
-                      key={card.id}
-                      href={`/pokemon/${card.id}`}
-                      className="flex-shrink-0 w-[280px] min-w-[280px] cursor-pointer block"
-                    >
-                      <CardSlabGrid
-                        displayName={labelData.primaryName}
-                        setLineText={labelData.contextLine}
-                        features={labelData.features}
-                        serial={labelData.serial}
-                        grade={labelData.grade}
-                        condition={labelData.condition}
-                        frontImageUrl={card.front_url}
-                        isAlteredAuthentic={labelData.isAlteredAuthentic}
-                        className="hover:shadow-xl hover:shadow-purple-500/20 transition-shadow duration-200"
-                      />
-                    </Link>
-                  )
-                })
-              )}
-            </div>
-
-            {/* CTA */}
-            <div className="mt-8 text-center">
-              <Link
-                href="/login?mode=signup&redirect=/upload/pokemon"
-                className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold px-8 py-3 rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg hover:shadow-orange-500/25"
-              >
-                Grade Your Pokemon Cards
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      <LatestGradesCarousel
+        apiPath="/api/pokemon-database/latest-grades"
+        title="Latest DCM Pokemon Grades"
+        subtitle="Recently graded Pokemon cards from our community"
+        cardHrefPrefix="/pokemon"
+        cta={{ href: '/login?mode=signup&redirect=/upload/pokemon', label: 'Grade Your Pokemon Cards' }}
+      />
 
       {/* Footer */}
       <footer className="py-8 bg-gray-900 border-t border-gray-800">

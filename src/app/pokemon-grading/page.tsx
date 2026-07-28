@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
-import FeaturedCardSlab, { type FeaturedCard } from '@/components/marketing/FeaturedCardSlab'
+import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
 import EbayListingMonitor from '@/components/EbayListingMonitor'
 
 // Declare tracking pixels for TypeScript
@@ -103,7 +103,6 @@ export default function PokemonGradingLanding() {
   // Live proof — never hardcode counts on a paid-traffic page. Falls back to
   // copy that makes no numeric claim if the API is unavailable.
   const [pokemonGraded, setPokemonGraded] = useState<string | null>(null)
-  const [featuredCards, setFeaturedCards] = useState<FeaturedCard[]>([])
 
   useEffect(() => {
     const session = getStoredSession()
@@ -134,20 +133,6 @@ export default function PokemonGradingLanding() {
         }
       })
       .catch(() => { /* non-fatal: the section renders without a number */ })
-    return () => { cancelled = true }
-  }, [])
-
-  // Live featured Pokemon cards (admin-curated, public only)
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/cards/featured?limit=8&category=Pokemon')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (cancelled) return
-        const list = Array.isArray(data) ? data : (data?.cards || [])
-        setFeaturedCards(list.filter((c: FeaturedCard) => c?.id && c?.front_url))
-      })
-      .catch(() => { /* non-fatal: section hides itself when empty */ })
     return () => { cancelled = true }
   }, [])
 
@@ -1044,38 +1029,21 @@ export default function PokemonGradingLanding() {
       {/* Real graded Pokemon cards — live, admin-curated. Hides itself     */}
       {/* when empty, so it never renders an awkward gap.                   */}
       {/* ================================================================ */}
-      {featuredCards.length > 0 && (
-        <section className="py-16 bg-gray-950">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-                Real Pokémon cards, really graded
-              </h2>
-              <p className="text-gray-400">
-                Every grade is publicly verifiable by serial number. Tap any card to read its full report.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-              {featuredCards.slice(0, 8).map((card) => (
-                <Link key={card.id} href={`/pokemon/${card.id}`} className="group">
-                  <FeaturedCardSlab card={card} />
-                  <div className="text-center mt-2">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-purple-400 transition-colors">
-                      {card.card_name || 'Graded Card'}
-                    </p>
-                    <p className="text-xs text-gray-500">Verified grade</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <Link href="/pop" className="text-purple-400 hover:text-purple-300 text-sm font-semibold">
-                Browse the full population report →
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Live auto-scrolling feed of the newest public Pokemon grades — the
+          same component /pokemon-database uses. Replaces a static grid that
+          could only ever show the 2 admin-curated featured cards. */}
+      <LatestGradesCarousel
+        apiPath="/api/pokemon-database/latest-grades"
+        title="Real Pokémon cards, really graded"
+        subtitle="The newest Pokémon grades from our community — every one publicly verifiable by serial number"
+        cardHrefPrefix="/pokemon"
+        className="py-16 bg-gray-950"
+        cta={{
+          href: user ? '/upload/pokemon' : '/login?mode=signup&redirect=/upload/pokemon',
+          label: user ? 'Grade Your Pokémon Cards' : 'Grade Your Pokémon Cards Free',
+          onClick: () => !user && trackSignupClick('latest_grades_section'),
+        }}
+      />
 
       {/* ================================================================ */}
       {/* Testimonials                                                      */}
