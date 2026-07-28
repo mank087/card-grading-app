@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
+import FeaturedCardSlab, { type FeaturedCard } from '@/components/marketing/FeaturedCardSlab'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -68,6 +69,10 @@ export default function PokemonGradingLanding() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [cardLoversPlan, setCardLoversPlan] = useState<'monthly' | 'annual'>('annual')
+  // Live proof — never hardcode counts on a paid-traffic page. Falls back to
+  // copy that makes no numeric claim if the API is unavailable.
+  const [pokemonGraded, setPokemonGraded] = useState<string | null>(null)
+  const [featuredCards, setFeaturedCards] = useState<FeaturedCard[]>([])
 
   useEffect(() => {
     const session = getStoredSession()
@@ -83,6 +88,36 @@ export default function PokemonGradingLanding() {
         traffic_source: 'paid_ad'
       })
     }
+  }, [])
+
+  // Live Pokemon graded count from the pop report
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/pop/categories')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.categories) return
+        const pkmn = data.categories.find((c: any) => c.dbCategory === 'Pokemon')
+        if (pkmn?.totalGraded > 0) {
+          setPokemonGraded(Number(pkmn.totalGraded).toLocaleString())
+        }
+      })
+      .catch(() => { /* non-fatal: the section renders without a number */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Live featured Pokemon cards (admin-curated, public only)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/cards/featured?limit=8&category=Pokemon')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : (data?.cards || [])
+        setFeaturedCards(list.filter((c: FeaturedCard) => c?.id && c?.front_url))
+      })
+      .catch(() => { /* non-fatal: section hides itself when empty */ })
+    return () => { cancelled = true }
   }, [])
 
   const handleOAuthSignup = async (provider: 'google' | 'facebook' | 'apple') => {
@@ -209,6 +244,9 @@ export default function PokemonGradingLanding() {
               </h1>
               <p className="text-base text-gray-300">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Results in 60 seconds.
+              </p>
+              <p className="text-sm text-purple-300/90 mt-2">
+                Card ID verified against 322 English &amp; Japanese sets.
               </p>
             </div>
 
@@ -428,8 +466,14 @@ export default function PokemonGradingLanding() {
                 </span>
               </h1>
 
-              <p className="text-xl text-gray-300 mb-6 max-w-xl">
+              <p className="text-xl text-gray-300 mb-3 max-w-xl">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
+              </p>
+
+              <p className="text-base text-purple-300/90 mb-6 max-w-xl">
+                Every card is matched against our own database of{' '}
+                <span className="text-white font-semibold">322 English &amp; Japanese sets</span> — so the set,
+                number and rarity on your label are verified, not guessed.
               </p>
 
               {/* Feature bullets - desktop only */}
@@ -662,6 +706,164 @@ export default function PokemonGradingLanding() {
         </div>
       </section>
 
+      {/* ================================================================ */}
+      {/* Pokemon card database — the differentiator vs generic AI graders  */}
+      {/* Every number here is real (see the counts in pokemon_cards /      */}
+      {/* pokemon_sets); do NOT replace these with rounded marketing        */}
+      {/* figures — a paid landing page is the worst place for a soft claim */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-full px-4 py-1.5 mb-4">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              <span className="text-purple-300 text-xs font-semibold tracking-wide uppercase">Pokémon Card Database</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              We know your card before we grade it
+            </h2>
+            <p className="text-gray-400 text-lg max-w-3xl mx-auto">
+              Most AI grading reads a photo and guesses. DCM checks every Pokémon card against our own
+              database first — so the set, card number, rarity, and print variant on your label are
+              verified, not invented.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto mb-10">
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-purple-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">20,933</div>
+              <div className="text-purple-400 font-semibold text-sm mb-1">English cards</div>
+              <p className="text-gray-500 text-xs">Every set from Base through the latest release</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-purple-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">5,548</div>
+              <div className="text-purple-400 font-semibold text-sm mb-1">Japanese cards</div>
+              <p className="text-gray-500 text-xs">Japanese-exclusive sets and promos included</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-purple-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">322</div>
+              <div className="text-purple-400 font-semibold text-sm mb-1">Sets covered</div>
+              <p className="text-gray-500 text-xs">177 English + 145 Japanese, kept in sync weekly</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-purple-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">
+                {pokemonGraded ?? '—'}
+              </div>
+              <div className="text-purple-400 font-semibold text-sm mb-1">Pokémon cards graded</div>
+              <p className="text-gray-500 text-xs">
+                {pokemonGraded ? 'Live count, updated continuously' : 'Live count from our pop report'}
+              </p>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto bg-gray-800/40 rounded-2xl p-6 sm:p-8 border border-gray-700/50">
+            <h3 className="text-white font-bold text-lg mb-4">What database matching actually fixes</h3>
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+              <div className="flex gap-3">
+                <span className="text-purple-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Set totals that actually match.</span>{' '}
+                  A card numbered 127 from a 94-card set is a secret rare, not card 127 of 94. We
+                  check the printed total so your label reads <span className="font-mono text-purple-300">#127/094</span>, not a number we made up.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-purple-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Misread digits get caught.</span>{' '}
+                  A blurry 7 that scans as a 1 would send a Charizard to the wrong card entirely.
+                  If only one card in the set matches the name, we correct the number instead of trusting the photo.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-purple-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Reprints stay separate.</span>{' '}
+                  Base Set, Base Set 2, Legendary Collection and the 151 reprints share artwork.
+                  Matching on set plus number keeps a 1999 Charizard from being labeled as a modern reprint.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-purple-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Japanese cards are first-class.</span>{' '}
+                  Japanese-exclusive promos and set codes are matched against the Japanese database,
+                  not force-fitted to the closest English name.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Pokemon-specific grading knowledge                                */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Graded the way Pokémon cards actually fail
+            </h2>
+            <p className="text-gray-400 text-lg max-w-3xl mx-auto">
+              Holo scratches, edge whitening on dark borders, and vintage centering are what separate a
+              9 from a 10 on a Pokémon card. DCM Optic™ inspects each of them at magnification, front and back.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">✨</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Holofoil surface</h3>
+              <p className="text-gray-400 text-sm">
+                Scratches on a holo pattern hide in the glare. Magnified inspection separates real
+                surface damage from the foil texture itself — the single most common reason a
+                Pokémon card is over- or under-graded.
+              </p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">◧</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Edge whitening on dark borders</h3>
+              <p className="text-gray-400 text-sm">
+                Black-bordered cards — vintage holos, full arts, modern ex and V cards — show every
+                speck of white. Each edge is scored separately so one worn edge does not quietly
+                sink the whole grade.
+              </p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">⊹</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Vintage centering</h3>
+              <p className="text-gray-400 text-sm">
+                1999-era print runs were rarely well centered. Left/right and top/bottom ratios are
+                measured on both faces and reported as numbers, so you can see exactly why a card
+                capped where it did.
+              </p>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            <p className="text-center text-gray-500 text-sm mb-4">Cards we grade every day</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {[
+                'Base Set Charizard', 'Jungle & Fossil holos', 'Neo Genesis Lugia', 'WOTC promos',
+                'EX-era Gold Stars', 'Full Art Trainers', 'Alt Art V & VMAX', 'Special Illustration Rares',
+                'Prismatic Evolutions', 'Japanese promos', 'Graded-case reholders', '151 reprints',
+              ].map((t) => (
+                <span key={t} className="bg-gray-800/70 border border-gray-700/60 text-gray-300 text-xs px-3 py-1.5 rounded-full">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works */}
       <section className="py-16 bg-gray-900">
         <div className="container mx-auto px-4">
@@ -815,6 +1017,119 @@ export default function PokemonGradingLanding() {
               <div className="text-3xl font-bold text-purple-400 mb-2">24/7</div>
               <div className="text-gray-300">Instant availability</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Real graded Pokemon cards — live, admin-curated. Hides itself     */}
+      {/* when empty, so it never renders an awkward gap.                   */}
+      {/* ================================================================ */}
+      {featuredCards.length > 0 && (
+        <section className="py-16 bg-gray-950">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+                Real Pokémon cards, really graded
+              </h2>
+              <p className="text-gray-400">
+                Every grade is publicly verifiable by serial number. Tap any card to read its full report.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+              {featuredCards.slice(0, 8).map((card) => (
+                <Link key={card.id} href={`/pokemon/${card.id}`} className="group">
+                  <FeaturedCardSlab card={card} />
+                  <div className="text-center mt-2">
+                    <p className="text-sm font-medium text-white truncate group-hover:text-purple-400 transition-colors">
+                      {card.card_name || 'Graded Card'}
+                    </p>
+                    <p className="text-xs text-gray-500">Verified grade</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <Link href="/pop" className="text-purple-400 hover:text-purple-300 text-sm font-semibold">
+                Browse the full population report →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================ */}
+      {/* Testimonials                                                      */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gray-900">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white text-center mb-12">
+            What Collectors Are Saying
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { quote: 'I graded 30 cards from my binder in an afternoon. Found two worth sending to PSA and saved myself from submitting the other 28.', name: 'Mike R.', role: 'Pokémon & Sports Collector' },
+              { quote: 'The sub-grades tell me exactly why a card missed a 10. That is worth more to me than the number itself.', name: 'Anthony M.', role: 'Sports Card Enthusiast' },
+              { quote: 'Being able to check a card before I buy it at a show has completely changed how I shop.', name: 'Paul S.', role: 'TCG Hobbyist' },
+            ].map((t) => (
+              <div key={t.name} className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-gray-300 text-sm mb-4">&ldquo;{t.quote}&rdquo;</p>
+                <div>
+                  <p className="text-white font-semibold text-sm">{t.name}</p>
+                  <p className="text-gray-500 text-xs">{t.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Pokemon-specific FAQ                                              */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gray-950">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white text-center mb-12">
+            Fair Questions
+          </h2>
+          <div className="max-w-3xl mx-auto space-y-4">
+            {[
+              {
+                q: 'Is a DCM grade the same as a PSA grade?',
+                a: 'No, and we do not claim it is. DCM is its own 10-point grade with four sub-grades, and every report includes estimated equivalents on the PSA, BGS, CGC and SGC scales so you know roughly where a card would land. Most collectors use DCM to decide which cards are worth paying to submit.',
+              },
+              {
+                q: 'Does it work on vintage WOTC cards?',
+                a: 'Yes. Base Set through Neo and the WOTC promos are all in our database, and vintage centering and edge wear are exactly what the magnified inspection is tuned for. Vintage cards legitimately grade lower on average — the report shows you the measurements behind the number.',
+              },
+              {
+                q: 'What about Japanese cards?',
+                a: 'Japanese sets have their own database with 5,548 cards across 145 sets, so a Japanese promo is matched against Japanese data rather than guessed at from the closest English name.',
+              },
+              {
+                q: 'Can you grade a card that is already slabbed?',
+                a: 'We can read it, but we will tell you the grade is limited. A card sealed in another company’s case cannot be inspected for surface and edge detail through the plastic, so the report says so rather than quietly guessing.',
+              },
+              {
+                q: 'What if I disagree with my grade?',
+                a: 'Every report shows the sub-grades and the specific defects behind the number, so you can see the reasoning. Photo quality is the most common cause of a surprising grade — retake with even lighting and no glare and grade it again.',
+              },
+            ].map((f) => (
+              <details key={f.q} className="group bg-gray-800/60 rounded-xl border border-gray-700/50 overflow-hidden">
+                <summary className="cursor-pointer list-none p-5 flex items-center justify-between gap-4 text-white font-semibold">
+                  <span>{f.q}</span>
+                  <span className="text-purple-400 text-xl leading-none transition-transform group-open:rotate-45 shrink-0">+</span>
+                </summary>
+                <div className="px-5 pb-5 text-gray-400 text-sm leading-relaxed">{f.a}</div>
+              </details>
+            ))}
           </div>
         </div>
       </section>

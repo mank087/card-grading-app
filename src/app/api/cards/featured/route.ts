@@ -5,12 +5,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '15', 10), 50)
+    // Optional category filter so category landing pages (e.g. /pokemon-grading)
+    // can show featured cards from their own category. Omitted = all categories,
+    // which is the pre-existing behavior every current caller relies on.
+    const category = searchParams.get('category')
 
     // Fetch featured cards (public, admin-curated, graded)
     // Accept cards with grade in either the decimal column OR the grading JSON blob
     // (older cards may only have the grade inside conversational_grading JSON)
     // Includes all fields needed for label generation + grading details + pricing
-    const { data: cards, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('cards')
       .select(`
         id, serial, card_name, category, front_path, back_path, created_at,
@@ -29,6 +33,12 @@ export async function GET(request: NextRequest) {
       .eq('visibility', 'public')
       .eq('is_featured', true)
       .or('conversational_decimal_grade.not.is.null,conversational_grading.not.is.null')
+
+    if (category) {
+      query = query.eq('category', category)
+    }
+
+    const { data: cards, error } = await query
       .order('created_at', { ascending: false })
       .limit(limit)
 
