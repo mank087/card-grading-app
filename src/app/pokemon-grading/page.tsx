@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
 import FeaturedCardSlab, { type FeaturedCard } from '@/components/marketing/FeaturedCardSlab'
+import EbayListingMonitor from '@/components/EbayListingMonitor'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -56,6 +57,36 @@ const trackSignupClick = (location: string) => {
 
     console.log(`[Analytics] Signup click tracked: ${location}`)
   }
+}
+
+// Special Illustration Rare chase cards, straight from our pokemon_cards
+// catalog. Kept as a constant (not a fetch) so the hero paints instantly —
+// a landing page must not wait on an API for its backdrop.
+const SIR_BACKDROP: Array<{
+  src: string
+  pos: string
+  size: string
+  anim: string
+  rot: string
+  hide?: string
+}> = [
+  { src: 'https://images.pokemontcg.io/sv8pt5/161.png', pos: 'top-16 left-[3%]', size: 'w-28 h-40', anim: 'animate-float-slow', rot: 'rotate-[-12deg]' },      // Umbreon ex — Prismatic Evolutions
+  { src: 'https://images.pokemontcg.io/me2/125.png', pos: 'bottom-24 left-[8%]', size: 'w-24 h-36', anim: 'animate-float-medium', rot: 'rotate-[8deg]' },        // Mega Charizard X ex — Phantasmal Flames
+  { src: 'https://images.pokemontcg.io/sv8pt5/167.png', pos: 'top-8 left-[22%]', size: 'w-24 h-34', anim: 'animate-float-fast', rot: 'rotate-[6deg]' },          // Eevee ex — Prismatic Evolutions
+  { src: 'https://images.pokemontcg.io/sv4pt5/234.png', pos: 'bottom-16 left-[28%]', size: 'w-26 h-36', anim: 'animate-float-slow', rot: 'rotate-[-8deg]' },     // Charizard ex — Paldean Fates
+  { src: 'https://images.pokemontcg.io/sv8pt5/156.png', pos: 'top-32 left-[42%]', size: 'w-24 h-34', anim: 'animate-float-medium', rot: 'rotate-[10deg]', hide: 'hidden lg:block' }, // Sylveon ex
+  { src: 'https://images.pokemontcg.io/sv10/231.png', pos: 'bottom-8 left-[38%]', size: 'w-22 h-32', anim: 'animate-float-fast', rot: 'rotate-[-5deg]', hide: 'hidden lg:block' },   // Team Rocket's Mewtwo ex
+  { src: 'https://images.scrydex.com/pokemon/me2pt5-276/small', pos: 'top-20 right-[6%]', size: 'w-20 h-28', anim: 'animate-float-slow', rot: 'rotate-[15deg]', hide: 'hidden xl:block' }, // Pikachu ex — Ascended Heroes
+  { src: 'https://images.scrydex.com/pokemon/me2pt5-284/small', pos: 'bottom-28 right-[10%]', size: 'w-20 h-28', anim: 'animate-float-medium', rot: 'rotate-[-14deg]', hide: 'hidden xl:block' }, // Mega Gengar ex
+]
+
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center mb-10 sm:mb-14">
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">{title}</h2>
+      {subtitle && <p className="mt-3 text-base sm:text-lg max-w-2xl mx-auto text-gray-400">{subtitle}</p>}
+    </div>
+  )
 }
 
 export default function PokemonGradingLanding() {
@@ -184,45 +215,33 @@ export default function PokemonGradingLanding() {
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900" />
 
-        {/* Animated Pokemon cards background - spread out, hidden on mobile */}
-        <div className="absolute inset-0 opacity-15 hidden md:block">
-          {/* Left side cards */}
-          <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" />
-          </div>
-          <div className="absolute bottom-24 left-[8%] w-24 h-34 animate-float-medium">
-            <Image src="/DCM-Card-Mega-Lucario-EX-930288-front.jpg" alt="" fill className="object-contain rotate-[8deg]" />
-          </div>
-
-          {/* Center-left cards */}
-          <div className="absolute top-8 left-[22%] w-24 h-34 animate-float-fast">
-            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[6deg]" />
-          </div>
-          <div className="absolute bottom-16 left-[28%] w-26 h-36 animate-float-slow">
-            <Image src="/DCM-Card-Garchomp-ex-700850-front.jpg" alt="" fill className="object-contain rotate-[-8deg]" />
-          </div>
-
-          {/* Center cards - only visible on large screens */}
-          <div className="absolute top-32 left-[42%] w-24 h-34 animate-float-medium hidden lg:block">
-            <Image src="/DCM-Card-Lugia-217275-front.jpg" alt="" fill className="object-contain rotate-[10deg]" />
-          </div>
-          <div className="absolute bottom-8 left-[38%] w-22 h-32 animate-float-fast hidden lg:block">
-            <Image src="/DCM-Card-Mega-Charizard-X-EX-261763-front.jpg" alt="" fill className="object-contain rotate-[-5deg]" />
-          </div>
-
-          {/* Extra card for very wide screens */}
-          <div className="absolute top-20 left-[15%] w-20 h-28 animate-float-slow hidden xl:block">
-            <Image src="/DCM-Card-Mega-Charizard-X-EX-899391-front.jpg" alt="" fill className="object-contain rotate-[15deg]" />
-          </div>
+        {/* Animated Special Illustration Rare backdrop — pulled from our own
+            Pokemon card database (pokemon_cards.image_large). These are the
+            chase cards the audience actually searches for, and using real
+            catalog art ties the hero to the database story below. Hosts are
+            already whitelisted in next.config remotePatterns. */}
+        <div className="absolute inset-0 opacity-[0.18] hidden md:block">
+          {SIR_BACKDROP.map((c, i) => (
+            <div key={c.src} className={`absolute ${c.pos} ${c.size} ${c.anim} ${c.hide || ''}`}>
+              <Image
+                src={c.src}
+                alt=""
+                fill
+                sizes="120px"
+                className={`object-contain ${c.rot}`}
+                priority={i < 2}
+              />
+            </div>
+          ))}
         </div>
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
-        <div className="absolute inset-0 opacity-10 md:hidden">
+        <div className="absolute inset-0 opacity-[0.12] md:hidden">
           <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-10deg]" />
+            <Image src={SIR_BACKDROP[0].src} alt="" fill sizes="80px" className="object-contain rotate-[-10deg]" />
           </div>
-          <div className="absolute top-24 right-[8%] w-18 h-26 animate-float-medium">
-            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[8deg]" />
+          <div className="absolute top-24 right-[8%] w-[72px] h-26 animate-float-medium">
+            <Image src={SIR_BACKDROP[2].src} alt="" fill sizes="72px" className="object-contain rotate-[8deg]" />
           </div>
         </div>
 
@@ -1134,398 +1153,265 @@ export default function PokemonGradingLanding() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-16 bg-gray-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Choose the package that fits your collection. All plans include our full DCM Optic™ analysis.
-            </p>
-            {/* Free Credit + Bonus Banner */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-5 py-2 shadow-lg">
-                <span className="text-lg">🎁</span>
-                <span className="font-semibold">2 Free Credits at Signup</span>
-              </div>
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full px-5 py-2 shadow-lg">
-                <span className="text-lg">🎉</span>
-                <span className="font-semibold">Bonus Credits on First Purchase</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
-            {/* Card Lovers Subscription */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-rose-400 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-5 py-4 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">♥</span>
-                    <h3 className="text-xl font-bold text-white">Card Lovers</h3>
-                  </div>
-                  <div className="bg-rose-900/80 text-rose-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    SUBSCRIPTION
-                  </div>
-                </div>
-                {/* Plan Toggle */}
-                <div className="mt-2 flex items-center justify-center gap-1 bg-white/20 rounded-full p-0.5">
-                  <button
-                    onClick={() => setCardLoversPlan('annual')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      cardLoversPlan === 'annual'
-                        ? 'bg-white text-purple-700'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                  >
-                    Annual
-                  </button>
-                  <button
-                    onClick={() => setCardLoversPlan('monthly')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      cardLoversPlan === 'monthly'
-                        ? 'bg-white text-purple-700'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  {cardLoversPlan === 'annual' ? (
-                    <>
-                      <div>
-                        <span className="text-3xl font-bold text-white">$449</span>
-                        <span className="text-gray-400 text-sm ml-1">/year</span>
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1">$37.42/mo • Save $150</p>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="text-3xl font-bold text-white">$49.99</span>
-                        <span className="text-gray-400 text-sm ml-1">/month</span>
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1">Cancel anytime</p>
-                    </>
-                  )}
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-rose-400">
-                    {cardLoversPlan === 'annual' ? '900' : '70'}
-                  </span>
-                  <span className="text-gray-300 ml-2">
-                    {cardLoversPlan === 'annual' ? 'credits upfront' : 'credits/mo'}
-                  </span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-rose-400">
-                      {cardLoversPlan === 'annual' ? '$0.50' : '$0.71'}
-                    </span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">
-                    {cardLoversPlan === 'annual' ? 'Our lowest price!' : 'Save 76% vs Basic!'}
-                  </div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-purple-500/10 to-rose-500/10 border border-rose-500/20 rounded-xl">
-                  <div className="text-rose-400 font-bold text-xs mb-1.5">Subscriber Benefits:</div>
-                  <ul className="text-rose-300/80 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      20% off all credit purchases
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Card Lover emblem on labels
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Market Pricing Dashboard
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/card-lovers"
-                  onClick={() => trackSignupClick('pricing_card_lovers')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Subscribe
-                </Link>
-              </div>
-            </div>
-
-            {/* VIP Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-indigo-400 flex flex-col">
-              <div className="bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-4 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">◆</span>
-                    <h3 className="text-xl font-bold text-white">VIP</h3>
-                  </div>
-                  <div className="bg-indigo-900/80 text-indigo-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    BEST VALUE
-                  </div>
-                </div>
-                <div className="mt-1.5 inline-block bg-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  ONE-TIME
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <div>
-                    <span className="text-3xl font-bold text-white">$99</span>
-                    <span className="text-gray-400 text-sm ml-1">one-time</span>
-                  </div>
-                  <p className="text-gray-500 text-xs mt-1">No subscription required</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-indigo-400">150</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-indigo-400">$0.66</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save 78% vs Basic!</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 rounded-xl">
-                  <div className="text-indigo-400 font-bold text-xs mb-1.5">VIP Benefits:</div>
-                  <ul className="text-indigo-300/80 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      VIP diamond emblem on labels
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Purchase multiple times
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_vip')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Basic Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">⭐</span>
-                    <h3 className="text-xl font-bold text-white">Basic</h3>
-                  </div>
-                  <div className="w-16"></div>
-                </div>
-                <div className="mt-1.5 h-[18px]"></div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$2.99</span>
-                  <p className="text-gray-500 text-xs mt-1">Perfect for trying out DCM Grading</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-blue-400">1</span>
-                  <span className="text-gray-300 ml-2">credit</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-blue-400">$2.99</span>
-                  </div>
-                  <div className="text-gray-500 text-[10px]">Standard rate</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+1 FREE = 2 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_basic')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Pro Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-purple-500 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🚀</span>
-                    <h3 className="text-xl font-bold text-white">Pro</h3>
-                  </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
-                    <span className="text-white font-bold text-xs">Save 33%</span>
-                  </div>
-                </div>
-                <div className="mt-1.5 inline-block bg-white text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  ⭐ MOST POPULAR
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$9.99</span>
-                  <p className="text-gray-500 text-xs mt-1">Best value for casual collectors</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-purple-400">5</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-purple-400">$2.00</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save $4.96 vs Basic</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+3 FREE = 8 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_pro')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Elite Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">👑</span>
-                    <h3 className="text-xl font-bold text-white">Elite</h3>
-                  </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
-                    <span className="text-white font-bold text-xs">Save 67%</span>
-                  </div>
-                </div>
-                <div className="mt-1.5 h-[18px]"></div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$19.99</span>
-                  <p className="text-gray-500 text-xs mt-1">For serious collectors and dealers</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-amber-400">20</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-amber-400">$1.00</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save $39.81 vs Basic</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+5 FREE = 25 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_elite')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* What's Included */}
-          <div className="mt-12 text-center">
-            <h3 className="text-xl font-bold text-white mb-6">Every Package Includes</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">🎯</div>
-                <div className="text-white font-medium text-sm">DCM Optic™ Grading</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">⚡</div>
-                <div className="text-white font-medium text-sm">Instant Results</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">📊</div>
-                <div className="text-white font-medium text-sm">Detailed Reports</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">♾️</div>
-                <div className="text-white font-medium text-sm">Credits Never Expire</div>
-              </div>
-            </div>
+      {/* ================================================================ */}
+      {/* SEE IT IN ACTION — product walkthrough video                      */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="See It in Action"
+            subtitle="Watch the full grading process from upload to finished label in under 3 minutes"
+          />
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50" style={{ aspectRatio: '16 / 9' }}>
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/oSz9lfvaEK4?rel=0"
+              title="DCM Grading — Full Process Walkthrough"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              className="absolute inset-0 w-full h-full"
+            />
           </div>
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/* MARKET PRICING                                                    */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Market Pricing at Your Fingertips"
+            subtitle="Real-time pricing from multiple sources so you always know what your Pokémon cards are worth"
+          />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            {[
+              { name: 'PriceCharting', desc: 'Pokémon & TCG', color: 'from-blue-500 to-blue-600' },
+              { name: 'SportsCardsPro', desc: 'Sports cards', color: 'from-green-500 to-green-600' },
+              { name: 'eBay', desc: 'Sold comparables', color: 'from-yellow-500 to-orange-500' },
+              { name: 'Scryfall', desc: 'MTG pricing', color: 'from-purple-500 to-indigo-500' },
+            ].map((source) => (
+              <div key={source.name} className="bg-gray-800/60 rounded-xl border border-gray-700/50 p-5 text-center">
+                <div className={`w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${source.color} flex items-center justify-center mb-3`}>
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 className="font-bold text-white text-sm">{source.name}</h3>
+                <p className="text-gray-500 text-xs mt-0.5">{source.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 text-center mb-6">
+            <p className="text-gray-300">
+              See how your card&apos;s <span className="font-semibold text-purple-400">grade affects its market value</span>. We pull
+              grade-adjusted pricing so you can tell whether a raw Charizard is worth grading before you spend a cent.
+            </p>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-gray-700/50 bg-white">
+            <Image src="/why-dcm/Price-graded-cards.png" alt="Price by grade — market prices from raw to graded" width={900} height={300} className="w-full h-auto" />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* LABEL STUDIO                                                      */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Your Label, Your Way"
+            subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders"
+          />
+          <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-10">
+            {[
+              { name: 'Graded Slab', img: '/why-dcm/lugia-graded-slab.png', desc: 'Front and back labels for standard grading slab cases' },
+              { name: 'Magnetic One-Touch', img: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic holders' },
+              { name: 'Toploader', img: '/why-dcm/lugia-top-loader.png', desc: 'Front + back pairs or fold-over labels for toploaders' },
+            ].map((label) => (
+              <div key={label.name} className="text-center">
+                <div className="relative w-full max-w-[180px] mx-auto mb-4" style={{ aspectRatio: '3 / 4' }}>
+                  <Image src={label.img} alt={label.name} fill className="object-contain" />
+                </div>
+                <h3 className="text-white font-bold mb-1">{label.name}</h3>
+                <p className="text-purple-200/80 text-sm">{label.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
+            {['8 Color Themes', 'Custom Gradients', 'Border Controls', 'Color-Match Eyedropper', 'Save 4 Custom Designs'].map((feature) => (
+              <span key={feature} className="bg-white/10 border border-white/20 text-white rounded-full px-4 py-1.5">{feature}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* BADGES                                                            */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <SectionHeading
+            title="Wear Your Badge"
+            subtitle="Show off your status on every graded card label. Fun enhancements for the hobby."
+          />
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {[
+              { name: 'VIP', letter: 'V', desc: 'Exclusive VIP emblem displayed on all your labels', color: 'from-amber-400 to-orange-500', accent: 'text-amber-400', border: 'border-amber-500/30' },
+              { name: 'Card Lovers', letter: 'C', desc: 'Subscriber badge with loyalty rewards and premium perks', color: 'from-purple-400 to-rose-500', accent: 'text-purple-300', border: 'border-purple-500/30' },
+            ].map((badge) => (
+              <div key={badge.name} className={`bg-gray-800/60 ${badge.border} border rounded-xl p-6`}>
+                <div className={`w-14 h-14 mx-auto rounded-full bg-gradient-to-br ${badge.color} flex items-center justify-center mb-3`}>
+                  <span className="text-white font-bold text-lg">{badge.letter}</span>
+                </div>
+                <h3 className={`font-bold ${badge.accent}`}>{badge.name}</h3>
+                <p className="text-gray-400 text-sm mt-1">{badge.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 max-w-md mx-auto rounded-xl overflow-hidden border border-gray-700/50">
+            <Image src="/why-dcm/card-lover-vip-label.png" alt="Card Lover and VIP badges on a graded card label" width={600} height={200} className="w-full h-auto" />
+          </div>
+          <p className="text-gray-500 text-xs mt-3">Card Lover and VIP badges displayed on a graded card label</p>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* EBAY INSTALIST                                                    */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Grade It. List It. Sell It."
+            subtitle="InstaList turns any graded card into a complete eBay listing — photos, title, condition, and the full DCM report — in one click."
+          />
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div>
+              <div className="space-y-4 mb-8">
+                {[
+                  'Professional HTML description auto-generated with grade details',
+                  '5 images auto-created: labeled front/back, raw front/back, and mini-report',
+                  'Grade automatically mapped to eBay\'s condition system',
+                  'Built-in shipping calculator with domestic and international options',
+                  'Supports fixed price and auction formats',
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-3">
+                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <p className="text-gray-300 text-sm">{item}</p>
+                  </div>
+                ))}
+              </div>
+              {user ? (
+                <Link
+                  href="/instalist-marketplace"
+                  className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                >
+                  Open InstaList
+                </Link>
+              ) : (
+                <Link
+                  href="/login?mode=signup"
+                  onClick={() => trackSignupClick('instalist_section')}
+                  className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
+                >
+                  Start with 2 Free Grades
+                </Link>
+              )}
+            </div>
+            <EbayListingMonitor />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* PRICING — compact 4-tier grid matching /why-dcm                   */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Simple, Affordable Pricing"
+            subtitle="Credits never expire. Buy what you need, grade when you're ready."
+          />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
+            {[
+              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: true },
+              { name: 'Basic', price: '$2.99', credits: '1', perGrade: '$2.99', bonus: '+1 bonus on first purchase', popular: false },
+              { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: false },
+              { name: 'Elite', price: '$19.99', credits: '20', perGrade: '$1.00', bonus: '+5 bonus on first purchase', popular: false },
+            ].map((tier) => (
+              <div
+                key={tier.name}
+                className={`bg-gray-800/60 rounded-2xl border-2 p-6 text-center relative ${tier.popular ? 'border-purple-500 ring-2 ring-purple-500/20' : 'border-gray-700/50'}`}
+              >
+                {tier.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                    Best Value
+                  </span>
+                )}
+                <h3 className="font-bold text-white text-lg mb-1">{tier.name}</h3>
+                <div className="text-3xl font-bold text-white mb-1">{tier.price}</div>
+                <p className="text-gray-400 text-sm mb-4">
+                  {tier.credits} credit{tier.credits !== '1' ? 's' : ''} &middot; {tier.perGrade}/grade
+                </p>
+                <p className="text-green-400 text-sm font-medium">{tier.bonus}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* why-dcm's pricing tiers are non-clickable; a paid landing page
+              needs a way to act on the prices it just showed you. */}
+          <div className="text-center mb-10">
+            <Link
+              href={user ? '/credits' : '/login?mode=signup&redirect=/credits'}
+              onClick={() => !user && trackSignupClick('pricing_section')}
+              className="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25"
+            >
+              {user ? 'Buy Credits' : 'Start with 2 Free Grades'}
+            </Link>
+            <p className="text-gray-500 text-sm mt-3">2 free credits at signup &middot; no subscription required</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
+            <h3 className="font-bold text-xl mb-2">&hearts; Card Lovers Subscription</h3>
+            <p className="text-rose-100 mb-5 max-w-2xl mx-auto">
+              For serious collectors. 70+ credits a month, 20% off all purchases, portfolio tracking,
+              and loyalty bonuses that scale with your tenure.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 mb-5">
+              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
+                <div className="font-bold text-lg">$49.99<span className="text-sm font-normal">/mo</span></div>
+                <p className="text-purple-100 text-xs">70 credits/month</p>
+              </div>
+              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
+                <div className="font-bold text-lg">$449<span className="text-sm font-normal">/yr</span></div>
+                <p className="text-purple-100 text-xs">900 credits/year &middot; $0.50 a grade</p>
+              </div>
+            </div>
+            <Link
+              href={user ? '/card-lovers' : '/login?mode=signup&redirect=/card-lovers'}
+              onClick={() => !user && trackSignupClick('card_lovers_section')}
+              className="inline-block bg-white text-purple-700 px-6 py-3 rounded-xl font-bold hover:bg-purple-50 transition-colors"
+            >
+              {user ? 'View Card Lovers' : 'Sign Up to Subscribe'}
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
+            {[
+              { icon: '\u{1F3AF}', label: 'DCM Optic\u2122 Grading' },
+              { icon: '\u26A1', label: 'Instant Results' },
+              { icon: '\u{1F4CA}', label: 'Detailed Reports' },
+              { icon: '\u267E\uFE0F', label: 'Credits Never Expire' },
+            ].map((f) => (
+              <div key={f.label} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 text-center">
+                <div className="text-2xl mb-2">{f.icon}</div>
+                <div className="text-white font-medium text-sm">{f.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
 
       {/* Final CTA */}
       <section className="py-16 bg-gradient-to-r from-purple-900 to-indigo-900">
