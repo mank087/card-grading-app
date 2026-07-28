@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
-import { CURRENT_DISCLAIMER_VERSION } from '@/app/api/ebay/disclaimer/route';
+import { CURRENT_DISCLAIMER_VERSION } from '@/lib/ebay/disclaimerVersion';
 import {
   EBAY_CONDITIONS,
   DCM_GRADER_ID,

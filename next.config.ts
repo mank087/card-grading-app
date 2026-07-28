@@ -6,9 +6,12 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Disable TypeScript errors during builds (optional - comment out if you want type checking)
+  // TypeScript errors FAIL the build. The baseline was driven to zero on
+  // 2026-07-28 (4,750 pre-existing errors cleaned); ignoreBuildErrors:true
+  // is what let a missing import ship and take down every card detail page
+  // for two days (fixed in 01b9673). Do not turn it back on — fix the error.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     // Enable modern image formats for better compression

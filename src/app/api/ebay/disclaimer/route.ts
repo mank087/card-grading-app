@@ -13,7 +13,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Current disclaimer version - increment this when terms change significantly
 // to require users to re-accept
-export const CURRENT_DISCLAIMER_VERSION = '1.0';
+import { CURRENT_DISCLAIMER_VERSION } from '@/lib/ebay/disclaimerVersion';
 
 function getAdminClient() {
   return createClient(supabaseUrl, supabaseServiceKey, {
