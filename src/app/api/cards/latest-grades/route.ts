@@ -13,9 +13,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const limitParam = parseInt(searchParams.get('limit') || '20')
     const limit = Math.min(Math.max(limitParam, 1), 30)
+    // Optional comma-separated category filter for category landing pages.
+    // Sports is spread across many category values (Baseball, Football,
+    // Basketball, … plus a generic 'Sports'), hence a list rather than one
+    // value. Omitted = all categories, the pre-existing behavior.
+    const categories = (searchParams.get('categories') || '')
+      .split(',')
+      .map(c => c.trim())
+      .filter(Boolean)
+      .slice(0, 20)
 
     // Fetch latest graded cards across all categories
-    const { data: cards, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('cards')
       .select(`
         id, serial, card_name, category, front_path, back_path, created_at,
@@ -30,6 +39,12 @@ export async function GET(request: Request) {
       `)
       .eq('visibility', 'public')
       .not('conversational_decimal_grade', 'is', null)
+
+    if (categories.length > 0) {
+      query = query.in('category', categories)
+    }
+
+    const { data: cards, error } = await query
       .order('created_at', { ascending: false })
       .limit(limit)
 

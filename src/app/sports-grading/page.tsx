@@ -5,6 +5,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
+import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
+import EbayListingMonitor from '@/components/EbayListingMonitor'
+import { SPORTS_CATEGORIES_PARAM, sumSportsGraded } from '@/lib/sportsCategories'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -57,6 +60,15 @@ const trackSignupClick = (location: string) => {
   }
 }
 
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center mb-10 sm:mb-14">
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">{title}</h2>
+      {subtitle && <p className="mt-3 text-base sm:text-lg max-w-2xl mx-auto text-gray-400">{subtitle}</p>}
+    </div>
+  )
+}
+
 export default function SportsGradingLanding() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -68,6 +80,10 @@ export default function SportsGradingLanding() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [cardLoversPlan, setCardLoversPlan] = useState<'monthly' | 'annual'>('annual')
+  // Live proof. This page previously advertised a hardcoded "50,000+ Cards
+  // Graded" while the real figure was ~16.5k — never hardcode a volume claim
+  // on a page you buy traffic for. Falls back to no numeric claim on failure.
+  const [sportsGraded, setSportsGraded] = useState<string | null>(null)
 
   useEffect(() => {
     const session = getStoredSession()
@@ -83,6 +99,20 @@ export default function SportsGradingLanding() {
         traffic_source: 'paid_ad'
       })
     }
+  }, [])
+
+  // Live sports graded count, summed across every sports category
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/pop/categories')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.categories) return
+        const total = sumSportsGraded(data.categories)
+        if (total > 0) setSportsGraded(total.toLocaleString())
+      })
+      .catch(() => { /* non-fatal: the tile renders without a number */ })
+    return () => { cancelled = true }
   }, [])
 
   const handleOAuthSignup = async (provider: 'google' | 'facebook' | 'apple') => {
@@ -209,6 +239,9 @@ export default function SportsGradingLanding() {
               </h1>
               <p className="text-base text-gray-300">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Results in 60 seconds.
+              </p>
+              <p className="text-sm text-emerald-300/90 mt-2">
+                Set &amp; parallel verified against 2,951 sets, 1901&ndash;2026.
               </p>
             </div>
 
@@ -420,8 +453,14 @@ export default function SportsGradingLanding() {
                 </span>
               </h1>
 
-              <p className="text-xl text-gray-300 mb-6 max-w-xl">
+              <p className="text-xl text-gray-300 mb-3 max-w-xl">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
+              </p>
+
+              <p className="text-base text-emerald-300/90 mb-6 max-w-xl">
+                Every card is matched against a catalog of{' '}
+                <span className="text-white font-semibold">2,951 sets from 1901 to 2026</span> — so the set,
+                parallel and serial numbering on your label are verified, not guessed.
               </p>
 
               {/* Feature bullets - desktop only */}
@@ -677,9 +716,13 @@ export default function SportsGradingLanding() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
-              <div className="text-3xl font-bold text-white mb-1">50,000+</div>
-              <div className="text-emerald-400 font-semibold mb-2">Cards Graded</div>
-              <p className="text-gray-400 text-sm">Trusted by collectors worldwide for accurate, reliable grading</p>
+              <div className="text-3xl font-bold text-white mb-1">{sportsGraded ?? '—'}</div>
+              <div className="text-emerald-400 font-semibold mb-2">Sports Cards Graded</div>
+              <p className="text-gray-400 text-sm">
+                {sportsGraded
+                  ? 'Live count across every sport, updated continuously'
+                  : 'Live count from our population report'}
+              </p>
             </div>
 
             <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-2xl p-6 border border-emerald-700/30 text-center">
@@ -702,6 +745,163 @@ export default function SportsGradingLanding() {
               <div className="text-3xl font-bold text-white mb-1">Detailed</div>
               <div className="text-emerald-400 font-semibold mb-2">Downloadable Reports</div>
               <p className="text-gray-400 text-sm">Professional PDF reports with grades, defect analysis, and printable labels</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Sports set database — the differentiator vs generic AI graders.   */}
+      {/* Counts are real (sports_sets); the graded figure is live. Do NOT  */}
+      {/* swap these for rounded marketing numbers — that is exactly what   */}
+      {/* the old hardcoded "50,000+" tile was.                             */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-4 py-1.5 mb-4">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="text-emerald-300 text-xs font-semibold tracking-wide uppercase">Sports Set Database</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              We know the set before we grade the card
+            </h2>
+            <p className="text-gray-400 text-lg max-w-3xl mx-auto">
+              Modern sports cards live and die by the parallel. DCM checks your card against a
+              catalog of 2,951 sets spanning 1901 to 2026, so the set, year, manufacturer and
+              parallel on your label are matched — not guessed from a photo.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto mb-10">
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">2,951</div>
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Sets catalogued</div>
+              <p className="text-gray-500 text-xs">Topps, Panini, Bowman, Fleer, Donruss, Leaf and more</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">9</div>
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Sports covered</div>
+              <p className="text-gray-500 text-xs">Baseball, basketball, football, hockey, soccer, golf, racing, wrestling, boxing</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">1901<span className="text-xl">→</span>2026</div>
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Years of cards</div>
+              <p className="text-gray-500 text-xs">Pre-war tobacco issues through this year&apos;s releases</p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="text-3xl font-bold text-white mb-1">{sportsGraded ?? '—'}</div>
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Sports cards graded</div>
+              <p className="text-gray-500 text-xs">
+                {sportsGraded ? 'Live count, updated continuously' : 'Live count from our pop report'}
+              </p>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto bg-gray-800/40 rounded-2xl p-6 sm:p-8 border border-gray-700/50">
+            <h3 className="text-white font-bold text-lg mb-4">What set matching actually fixes</h3>
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+              <div className="flex gap-3">
+                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Parallels stay straight.</span>{' '}
+                  Prizm, Silver, Refractor, Optic Holo — the base card and its parallels share the
+                  same photo and number. Matching against the real set list keeps a base rookie from
+                  being labeled as the parallel that&apos;s worth ten times more.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Serial numbering is read, not invented.</span>{' '}
+                  A card stamped 07/10 gets that on the label exactly. Numbered parallels are where
+                  sports value concentrates, so the print run has to be right.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Rookie cards get flagged correctly.</span>{' '}
+                  RC status drives the price. We check the player&apos;s first-print year against the
+                  set rather than trusting an &ldquo;RC&rdquo; shield that appears on reprints too.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                <p className="text-gray-300 text-sm">
+                  <span className="text-white font-semibold">Vintage gets its real year.</span>{' '}
+                  Pre-war and 1950s issues rarely print a year on the card. The set catalog supplies
+                  it, so a 1952 Topps doesn&apos;t end up dated by the copyright line.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* Sports-specific grading knowledge                                 */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Graded the way sports cards actually fail
+            </h2>
+            <p className="text-gray-400 text-lg max-w-3xl mx-auto">
+              Chrome surface, corner sharpness on thick stock, and vintage centering are what separate
+              a 9 from a 10. DCM Optic™ inspects each at magnification, front and back.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">◇</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Chrome &amp; refractor surface</h3>
+              <p className="text-gray-400 text-sm">
+                Chrome stock shows every scratch and the refractor pattern hides them in glare.
+                Magnified inspection separates real surface damage from the finish itself — the most
+                common reason a modern rookie is over- or under-graded.
+              </p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">◺</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Corners on thick stock</h3>
+              <p className="text-gray-400 text-sm">
+                Patch and relic cards are thick, and thick corners fray rather than round. All four
+                corners are scored separately so one soft corner does not quietly sink the card
+                without you knowing which one.
+              </p>
+            </div>
+            <div className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-4">
+                <span className="text-2xl">⊹</span>
+              </div>
+              <h3 className="text-white font-bold mb-2">Vintage centering</h3>
+              <p className="text-gray-400 text-sm">
+                1950s–70s print runs were rarely well centered, and centering is the usual cap on a
+                vintage grade. Left/right and top/bottom ratios are measured on both faces and
+                reported as numbers, so you see exactly why it capped.
+              </p>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            <p className="text-center text-gray-500 text-sm mb-4">Cards we grade every day</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {[
+                'Topps Chrome rookies', 'Prizm Silver', 'Bowman 1st Chrome', 'Optic Holo',
+                'Numbered parallels', 'Patch autos', 'Vintage Topps', 'Pre-war tobacco',
+                'Rookie Card autos', 'Graded-case reholders', 'Panini Select', 'Donruss Optic',
+              ].map((t) => (
+                <span key={t} className="bg-gray-800/70 border border-gray-700/60 text-gray-300 text-xs px-3 py-1.5 rounded-full">
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -883,398 +1083,352 @@ export default function SportsGradingLanding() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Live auto-scrolling feed of the newest public sports grades. Sports
+          spans many category values, hence the shared SPORTS_CATEGORIES list. */}
+      <LatestGradesCarousel
+        apiPath={`/api/cards/latest-grades?limit=15&categories=${encodeURIComponent(SPORTS_CATEGORIES_PARAM)}`}
+        title="Real sports cards, really graded"
+        subtitle="The newest sports grades from our community — every one publicly verifiable by serial number"
+        cardHrefPrefix="/sports"
+        className="py-16 bg-gray-950"
+        cta={{
+          href: user ? '/upload/sports' : '/login?mode=signup&redirect=/upload/sports',
+          label: user ? 'Grade Your Sports Cards' : 'Grade Your Sports Cards Free',
+          onClick: () => !user && trackSignupClick('latest_grades_section'),
+        }}
+      />
+
+      {/* ================================================================ */}
+      {/* TESTIMONIALS                                                      */}
+      {/* ================================================================ */}
       <section className="py-16 bg-gray-900">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Choose the package that fits your collection. All plans include our full DCM Optic™ analysis.
-            </p>
-            {/* Free Credit + Bonus Banner */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-5 py-2 shadow-lg">
-                <span className="text-lg">🎁</span>
-                <span className="font-semibold">2 Free Credits at Signup</span>
-              </div>
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full px-5 py-2 shadow-lg">
-                <span className="text-lg">🎉</span>
-                <span className="font-semibold">Bonus Credits on First Purchase</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
-            {/* Card Lovers Subscription */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-rose-400 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-5 py-4 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">♥</span>
-                    <h3 className="text-xl font-bold text-white">Card Lovers</h3>
-                  </div>
-                  <div className="bg-rose-900/80 text-rose-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    SUBSCRIPTION
-                  </div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white text-center mb-12">
+            What Collectors Are Saying
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { quote: 'I graded 30 cards from my binder in an afternoon. Found two worth sending to PSA and saved myself from submitting the other 28.', name: 'Mike R.', role: 'Pokémon & Sports Collector' },
+              { quote: 'The sub-grades tell me exactly why a card missed a 10. That is worth more to me than the number itself.', name: 'Anthony M.', role: 'Sports Card Enthusiast' },
+              { quote: 'Being able to check a card before I buy it at a show has completely changed how I shop.', name: 'Paul S.', role: 'TCG Hobbyist' },
+            ].map((t) => (
+              <div key={t.name} className="bg-gray-800/60 rounded-2xl p-6 border border-gray-700/50">
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
-                {/* Plan Toggle */}
-                <div className="mt-2 flex items-center justify-center gap-1 bg-white/20 rounded-full p-0.5">
-                  <button
-                    onClick={() => setCardLoversPlan('annual')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      cardLoversPlan === 'annual'
-                        ? 'bg-white text-purple-700'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                  >
-                    Annual
-                  </button>
-                  <button
-                    onClick={() => setCardLoversPlan('monthly')}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      cardLoversPlan === 'monthly'
-                        ? 'bg-white text-purple-700'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                  >
-                    Monthly
-                  </button>
+                <p className="text-gray-300 text-sm mb-4">&ldquo;{t.quote}&rdquo;</p>
+                <div>
+                  <p className="text-white font-semibold text-sm">{t.name}</p>
+                  <p className="text-gray-500 text-xs">{t.role}</p>
                 </div>
               </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  {cardLoversPlan === 'annual' ? (
-                    <>
-                      <div>
-                        <span className="text-3xl font-bold text-white">$449</span>
-                        <span className="text-gray-400 text-sm ml-1">/year</span>
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1">$37.42/mo • Save $150</p>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="text-3xl font-bold text-white">$49.99</span>
-                        <span className="text-gray-400 text-sm ml-1">/month</span>
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1">Cancel anytime</p>
-                    </>
-                  )}
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-rose-400">
-                    {cardLoversPlan === 'annual' ? '900' : '70'}
-                  </span>
-                  <span className="text-gray-300 ml-2">
-                    {cardLoversPlan === 'annual' ? 'credits upfront' : 'credits/mo'}
-                  </span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-rose-400">
-                      {cardLoversPlan === 'annual' ? '$0.50' : '$0.71'}
-                    </span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">
-                    {cardLoversPlan === 'annual' ? 'Our lowest price!' : 'Save 76% vs Basic!'}
-                  </div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-purple-500/10 to-rose-500/10 border border-rose-500/20 rounded-xl">
-                  <div className="text-rose-400 font-bold text-xs mb-1.5">Subscriber Benefits:</div>
-                  <ul className="text-rose-300/80 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      20% off all credit purchases
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Card Lover emblem on labels
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Market Pricing Dashboard
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/card-lovers"
-                  onClick={() => trackSignupClick('pricing_card_lovers')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Subscribe
-                </Link>
-              </div>
-            </div>
-
-            {/* VIP Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-indigo-400 flex flex-col">
-              <div className="bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-4 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">◆</span>
-                    <h3 className="text-xl font-bold text-white">VIP</h3>
-                  </div>
-                  <div className="bg-indigo-900/80 text-indigo-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    BEST VALUE
-                  </div>
-                </div>
-                <div className="mt-1.5 inline-block bg-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  ONE-TIME
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <div>
-                    <span className="text-3xl font-bold text-white">$99</span>
-                    <span className="text-gray-400 text-sm ml-1">one-time</span>
-                  </div>
-                  <p className="text-gray-500 text-xs mt-1">No subscription required</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-indigo-400">150</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-indigo-400">$0.66</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save 78% vs Basic!</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 rounded-xl">
-                  <div className="text-indigo-400 font-bold text-xs mb-1.5">VIP Benefits:</div>
-                  <ul className="text-indigo-300/80 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      VIP diamond emblem on labels
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Purchase multiple times
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_vip')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Basic Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">⭐</span>
-                    <h3 className="text-xl font-bold text-white">Basic</h3>
-                  </div>
-                  <div className="w-16"></div>
-                </div>
-                <div className="mt-1.5 h-[18px]"></div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$2.99</span>
-                  <p className="text-gray-500 text-xs mt-1">Perfect for trying out DCM Grading</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-blue-400">1</span>
-                  <span className="text-gray-300 ml-2">credit</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-blue-400">$2.99</span>
-                  </div>
-                  <div className="text-gray-500 text-[10px]">Standard rate</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+1 FREE = 2 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_basic')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Pro Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-purple-500 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🚀</span>
-                    <h3 className="text-xl font-bold text-white">Pro</h3>
-                  </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
-                    <span className="text-white font-bold text-xs">Save 33%</span>
-                  </div>
-                </div>
-                <div className="mt-1.5 inline-block bg-white text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  ⭐ MOST POPULAR
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$9.99</span>
-                  <p className="text-gray-500 text-xs mt-1">Best value for casual collectors</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-purple-400">5</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-purple-400">$2.00</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save $4.96 vs Basic</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+3 FREE = 8 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_pro')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-
-            {/* Elite Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">👑</span>
-                    <h3 className="text-xl font-bold text-white">Elite</h3>
-                  </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
-                    <span className="text-white font-bold text-xs">Save 67%</span>
-                  </div>
-                </div>
-                <div className="mt-1.5 h-[18px]"></div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-grow">
-                <div className="text-center mb-3">
-                  <span className="text-3xl font-bold text-white">$19.99</span>
-                  <p className="text-gray-500 text-xs mt-1">For serious collectors and dealers</p>
-                </div>
-
-                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-amber-400">20</span>
-                  <span className="text-gray-300 ml-2">credits</span>
-                </div>
-
-                <div className="mb-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-amber-400">$1.00</span>
-                  </div>
-                  <div className="text-green-400 text-[10px] font-semibold">Save $39.81 vs Basic</div>
-                </div>
-
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-lg">🎁</span>
-                    <div className="text-center">
-                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
-                      <div className="text-green-300 text-sm font-bold">+5 FREE = 25 total</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_elite')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  Sign Up to Purchase
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* What's Included */}
-          <div className="mt-12 text-center">
-            <h3 className="text-xl font-bold text-white mb-6">Every Package Includes</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">🎯</div>
-                <div className="text-white font-medium text-sm">DCM Optic™ Grading</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">⚡</div>
-                <div className="text-white font-medium text-sm">Instant Results</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">📊</div>
-                <div className="text-white font-medium text-sm">Detailed Reports</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <div className="text-2xl mb-2">♾️</div>
-                <div className="text-white font-medium text-sm">Credits Never Expire</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/* SPORTS-SPECIFIC FAQ                                               */}
+      {/* ================================================================ */}
+      <section className="py-16 bg-gray-950">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white text-center mb-12">Fair Questions</h2>
+          <div className="max-w-3xl mx-auto space-y-4">
+            {[
+              {
+                q: 'Is a DCM grade the same as a PSA grade?',
+                a: 'No, and we do not claim it is. DCM is its own 10-point grade with four sub-grades, and every report includes estimated equivalents on the PSA, BGS, SGC and CGC scales so you know roughly where a card would land. Most collectors use DCM to decide which cards are worth paying to submit.',
+              },
+              {
+                q: 'Can you tell a base card from its parallel?',
+                a: 'That is exactly what the set database is for. Prizm Silver, Optic Holo, Refractors and numbered parallels share artwork and card numbers with the base card, so we match against the real set list and read the serial numbering off the card rather than guessing from the photo.',
+              },
+              {
+                q: 'Does it work on vintage cards?',
+                a: 'Yes — the catalog goes back to 1901. Vintage centering and edge wear are what the magnified inspection is tuned for, and the set data supplies the year for cards that never printed one. Vintage legitimately grades lower on average; the report shows the measurements behind the number.',
+              },
+              {
+                q: 'What about patch cards, autos and relics?',
+                a: 'They grade fine. Thick stock corners and on-card autographs are inspected the same way, and the label carries the auto and memorabilia flags. Cards with an embedded relic window are surface-scored around the window rather than through it.',
+              },
+              {
+                q: 'What if I disagree with my grade?',
+                a: 'Every report shows the sub-grades and the specific defects behind the number, so you can see the reasoning. Photo quality is the most common cause of a surprising grade — retake with even lighting and no glare and grade it again.',
+              },
+            ].map((f) => (
+              <details key={f.q} className="group bg-gray-800/60 rounded-xl border border-gray-700/50 overflow-hidden">
+                <summary className="cursor-pointer list-none p-5 flex items-center justify-between gap-4 text-white font-semibold">
+                  <span>{f.q}</span>
+                  <span className="text-emerald-400 text-xl leading-none transition-transform group-open:rotate-45 shrink-0">+</span>
+                </summary>
+                <div className="px-5 pb-5 text-gray-400 text-sm leading-relaxed">{f.a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* SEE IT IN ACTION                                                  */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="See It in Action"
+            subtitle="Watch the full grading process from upload to finished label in under 3 minutes"
+          />
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50" style={{ aspectRatio: '16 / 9' }}>
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/oSz9lfvaEK4?rel=0"
+              title="DCM Grading — Full Process Walkthrough"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* MARKET PRICING                                                    */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Market Pricing at Your Fingertips"
+            subtitle="Real-time pricing from multiple sources so you always know what your sports cards are worth"
+          />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            {[
+              { name: 'SportsCardsPro', desc: 'Sports cards', color: 'from-green-500 to-green-600' },
+              { name: 'PriceCharting', desc: 'TCG & sealed', color: 'from-blue-500 to-blue-600' },
+              { name: 'eBay', desc: 'Sold comparables', color: 'from-yellow-500 to-orange-500' },
+              { name: 'Scryfall', desc: 'MTG pricing', color: 'from-purple-500 to-indigo-500' },
+            ].map((source) => (
+              <div key={source.name} className="bg-gray-800/60 rounded-xl border border-gray-700/50 p-5 text-center">
+                <div className={`w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${source.color} flex items-center justify-center mb-3`}>
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 className="font-bold text-white text-sm">{source.name}</h3>
+                <p className="text-gray-500 text-xs mt-0.5">{source.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 text-center mb-6">
+            <p className="text-gray-300">
+              See how your card&apos;s <span className="font-semibold text-emerald-400">grade affects its market value</span>. We pull
+              grade-adjusted pricing so you can tell whether a raw rookie is worth grading before you spend a cent.
+            </p>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-gray-700/50 bg-white">
+            <Image src="/why-dcm/Price-graded-cards.png" alt="Price by grade — market prices from raw to graded" width={900} height={300} className="w-full h-auto" />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* LABEL STUDIO                                                      */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Your Label, Your Way"
+            subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders"
+          />
+          <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-10">
+            {[
+              { name: 'Graded Slab', img: '/why-dcm/lugia-graded-slab.png', desc: 'Front and back labels for standard grading slab cases' },
+              { name: 'Magnetic One-Touch', img: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic holders' },
+              { name: 'Toploader', img: '/why-dcm/lugia-top-loader.png', desc: 'Front + back pairs or fold-over labels for toploaders' },
+            ].map((label) => (
+              <div key={label.name} className="text-center">
+                <div className="relative w-full max-w-[180px] mx-auto mb-4" style={{ aspectRatio: '3 / 4' }}>
+                  <Image src={label.img} alt={label.name} fill className="object-contain" />
+                </div>
+                <h3 className="text-white font-bold mb-1">{label.name}</h3>
+                <p className="text-emerald-200/80 text-sm">{label.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
+            {['8 Color Themes', 'Custom Gradients', 'Border Controls', 'Color-Match Eyedropper', 'Save 4 Custom Designs'].map((feature) => (
+              <span key={feature} className="bg-white/10 border border-white/20 text-white rounded-full px-4 py-1.5">{feature}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* BADGES                                                            */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <SectionHeading
+            title="Wear Your Badge"
+            subtitle="Show off your status on every graded card label. Fun enhancements for the hobby."
+          />
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {[
+              { name: 'VIP', letter: 'V', desc: 'Exclusive VIP emblem displayed on all your labels', color: 'from-amber-400 to-orange-500', accent: 'text-amber-400', border: 'border-amber-500/30' },
+              { name: 'Card Lovers', letter: 'C', desc: 'Subscriber badge with loyalty rewards and premium perks', color: 'from-purple-400 to-rose-500', accent: 'text-purple-300', border: 'border-purple-500/30' },
+            ].map((badge) => (
+              <div key={badge.name} className={`bg-gray-800/60 ${badge.border} border rounded-xl p-6`}>
+                <div className={`w-14 h-14 mx-auto rounded-full bg-gradient-to-br ${badge.color} flex items-center justify-center mb-3`}>
+                  <span className="text-white font-bold text-lg">{badge.letter}</span>
+                </div>
+                <h3 className={`font-bold ${badge.accent}`}>{badge.name}</h3>
+                <p className="text-gray-400 text-sm mt-1">{badge.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 max-w-md mx-auto rounded-xl overflow-hidden border border-gray-700/50">
+            <Image src="/why-dcm/card-lover-vip-label.png" alt="Card Lover and VIP badges on a graded card label" width={600} height={200} className="w-full h-auto" />
+          </div>
+          <p className="text-gray-500 text-xs mt-3">Card Lover and VIP badges displayed on a graded card label</p>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* EBAY INSTALIST                                                    */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Grade It. List It. Sell It."
+            subtitle="InstaList turns any graded card into a complete eBay listing — photos, title, condition, and the full DCM report — in one click."
+          />
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div>
+              <div className="space-y-4 mb-8">
+                {[
+                  'Professional HTML description auto-generated with grade details',
+                  '5 images auto-created: labeled front/back, raw front/back, and mini-report',
+                  'Grade automatically mapped to eBay\'s condition system',
+                  'Built-in shipping calculator with domestic and international options',
+                  'Supports fixed price and auction formats',
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-3">
+                    <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <p className="text-gray-300 text-sm">{item}</p>
+                  </div>
+                ))}
+              </div>
+              {user ? (
+                <Link
+                  href="/instalist-marketplace"
+                  className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                >
+                  Open InstaList
+                </Link>
+              ) : (
+                <Link
+                  href="/login?mode=signup"
+                  onClick={() => trackSignupClick('instalist_section')}
+                  className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
+                >
+                  Start with 2 Free Grades
+                </Link>
+              )}
+            </div>
+            <EbayListingMonitor />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* PRICING — compact 4-tier grid matching /why-dcm                   */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-20 bg-gray-950">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading
+            title="Simple, Affordable Pricing"
+            subtitle="Credits never expire. Buy what you need, grade when you're ready."
+          />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
+            {[
+              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: true },
+              { name: 'Basic', price: '$2.99', credits: '1', perGrade: '$2.99', bonus: '+1 bonus on first purchase', popular: false },
+              { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: false },
+              { name: 'Elite', price: '$19.99', credits: '20', perGrade: '$1.00', bonus: '+5 bonus on first purchase', popular: false },
+            ].map((tier) => (
+              <div
+                key={tier.name}
+                className={`bg-gray-800/60 rounded-2xl border-2 p-6 text-center relative ${tier.popular ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-gray-700/50'}`}
+              >
+                {tier.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                    Best Value
+                  </span>
+                )}
+                <h3 className="font-bold text-white text-lg mb-1">{tier.name}</h3>
+                <div className="text-3xl font-bold text-white mb-1">{tier.price}</div>
+                <p className="text-gray-400 text-sm mb-4">
+                  {tier.credits} credit{tier.credits !== '1' ? 's' : ''} &middot; {tier.perGrade}/grade
+                </p>
+                <p className="text-green-400 text-sm font-medium">{tier.bonus}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center mb-10">
+            <Link
+              href={user ? '/credits' : '/login?mode=signup&redirect=/credits'}
+              onClick={() => !user && trackSignupClick('pricing_section')}
+              className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
+            >
+              {user ? 'Buy Credits' : 'Start with 2 Free Grades'}
+            </Link>
+            <p className="text-gray-500 text-sm mt-3">2 free credits at signup &middot; no subscription required</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
+            <h3 className="font-bold text-xl mb-2">&hearts; Card Lovers Subscription</h3>
+            <p className="text-rose-100 mb-5 max-w-2xl mx-auto">
+              For serious collectors. 70+ credits a month, 20% off all purchases, portfolio tracking,
+              and loyalty bonuses that scale with your tenure.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 mb-5">
+              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
+                <div className="font-bold text-lg">$49.99<span className="text-sm font-normal">/mo</span></div>
+                <p className="text-purple-100 text-xs">70 credits/month</p>
+              </div>
+              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
+                <div className="font-bold text-lg">$449<span className="text-sm font-normal">/yr</span></div>
+                <p className="text-purple-100 text-xs">900 credits/year &middot; $0.50 a grade</p>
+              </div>
+            </div>
+            <Link
+              href={user ? '/card-lovers' : '/login?mode=signup&redirect=/card-lovers'}
+              onClick={() => !user && trackSignupClick('card_lovers_section')}
+              className="inline-block bg-white text-purple-700 px-6 py-3 rounded-xl font-bold hover:bg-purple-50 transition-colors"
+            >
+              {user ? 'View Card Lovers' : 'Sign Up to Subscribe'}
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
+            {[
+              { icon: '\u{1F3AF}', label: 'DCM Optic\u2122 Grading' },
+              { icon: '\u26A1', label: 'Instant Results' },
+              { icon: '\u{1F4CA}', label: 'Detailed Reports' },
+              { icon: '\u267E\uFE0F', label: 'Credits Never Expire' },
+            ].map((f) => (
+              <div key={f.label} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 text-center">
+                <div className="text-2xl mb-2">{f.icon}</div>
+                <div className="text-white font-medium text-sm">{f.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
 
       {/* Final CTA */}
       <section className="py-16 bg-gradient-to-r from-emerald-900 to-teal-900">
