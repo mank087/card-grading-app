@@ -344,13 +344,34 @@ export const ComposerScene: React.FC<ComposerProps> = ({
         </div>
       )}
 
-      {/* karaoke captions: one word at a time from the voiceover script */}
-      {beat.karaoke && beat.voiceover && (() => {
-        const words = beat.voiceover.trim().split(/\s+/);
-        const voFrames = Math.max(1, Math.round((beat.voiceoverDuration || beat.duration) * fps));
-        const wordIdx = Math.min(words.length - 1, Math.floor((localFrame / voFrames) * words.length));
-        const wordLocal = (localFrame - (wordIdx * voFrames) / words.length) / (voFrames / words.length);
-        const popIn = interpolate(Math.min(1, wordLocal * 3), [0, 1], [0.7, 1]);
+      {/* karaoke captions: one word at a time.
+          With voiceoverWords (real timings from transcribing the recording)
+          each word shows exactly when it's spoken; without them we fall back
+          to spreading the script evenly across the beat. */}
+      {beat.karaoke && (beat.voiceover || beat.voiceoverWords?.length) && (() => {
+        const timed = beat.voiceoverWords;
+        let word: string;
+        let popIn: number;
+
+        if (timed && timed.length > 0) {
+          const tSec = localFrame / fps;
+          // last word whose start has passed (clamped to the first)
+          let idx = 0;
+          for (let i = 0; i < timed.length; i++) {
+            if (timed[i].start <= tSec) idx = i; else break;
+          }
+          word = timed[idx].word;
+          const since = tSec - timed[idx].start;
+          popIn = interpolate(Math.min(1, since * 12), [0, 1], [0.7, 1]);
+        } else {
+          const words = (beat.voiceover || '').trim().split(/\s+/);
+          const voFrames = Math.max(1, Math.round((beat.voiceoverDuration || beat.duration) * fps));
+          const wordIdx = Math.min(words.length - 1, Math.floor((localFrame / voFrames) * words.length));
+          const wordLocal = (localFrame - (wordIdx * voFrames) / words.length) / (voFrames / words.length);
+          word = words[wordIdx];
+          popIn = interpolate(Math.min(1, wordLocal * 3), [0, 1], [0.7, 1]);
+        }
+
         return (
           <div
             style={{
@@ -367,7 +388,7 @@ export const ComposerScene: React.FC<ComposerProps> = ({
               textTransform: 'uppercase',
             }}
           >
-            {words[wordIdx]}
+            {word}
           </div>
         );
       })()}

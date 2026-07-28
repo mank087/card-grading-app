@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Player } from '@remotion/player'
 import { ComposerScene, sceneDurationInFrames } from '@/lib/slabby/ComposerScene'
 import {
@@ -227,6 +227,125 @@ export default function SlabbyLabClient() {
       setVoGenerating(false)
     }
   }, [scene.beats, selectedBeat, voice, updateBeat])
+
+  // ---- record your own voiceover ----
+  // Writes to the same voiceoverAudio/voiceoverDuration slots as TTS, so
+  // preview and render need no special handling. Beat duration auto-fits the
+  // take: a human reads slower than TTS, and clipping a line is worse than a
+  // slightly long beat.
+  const [recording, setRecording] = useState(false)
+  const [recSeconds, setRecSeconds] = useState(0)
+  const [transcribing, setTranscribing] = useState(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const recTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const stopTracks = (rec: MediaRecorder | null) => {
+    rec?.stream.getTracks().forEach((t) => t.stop())
+  }
+
+  const startRecording = useCallback(async () => {
+    setVoError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
+      // webm/opus everywhere except Safari, which gives mp4 — both decode in
+      // the Remotion (Chrome) renderer.
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+        .find((m) => MediaRecorder.isTypeSupported(m)) || ''
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      chunksRef.current = []
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stopTracks(rec)
+        if (recTimerRef.current) clearInterval(recTimerRef.current)
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        if (!blob.size) { setVoError('Nothing was recorded'); return }
+        const dataUrl: string = await new Promise((resolve, reject) => {
+          const fr = new FileReader()
+          fr.onload = () => resolve(String(fr.result))
+          fr.onerror = () => reject(new Error('Could not read the recording'))
+          fr.readAsDataURL(blob)
+        })
+        // MediaRecorder blobs often report Infinity for duration until seeked;
+        // nudge past the end to force the real value out of the element.
+        const el = new window.Audio(dataUrl)
+        const dur = await new Promise<number>((resolve) => {
+          const done = (d: number) => resolve(Number.isFinite(d) && d > 0 ? d : 0)
+          el.onloadedmetadata = () => {
+            if (Number.isFinite(el.duration) && el.duration > 0) return done(el.duration)
+            el.currentTime = 1e101
+            el.ontimeupdate = () => { el.ontimeupdate = null; el.currentTime = 0; done(el.duration) }
+          }
+          el.onerror = () => done(0)
+          setTimeout(() => done(el.duration), 4000)
+        })
+        const seconds = dur > 0 ? Math.round(dur * 10) / 10 : recSeconds
+        updateBeat(selectedBeat, {
+          voiceoverAudio: dataUrl,
+          voiceoverDuration: seconds,
+          // fit the beat to the take (+0.4s so the last word isn't clipped)
+          duration: Math.max(0.5, Math.round((seconds + 0.4) * 100) / 100),
+          // any previous word timings belong to the old audio
+          voiceoverWords: undefined,
+        })
+      }
+      rec.start()
+      recorderRef.current = rec
+      setRecording(true)
+      setRecSeconds(0)
+      recTimerRef.current = setInterval(() => setRecSeconds((s) => Math.round((s + 0.1) * 10) / 10), 100)
+    } catch (e: any) {
+      setVoError(
+        e?.name === 'NotAllowedError'
+          ? 'Microphone blocked — allow access in the browser address bar and try again.'
+          : e?.message || 'Could not start recording'
+      )
+    }
+  }, [selectedBeat, updateBeat, recSeconds])
+
+  const stopRecording = useCallback(() => {
+    recorderRef.current?.stop()
+    recorderRef.current = null
+    setRecording(false)
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
+  }, [])
+
+  // Never leave the mic light on if the Lab unmounts mid-take
+  useEffect(() => () => {
+    if (recorderRef.current) { try { recorderRef.current.stop() } catch {} stopTracks(recorderRef.current) }
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
+  }, [])
+
+  /** Transcribe the beat's audio → real per-word timings for karaoke. */
+  const syncKaraoke = useCallback(async () => {
+    const audio = scene.beats[selectedBeat]?.voiceoverAudio
+    if (!audio) return
+    setTranscribing(true)
+    setVoError(null)
+    try {
+      const res = await fetch('/api/admin/slabby/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Transcription failed')
+      if (!json.words?.length) throw new Error('No speech detected in this take')
+      const current = scene.beats[selectedBeat]?.voiceover?.trim()
+      updateBeat(selectedBeat, {
+        voiceoverWords: json.words,
+        karaoke: true,
+        // adopt the transcript when the beat has no script yet (ad-libbed take)
+        ...(current ? {} : { voiceover: json.text }),
+      })
+    } catch (e: any) {
+      setVoError(e.message)
+    } finally {
+      setTranscribing(false)
+    }
+  }, [scene.beats, selectedBeat, updateBeat])
 
   // ---- templates ----
   const [savedTemplates, setSavedTemplates] = useState<{ name: string; scene: SlabbyScene }[]>([])
@@ -643,17 +762,48 @@ export default function SlabbyLabClient() {
                   >
                     {voGenerating ? 'Generating…' : beat.voiceoverAudio ? '🔁 Re-generate voice' : '🎙️ Generate voice'}
                   </button>
+                  {/* record your own voice — beat auto-fits the take */}
+                  {recording ? (
+                    <button
+                      onClick={stopRecording}
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold animate-pulse"
+                    >
+                      ⏹ Stop · {recSeconds.toFixed(1)}s
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startRecording}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                      title="Record this line in your own voice"
+                    >
+                      {beat.voiceoverAudio ? '🔴 Re-record' : '🔴 Record my voice'}
+                    </button>
+                  )}
                   {beat.voiceoverAudio && (
                     <>
                       <span className="text-[11px] text-green-700 font-semibold">✓ {beat.voiceoverDuration}s audio</span>
                       <button
-                        onClick={() => updateBeat(selectedBeat, { duration: Math.max(0.5, Math.ceil(((beat.voiceoverDuration || 1) + 0.3) * 2) / 2) })}
+                        onClick={() => new window.Audio(beat.voiceoverAudio!).play()}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 font-semibold"
+                      >
+                        ▶ Play
+                      </button>
+                      <button
+                        onClick={() => updateBeat(selectedBeat, { duration: Math.max(0.5, Math.round(((beat.voiceoverDuration || 1) + 0.4) * 100) / 100) })}
                         className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-semibold"
                       >
                         ⏱ Fit beat to audio
                       </button>
                       <button
-                        onClick={() => updateBeat(selectedBeat, { voiceoverAudio: undefined, voiceoverDuration: undefined })}
+                        onClick={syncKaraoke}
+                        disabled={transcribing}
+                        className="px-2 py-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 font-semibold"
+                        title="Transcribe this take so karaoke captions land on the word actually being spoken"
+                      >
+                        {transcribing ? 'Syncing…' : beat.voiceoverWords?.length ? `🎯 Re-sync (${beat.voiceoverWords.length}w)` : '🎯 Sync karaoke to audio'}
+                      </button>
+                      <button
+                        onClick={() => updateBeat(selectedBeat, { voiceoverAudio: undefined, voiceoverDuration: undefined, voiceoverWords: undefined })}
                         className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
                       >
                         Clear audio

@@ -66,6 +66,13 @@ export interface SlabbyBeat {
   voiceoverDuration?: number;
   /** karaoke captions: animate the voiceover script word by word (TikTok style) */
   karaoke?: boolean;
+  /**
+   * Real word timings (seconds from the start of this beat's audio), from
+   * transcribing the voiceover. When present, karaoke syncs to the actual
+   * speech instead of spreading words evenly across the beat — which only
+   * ever approximated, and drifts badly on lines with pauses.
+   */
+  voiceoverWords?: { word: string; start: number; end: number }[];
   /** motion-matched sound effect at beat start (default true) */
   sfx?: boolean;
   /** comic-style speech bubble anchored to Slabby */
