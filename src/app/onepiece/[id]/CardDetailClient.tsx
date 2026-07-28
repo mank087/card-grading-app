@@ -61,10 +61,7 @@ import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 
 interface SportsAIGrading {
   "Final Score"?: {
-    "Overall Grade"?: string;
-  };
-  "Final Score"?: {
-    "Overall Grade"?: number;
+    "Overall Grade"?: string | number;
     "Decimal Grade"?: number;
     "Whole Number Grade"?: number;
     "Grade Range"?: string;
@@ -232,6 +229,7 @@ interface SportsAIGrading {
     "Quality Calculation"?: string | null;
     "Grading Reliability"?: string;
     "Grading Summary"?: any;
+    "Confidence Letter Grade"?: string;
     "Recommendations"?: string[] | string | null;
   };
   "Image Conditions"?: {
@@ -245,11 +243,14 @@ interface SportsAIGrading {
     "Clarity Score"?: number | null;
     "Glare Present"?: string;
     "Glare Penalty"?: number;
-    "Obstructions"?: string;
+    "Obstructions"?: string | string[];
     "Obstruction Penalty"?: number;
     "Overall Quality Score"?: number | string | null;
     "Quality Tier"?: string;
     "Calculation"?: string;
+    "Angle Deviation"?: string;
+    "Perspective Distortion"?: string;
+    "Impact on Grading"?: string;
   };
   "Card Detection Assessment"?: {
     "Detection Confidence"?: string;
@@ -260,14 +261,7 @@ interface SportsAIGrading {
     "Detection Impact on Grading"?: string;
     "Fallback Methods Used"?: string;
   };
-  "Image Conditions"?: {
-    "Resolution"?: string;
-    "Angle Deviation"?: string;
-    "Perspective Distortion"?: string;
-    "Obstructions"?: string[];
-    "Quality Tier"?: string;
-    "Impact on Grading"?: string;
-  };
+  // (second "Image Conditions" declaration merged into the one above)
 
   // v2.2 REVISED - New Fields
   "Visual Geometry"?: {
@@ -362,6 +356,14 @@ interface SportsAIGrading {
     recommended_grade_range?: string;
     confidence_statement?: string;
   };
+
+  // Top-level fields present on some grading payload versions
+  "Centering_Measurements"?: any;
+  centerings_used?: any;
+  category_scores?: Record<string, {score: number; weight: number; contribution?: number}>;
+  front_specific_feedback?: any;
+  back_specific_feedback?: any;
+  text_transcription_summary?: any;
 }
 
 interface SportsCard {
@@ -496,6 +498,8 @@ interface SportsCard {
     front_tb: string | null;
     back_lr: string | null;
     back_tb: string | null;
+    front_quality_tier?: string | null;
+    back_quality_tier?: string | null;
   } | null;
 
   // Professional grading company estimates (deterministic mapper)
@@ -585,6 +589,60 @@ interface SportsCard {
   scryfall_price_usd_foil?: number | null;
   scryfall_price_eur?: number | null;
   scryfall_price_updated_at?: string | null;
+
+  // Card owner + ownership metadata
+  user_id?: string | null;
+  grade?: number | null;
+  owner_preferred_label_emblem?: string | null;
+  owner_is_founder?: boolean | null;
+  owner_show_founder_badge?: boolean | null;
+  owner_is_vip?: boolean | null;
+  owner_show_vip_badge?: boolean | null;
+  owner_is_card_lover?: boolean | null;
+  owner_show_card_lover_badge?: boolean | null;
+
+  // Conversational grading structured payloads (deeply dynamic JSON)
+  conversational_defects_front?: any;
+  conversational_defects_back?: any;
+  conversational_case_detection?: any;
+  conversational_slab_detection?: any;
+  conversational_corners_edges_surface?: any;
+  conversational_weighted_sub_scores?: any;
+  conversational_final_grade_summary?: string | null;
+
+  // DVG image-quality signals
+  dvg_image_quality?: string | null;
+  dvg_reshoot_required?: boolean | null;
+  stage0_detection?: any;
+
+  // User condition report (dual schema — always optional-chain nested access)
+  has_user_condition_report?: boolean | null;
+  user_condition_report?: any;
+  user_condition_ai_response?: any;
+  user_report_influenced_grade?: boolean | null;
+
+  // DCM pricing product selection
+  dcm_selected_product_id?: string | null;
+  dcm_selected_product_name?: string | null;
+
+  // Custom label
+  custom_label_data?: any;
+
+  // Category-specific DB columns referenced by shared display code
+  pokemon_featured?: string | null;
+  rarity_description?: string | null;
+  autographed?: boolean | null;
+  pokemon_type?: string | null;
+  pokemon_stage?: string | null;
+  hp?: string | number | null;
+  card_type?: string | null;
+  expansion_code?: string | null;
+  artist_name?: string | null;
+  is_promo?: boolean | null;
+  border_color?: string | null;
+  keywords?: string[] | string | null;
+  language?: string | null;
+  frame_version?: string | null;
 }
 
 const renderValue = (value: any) => {
@@ -1699,7 +1757,7 @@ export function OnePieceCardDetails() {
 
         if (parsed) {
           console.log('[Conversational Parser] ✅ Successfully parsed defects from markdown');
-          setConversationalDefects(parsed);
+          setConversationalDefects(parsed as CardDefects);
           setParsingError(null);
         } else {
           const errorMsg = 'Grading report format not recognized. Some details may be unavailable.';
@@ -2424,7 +2482,7 @@ export function OnePieceCardDetails() {
     ? `${setNameRaw} - ${subsetRaw}`
     : setNameRaw || null;
 
-  const cardInfo = {
+  const cardInfo: Record<string, any> = {
     // Core identification - from conversational_card_info (Database data merged in by API)
     card_name: stripMarkdown(convInfo.card_name) || card.card_name || dvgGrading.card_info?.card_name,
     player_or_character: stripMarkdown(convInfo.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
@@ -2468,8 +2526,8 @@ export function OnePieceCardDetails() {
     // One Piece variant features
     is_parallel: convInfo.is_parallel ?? (card.op_variant_type?.includes('parallel') ?? false),
     is_manga_art: convInfo.is_manga_art ?? (card.op_variant_type?.includes('manga') ?? false),
-    is_alternate_art: convInfo.is_alternate_art ?? (card.op_variant_type === 'alternate_art' ?? false),
-    is_sp: convInfo.is_sp ?? (card.op_variant_type === 'sp' ?? false),
+    is_alternate_art: convInfo.is_alternate_art ?? (card.op_variant_type === 'alternate_art' || false),
+    is_sp: convInfo.is_sp ?? (card.op_variant_type === 'sp' || false),
     // Other fields
     border_color: stripMarkdown(convInfo.border_color) || card.border_color || null,
     language: stripMarkdown(convInfo.language) || card.card_language || 'English',
@@ -2529,7 +2587,7 @@ export function OnePieceCardDetails() {
   const finalScore = card.ai_grading?.["Final Score"] || {};
 
   // For One Piece cards, create gradingScale from conversational data
-  const gradingScale = card.conversational_sub_scores ? {
+  const gradingScale: any = card.conversational_sub_scores ? {
     "Visual_Inspection_Results": {
       centering: card.conversational_sub_scores.centering,
       corners: card.conversational_sub_scores.corners,
@@ -3305,7 +3363,7 @@ export function OnePieceCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
+                    {isOwner && <DownloadReportButton card={card} cardType={"onepiece" as any} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
@@ -3543,7 +3601,7 @@ export function OnePieceCardDetails() {
                     return (
                       <div id="tour-edit-details">
                         <EditCardDetailsButton
-                          card={card}
+                          card={card as any}
                           currentUserId={session?.user?.id}
                           onEditComplete={(updatedCard) => {
                             window.location.reload();
@@ -3567,8 +3625,8 @@ export function OnePieceCardDetails() {
 
                         if (hasJapanese) {
                           const parts = cardName.split(/[/()（）]/);
-                          const japanesePart = parts.find(p => /[぀-ゟ゠-ヿ一-龯]/.test(p));
-                          const englishPart = parts.find(p => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const japanesePart = parts.find((p: string) => /[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const englishPart = parts.find((p: string) => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
 
                           if (japanesePart && englishPart) {
                             return (
@@ -4198,8 +4256,8 @@ export function OnePieceCardDetails() {
                     // Get analysis text and quality tiers
                     const frontAnalysisText = card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis || 'No analysis available';
                     const backAnalysisText = card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis || 'No analysis available';
-                    const frontQualityTier = card.conversational_centering_ratios?.front_quality_tier;
-                    const backQualityTier = card.conversational_centering_ratios?.back_quality_tier;
+                    const frontQualityTier = card.conversational_centering_ratios?.front_quality_tier ?? undefined;
+                    const backQualityTier = card.conversational_centering_ratios?.back_quality_tier ?? undefined;
 
                     const formattedFront = formatDCMAnalysis(frontAnalysisText, frontLRRatio, frontTBRatio, frontLRObj, frontTBObj, frontQualityTier);
                     const formattedBack = formatDCMAnalysis(backAnalysisText, backLRRatio, backTBRatio, backLRObj, backTBObj, backQualityTier);
@@ -5178,26 +5236,26 @@ export function OnePieceCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-gray-800">
-                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
+                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
+                                (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
+                                  : (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
+                            {(professionalGrades.SGC || professionalGrades.TAG)?.notes}
                             {!professionalGrades.SGC && professionalGrades.TAG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
@@ -5219,26 +5277,26 @@ export function OnePieceCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-teal-700">
-                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
+                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
+                                (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
+                                  : (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
+                            {(professionalGrades.CGC || professionalGrades.CSG)?.notes}
                             {!professionalGrades.CGC && professionalGrades.CSG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate
@@ -5281,8 +5339,8 @@ export function OnePieceCardDetails() {
                         collector_number: cardInfo.card_id || cardInfo.collector_number || card.card_number,
                         year: cardInfo.set_year || card.release_date,
                         rarity_or_variant: cardInfo.rarity || cardInfo.op_variant_type,
-                        dcm_selected_product_id: card.dcm_selected_product_id,
-                        dcm_selected_product_name: card.dcm_selected_product_name,
+                        dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
+                        dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
                       }}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}
                       isOwner={isPricingOwner}
@@ -5470,11 +5528,11 @@ export function OnePieceCardDetails() {
           {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
           {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
-            const categoryScores = gradingScale["Category Scores"] || card.ai_grading?.category_scores;
+            const categoryScores = gradingScale["Category Scores"] || card?.ai_grading?.category_scores;
             return categoryScores && (
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">Category Breakdown Scores</h2>
-                {card.ai_grading?.["Alteration Check"]?.card_is_altered && (
+                {card?.ai_grading?.["Alteration Check"]?.card_is_altered && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
                     ⚠️ Category scores are not applicable for altered cards. See Alteration Check section below for details.
                   </div>
@@ -5526,8 +5584,8 @@ export function OnePieceCardDetails() {
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-800">Weighted Composite Score:</span>
-                      <span className={`text-3xl font-bold ${card.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
-                        {card.ai_grading?.["Alteration Check"]?.card_is_altered
+                      <span className={`text-3xl font-bold ${card?.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
+                        {card?.ai_grading?.["Alteration Check"]?.card_is_altered
                           ? 'NA'
                           : safeToFixed(gradingScale["Weighted Composite Score"], 2)}
                       </span>
@@ -5540,36 +5598,36 @@ export function OnePieceCardDetails() {
           })()}
 
           {/* 4. DCM Confidence and Image Quality */}
-          {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
+          {(card?.ai_grading?.["AI Confidence Assessment"] || card?.ai_grading?.["Image Conditions"]) && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* DCM Confidence Section */}
-                {card.ai_grading?.["AI Confidence Assessment"] && (
+                {card?.ai_grading?.["AI Confidence Assessment"] && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">DCM Confidence</h3>
                     <div className="space-y-3">
                       <div>
                         <span className="font-semibold text-gray-600">Confidence Tier:</span>
                         <span className={`ml-2 capitalize font-bold ${
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'medium' ? 'text-blue-600' :
+                          card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"] === 'high' ? 'text-green-600' :
+                          card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"] === 'medium' ? 'text-blue-600' :
                           'text-yellow-600'
                         }`}>
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Tier"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"])}
                         </span>
                       </div>
                       <div>
                         <span className="font-semibold text-gray-600">Confidence Letter Grade:</span>
                         <span className="ml-2 font-bold text-lg text-blue-600">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Letter Grade"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Letter Grade"])}
                         </span>
                       </div>
                       <div>
                         <span className="font-semibold text-gray-600">Grade Uncertainty:</span>
                         <span className="ml-2 font-semibold">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Grade Uncertainty"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Grade Uncertainty"])}
                         </span>
                       </div>
                     </div>
@@ -5577,21 +5635,21 @@ export function OnePieceCardDetails() {
                 )}
 
                 {/* Image Quality Section */}
-                {card.ai_grading?.["Image Conditions"] && (
+                {card?.ai_grading?.["Image Conditions"] && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Image Quality</h3>
 
                     {/* Overall Quality Score */}
-                    {card.ai_grading["Image Conditions"]["Overall Quality Score"] && (
+                    {card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"] && (
                       <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-gray-700">Overall Score:</span>
                           <span className={`text-2xl font-bold ${
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 7 ? 'text-green-600' :
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 5 ? 'text-blue-600' :
+                            Number(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"]) >= 7 ? 'text-green-600' :
+                            Number(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"]) >= 5 ? 'text-blue-600' :
                             'text-yellow-600'
                           }`}>
-                            {renderValue(card.ai_grading["Image Conditions"]["Overall Quality Score"])}/10
+                            {renderValue(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"])}/10
                           </span>
                         </div>
                       </div>
@@ -5601,50 +5659,50 @@ export function OnePieceCardDetails() {
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Resolution:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'high' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'standard' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Resolution"] === 'high' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Resolution"] === 'standard' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Resolution"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Resolution"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Lighting:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'even' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'adequate' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Lighting"] === 'even' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Lighting"] === 'adequate' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Lighting"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Lighting"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Clarity:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'sharp' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'moderate' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Clarity"] === 'sharp' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Clarity"] === 'moderate' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Clarity"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Clarity"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Glare:</span>
                         <span className={`${
-                          card.ai_grading["Image Conditions"]["Glare Present"] === 'Yes' ? 'text-red-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Glare Present"] === 'Yes' ? 'text-red-600 font-semibold' :
                           'text-green-600 font-semibold'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Glare Present"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Glare Present"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Quality Tier:</span>
                         <span className={`capitalize font-semibold ${
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'medium' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Quality Tier"] === 'high' ? 'text-green-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Quality Tier"] === 'medium' ? 'text-blue-600' :
                           'text-yellow-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Quality Tier"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Quality Tier"])}
                         </span>
                       </div>
                     </div>
@@ -5653,35 +5711,35 @@ export function OnePieceCardDetails() {
               </div>
 
               {/* Additional Info Sections */}
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"] && (
+              {card?.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"] && (
                 <div className="mt-6 bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Grading Reliability: </span>
-                    {card.ai_grading["AI Confidence Assessment"]["Grading Reliability"]}
+                    {card?.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"]}
                   </p>
                 </div>
               )}
 
-              {card.ai_grading?.["Image Conditions"]?.["Impact on Grading"] && (
+              {card?.ai_grading?.["Image Conditions"]?.["Impact on Grading"] && (
                 <div className="mt-4 bg-blue-50 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Impact on Grading: </span>
-                    {card.ai_grading["Image Conditions"]["Impact on Grading"]}
+                    {card?.ai_grading?.["Image Conditions"]?.["Impact on Grading"]}
                   </p>
                 </div>
               )}
 
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] && (
+              {card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] && (
                 <div className="mt-4 bg-yellow-50 rounded-lg p-4">
                   <h3 className="font-semibold text-gray-800 mb-2">Recommendations</h3>
-                  {Array.isArray(card.ai_grading["AI Confidence Assessment"]["Recommendations"]) ? (
+                  {Array.isArray(card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"]) ? (
                     <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                      {card.ai_grading["AI Confidence Assessment"]["Recommendations"].map((rec: string, idx: number) => (
+                      {(card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] as string[])?.map((rec: string, idx: number) => (
                         <li key={idx}>{rec}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-700">{card.ai_grading["AI Confidence Assessment"]["Recommendations"]}</p>
+                    <p className="text-sm text-gray-700">{card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"]}</p>
                   )}
                 </div>
               )}
@@ -5689,45 +5747,45 @@ export function OnePieceCardDetails() {
           )}
 
           {/* 4. Card Detection Assessment */}
-          {card.ai_grading?.["Card Detection Assessment"] && (
+          {card?.ai_grading?.["Card Detection Assessment"] && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Detection Assessment</h2>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <div>
                     <span className="font-semibold text-gray-600">Detection Confidence:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Confidence"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Confidence"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Aspect Ratio:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detected Aspect Ratio"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detected Aspect Ratio"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Aspect Ratio Validation:</span>
-                    <span className={`ml-2 ${card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"] === "Pass" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}`}>
-                      {renderValue(card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"])}
+                    <span className={`ml-2 ${card?.ai_grading?.["Card Detection Assessment"]?.["Aspect Ratio Validation"] === "Pass" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}`}>
+                      {renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Aspect Ratio Validation"])}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div>
                     <span className="font-semibold text-gray-600">Boundary Quality:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Card Boundary Quality"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Card Boundary Quality"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Detection Factors:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Factors"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Factors"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Impact on Grading:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Impact on Grading"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Impact on Grading"])}</span>
                   </div>
                 </div>
               </div>
-              {card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"] && (
+              {card?.ai_grading?.["Card Detection Assessment"]?.["Fallback Methods Used"] && (
                 <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                   <span className="font-semibold text-yellow-800">Fallback Methods Used:</span>
-                  <span className="ml-2 text-yellow-700">{card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"]}</span>
+                  <span className="ml-2 text-yellow-700">{card?.ai_grading?.["Card Detection Assessment"]?.["Fallback Methods Used"]}</span>
                 </div>
               )}
             </div>
@@ -5735,7 +5793,7 @@ export function OnePieceCardDetails() {
 
           {/* 5. Professional Grading Company Estimates - REMOVED OLD SECTION */}
           {/* v2.2 REVISED: Execution Control & Fatal Flags */}
-          {card.ai_grading?.["Execution Control"] && (
+          {card?.ai_grading?.["Execution Control"] && (
             <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -5748,7 +5806,7 @@ export function OnePieceCardDetails() {
               <div className="p-4 bg-white space-y-3">
                 {/* All Steps Completed */}
                 <div className="flex items-center gap-2">
-                  {card.ai_grading["Execution Control"].all_steps_completed ? (
+                  {card?.ai_grading?.["Execution Control"]?.all_steps_completed ? (
                     <>
                       <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -5766,11 +5824,11 @@ export function OnePieceCardDetails() {
                 </div>
 
                 {/* Skipped Steps Warning */}
-                {card.ai_grading["Execution Control"].skipped_steps && card.ai_grading["Execution Control"].skipped_steps.length > 0 && (
+                {card?.ai_grading?.["Execution Control"]?.skipped_steps && (card?.ai_grading?.["Execution Control"]?.skipped_steps?.length ?? 0) > 0 && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
                     <div className="text-sm font-medium text-yellow-800 mb-1">⚠️ Skipped Steps:</div>
                     <ul className="text-sm text-yellow-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].skipped_steps.map((step, idx) => (
+                      {card?.ai_grading?.["Execution Control"]?.skipped_steps?.map((step, idx) => (
                         <li key={idx}>{step}</li>
                       ))}
                     </ul>
@@ -5778,11 +5836,11 @@ export function OnePieceCardDetails() {
                 )}
 
                 {/* Fatal Flags Alert */}
-                {card.ai_grading["Execution Control"].fatal_flags && card.ai_grading["Execution Control"].fatal_flags.length > 0 && (
+                {card?.ai_grading?.["Execution Control"]?.fatal_flags && (card?.ai_grading?.["Execution Control"]?.fatal_flags?.length ?? 0) > 0 && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded">
                     <div className="text-sm font-medium text-red-800 mb-1">🚨 Critical Issues Detected:</div>
                     <ul className="text-sm text-red-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].fatal_flags.map((flag, idx) => (
+                      {card?.ai_grading?.["Execution Control"]?.fatal_flags?.map((flag, idx) => (
                         <li key={idx}>{flag}</li>
                       ))}
                     </ul>
@@ -5796,62 +5854,62 @@ export function OnePieceCardDetails() {
 
           {/* Delete Card Section */}
           {/* 7. Front/Back Specific Feedback (Parallel Processing v2.3) */}
-          {(card.ai_grading?.front_specific_feedback || card.ai_grading?.back_specific_feedback) && (
+          {(card?.ai_grading?.front_specific_feedback || card?.ai_grading?.back_specific_feedback) && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">📊 Front/Back Analysis</h2>
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Front Analysis */}
-                {card.ai_grading.front_specific_feedback && (
+                {card?.ai_grading?.front_specific_feedback && (
                   <div className="bg-blue-50 rounded-lg p-4">
                     <h3 className="font-semibold text-blue-900 mb-3">
                       Front Condition
                     </h3>
                     <p className="text-sm text-blue-800 mb-3">
-                      {card.ai_grading.front_specific_feedback.overall_front_condition || 'Analysis complete'}
+                      {card?.ai_grading?.front_specific_feedback.overall_front_condition || 'Analysis complete'}
                     </p>
                     <div className="text-xs text-blue-700 space-y-1">
-                      {card.ai_grading.front_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.front_specific_feedback.corner_status}</div>
+                      {card?.ai_grading?.front_specific_feedback.corner_status && (
+                        <div><strong>Corners:</strong> {card?.ai_grading?.front_specific_feedback.corner_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.front_specific_feedback.edge_status}</div>
+                      {card?.ai_grading?.front_specific_feedback.edge_status && (
+                        <div><strong>Edges:</strong> {card?.ai_grading?.front_specific_feedback.edge_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.front_specific_feedback.surface_status}</div>
+                      {card?.ai_grading?.front_specific_feedback.surface_status && (
+                        <div><strong>Surface:</strong> {card?.ai_grading?.front_specific_feedback.surface_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.centering_lr && card.ai_grading.front_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.front_specific_feedback.centering_lr} L/R, {card.ai_grading.front_specific_feedback.centering_tb} T/B</div>
+                      {card?.ai_grading?.front_specific_feedback.centering_lr && card?.ai_grading?.front_specific_feedback.centering_tb && (
+                        <div><strong>Centering:</strong> {card?.ai_grading?.front_specific_feedback.centering_lr} L/R, {card?.ai_grading?.front_specific_feedback.centering_tb} T/B</div>
                       )}
                     </div>
                   </div>
                 )}
 
                 {/* Back Analysis */}
-                {card.ai_grading.back_specific_feedback && (
+                {card?.ai_grading?.back_specific_feedback && (
                   <div className="bg-green-50 rounded-lg p-4">
                     <h3 className="font-semibold text-green-900 mb-3">
                       Back Condition
                     </h3>
                     <p className="text-sm text-green-800 mb-3">
-                      {card.ai_grading.back_specific_feedback.overall_back_condition || 'Analysis complete'}
+                      {card?.ai_grading?.back_specific_feedback.overall_back_condition || 'Analysis complete'}
                     </p>
                     <div className="text-xs text-green-700 space-y-1">
-                      {card.ai_grading.back_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.back_specific_feedback.corner_status}</div>
+                      {card?.ai_grading?.back_specific_feedback.corner_status && (
+                        <div><strong>Corners:</strong> {card?.ai_grading?.back_specific_feedback.corner_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.back_specific_feedback.edge_status}</div>
+                      {card?.ai_grading?.back_specific_feedback.edge_status && (
+                        <div><strong>Edges:</strong> {card?.ai_grading?.back_specific_feedback.edge_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.back_specific_feedback.surface_status}</div>
+                      {card?.ai_grading?.back_specific_feedback.surface_status && (
+                        <div><strong>Surface:</strong> {card?.ai_grading?.back_specific_feedback.surface_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.centering_lr && card.ai_grading.back_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.back_specific_feedback.centering_lr} L/R, {card.ai_grading.back_specific_feedback.centering_tb} T/B</div>
+                      {card?.ai_grading?.back_specific_feedback.centering_lr && card?.ai_grading?.back_specific_feedback.centering_tb && (
+                        <div><strong>Centering:</strong> {card?.ai_grading?.back_specific_feedback.centering_lr} L/R, {card?.ai_grading?.back_specific_feedback.centering_tb} T/B</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.authentication_status && (
+                      {card?.ai_grading?.back_specific_feedback.authentication_status && (
                         <div className="font-semibold mt-2 pt-2 border-t border-green-200">
-                          {card.ai_grading.back_specific_feedback.authentication_status}
+                          {card?.ai_grading?.back_specific_feedback.authentication_status}
                         </div>
                       )}
                     </div>
@@ -5862,7 +5920,7 @@ export function OnePieceCardDetails() {
           )}
 
           {/* 8. Text Transcription (OCR) - Parallel Processing v2.3 */}
-          {card.ai_grading?.text_transcription_summary && (
+          {card?.ai_grading?.text_transcription_summary && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Text (OCR)</h2>
               <p className="text-xs text-gray-500 mb-4 italic">
@@ -5871,11 +5929,11 @@ export function OnePieceCardDetails() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Front Text */}
-                {card.ai_grading.text_transcription_summary.front_key_text && card.ai_grading.text_transcription_summary.front_key_text.length > 0 && (
+                {card?.ai_grading?.text_transcription_summary.front_key_text && card?.ai_grading?.text_transcription_summary.front_key_text.length > 0 && (
                   <div className="border-l-4 border-blue-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Front Text ({card.ai_grading.text_transcription_summary.front_text_count || 0} items)</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Front Text ({card?.ai_grading?.text_transcription_summary.front_text_count || 0} items)</h3>
                     <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.front_key_text.map((text: string, i: number) => (
+                      {card?.ai_grading?.text_transcription_summary.front_key_text.map((text: string, i: number) => (
                         <li key={i} className="flex items-start">
                           <span className="text-blue-500 mr-2">•</span>
                           <span>{text}</span>
@@ -5886,11 +5944,11 @@ export function OnePieceCardDetails() {
                 )}
 
                 {/* Back Text */}
-                {card.ai_grading.text_transcription_summary.back_key_text && card.ai_grading.text_transcription_summary.back_key_text.length > 0 && (
+                {card?.ai_grading?.text_transcription_summary.back_key_text && card?.ai_grading?.text_transcription_summary.back_key_text.length > 0 && (
                   <div className="border-l-4 border-green-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Back Text ({card.ai_grading.text_transcription_summary.back_text_count || 0} items)</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Back Text ({card?.ai_grading?.text_transcription_summary.back_text_count || 0} items)</h3>
                     <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.back_key_text.map((text: string, i: number) => (
+                      {card?.ai_grading?.text_transcription_summary.back_key_text.map((text: string, i: number) => (
                         <li key={i} className="flex items-start">
                           <span className="text-green-500 mr-2">•</span>
                           <span>{text}</span>
@@ -5901,13 +5959,13 @@ export function OnePieceCardDetails() {
                 )}
               </div>
 
-              {card.ai_grading.text_transcription_summary.transcription_confidence && (
+              {card?.ai_grading?.text_transcription_summary.transcription_confidence && (
                 <div className="mt-4 text-xs text-gray-500 text-center">
                   Transcription Confidence: <span className={`font-semibold ${
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'high' ? 'text-green-600' :
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'medium' ? 'text-yellow-600' :
+                    card?.ai_grading?.text_transcription_summary.transcription_confidence === 'high' ? 'text-green-600' :
+                    card?.ai_grading?.text_transcription_summary.transcription_confidence === 'medium' ? 'text-yellow-600' :
                     'text-red-600'
-                  }`}>{card.ai_grading.text_transcription_summary.transcription_confidence.toUpperCase()}</span>
+                  }`}>{card?.ai_grading?.text_transcription_summary.transcription_confidence.toUpperCase()}</span>
                 </div>
               )}
             </div>

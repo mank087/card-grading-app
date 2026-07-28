@@ -33,7 +33,7 @@ import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { MTGPriceLookup } from '@/components/pricing/MTGPriceLookup';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
-import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
+import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses, SideDefects } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import SectionDefects from '@/components/reports/SectionDefects';
@@ -61,10 +61,7 @@ import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayDa
 
 interface SportsAIGrading {
   "Final Score"?: {
-    "Overall Grade"?: string;
-  };
-  "Final Score"?: {
-    "Overall Grade"?: number;
+    "Overall Grade"?: string | number;
     "Decimal Grade"?: number;
     "Whole Number Grade"?: number;
     "Grade Range"?: string;
@@ -245,11 +242,14 @@ interface SportsAIGrading {
     "Clarity Score"?: number | null;
     "Glare Present"?: string;
     "Glare Penalty"?: number;
-    "Obstructions"?: string;
+    "Obstructions"?: string | string[];
     "Obstruction Penalty"?: number;
     "Overall Quality Score"?: number | string | null;
     "Quality Tier"?: string;
     "Calculation"?: string;
+    "Angle Deviation"?: string;
+    "Perspective Distortion"?: string;
+    "Impact on Grading"?: string;
   };
   "Card Detection Assessment"?: {
     "Detection Confidence"?: string;
@@ -260,15 +260,6 @@ interface SportsAIGrading {
     "Detection Impact on Grading"?: string;
     "Fallback Methods Used"?: string;
   };
-  "Image Conditions"?: {
-    "Resolution"?: string;
-    "Angle Deviation"?: string;
-    "Perspective Distortion"?: string;
-    "Obstructions"?: string[];
-    "Quality Tier"?: string;
-    "Impact on Grading"?: string;
-  };
-
   // v2.2 REVISED - New Fields
   "Visual Geometry"?: {
     front?: {
@@ -362,10 +353,15 @@ interface SportsAIGrading {
     recommended_grade_range?: string;
     confidence_statement?: string;
   };
+
+  // Legacy top-level centering fields (older grading payloads)
+  "Centering_Measurements"?: any;
+  centerings_used?: any;
 }
 
 interface SportsCard {
   id: string;
+  user_id?: string;
   serial: string;
   front_url: string;
   back_url: string;
@@ -427,6 +423,7 @@ interface SportsCard {
   } | null;
   raw_decimal_grade: number | null;
   dcm_grade_whole: number | null;
+  grade?: number | null;
   ai_confidence_score: string;
   processing_time?: number;
   category: string;
@@ -496,7 +493,45 @@ interface SportsCard {
     front_tb: string | null;
     back_lr: string | null;
     back_tb: string | null;
+    front_quality_tier?: string;
+    back_quality_tier?: string;
   } | null;
+  // Structured defect data + detection JSON (Phase 2 / v4.0 / v5.0)
+  conversational_defects_front?: SideDefects | null;
+  conversational_defects_back?: SideDefects | null;
+  conversational_case_detection?: any | null;
+  conversational_slab_detection?: any | null;
+  conversational_corners_edges_surface?: any | null;
+  conversational_weighted_sub_scores?: {
+    centering: number;
+    corners: number;
+    edges: number;
+    surface: number;
+  } | null;
+  conversational_final_grade_summary?: string | null;
+  stage0_detection?: any | null;
+
+  // User condition report (dual schema — always optional-chain nested access)
+  has_user_condition_report?: boolean;
+  user_condition_report?: any | null;
+  user_condition_ai_response?: {
+    hints_confirmed?: string[];
+    hints_not_visible?: string[];
+  } | null;
+  user_report_influenced_grade?: boolean | null;
+
+  // DVG image quality (legacy)
+  dvg_image_quality?: string | null;
+  dvg_reshoot_required?: boolean | null;
+
+  // Card owner emblem settings (joined from owner profile)
+  owner_preferred_label_emblem?: string | null;
+  owner_is_founder?: boolean;
+  owner_show_founder_badge?: boolean;
+  owner_is_vip?: boolean;
+  owner_show_vip_badge?: boolean;
+  owner_is_card_lover?: boolean;
+  owner_show_card_lover_badge?: boolean;
 
   // Professional grading company estimates (deterministic mapper)
   estimated_professional_grades?: {
@@ -555,6 +590,37 @@ interface SportsCard {
   rarity_tier?: string | null;
   autograph_type?: string | null;
   memorabilia_type?: string | null;
+  rarity_description?: string | null;
+  autographed?: boolean | null;
+  language?: string | null;
+  keywords?: string[] | null;
+
+  // Pokemon-specific fields (shared DB row)
+  pokemon_featured?: string | null;
+  pokemon_type?: string | null;
+  pokemon_stage?: string | null;
+  hp?: string | null;
+  card_type?: string | null;
+
+  // MTG-specific fields (DB columns)
+  mana_cost?: string | null;
+  color_identity?: string | null;
+  mtg_card_type?: string | null;
+  creature_type?: string | null;
+  power_toughness?: string | null;
+  expansion_code?: string | null;
+  artist_name?: string | null;
+  is_promo?: boolean | null;
+  border_color?: string | null;
+  frame_version?: string | null;
+  scryfall_id?: string | null;
+
+  // DCM pricing product selection
+  dcm_selected_product_id?: string | null;
+  dcm_selected_product_name?: string | null;
+
+  // Custom label
+  custom_label_data?: any | null;
 
   // Timestamps
   created_at?: string;
@@ -1712,7 +1778,7 @@ export function MTGCardDetails() {
 
         if (parsed) {
           console.log('[Conversational Parser] ✅ Successfully parsed defects from markdown');
-          setConversationalDefects(parsed);
+          setConversationalDefects(parsed as CardDefects);
           setParsingError(null);
         } else {
           const errorMsg = 'Grading report format not recognized. Some details may be unavailable.';
@@ -2581,7 +2647,7 @@ export function MTGCardDetails() {
     "Centering_Measurements": card.conversational_centering_ratios || {}
   } : (card.ai_grading?.["Grading (DCM Master Scale)"] || {});
 
-  const visualInspection = gradingScale["Visual_Inspection_Results"] || {};
+  const visualInspection = (gradingScale as any)["Visual_Inspection_Results"] || {};
 
   // 🎯 MTG cards: Extract centering from conversational_grading JSON as primary source
   // 🆕 Structural "unconfirmed" note — flagged crease reviewed and dismissed as a lighting reflection
@@ -3587,7 +3653,7 @@ export function MTGCardDetails() {
                     return (
                       <div id="tour-edit-details">
                         <EditCardDetailsButton
-                          card={card}
+                          card={card as any}
                           currentUserId={session?.user?.id}
                           onEditComplete={(updatedCard) => {
                             window.location.reload();
@@ -3622,8 +3688,8 @@ export function MTGCardDetails() {
 
                         if (hasJapanese) {
                           const parts = cardName.split(/[/()（）]/);
-                          const japanesePart = parts.find(p => /[぀-ゟ゠-ヿ一-龯]/.test(p));
-                          const englishPart = parts.find(p => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const japanesePart = parts.find((p: string) => /[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const englishPart = parts.find((p: string) => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
 
                           if (japanesePart && englishPart) {
                             return (
@@ -3691,7 +3757,7 @@ export function MTGCardDetails() {
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Color Identity</p>
                       <div className="flex gap-1">
-                        {(cardInfo.color_identity || card.color_identity).split('').map((color: string, idx: number) => {
+                        {(cardInfo.color_identity || card.color_identity)?.split('').map((color: string, idx: number) => {
                           const colorMap: {[key: string]: {name: string, bg: string, text: string}} = {
                             'W': {name: 'White', bg: 'bg-yellow-100', text: 'text-yellow-800'},
                             'U': {name: 'Blue', bg: 'bg-blue-100', text: 'text-blue-800'},
@@ -4043,7 +4109,7 @@ export function MTGCardDetails() {
                       {(() => {
                         // Only show autograph badge if explicitly present
                         const hasAutograph = (
-                          (cardInfo.autographed === true || cardInfo.autographed === 'true' || cardInfo.autographed === 'Yes') ||
+                          (cardInfo.autographed === true || (cardInfo.autographed as any) === 'true' || (cardInfo.autographed as any) === 'Yes') ||
                           dvgGrading.autograph?.present === true ||
                           dvgGrading.rarity_features?.autograph?.present === true
                         );
@@ -4087,13 +4153,13 @@ export function MTGCardDetails() {
                       )}
 
                       {/* Authentic */}
-                      {typeof cardInfo.authentic === 'boolean' && (
-                        <div className={`rounded-lg p-3 border ${cardInfo.authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <p className={`text-xs font-semibold mb-1 ${cardInfo.authentic ? 'text-green-700' : 'text-red-700'}`}>
+                      {typeof (cardInfo as any).authentic === 'boolean' && (
+                        <div className={`rounded-lg p-3 border ${(cardInfo as any).authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <p className={`text-xs font-semibold mb-1 ${(cardInfo as any).authentic ? 'text-green-700' : 'text-red-700'}`}>
                             AUTHENTIC
                           </p>
-                          <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
-                            {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
+                          <p className={`font-bold ${(cardInfo as any).authentic ? 'text-green-900' : 'text-red-900'}`}>
+                            {(cardInfo as any).authentic ? '✓ Licensed' : '✗ Unlicensed'}
                           </p>
                         </div>
                       )}
@@ -5191,12 +5257,12 @@ export function MTGCardDetails() {
                         card_name: cardInfo.card_name || card.card_name,
                         set_name: cardInfo.set_name || card.card_set,
                         collector_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
-                        expansion_code: cardInfo.expansion_code || card.expansion_code,
+                        expansion_code: cardInfo.expansion_code || card.expansion_code || undefined,
                         year: cardInfo.year || card.release_date,
                         is_foil: cardInfo.is_foil || card.is_foil || false,
-                        rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.rarity || card.mtg_rarity,
-                        dcm_selected_product_id: card.dcm_selected_product_id,
-                        dcm_selected_product_name: card.dcm_selected_product_name,
+                        rarity_or_variant: cardInfo.rarity_or_variant || (cardInfo as any).rarity || card.mtg_rarity,
+                        dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
+                        dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
                       }}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}
                       isOwner={isPricingOwner}
@@ -5323,9 +5389,9 @@ export function MTGCardDetails() {
                   </a>
 
                   {/* Scryfall - Link to verified card page */}
-                  {(card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id) && (
+                  {(card.mtg_api_id || card.scryfall_id || (cardInfo as any).scryfall_id) && (
                     <a
-                      href={`https://scryfall.com/card/${card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id}`}
+                      href={`https://scryfall.com/card/${card.mtg_api_id || card.scryfall_id || (cardInfo as any).scryfall_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
@@ -5469,26 +5535,26 @@ export function MTGCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-gray-800">
-                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
+                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
+                                (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
+                                  : (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
+                            {(professionalGrades.SGC || professionalGrades.TAG)?.notes}
                             {!professionalGrades.SGC && professionalGrades.TAG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
@@ -5510,26 +5576,26 @@ export function MTGCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-teal-700">
-                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
+                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
+                                (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
+                                  : (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
+                            {(professionalGrades.CGC || professionalGrades.CSG)?.notes}
                             {!professionalGrades.CGC && professionalGrades.CSG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate

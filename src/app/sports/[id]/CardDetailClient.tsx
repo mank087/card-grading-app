@@ -59,10 +59,7 @@ import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayDa
 
 interface SportsAIGrading {
   "Final Score"?: {
-    "Overall Grade"?: string;
-  };
-  "Final Score"?: {
-    "Overall Grade"?: number;
+    "Overall Grade"?: string | number;
     "Decimal Grade"?: number;
     "Whole Number Grade"?: number;
     "Grade Range"?: string;
@@ -225,6 +222,7 @@ interface SportsAIGrading {
   "AI Confidence Assessment"?: {
     "Overall Confidence"?: string;
     "Confidence Tier"?: string;
+    "Confidence Letter Grade"?: string;
     "Grade Uncertainty"?: string;
     "Image Quality Score"?: number | string | null;
     "Quality Calculation"?: string | null;
@@ -243,11 +241,14 @@ interface SportsAIGrading {
     "Clarity Score"?: number | null;
     "Glare Present"?: string;
     "Glare Penalty"?: number;
-    "Obstructions"?: string;
+    "Obstructions"?: string | string[];
     "Obstruction Penalty"?: number;
     "Overall Quality Score"?: number | string | null;
     "Quality Tier"?: string;
     "Calculation"?: string;
+    "Angle Deviation"?: string;
+    "Perspective Distortion"?: string;
+    "Impact on Grading"?: string;
   };
   "Card Detection Assessment"?: {
     "Detection Confidence"?: string;
@@ -258,15 +259,6 @@ interface SportsAIGrading {
     "Detection Impact on Grading"?: string;
     "Fallback Methods Used"?: string;
   };
-  "Image Conditions"?: {
-    "Resolution"?: string;
-    "Angle Deviation"?: string;
-    "Perspective Distortion"?: string;
-    "Obstructions"?: string[];
-    "Quality Tier"?: string;
-    "Impact on Grading"?: string;
-  };
-
   // v2.2 REVISED - New Fields
   "Visual Geometry"?: {
     front?: {
@@ -360,6 +352,37 @@ interface SportsAIGrading {
     recommended_grade_range?: string;
     confidence_statement?: string;
   };
+
+  // v3.1 top-level fields (legacy JSON shapes vary between grading versions)
+  "Centering_Measurements"?: any;
+  centerings_used?: any;
+  category_scores?: Record<string, { score?: number | string | null; weight?: number; contribution?: number }> | null;
+
+  // Parallel Processing v2.3 fields
+  front_specific_feedback?: {
+    overall_front_condition?: string;
+    corner_status?: string;
+    edge_status?: string;
+    surface_status?: string;
+    centering_lr?: string;
+    centering_tb?: string;
+  } | null;
+  back_specific_feedback?: {
+    overall_back_condition?: string;
+    corner_status?: string;
+    edge_status?: string;
+    surface_status?: string;
+    centering_lr?: string;
+    centering_tb?: string;
+    authentication_status?: string;
+  } | null;
+  text_transcription_summary?: {
+    front_key_text?: string[];
+    back_key_text?: string[];
+    front_text_count?: number;
+    back_text_count?: number;
+    transcription_confidence?: string;
+  } | null;
 }
 
 interface SportsCard {
@@ -494,6 +517,34 @@ interface SportsCard {
     front_tb: string | null;
     back_lr: string | null;
     back_tb: string | null;
+    front_quality_tier?: string | null;
+    back_quality_tier?: string | null;
+  } | null;
+  // v5.0 structured defect/detection columns (parsed on backend; deeply dynamic JSON)
+  conversational_defects_front?: any;
+  conversational_defects_back?: any;
+  conversational_corners_edges_surface?: any;
+  conversational_weighted_sub_scores?: {
+    centering?: number;
+    corners?: number;
+    edges?: number;
+    surface?: number;
+  } | null;
+  conversational_final_grade_summary?: string | null;
+  conversational_case_detection?: {
+    case_type?: string;
+    case_visibility?: string;
+    impact_level?: string;
+    adjusted_uncertainty?: string;
+    notes?: string;
+  } | null;
+  conversational_slab_detection?: {
+    detected?: boolean;
+    company?: string | null;
+    grade?: string | null;
+    grade_description?: string | null;
+    cert_number?: string | null;
+    subgrades?: { raw?: any } | null;
   } | null;
 
   // Professional grading company estimates (deterministic mapper)
@@ -538,6 +589,39 @@ interface SportsCard {
 
   // DVG grading data (when DVG v2 is enabled)
   dvg_grading?: any;
+  dvg_image_quality?: string | null;
+  dvg_reshoot_required?: boolean | null;
+  dvg_whole_grade?: number | null;
+
+  // Card owner + emblem preference fields (joined from owner profile)
+  user_id?: string | null;
+  owner_preferred_label_emblem?: string | null;
+  owner_is_founder?: boolean | null;
+  owner_show_founder_badge?: boolean | null;
+  owner_is_vip?: boolean | null;
+  owner_show_vip_badge?: boolean | null;
+  owner_is_card_lover?: boolean | null;
+  owner_show_card_lover_badge?: boolean | null;
+
+  // Legacy grade column + stage0 detection data
+  grade?: number | null;
+  stage0_detection?: any;
+
+  // User condition report (dual schema — see project memory; consumers optional-chain)
+  has_user_condition_report?: boolean | null;
+  user_condition_report?: any;
+  user_condition_ai_response?: {
+    hints_confirmed?: string[];
+    hints_not_visible?: string[];
+  } | null;
+  user_report_influenced_grade?: boolean | null;
+
+  // Saved manual parallel selection (SportsCardsPro pricing)
+  dcm_selected_product_id?: string | null;
+  dcm_selected_product_name?: string | null;
+
+  // Custom label designer data
+  custom_label_data?: any;
 
   // Database fields for card info (from conversational AI or manual entry)
   card_name?: string | null;
@@ -549,8 +633,11 @@ interface SportsCard {
   sport?: string | null;
   serial_numbering?: string | null;
   rookie_card?: boolean;
+  rookie_or_first_print?: string | null;
   subset?: string | null;
+  subset_insert_name?: string | null;
   rarity_tier?: string | null;
+  rarity_description?: string | null;
   autograph_type?: string | null;
   memorabilia_type?: string | null;
 
@@ -1816,7 +1903,7 @@ export function SportsCardDetails() {
 
         if (parsed) {
           console.log('[Conversational Parser] ✅ Successfully parsed defects from markdown');
-          setConversationalDefects(parsed);
+          setConversationalDefects(parsed as CardDefects);
           setParsingError(null);
         } else {
           const errorMsg = 'Grading report format not recognized. Some details may be unavailable.';
@@ -2452,7 +2539,7 @@ export function SportsCardDetails() {
     "Centering_Measurements": card.conversational_centering_ratios || {}
   } : (card.ai_grading?.["Grading (DCM Master Scale)"] || {});
 
-  const visualInspection = gradingScale["Visual_Inspection_Results"] || {};
+  const visualInspection = (gradingScale as any)["Visual_Inspection_Results"] || {};
 
   // v3.1: Read centering from multiple possible sources (v3.1 centerings_used, legacy Centering_Measurements, or stage0_detection)
   // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
@@ -3507,7 +3594,7 @@ export function SportsCardDetails() {
                     return (
                       <div id="tour-edit-details">
                       <EditCardDetailsButton
-                        card={card}
+                        card={card as any}
                         currentUserId={session?.user?.id}
                         onEditComplete={(updatedCard) => {
                           window.location.reload();
@@ -3969,7 +4056,7 @@ export function SportsCardDetails() {
                                 `${frontTB.left}/${frontTB.right}`,
                                 frontLR,
                                 frontTB,
-                                aiQualityTier
+                                aiQualityTier ?? undefined
                               );
                               return (
                                 <div className="w-full max-w-xs mt-3">
@@ -4820,14 +4907,14 @@ export function SportsCardDetails() {
                       card_number: cardInfo.card_number || card.card_number,
                       rarity_or_variant: cardInfo.rarity_or_variant,
                       subset: cardInfo.subset,  // Insert/subset name (e.g., "Downtown") - NOT used for variant
-                      subset_insert_name: cardInfo.subset_insert_name,  // Alternative field from v3.3
-                      parallel_type: cardInfo.parallel_type,  // Actual parallel color (e.g., "Green", "Gold")
+                      subset_insert_name: cardInfo.subset_insert_name ?? undefined,  // Alternative field from v3.3
+                      parallel_type: cardInfo.parallel_type ?? undefined,  // Actual parallel color (e.g., "Green", "Gold")
                       rookie_or_first: cardInfo.rookie_or_first === true || card.rookie_card === true,
                       category: card.category,  // e.g., "Hockey", "Baseball", "Basketball", "Football"
                       serial_numbering: cardInfo.serial_number || card.serial_numbering,  // e.g., "23/75"
                       // Saved manual parallel selection
-                      dcm_selected_product_id: card.dcm_selected_product_id,
-                      dcm_selected_product_name: card.dcm_selected_product_name,
+                      dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
+                      dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
                     }}
                     dcmGrade={card.conversational_decimal_grade ?? undefined}
                     isOwner={isPricingOwner}
@@ -5030,26 +5117,26 @@ export function SportsCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-gray-800">
-                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
+                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
+                                (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
+                                  : (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
+                            {(professionalGrades.SGC || professionalGrades.TAG)?.notes}
                             {!professionalGrades.SGC && professionalGrades.TAG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 Showing TAG estimate (legacy) - regrade to get SGC estimate
@@ -5071,26 +5158,26 @@ export function SportsCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-teal-700">
-                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
+                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
+                                (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
+                                  : (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
+                            {(professionalGrades.CGC || professionalGrades.CSG)?.notes}
                             {!professionalGrades.CGC && professionalGrades.CSG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 Showing CSG estimate (legacy) - regrade to get CGC estimate
@@ -5157,11 +5244,11 @@ export function SportsCardDetails() {
           {/* LEGACY_SECTIONS_START - removed in layout redesign */}
           {false && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
-            const categoryScores = gradingScale["Category Scores"] || card.ai_grading?.category_scores;
+            const categoryScores = (gradingScale as any)["Category Scores"] || card?.ai_grading?.category_scores;
             return categoryScores && (
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">Category Breakdown Scores</h2>
-                {card.ai_grading?.["Alteration Check"]?.card_is_altered && (
+                {card?.ai_grading?.["Alteration Check"]?.card_is_altered && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
                     ⚠️ Category scores are not applicable for altered cards. See Alteration Check section below for details.
                   </div>
@@ -5209,14 +5296,14 @@ export function SportsCardDetails() {
                     </div>
                   );
                 })}
-                {gradingScale["Weighted Composite Score"] && (
+                {(gradingScale as any)["Weighted Composite Score"] && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-800">Weighted Composite Score:</span>
-                      <span className={`text-3xl font-bold ${card.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
-                        {card.ai_grading?.["Alteration Check"]?.card_is_altered
+                      <span className={`text-3xl font-bold ${card?.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
+                        {card?.ai_grading?.["Alteration Check"]?.card_is_altered
                           ? 'NA'
-                          : safeToFixed(gradingScale["Weighted Composite Score"], 2)}
+                          : safeToFixed((gradingScale as any)["Weighted Composite Score"], 2)}
                       </span>
                     </div>
                   </div>

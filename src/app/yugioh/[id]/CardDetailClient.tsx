@@ -61,10 +61,7 @@ import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayDa
 
 interface SportsAIGrading {
   "Final Score"?: {
-    "Overall Grade"?: string;
-  };
-  "Final Score"?: {
-    "Overall Grade"?: number;
+    "Overall Grade"?: string | number;
     "Decimal Grade"?: number;
     "Whole Number Grade"?: number;
     "Grade Range"?: string;
@@ -122,6 +119,7 @@ interface SportsAIGrading {
       value?: boolean;
     }>;
     "Visual_Inspection_Details"?: Record<string, any>;
+    "Visual_Inspection_Results"?: Record<string, any>;
     // V3.0 5-Category Defect Structure
     structural_integrity?: {
       overall_score?: number;
@@ -227,6 +225,7 @@ interface SportsAIGrading {
   "AI Confidence Assessment"?: {
     "Overall Confidence"?: string;
     "Confidence Tier"?: string;
+    "Confidence Letter Grade"?: string;
     "Grade Uncertainty"?: string;
     "Image Quality Score"?: number | string | null;
     "Quality Calculation"?: string | null;
@@ -245,11 +244,14 @@ interface SportsAIGrading {
     "Clarity Score"?: number | null;
     "Glare Present"?: string;
     "Glare Penalty"?: number;
-    "Obstructions"?: string;
+    "Obstructions"?: string | string[];
     "Obstruction Penalty"?: number;
     "Overall Quality Score"?: number | string | null;
     "Quality Tier"?: string;
     "Calculation"?: string;
+    "Angle Deviation"?: string;
+    "Perspective Distortion"?: string;
+    "Impact on Grading"?: string;
   };
   "Card Detection Assessment"?: {
     "Detection Confidence"?: string;
@@ -259,14 +261,6 @@ interface SportsAIGrading {
     "Detection Factors"?: string;
     "Detection Impact on Grading"?: string;
     "Fallback Methods Used"?: string;
-  };
-  "Image Conditions"?: {
-    "Resolution"?: string;
-    "Angle Deviation"?: string;
-    "Perspective Distortion"?: string;
-    "Obstructions"?: string[];
-    "Quality Tier"?: string;
-    "Impact on Grading"?: string;
   };
 
   // v2.2 REVISED - New Fields
@@ -362,6 +356,37 @@ interface SportsAIGrading {
     recommended_grade_range?: string;
     confidence_statement?: string;
   };
+
+  // v3.1 top-level fields (legacy ai_grading payload variants)
+  "Centering_Measurements"?: any;
+  centerings_used?: any;
+  category_scores?: Record<string, any> | null;
+
+  // Parallel Processing v2.3 fields
+  front_specific_feedback?: {
+    overall_front_condition?: string;
+    corner_status?: string;
+    edge_status?: string;
+    surface_status?: string;
+    centering_lr?: string;
+    centering_tb?: string;
+  } | null;
+  back_specific_feedback?: {
+    overall_back_condition?: string;
+    corner_status?: string;
+    edge_status?: string;
+    surface_status?: string;
+    centering_lr?: string;
+    centering_tb?: string;
+    authentication_status?: string;
+  } | null;
+  text_transcription_summary?: {
+    front_key_text?: string[];
+    front_text_count?: number;
+    back_key_text?: string[];
+    back_text_count?: number;
+    transcription_confidence?: string;
+  } | null;
 }
 
 interface SportsCard {
@@ -496,6 +521,8 @@ interface SportsCard {
     front_tb: string | null;
     back_lr: string | null;
     back_tb: string | null;
+    front_quality_tier?: string | null;
+    back_quality_tier?: string | null;
   } | null;
 
   // Professional grading company estimates (deterministic mapper)
@@ -585,6 +612,74 @@ interface SportsCard {
   scryfall_price_usd_foil?: number | null;
   scryfall_price_eur?: number | null;
   scryfall_price_updated_at?: string | null;
+
+  // Ownership / access control
+  user_id?: string | null;
+
+  // Legacy grade column (used for GA4 tracking)
+  grade?: number | null;
+
+  // Card owner's emblem settings (joined from profile by the API)
+  owner_preferred_label_emblem?: string | null;
+  owner_is_founder?: boolean | null;
+  owner_show_founder_badge?: boolean | null;
+  owner_is_vip?: boolean | null;
+  owner_show_vip_badge?: boolean | null;
+  owner_is_card_lover?: boolean | null;
+  owner_show_card_lover_badge?: boolean | null;
+
+  // Structured conversational grading payloads (dynamic JSON from backend)
+  conversational_defects_front?: any;
+  conversational_defects_back?: any;
+  conversational_case_detection?: any;
+  conversational_slab_detection?: any;
+  conversational_corners_edges_surface?: any;
+  conversational_weighted_sub_scores?: {
+    centering?: number;
+    corners?: number;
+    edges?: number;
+    surface?: number;
+  } | null;
+  conversational_final_grade_summary?: string | null;
+
+  // DVG image-quality fields
+  dvg_image_quality?: string | null;
+  dvg_reshoot_required?: boolean | null;
+
+  // Stage 0 detection payload (dynamic JSON)
+  stage0_detection?: any;
+
+  // User-reported condition (dual schema — always optional-chain nested access)
+  has_user_condition_report?: boolean | null;
+  user_condition_report?: any;
+  user_condition_ai_response?: {
+    hints_confirmed?: string[];
+    hints_not_visible?: string[];
+  } | null;
+  user_report_influenced_grade?: boolean | null;
+
+  // Additional card info fields (cross-category DB columns)
+  pokemon_featured?: string | null;
+  pokemon_type?: string | null;
+  pokemon_stage?: string | null;
+  hp?: string | number | null;
+  card_type?: string | null;
+  rarity_description?: string | null;
+  autographed?: boolean | null;
+  expansion_code?: string | null;
+  artist_name?: string | null;
+  is_promo?: boolean | null;
+  border_color?: string | null;
+  keywords?: string[] | null;
+  language?: string | null;
+  frame_version?: string | null;
+
+  // DCM pricing product selection
+  dcm_selected_product_id?: string | null;
+  dcm_selected_product_name?: string | null;
+
+  // Custom label configuration (dynamic JSON)
+  custom_label_data?: any;
 }
 
 const renderValue = (value: any) => {
@@ -1699,7 +1794,7 @@ export function YugiohCardDetails() {
 
         if (parsed) {
           console.log('[Conversational Parser] ✅ Successfully parsed defects from markdown');
-          setConversationalDefects(parsed);
+          setConversationalDefects(parsed as CardDefects);
           setParsingError(null);
         } else {
           const errorMsg = 'Grading report format not recognized. Some details may be unavailable.';
@@ -2468,8 +2563,8 @@ export function YugiohCardDetails() {
     // Yu-Gi-Oh variant features
     is_parallel: convInfo.is_parallel ?? (card.ygo_frame_type?.includes('parallel') ?? false),
     is_manga_art: convInfo.is_manga_art ?? (card.ygo_frame_type?.includes('manga') ?? false),
-    is_alternate_art: convInfo.is_alternate_art ?? (card.ygo_frame_type === 'alternate_art' ?? false),
-    is_sp: convInfo.is_sp ?? (card.ygo_frame_type === 'sp' ?? false),
+    is_alternate_art: convInfo.is_alternate_art ?? (card.ygo_frame_type === 'alternate_art'),
+    is_sp: convInfo.is_sp ?? (card.ygo_frame_type === 'sp'),
     // Other fields
     border_color: stripMarkdown(convInfo.border_color) || card.border_color || null,
     language: stripMarkdown(convInfo.language) || card.card_language || 'English',
@@ -3305,7 +3400,7 @@ export function YugiohCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="yugioh" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
+                    {isOwner && <DownloadReportButton card={card} cardType={"yugioh" as any} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
@@ -3543,7 +3638,7 @@ export function YugiohCardDetails() {
                     return (
                       <div id="tour-edit-details">
                         <EditCardDetailsButton
-                          card={card}
+                          card={card as any}
                           currentUserId={session?.user?.id}
                           onEditComplete={(updatedCard) => {
                             window.location.reload();
@@ -3567,8 +3662,8 @@ export function YugiohCardDetails() {
 
                         if (hasJapanese) {
                           const parts = cardName.split(/[/()（）]/);
-                          const japanesePart = parts.find(p => /[぀-ゟ゠-ヿ一-龯]/.test(p));
-                          const englishPart = parts.find(p => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const japanesePart = parts.find((p: string) => /[぀-ゟ゠-ヿ一-龯]/.test(p));
+                          const englishPart = parts.find((p: string) => p.trim() && !/[぀-ゟ゠-ヿ一-龯]/.test(p));
 
                           if (japanesePart && englishPart) {
                             return (
@@ -3606,7 +3701,7 @@ export function YugiohCardDetails() {
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Color</p>
                       <div className="flex gap-1 flex-wrap">
-                        {(cardInfo.ygo_attribute || card.ygo_attribute).split('/').map((color: string, idx: number) => {
+                        {(cardInfo.ygo_attribute || card.ygo_attribute)?.split('/').map((color: string, idx: number) => {
                           const colorMap: {[key: string]: {name: string, bg: string, text: string}} = {
                             'Red': {name: 'Red', bg: 'bg-red-500', text: 'text-white'},
                             'Blue': {name: 'Blue', bg: 'bg-blue-500', text: 'text-white'},
@@ -3696,7 +3791,7 @@ export function YugiohCardDetails() {
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Variant</p>
                       <span className="px-2 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-                        {(cardInfo.ygo_frame_type || card.ygo_frame_type).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                        {(cardInfo.ygo_frame_type || card.ygo_frame_type)?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                       </span>
                     </div>
                   )}
@@ -3828,17 +3923,17 @@ export function YugiohCardDetails() {
                   )}
 
                   {/* Frame Version */}
-                  {(cardInfo.frame_version || card.frame_version) && (
+                  {((cardInfo as any).frame_version || card.frame_version) && (
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Frame</p>
                       <p className="font-semibold text-gray-900">
-                        {cardInfo.frame_version || card.frame_version}
+                        {(cardInfo as any).frame_version || card.frame_version}
                       </p>
                     </div>
                   )}
 
                   {/* Double-Faced Card Badge - only show if not already showing above */}
-                  {(cardInfo.is_double_faced || card.is_double_faced) && !card.is_double_faced && (
+                  {((cardInfo as any).is_double_faced || card.is_double_faced) && !card.is_double_faced && (
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Card Layout</p>
                       <span className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500 text-white rounded-lg text-sm font-bold">
@@ -3969,7 +4064,7 @@ export function YugiohCardDetails() {
                       {(() => {
                         // Only show autograph badge if explicitly present
                         const hasAutograph = (
-                          (cardInfo.autographed === true || cardInfo.autographed === 'true' || cardInfo.autographed === 'Yes') ||
+                          (cardInfo.autographed === true || (cardInfo.autographed as any) === 'true' || (cardInfo.autographed as any) === 'Yes') ||
                           dvgGrading.autograph?.present === true ||
                           dvgGrading.rarity_features?.autograph?.present === true
                         );
@@ -4013,13 +4108,13 @@ export function YugiohCardDetails() {
                       )}
 
                       {/* Authentic */}
-                      {typeof cardInfo.authentic === 'boolean' && (
-                        <div className={`rounded-lg p-3 border ${cardInfo.authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <p className={`text-xs font-semibold mb-1 ${cardInfo.authentic ? 'text-green-700' : 'text-red-700'}`}>
+                      {typeof (cardInfo as any).authentic === 'boolean' && (
+                        <div className={`rounded-lg p-3 border ${(cardInfo as any).authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <p className={`text-xs font-semibold mb-1 ${(cardInfo as any).authentic ? 'text-green-700' : 'text-red-700'}`}>
                             AUTHENTIC
                           </p>
-                          <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
-                            {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
+                          <p className={`font-bold ${(cardInfo as any).authentic ? 'text-green-900' : 'text-red-900'}`}>
+                            {(cardInfo as any).authentic ? '✓ Licensed' : '✗ Unlicensed'}
                           </p>
                         </div>
                       )}
@@ -4198,8 +4293,8 @@ export function YugiohCardDetails() {
                     // Get analysis text and quality tiers
                     const frontAnalysisText = card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis || 'No analysis available';
                     const backAnalysisText = card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis || 'No analysis available';
-                    const frontQualityTier = card.conversational_centering_ratios?.front_quality_tier;
-                    const backQualityTier = card.conversational_centering_ratios?.back_quality_tier;
+                    const frontQualityTier = card.conversational_centering_ratios?.front_quality_tier ?? undefined;
+                    const backQualityTier = card.conversational_centering_ratios?.back_quality_tier ?? undefined;
 
                     const formattedFront = formatDCMAnalysis(frontAnalysisText, frontLRRatio, frontTBRatio, frontLRObj, frontTBObj, frontQualityTier);
                     const formattedBack = formatDCMAnalysis(backAnalysisText, backLRRatio, backTBRatio, backLRObj, backTBObj, backQualityTier);
@@ -5178,26 +5273,26 @@ export function YugiohCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-gray-800">
-                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
+                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
+                                (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
+                                  : (professionalGrades.SGC || professionalGrades.TAG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
+                                {(professionalGrades.SGC || professionalGrades.TAG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
+                            {(professionalGrades.SGC || professionalGrades.TAG)?.notes}
                             {!professionalGrades.SGC && professionalGrades.TAG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
@@ -5219,26 +5314,26 @@ export function YugiohCardDetails() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-3xl font-bold text-teal-700">
-                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.estimated_grade}
                               </p>
                               <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
+                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG)?.numeric_score}
                               </p>
                             </div>
                             <div>
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
+                                (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'high'
                                   ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
+                                  : (professionalGrades.CGC || professionalGrades.CSG)?.confidence === 'medium'
                                   ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                   : 'bg-gray-100 text-gray-800 border border-gray-300'
                               }`}>
-                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
+                                {(professionalGrades.CGC || professionalGrades.CSG)?.confidence.toUpperCase()}
                               </span>
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
+                            {(professionalGrades.CGC || professionalGrades.CSG)?.notes}
                             {!professionalGrades.CGC && professionalGrades.CSG && (
                               <div className="mt-2 text-xs text-amber-600">
                                 ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate
@@ -5278,13 +5373,13 @@ export function YugiohCardDetails() {
                         id: card.id,
                         card_name: cardInfo.card_name || card.card_name,
                         set_name: cardInfo.set_name || card.card_set,
-                        card_number: cardInfo.card_id || cardInfo.card_number || card.card_number,
-                        year: cardInfo.set_year || card.release_date,
+                        card_number: (cardInfo as any).card_id || cardInfo.card_number || card.card_number,
+                        year: (cardInfo as any).set_year || card.release_date,
                         manufacturer: 'Konami',
-                        rarity_or_variant: cardInfo.rarity || cardInfo.ygo_frame_type,
+                        rarity_or_variant: (cardInfo as any).rarity || cardInfo.ygo_frame_type,
                         game_type: 'Yu-Gi-Oh',
-                        dcm_selected_product_id: card.dcm_selected_product_id,
-                        dcm_selected_product_name: card.dcm_selected_product_name,
+                        dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
+                        dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
                       }}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}
                       isOwner={isPricingOwner}
@@ -5357,7 +5452,7 @@ export function YugiohCardDetails() {
                     href={generateOnePieceEbaySearchUrl({
                       card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
                       featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_number: cardInfo.card_id || cardInfo.card_number || card.card_number
+                      card_number: (cardInfo as any).card_id || cardInfo.card_number || card.card_number
                     } as CardData)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -5379,7 +5474,7 @@ export function YugiohCardDetails() {
                     href={generateOnePieceEbaySoldListingsUrl({
                       card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
                       featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_number: cardInfo.card_id || cardInfo.card_number || card.card_number
+                      card_number: (cardInfo as any).card_id || cardInfo.card_number || card.card_number
                     } as CardData)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -5401,7 +5496,7 @@ export function YugiohCardDetails() {
                     href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
                       [
                         extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                        cardInfo.card_id || cardInfo.card_number || card.card_number
+                        (cardInfo as any).card_id || cardInfo.card_number || card.card_number
                       ].filter(Boolean).join(' ')
                     )}&type=prices`}
                     target="_blank"
@@ -5454,7 +5549,7 @@ export function YugiohCardDetails() {
 
                     <EbayListingButton
                       card={card}
-                      cardType="yugioh"
+                      cardType={"yugioh" as any}
                       showFounderEmblem={showFounderEmblem}
                       labelStyle={labelStyle}
                       className="w-full"
@@ -5472,11 +5567,11 @@ export function YugiohCardDetails() {
           {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
           {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
-            const categoryScores = gradingScale["Category Scores"] || card.ai_grading?.category_scores;
+            const categoryScores = (gradingScale as any)["Category Scores"] || card?.ai_grading?.category_scores;
             return categoryScores && (
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">Category Breakdown Scores</h2>
-                {card.ai_grading?.["Alteration Check"]?.card_is_altered && (
+                {card?.ai_grading?.["Alteration Check"]?.card_is_altered && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
                     ⚠️ Category scores are not applicable for altered cards. See Alteration Check section below for details.
                   </div>
@@ -5524,14 +5619,14 @@ export function YugiohCardDetails() {
                     </div>
                   );
                 })}
-                {gradingScale["Weighted Composite Score"] && (
+                {(gradingScale as any)["Weighted Composite Score"] && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-800">Weighted Composite Score:</span>
-                      <span className={`text-3xl font-bold ${card.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
-                        {card.ai_grading?.["Alteration Check"]?.card_is_altered
+                      <span className={`text-3xl font-bold ${card?.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
+                        {card?.ai_grading?.["Alteration Check"]?.card_is_altered
                           ? 'NA'
-                          : safeToFixed(gradingScale["Weighted Composite Score"], 2)}
+                          : safeToFixed((gradingScale as any)["Weighted Composite Score"], 2)}
                       </span>
                     </div>
                   </div>
@@ -5542,36 +5637,36 @@ export function YugiohCardDetails() {
           })()}
 
           {/* 4. DCM Confidence and Image Quality */}
-          {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
+          {(card?.ai_grading?.["AI Confidence Assessment"] || card?.ai_grading?.["Image Conditions"]) && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* DCM Confidence Section */}
-                {card.ai_grading?.["AI Confidence Assessment"] && (
+                {card?.ai_grading?.["AI Confidence Assessment"] && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">DCM Confidence</h3>
                     <div className="space-y-3">
                       <div>
                         <span className="font-semibold text-gray-600">Confidence Tier:</span>
                         <span className={`ml-2 capitalize font-bold ${
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'medium' ? 'text-blue-600' :
+                          card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"] === 'high' ? 'text-green-600' :
+                          card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"] === 'medium' ? 'text-blue-600' :
                           'text-yellow-600'
                         }`}>
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Tier"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Tier"])}
                         </span>
                       </div>
                       <div>
                         <span className="font-semibold text-gray-600">Confidence Letter Grade:</span>
                         <span className="ml-2 font-bold text-lg text-blue-600">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Letter Grade"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Confidence Letter Grade"])}
                         </span>
                       </div>
                       <div>
                         <span className="font-semibold text-gray-600">Grade Uncertainty:</span>
                         <span className="ml-2 font-semibold">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Grade Uncertainty"])}
+                          {renderValue(card?.ai_grading?.["AI Confidence Assessment"]?.["Grade Uncertainty"])}
                         </span>
                       </div>
                     </div>
@@ -5579,21 +5674,21 @@ export function YugiohCardDetails() {
                 )}
 
                 {/* Image Quality Section */}
-                {card.ai_grading?.["Image Conditions"] && (
+                {card?.ai_grading?.["Image Conditions"] && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Image Quality</h3>
 
                     {/* Overall Quality Score */}
-                    {card.ai_grading["Image Conditions"]["Overall Quality Score"] && (
+                    {card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"] && (
                       <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-gray-700">Overall Score:</span>
                           <span className={`text-2xl font-bold ${
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 7 ? 'text-green-600' :
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 5 ? 'text-blue-600' :
+                            Number(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"]) >= 7 ? 'text-green-600' :
+                            Number(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"]) >= 5 ? 'text-blue-600' :
                             'text-yellow-600'
                           }`}>
-                            {renderValue(card.ai_grading["Image Conditions"]["Overall Quality Score"])}/10
+                            {renderValue(card?.ai_grading?.["Image Conditions"]?.["Overall Quality Score"])}/10
                           </span>
                         </div>
                       </div>
@@ -5603,50 +5698,50 @@ export function YugiohCardDetails() {
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Resolution:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'high' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'standard' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Resolution"] === 'high' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Resolution"] === 'standard' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Resolution"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Resolution"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Lighting:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'even' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'adequate' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Lighting"] === 'even' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Lighting"] === 'adequate' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Lighting"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Lighting"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Clarity:</span>
                         <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'sharp' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'moderate' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Clarity"] === 'sharp' ? 'text-green-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Clarity"] === 'moderate' ? 'text-blue-600' :
                           'text-red-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Clarity"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Clarity"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Glare:</span>
                         <span className={`${
-                          card.ai_grading["Image Conditions"]["Glare Present"] === 'Yes' ? 'text-red-600 font-semibold' :
+                          card?.ai_grading?.["Image Conditions"]?.["Glare Present"] === 'Yes' ? 'text-red-600 font-semibold' :
                           'text-green-600 font-semibold'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Glare Present"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Glare Present"])}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-600">Quality Tier:</span>
                         <span className={`capitalize font-semibold ${
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'medium' ? 'text-blue-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Quality Tier"] === 'high' ? 'text-green-600' :
+                          card?.ai_grading?.["Image Conditions"]?.["Quality Tier"] === 'medium' ? 'text-blue-600' :
                           'text-yellow-600'
                         }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Quality Tier"])}
+                          {renderValue(card?.ai_grading?.["Image Conditions"]?.["Quality Tier"])}
                         </span>
                       </div>
                     </div>
@@ -5655,35 +5750,35 @@ export function YugiohCardDetails() {
               </div>
 
               {/* Additional Info Sections */}
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"] && (
+              {card?.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"] && (
                 <div className="mt-6 bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Grading Reliability: </span>
-                    {card.ai_grading["AI Confidence Assessment"]["Grading Reliability"]}
+                    {card?.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"]}
                   </p>
                 </div>
               )}
 
-              {card.ai_grading?.["Image Conditions"]?.["Impact on Grading"] && (
+              {card?.ai_grading?.["Image Conditions"]?.["Impact on Grading"] && (
                 <div className="mt-4 bg-blue-50 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Impact on Grading: </span>
-                    {card.ai_grading["Image Conditions"]["Impact on Grading"]}
+                    {card?.ai_grading?.["Image Conditions"]?.["Impact on Grading"]}
                   </p>
                 </div>
               )}
 
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] && (
+              {card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] && (
                 <div className="mt-4 bg-yellow-50 rounded-lg p-4">
                   <h3 className="font-semibold text-gray-800 mb-2">Recommendations</h3>
-                  {Array.isArray(card.ai_grading["AI Confidence Assessment"]["Recommendations"]) ? (
+                  {Array.isArray(card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"]) ? (
                     <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                      {card.ai_grading["AI Confidence Assessment"]["Recommendations"].map((rec: string, idx: number) => (
+                      {(card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] as string[]).map((rec: string, idx: number) => (
                         <li key={idx}>{rec}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-700">{card.ai_grading["AI Confidence Assessment"]["Recommendations"]}</p>
+                    <p className="text-sm text-gray-700">{card?.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"]}</p>
                   )}
                 </div>
               )}
@@ -5691,45 +5786,45 @@ export function YugiohCardDetails() {
           )}
 
           {/* 4. Card Detection Assessment */}
-          {card.ai_grading?.["Card Detection Assessment"] && (
+          {card?.ai_grading?.["Card Detection Assessment"] && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Detection Assessment</h2>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <div>
                     <span className="font-semibold text-gray-600">Detection Confidence:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Confidence"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Confidence"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Aspect Ratio:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detected Aspect Ratio"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detected Aspect Ratio"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Aspect Ratio Validation:</span>
-                    <span className={`ml-2 ${card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"] === "Pass" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}`}>
-                      {renderValue(card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"])}
+                    <span className={`ml-2 ${card?.ai_grading?.["Card Detection Assessment"]?.["Aspect Ratio Validation"] === "Pass" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}`}>
+                      {renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Aspect Ratio Validation"])}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div>
                     <span className="font-semibold text-gray-600">Boundary Quality:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Card Boundary Quality"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Card Boundary Quality"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Detection Factors:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Factors"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Factors"])}</span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-600">Impact on Grading:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Impact on Grading"])}</span>
+                    <span className="ml-2">{renderValue(card?.ai_grading?.["Card Detection Assessment"]?.["Detection Impact on Grading"])}</span>
                   </div>
                 </div>
               </div>
-              {card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"] && (
+              {card?.ai_grading?.["Card Detection Assessment"]?.["Fallback Methods Used"] && (
                 <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                   <span className="font-semibold text-yellow-800">Fallback Methods Used:</span>
-                  <span className="ml-2 text-yellow-700">{card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"]}</span>
+                  <span className="ml-2 text-yellow-700">{card?.ai_grading?.["Card Detection Assessment"]?.["Fallback Methods Used"]}</span>
                 </div>
               )}
             </div>
@@ -5737,7 +5832,7 @@ export function YugiohCardDetails() {
 
           {/* 5. Professional Grading Company Estimates - REMOVED OLD SECTION */}
           {/* v2.2 REVISED: Execution Control & Fatal Flags */}
-          {card.ai_grading?.["Execution Control"] && (
+          {card?.ai_grading?.["Execution Control"] && (
             <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -5750,7 +5845,7 @@ export function YugiohCardDetails() {
               <div className="p-4 bg-white space-y-3">
                 {/* All Steps Completed */}
                 <div className="flex items-center gap-2">
-                  {card.ai_grading["Execution Control"].all_steps_completed ? (
+                  {card?.ai_grading?.["Execution Control"]?.all_steps_completed ? (
                     <>
                       <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -5768,11 +5863,11 @@ export function YugiohCardDetails() {
                 </div>
 
                 {/* Skipped Steps Warning */}
-                {card.ai_grading["Execution Control"].skipped_steps && card.ai_grading["Execution Control"].skipped_steps.length > 0 && (
+                {card?.ai_grading?.["Execution Control"]?.skipped_steps && (card?.ai_grading?.["Execution Control"]?.skipped_steps?.length ?? 0) > 0 && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
                     <div className="text-sm font-medium text-yellow-800 mb-1">⚠️ Skipped Steps:</div>
                     <ul className="text-sm text-yellow-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].skipped_steps.map((step, idx) => (
+                      {card?.ai_grading?.["Execution Control"]?.skipped_steps?.map((step, idx) => (
                         <li key={idx}>{step}</li>
                       ))}
                     </ul>
@@ -5780,11 +5875,11 @@ export function YugiohCardDetails() {
                 )}
 
                 {/* Fatal Flags Alert */}
-                {card.ai_grading["Execution Control"].fatal_flags && card.ai_grading["Execution Control"].fatal_flags.length > 0 && (
+                {card?.ai_grading?.["Execution Control"]?.fatal_flags && (card?.ai_grading?.["Execution Control"]?.fatal_flags?.length ?? 0) > 0 && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded">
                     <div className="text-sm font-medium text-red-800 mb-1">🚨 Critical Issues Detected:</div>
                     <ul className="text-sm text-red-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].fatal_flags.map((flag, idx) => (
+                      {card?.ai_grading?.["Execution Control"]?.fatal_flags?.map((flag, idx) => (
                         <li key={idx}>{flag}</li>
                       ))}
                     </ul>
@@ -5798,62 +5893,62 @@ export function YugiohCardDetails() {
 
           {/* Delete Card Section */}
           {/* 7. Front/Back Specific Feedback (Parallel Processing v2.3) */}
-          {(card.ai_grading?.front_specific_feedback || card.ai_grading?.back_specific_feedback) && (
+          {(card?.ai_grading?.front_specific_feedback || card?.ai_grading?.back_specific_feedback) && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">📊 Front/Back Analysis</h2>
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Front Analysis */}
-                {card.ai_grading.front_specific_feedback && (
+                {card?.ai_grading?.front_specific_feedback && (
                   <div className="bg-blue-50 rounded-lg p-4">
                     <h3 className="font-semibold text-blue-900 mb-3">
                       Front Condition
                     </h3>
                     <p className="text-sm text-blue-800 mb-3">
-                      {card.ai_grading.front_specific_feedback.overall_front_condition || 'Analysis complete'}
+                      {card?.ai_grading?.front_specific_feedback?.overall_front_condition || 'Analysis complete'}
                     </p>
                     <div className="text-xs text-blue-700 space-y-1">
-                      {card.ai_grading.front_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.front_specific_feedback.corner_status}</div>
+                      {card?.ai_grading?.front_specific_feedback?.corner_status && (
+                        <div><strong>Corners:</strong> {card?.ai_grading?.front_specific_feedback?.corner_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.front_specific_feedback.edge_status}</div>
+                      {card?.ai_grading?.front_specific_feedback?.edge_status && (
+                        <div><strong>Edges:</strong> {card?.ai_grading?.front_specific_feedback?.edge_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.front_specific_feedback.surface_status}</div>
+                      {card?.ai_grading?.front_specific_feedback?.surface_status && (
+                        <div><strong>Surface:</strong> {card?.ai_grading?.front_specific_feedback?.surface_status}</div>
                       )}
-                      {card.ai_grading.front_specific_feedback.centering_lr && card.ai_grading.front_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.front_specific_feedback.centering_lr} L/R, {card.ai_grading.front_specific_feedback.centering_tb} T/B</div>
+                      {card?.ai_grading?.front_specific_feedback?.centering_lr && card?.ai_grading?.front_specific_feedback?.centering_tb && (
+                        <div><strong>Centering:</strong> {card?.ai_grading?.front_specific_feedback?.centering_lr} L/R, {card?.ai_grading?.front_specific_feedback?.centering_tb} T/B</div>
                       )}
                     </div>
                   </div>
                 )}
 
                 {/* Back Analysis */}
-                {card.ai_grading.back_specific_feedback && (
+                {card?.ai_grading?.back_specific_feedback && (
                   <div className="bg-green-50 rounded-lg p-4">
                     <h3 className="font-semibold text-green-900 mb-3">
                       Back Condition
                     </h3>
                     <p className="text-sm text-green-800 mb-3">
-                      {card.ai_grading.back_specific_feedback.overall_back_condition || 'Analysis complete'}
+                      {card?.ai_grading?.back_specific_feedback?.overall_back_condition || 'Analysis complete'}
                     </p>
                     <div className="text-xs text-green-700 space-y-1">
-                      {card.ai_grading.back_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.back_specific_feedback.corner_status}</div>
+                      {card?.ai_grading?.back_specific_feedback?.corner_status && (
+                        <div><strong>Corners:</strong> {card?.ai_grading?.back_specific_feedback?.corner_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.back_specific_feedback.edge_status}</div>
+                      {card?.ai_grading?.back_specific_feedback?.edge_status && (
+                        <div><strong>Edges:</strong> {card?.ai_grading?.back_specific_feedback?.edge_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.back_specific_feedback.surface_status}</div>
+                      {card?.ai_grading?.back_specific_feedback?.surface_status && (
+                        <div><strong>Surface:</strong> {card?.ai_grading?.back_specific_feedback?.surface_status}</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.centering_lr && card.ai_grading.back_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.back_specific_feedback.centering_lr} L/R, {card.ai_grading.back_specific_feedback.centering_tb} T/B</div>
+                      {card?.ai_grading?.back_specific_feedback?.centering_lr && card?.ai_grading?.back_specific_feedback?.centering_tb && (
+                        <div><strong>Centering:</strong> {card?.ai_grading?.back_specific_feedback?.centering_lr} L/R, {card?.ai_grading?.back_specific_feedback?.centering_tb} T/B</div>
                       )}
-                      {card.ai_grading.back_specific_feedback.authentication_status && (
+                      {card?.ai_grading?.back_specific_feedback?.authentication_status && (
                         <div className="font-semibold mt-2 pt-2 border-t border-green-200">
-                          {card.ai_grading.back_specific_feedback.authentication_status}
+                          {card?.ai_grading?.back_specific_feedback?.authentication_status}
                         </div>
                       )}
                     </div>
@@ -5864,7 +5959,7 @@ export function YugiohCardDetails() {
           )}
 
           {/* 8. Text Transcription (OCR) - Parallel Processing v2.3 */}
-          {card.ai_grading?.text_transcription_summary && (
+          {card?.ai_grading?.text_transcription_summary && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Text (OCR)</h2>
               <p className="text-xs text-gray-500 mb-4 italic">
@@ -5873,11 +5968,11 @@ export function YugiohCardDetails() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Front Text */}
-                {card.ai_grading.text_transcription_summary.front_key_text && card.ai_grading.text_transcription_summary.front_key_text.length > 0 && (
+                {card?.ai_grading?.text_transcription_summary?.front_key_text && (card?.ai_grading?.text_transcription_summary?.front_key_text?.length ?? 0) > 0 && (
                   <div className="border-l-4 border-blue-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Front Text ({card.ai_grading.text_transcription_summary.front_text_count || 0} items)</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Front Text ({card?.ai_grading?.text_transcription_summary?.front_text_count || 0} items)</h3>
                     <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.front_key_text.map((text: string, i: number) => (
+                      {card?.ai_grading?.text_transcription_summary?.front_key_text?.map((text: string, i: number) => (
                         <li key={i} className="flex items-start">
                           <span className="text-blue-500 mr-2">•</span>
                           <span>{text}</span>
@@ -5888,11 +5983,11 @@ export function YugiohCardDetails() {
                 )}
 
                 {/* Back Text */}
-                {card.ai_grading.text_transcription_summary.back_key_text && card.ai_grading.text_transcription_summary.back_key_text.length > 0 && (
+                {card?.ai_grading?.text_transcription_summary?.back_key_text && (card?.ai_grading?.text_transcription_summary?.back_key_text?.length ?? 0) > 0 && (
                   <div className="border-l-4 border-green-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Back Text ({card.ai_grading.text_transcription_summary.back_text_count || 0} items)</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Back Text ({card?.ai_grading?.text_transcription_summary?.back_text_count || 0} items)</h3>
                     <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.back_key_text.map((text: string, i: number) => (
+                      {card?.ai_grading?.text_transcription_summary?.back_key_text?.map((text: string, i: number) => (
                         <li key={i} className="flex items-start">
                           <span className="text-green-500 mr-2">•</span>
                           <span>{text}</span>
@@ -5903,13 +5998,13 @@ export function YugiohCardDetails() {
                 )}
               </div>
 
-              {card.ai_grading.text_transcription_summary.transcription_confidence && (
+              {card?.ai_grading?.text_transcription_summary?.transcription_confidence && (
                 <div className="mt-4 text-xs text-gray-500 text-center">
                   Transcription Confidence: <span className={`font-semibold ${
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'high' ? 'text-green-600' :
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'medium' ? 'text-yellow-600' :
+                    card?.ai_grading?.text_transcription_summary?.transcription_confidence === 'high' ? 'text-green-600' :
+                    card?.ai_grading?.text_transcription_summary?.transcription_confidence === 'medium' ? 'text-yellow-600' :
                     'text-red-600'
-                  }`}>{card.ai_grading.text_transcription_summary.transcription_confidence.toUpperCase()}</span>
+                  }`}>{card?.ai_grading?.text_transcription_summary?.transcription_confidence?.toUpperCase()}</span>
                 </div>
               )}
             </div>
