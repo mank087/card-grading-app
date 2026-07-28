@@ -45,9 +45,11 @@ export interface ViewportGuideContext {
   /** CSS pixel size of the video element (object-cover, fills the viewport). */
   viewW: number;
   viewH: number;
-  /** CSS pixel size of the guide box, centered in the viewport. */
+  /** CSS pixel size of the guide box. */
   guideW: number;
   guideH: number;
+  /** Guide center's vertical offset from the viewport center (CSS px, negative = up). */
+  guideCenterOffsetY: number;
   /** Pixel dimensions of the preview stream. */
   streamW: number;
   streamH: number;
@@ -70,16 +72,17 @@ function computeViewportCropRect(
   ctx: ViewportGuideContext,
   paddingPercent: number
 ): { cropX: number; cropY: number; cropW: number; cropH: number } {
-  const { viewW, viewH, guideW, guideH, streamW, streamH, streamTransform } = ctx;
+  const { viewW, viewH, guideW, guideH, guideCenterOffsetY, streamW, streamH, streamTransform } = ctx;
 
   // object-cover: scale to cover, center the overflow
   const coverScale = Math.max(viewW / streamW, viewH / streamH);
   const dispX = (viewW - streamW * coverScale) / 2; // <= 0
   const dispY = (viewH - streamH * coverScale) / 2; // <= 0
 
-  // Guide box is centered in the viewport
+  // Guide box: centered horizontally; vertically centered in the available
+  // region between header and controls (same offset the overlay renders with)
   const guideX = (viewW - guideW) / 2;
-  const guideY = (viewH - guideH) / 2;
+  const guideY = (viewH - guideH) / 2 + guideCenterOffsetY;
 
   // Viewport -> stream coordinates
   const sX = (guideX - dispX) / coverScale;

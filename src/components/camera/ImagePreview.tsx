@@ -29,24 +29,29 @@ export default function ImagePreview({
         </h2>
       </div>
 
-      {/* Image Preview */}
-      <div className="flex-1 relative overflow-hidden bg-gray-900">
-        <div className="absolute inset-0 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-md" style={{ aspectRatio: '2.5 / 3.5' }}>
-            <Image
-              src={imageUrl}
-              alt={`${side} of card`}
-              fill
-              className="object-contain rounded-lg"
-              priority
-            />
-          </div>
+      {/* Image Preview — object-contain fills whatever space the quality
+          panel and buttons leave, so the card is NEVER clipped. The previous
+          wrapper derived its height from its WIDTH (fixed 2.5/3.5 aspect box):
+          on phone-height viewports the box wanted ~550px while the flex area
+          had ~200px, and overflow-hidden cut the card off top and bottom. It
+          also forced landscape captures into a portrait frame. min-h-0 lets
+          the flex item actually shrink. */}
+      <div className="flex-1 min-h-0 relative bg-gray-900">
+        <div className="absolute inset-3">
+          <Image
+            src={imageUrl}
+            alt={`${side} of card`}
+            fill
+            className="object-contain rounded-lg"
+            priority
+          />
         </div>
       </div>
 
-      {/* Quality Validation Feedback */}
+      {/* Quality Validation Feedback — height-capped and scrollable so a long
+          suggestion list squeezes the panel, not the card image above it. */}
       {qualityValidation && (
-        <div className="px-4 py-3 bg-gray-800">
+        <div className="px-4 py-3 bg-gray-800 max-h-[38vh] overflow-y-auto">
           <div className={`rounded-lg p-3 ${
             qualityValidation.isValid
               ? 'bg-green-900/50 border border-green-500'

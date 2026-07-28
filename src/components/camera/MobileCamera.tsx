@@ -6,7 +6,7 @@ import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality } from '@/utils/imageQuality';
 import { cropCanvasToGuideFrame, canvasToJpegFile } from '@/utils/guideCrop';
-import { computeGuideSizePx } from '@/utils/cameraGuideGeometry';
+import { computeGuideLayoutPx } from '@/utils/cameraGuideGeometry';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
@@ -117,17 +117,19 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         const videoEl = videoRef.current;
         const rect = videoEl?.getBoundingClientRect();
         const viewContext = rect && rect.width > 0 && rect.height > 0
-          ? {
-              viewW: rect.width,
-              viewH: rect.height,
-              ...(() => {
-                const g = computeGuideSizePx(rect.width, rect.height, orientation);
-                return { guideW: g.width, guideH: g.height };
-              })(),
-              streamW: captured.streamSize.width,
-              streamH: captured.streamSize.height,
-              streamTransform: captured.streamTransform,
-            }
+          ? (() => {
+              const g = computeGuideLayoutPx(rect.width, rect.height, orientation);
+              return {
+                viewW: rect.width,
+                viewH: rect.height,
+                guideW: g.width,
+                guideH: g.height,
+                guideCenterOffsetY: g.centerOffsetY,
+                streamW: captured.streamSize.width,
+                streamH: captured.streamSize.height,
+                streamTransform: captured.streamTransform,
+              };
+            })()
           : undefined;
 
         const cropResult = await cropCanvasToGuideFrame(captured.canvas, {
@@ -281,7 +283,6 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         <CameraGuideOverlay
           side={side}
           orientation={orientation}
-          onToggleOrientation={toggleOrientation}
         />
       </div>
 
@@ -306,6 +307,22 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             <span className="font-semibold text-sm">{side === 'front' ? 'Front' : 'Back'}</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={toggleOrientation}
+              className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+              title={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} guide`}
+              aria-label={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} guide`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`w-5 h-5 transition-transform duration-300 ${orientation === 'landscape' ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <rect x="7" y="4" width="10" height="16" rx="2" strokeWidth="2" />
+              </svg>
+            </button>
             {torchSupported && (
               <button
                 onClick={toggleTorch}
@@ -337,18 +354,21 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         </div>
       </div>
 
+      {/* Low-resolution stream warning — rendered under the HEADER, not in the
+          bottom stack, so it never collides with the guide, tips, or shutter.
+          The fallback constraint ladder can silently negotiate 1080p or worse;
+          card crops from those streams sit at or below the 1000px grading
+          minimum. Warn BEFORE the shutter. */}
+      {streamResolution && Math.max(streamResolution.width, streamResolution.height) < 1920 && (
+        <div className="absolute left-0 right-0 z-20 flex justify-center px-4" style={{ top: '52px' }}>
+          <div className="bg-amber-500/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded-lg text-xs font-medium text-center max-w-sm">
+            ⚠️ Camera opened at low resolution ({streamResolution.width}×{streamResolution.height}). Photos may be too small to grade — try the gallery upload with your phone&apos;s camera app instead.
+          </div>
+        </div>
+      )}
+
       {/* Overlaid Capture Controls - bottom, compact design */}
       <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-4">
-        {/* Low-resolution stream warning — the fallback constraint ladder can
-            silently negotiate 1080p or worse; card crops from those streams sit
-            at or below the 1000px grading minimum. Warn BEFORE the shutter. */}
-        {streamResolution && Math.max(streamResolution.width, streamResolution.height) < 1920 && (
-          <div className="flex justify-center mb-2 px-4">
-            <div className="bg-amber-500/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded-full text-xs font-medium text-center">
-              ⚠️ Camera opened at low resolution ({streamResolution.width}×{streamResolution.height}). Photos may be too small to grade — try the gallery upload with your phone&apos;s camera app instead.
-            </div>
-          </div>
-        )}
         {/* Tips row - compact */}
         <div className="flex justify-center gap-1.5 mb-3 px-2">
           <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">

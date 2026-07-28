@@ -1,27 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { computeGuideSizePx } from '@/utils/cameraGuideGeometry';
+import { computeGuideLayoutPx } from '@/utils/cameraGuideGeometry';
 
 interface CameraGuideOverlayProps {
   side: 'front' | 'back';
   orientation?: 'portrait' | 'landscape';
-  onToggleOrientation?: () => void;
 }
 
 export default function CameraGuideOverlay({
   side,
   orientation = 'portrait',
-  onToggleOrientation,
 }: CameraGuideOverlayProps) {
-  // Guide dimensions come from the shared geometry util so the capture crop
-  // uses the exact same rectangle the user framed against.
-  const [guideDimensions, setGuideDimensions] = useState({ width: '96%', height: 'auto' });
+  // Guide layout comes from the shared geometry util so the capture crop uses
+  // the exact same rectangle (size AND vertical position) the user framed
+  // against. centerOffsetY keeps the guide centered between the header and
+  // the bottom controls instead of the full viewport — previously it sat low
+  // enough to collide with the tips row and capture button on short screens.
+  const [guideLayout, setGuideLayout] = useState({ width: 0, height: 0, centerOffsetY: 0 });
 
   useEffect(() => {
     const calculateOptimalSize = () => {
-      const { width, height } = computeGuideSizePx(window.innerWidth, window.innerHeight, orientation);
-      setGuideDimensions({ width: `${width}px`, height: `${height}px` });
+      setGuideLayout(computeGuideLayoutPx(window.innerWidth, window.innerHeight, orientation));
     };
 
     calculateOptimalSize();
@@ -29,15 +29,18 @@ export default function CameraGuideOverlay({
     return () => window.removeEventListener('resize', calculateOptimalSize);
   }, [orientation]);
 
+  if (!guideLayout.width) return null;
+
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Card outline guide - centered, maximized to fill available space */}
+      {/* Card outline guide - centered in the available region */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div
           className="relative border-4 border-white/90 rounded-xl shadow-[0_0_30px_rgba(255,255,255,0.4)]"
           style={{
-            width: guideDimensions.width,
-            height: guideDimensions.height,
+            width: `${guideLayout.width}px`,
+            height: `${guideLayout.height}px`,
+            transform: `translateY(${guideLayout.centerOffsetY}px)`,
           }}
         >
           {/* Corner markers - larger for visibility */}
@@ -46,46 +49,18 @@ export default function CameraGuideOverlay({
           <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-xl" />
           <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-xl" />
 
-          {/* Subtle center indicator */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="bg-black/40 backdrop-blur-sm text-white/80 px-4 py-1.5 rounded-full">
-              <p className="text-sm font-medium text-center">
-                {side === 'front' ? 'FRONT' : 'BACK'}
-              </p>
-            </div>
-          </div>
-
-          {/* Fill frame tip inside the guide */}
-          <div className="absolute bottom-3 left-0 right-0 flex justify-center">
-            <div className="bg-black/50 backdrop-blur-sm text-white/90 px-3 py-1 rounded-full">
-              <span className="text-xs font-medium">Fill card to edges</span>
+          {/* Single label ABOVE the guide — nothing overlays the card itself.
+              (The old center FRONT/BACK pill and the in-guide "Fill card to
+              edges" pill both sat on top of the card being framed.) */}
+          <div className="absolute -top-9 left-0 right-0 flex justify-center">
+            <div className="bg-black/50 backdrop-blur-sm text-white/90 px-3 py-1 rounded-full whitespace-nowrap">
+              <span className="text-xs font-semibold tracking-wide">
+                {side === 'front' ? 'FRONT' : 'BACK'} · fill card to edges
+              </span>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Orientation toggle button - positioned to not overlap with header */}
-      {onToggleOrientation && (
-        <div className="absolute top-16 right-4 pointer-events-auto">
-          <button
-            onClick={onToggleOrientation}
-            className="bg-black/60 backdrop-blur-sm text-white p-3 rounded-full shadow-lg active:scale-95 transition-transform"
-            aria-label={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} mode`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`w-6 h-6 transition-transform duration-300 ${
-                orientation === 'landscape' ? 'rotate-90' : ''
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <rect x="5" y="3" width="14" height="18" rx="2" strokeWidth="2" />
-            </svg>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

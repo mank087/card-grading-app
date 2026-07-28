@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform, ScrollView, useWindowDimensions } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -52,6 +52,7 @@ export default function CaptureScreen() {
 
   // Preview state
   const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -369,6 +370,18 @@ export default function CaptureScreen() {
   // Preview mode
   if (previewUri && previewQuality) {
     const isFront = currentSide === 'front'
+    // Match the preview frame to the CAPTURED image's real aspect (the old
+    // hardcoded 0.714 squashed landscape captures into a portrait box) and
+    // cap its height so the full card + quality details fit the first screen
+    // on shorter phones instead of the card's bottom hiding below the fold.
+    const previewCompressed = isFront ? frontCompressed : backCompressed
+    const previewAspect = previewCompressed && previewCompressed.width > 0 && previewCompressed.height > 0
+      ? previewCompressed.width / previewCompressed.height
+      : 0.714
+    const previewImageStyle = {
+      aspectRatio: previewAspect,
+      maxHeight: Math.round(windowHeight * 0.48),
+    }
     return (
       <View style={styles.container}>
         <View style={[styles.previewHeader, { paddingTop: insets.top + 8 }]}>
@@ -389,7 +402,7 @@ export default function CaptureScreen() {
             footer that can never be clipped. */}
         <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
           <View style={styles.previewImageContainer}>
-            <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="contain" />
+            <Image source={{ uri: previewUri }} style={[styles.previewImage, previewImageStyle]} resizeMode="contain" />
           </View>
 
           <View style={styles.qualityDetails}>
@@ -706,7 +719,9 @@ const styles = StyleSheet.create({
   // Guide (absolute overlay on camera)
   guideContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   guide: { width: '70%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 4, position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
-  guideLabel: { position: 'absolute', alignSelf: 'center', top: '45%', color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', letterSpacing: 3, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  // Label sits ABOVE the guide box, not on the card the user is framing —
+  // the old top:'45%' put "FRONT"/"BACK" across the middle of the card.
+  guideLabel: { position: 'absolute', alignSelf: 'center', top: -30, color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '700', letterSpacing: 3, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   corner: { position: 'absolute', width: 24, height: 24, borderColor: Colors.white },
   cornerTL: { top: -1, left: -1, borderTopWidth: 3, borderLeftWidth: 3 },
   cornerTR: { top: -1, right: -1, borderTopWidth: 3, borderRightWidth: 3 },
