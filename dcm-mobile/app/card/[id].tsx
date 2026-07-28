@@ -1268,7 +1268,7 @@ export default function CardDetailScreen() {
             condition={card.conversational_condition_label || ''}
             size="lg"
             isBack={activeImage === 'back'}
-            subScores={sub}
+            subScores={sub as any}
             labelStyle={labelStyle}
             colorOverrides={colorOverrides}
             qrUrl={`https://dcmgrading.com/verify/${card.serial}`}

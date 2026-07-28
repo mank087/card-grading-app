@@ -32,6 +32,7 @@ export interface CardInfo {
   serial_number?: string
   rookie_or_first?: boolean | string | null
   rarity_or_variant?: string | null
+  rarity_tier?: string | null
   authentic?: boolean | null
 }
 
@@ -136,6 +137,8 @@ export interface Card {
   conversational_defects_back: SideDefects | null
   conversational_front_summary: string | null
   conversational_back_summary: string | null
+  conversational_final_grade_summary?: string | null
+  conversational_corners_edges_surface?: any | null
 
   // Centering
   conversational_centering: CenteringData | null
@@ -150,6 +153,7 @@ export interface Card {
   slab_detected?: boolean
   slab_company?: string | null
   slab_grade?: string | null
+  slab_cert_number?: string | null
 
   // Pricing
   ebay_price_lowest: number | null
@@ -160,7 +164,12 @@ export interface Card {
   ebay_price_updated_at: string | null
   dcm_price_estimate: number | null
   dcm_price_raw: number | null
+  dcm_price_average?: number | null
   dcm_price_updated_at: string | null
+  dcm_prices_cached_at?: string | null
+  dcm_cached_prices?: any | null
+  dcm_price_match_confidence?: string | null
+  dcm_price_product_name?: string | null
   scryfall_price_usd: number | null
   scryfall_price_usd_foil: number | null
 

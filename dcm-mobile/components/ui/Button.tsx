@@ -36,7 +36,7 @@ export default function Button({
 
   return (
     <TouchableOpacity
-      style={buttonStyle}
+      style={buttonStyle as any}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}

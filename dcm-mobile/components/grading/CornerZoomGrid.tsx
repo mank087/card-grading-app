@@ -32,7 +32,7 @@ export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) 
               {/* Overflow hidden container shows only corner region */}
               <Image
                 source={{ uri: imageUrl }}
-                style={[styles.zoomedImage, { top: corner.offset.top, left: corner.offset.left }]}
+                style={[styles.zoomedImage, { top: corner.offset.top, left: corner.offset.left } as any]}
                 resizeMode="stretch"
               />
             </View>

@@ -1994,7 +1994,7 @@ function ThemeSwatch({ preset, cardColors }: { preset: ColorPreset; cardColors: 
   if (preset.isCardColors && cardColors) {
     return (
       <LinearGradient
-        colors={cardColors.palette.slice(0, 3) as [string, ...string[]]}
+        colors={cardColors.palette.slice(0, 3) as [string, string, ...string[]]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={s.themeSwatch}
       />
@@ -2058,7 +2058,7 @@ function CustomLayoutSwatch({ layoutId, colors }: { layoutId: string; colors: st
   if (layoutId === 'card-extension' && colors.length >= 3) {
     return (
       <LinearGradient
-        colors={colors as [string, ...string[]]}
+        colors={colors as [string, string, ...string[]]}
         start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
         style={s.themeSwatch}
       />

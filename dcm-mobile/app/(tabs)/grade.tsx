@@ -68,7 +68,9 @@ export default function GradeScreen() {
   const handleGallery = () => handleStart('gallery')
 
   // Legacy state — referenced by the gallery button label below; keep at idle.
-  const galleryStep: 'idle' | 'front' | 'back' | 'processing' = 'idle'
+  // Widened via `as` so the const isn't narrowed to 'idle' — the comparisons
+  // below cover the full step union this stub stands in for.
+  const galleryStep = 'idle' as 'idle' | 'front' | 'back' | 'processing'
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

@@ -243,7 +243,7 @@ export default function HelpBot() {
                   </View>
                   {item.buttons && (
                     <View style={styles.btnGrid}>
-                      {item.buttons.map((btn, i) => (
+                      {item.buttons.map((btn: { label: string; action: string }, i: number) => (
                         <TouchableOpacity key={i} style={styles.topicBtn} onPress={() => handleButtonPress(btn.action)} activeOpacity={0.7}>
                           <Text style={styles.topicBtnText}>{btn.label}</Text>
                         </TouchableOpacity>
