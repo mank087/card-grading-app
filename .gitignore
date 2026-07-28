@@ -81,3 +81,6 @@ scripts/export-users.js
 # Scratch / generated reports (not source)
 output/
 public/labels/Screenshot*.png
+
+# Slabby render cache: assets extracted from scene JSON at render time
+slabby/public/lab-assets/

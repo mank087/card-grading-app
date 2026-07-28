@@ -12,6 +12,7 @@
 import http from 'http';
 import { spawn } from 'child_process';
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -21,6 +22,62 @@ const PRESETS = new Set(['shorts', 'square', 'wide', 'overlay']);
 
 let busy = false;
 let counter = 0;
+
+const EXT_FOR = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/webp': 'webp',
+  'image/gif': 'gif', 'image/avif': 'avif', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a',
+  'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/aac': 'aac',
+};
+
+/**
+ * Move every embedded data URL out of the scene and into public/lab-assets/,
+ * rewriting the scene to reference the file instead.
+ *
+ * Two problems this solves:
+ *  1. SPEED — a scene with inline base64 makes the props payload 10-15MB, and
+ *     Remotion re-serialises it for every frame. Renders that should take
+ *     ~2 minutes were estimating 4-6 HOURS. Files are read once, natively.
+ *  2. RELIABILITY — Remotion's data-URL parser rejects MIME parameters such
+ *     as MediaRecorder's `audio/webm;codecs=opus`. Files have no such issue.
+ *
+ * Assets are content-hashed, so re-rendering the same scene reuses them.
+ */
+function externalizeAssets(scene) {
+  const dir = path.join(__dirname, 'public', 'lab-assets');
+  fs.mkdirSync(dir, { recursive: true });
+  let written = 0;
+  let savedBytes = 0;
+
+  const put = (value) => {
+    if (typeof value !== 'string' || !value.startsWith('data:')) return value;
+    const comma = value.indexOf(',');
+    if (comma < 0) return value;
+    const header = value.slice(5, comma);
+    const mime = header.split(';')[0].toLowerCase();
+    const b64 = value.slice(comma + 1);
+    let buf;
+    try { buf = Buffer.from(b64, 'base64'); } catch { return value; }
+    if (!buf.length) return value;
+
+    const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16);
+    const file = `${hash}.${EXT_FOR[mime] || 'bin'}`;
+    const abs = path.join(dir, file);
+    if (!fs.existsSync(abs)) { fs.writeFileSync(abs, buf); written++; }
+    savedBytes += value.length;
+    // Relative to public/ — Remotion resolves it via staticFile().
+    return `lab-assets/${file}`;
+  };
+
+  const beats = scene.beats.map((b) => ({
+    ...b,
+    voiceoverAudio: put(b.voiceoverAudio),
+    backgroundImage: put(b.backgroundImage),
+    ...(b.slabCard ? { slabCard: { ...b.slabCard, image: put(b.slabCard.image) } } : {}),
+    ...(b.detailsPage ? { detailsPage: { ...b.detailsPage, image: put(b.detailsPage.image) } } : {}),
+  }));
+
+  return { scene: { ...scene, beats }, written, savedMb: (savedBytes / 1048576).toFixed(1) };
+}
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -57,11 +114,23 @@ const server = http.createServer((req, res) => {
         const outFile = path.join(__dirname, 'out', `${safeName}-${p}-${stamp}.mp4`);
         fs.mkdirSync(path.join(__dirname, 'scenes'), { recursive: true });
         fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true });
-        fs.writeFileSync(sceneFile, JSON.stringify({ scene }));
+
+        // Pull embedded base64 out to files — see externalizeAssets().
+        const ext = externalizeAssets(scene);
+        if (ext.savedMb > 0.5) {
+          console.log(`[render] externalized ${ext.savedMb}MB of assets (${ext.written} new files)`);
+        }
+        fs.writeFileSync(sceneFile, JSON.stringify({ scene: ext.scene }));
 
         busy = true;
         console.log(`[render] ${safeName} (${p}) starting…`);
-        const args = ['remotion', 'render', 'src/index.ts', `composer-${p}`, outFile, `--props=${sceneFile}`];
+        // --port: Remotion serves its bundle on 3000 by default, which
+        // collides with a running Next dev server and fails with
+        // 'Visited http://localhost:3000/index.html but got no response'.
+        const args = [
+          'remotion', 'render', 'src/index.ts', `composer-${p}`, outFile,
+          `--props=${sceneFile}`, '--port=7788',
+        ];
         if (p === 'overlay') args.push('--codec=vp8', '--image-format=png');
         const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', args, {
           cwd: __dirname,

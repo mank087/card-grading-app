@@ -1,5 +1,6 @@
 import React from 'react';
 import { Img } from 'remotion';
+import { assetSrc } from './assetSrc';
 import { SlabCardData } from './types';
 
 /**
@@ -140,7 +141,7 @@ export const SlabCard: React.FC<{ card: SlabCardData; width: number; logoHref?: 
           background: 'rgba(0,0,0,0.06)',
         }}
       >
-        <Img src={card.image} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <Img src={assetSrc(card.image)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </div>
     </div>
   );

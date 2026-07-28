@@ -1,5 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { assetSrc } from './assetSrc';
 import { SlabbyRig } from './SlabbyRig';
 import { SlabCard } from './SlabCard';
 import { DetailsPageScroll } from './DetailsPageScroll';
@@ -211,7 +212,7 @@ export const ComposerScene: React.FC<ComposerProps> = ({
             <SlabCard card={beat.slabCard} width={Math.min(short * 0.46, (height * 0.5) / 1.9)} logoHref={logoHref} />
           ) : (
             <Img
-              src={beat.backgroundImage!}
+              src={assetSrc(beat.backgroundImage!)}
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',
@@ -427,7 +428,7 @@ export const ComposerScene: React.FC<ComposerProps> = ({
             <React.Fragment key={`audio-${i}`}>
               {b.voiceoverAudio && (
                 <Sequence from={from} durationInFrames={Math.max(frames, Math.round((b.voiceoverDuration || 0) * fps) + 1)}>
-                  <Audio src={b.voiceoverAudio} />
+                  <Audio src={assetSrc(b.voiceoverAudio)} />
                 </Sequence>
               )}
               {sfx && (

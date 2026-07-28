@@ -10,6 +10,8 @@ import {
   MOTIONS,
   SlabbyBeat,
   SlabbyScene,
+  sanitizeDataUrl,
+  sanitizeScene,
 } from '@/lib/slabby/types'
 import { BUILTIN_TEMPLATES } from '@/lib/slabby/templates'
 
@@ -260,11 +262,19 @@ export default function SlabbyLabClient() {
       rec.onstop = async () => {
         stopTracks(rec)
         if (recTimerRef.current) clearInterval(recTimerRef.current)
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        // Drop codec parameters from the MIME type. MediaRecorder yields
+        // 'audio/webm;codecs=opus', and FileReader bakes that straight into
+        // the data URL — but Remotion's parser expects exactly
+        // `data:[mime];base64,…` and reads ';codecs=opus' as the encoding,
+        // failing the render with "did not have the correct format".
+        // The bytes are unchanged; only the label is simplified.
+        const rawType = rec.mimeType || 'audio/webm'
+        const cleanType = rawType.split(';')[0].trim() || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: cleanType })
         if (!blob.size) { setVoError('Nothing was recorded'); return }
         const dataUrl: string = await new Promise((resolve, reject) => {
           const fr = new FileReader()
-          fr.onload = () => resolve(String(fr.result))
+          fr.onload = () => resolve(sanitizeDataUrl(String(fr.result)))
           fr.onerror = () => reject(new Error('Could not read the recording'))
           fr.readAsDataURL(blob)
         })
@@ -414,7 +424,9 @@ export default function SlabbyLabClient() {
       const file = await fetch(json.url).then((r) => r.json())
       const loaded = file.scene || file
       if (!loaded?.beats?.length) throw new Error('Draft file is not a valid scene')
-      setScene(loaded)
+      // Repair any data URLs carrying MIME parameters (older recordings saved
+      // as `audio/webm;codecs=opus`, which fails the render).
+      setScene(sanitizeScene(loaded))
       setSelectedBeat(0)
     } catch (e: any) {
       setDraftError(e.message)

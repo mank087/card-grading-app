@@ -92,6 +92,41 @@ export const DEFAULT_BEAT: SlabbyBeat = {
   gradeLabel: 'GEM MINT',
 };
 
+/**
+ * Strip MIME parameters from a data URL so Remotion can parse it.
+ *
+ * MediaRecorder produces `data:audio/webm;codecs=opus;base64,…`. Remotion
+ * expects exactly `data:[mime];[encoding],[data]` and reads `;codecs=opus`
+ * as the encoding, so the render dies with "A data URL was passed but did
+ * not have the correct format". Only the label changes — the bytes and the
+ * container are untouched, and Chrome still decodes it.
+ */
+export function sanitizeDataUrl<T extends string | undefined | null>(url: T): T {
+  if (typeof url !== 'string' || !url.startsWith('data:')) return url;
+  const comma = url.indexOf(',');
+  if (comma < 0) return url;
+  const header = url.slice(5, comma);
+  const parts = header.split(';');
+  const mime = parts[0];
+  const encoding = parts[parts.length - 1];
+  const clean = encoding && encoding !== mime ? `${mime};${encoding}` : mime;
+  return (`data:${clean},${url.slice(comma + 1)}`) as T;
+}
+
+/** Repair every embedded asset in a scene (safe to run repeatedly). */
+export function sanitizeScene(scene: SlabbyScene): SlabbyScene {
+  return {
+    ...scene,
+    beats: scene.beats.map((b) => ({
+      ...b,
+      voiceoverAudio: sanitizeDataUrl(b.voiceoverAudio),
+      backgroundImage: sanitizeDataUrl(b.backgroundImage),
+      ...(b.slabCard ? { slabCard: { ...b.slabCard, image: sanitizeDataUrl(b.slabCard.image) } } : {}),
+      ...(b.detailsPage ? { detailsPage: { ...b.detailsPage, image: sanitizeDataUrl(b.detailsPage.image) } } : {}),
+    })),
+  };
+}
+
 export const EXPRESSIONS: SlabbyExpression[] = ['happy', 'excited', 'shocked', 'thinking', 'sad', 'wink'];
 export const MOTIONS: SlabbyMotion[] = ['enter', 'idle', 'wave', 'jump', 'shake', 'celebrate', 'point'];
 export const BG_ANIMATIONS: BgAnimation[] = ['fade', 'slide-left', 'slide-right', 'pop', 'static'];
