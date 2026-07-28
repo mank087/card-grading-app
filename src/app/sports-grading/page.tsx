@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
 import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
+import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
 import EbayListingMonitor from '@/components/EbayListingMonitor'
 import { SPORTS_CATEGORIES_PARAM, sumSportsGraded } from '@/lib/sportsCategories'
 
@@ -1518,6 +1519,21 @@ export default function SportsGradingLanding() {
         .animate-float-medium { animation: float-medium 5s ease-in-out infinite; }
         .animate-float-fast { animation: float-fast 4s ease-in-out infinite; }
       `}</style>
+
+      {/* Spacer so the floating bar never covers the final CTA */}
+      {!user && <div className="h-16" />}
+
+      <FloatingCtaBar
+        isAuthenticated={!!user}
+        accent="emerald"
+        source="sports_landing"
+        messages={[
+          '2 free grades + bonus credits',
+          'Know which rookies are worth submitting',
+          'Parallels verified against 2,951 sets',
+          'From $0.50/card — credits never expire',
+        ]}
+      />
     </main>
   )
 }
