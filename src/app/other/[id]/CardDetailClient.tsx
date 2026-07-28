@@ -10,6 +10,7 @@ declare global {
 }
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import SectionDefects from '@/components/reports/SectionDefects';
 import Link from "next/link";
 import Script from "next/script";
 import { QRCodeCanvas } from 'qrcode.react';
