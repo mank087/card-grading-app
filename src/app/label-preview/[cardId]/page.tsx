@@ -37,6 +37,7 @@ import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenera
 import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '@/lib/foldableLabelGenerator';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
+import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 
 declare global {
   interface Window {
@@ -158,14 +159,10 @@ export default function LabelPreviewPage() {
             .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
             .single();
           if (creditsRow) {
-            const selected: string[] = (creditsRow.preferred_label_emblem || '')
-              .split(',').map((s: string) => s.trim()).filter(Boolean);
-            // No preference = show all owned badges (matches web Label Studio,
-            // LabelStudioClient.tsx emblem defaults).
-            const wantsAll = selected.length === 0;
-            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && (wantsAll || selected.includes('founder'));
-            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && (wantsAll || selected.includes('vip'));
-            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && (wantsAll || selected.includes('card_lover'));
+            const emblems = resolveEmblemVisibility(creditsRow);
+            showFounderEmblem = emblems.showFounderEmblem;
+            showVipEmblem = emblems.showVipEmblem;
+            showCardLoversEmblem = emblems.showCardLoversEmblem;
           }
         } catch { /* non-fatal */ }
 

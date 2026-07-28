@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { recordGradingFailure } from "@/lib/gradingFailure";
+import { recordGradingFailure, acquireGradingLock } from "@/lib/gradingFailure";
 import { lookupNarutoCard, looksLikeKayouNumber } from "@/lib/narutoCardMatcher";
 import { lookupTcgCard, looksLikeTcgCode, SUB_CATEGORY_TO_GAME, GAME_DISPLAY } from "@/lib/tcgCardMatcher";
 // PRIMARY: Conversational grading system (matches sports card flow)
@@ -106,6 +106,12 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
 
 // Main GET handler for Other cards
 export async function GET(request: NextRequest, { params }: OtherCardGradingRequest) {
+  // Set once this request takes the grading lock; gates failure recording
+  // in the outer catch so cache-hit errors never refund or mark a card failed.
+  let gradingAttempted = false;
+  // Captured while `card` is in scope so the outer catch (which cannot see
+  // the try-scoped `card`) can still refund the right user.
+  let gradingOwnerId: string | null = null;
   const { id: cardId } = await params;
   if (!isUuid(cardId)) {
     return NextResponse.json({ error: "Card not found" }, { status: 404 });
@@ -462,6 +468,21 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         owner_preferred_label_emblem: ownerPreferredLabelEmblem
       });
     }
+
+    // 🔐 Cross-instance grading lock (the in-memory set above only guards one
+    // serverless instance; this CAS on cards.grade_status guards all of them)
+    const gradingLock = await acquireGradingLock(cardId, (card as any).grade_status);
+    if (!gradingLock.acquired) {
+      console.log(`[GET /api/other/${cardId}] Another instance holds the grading lock, returning 429`);
+      return NextResponse.json(
+        { error: "This card is being processed by another request. Please wait and refresh." },
+        { status: 429 }
+      );
+    }
+    // From here on a failure means a real grading attempt: the outer catch
+    // may refund + mark the card failed.
+    gradingAttempted = true;
+    gradingOwnerId = (card as any)?.user_id ?? null;
 
     // Grade the card with conversational v4.2 (Other-specific)
     console.log(`[GET /api/other/${cardId}] Grading Other card with conversational v4.2...`);
@@ -927,6 +948,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     const { error: updateError } = await supabase
       .from('cards')
       .update({
+        // 🔐 Release the grading lock and clear any prior failure marker
+        grade_status: 'complete',
+        error_message: null,
+
         ai_grading: conversationalGradingResult,
         conversational_grading: conversationalGradingResult,
         conversational_card_info: parsedCardInfo,
@@ -941,6 +966,21 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
     if (updateError) {
       console.error(`[GET /api/other/${cardId}] ❌ Failed to update card:`, updateError);
+      // Previously this logged and FELL THROUGH, returning 200 with a grade the
+      // database never stored: the user was charged, saw a grade, and the card
+      // stayed ungraded with no failure record. Release the lock as 'failed',
+      // refund, and report the failure like every other category route.
+      const failure = await recordGradingFailure({
+        cardId,
+        userId: card.user_id,
+        category: 'Other',
+        errorMessage: `Save failed: ${updateError.message}`
+      });
+      return NextResponse.json({
+        error: "Failed to save Other card grading results",
+        grading_failed: true,
+        credit_refunded: failure.refunded
+      }, { status: 500 });
     }
 
     // 🎨 Color Extraction (Post-Grading, fire-and-forget)
@@ -978,6 +1018,16 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
   } catch (error: any) {
     console.error(`[GET /api/other/${cardId}] ❌ Error:`, error);
+    // Only refund/mark-failed when this request actually held the grading
+    // lock; errors on a cache-hit path must not touch an already-graded card.
+    if (gradingAttempted) {
+      await recordGradingFailure({
+        cardId,
+        userId: gradingOwnerId,
+        category: 'Other',
+        errorMessage: error?.message || 'Unhandled grading error'
+      });
+    }
     processingOtherCards.delete(cardId);
     return NextResponse.json(
       { error: 'Failed to process Other card', details: error.message },

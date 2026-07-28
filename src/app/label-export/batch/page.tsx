@@ -53,6 +53,7 @@ import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { pdf } from '@react-pdf/renderer';
 import { BatchCardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
+import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 
 declare global {
   interface Window {
@@ -189,11 +190,10 @@ function BatchLabelExportInner() {
             .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles')
             .single();
           if (creditsRow) {
-            const selected: string[] = (creditsRow.preferred_label_emblem || '')
-              .split(',').map((s: string) => s.trim()).filter(Boolean);
-            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && selected.includes('founder');
-            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && selected.includes('vip');
-            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && selected.includes('card_lover');
+            const emblems = resolveEmblemVisibility(creditsRow);
+            showFounderEmblem = emblems.showFounderEmblem;
+            showVipEmblem = emblems.showVipEmblem;
+            showCardLoversEmblem = emblems.showCardLoversEmblem;
             if (Array.isArray(creditsRow.custom_label_styles)) {
               savedCustomStyles = creditsRow.custom_label_styles as any[];
             }

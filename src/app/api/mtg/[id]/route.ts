@@ -181,6 +181,12 @@ function coerceKeywordsArray(value: unknown): string[] | null {
 
 // Main GET handler for MTG cards
 export async function GET(request: NextRequest, { params }: MTGCardGradingRequest) {
+  // Set once this request takes the grading lock; gates failure recording
+  // in the outer catch so cache-hit errors never refund or mark a card failed.
+  let gradingAttempted = false;
+  // Captured while `card` is in scope so the outer catch (which cannot see
+  // the try-scoped `card`) can still refund the right user.
+  let gradingOwnerId: string | null = null;
   const { id: cardId } = await params;
   if (!isUuid(cardId)) {
     return NextResponse.json({ error: "Card not found" }, { status: 404 });
@@ -636,6 +642,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         { status: 429 }
       );
     }
+    // From here on a failure means a real grading attempt: the outer catch
+    // may refund + mark the card failed.
+    gradingAttempted = true;
+    gradingOwnerId = (card as any)?.user_id ?? null;
 
     // 🎯 PRIMARY: Conversational AI grading (v4.2 JSON format)
     console.log(`[GET /api/mtg/${cardId}] Starting MTG card conversational AI grading (v4.2)...`);
@@ -1374,6 +1384,18 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
   } catch (error: any) {
     console.error(`[GET /api/mtg/${cardId}] Error:`, error.message);
+    // Only refund/mark-failed when this request actually held the grading
+    // lock; errors on a cache-hit path must not touch an already-graded card.
+    // Without this the lock stayed 'processing:<ISO>' and every retry 429'd
+    // for the full 6-minute stale window.
+    if (gradingAttempted) {
+      await recordGradingFailure({
+        cardId,
+        userId: gradingOwnerId,
+        category: 'MTG',
+        errorMessage: error?.message || 'Unhandled grading error'
+      });
+    }
     return NextResponse.json(
       { error: "Failed to process MTG card: " + error.message },
       { status: 500 }
