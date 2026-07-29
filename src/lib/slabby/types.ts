@@ -5,6 +5,8 @@
 
 export type SlabbyExpression = 'happy' | 'excited' | 'shocked' | 'thinking' | 'sad' | 'wink';
 
+export type SlabbyCostume = 'none' | 'hero';
+
 export type SlabbyMotion =
   | 'enter'      // hop in from below with landing squash
   | 'idle'       // gentle bob
@@ -12,7 +14,9 @@ export type SlabbyMotion =
   | 'jump'       // single hop with squash
   | 'shake'      // anticipation/nervous rumble
   | 'celebrate'  // both arms up
-  | 'point';     // right arm pointing up toward the image/page
+  | 'point'      // right arm pointing up toward the image/page
+  | 'fly-in'     // superhero: rockets in from off-screen left, cape streaming, lands
+  | 'hover';     // superhero: holds in the air, cape rippling
 
 /** 'static' = no entrance — image sits in place (use to hold one image across beats) */
 export type BgAnimation = 'fade' | 'slide-left' | 'slide-right' | 'pop' | 'static';
@@ -77,11 +81,23 @@ export interface SlabbyBeat {
   sfx?: boolean;
   /** comic-style speech bubble anchored to Slabby */
   speechBubble?: string;
+  /**
+   * Costume for this beat, overriding the scene default. 'hero' = cape +
+   * black eye mask, and it composes with EVERY motion — a caped wave, a caped
+   * celebrate, a caped point. Leave unset to inherit the scene costume.
+   */
+  costume?: SlabbyCostume;
 }
 
 export interface SlabbyScene {
   name: string;
   beats: SlabbyBeat[];
+  /**
+   * Costume worn for the whole video unless a beat overrides it. Set this to
+   * 'hero' to keep Slabby caped and masked through every motion he already
+   * has; individual beats can still drop back to 'none'.
+   */
+  costume?: SlabbyCostume;
 }
 
 export const DEFAULT_BEAT: SlabbyBeat = {
@@ -128,5 +144,6 @@ export function sanitizeScene(scene: SlabbyScene): SlabbyScene {
 }
 
 export const EXPRESSIONS: SlabbyExpression[] = ['happy', 'excited', 'shocked', 'thinking', 'sad', 'wink'];
-export const MOTIONS: SlabbyMotion[] = ['enter', 'idle', 'wave', 'jump', 'shake', 'celebrate', 'point'];
+export const MOTIONS: SlabbyMotion[] = ['enter', 'idle', 'wave', 'jump', 'shake', 'celebrate', 'point', 'fly-in', 'hover'];
+export const COSTUMES: SlabbyCostume[] = ['none', 'hero'];
 export const BG_ANIMATIONS: BgAnimation[] = ['fade', 'slide-left', 'slide-right', 'pop', 'static'];

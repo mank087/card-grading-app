@@ -20,6 +20,9 @@ export type SlabbyExpression =
   | 'sad'
   | 'wink';
 
+/** 'hero' = cape + black eye mask (Super Slabby). */
+export type SlabbyCostume = 'none' | 'hero';
+
 export interface SlabbyProps {
   expression?: SlabbyExpression;
   /** degrees; 0 = arms resting down-out. Negative raises the arm. */
@@ -40,6 +43,14 @@ export interface SlabbyProps {
    * the slabby render workspace passes staticFile('dcm-logo-white.png').
    */
   logoHref?: string;
+  /** 'hero' adds the cape + black eye mask. Default 'none'. */
+  costume?: SlabbyCostume;
+  /**
+   * Cape flutter, -1…1. 0 = hanging straight down at rest; positive values
+   * stream the cape out to the LEFT (i.e. behind him when flying right).
+   * The scene drives this per frame — the rig itself never animates.
+   */
+  capeSway?: number;
 }
 
 const PURPLE = '#7c3aed';
@@ -188,6 +199,103 @@ const Face: React.FC<{ expression: SlabbyExpression }> = ({ expression }) => {
   );
 };
 
+const CAPE = '#dc2626';
+const CAPE_DARK = '#991b1b';
+
+/**
+ * Black domino eye mask. Drawn UNDER the eyes so every expression's pupils
+ * show through the holes; evenodd fill punches the holes out of the band.
+ */
+const HeroMask: React.FC = () => {
+  const eyeY = 530;
+  const leftX = 435;
+  const rightX = 565;
+  const hole = 39;
+
+  // band + two circular holes, evenodd => holes
+  const band = `M 388 478 Q 500 462 612 478 L 620 540 Q 500 596 380 540 Z`;
+  const holes =
+    `M ${leftX + hole} ${eyeY} a ${hole} ${hole} 0 1 0 ${-hole * 2} 0 a ${hole} ${hole} 0 1 0 ${hole * 2} 0 Z` +
+    `M ${rightX + hole} ${eyeY} a ${hole} ${hole} 0 1 0 ${-hole * 2} 0 a ${hole} ${hole} 0 1 0 ${hole * 2} 0 Z`;
+
+  return (
+    <g>
+      {/* pointed outer flares */}
+      <path d={`M 388 478 L 352 462 L 372 520 Z`} fill={INK} />
+      <path d={`M 612 478 L 648 462 L 628 520 Z`} fill={INK} />
+      <path d={`${band} ${holes}`} fill={INK} fillRule="evenodd" />
+      {/* soft highlight along the top edge so the mask reads as fabric */}
+      <path d="M 396 484 Q 500 470 604 484" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={6} fill="none" strokeLinecap="round" />
+    </g>
+  );
+};
+
+/**
+ * Cape, drawn BEHIND the whole body.
+ *
+ * `sway` 0…1 morphs between two poses:
+ *   0 = at rest — drapes symmetrically behind him and spills out past both
+ *       sides of the slab, so it reads as a cape rather than a red sliver.
+ *   1 = full flight — collapsed to one side and streaming straight out to the
+ *       LEFT, i.e. trailing him as he flies right.
+ *
+ * The path keeps the same four control points through the whole morph, so any
+ * in-between value is a valid drape (that's what the flutter rides on).
+ */
+const HeroCape: React.FC<{ sway: number }> = ({ sway }) => {
+  const s = Math.max(0, Math.min(1, sway));
+  const lerp = (a: number, b: number) => a + (b - a) * s;
+
+  // the two lower corners of the cape: rest → full-stream
+  const leftX = lerp(168, 8);
+  const leftY = lerp(902, 288);
+  const rightX = lerp(832, 232);
+  const rightY = lerp(902, 618);
+
+  // bow of each side seam, and the sag across the hem
+  const ctrlLX = lerp(232, 196);
+  const ctrlLY = lerp(596, 296);
+  const hemX = lerp(500, 84);
+  const hemY = lerp(986, 520);
+  const ctrlRX = lerp(768, 520);
+  const ctrlRY = lerp(596, 470);
+
+  const d =
+    `M 322 232 ` +
+    `Q ${ctrlLX} ${ctrlLY} ${leftX} ${leftY} ` +
+    `Q ${hemX} ${hemY} ${rightX} ${rightY} ` +
+    `Q ${ctrlRX} ${ctrlRY} 678 232 Z`;
+
+  return (
+    <g>
+      <path d={d} fill={CAPE} stroke={CAPE_DARK} strokeWidth={8} strokeLinejoin="round" />
+      {/* centre fold — sells the fabric and tracks the same morph */}
+      <path
+        d={`M 500 244 Q ${lerp(430, 300)} ${lerp(640, 340)} ${lerp(350, 120)} ${lerp(880, 372)}`}
+        stroke={CAPE_DARK}
+        strokeWidth={14}
+        fill="none"
+        opacity={0.5}
+        strokeLinecap="round"
+      />
+    </g>
+  );
+};
+
+/**
+ * Gold cape fasteners. They sit ON the shell's outer edges (x≈272/728) —
+ * deliberately clear of the label block (x 300–700), which carries the grade
+ * badge and must never be covered.
+ */
+const HeroClasp: React.FC = () => (
+  <g>
+    <circle cx={276} cy={252} r={19} fill={GOLD} stroke={GOLD_DARK} strokeWidth={6} />
+    <circle cx={724} cy={252} r={19} fill={GOLD} stroke={GOLD_DARK} strokeWidth={6} />
+    <circle cx={276} cy={252} r={6} fill={GOLD_DARK} opacity={0.6} />
+    <circle cx={724} cy={252} r={6} fill={GOLD_DARK} opacity={0.6} />
+  </g>
+);
+
 export const SlabbyRig: React.FC<SlabbyProps> = ({
   expression = 'happy',
   leftArmRotation = 0,
@@ -198,7 +306,10 @@ export const SlabbyRig: React.FC<SlabbyProps> = ({
   gradeLabel = 'GEM MINT',
   scale = 1,
   logoHref = '/DCM Logo white.png',
+  costume = 'none',
+  capeSway = 0,
 }) => {
+  const hero = costume === 'hero';
   // squash about the feet line (y=930): wider+shorter when squash > 1
   const squashTransform = `translate(500 930) scale(${squash} ${2 - squash}) translate(-500 -930)`;
 
@@ -232,6 +343,9 @@ export const SlabbyRig: React.FC<SlabbyProps> = ({
 
       <g transform={`translate(0 ${bob})`}>
         <g transform={squashTransform}>
+          {/* cape — behind the shadow, the arms and the shell */}
+          {hero && <HeroCape sway={capeSway} />}
+
           {/* ground shadow */}
           <ellipse cx={500} cy={946} rx={225} ry={26} fill={INK} opacity={0.13} />
 
@@ -293,6 +407,8 @@ export const SlabbyRig: React.FC<SlabbyProps> = ({
             <rect x={330} y={348} width={340} height={480} rx={18} fill="url(#cardGold)" stroke={GOLD_DARK} strokeWidth={6} />
             {/* art window (the face lives here) */}
             <rect x={358} y={396} width={284} height={300} rx={14} fill={CREAM} stroke={GOLD_DARK} strokeWidth={4} />
+            {/* mask sits under the eyes so pupils show through the holes */}
+            {hero && <HeroMask />}
             <Face expression={expression} />
             {/* card nameplate */}
             <rect x={370} y={726} width={260} height={56} rx={12} fill={CREAM} stroke={GOLD_DARK} strokeWidth={4} />
@@ -305,6 +421,9 @@ export const SlabbyRig: React.FC<SlabbyProps> = ({
               <path d="M 626 800 l 5 11 l 11 5 l -11 5 l -5 11 l -5 -11 l -11 -5 l 11 -5 Z" opacity={0.8} />
             </g>
           </g>
+
+          {/* cape clasp over the shell, at the shoulder line */}
+          {hero && <HeroClasp />}
 
           {/* acrylic shine streak over everything inside the shell */}
           <path d="M 306 200 L 420 200 L 330 860 L 296 860 Z" fill="url(#shine)" opacity={0.35} />

@@ -84,3 +84,7 @@ public/labels/Screenshot*.png
 
 # Slabby render cache: assets extracted from scene JSON at render time
 slabby/public/lab-assets/
+# Generated Slabby scenes embed their card images as data URLs and run to many
+# MB — they live in the slabby-drafts bucket, not git. The examples are tracked.
+slabby/scenes/*.json
+!slabby/scenes/example-*.json

@@ -9,6 +9,7 @@ import {
   EXPRESSIONS,
   MOTIONS,
   SlabbyBeat,
+  SlabbyCostume,
   SlabbyScene,
   sanitizeDataUrl,
   sanitizeScene,
@@ -550,6 +551,20 @@ export default function SlabbyLabClient() {
             <div className="text-xs text-gray-500 mt-2 text-center">
               {scene.beats.length} beat{scene.beats.length === 1 ? '' : 's'} · {totalSeconds}s total
             </div>
+
+            {/* costume applies to the whole scene and composes with every
+                motion — individual beats can still override it */}
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="text-xs text-gray-600">Costume</span>
+              <select
+                value={scene.costume || 'none'}
+                onChange={(e) => setScene((prev) => ({ ...prev, costume: e.target.value as SlabbyCostume }))}
+                className="px-2 py-1 border border-gray-300 rounded-lg text-xs bg-white"
+              >
+                <option value="none">none (classic Slabby)</option>
+                <option value="hero">🦸 hero — cape + eye mask</option>
+              </select>
+            </div>
             {autosaveSkipped && (
               <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-2 text-center">
                 ⚠️ Scene too large for browser autosave (embedded images) — use <b>Download scene JSON</b> to keep your work.
@@ -729,6 +744,18 @@ export default function SlabbyLabClient() {
                     <label className={labelCls}>Motion</label>
                     <select value={beat.motion} onChange={(e) => updateBeat(selectedBeat, { motion: e.target.value as SlabbyBeat['motion'] })} className={inputCls}>
                       {MOTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Costume</label>
+                    <select
+                      value={beat.costume || 'inherit'}
+                      onChange={(e) => updateBeat(selectedBeat, { costume: e.target.value === 'inherit' ? undefined : (e.target.value as SlabbyCostume) })}
+                      className={inputCls}
+                    >
+                      <option value="inherit">inherit ({scene.costume || 'none'})</option>
+                      <option value="none">none</option>
+                      <option value="hero">🦸 hero</option>
                     </select>
                   </div>
                   <div>

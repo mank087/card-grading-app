@@ -31,7 +31,7 @@ const sfxForBeat = (beat: SlabbyBeat): 'pop' | 'whoosh' | 'ding' | null => {
   if (beat.sfx === false) return null;
   if (beat.motion === 'celebrate') return 'ding';
   if (beat.motion === 'jump') return 'pop';
-  if (beat.motion === 'enter') return 'whoosh';
+  if (beat.motion === 'enter' || beat.motion === 'fly-in') return 'whoosh';
   if (beat.bgAnimation === 'pop') return 'pop';
   if (beat.bgAnimation === 'slide-left' || beat.bgAnimation === 'slide-right') return 'whoosh';
   return null;
@@ -85,6 +85,16 @@ export const ComposerScene: React.FC<ComposerProps> = ({
   let rightArm = -Math.sin(frame / 16) * 4;
   let shiftX = 0;
   let shiftY = 0;
+  let tilt = 0;        // degrees; superhero flight lean
+  let capeSway = 0;    // 0 = hanging, 1 = fully streamed out behind him
+
+  // Costume resolution: beat override → scene-wide default → implied by the
+  // motion ('fly-in'/'hover' ARE the superhero bit) → plain Slabby. The suit is
+  // orthogonal to motion, so 'hero' composes with wave, point, celebrate, etc.
+  const costume =
+    beat.costume ??
+    scene.costume ??
+    (beat.motion === 'fly-in' || beat.motion === 'hover' ? 'hero' : 'none');
 
   switch (beat.motion) {
     case 'enter': {
@@ -123,9 +133,37 @@ export const ComposerScene: React.FC<ComposerProps> = ({
       shiftX = interpolate(s, [0, 1], [0, width * 0.012]);
       break;
     }
+    case 'fly-in': {
+      // Rockets in from off-screen left on a shallow arc, lead fist forward,
+      // cape streaming straight out behind him, then plants a landing.
+      const s = spring({ frame: localFrame, fps, config: { damping: 14, mass: 1.1 } });
+      const landing = Math.max(0, Math.min(1, (s - 0.82) / 0.18));
+      shiftX = interpolate(s, [0, 1], [-width * 0.95, 0]);
+      shiftY = interpolate(s, [0, 1], [-height * 0.3, 0]) + Math.sin(Math.min(s, 1) * Math.PI) * height * 0.05;
+      tilt = interpolate(s, [0, 1], [-20, 0]);
+      leftArm = interpolate(s, [0, 1], [-124, 0]);  // lead fist punched forward
+      rightArm = interpolate(s, [0, 1], [64, 0]);   // trailing arm swept back
+      squash = interpolate(s, [0, 1], [0.9, 1]) + Math.sin(landing * Math.PI) * 0.12;
+      capeSway = interpolate(s, [0, 1], [1, 0.16]) + Math.sin(frame / 5) * 0.06;
+      break;
+    }
+    case 'hover': {
+      // Holds in the air mid-shot, cape rippling — the "so, about this card" pose.
+      shiftY = -height * 0.06 + Math.sin(frame / 18) * height * 0.012;
+      tilt = Math.sin(frame / 22) * 3;
+      leftArm = -22 + Math.sin(frame / 15) * 5;
+      rightArm = 22 - Math.sin(frame / 15) * 5;
+      capeSway = 0.55 + Math.sin(frame / 7) * 0.12;
+      break;
+    }
     case 'idle':
     default:
       break;
+  }
+
+  // Costumed but not flying: the cape still needs to be alive, just barely.
+  if (costume === 'hero' && beat.motion !== 'fly-in' && beat.motion !== 'hover') {
+    capeSway = 0.12 + Math.sin(frame / 12) * 0.06;
   }
 
   // ---- layout: full-stage vs commentator mode ----
@@ -231,7 +269,8 @@ export const ComposerScene: React.FC<ComposerProps> = ({
           ...(hasBg
             ? { left: -(1000 * slabbyScale) * 0.12, bottom: -(1000 * slabbyScale) * 0.04 }
             : { left: '50%', top: '50%', marginLeft: -(1000 * slabbyScale) / 2, marginTop: -(1000 * slabbyScale) / 2 }),
-          transform: `translate(${shiftX}px, ${shiftY}px)`,
+          transform: `translate(${shiftX}px, ${shiftY}px)${tilt ? ` rotate(${tilt}deg)` : ''}`,
+          transformOrigin: '50% 70%',
         }}
       >
         <SlabbyRig
@@ -245,6 +284,8 @@ export const ComposerScene: React.FC<ComposerProps> = ({
           squash={squash}
           scale={slabbyScale}
           logoHref={logoHref}
+          costume={costume}
+          capeSway={capeSway}
         />
       </div>
 
