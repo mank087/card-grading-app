@@ -1835,6 +1835,35 @@ For ALL text-based fields (card_number, card_name, set_name, year, serial_number
 5. Nothing printed/visible → **null**. Never estimate from design era, art style, or subject.
 When sources disagree, the HIGHER-priority source always wins (copyright beats season label).
 
+🚨 **MANDATORY YEAR EVIDENCE (v9.11 — two REQUIRED companion fields):**
+You may not report a `year` without also reporting WHERE you read it. Fill these two fields
+in card_info EVERY time, for EVERY card type:
+
+• `"year_text_seen"`: the exact characters you read on the card that contain the year,
+  transcribed verbatim — e.g. "© 2019 Panini America, Inc.", "2023-24", "1989 TOPPS".
+  If you did not actually read year characters anywhere on either image → null.
+• `"year_source"`: one of exactly these values —
+    "back_copyright"    — read a © YYYY line on the back
+    "printed_date"      — read an explicit print/release date on the card
+    "set_logo"          — read a 4-digit year inside the set/product logo
+    "season_indicator"  — read a season range like "2023-24" (no copyright visible)
+    "not_visible"       — no year characters legible anywhere → year MUST be null
+
+RULES (these are hard failures, not preferences):
+❌ If `year_source` is "not_visible", `year` MUST be null.
+❌ If you cannot transcribe `year_text_seen`, you did not read a year — set
+   `year_source`: "not_visible" and `year`: null.
+❌ `year_text_seen` must contain the digits you reported in `year` (or, for
+   "season_indicator", the first year of the range).
+❌ Recalling the release year of a set from knowledge is NOT reading it. If the year is
+   not physically legible in the images, it is "not_visible" — even if you are certain
+   the set is from 2021. Blurry, cropped, glare-covered, or half-cut copyright text is
+   "not_visible".
+✅ A blank year is a correct answer. A confidently wrong year is a customer refund.
+
+The system verifies these fields and DISCARDS any year that is not backed by a legible
+source, so guessing gains you nothing and costs the customer a wrong slab label.
+
 **IDENTIFICATION CONFIDENCE (v8.8 — REQUIRED output field):**
 Add to card_info: `"identification_confidence": "high" | "medium" | "low"`
 • high = name/subject, set, and number all read directly from clear printed text
@@ -1849,6 +1878,8 @@ This never changes the GRADE — it lets the system flag identity for review.
     "card_name": "string|null",
     "set_name": "string|null",
     "year": "string|null",
+    "year_text_seen": "string|null",   // REQUIRED — verbatim year text read off the card
+    "year_source": "back_copyright|printed_date|set_logo|season_indicator|not_visible",  // REQUIRED
     "manufacturer": "string|null",
     "card_number": "string|null",  // EXACT as printed - do not modify
     "authentic": true|false,

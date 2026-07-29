@@ -36,7 +36,12 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.8';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.11';
+// v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
+// cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
+// (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
+// src/lib/yearGuard.ts discards, server-side, any year not backed by a legible,
+// self-consistent source. Blank beats wrong on the printed label.
 // v9.7 (2026-07-24): OUTPUT ECONOMY — negative-finding notes fields (autograph,
 // reprint, marking, trimming, image_completeness, card_presence, slab-when-absent,
 // case-when-none, image_quality one-sentence cap, processing_notes) emit empty

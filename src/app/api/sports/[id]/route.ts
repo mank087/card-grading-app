@@ -25,6 +25,8 @@ import { resolveGradedFrom } from "@/lib/platformAttribution";
 import { matchSportsCardLocal, isSportsLocalDbAvailable } from "@/lib/sportsCardMatcher";
 // WS2c: visual parallel disambiguation (attribute-based, confidence-gated)
 import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
+// v9.11: discard any year the model could not actually read off the card
+import { applyYearGuard } from "@/lib/yearGuard";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -901,6 +903,39 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     // number (plus parallel when pinned to a single product). The raw AI
     // extraction is preserved in ai_card_info_original. Mirrors the One Piece
     // grade-time DB lookup — any failure here is non-fatal and keeps AI values.
+    // 🛡️ v9.11 YEAR GUARD (runs BEFORE DB validation)
+    // Drop any year the model could not point to legible text for. The model's
+    // raw proposal is kept in `aiYearHint` — it is still useful for narrowing DB
+    // set candidates, it is just not trustworthy enough to PRINT.
+    let aiYearHint: string | null = null;
+    let yearGuardOutcome: string | null = null;
+    if (conversationalGradingData?.card_info) {
+      const guard = applyYearGuard(conversationalGradingData.card_info, `sports/${cardId}`);
+      aiYearHint = guard.originalYear;
+      yearGuardOutcome = guard.outcome;
+
+      if (guard.outcome.startsWith('dropped_')) {
+        // conversationalGradingData.card_info is a live reference into the
+        // parsed report, but the RAW report string and the legacy
+        // gradingResult["Card Information"] block were parsed separately —
+        // the full-report tab renders straight off the raw string, so both
+        // need the same correction or the dropped year reappears there.
+        if (conversationalGradingResult) {
+          try {
+            const raw = JSON.parse(conversationalGradingResult);
+            if (raw?.card_info) {
+              raw.card_info.year = null;
+              raw.card_info._year_guard = conversationalGradingData.card_info._year_guard;
+              conversationalGradingResult = JSON.stringify(raw);
+            }
+          } catch { /* markdown-format report: nothing to patch */ }
+        }
+        if (gradingResult && (gradingResult as any)["Card Information"]) {
+          (gradingResult as any)["Card Information"].year = null;
+        }
+      }
+    }
+
     const validationColumns: Record<string, any> = {};
     if (conversationalGradingData?.card_info) {
       try {
@@ -914,7 +949,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
           const matchResult = await matchSportsCardLocal({
             playerName: cardInfo.player_or_character || cardInfo.featured,
-            year: cardInfo.year || cardInfo.release_date,
+            // Match-time hint only: an unverified year still narrows the set
+            // cohort usefully, and nothing the matcher returns is printed
+            // without passing the adoption rules below.
+            year: cardInfo.year || aiYearHint || cardInfo.release_date,
             setName: cardInfo.set_name || cardInfo.card_set,
             cardNumber: cardInfo.card_number_raw || cardInfo.card_number,
             variant: cardInfo.parallel_type,
@@ -955,8 +993,28 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             // Family-level facts (adopted for BOTH exact and family tiers):
             // set name, year, card number — confirmed by the DB match.
             if (displaySetName) cardInfo.set_name = displaySetName;
-            if (matchedSet?.year != null) cardInfo.year = String(matchedSet.year);
             if (product.card_number) cardInfo.card_number = product.card_number;
+
+            // 🛡️ v9.11 YEAR ADOPTION RULE
+            // The DB set year may only CANONICALIZE a year the card itself
+            // supplied (e.g. season label "2023-24" → set year 2023); it may
+            // never INVENT one. When the card showed no legible year, the set
+            // cohort was selected without any year constraint at all, so its
+            // year is a coin flip across every printing of that product line —
+            // exactly the "wrong date" customers were reporting. Leave it blank.
+            if (matchedSet?.year != null) {
+              if (cardInfo.year) {
+                cardInfo.year = String(matchedSet.year);
+              } else {
+                databaseMatch.year_not_adopted = {
+                  db_year: matchedSet.year,
+                  reason: yearGuardOutcome === 'kept_unverified'
+                    ? 'card year unreadable'
+                    : `card year unverified (${yearGuardOutcome ?? 'none'})`,
+                };
+                console.log(`[SportsValidation] 🛡️ DB set year ${matchedSet.year} NOT adopted — no verified year read from the card (${yearGuardOutcome ?? 'none'})`);
+              }
+            }
             // player_or_character stays AI-primary (DB player names differ
             // only in punctuation/initials — keep the AI reading)
 
@@ -1179,7 +1237,11 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       card_number: cardInfoFromAI?.card_number || card.card_number,
       // 🔧 v7.2: Enhanced fallback chain for player name
       featured: cardInfoFromAI?.player_or_character || extractedPlayerName || card.featured,
-      release_date: cardInfoFromAI?.year || card.release_date,
+      // 🛡️ v9.11: never fall back to the row's stored release_date when this
+      // grade's year was dropped — that would resurrect the wrong year a
+      // regrade was meant to clear.
+      release_date: cardInfoFromAI?.year
+        || (yearGuardOutcome && yearGuardOutcome.startsWith('dropped_') ? null : card.release_date),
       serial_numbering: cardInfoFromAI?.serial_number || card.serial_numbering,
       autographed: cardInfoFromAI?.autographed || card.autographed,
       rookie_card: cardInfoFromAI?.rookie_or_first === true || card.rookie_card,

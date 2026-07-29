@@ -57,6 +57,19 @@ REQUIRED FIELDS (All Sports Cards)
 • Modern sports products (Panini, Topps, Upper Deck, Bowman) consistently print a back © year — look for it before falling back to the season label.
 • **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the player, design era, or set "feel." A blank year on the label is better than a wrong one.**
 
+🚨 **REQUIRED YEAR EVIDENCE FIELDS (v9.11)** — see the master rubric's MANDATORY YEAR
+EVIDENCE block. On every sports card you MUST also output:
+  • `year_text_seen`: verbatim transcription of the year characters you read
+    (e.g. "© 2019 Panini America, Inc.", "2023-24 SEASON", "1989 TOPPS") — null if none.
+  • `year_source`: "back_copyright" | "printed_date" | "set_logo" | "season_indicator" | "not_visible"
+If `year_source` is "not_visible", `year` MUST be null. Sports-specific traps:
+  ❌ The player's rookie season, career span, or team-era uniform is NOT year evidence.
+  ❌ A design you recognize ("that's the 1990 Donruss red border") is NOT year evidence
+     unless the year characters are actually legible in the image.
+  ❌ A statistics table on the back ending in a given season is NOT the print year and is
+     NOT year evidence — a card listing stats through 2018 may well be a 2019 or later print.
+  ✅ Only characters you can actually READ in these images count.
+
 **manufacturer**: Card publisher
 • Official company name
 • Common manufacturers:

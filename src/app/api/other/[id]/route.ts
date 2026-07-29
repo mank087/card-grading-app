@@ -14,6 +14,8 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v9.11: discard any year the model could not actually read off the card
+import { applyYearGuard } from "@/lib/yearGuard";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
 import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
@@ -640,6 +642,17 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         } catch (tcgError: any) {
           // Table may not exist yet (migration pending) — never fail grading over enrichment
           console.log(`[GET /api/other/${cardId}] ⚠️ TCG DB lookup skipped: ${tcgError.message}`);
+        }
+
+        // 🛡️ v9.11 YEAR GUARD — discard any year not backed by legible card
+        // text, BEFORE field extraction so the label/DB/eBay title all inherit
+        // the blank rather than a guess. Re-serialize so the stored report and
+        // the parsed card_info agree.
+        if (jsonData.card_info) {
+          const guard = applyYearGuard(jsonData.card_info, `other/${cardId}`);
+          if (guard.outcome.startsWith('dropped_')) {
+            conversationalGradingResult = JSON.stringify(jsonData);
+          }
         }
 
         // Extract card-specific fields

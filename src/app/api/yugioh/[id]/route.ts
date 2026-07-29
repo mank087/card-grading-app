@@ -13,6 +13,8 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v9.11: discard any year the model could not actually read off the card
+import { applyYearGuard } from "@/lib/yearGuard";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
 import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
@@ -838,6 +840,11 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       } catch (error) {
         console.error(`[GET /api/yugioh/${cardId}] Failed to parse conversational JSON:`, error);
       }
+    }
+
+    // 🛡️ v9.11 YEAR GUARD — discard any year not backed by legible card text
+    if (conversationalGradingData?.card_info) {
+      applyYearGuard(conversationalGradingData.card_info, `yugioh/${cardId}`);
     }
 
     // DATABASE LOOKUP: Cross-reference AI identification with internal Yu-Gi-Oh database
