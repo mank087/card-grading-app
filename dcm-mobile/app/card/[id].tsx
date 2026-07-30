@@ -611,11 +611,11 @@ export default function CardDetailScreen() {
           onPress: () => {
             Alert.alert(
               'Delete permanently?',
-              'Once deleted, this card can no longer be found or viewed.\n\n' +
-                '• Its grade report and images go away\n' +
-                '• The QR code on its printed label stops working — for anyone holding it\n' +
-                '• Any eBay sale history for it is removed\n\n' +
-                'If someone else has this card, choose "I sold it" instead so they can still verify it.',
+              'Once deleted, this card is gone from your collection for good.\n\n' +
+                '• You won\'t be able to view it or its grade report again\n' +
+                '• The QR code on its printed label stops working — for anyone holding it\n\n' +
+                'If someone else has this card, choose "I sold it" instead so they can still verify it.\n\n' +
+                'We keep an internal record of the grade for population statistics.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {

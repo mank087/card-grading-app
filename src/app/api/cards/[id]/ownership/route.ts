@@ -17,7 +17,11 @@ import {
  *   { "ownership_status": "sold", "sold_price": 120.00, "sold_at": "...",
  *     "sold_note": "Sold at the Portland show" }
  *   { "ownership_status": "owned" }      // undo — "actually, still mine"
- *   { "ownership_status": "archived" }   // gone, but not sold
+ *
+ * There is no "archived" any more — it duplicated what delete means and gave
+ * users two ways to make a card disappear. Anything that isn't a sale is a
+ * delete, which soft-deletes: gone from the owner's view, record kept
+ * internally for population and accuracy statistics.
  *
  * Why this exists rather than DELETE: the printed slab carries a QR to
  * /verify/<serial>, so the row has to survive the sale or the buyer is left
@@ -50,7 +54,7 @@ export async function PATCH(
     const nextStatus = body?.ownership_status;
     if (!isOwnershipStatus(nextStatus)) {
       return NextResponse.json(
-        { error: "ownership_status must be 'owned', 'sold', or 'archived'." },
+        { error: "ownership_status must be 'owned' or 'sold'." },
         { status: 400 }
       );
     }

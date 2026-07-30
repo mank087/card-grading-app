@@ -176,7 +176,7 @@ export interface Card {
   // Ownership lifecycle — a sold card leaves the collection but keeps its
   // grade page online so the buyer's slab QR still resolves. Never delete a
   // graded card; see the web migration 20260730_add_card_ownership_status.sql.
-  ownership_status?: 'owned' | 'sold' | 'archived' | null
+  ownership_status?: 'owned' | 'sold' | null
   sold_at?: string | null
   sold_price?: number | null
   sold_channel?: 'ebay' | 'manual' | 'other' | null

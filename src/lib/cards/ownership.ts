@@ -8,12 +8,24 @@
  * it exists.
  */
 
-export type OwnershipStatus = 'owned' | 'sold' | 'archived';
+/**
+ * A card is either in the collection or sold on.
+ *
+ * There was a third state, 'archived', for cards no longer held but not sold.
+ * It was removed: it duplicated what delete now means, and two ways to make a
+ * card disappear is one too many for users to reason about. The DB CHECK still
+ * permits the value so no constraint has to change; nothing writes it.
+ *
+ * "Gone from my collection" is now DELETE, which soft-deletes — the user stops
+ * seeing the card anywhere, and we keep the row internally for grading
+ * statistics and population data.
+ */
+export type OwnershipStatus = 'owned' | 'sold';
 
-export const OWNERSHIP_STATUSES: OwnershipStatus[] = ['owned', 'sold', 'archived'];
+export const OWNERSHIP_STATUSES: OwnershipStatus[] = ['owned', 'sold'];
 
-/** States hidden from the owner's active collection and the eBay listing picker. */
-export const INACTIVE_OWNERSHIP: OwnershipStatus[] = ['sold', 'archived'];
+/** Hidden from the owner's active collection and the eBay listing picker. */
+export const INACTIVE_OWNERSHIP: OwnershipStatus[] = ['sold'];
 
 export type SoldChannel = 'ebay' | 'manual' | 'other';
 

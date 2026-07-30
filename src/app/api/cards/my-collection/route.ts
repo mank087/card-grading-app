@@ -20,13 +20,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
 
     // Ownership view. Defaults to 'owned' so the collection shows what the
-    // user actually holds; ?status=sold / archived power the other tabs and
-    // ?status=all is the escape hatch (batch reports over everything).
+    // user actually holds; ?status=sold powers the Sold tab and ?status=all is
+    // the escape hatch (batch reports over everything). Soft-deleted cards are
+    // never returned by any of them.
     const statusParam = searchParams.get('status') || 'owned';
     const ownershipFilter = isOwnershipStatus(statusParam) ? statusParam : null;
     if (!ownershipFilter && statusParam !== 'all') {
       return NextResponse.json(
-        { error: "Invalid status. Use 'owned', 'sold', 'archived', or 'all'." },
+        { error: "Invalid status. Use 'owned', 'sold', or 'all'." },
         { status: 400 }
       );
     }
@@ -93,15 +94,15 @@ export async function GET(request: NextRequest) {
 
       // Falling back to the UNFILTERED query is only acceptable for the default
       // "owned" view, where showing everything matches the pre-ownership
-      // behaviour. For an explicit sold/archived request it is actively wrong —
-      // the user asked for a subset and would silently get their whole
-      // collection back under a "Sold" heading. Return nothing instead, and let
+      // behaviour. For an explicit sold request it is actively wrong — the user
+      // asked for a subset and would silently get their whole collection back
+      // under a "Sold" heading. Return nothing instead, and let
       // ownershipApplied:false tell the client to hide the tabs.
       if (ownershipFilter && ownershipFilter !== 'owned') {
         console.warn(`[Collection API] cannot serve status=${ownershipFilter} pre-migration — returning empty.`);
         return NextResponse.json({
           cards: [],
-          counts: { owned: 0, sold: 0, archived: 0 },
+          counts: { owned: 0, sold: 0 },
           ownershipApplied: false,
           status: statusParam,
         });
@@ -120,10 +121,10 @@ export async function GET(request: NextRequest) {
 
     // Per-status counts drive the collection tabs. Head-only count queries —
     // no rows transferred. Skipped entirely during the migration window.
-    const counts = { owned: 0, sold: 0, archived: 0 };
+    const counts = { owned: 0, sold: 0 };
     if (ownershipApplied) {
-      const [owned, sold, archived] = await Promise.all(
-        (['owned', 'sold', 'archived'] as const).map(status =>
+      const [owned, sold] = await Promise.all(
+        (['owned', 'sold'] as const).map(status =>
           supabase
             .from('cards')
             .select('id', { count: 'exact', head: true })
@@ -134,7 +135,6 @@ export async function GET(request: NextRequest) {
       );
       counts.owned = owned.count ?? 0;
       counts.sold = sold.count ?? 0;
-      counts.archived = archived.count ?? 0;
     }
 
     if (!cards || cards.length === 0) {

@@ -45,7 +45,7 @@ type Card = {
   visibility?: 'public' | 'private'
   // Ownership lifecycle — a sold card leaves the collection but keeps its
   // grade page so the buyer's slab QR still resolves.
-  ownership_status?: 'owned' | 'sold' | 'archived'
+  ownership_status?: 'owned' | 'sold'
   sold_at?: string | null
   sold_price?: number | null
   sold_channel?: 'ebay' | 'manual' | 'other' | null
@@ -408,11 +408,11 @@ function CollectionPageContent() {
   const [selectedSport, setSelectedSport] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
-  // Ownership view: what you hold, what you sold, what you archived. Sold and
-  // archived cards keep their grade page alive (the printed slab's QR points
-  // at it) — they just leave the working collection.
-  const [ownershipView, setOwnershipView] = useState<'owned' | 'sold' | 'archived'>('owned')
-  const [ownershipCounts, setOwnershipCounts] = useState({ owned: 0, sold: 0, archived: 0 })
+  // Ownership view: what you hold vs what you've sold. A sold card keeps its
+  // grade page alive (the printed slab's QR points at it) — it just leaves the
+  // working collection. Anything else the user wants gone is a delete.
+  const [ownershipView, setOwnershipView] = useState<'owned' | 'sold'>('owned')
+  const [ownershipCounts, setOwnershipCounts] = useState({ owned: 0, sold: 0 })
   const [ownershipReady, setOwnershipReady] = useState(true)
   const [sellCard, setSellCard] = useState<Card | null>(null)
   const [deleteCard, setDeleteCard] = useState<Card | null>(null)
@@ -1584,8 +1584,9 @@ function CollectionPageContent() {
     const n = selectedCardIds.size
     const confirmDelete = window.confirm(
       `Delete ${n} card${n !== 1 ? 's' : ''}?\n\n` +
-      `Once deleted they can no longer be found or viewed — the grade reports go away and ` +
-      `the QR codes on their printed labels stop working, for anyone holding them.\n\n` +
+      `They'll be gone from your collection for good — you won't be able to view them ` +
+      `again, and the QR codes on their printed labels will stop working for anyone ` +
+      `holding them.\n\n` +
       `If you SOLD these cards, cancel and use "Sold" on each one instead so the buyers ` +
       `can still verify them.`
     )
@@ -1641,7 +1642,7 @@ function CollectionPageContent() {
    */
   const updateOwnership = async (
     cardId: string,
-    ownership_status: 'owned' | 'sold' | 'archived',
+    ownership_status: 'owned' | 'sold',
     extra: { sold_price?: string; sold_at?: string; sold_note?: string } = {}
   ) => {
     setUpdatingOwnershipId(cardId)
@@ -1673,8 +1674,6 @@ function CollectionPageContent() {
 
       if (ownership_status === 'sold') {
         toast.success('Marked as sold — the buyer can still verify this card.')
-      } else if (ownership_status === 'archived') {
-        toast.success('Card archived.')
       } else {
         toast.success('Moved back to your collection.')
       }
@@ -1766,7 +1765,7 @@ function CollectionPageContent() {
   // an empty Sold/Archived tab used to take the tabs, binder strip and every
   // other control with it — leaving no way back to Owned.
   const totalAcrossViews =
-    ownershipCounts.owned + ownershipCounts.sold + ownershipCounts.archived
+    ownershipCounts.owned + ownershipCounts.sold
   if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId) {
     return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
   }
@@ -2006,7 +2005,6 @@ function CollectionPageContent() {
               {([
                 { key: 'owned' as const, label: 'Owned', count: ownershipCounts.owned },
                 { key: 'sold' as const, label: 'Sold', count: ownershipCounts.sold },
-                { key: 'archived' as const, label: 'Archived', count: ownershipCounts.archived },
               ]).map(tab => (
                 <button
                   key={tab.key}
@@ -2623,16 +2621,11 @@ function CollectionPageContent() {
                                   return null;
                                 })()}
 
-                                {/* Sold / Archived badge — makes the category
-                                    obvious at a glance, wherever the tile is shown */}
+                                {/* Sold badge — makes the state obvious at a
+                                    glance, wherever the tile is shown */}
                                 {card.ownership_status === 'sold' && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold tracking-wider">
                                     SOLD
-                                  </span>
-                                )}
-                                {card.ownership_status === 'archived' && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-500 text-white text-[10px] font-extrabold tracking-wider">
-                                    ARCHIVED
                                   </span>
                                 )}
 
@@ -3122,7 +3115,6 @@ function CollectionPageContent() {
           busy={updatingOwnershipId === sellCard.id}
           onCancel={() => setSellCard(null)}
           onConfirm={(details) => updateOwnership(sellCard.id, 'sold', details)}
-          onArchive={() => updateOwnership(sellCard.id, 'archived')}
         />
       )}
     </main>
@@ -3142,7 +3134,7 @@ function EmptyView({
   category,
   onBackToOwned,
 }: {
-  ownershipView: 'owned' | 'sold' | 'archived'
+  ownershipView: 'owned' | 'sold'
   binderName: string | null
   category: string
   onBackToOwned: () => void
@@ -3156,9 +3148,6 @@ function EmptyView({
   } else if (ownershipView === 'sold') {
     title = 'No sold cards yet'
     body = 'When you mark a card as sold it moves here — and stays viewable so the buyer can verify it.'
-  } else if (ownershipView === 'archived') {
-    title = 'Nothing archived'
-    body = 'Archived cards are ones you no longer hold but didn\'t sell.'
   } else if (category !== 'all') {
     title = `No ${category} cards in your collection`
   } else {
@@ -3239,7 +3228,7 @@ function DeleteCardModal({
               >
                 <div className="font-semibold text-gray-900">I just don&apos;t want it in my collection</div>
                 <div className="text-sm text-gray-600 mt-0.5">
-                  Deletes the card and its grade report entirely.
+                  Removes the card from your collection for good.
                 </div>
               </button>
             </div>
@@ -3260,15 +3249,17 @@ function DeleteCardModal({
             </p>
 
             <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-900">
-              <p className="font-semibold">Once deleted, this card can no longer be found or viewed.</p>
+              <p className="font-semibold">Once deleted, this card is gone from your collection for good.</p>
               <ul className="mt-2 space-y-1 list-disc list-inside text-red-800">
-                <li>Its grade report and images go away</li>
+                <li>You won&apos;t be able to view it or its grade report again</li>
                 <li>The QR code on its printed label will stop working — for anyone holding it</li>
-                <li>Any eBay sale history for it is removed too</li>
               </ul>
               <p className="mt-2">
                 If someone else has this card, choose <strong>&ldquo;I sold it&rdquo;</strong> instead
                 so they can still verify it.
+              </p>
+              <p className="mt-2 text-xs text-red-700">
+                We keep an internal record of the grade for population and accuracy statistics.
               </p>
             </div>
 
@@ -3311,13 +3302,11 @@ function MarkAsSoldModal({
   busy,
   onCancel,
   onConfirm,
-  onArchive,
 }: {
   card: Card
   busy: boolean
   onCancel: () => void
   onConfirm: (details: { sold_price?: string; sold_at?: string; sold_note?: string }) => void
-  onArchive: () => void
 }) {
   const [price, setPrice] = useState('')
   const [soldAt, setSoldAt] = useState(() => new Date().toISOString().slice(0, 10))
@@ -3401,13 +3390,6 @@ function MarkAsSoldModal({
           </button>
         </div>
 
-        <button
-          onClick={onArchive}
-          disabled={busy}
-          className="mt-3 w-full text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
-        >
-          Didn&apos;t sell it? Archive instead
-        </button>
       </div>
     </div>
   )
