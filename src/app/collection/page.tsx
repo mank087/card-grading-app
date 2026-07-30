@@ -14,6 +14,9 @@ import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
+import BinderStrip from '@/components/binders/BinderStrip'
+import { SortableGrid, SortableCell } from '@/components/binders/SortableCardGrid'
+import { useBinders } from '@/components/binders/useBinders'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 
@@ -413,6 +416,13 @@ function CollectionPageContent() {
   const [ownershipReady, setOwnershipReady] = useState(true)
   const [sellCard, setSellCard] = useState<Card | null>(null)
   const [deleteCard, setDeleteCard] = useState<Card | null>(null)
+  // Binders. null = All Cards (the master view, never manually ordered).
+  const [selectedBinderId, setSelectedBinderId] = useState<string | null>(null)
+  const [binderCards, setBinderCards] = useState<Card[] | null>(null)
+  const [binderReorderable, setBinderReorderable] = useState(false)
+  const [binderLoading, setBinderLoading] = useState(false)
+  const [addToBinderOpen, setAddToBinderOpen] = useState(false)
+  const binderApi = useBinders()
   const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
   // Bumped to force a collection refetch (e.g. after an undo restores a card).
   const [refreshKey, setRefreshKey] = useState(0)
@@ -586,6 +596,43 @@ function CollectionPageContent() {
       })
       .catch(() => { /* prompt is optional — never block the collection on it */ })
   }, [refreshKey])
+
+  // Load the selected binder's cards, in the user's order. Cleared when they
+  // switch back to All Cards, which falls through to the normal collection.
+  useEffect(() => {
+    if (!selectedBinderId) { setBinderCards(null); return }
+    const session = getStoredSession()
+    if (!session?.access_token) return
+    setBinderLoading(true)
+    fetch(`/api/binders/${selectedBinderId}/cards`, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error)
+        setBinderCards(data.cards || [])
+        setBinderReorderable(Boolean(data.reorderable))
+      })
+      .catch((e) => { toast.error(e.message); setBinderCards([]) })
+      .finally(() => setBinderLoading(false))
+  }, [selectedBinderId, refreshKey])
+
+  /**
+   * Drag committed. The list is already reordered on screen (optimistic) — a
+   * card that visibly snaps back while a request flies feels broken — so on
+   * failure we put the old order back and say why.
+   */
+  const handleBinderReorder = async (movedId: string, afterId: string | null, next: Card[]) => {
+    if (!selectedBinderId) return
+    const previous = binderCards
+    setBinderCards(next)
+    try {
+      await binderApi.reorderCard(selectedBinderId, movedId, afterId)
+    } catch (e: any) {
+      setBinderCards(previous)
+      toast.error(e.message)
+    }
+  }
 
   const answerSoldPrompt = async (autoMark: boolean) => {
     setSoldPromptBusy(true)
@@ -1412,7 +1459,15 @@ function CollectionPageContent() {
   }
 
   // Sort cards based on current sort settings
-  const sortedCards = [...cards].sort((a, b) => {
+  // Inside a binder the source list is the binder's cards, already in the
+  // user's order. Everything downstream — sort, category filter, search,
+  // bulk select — then works unchanged within that scope.
+  const baseCards = selectedBinderId ? (binderCards ?? []) : cards
+
+  // Custom order IS "no sort column". Picking a sort overrides the binder's
+  // arrangement (and disables dragging, below) — the Notion/Airtable rule that
+  // stops a drag silently snapping back under an active sort.
+  const sortedCards = [...baseCards].sort((a, b) => {
     if (!sortColumn) return 0
 
     let aValue: any
@@ -1507,6 +1562,11 @@ function CollectionPageContent() {
   // Limit displayed cards for performance
   const displayedCards = filteredCards.slice(0, displayLimit)
   const hasMore = filteredCards.length > displayLimit
+
+  // Dragging requires a manual binder AND no active sort — otherwise the sort
+  // would immediately re-order whatever the user just arranged.
+  const canReorder = Boolean(selectedBinderId) && binderReorderable && !sortColumn
+  const selectedBinder = binderApi.binders.find(b => b.id === selectedBinderId) || null
 
   // Multi-select helper calculations (must be after displayedCards is defined)
   const isAllSelected = displayedCards.length > 0 && displayedCards.every(card => selectedCardIds.has(card.id))
@@ -1845,6 +1905,56 @@ function CollectionPageContent() {
           </div>
         </div>
 
+        {/* Binder strip — scopes everything below it. Hidden entirely until the
+            binders migration lands, so the page behaves exactly as before. */}
+        {binderApi.available && (
+          <BinderStrip
+            binders={binderApi.binders}
+            selectedId={selectedBinderId}
+            onSelect={(id) => { setSelectedBinderId(id); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
+            onCreate={async () => {
+              const name = window.prompt('Name this binder', 'New binder')
+              if (!name?.trim()) return
+              try {
+                const b = await binderApi.createBinder(name.trim())
+                setSelectedBinderId(b.id)
+                toast.success(`Created "${b.name}" — add cards with the checkboxes.`)
+              } catch (e: any) { toast.error(e.message) }
+            }}
+            onManage={async (b) => {
+              if (b.system_key) {
+                toast.info('This binder is managed for you and fills itself.')
+                return
+              }
+              const name = window.prompt('Rename binder', b.name)
+              if (!name?.trim() || name === b.name) return
+              try { await binderApi.renameBinder(b.id, name.trim()) } catch (e: any) { toast.error(e.message) }
+            }}
+          />
+        )}
+
+        {/* Binder context line. The sort/drag interaction is the one thing users
+            reliably get confused by, so say it plainly rather than letting a
+            drag silently snap back under an active sort. */}
+        {selectedBinder && (
+          <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="font-semibold text-gray-800">{selectedBinder.name}</span>
+            {selectedBinder.smart_filter ? (
+              <span className="text-gray-500">Fills itself automatically — no manual order.</span>
+            ) : canReorder ? (
+              <span className="text-purple-700">Drag cards to rearrange. Your order saves as you go.</span>
+            ) : (
+              <span className="text-amber-700">
+                Sorted by {sortColumn}. <button
+                  onClick={() => setSortColumn(null)}
+                  className="underline font-semibold"
+                >Switch to custom order</button> to rearrange.
+              </span>
+            )}
+            {binderLoading && <span className="text-gray-400">Loading…</span>}
+          </div>
+        )}
+
         {/* One-time eBay prompt. Asked once, remembered — bulk sellers don't
             get nagged per card. Off-eBay sales use Mark as Sold instead. */}
         {soldPrompt && soldPrompt.length > 0 && (
@@ -2118,14 +2228,25 @@ function CollectionPageContent() {
               </p>
             ) : (
               <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <SortableGrid
+                enabled={canReorder}
+                ids={displayedCards.map(c => c.id)}
+                onReorder={(movedId, afterId, nextIds) => {
+                  // Reorder the loaded binder list to match, then persist.
+                  const byId = new Map((binderCards ?? []).map(c => [c.id, c]))
+                  const next = nextIds.map(id => byId.get(id)).filter(Boolean) as Card[]
+                  const rest = (binderCards ?? []).filter(c => !nextIds.includes(c.id))
+                  handleBinderReorder(movedId, afterId, [...next, ...rest])
+                }}
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+              >
                 {displayedCards.map((card) => {
               // 🎯 Use unified label data for consistent display
               const labelData = getCardLabelData(card);
 
               return (
+                <SortableCell key={card.id} id={card.id} enabled={canReorder}>
                 <CardSlabGrid
-                  key={card.id}
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine}
                   features={labelData.features}
@@ -2189,9 +2310,10 @@ function CollectionPageContent() {
                     </Link>
                   </div>
                 </CardSlabGrid>
+                </SortableCell>
               );
                 })}
-              </div>
+              </SortableGrid>
 
               {/* Load More Button */}
               {hasMore && (
@@ -2301,6 +2423,41 @@ function CollectionPageContent() {
                             )}
                           </div>
                         )}
+                        {/* Add to binder — the primary way cards get filed */}
+                        {selectedCardIds.size > 0 && binderApi.available && (
+                          <button
+                            onClick={() => setAddToBinderOpen(true)}
+                            disabled={isDeleting}
+                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                            title="Add selected cards to a binder"
+                          >
+                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                            <span className="hidden md:inline">Add to binder ({selectedCardIds.size})</span>
+                          </button>
+                        )}
+
+                        {/* Remove from THIS binder — membership only, the cards stay */}
+                        {selectedCardIds.size > 0 && selectedBinderId && binderReorderable && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await binderApi.removeCards(selectedBinderId, [...selectedCardIds])
+                                toast.success(`Removed from binder — the card${selectedCardIds.size === 1 ? ' is' : 's are'} still in your collection.`)
+                                setSelectedCardIds(new Set())
+                                setRefreshKey(k => k + 1)
+                              } catch (e: any) { toast.error(e.message) }
+                            }}
+                            disabled={isDeleting}
+                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                            title="Remove from this binder (keeps the cards)"
+                          >
+                            <span className="hidden md:inline">Remove from binder</span>
+                            <span className="md:hidden">－</span>
+                          </button>
+                        )}
+
                         {/* Download Reports Button */}
                         {selectedCardIds.size > 0 && (
                           <button
@@ -2849,6 +3006,74 @@ function CollectionPageContent() {
         selectedCards={cards.filter(c => selectedCardIds.has(c.id)) as any}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
+
+      {addToBinderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAddToBinderOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900">
+              Add {selectedCardIds.size} card{selectedCardIds.size === 1 ? '' : 's'} to…
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              A card can live in as many binders as you like — adding it here doesn&apos;t
+              take it out of anywhere else.
+            </p>
+
+            <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
+              {binderApi.binders.filter(b => !b.smart_filter).map(b => (
+                <button
+                  key={b.id}
+                  onClick={async () => {
+                    try {
+                      const r = await binderApi.addCards(b.id, [...selectedCardIds])
+                      toast.success(
+                        r.skipped
+                          ? `Added ${r.added} to "${b.name}" (${r.skipped} already there).`
+                          : `Added ${r.added} card${r.added === 1 ? '' : 's'} to "${b.name}".`
+                      )
+                      setAddToBinderOpen(false)
+                      setSelectedCardIds(new Set())
+                    } catch (e: any) { toast.error(e.message) }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-gray-200 hover:bg-gray-50 text-left"
+                >
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ background: b.accent_color || '#a78bfa' }} />
+                  <span className="font-semibold text-gray-900">{b.name}</span>
+                  <span className="ml-auto text-sm text-gray-400">{b.card_count}</span>
+                </button>
+              ))}
+
+              {binderApi.binders.filter(b => !b.smart_filter).length === 0 && (
+                <p className="text-sm text-gray-500 py-4 text-center">
+                  You don&apos;t have any binders yet.
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={async () => {
+                const name = window.prompt('Name this binder', 'New binder')
+                if (!name?.trim()) return
+                try {
+                  const b = await binderApi.createBinder(name.trim())
+                  const r = await binderApi.addCards(b.id, [...selectedCardIds])
+                  toast.success(`Created "${b.name}" with ${r.added} card${r.added === 1 ? '' : 's'}.`)
+                  setAddToBinderOpen(false)
+                  setSelectedCardIds(new Set())
+                } catch (e: any) { toast.error(e.message) }
+              }}
+              className="mt-4 w-full px-4 py-2 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700"
+            >
+              ＋ New binder with these cards
+            </button>
+            <button
+              onClick={() => setAddToBinderOpen(false)}
+              className="mt-2 w-full px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {deleteCard && (
         <DeleteCardModal
