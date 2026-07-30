@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { BinderDropTarget } from './SortableCardGrid';
 
 /**
  * Horizontally scrollable binder selector, sitting above the collection's
@@ -54,24 +55,31 @@ export function BinderStrip({
 
         {binders.map(b => {
           const active = selectedId === b.id;
+          // Smart binders fill themselves — nothing can be dropped into them.
+          const canDrop = !b.smart_filter;
           return (
-            <button
-              key={b.id}
-              className={chip(active)}
-              onClick={() => onSelect(b.id)}
-              onDoubleClick={() => onManage(b)}
-              title={b.smart_filter ? 'Fills itself from a filter' : 'Drag cards to rearrange'}
-            >
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: b.accent_color || (active ? '#fff' : '#a78bfa') }}
-              />
-              <span className="whitespace-nowrap">{b.name}</span>
-              {b.smart_filter ? <span className="text-xs opacity-70">auto</span> : null}
-              <span className={`text-xs ${active ? 'text-purple-100' : 'text-gray-400'}`}>
-                {b.card_count}
-              </span>
-            </button>
+            <BinderDropTarget key={b.id} binderId={b.id} disabled={!canDrop}>
+              {(isOver) => (
+                <button
+                  className={`${chip(active)} ${
+                    isOver ? 'ring-4 ring-purple-400 ring-offset-1 scale-105 bg-purple-50 border-purple-400 text-purple-900' : ''
+                  }`}
+                  onClick={() => onSelect(b.id)}
+                  onDoubleClick={() => onManage(b)}
+                  title={b.smart_filter ? 'Fills itself from a filter' : 'Drop cards here to add them'}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: b.accent_color || (active && !isOver ? '#fff' : '#a78bfa') }}
+                  />
+                  <span className="whitespace-nowrap">{b.name}</span>
+                  {b.smart_filter ? <span className="text-xs opacity-70">auto</span> : null}
+                  <span className={`text-xs ${active && !isOver ? 'text-purple-100' : 'text-gray-400'}`}>
+                    {isOver ? 'drop' : b.card_count}
+                  </span>
+                </button>
+              )}
+            </BinderDropTarget>
           );
         })}
 
@@ -85,10 +93,15 @@ export function BinderStrip({
 
       {/* Empty state: a bare "+ New binder" chip on its own reads as broken, so
           say what a binder is for exactly once. */}
-      {binders.length === 0 && (
+      {binders.length === 0 ? (
         <p className="text-sm text-gray-500 mt-1">
           Binders let you group cards however you like — by set, by player, by what&apos;s
-          for sale — and drag them into your own order.
+          for sale. Make one, then drag cards onto it.
+        </p>
+      ) : (
+        <p className="text-sm text-gray-500 mt-1">
+          Drag any card onto a binder to file it — or tick cards and use{' '}
+          <span className="font-semibold">Add to binder</span>.
         </p>
       )}
     </div>

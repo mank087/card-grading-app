@@ -15,7 +15,7 @@ import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167Lab
 import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 import BinderStrip from '@/components/binders/BinderStrip'
-import { SortableGrid, SortableCell } from '@/components/binders/SortableCardGrid'
+import { SortableGrid, SortableCell, CollectionDnd } from '@/components/binders/SortableCardGrid'
 import { useBinders } from '@/components/binders/useBinders'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
@@ -1563,10 +1563,26 @@ function CollectionPageContent() {
   const displayedCards = filteredCards.slice(0, displayLimit)
   const hasMore = filteredCards.length > displayLimit
 
-  // Dragging requires a manual binder AND no active sort — otherwise the sort
+  // Reordering requires a manual binder AND no active sort — otherwise the sort
   // would immediately re-order whatever the user just arranged.
   const canReorder = Boolean(selectedBinderId) && binderReorderable && !sortColumn
   const selectedBinder = binderApi.binders.find(b => b.id === selectedBinderId) || null
+  // Dragging is available whenever there's somewhere to drop — you can drag a
+  // card onto a binder chip from any view, including All Cards.
+  const canDragCards = binderApi.available && binderApi.binders.some(b => !b.smart_filter)
+
+  /** Card dragged onto a binder chip. */
+  const fileCardToBinder = async (cardId: string, binderId: string) => {
+    const binder = binderApi.binders.find(b => b.id === binderId)
+    try {
+      const r = await binderApi.addCards(binderId, [cardId])
+      toast.success(
+        r.added
+          ? `Added to "${binder?.name ?? 'binder'}".`
+          : `Already in "${binder?.name ?? 'binder'}".`
+      )
+    } catch (e: any) { toast.error(e.message) }
+  }
 
   // Multi-select helper calculations (must be after displayedCards is defined)
   const isAllSelected = displayedCards.length > 0 && displayedCards.every(card => selectedCardIds.has(card.id))
@@ -1912,6 +1928,30 @@ function CollectionPageContent() {
           </div>
         </div>
 
+        {/* One drag context spans the strip AND the grid, so a card can be
+            dragged out of the grid and dropped onto a binder chip. */}
+        <CollectionDnd
+          enabled={canDragCards}
+          ids={displayedCards.map(c => c.id)}
+          canReorder={canReorder}
+          onReorder={(movedId, afterId, nextIds) => {
+            const byId = new Map((binderCards ?? []).map(c => [c.id, c]))
+            const next = nextIds.map(id => byId.get(id)).filter(Boolean) as Card[]
+            const rest = (binderCards ?? []).filter(c => !nextIds.includes(c.id))
+            handleBinderReorder(movedId, afterId, [...next, ...rest])
+          }}
+          onFileToBinder={fileCardToBinder}
+          dragPreview={(cardId) => {
+            const c = displayedCards.find(x => x.id === cardId)
+            if (!c) return null
+            return (
+              <div className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-bold shadow-2xl rotate-3">
+                {getPlayerName(c)}
+              </div>
+            )
+          }}
+        >
+
         {/* Binder strip — scopes everything below it. Hidden entirely until the
             binders migration lands, so the page behaves exactly as before. */}
         {binderApi.available && (
@@ -2236,15 +2276,7 @@ function CollectionPageContent() {
             ) : (
               <>
               <SortableGrid
-                enabled={canReorder}
                 ids={displayedCards.map(c => c.id)}
-                onReorder={(movedId, afterId, nextIds) => {
-                  // Reorder the loaded binder list to match, then persist.
-                  const byId = new Map((binderCards ?? []).map(c => [c.id, c]))
-                  const next = nextIds.map(id => byId.get(id)).filter(Boolean) as Card[]
-                  const rest = (binderCards ?? []).filter(c => !nextIds.includes(c.id))
-                  handleBinderReorder(movedId, afterId, [...next, ...rest])
-                }}
                 className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
               >
                 {displayedCards.map((card) => {
@@ -2252,7 +2284,31 @@ function CollectionPageContent() {
               const labelData = getCardLabelData(card);
 
               return (
-                <SortableCell key={card.id} id={card.id} enabled={canReorder}>
+                <SortableCell key={card.id} id={card.id} enabled={canDragCards}>
+                {/* Wrapper gives the selection control something to anchor to
+                    and carries the selected ring. `group` drives hover reveal. */}
+                <div className={`relative group rounded-2xl transition-shadow ${
+                  selectedCardIds.has(card.id) ? 'ring-4 ring-purple-500 ring-offset-2' : ''
+                }`}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleCardSelection(card.id) }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-pressed={selectedCardIds.has(card.id)}
+                  aria-label={selectedCardIds.has(card.id) ? 'Deselect card' : 'Select card'}
+                  title={selectedCardIds.has(card.id) ? 'Deselect' : 'Select'}
+                  className={`absolute top-2 left-2 z-30 w-7 h-7 rounded-md border-2 flex items-center justify-center shadow-sm transition-all ${
+                    selectedCardIds.has(card.id)
+                      ? 'bg-purple-600 border-purple-600 opacity-100'
+                      : 'bg-white/90 border-gray-300 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:border-purple-500'
+                  } ${isSomeSelected ? 'opacity-100' : ''}`}
+                >
+                  {selectedCardIds.has(card.id) && (
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 111.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z" />
+                    </svg>
+                  )}
+                </button>
                 <CardSlabGrid
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine}
@@ -2268,23 +2324,6 @@ function CollectionPageContent() {
                 >
                   {/* Visibility & Price Badges */}
                   <div className="relative">
-                    {/* Selection checkbox — gallery view had none, so binders
-                        could only be filled from list view. stopPropagation
-                        keeps a tap here from starting a drag or opening the card. */}
-                    <label
-                      className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 border-2 border-gray-300 shadow-sm cursor-pointer hover:border-purple-500"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleCardSelection(card.id) }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title={selectedCardIds.has(card.id) ? 'Deselect' : 'Select for binders, labels or downloads'}
-                    >
-                      <input
-                        type="checkbox"
-                        readOnly
-                        checked={selectedCardIds.has(card.id)}
-                        className="w-4 h-4 text-purple-600 rounded pointer-events-none"
-                      />
-                    </label>
-
                     {/* Visibility Badge - Left */}
                     <div className={`absolute -top-8 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
                       card.visibility === 'public'
@@ -2334,6 +2373,7 @@ function CollectionPageContent() {
                     </Link>
                   </div>
                 </CardSlabGrid>
+                </div>
                 </SortableCell>
               );
                 })}
@@ -2980,6 +3020,7 @@ function CollectionPageContent() {
             )}
           </>
         )}
+        </CollectionDnd>
       </div>
 
       {/* Batch Foldable Label Modal (Avery 6871) */}
