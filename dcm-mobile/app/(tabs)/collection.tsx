@@ -173,7 +173,12 @@ export default function CollectionScreen() {
     if (!(await hasActiveSession())) return
     setFetchError(null)
     try {
-      const { data, error } = await supabase
+      // Ownership filter: sold and archived cards leave the collection (their
+      // grade page stays online for the buyer), and soft-deleted ones are
+      // hidden entirely. `applyOwnership` off = pre-migration fallback so an
+      // app build that ships ahead of the schema still lists cards.
+      const runQuery = (applyOwnership: boolean) => {
+        let q = supabase
         .from('cards')
         .select(`
           id, serial, card_name, featured, category, sub_category, card_set,
@@ -188,6 +193,15 @@ export default function CollectionScreen() {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1000)
+        if (applyOwnership) q = q.eq('ownership_status', 'owned').is('deleted_at', null)
+        return q
+      }
+
+      let { data, error } = await runQuery(true)
+      if (error && (error as any).code === '42703') {
+        console.warn('[collection] ownership columns missing — listing all cards')
+        ;({ data, error } = await runQuery(false))
+      }
 
       if (error) throw error
 

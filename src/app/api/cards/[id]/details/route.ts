@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
 import { isUuid } from "@/lib/uuid";
+import { isRecordLocked, LOCKED_RECORD_ERROR } from "@/lib/cards/ownership";
 
 // Fields that are protected and cannot be edited
 const PROTECTED_FIELDS = [
@@ -309,6 +310,13 @@ export async function PATCH(
 
     if (card.user_id !== auth.userId) {
       return NextResponse.json({ error: "You do not own this card" }, { status: 403 });
+    }
+
+    // 2b. A sold card's identity is frozen. The buyer is holding a slab whose
+    // QR resolves to this page — editing the name/set/number after the sale
+    // would show them details that don't match what they bought.
+    if (isRecordLocked(card)) {
+      return NextResponse.json(LOCKED_RECORD_ERROR, { status: 423 });
     }
 
     // 3. Parse request body

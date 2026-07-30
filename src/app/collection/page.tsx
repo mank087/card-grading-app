@@ -413,6 +413,8 @@ function CollectionPageContent() {
   const [ownershipReady, setOwnershipReady] = useState(true)
   const [sellCard, setSellCard] = useState<Card | null>(null)
   const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
+  // Bumped to force a collection refetch (e.g. after an undo restores a card).
+  const [refreshKey, setRefreshKey] = useState(0)
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
@@ -562,7 +564,7 @@ function CollectionPageContent() {
     }
 
     fetchCards()
-  }, [searchQuery, ownershipView])
+  }, [searchQuery, ownershipView, refreshKey])
 
   // Background price refresh for stale cards (>= 7 days old)
   useEffect(() => {
@@ -1605,11 +1607,31 @@ function CollectionPageContent() {
         throw new Error(data.error || 'Failed to delete card')
       }
 
+      const result = await response.json().catch(() => ({}))
+
       // Remove card from local state
       setCards(prevCards => prevCards.filter(card => card.id !== cardId))
 
-      // Show success message
-      toast.success('Card deleted successfully!')
+      // Soft-deleted cards can be put straight back. Offer it in the toast —
+      // the moment right after deleting is when people realise their mistake.
+      if (result.restorable) {
+        toast.action('Card deleted', 'Undo', async () => {
+          try {
+            const s = getStoredSession()
+            const res = await fetch(`/api/cards/${cardId}`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${s?.access_token}` },
+            })
+            if (!res.ok) throw new Error((await res.json()).error || 'Restore failed')
+            toast.success("Card restored — it's private, make it public to share again.")
+            setRefreshKey(k => k + 1)
+          } catch (e: any) {
+            toast.error(e.message)
+          }
+        })
+      } else {
+        toast.success('Card deleted successfully!')
+      }
     } catch (error: any) {
       console.error('Delete error:', error)
       toast.error(`Failed to delete card: ${error.message}`)

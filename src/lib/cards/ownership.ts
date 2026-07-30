@@ -46,6 +46,56 @@ export function isMissingColumnError(error: unknown): boolean {
   return typeof e.message === 'string' && /column .* does not exist/i.test(e.message);
 }
 
+/**
+ * True once a card has been sold on. The buyer-facing record is frozen from
+ * this point.
+ *
+ * The threat this closes: a seller lists a card, sells it, and then edits the
+ * card's name / set / number / year — or hides the page, or deletes it. The
+ * buyer, holding a slab whose QR points at /verify/<serial>, then sees details
+ * that don't match what they bought, or nothing at all. Once money has changed
+ * hands the grade record stops being the seller's to rewrite.
+ *
+ * Reversible by design: "Still mine" moves the card back to 'owned' and unlocks
+ * it, because sales get cancelled and manual marks are self-reported.
+ */
+export function isRecordLocked(card: { ownership_status?: string | null } | null | undefined): boolean {
+  return card?.ownership_status === 'sold';
+}
+
+/** Standard 423 body for a write blocked by the sold lock. */
+export const LOCKED_RECORD_ERROR = {
+  error:
+    "This card is marked as sold, so its grade record is locked — the buyer can " +
+    "verify it by scanning the label. If you still own it, move it back to your " +
+    "collection with \"Still mine\" first.",
+  code: 'card_sold_locked',
+} as const;
+
+/**
+ * Run a query that uses the new ownership/deleted_at columns; if the schema
+ * predates them, fall back to a variant that doesn't.
+ *
+ * Both callbacks return the usual supabase `{ data, error }`. Used by paths
+ * where a hard failure during the migration window would be user-visible —
+ * most importantly /verify/<serial>, the QR target printed on every slab.
+ */
+export async function withColumnFallback<T extends { data: any; error: any }>(
+  primary: () => PromiseLike<T>,
+  fallback: () => PromiseLike<T>,
+  label = 'query'
+): Promise<T> {
+  const result = await primary();
+  if (result.error && isMissingColumnError(result.error)) {
+    console.warn(
+      `[ownership] ${label}: ownership columns missing — using the pre-migration query. ` +
+      `Apply supabase/migrations/20260730_add_card_ownership_status.sql.`
+    );
+    return fallback();
+  }
+  return result;
+}
+
 /** Human-readable label for a sale channel. */
 export function soldChannelLabel(channel: string | null | undefined): string {
   switch (channel) {

@@ -537,19 +537,73 @@ export default function CardDetailScreen() {
     await Share.share({ message: `Check out this ${cardName} graded ${grade}/10 by DCM! https://dcmgrading.com/${catPath}/${card.id}` })
   }
 
+  /**
+   * Move the card out of the collection without destroying it.
+   *
+   * Both actions go through the web API rather than hitting Supabase directly:
+   * the server owns the rules (a sold card's record is locked, deletes are
+   * soft) and a direct client write would sail straight past all of them.
+   */
+  const callOwnershipApi = async (
+    path: string,
+    method: 'PATCH' | 'DELETE',
+    body?: Record<string, any>
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Not authenticated')
+    const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const res = await fetch(`${apiBase}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json.error || 'Request failed')
+    return json
+  }
+
+  const handleMarkSold = () => {
+    Alert.alert(
+      'Mark as sold',
+      "This takes the card out of your collection and stops it being offered for eBay listings — but keeps its grade page online so the buyer can still scan the label and verify it.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark as sold',
+          onPress: async () => {
+            try {
+              await callOwnershipApi(`/api/cards/${card.id}/ownership`, 'PATCH', {
+                ownership_status: 'sold',
+              })
+              router.back()
+            } catch (err: any) {
+              Alert.alert('Could not mark as sold', err?.message || 'Please try again.')
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const handleDelete = () => {
-    Alert.alert('Delete Card', 'Are you sure? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          const { error } = await supabase.from('cards').delete().eq('id', card.id)
-          if (error) throw error
-          router.back()
-        } catch (err: any) {
-          Alert.alert('Delete failed', err?.message || 'Could not delete this card. Please try again.')
-        }
-      }},
-    ])
+    Alert.alert(
+      'Delete Card',
+      "This removes the card, its images and its grade report, and the QR code on its printed label will stop working.\n\nIf you SOLD this card, use \"Mark as Sold\" instead — that keeps the grade page alive for the buyer.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await callOwnershipApi(`/api/cards/${card.id}`, 'DELETE')
+            router.back()
+          } catch (err: any) {
+            Alert.alert('Delete failed', err?.message || 'Could not delete this card. Please try again.')
+          }
+        }},
+      ]
+    )
   }
 
   return (
@@ -2660,8 +2714,33 @@ export default function CardDetailScreen() {
           )
         })()}
 
+        {/* ══════ SOLD BANNER ══════ */}
+        {card.ownership_status === 'sold' && (
+          <View style={s.soldBanner}>
+            <Ionicons name="checkmark-circle" size={18} color={'#047857'} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={s.soldBannerTitle}>
+                SOLD{card.sold_at ? ` · ${new Date(card.sold_at).toLocaleDateString()}` : ''}
+              </Text>
+              <Text style={s.soldBannerBody}>
+                {isOwner
+                  ? 'Out of your collection, but the grade report stays online so the buyer can verify it. The record is locked — use "Still mine" on the web to edit it.'
+                  : 'This card has been sold. Its grade and details are locked and cannot be changed.'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* ══════ OWNERSHIP ══════ */}
+        {isOwner && card.ownership_status !== 'sold' && (
+          <TouchableOpacity style={s.soldBtn} onPress={handleMarkSold}>
+            <Ionicons name="pricetag" size={16} color={'#047857'} />
+            <Text style={s.soldBtnText}>Mark as sold</Text>
+          </TouchableOpacity>
+        )}
+
         {/* ══════ DELETE ══════ */}
-        {isOwner && (
+        {isOwner && card.ownership_status !== 'sold' && (
           <TouchableOpacity style={s.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash" size={16} color={Colors.red[600]} />
             <Text style={s.deleteBtnText}>Delete card from collection</Text>
@@ -2922,4 +3001,9 @@ const s = StyleSheet.create({
   // Delete
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.red[100], backgroundColor: Colors.red[50] },
   deleteBtnText: { fontSize: 14, fontWeight: '600', color: Colors.red[600] },
+  soldBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' },
+  soldBtnText: { fontSize: 14, fontWeight: '600', color: '#047857' },
+  soldBanner: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 24, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' },
+  soldBannerTitle: { fontSize: 13, fontWeight: '800', color: '#065f46', letterSpacing: 0.5 },
+  soldBannerBody: { fontSize: 13, color: '#047857', marginTop: 3, lineHeight: 18 },
 })

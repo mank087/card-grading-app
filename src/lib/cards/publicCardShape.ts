@@ -8,7 +8,14 @@
  * detail client still uses it for owner-only UI; that removal is a separate
  * change tied to the ownership-check refactor.
  */
-const SENSITIVE_CARD_FIELDS = ['user_email'] as const
+/**
+ * `sold_price` / `sold_note` are the SELLER's private business details. The
+ * card detail page is public (and indexed), and these routes run with the
+ * service role, so returning them would publish what every card sold for to
+ * anyone who opens devtools. The owner still sees both on the authenticated
+ * collection endpoint, which is where the sold view reads them from.
+ */
+const SENSITIVE_CARD_FIELDS = ['user_email', 'sold_price', 'sold_note'] as const
 
 export function stripSensitiveCardFields<T extends Record<string, any>>(card: T): T {
   if (!card || typeof card !== 'object') return card

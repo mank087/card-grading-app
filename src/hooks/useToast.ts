@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import toast from 'react-hot-toast'
 
 /**
@@ -60,6 +61,43 @@ export function useToast() {
           fontWeight: '500',
         },
       })
+    },
+
+    /**
+     * Success toast carrying a single action button — "Card deleted · Undo".
+     *
+     * Kept here rather than calling react-hot-toast directly at the call site
+     * so the styling stays consistent and callers keep using one toast API.
+     * The toast dismisses itself before running the action.
+     */
+    action: (
+      message: string,
+      actionLabel: string,
+      onAction: () => void,
+      duration = 8000
+    ) => {
+      toast.success(
+        (t) => (
+          React.createElement(
+            'span',
+            { className: 'flex items-center gap-3' },
+            message,
+            React.createElement(
+              'button',
+              {
+                onClick: () => { toast.dismiss(t.id); onAction() },
+                className: 'underline font-semibold whitespace-nowrap',
+              },
+              actionLabel
+            )
+          )
+        ),
+        {
+          duration,
+          style: { background: '#10B981', color: '#fff', fontWeight: '500' },
+          iconTheme: { primary: '#fff', secondary: '#10B981' },
+        }
+      )
     },
 
     /**

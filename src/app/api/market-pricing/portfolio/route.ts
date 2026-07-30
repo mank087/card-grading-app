@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('user_id', auth.userId)
       .order('created_at', { ascending: false });
-      if (applyOwnership) q = q.eq('ownership_status', 'owned');
+      if (applyOwnership) q = q.eq('ownership_status', 'owned').is('deleted_at', null);
       return q;
     };
 

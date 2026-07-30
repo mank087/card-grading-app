@@ -34,6 +34,7 @@ import { OnePiecePriceLookup } from '@/components/pricing/OnePiecePriceLookup';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
+import { SoldBanner } from '@/components/cards/SoldBanner';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
@@ -367,6 +368,13 @@ interface SportsAIGrading {
 }
 
 interface SportsCard {
+  // Ownership lifecycle — a sold card leaves the collection but keeps this
+  // page online so the buyer's slab QR still resolves.
+  ownership_status?: 'owned' | 'sold' | 'archived' | null;
+  sold_at?: string | null;
+  sold_price?: number | null;
+  sold_channel?: 'ebay' | 'manual' | 'other' | null;
+  sold_note?: string | null;
   id: string;
   serial: string;
   front_url: string;
@@ -2761,6 +2769,17 @@ export function OnePieceCardDetails() {
       {/* Main Layout */}
       <div className="space-y-8">
         {/* Card Images with Professional-Style Labels in Metallic Slab */}
+        {/* Sold: the record is locked and stays online for the buyer */}
+        {card?.ownership_status === 'sold' && (
+          <SoldBanner
+            soldAt={card.sold_at}
+            soldPrice={card.sold_price}
+            soldChannel={card.sold_channel}
+            soldNote={card.sold_note}
+            isOwner={getStoredSession()?.user?.id === card.user_id}
+          />
+        )}
+
         <div id="tour-card-images" className="flex justify-center">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
             {/* Front Card with Label - Metallic Slab */}

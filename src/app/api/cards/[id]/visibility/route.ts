@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { isUuid } from "@/lib/uuid";
+import { isRecordLocked } from "@/lib/cards/ownership";
 
 type VisibilityToggleRequest = {
   params: Promise<{ id: string }>;
@@ -71,7 +72,7 @@ export async function PATCH(
     // Check if card exists and user owns it
     const { data: card, error: cardError } = await supabase
       .from('cards')
-      .select('id, user_id, serial')
+      .select('id, user_id, serial, ownership_status')
       .eq('id', cardId)
       .single();
 
@@ -87,6 +88,22 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Forbidden - You can only change visibility of your own cards" },
         { status: 403 }
+      );
+    }
+
+    // A sold card can't be hidden. The buyer's slab carries a QR to this
+    // page; making it private turns that QR into a dead end. Going MORE
+    // visible is always allowed.
+    if (visibility === 'private' && isRecordLocked(card)) {
+      return NextResponse.json(
+        {
+          error:
+            "This card is marked as sold, so it has to stay visible — the buyer " +
+            "verifies it by scanning the label. Move it back to your collection " +
+            "with \"Still mine\" first if you want to hide it.",
+          code: 'card_sold_locked',
+        },
+        { status: 423 }
       );
     }
 

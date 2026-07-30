@@ -46,6 +46,20 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS sold_note TEXT;
 -- cancelled eBay sale would have the 15-minute cron re-mark it sold forever.
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS ownership_overridden_at TIMESTAMPTZ;
 
+-- Soft delete. Deleting used to remove the row AND purge both card images from
+-- storage in the same request — unrecoverable, and it took the slab's QR target
+-- and the eBay sale record with it. Now a delete just stamps deleted_at: the
+-- card leaves every view, images stay put, and it can be restored. A later
+-- sweep can hard-delete rows past a retention window and purge their images
+-- then, when the decision has had time to be regretted.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Every read path filters `deleted_at IS NULL`; a partial index keeps that
+-- free rather than making the common case pay for the rare one.
+CREATE INDEX IF NOT EXISTS idx_cards_user_live
+  ON cards(user_id, created_at DESC)
+  WHERE deleted_at IS NULL;
+
 -- Constrain to the known states. Written as a guarded DO block so re-running
 -- the migration doesn't error on an existing constraint.
 DO $$
@@ -85,3 +99,5 @@ COMMENT ON COLUMN cards.sold_channel IS
   'ebay = auto-detected by the eBay sync; manual = user marked an off-platform sale; other = reserved.';
 COMMENT ON COLUMN cards.ownership_overridden_at IS
   'Last MANUAL ownership change. The eBay reconciliation defers to it unless a newer sale post-dates it, so "Still mine" is not undone by the next cron run.';
+COMMENT ON COLUMN cards.deleted_at IS
+  'Soft delete. NULL = live. Set = hidden everywhere but restorable; images are NOT purged until a retention sweep hard-deletes the row.';

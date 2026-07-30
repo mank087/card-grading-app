@@ -173,6 +173,16 @@ export interface Card {
   scryfall_price_usd: number | null
   scryfall_price_usd_foil: number | null
 
+  // Ownership lifecycle — a sold card leaves the collection but keeps its
+  // grade page online so the buyer's slab QR still resolves. Never delete a
+  // graded card; see the web migration 20260730_add_card_ownership_status.sql.
+  ownership_status?: 'owned' | 'sold' | 'archived' | null
+  sold_at?: string | null
+  sold_price?: number | null
+  sold_channel?: 'ebay' | 'manual' | 'other' | null
+  sold_note?: string | null
+  deleted_at?: string | null
+
   // Card characteristics
   visibility: 'public' | 'private'
   is_foil: boolean | null

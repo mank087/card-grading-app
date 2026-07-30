@@ -119,8 +119,10 @@ export async function GET(request: NextRequest) {
         .limit(HARD_LIMIT);
 
       // You can't list a card you no longer hold. Covers eBay sales, private
-      // sales, and archived cards alike.
-      if (applyOwnership) query = query.eq('ownership_status', 'owned');
+      // sales, and archived cards alike — plus soft-deleted ones.
+      if (applyOwnership) {
+        query = query.eq('ownership_status', 'owned').is('deleted_at', null);
+      }
       return query;
     };
     let query = buildQuery(true);

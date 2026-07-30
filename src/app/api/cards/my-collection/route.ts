@@ -62,8 +62,9 @@ export async function GET(request: NextRequest) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (applyOwnership && ownershipFilter) {
-        query = query.eq('ownership_status', ownershipFilter);
+      if (applyOwnership) {
+        query = query.is('deleted_at', null);
+        if (ownershipFilter) query = query.eq('ownership_status', ownershipFilter);
       }
 
       // Apply search filter if provided
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
             .from('cards')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
+            .is('deleted_at', null)
             .eq('ownership_status', status)
         )
       );

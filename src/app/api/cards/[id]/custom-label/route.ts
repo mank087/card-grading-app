@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
 import { isUuid } from "@/lib/uuid";
+import { isRecordLocked, LOCKED_RECORD_ERROR } from "@/lib/cards/ownership";
 
 /**
  * Custom Label Data API
@@ -80,6 +81,11 @@ export async function PUT(
 
     if (card.user_id !== auth.userId) {
       return NextResponse.json({ error: "You do not own this card" }, { status: 403 });
+    }
+
+    // The label is what the buyer sees on the slab — frozen once sold.
+    if (isRecordLocked(card)) {
+      return NextResponse.json(LOCKED_RECORD_ERROR, { status: 423 });
     }
 
     const body = await request.json();
