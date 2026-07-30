@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -20,20 +20,21 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 /**
- * Drag-to-reorder for a binder, shaped as a PROVIDER + CELL rather than a
- * render-prop grid so it can wrap the collection's existing (large, inline)
- * card markup without restructuring it.
+ * Drag-to-reorder for a binder, shaped as a PROVIDER + CELL so it can wrap the
+ * collection's existing (large, inline) card markup without restructuring it.
  *
  *   <SortableGrid enabled={...} ids={...} onReorder={...} className="grid ...">
  *     {cards.map(c => <SortableCell key={c.id} id={c.id} enabled={...}>…</SortableCell>)}
  *   </SortableGrid>
  *
- * dnd-kit rather than native HTML5 drag events: HTML5 DnD has no touch support
- * (a lot of this traffic is mobile web) and no keyboard path. dnd-kit gives
- * pointer, touch and keyboard, which keeps reordering reachable without a mouse.
+ * The contexts are ALWAYS rendered, with the sensors gated on `enabled`, rather
+ * than conditionally wrapping the tree. Two reasons: useSortable outside a
+ * SortableContext warns and misbehaves, and flipping the tree structure when a
+ * binder is selected would remount every card. With no sensors the contexts are
+ * inert, so the plain collection pays nothing.
  *
- * When `enabled` is false both components render plain wrappers, so the
- * non-binder collection pays nothing.
+ * dnd-kit rather than native HTML5 drag events: HTML5 DnD has no touch support
+ * (much of this traffic is mobile web) and no keyboard path.
  */
 
 export function SortableCell({
@@ -45,10 +46,13 @@ export function SortableCell({
   enabled: boolean;
   children: React.ReactNode;
 }) {
-  const sortable = useSortable({ id, disabled: !enabled });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !enabled,
+  });
+
   if (!enabled) return <>{children}</>;
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
   return (
     <div
       ref={setNodeRef}
@@ -57,10 +61,17 @@ export function SortableCell({
         transition,
         opacity: isDragging ? 0.4 : 1,
         zIndex: isDragging ? 10 : undefined,
-      }}
+        // Without this the browser's own image/link dragging hijacks the
+        // gesture before dnd-kit's 8px threshold is reached, and the card never
+        // moves — it just shows a ghost image.
+        WebkitUserDrag: 'none',
+      } as React.CSSProperties}
+      // Belt and braces for the same problem: card tiles contain <a> and <img>,
+      // both natively draggable.
+      onDragStart={(e) => e.preventDefault()}
       {...attributes}
       {...listeners}
-      className="touch-none cursor-grab active:cursor-grabbing"
+      className="touch-none select-none cursor-grab active:cursor-grabbing"
     >
       {children}
     </div>
@@ -81,35 +92,32 @@ export function SortableGrid({
   className?: string;
   children: React.ReactNode;
 }) {
-  const [, force] = useState(0);
-
-  const sensors = useSensors(
-    // 8px of travel before a drag begins, so a tap still opens the card.
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  if (!enabled) return <div className={className}>{children}</div>;
+  // 8px of travel before a drag begins, so a tap still opens the card.
+  const pointer = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const keyboard = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
+  const active = useSensors(pointer, keyboard);
+  const none = useSensors();
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    const { active: a, over } = event;
+    if (!over || a.id === over.id) return;
 
-    const oldIndex = ids.indexOf(String(active.id));
+    const oldIndex = ids.indexOf(String(a.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
 
     const next = arrayMove(ids, oldIndex, newIndex);
-    const movedIdx = next.indexOf(String(active.id));
+    const movedIdx = next.indexOf(String(a.id));
     // The server takes "put it after X"; at index 0 there is no X.
-    const afterId = movedIdx === 0 ? null : next[movedIdx - 1];
-
-    onReorder(String(active.id), afterId, next);
-    force(n => n + 1);
+    onReorder(String(a.id), movedIdx === 0 ? null : next[movedIdx - 1], next);
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={enabled ? active : none}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
       <SortableContext items={ids} strategy={rectSortingStrategy}>
         <div className={className}>{children}</div>
       </SortableContext>

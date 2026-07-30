@@ -1761,7 +1761,15 @@ function CollectionPageContent() {
       </div>
     );
   }
-  if (cards.length === 0) return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
+  // Only bail out of the whole page when the account genuinely has NO cards.
+  // `cards` is scoped to the selected ownership view now, so returning early on
+  // an empty Sold/Archived tab used to take the tabs, binder strip and every
+  // other control with it — leaving no way back to Owned.
+  const totalAcrossViews =
+    ownershipCounts.owned + ownershipCounts.sold + ownershipCounts.archived
+  if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId) {
+    return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8">
@@ -2221,11 +2229,12 @@ function CollectionPageContent() {
         {viewMode === 'grid' && (
           <>
             {filteredCards.length === 0 ? (
-              <p className="p-6 text-center text-gray-600">
-                {selectedCategory === 'all'
-                  ? 'You have not uploaded any cards yet.'
-                  : `You have no ${selectedCategory} cards in your collection.`}
-              </p>
+              <EmptyView
+                ownershipView={ownershipView}
+                binderName={selectedBinder?.name || null}
+                category={selectedCategory}
+                onBackToOwned={() => { setOwnershipView('owned'); setSelectedBinderId(null) }}
+              />
             ) : (
               <>
               <SortableGrid
@@ -2261,6 +2270,23 @@ function CollectionPageContent() {
                 >
                   {/* Visibility & Price Badges */}
                   <div className="relative">
+                    {/* Selection checkbox — gallery view had none, so binders
+                        could only be filled from list view. stopPropagation
+                        keeps a tap here from starting a drag or opening the card. */}
+                    <label
+                      className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 border-2 border-gray-300 shadow-sm cursor-pointer hover:border-purple-500"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleCardSelection(card.id) }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      title={selectedCardIds.has(card.id) ? 'Deselect' : 'Select for binders, labels or downloads'}
+                    >
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={selectedCardIds.has(card.id)}
+                        className="w-4 h-4 text-purple-600 rounded pointer-events-none"
+                      />
+                    </label>
+
                     {/* Visibility Badge - Left */}
                     <div className={`absolute -top-8 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
                       card.visibility === 'public'
@@ -2335,11 +2361,12 @@ function CollectionPageContent() {
         {viewMode === 'list' && (
           <>
             {filteredCards.length === 0 ? (
-              <p className="p-6 text-center text-gray-600">
-                {selectedCategory === 'all'
-                  ? 'You have not uploaded any cards yet.'
-                  : `You have no ${selectedCategory} cards in your collection.`}
-              </p>
+              <EmptyView
+                ownershipView={ownershipView}
+                binderName={selectedBinder?.name || null}
+                category={selectedCategory}
+                onBackToOwned={() => { setOwnershipView('owned'); setSelectedBinderId(null) }}
+              />
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 {/* Bulk Action Bar - Responsive */}
@@ -3099,6 +3126,58 @@ function CollectionPageContent() {
         />
       )}
     </main>
+  )
+}
+
+/**
+ * Empty state, scoped to whatever the user is actually looking at.
+ *
+ * "You have not uploaded any cards yet" is wrong — and alarming — when the
+ * account is full of cards and they simply opened an empty Sold tab or a new
+ * binder. Each case says what's empty and offers the way back.
+ */
+function EmptyView({
+  ownershipView,
+  binderName,
+  category,
+  onBackToOwned,
+}: {
+  ownershipView: 'owned' | 'sold' | 'archived'
+  binderName: string | null
+  category: string
+  onBackToOwned: () => void
+}) {
+  let title: string
+  let body: string | null = null
+
+  if (binderName) {
+    title = `"${binderName}" is empty`
+    body = 'Select cards in your collection and use "Add to binder" to file them here.'
+  } else if (ownershipView === 'sold') {
+    title = 'No sold cards yet'
+    body = 'When you mark a card as sold it moves here — and stays viewable so the buyer can verify it.'
+  } else if (ownershipView === 'archived') {
+    title = 'Nothing archived'
+    body = 'Archived cards are ones you no longer hold but didn\'t sell.'
+  } else if (category !== 'all') {
+    title = `No ${category} cards in your collection`
+  } else {
+    title = 'You have not uploaded any cards yet.'
+  }
+
+  return (
+    <div className="p-10 text-center">
+      <p className="text-gray-800 font-semibold">{title}</p>
+      {body && <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">{body}</p>}
+      {(binderName || ownershipView !== 'owned') && (
+        <button
+          onClick={onBackToOwned}
+          className="mt-4 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700"
+        >
+          Back to my collection
+        </button>
+      )}
+    </div>
   )
 }
 

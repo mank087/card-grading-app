@@ -30,6 +30,7 @@ import { assessCardCondition, getConditionColor, getConditionDescription, getCon
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
 import { getStoredSession } from '@/lib/directAuth';
 import { SoldBanner } from '@/components/cards/SoldBanner';
+import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
@@ -6392,6 +6393,12 @@ export function SportsCardDetails() {
           </div>
         </div>
       )}
+
+      {/* Add this card to a binder — owner-only, hidden pre-migration */}
+      <CardBinderPicker
+        cardId={card.id}
+        isOwner={Boolean(getStoredSession()?.user?.id && card.user_id && getStoredSession()?.user?.id === card.user_id)}
+      />
 
       {/* Re-grade Confirmation Modal */}
       {showRegradeConfirm && (

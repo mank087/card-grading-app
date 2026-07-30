@@ -35,6 +35,7 @@ import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { SoldBanner } from '@/components/cards/SoldBanner';
+import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
@@ -6702,6 +6703,12 @@ export function StarWarsCardDetails() {
           </div>
         </div>
       )}
+
+      {/* Add this card to a binder — owner-only, hidden pre-migration */}
+      <CardBinderPicker
+        cardId={card.id}
+        isOwner={Boolean(getStoredSession()?.user?.id && card.user_id && getStoredSession()?.user?.id === card.user_id)}
+      />
 
       {/* Re-grade Confirmation Modal */}
       {showRegradeConfirm && (

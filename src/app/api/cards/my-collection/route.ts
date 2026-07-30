@@ -90,6 +90,23 @@ export async function GET(request: NextRequest) {
         'collection. Apply supabase/migrations/20260730_add_card_ownership_status.sql.'
       );
       ownershipApplied = false;
+
+      // Falling back to the UNFILTERED query is only acceptable for the default
+      // "owned" view, where showing everything matches the pre-ownership
+      // behaviour. For an explicit sold/archived request it is actively wrong —
+      // the user asked for a subset and would silently get their whole
+      // collection back under a "Sold" heading. Return nothing instead, and let
+      // ownershipApplied:false tell the client to hide the tabs.
+      if (ownershipFilter && ownershipFilter !== 'owned') {
+        console.warn(`[Collection API] cannot serve status=${ownershipFilter} pre-migration — returning empty.`);
+        return NextResponse.json({
+          cards: [],
+          counts: { owned: 0, sold: 0, archived: 0 },
+          ownershipApplied: false,
+          status: statusParam,
+        });
+      }
+
       // Same query, minus the ownership columns and the filter.
       const legacy = await buildQuery(false);
       cards = (legacy.data ?? null) as unknown as Record<string, any>[] | null;
