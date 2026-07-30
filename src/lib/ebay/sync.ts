@@ -347,7 +347,22 @@ export async function syncUser(
  * Respects a manual override: if the owner said "Still mine" (a cancelled or
  * returned sale) we leave it alone unless a NEWER sale post-dates that call.
  */
-async function reconcileSoldCards(userId: string): Promise<number> {
+export interface EbaySoldCandidate {
+  cardId: string;
+  serial: string | null;
+  soldAt: string | null;
+  price: number | null;
+}
+
+/**
+ * Cards whose eBay listing has SOLD but which are still sitting in the owner's
+ * collection — i.e. the ones an auto-move (or the collection prompt) would act
+ * on. Shared by the sync and /api/cards/sold-pending so both agree on the set.
+ *
+ * Respects a manual override: if the owner said "Still mine" (a cancelled or
+ * returned sale) the card is skipped unless a NEWER sale post-dates that call.
+ */
+export async function findEbaySoldCandidates(userId: string): Promise<EbaySoldCandidate[]> {
   const { data: soldRows, error: listErr } = await supabaseAdmin
     .from('ebay_listings')
     .select('card_id, sold_at, price')
@@ -355,7 +370,7 @@ async function reconcileSoldCards(userId: string): Promise<number> {
     .eq('status', 'sold')
     .not('card_id', 'is', null);
 
-  if (listErr || !soldRows?.length) return 0;
+  if (listErr || !soldRows?.length) return [];
 
   // Most-recent sale wins if a card somehow has several sold rows.
   const byCard = new Map<string, { sold_at: string | null; price: number | null }>();
@@ -376,16 +391,16 @@ async function reconcileSoldCards(userId: string): Promise<number> {
   if (cardErr) {
     // Migration window: columns not applied yet. Listings still sync correctly;
     // cards just aren't stamped until the migration lands.
-    if (cardErr.code === '42703') {
+    if ((cardErr as any).code === '42703') {
       console.warn('[ebay-sync] ownership columns missing — skipping card reconciliation.');
-      return 0;
+      return [];
     }
     console.error('[ebay-sync] card reconciliation query failed:', cardErr.message);
-    return 0;
+    return [];
   }
-  if (!candidates?.length) return 0;
+  if (!candidates?.length) return [];
 
-  let marked = 0;
+  const out: EbaySoldCandidate[] = [];
   for (const card of candidates) {
     const sale = byCard.get(card.id);
     if (!sale) continue;
@@ -396,12 +411,29 @@ async function reconcileSoldCards(userId: string): Promise<number> {
       const soldAt = sale.sold_at ? new Date(sale.sold_at).getTime() : 0;
       if (soldAt <= overriddenAt) continue;
     }
+    out.push({ cardId: card.id, serial: card.serial, soldAt: sale.sold_at, price: sale.price });
+  }
+  return out;
+}
 
+/**
+ * Move the given eBay-sold cards into the Sold category.
+ *
+ * Cards are NOT deleted — the printed slab's QR points at /verify/<serial>, so
+ * the row has to outlive the sale for the buyer. They just leave the owner's
+ * collection and the "list a card" picker.
+ */
+export async function markCardsSoldFromEbay(
+  userId: string,
+  candidates: EbaySoldCandidate[]
+): Promise<number> {
+  let marked = 0;
+  for (const sale of candidates) {
     const { error: updErr } = await supabaseAdmin
       .from('cards')
       .update({
         ownership_status: 'sold',
-        sold_at: sale.sold_at ?? new Date().toISOString(),
+        sold_at: sale.soldAt ?? new Date().toISOString(),
         // ebay_listings.price holds the FINAL sale price once sold — see
         // finalSalePrice() above, not the original ask.
         sold_price: sale.price ?? null,
@@ -409,20 +441,48 @@ async function reconcileSoldCards(userId: string): Promise<number> {
         // A sold card must stay viewable or the buyer's QR resolves to nothing.
         visibility: 'public',
       })
-      .eq('id', card.id)
+      .eq('id', sale.cardId)
       .eq('user_id', userId)
       // Guard against a concurrent manual change between read and write.
       .eq('ownership_status', 'owned');
 
     if (updErr) {
-      console.error(`[ebay-sync] failed to mark card ${card.serial} sold:`, updErr.message);
+      console.error(`[ebay-sync] failed to mark card ${sale.serial} sold:`, updErr.message);
       continue;
     }
     marked++;
-    console.log(`[ebay-sync] card ${card.serial} → sold (eBay${sale.price ? `, $${sale.price}` : ''})`);
+    console.log(`[ebay-sync] card ${sale.serial} → sold (eBay${sale.price ? `, $${sale.price}` : ''})`);
   }
 
   return marked;
+}
+
+/**
+ * Sync-time hook: auto-move eBay-sold cards, but only if the owner has said
+ * that's what they want.
+ *
+ *   NULL   never asked — stand down; the collection prompts instead
+ *   TRUE   move them
+ *   FALSE  they opted out; they mark by hand
+ */
+async function reconcileSoldCards(userId: string): Promise<number> {
+  const { data: prefRow, error: prefErr } = await supabaseAdmin
+    .from('user_credits')
+    .select('ebay_auto_mark_sold')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (prefErr && (prefErr as any).code !== '42703') {
+    console.error('[ebay-sync] could not read auto-mark preference:', prefErr.message);
+    return 0;
+  }
+  // Pre-migration (42703): behave as "not asked" and leave cards alone.
+  const autoMark = prefErr ? null : prefRow?.ebay_auto_mark_sold ?? null;
+  if (autoMark !== true) return 0;
+
+  const candidates = await findEbaySoldCandidates(userId);
+  if (!candidates.length) return 0;
+  return markCardsSoldFromEbay(userId, candidates);
 }
 
 /**

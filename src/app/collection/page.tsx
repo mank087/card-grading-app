@@ -412,9 +412,14 @@ function CollectionPageContent() {
   const [ownershipCounts, setOwnershipCounts] = useState({ owned: 0, sold: 0, archived: 0 })
   const [ownershipReady, setOwnershipReady] = useState(true)
   const [sellCard, setSellCard] = useState<Card | null>(null)
+  const [deleteCard, setDeleteCard] = useState<Card | null>(null)
   const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
   // Bumped to force a collection refetch (e.g. after an undo restores a card).
   const [refreshKey, setRefreshKey] = useState(0)
+  // One-time "we spotted eBay sales — move them to Sold?" prompt. Only ever
+  // shown when there are actual cards waiting on the answer.
+  const [soldPrompt, setSoldPrompt] = useState<{ id: string; name: string; price: number | null }[] | null>(null)
+  const [soldPromptBusy, setSoldPromptBusy] = useState(false)
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
@@ -565,6 +570,53 @@ function CollectionPageContent() {
 
     fetchCards()
   }, [searchQuery, ownershipView, refreshKey])
+
+  // Ask once whether eBay sales should move themselves into Sold. The endpoint
+  // only says "ask" when the question hasn't been answered AND there are cards
+  // actually waiting on it, so this never fires on an empty account.
+  useEffect(() => {
+    const session = getStoredSession()
+    if (!session?.access_token) return
+    fetch('/api/cards/sold-pending', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.shouldAsk && data.pending?.length) setSoldPrompt(data.pending)
+      })
+      .catch(() => { /* prompt is optional — never block the collection on it */ })
+  }, [refreshKey])
+
+  const answerSoldPrompt = async (autoMark: boolean) => {
+    setSoldPromptBusy(true)
+    try {
+      const session = getStoredSession()
+      const res = await fetch('/api/cards/sold-pending', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ autoMark }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not save your choice')
+
+      setSoldPrompt(null)
+      if (autoMark) {
+        toast.success(
+          `Moved ${data.moved} card${data.moved === 1 ? '' : 's'} to Sold. We'll do this automatically from now on.`
+        )
+        setRefreshKey(k => k + 1)
+      } else {
+        toast.success("Got it — we'll leave your eBay sales alone. Use Mark as Sold when you're ready.")
+      }
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSoldPromptBusy(false)
+    }
+  }
 
   // Background price refresh for stale cards (>= 7 days old)
   useEffect(() => {
@@ -1469,8 +1521,13 @@ function CollectionPageContent() {
   const handleBulkDelete = async () => {
     if (selectedCardIds.size === 0) return
 
+    const n = selectedCardIds.size
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${selectedCardIds.size} card${selectedCardIds.size !== 1 ? 's' : ''}?\n\nThis action cannot be undone.`
+      `Delete ${n} card${n !== 1 ? 's' : ''}?\n\n` +
+      `Once deleted they can no longer be found or viewed — the grade reports go away and ` +
+      `the QR codes on their printed labels stop working, for anyone holding them.\n\n` +
+      `If you SOLD these cards, cancel and use "Sold" on each one instead so the buyers ` +
+      `can still verify them.`
     )
 
     if (!confirmDelete) return
@@ -1569,23 +1626,9 @@ function CollectionPageContent() {
     }
   }
 
-  // Delete card handler
+  // Delete opens a two-step dialog (reason, then a hard confirmation) rather
+  // than firing straight into the request — see DeleteCardModal.
   const handleDeleteCard = async (cardId: string, cardName: string) => {
-    // Confirmation dialog. Deleting purges the images and breaks the slab's QR
-    // code permanently — steer people who sold the card to "Mark as Sold".
-    const confirmDelete = window.confirm(
-      `Delete "${cardName}"?\n\n` +
-      `This permanently removes the card, its images, and its grade report. ` +
-      `The QR code on its printed label will stop working, and any eBay sale ` +
-      `history for it is erased too.\n\n` +
-      `If you SOLD this card, cancel and use "Mark as Sold" instead — that keeps ` +
-      `the grade page alive for the buyer.\n\nThis cannot be undone.`
-    )
-
-    if (!confirmDelete) {
-      return
-    }
-
     setDeletingCardId(cardId)
 
     try {
@@ -1801,6 +1844,40 @@ function CollectionPageContent() {
             </div>
           </div>
         </div>
+
+        {/* One-time eBay prompt. Asked once, remembered — bulk sellers don't
+            get nagged per card. Off-eBay sales use Mark as Sold instead. */}
+        {soldPrompt && soldPrompt.length > 0 && (
+          <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+            <p className="font-semibold text-emerald-900">
+              {soldPrompt.length === 1
+                ? `Looks like "${soldPrompt[0].name}" sold on eBay.`
+                : `Looks like ${soldPrompt.length} of your cards sold on eBay.`}
+            </p>
+            <p className="text-sm text-emerald-800 mt-1">
+              Want us to move eBay sales into your <strong>Sold</strong> category automatically?
+              They stay fully viewable there — the buyer can still scan the label and verify the
+              grade — they just leave your active collection and stop being offered for listing.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <button
+                onClick={() => answerSoldPrompt(true)}
+                disabled={soldPromptBusy}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {soldPromptBusy ? 'Saving…' : `Yes, move ${soldPrompt.length === 1 ? 'it' : 'them'} to Sold`}
+              </button>
+              <button
+                onClick={() => answerSoldPrompt(false)}
+                disabled={soldPromptBusy}
+                className="px-4 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              >
+                No, I&apos;ll do it myself
+              </button>
+              <span className="text-xs text-emerald-700">You can change this later in settings.</span>
+            </div>
+          </div>
+        )}
 
         {/* Ownership tabs — Owned / Sold / Archived. Sold and archived cards
             keep their public grade page (the slab QR depends on it); they just
@@ -2362,6 +2439,19 @@ function CollectionPageContent() {
                                   return null;
                                 })()}
 
+                                {/* Sold / Archived badge — makes the category
+                                    obvious at a glance, wherever the tile is shown */}
+                                {card.ownership_status === 'sold' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold tracking-wider">
+                                    SOLD
+                                  </span>
+                                )}
+                                {card.ownership_status === 'archived' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-500 text-white text-[10px] font-extrabold tracking-wider">
+                                    ARCHIVED
+                                  </span>
+                                )}
+
                                 {/* Visibility */}
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                   card.visibility === 'public'
@@ -2428,10 +2518,10 @@ function CollectionPageContent() {
                                     </button>
                                   )}
                                   <button
-                                    onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
+                                    onClick={() => setDeleteCard(card)}
                                     disabled={deletingCardId === card.id}
                                     className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors disabled:opacity-50"
-                                    title="Delete card"
+                                    title="Remove card"
                                   >
                                     {deletingCardId === card.id ? (
                                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
@@ -2683,10 +2773,10 @@ function CollectionPageContent() {
                                 </button>
                               )}
                               <button
-                                onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
+                                onClick={() => setDeleteCard(card)}
                                 disabled={deletingCardId === card.id}
                                 className="text-red-500 hover:text-red-700 font-medium disabled:opacity-50 cursor-pointer"
-                                title="Delete card"
+                                title="Remove card"
                               >
                                 {deletingCardId === card.id ? '...' : '✕'}
                               </button>
@@ -2760,6 +2850,20 @@ function CollectionPageContent() {
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
 
+      {deleteCard && (
+        <DeleteCardModal
+          card={deleteCard}
+          busy={deletingCardId === deleteCard.id}
+          onCancel={() => setDeleteCard(null)}
+          onSold={() => { const c = deleteCard; setDeleteCard(null); setSellCard(c) }}
+          onConfirmDelete={() => {
+            const c = deleteCard
+            setDeleteCard(null)
+            handleDeleteCard(c.id, getPlayerName(c))
+          }}
+        />
+      )}
+
       {sellCard && (
         <MarkAsSoldModal
           card={sellCard}
@@ -2770,6 +2874,120 @@ function CollectionPageContent() {
         />
       )}
     </main>
+  )
+}
+
+/**
+ * Two-step removal dialog.
+ *
+ * Step 1 asks WHY, because the two reasons want opposite outcomes and users
+ * reach for "delete" for both:
+ *   - sold it            → the buyer needs the grade page to survive, so this
+ *                          routes to Mark as Sold instead of deleting
+ *   - just hide it       → nobody is relying on the record; deletion is fine
+ *
+ * Step 2 is a deliberate second gate spelling out that a deleted card can no
+ * longer be found or viewed — by them, by a buyer, or by anyone holding the
+ * printed label.
+ */
+function DeleteCardModal({
+  card,
+  busy,
+  onCancel,
+  onSold,
+  onConfirmDelete,
+}: {
+  card: Card
+  busy: boolean
+  onCancel: () => void
+  onSold: () => void
+  onConfirmDelete: () => void
+}) {
+  const [step, setStep] = useState<'reason' | 'confirm'>('reason')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        {step === 'reason' ? (
+          <>
+            <h2 className="text-lg font-bold text-gray-900">Remove this card?</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {getPlayerName(card)}
+              {card.serial ? <span className="text-gray-400"> · {card.serial}</span> : null}
+            </p>
+            <p className="text-sm text-gray-700 mt-4">What happened to it?</p>
+
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={onSold}
+                className="w-full text-left px-4 py-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+              >
+                <div className="font-semibold text-emerald-900">I sold it</div>
+                <div className="text-sm text-emerald-800 mt-0.5">
+                  Moves it to your Sold category. The buyer can still scan the label and
+                  verify the grade — recommended for any card you&apos;ve passed on.
+                </div>
+              </button>
+
+              <button
+                onClick={() => setStep('confirm')}
+                className="w-full text-left px-4 py-3 rounded-lg border-2 border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <div className="font-semibold text-gray-900">I just don&apos;t want it in my collection</div>
+                <div className="text-sm text-gray-600 mt-0.5">
+                  Deletes the card and its grade report entirely.
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={onCancel}
+              className="mt-4 w-full px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-gray-900">Delete permanently?</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {getPlayerName(card)}
+              {card.serial ? <span className="text-gray-400"> · {card.serial}</span> : null}
+            </p>
+
+            <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-900">
+              <p className="font-semibold">Once deleted, this card can no longer be found or viewed.</p>
+              <ul className="mt-2 space-y-1 list-disc list-inside text-red-800">
+                <li>Its grade report and images go away</li>
+                <li>The QR code on its printed label will stop working — for anyone holding it</li>
+                <li>Any eBay sale history for it is removed too</li>
+              </ul>
+              <p className="mt-2">
+                If someone else has this card, choose <strong>&ldquo;I sold it&rdquo;</strong> instead
+                so they can still verify it.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={onConfirmDelete}
+                disabled={busy}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy ? 'Deleting…' : 'Yes, delete it permanently'}
+              </button>
+              <button
+                onClick={() => setStep('reason')}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-50"
+              >
+                Back
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -588,20 +588,53 @@ export default function CardDetailScreen() {
     )
   }
 
+  /**
+   * Two-step removal, mirroring the web dialog.
+   *
+   * Step 1 asks WHY, because the two reasons want opposite outcomes and people
+   * reach for "delete" for both: a sold card needs its grade page to survive
+   * for the buyer, while a card they simply don't want is safe to remove.
+   * Step 2 spells out that a deleted card can no longer be found or viewed.
+   */
   const handleDelete = () => {
     Alert.alert(
-      'Delete Card',
-      "This removes the card, its images and its grade report, and the QR code on its printed label will stop working.\n\nIf you SOLD this card, use \"Mark as Sold\" instead — that keeps the grade page alive for the buyer.",
+      'Remove this card?',
+      'What happened to it?',
       [
+        {
+          text: 'I sold it',
+          onPress: handleMarkSold,
+        },
+        {
+          text: "I don't want it in my collection",
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Delete permanently?',
+              'Once deleted, this card can no longer be found or viewed.\n\n' +
+                '• Its grade report and images go away\n' +
+                '• The QR code on its printed label stops working — for anyone holding it\n' +
+                '• Any eBay sale history for it is removed\n\n' +
+                'If someone else has this card, choose "I sold it" instead so they can still verify it.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete permanently',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await callOwnershipApi(`/api/cards/${card.id}`, 'DELETE')
+                      router.back()
+                    } catch (err: any) {
+                      Alert.alert('Delete failed', err?.message || 'Could not delete this card. Please try again.')
+                    }
+                  },
+                },
+              ]
+            )
+          },
+        },
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            await callOwnershipApi(`/api/cards/${card.id}`, 'DELETE')
-            router.back()
-          } catch (err: any) {
-            Alert.alert('Delete failed', err?.message || 'Could not delete this card. Please try again.')
-          }
-        }},
       ]
     )
   }
@@ -2743,7 +2776,7 @@ export default function CardDetailScreen() {
         {isOwner && card.ownership_status !== 'sold' && (
           <TouchableOpacity style={s.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash" size={16} color={Colors.red[600]} />
-            <Text style={s.deleteBtnText}>Delete card from collection</Text>
+            <Text style={s.deleteBtnText}>Remove card from collection</Text>
           </TouchableOpacity>
         )}
       </View>
