@@ -8,7 +8,6 @@ import {
   DragStartEvent,
   KeyboardSensor,
   MouseSensor,
-  TouchSensor,
   closestCenter,
   pointerWithin,
   useDroppable,
@@ -130,19 +129,18 @@ export function CollectionDnd({
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Mouse and touch are deliberately separate sensors rather than one
-  // PointerSensor.
+  // MOUSE ONLY, deliberately. Touch gets a long-press action sheet instead of
+  // a drag (see useLongPress + CardActionSheet): dragging across a scrolling
+  // grid on a phone fights the page scroll, and the binder chips are small and
+  // usually off-screen, so aiming a drop is unpleasant. Tapping a binder in a
+  // sheet, and stepping position with top/up/down/bottom, is both easier to hit
+  // and more precise.
   //
-  // A PointerSensor needs `touch-action: none` on every draggable to stop the
-  // browser scrolling mid-drag — and with dragging enabled across the whole
-  // collection that would kill vertical scrolling on mobile, since every card
-  // would swallow the gesture. Splitting them lets touch use a LONG PRESS
-  // (250ms) to start a drag, so a normal swipe still scrolls the page, while
-  // the mouse keeps the instant 8px threshold.
+  // Keeping a TouchSensor here would also need `touch-action: none` on every
+  // card, which would swallow vertical scrolling across the whole collection.
   const mouse = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
-  const touch = useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } });
   const keyboard = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
-  const active = useSensors(mouse, touch, keyboard);
+  const active = useSensors(mouse, keyboard);
   const none = useSensors();
 
   const handleDragEnd = (event: DragEndEvent) => {

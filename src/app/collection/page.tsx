@@ -17,6 +17,8 @@ import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 import BinderStrip from '@/components/binders/BinderStrip'
 import { SortableGrid, SortableCell, CollectionDnd } from '@/components/binders/SortableCardGrid'
 import { useBinders } from '@/components/binders/useBinders'
+import CardActionSheet from '@/components/binders/CardActionSheet'
+import { useLongPress } from '@/components/binders/useLongPress'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 
@@ -427,6 +429,11 @@ function CollectionPageContent() {
   const [newBinderFor, setNewBinderFor] = useState<string[] | null>(null)
   const [newBinderBusy, setNewBinderBusy] = useState(false)
   const [removingFromBinderId, setRemovingFromBinderId] = useState<string | null>(null)
+  // Long-press / ⋯ action sheet (touch). Holds the card plus which binders it's
+  // already in, so the sheet can show ticks without a second round trip.
+  const [sheetCard, setSheetCard] = useState<Card | null>(null)
+  const [sheetMemberOf, setSheetMemberOf] = useState<Set<string>>(new Set())
+  const [sheetBusy, setSheetBusy] = useState(false)
   const binderApi = useBinders()
   const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
   // Bumped to force a collection refetch (e.g. after an undo restores a card).
@@ -1595,6 +1602,81 @@ function CollectionPageContent() {
     } catch (e: any) { toast.error(e.message) }
   }
 
+  /** Open the action sheet, pre-loading which binders already hold this card. */
+  const openSheet = async (card: Card) => {
+    setSheetCard(card)
+    setSheetMemberOf(new Set())
+    try {
+      const s = getStoredSession()
+      const res = await fetch(`/api/cards/${card.id}/binders`, {
+        headers: { 'Authorization': `Bearer ${s?.access_token}` },
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setSheetMemberOf(new Set<string>(d.binderIds || []))
+      }
+    } catch { /* ticks just won't show; the actions still work */ }
+  }
+
+  /** Toggle membership from the sheet. */
+  const sheetToggleBinder = async (binderId: string) => {
+    if (!sheetCard) return
+    const inIt = sheetMemberOf.has(binderId)
+    const binder = binderApi.binders.find(b => b.id === binderId)
+    setSheetBusy(true)
+    setSheetMemberOf(prev => {
+      const next = new Set(prev)
+      inIt ? next.delete(binderId) : next.add(binderId)
+      return next
+    })
+    try {
+      if (inIt) await binderApi.removeCards(binderId, [sheetCard.id])
+      else await binderApi.addCards(binderId, [sheetCard.id])
+      toast.success(inIt ? `Removed from "${binder?.name}".` : `Added to "${binder?.name}".`)
+      if (selectedBinderId === binderId) setRefreshKey(k => k + 1)
+    } catch (e: any) {
+      setSheetMemberOf(prev => {
+        const next = new Set(prev)
+        inIt ? next.add(binderId) : next.delete(binderId)
+        return next
+      })
+      toast.error(e.message)
+    } finally { setSheetBusy(false) }
+  }
+
+  /**
+   * Step a card through the binder order without dragging.
+   * Maps onto the same "put this after that card" API the drag uses, so there
+   * is one ordering path on the server rather than two.
+   */
+  const sheetMove = async (to: 'top' | 'up' | 'down' | 'bottom') => {
+    if (!sheetCard || !selectedBinderId || !binderCards) return
+    const list = binderCards
+    const i = list.findIndex(c => c.id === sheetCard.id)
+    if (i === -1) return
+
+    let afterId: string | null
+    if (to === 'top') afterId = null
+    else if (to === 'up') afterId = i >= 2 ? list[i - 2].id : null
+    else if (to === 'down') afterId = list[i + 1]?.id ?? null
+    else afterId = list[list.length - 1]?.id ?? null
+    if (to === 'bottom' && afterId === sheetCard.id) return
+
+    // Optimistic reorder so the sheet's "3 of 12" updates immediately.
+    const without = list.filter(c => c.id !== sheetCard.id)
+    const at = afterId === null ? 0 : without.findIndex(c => c.id === afterId) + 1
+    const next = [...without.slice(0, at), sheetCard, ...without.slice(at)]
+
+    setSheetBusy(true)
+    setBinderCards(next)
+    try {
+      await binderApi.reorderCard(selectedBinderId, sheetCard.id, afterId)
+    } catch (e: any) {
+      setBinderCards(list)
+      toast.error(e.message)
+    } finally { setSheetBusy(false) }
+  }
+
   /**
    * Take one card out of the binder currently being viewed.
    * Membership only — the card stays in the collection and in any other binder.
@@ -2336,10 +2418,13 @@ function CollectionPageContent() {
               return (
                 <SortableCell key={card.id} id={card.id} enabled={canDragCards}>
                 {/* Wrapper gives the selection control something to anchor to
-                    and carries the selected ring. `group` drives hover reveal. */}
-                <div className={`relative group rounded-2xl transition-shadow ${
-                  selectedCardIds.has(card.id) ? 'ring-4 ring-purple-500 ring-offset-2' : ''
-                }`}>
+                    and carries the selected ring. `group` drives hover reveal.
+                    Long-press (touch only) opens the action sheet — desktop
+                    drags instead. */}
+                <CardTileWrapper
+                  selected={selectedCardIds.has(card.id)}
+                  onLongPress={() => openSheet(card)}
+                >
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleCardSelection(card.id) }}
@@ -2359,6 +2444,23 @@ function CollectionPageContent() {
                     </svg>
                   )}
                 </button>
+
+                {/* Touch discoverability: long-press is invisible, so give the
+                    same sheet a visible button. Hidden on desktop, which drags. */}
+                {binderApi.available && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); openSheet(card) }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label={`Actions for ${getPlayerName(card)}`}
+                    title="Add to binder, reorder…"
+                    className="sm:hidden absolute bottom-2 right-2 z-30 w-9 h-9 rounded-full bg-white/95 border border-gray-300 text-gray-600 flex items-center justify-center shadow-md active:bg-gray-100"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                      <circle cx="4" cy="10" r="1.8" /><circle cx="10" cy="10" r="1.8" /><circle cx="16" cy="10" r="1.8" />
+                    </svg>
+                  </button>
+                )}
 
                 {/* Take this card out of the binder you're looking at. Removes
                     membership only — the card stays in the collection, which
@@ -2446,7 +2548,7 @@ function CollectionPageContent() {
                     </Link>
                   </div>
                 </CardSlabGrid>
-                </div>
+                </CardTileWrapper>
                 </SortableCell>
               );
                 })}
@@ -3141,6 +3243,25 @@ function CollectionPageContent() {
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
 
+      {sheetCard && (
+        <CardActionSheet
+          cardName={getPlayerName(sheetCard)}
+          binders={binderApi.binders.filter(b => !b.smart_filter)}
+          memberOf={sheetMemberOf}
+          currentBinder={selectedBinderId && binderReorderable && selectedBinder
+            ? { id: selectedBinder.id, name: selectedBinder.name }
+            : null}
+          index={(binderCards ?? []).findIndex(c => c.id === sheetCard.id)}
+          total={(binderCards ?? []).length}
+          busy={sheetBusy}
+          onToggleBinder={sheetToggleBinder}
+          onCreateBinder={() => { setNewBinderFor([sheetCard.id]); setSheetCard(null) }}
+          onMove={sheetMove}
+          onRemoveFromBinder={async () => { await removeFromCurrentBinder(sheetCard); setSheetCard(null) }}
+          onClose={() => setSheetCard(null)}
+        />
+      )}
+
       {newBinderFor !== null && (
         <NewBinderModal
           cardCount={newBinderFor.length}
@@ -3231,6 +3352,35 @@ function CollectionPageContent() {
         />
       )}
     </main>
+  )
+}
+
+/**
+ * Card tile wrapper: anchors the overlay controls, carries the selected ring,
+ * and hosts touch long-press.
+ *
+ * Split out because useLongPress is a hook and the tiles are rendered inside a
+ * .map() in the page body — a hook can't be called there.
+ */
+function CardTileWrapper({
+  selected,
+  onLongPress,
+  children,
+}: {
+  selected: boolean
+  onLongPress: () => void
+  children: React.ReactNode
+}) {
+  const press = useLongPress(onLongPress)
+  return (
+    <div
+      {...press}
+      className={`relative group rounded-2xl transition-shadow ${
+        selected ? 'ring-4 ring-purple-500 ring-offset-2' : ''
+      }`}
+    >
+      {children}
+    </div>
   )
 }
 
