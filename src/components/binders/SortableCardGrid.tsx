@@ -42,6 +42,14 @@ import { CSS } from '@dnd-kit/utilities';
 
 export const BINDER_DROP_PREFIX = 'binder:';
 
+/**
+ * Sentinel target for the "+ New binder" chip. Without its own droppable id the
+ * chip isn't a drop target at all, so a card dropped on it falls through to
+ * whichever real binder happens to be nearest — silently filing it somewhere
+ * the user never chose.
+ */
+export const NEW_BINDER_DROP_ID = `${BINDER_DROP_PREFIX}__new__`;
+
 /** Wrap a binder chip to make it a drop target. */
 export function BinderDropTarget({
   binderId,

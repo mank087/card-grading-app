@@ -121,7 +121,7 @@ export function CardBinderPicker({ cardId, isOwner }: { cardId: string; isOwner:
     <div className="mt-8 bg-white rounded-xl border border-gray-200 p-5">
       <h3 className="font-bold text-gray-900">Add to a binder</h3>
       <p className="text-sm text-gray-500 mt-0.5">
-        Organise this card however you like. It can be in as many binders as you want.
+        Organize this card however you like. It can be in as many binders as you want.
       </p>
 
       <div className="flex flex-wrap gap-2 mt-4">

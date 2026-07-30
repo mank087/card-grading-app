@@ -83,12 +83,23 @@ export function BinderStrip({
           );
         })}
 
-        <button
-          className="shrink-0 inline-flex items-center gap-1 px-4 py-2 rounded-full border border-dashed border-gray-300 text-sm font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-          onClick={onCreate}
-        >
-          ＋ New binder
-        </button>
+        {/* Its own drop target: otherwise a card dropped here falls through to
+            whichever real binder is nearest and gets filed somewhere the user
+            never picked. Dropping opens the create dialog instead. */}
+        <BinderDropTarget binderId="__new__">
+          {(isOver) => (
+            <button
+              className={`shrink-0 inline-flex items-center gap-1 px-4 py-2 rounded-full border border-dashed text-sm font-semibold transition-all ${
+                isOver
+                  ? 'border-purple-500 border-solid bg-purple-50 text-purple-800 ring-4 ring-purple-300 scale-105'
+                  : 'border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+              onClick={onCreate}
+            >
+              ＋ {isOver ? 'Drop to create a binder' : 'New binder'}
+            </button>
+          )}
+        </BinderDropTarget>
       </div>
 
       {/* Empty state: a bare "+ New binder" chip on its own reads as broken, so

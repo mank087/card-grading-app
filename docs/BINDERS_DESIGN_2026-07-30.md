@@ -1,4 +1,4 @@
-# Binders — collection organisation design
+# Binders — collection organization design
 
 **Date:** 2026-07-30
 **Status:** proposal, nothing built
@@ -8,13 +8,13 @@
 
 ## 1. The problem
 
-Users ask to "reorder their collection and organise it how they want." In practice that
+Users ask to "reorder their collection and organize it how they want." In practice that
 request bundles three separate needs:
 
 | What they say | What they mean | Covered today? |
 |---|---|---|
 | "Let me reorder" | My best cards should be at the top | No |
-| "Let me organise it" | I want my own named groupings | No |
+| "Let me organize it" | I want my own named groupings | No |
 | "It keeps resetting" | Remember my sort/filter between visits | No |
 
 The collection today has sort (name / grade / value / date / set, both directions),

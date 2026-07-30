@@ -422,6 +422,11 @@ function CollectionPageContent() {
   const [binderReorderable, setBinderReorderable] = useState(false)
   const [binderLoading, setBinderLoading] = useState(false)
   const [addToBinderOpen, setAddToBinderOpen] = useState(false)
+  // Non-null = the new-binder dialog is open; the array is the cards waiting to
+  // be filed into it (empty = plain "create a binder").
+  const [newBinderFor, setNewBinderFor] = useState<string[] | null>(null)
+  const [newBinderBusy, setNewBinderBusy] = useState(false)
+  const [removingFromBinderId, setRemovingFromBinderId] = useState<string | null>(null)
   const binderApi = useBinders()
   const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
   // Bumped to force a collection refetch (e.g. after an undo restores a card).
@@ -1571,8 +1576,14 @@ function CollectionPageContent() {
   // card onto a binder chip from any view, including All Cards.
   const canDragCards = binderApi.available && binderApi.binders.some(b => !b.smart_filter)
 
-  /** Card dragged onto a binder chip. */
+  /** Card dragged onto a binder chip. `__new__` is the "+ New binder" chip. */
   const fileCardToBinder = async (cardId: string, binderId: string) => {
+    // Dropped on "+ New binder": ask for a name first, then file the card into
+    // whatever they create. Cancelling leaves the card where it was.
+    if (binderId === '__new__') {
+      setNewBinderFor([cardId])
+      return
+    }
     const binder = binderApi.binders.find(b => b.id === binderId)
     try {
       const r = await binderApi.addCards(binderId, [cardId])
@@ -1582,6 +1593,53 @@ function CollectionPageContent() {
           : `Already in "${binder?.name ?? 'binder'}".`
       )
     } catch (e: any) { toast.error(e.message) }
+  }
+
+  /**
+   * Take one card out of the binder currently being viewed.
+   * Membership only — the card stays in the collection and in any other binder.
+   */
+  const removeFromCurrentBinder = async (card: Card) => {
+    if (!selectedBinderId) return
+    setRemovingFromBinderId(card.id)
+    const previous = binderCards
+    // Optimistic: the tile should vanish on click, not after a round trip.
+    setBinderCards(prev => (prev ?? []).filter(c => c.id !== card.id))
+    try {
+      await binderApi.removeCards(selectedBinderId, [card.id])
+      toast.success(`Removed from ${selectedBinder?.name ?? 'binder'} — still in your collection.`)
+    } catch (e: any) {
+      setBinderCards(previous)
+      toast.error(e.message)
+    } finally {
+      setRemovingFromBinderId(null)
+    }
+  }
+
+  /**
+   * Create a binder and optionally drop cards straight into it.
+   * `newBinderFor` holds the cards waiting on the name — [] means "just create".
+   */
+  const confirmNewBinder = async (name: string) => {
+    const cardIds = newBinderFor ?? []
+    setNewBinderBusy(true)
+    try {
+      const b = await binderApi.createBinder(name)
+      if (cardIds.length) {
+        const r = await binderApi.addCards(b.id, cardIds)
+        toast.success(`Created "${b.name}" with ${r.added} card${r.added === 1 ? '' : 's'}.`)
+      } else {
+        toast.success(`Created "${b.name}" — add cards by dragging them onto it.`)
+        setSelectedBinderId(b.id)
+      }
+      setNewBinderFor(null)
+      setSelectedCardIds(new Set())
+      setAddToBinderOpen(false)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setNewBinderBusy(false)
+    }
   }
 
   // Multi-select helper calculations (must be after displayedCards is defined)
@@ -1959,15 +2017,7 @@ function CollectionPageContent() {
             binders={binderApi.binders}
             selectedId={selectedBinderId}
             onSelect={(id) => { setSelectedBinderId(id); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
-            onCreate={async () => {
-              const name = window.prompt('Name this binder', 'New binder')
-              if (!name?.trim()) return
-              try {
-                const b = await binderApi.createBinder(name.trim())
-                setSelectedBinderId(b.id)
-                toast.success(`Created "${b.name}" — add cards with the checkboxes.`)
-              } catch (e: any) { toast.error(e.message) }
-            }}
+            onCreate={() => setNewBinderFor([])}
             onManage={async (b) => {
               if (b.system_key) {
                 toast.info('This binder is managed for you and fills itself.')
@@ -2309,6 +2359,29 @@ function CollectionPageContent() {
                     </svg>
                   )}
                 </button>
+
+                {/* Take this card out of the binder you're looking at. Removes
+                    membership only — the card stays in the collection, which
+                    the toast says out loud so it can't be mistaken for delete. */}
+                {selectedBinderId && binderReorderable && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeFromCurrentBinder(card) }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    disabled={removingFromBinderId === card.id}
+                    aria-label={`Remove ${getPlayerName(card)} from this binder`}
+                    title="Remove from this binder (keeps the card)"
+                    className="absolute top-2 right-2 z-30 w-7 h-7 rounded-md border-2 border-gray-300 bg-white/90 text-gray-500 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 hover:border-red-400 hover:text-red-600 hover:bg-white transition-all disabled:opacity-50"
+                  >
+                    {removingFromBinderId === card.id ? (
+                      <span className="w-3 h-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5 9h10a1 1 0 110 2H5a1 1 0 110-2z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
                 <CardSlabGrid
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine}
@@ -3068,6 +3141,15 @@ function CollectionPageContent() {
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
 
+      {newBinderFor !== null && (
+        <NewBinderModal
+          cardCount={newBinderFor.length}
+          busy={newBinderBusy}
+          onCancel={() => setNewBinderFor(null)}
+          onConfirm={confirmNewBinder}
+        />
+      )}
+
       {addToBinderOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAddToBinderOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
@@ -3111,17 +3193,7 @@ function CollectionPageContent() {
             </div>
 
             <button
-              onClick={async () => {
-                const name = window.prompt('Name this binder', 'New binder')
-                if (!name?.trim()) return
-                try {
-                  const b = await binderApi.createBinder(name.trim())
-                  const r = await binderApi.addCards(b.id, [...selectedCardIds])
-                  toast.success(`Created "${b.name}" with ${r.added} card${r.added === 1 ? '' : 's'}.`)
-                  setAddToBinderOpen(false)
-                  setSelectedCardIds(new Set())
-                } catch (e: any) { toast.error(e.message) }
-              }}
+              onClick={() => setNewBinderFor([...selectedCardIds])}
               className="mt-4 w-full px-4 py-2 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700"
             >
               ＋ New binder with these cards
@@ -3159,6 +3231,67 @@ function CollectionPageContent() {
         />
       )}
     </main>
+  )
+}
+
+/**
+ * New-binder dialog.
+ *
+ * Also the landing point for a card dropped on the "+ New binder" chip, so it
+ * says how many cards are waiting — cancelling has to visibly leave them alone
+ * rather than silently filing them somewhere.
+ */
+function NewBinderModal({
+  cardCount,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  cardCount: number
+  busy: boolean
+  onCancel: () => void
+  onConfirm: (name: string) => void
+}) {
+  const [name, setName] = useState('')
+  const submit = () => { if (name.trim() && !busy) onConfirm(name.trim()) }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-900">New binder</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          {cardCount > 0
+            ? `${cardCount} card${cardCount === 1 ? '' : 's'} will go straight into it.`
+            : 'Group your cards however you like — by set, by player, by what’s for sale.'}
+        </p>
+
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value.slice(0, 60))}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel() }}
+          placeholder="e.g. Vintage Football, PC, For sale"
+          className="mt-4 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+        />
+
+        <div className="mt-5 flex items-center gap-2">
+          <button
+            onClick={submit}
+            disabled={busy || !name.trim()}
+            className="flex-1 px-4 py-2 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-50"
+          >
+            {busy ? 'Creating…' : cardCount > 0 ? `Create and add ${cardCount}` : 'Create binder'}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
