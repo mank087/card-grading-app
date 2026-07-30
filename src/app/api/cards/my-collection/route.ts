@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { createSignedUrlMap } from "@/lib/signedUrlBatch";
+import { isMissingColumnError, isOwnershipStatus } from "@/lib/cards/ownership";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +19,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
 
-    // Query cards for this user - includes all fields needed for label generation and batch reports
-    let query = supabase
-      .from('cards')
-      .select(`
+    // Ownership view. Defaults to 'owned' so the collection shows what the
+    // user actually holds; ?status=sold / archived power the other tabs and
+    // ?status=all is the escape hatch (batch reports over everything).
+    const statusParam = searchParams.get('status') || 'owned';
+    const ownershipFilter = isOwnershipStatus(statusParam) ? statusParam : null;
+    if (!ownershipFilter && statusParam !== 'all') {
+      return NextResponse.json(
+        { error: "Invalid status. Use 'owned', 'sold', 'archived', or 'all'." },
+        { status: 400 }
+      );
+    }
+
+    // Explicit column list — the cards table carries multi-MB grading blobs
+    // this endpoint never reads. Split so the migration-window fallback can
+    // drop the ownership columns without falling back to SELECT *.
+    const BASE_COLUMNS = `
         id, serial, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
         manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
         dcm_grade_whole, dvg_image_quality, created_at, visibility,
@@ -39,25 +52,74 @@ export async function GET(request: NextRequest) {
         dcm_price_updated_at, dcm_price_match_confidence, dcm_price_product_id, dcm_price_product_name,
         dcm_prices_cached_at,
         custom_label_data,
-        card_colors
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+        card_colors`;
+    const OWNERSHIP_COLUMNS = `ownership_status, sold_at, sold_price, sold_channel, sold_note`;
 
-    // Apply search filter if provided
-    if (search) {
-      query = query.or(`serial.ilike.%${search}%,card_name.ilike.%${search}%`);
+    const buildQuery = (applyOwnership: boolean) => {
+      let query = supabase
+        .from('cards')
+        .select(applyOwnership ? `${BASE_COLUMNS}, ${OWNERSHIP_COLUMNS}` : BASE_COLUMNS)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (applyOwnership && ownershipFilter) {
+        query = query.eq('ownership_status', ownershipFilter);
+      }
+
+      // Apply search filter if provided
+      if (search) {
+        query = query.or(`serial.ilike.%${search}%,card_name.ilike.%${search}%`);
+      }
+      return query;
+    };
+
+    // supabase-js can only infer row types from a LITERAL select string; ours
+    // is assembled at runtime, so type the rows explicitly (they're plain card
+    // records) exactly as /api/ebay/eligible-cards does.
+    const first = await buildQuery(true);
+    let cards = (first.data ?? null) as unknown as Record<string, any>[] | null;
+    let error = first.error;
+
+    // Migration window: the ownership columns are applied by hand, so tolerate
+    // a schema that predates them rather than 500ing the collection page.
+    let ownershipApplied = true;
+    if (error && isMissingColumnError(error)) {
+      console.warn(
+        '[Collection API] ownership_status column missing — falling back to an unfiltered ' +
+        'collection. Apply supabase/migrations/20260730_add_card_ownership_status.sql.'
+      );
+      ownershipApplied = false;
+      // Same query, minus the ownership columns and the filter.
+      const legacy = await buildQuery(false);
+      cards = (legacy.data ?? null) as unknown as Record<string, any>[] | null;
+      error = legacy.error;
     }
-
-    const { data: cards, error } = await query;
 
     if (error) {
       console.error('[Collection API] Error fetching cards:', error);
       return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
     }
 
+    // Per-status counts drive the collection tabs. Head-only count queries —
+    // no rows transferred. Skipped entirely during the migration window.
+    const counts = { owned: 0, sold: 0, archived: 0 };
+    if (ownershipApplied) {
+      const [owned, sold, archived] = await Promise.all(
+        (['owned', 'sold', 'archived'] as const).map(status =>
+          supabase
+            .from('cards')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('ownership_status', status)
+        )
+      );
+      counts.owned = owned.count ?? 0;
+      counts.sold = sold.count ?? 0;
+      counts.archived = archived.count ?? 0;
+    }
+
     if (!cards || cards.length === 0) {
-      return NextResponse.json({ cards: [] });
+      return NextResponse.json({ cards: [], counts, ownershipApplied, status: statusParam });
     }
 
     // 🚀 PERFORMANCE: Batch create signed URLs — chunked to respect Supabase's
@@ -72,7 +134,10 @@ export async function GET(request: NextRequest) {
       console.error('[Collection API] Error creating signed URLs:', signError);
       // Fall back to returning cards without URLs
       return NextResponse.json({
-        cards: cards.map(card => ({ ...card, front_url: null, back_url: null }))
+        cards: cards.map(card => ({ ...card, front_url: null, back_url: null })),
+        counts,
+        ownershipApplied,
+        status: statusParam,
       });
     }
 
@@ -87,7 +152,7 @@ export async function GET(request: NextRequest) {
       return enrichedCard;
     });
 
-    return NextResponse.json({ cards: cardsWithUrls });
+    return NextResponse.json({ cards: cardsWithUrls, counts, ownershipApplied, status: statusParam });
   } catch (error: any) {
     console.error('[Collection API] Unexpected error:', error);
     return NextResponse.json({

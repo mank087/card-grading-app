@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { resolveCardValue, type CardForPricing, type PriceSource } from '@/lib/pricing/resolveCardValue';
 import { isCacheStale } from '@/lib/pricing/batchPriceRefresh';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
+import { isMissingColumnError } from '@/lib/cards/ownership';
 
 // DB stores: Pokemon, MTG, Lorcana, One Piece, Other, or sport names (Football, Baseball, etc.)
 const SPORTS_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
@@ -77,8 +78,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = supabaseServer();
 
-    // Fetch all user cards with pricing columns (lighter query than my-collection)
-    const { data: allCards, error } = await supabase
+    // Fetch all user cards with pricing columns (lighter query than my-collection).
+    // Sold/archived cards are excluded — portfolio value is what you still HOLD,
+    // and counting cards the user sold silently inflated it.
+    const runQuery = (applyOwnership: boolean) => {
+      let q = supabase
       .from('cards')
       .select(`
         id, card_name, featured, pokemon_featured, conversational_card_info,
@@ -92,6 +96,18 @@ export async function GET(request: NextRequest) {
       `)
       .eq('user_id', auth.userId)
       .order('created_at', { ascending: false });
+      if (applyOwnership) q = q.eq('ownership_status', 'owned');
+      return q;
+    };
+
+    let { data: allCards, error } = await runQuery(true);
+
+    // Migration window: fall back to the old unfiltered behaviour rather than
+    // emptying the portfolio if the ownership columns aren't applied yet.
+    if (error && isMissingColumnError(error)) {
+      console.warn('[Portfolio] ownership_status column missing — including all cards.');
+      ({ data: allCards, error } = await runQuery(false));
+    }
 
     if (error) {
       console.error('[Market Pricing] Error fetching cards:', error);

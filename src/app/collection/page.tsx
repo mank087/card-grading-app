@@ -40,6 +40,13 @@ type Card = {
   dvg_image_quality?: string
   created_at?: string
   visibility?: 'public' | 'private'
+  // Ownership lifecycle — a sold card leaves the collection but keeps its
+  // grade page so the buyer's slab QR still resolves.
+  ownership_status?: 'owned' | 'sold' | 'archived'
+  sold_at?: string | null
+  sold_price?: number | null
+  sold_channel?: 'ebay' | 'manual' | 'other' | null
+  sold_note?: string | null
   // 🎯 PRIMARY: Conversational AI grading (2025-10-21)
   conversational_decimal_grade?: number | null
   conversational_whole_grade?: number | null
@@ -398,6 +405,14 @@ function CollectionPageContent() {
   const [selectedSport, setSelectedSport] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
+  // Ownership view: what you hold, what you sold, what you archived. Sold and
+  // archived cards keep their grade page alive (the printed slab's QR points
+  // at it) — they just leave the working collection.
+  const [ownershipView, setOwnershipView] = useState<'owned' | 'sold' | 'archived'>('owned')
+  const [ownershipCounts, setOwnershipCounts] = useState({ owned: 0, sold: 0, archived: 0 })
+  const [ownershipReady, setOwnershipReady] = useState(true)
+  const [sellCard, setSellCard] = useState<Card | null>(null)
+  const [updatingOwnershipId, setUpdatingOwnershipId] = useState<string | null>(null)
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
@@ -519,7 +534,9 @@ function CollectionPageContent() {
 
         // Call server-side API that creates signed URLs (same approach as card detail pages)
         // Pass the access token in Authorization header for secure authentication
-        const url = `/api/cards/my-collection${searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : ''}`
+        const params = new URLSearchParams({ status: ownershipView })
+        if (searchQuery) params.set('search', searchQuery)
+        const url = `/api/cards/my-collection?${params.toString()}`
         const res = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
@@ -530,8 +547,12 @@ function CollectionPageContent() {
           throw new Error('Failed to load cards.')
         }
 
-        const { cards } = await res.json()
+        const { cards, counts, ownershipApplied } = await res.json()
         setCards(cards || [])
+        if (counts) setOwnershipCounts(counts)
+        // false = migration not applied yet; hide the tabs rather than show
+        // three views that all return the same unfiltered list.
+        setOwnershipReady(ownershipApplied !== false)
       } catch (err) {
         console.error(err)
         setError('Failed to load cards. Please try again later.')
@@ -541,7 +562,7 @@ function CollectionPageContent() {
     }
 
     fetchCards()
-  }, [searchQuery])
+  }, [searchQuery, ownershipView])
 
   // Background price refresh for stale cards (>= 7 days old)
   useEffect(() => {
@@ -1492,11 +1513,71 @@ function CollectionPageContent() {
     }
   }
 
+  /**
+   * Move a card through its ownership lifecycle. Used for "Mark as Sold",
+   * "Archive", and the "Still mine" undo.
+   *
+   * Never deletes: the printed slab carries a QR to /verify/<serial>, so the
+   * buyer needs the grade page to keep resolving after the sale.
+   */
+  const updateOwnership = async (
+    cardId: string,
+    ownership_status: 'owned' | 'sold' | 'archived',
+    extra: { sold_price?: string; sold_at?: string; sold_note?: string } = {}
+  ) => {
+    setUpdatingOwnershipId(cardId)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) throw new Error('You must be logged in')
+
+      const res = await fetch(`/api/cards/${cardId}/ownership`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ownership_status, ...extra }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update card')
+
+      // Drop it from the current view and fix the tab counts locally so the
+      // UI responds immediately instead of waiting for a refetch.
+      setCards(prev => prev.filter(c => c.id !== cardId))
+      setOwnershipCounts(prev => {
+        const next = { ...prev }
+        if (next[ownershipView] > 0) next[ownershipView] -= 1
+        next[ownership_status] += 1
+        return next
+      })
+      setSellCard(null)
+
+      if (ownership_status === 'sold') {
+        toast.success('Marked as sold — the buyer can still verify this card.')
+      } else if (ownership_status === 'archived') {
+        toast.success('Card archived.')
+      } else {
+        toast.success('Moved back to your collection.')
+      }
+    } catch (error: any) {
+      console.error('Ownership update error:', error)
+      toast.error(error.message)
+    } finally {
+      setUpdatingOwnershipId(null)
+    }
+  }
+
   // Delete card handler
   const handleDeleteCard = async (cardId: string, cardName: string) => {
-    // Confirmation dialog
+    // Confirmation dialog. Deleting purges the images and breaks the slab's QR
+    // code permanently — steer people who sold the card to "Mark as Sold".
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete "${cardName}"?\n\nThis action cannot be undone.`
+      `Delete "${cardName}"?\n\n` +
+      `This permanently removes the card, its images, and its grade report. ` +
+      `The QR code on its printed label will stop working, and any eBay sale ` +
+      `history for it is erased too.\n\n` +
+      `If you SOLD this card, cancel and use "Mark as Sold" instead — that keeps ` +
+      `the grade page alive for the buyer.\n\nThis cannot be undone.`
     )
 
     if (!confirmDelete) {
@@ -1698,6 +1779,41 @@ function CollectionPageContent() {
             </div>
           </div>
         </div>
+
+        {/* Ownership tabs — Owned / Sold / Archived. Sold and archived cards
+            keep their public grade page (the slab QR depends on it); they just
+            leave the working collection and the eBay listing picker. */}
+        {ownershipReady && (
+          <div className="mb-4">
+            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+              {([
+                { key: 'owned' as const, label: 'Owned', count: ownershipCounts.owned },
+                { key: 'sold' as const, label: 'Sold', count: ownershipCounts.sold },
+                { key: 'archived' as const, label: 'Archived', count: ownershipCounts.archived },
+              ]).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => { setOwnershipView(tab.key); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
+                  className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    ownershipView === tab.key
+                      ? 'bg-purple-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`ml-2 text-xs ${ownershipView === tab.key ? 'text-purple-100' : 'text-gray-400'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {ownershipView === 'sold' && (
+              <p className="text-sm text-gray-500 mt-2">
+                Sold cards stay verifiable — the buyer can still scan the QR on the label and see the full grade report.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Search Input */}
         <div className="mb-6">
@@ -2234,6 +2350,30 @@ function CollectionPageContent() {
                                 </span>
                               </div>
 
+                              {/* Sale details (Sold view) */}
+                              {card.ownership_status === 'sold' && (
+                                <div className="mt-2 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-1.5 text-xs text-emerald-900">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-semibold">
+                                      {card.sold_channel === 'ebay' ? 'Sold on eBay' : 'Sold'}
+                                    </span>
+                                    {typeof card.sold_price === 'number' && (
+                                      <span className="font-bold">${card.sold_price.toFixed(2)}</span>
+                                    )}
+                                  </div>
+                                  {card.sold_at && (
+                                    <div className="text-emerald-700">
+                                      {new Date(card.sold_at).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                  {card.sold_note && (
+                                    <div className="text-emerald-700 italic truncate" title={card.sold_note}>
+                                      {card.sold_note}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
                               {/* Actions Row */}
                               <div className="flex items-center justify-end gap-2 mt-2">
                                   <Link
@@ -2246,6 +2386,25 @@ function CollectionPageContent() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                   </Link>
+                                  {ownershipView === 'owned' ? (
+                                    <button
+                                      onClick={() => setSellCard(card)}
+                                      disabled={updatingOwnershipId === card.id}
+                                      className="inline-flex items-center justify-center h-10 px-3 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors disabled:opacity-50 text-sm font-semibold"
+                                      title="Mark this card as sold — keeps the grade page alive for the buyer"
+                                    >
+                                      Sold
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => updateOwnership(card.id, 'owned')}
+                                      disabled={updatingOwnershipId === card.id}
+                                      className="inline-flex items-center justify-center h-10 px-3 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors disabled:opacity-50 text-sm font-semibold"
+                                      title="Move this card back into your collection"
+                                    >
+                                      {updatingOwnershipId === card.id ? '…' : 'Still mine'}
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
                                     disabled={deletingCardId === card.id}
@@ -2482,6 +2641,25 @@ function CollectionPageContent() {
                               >
                                 View
                               </Link>
+                              {ownershipView === 'owned' ? (
+                                <button
+                                  onClick={() => setSellCard(card)}
+                                  disabled={updatingOwnershipId === card.id}
+                                  className="text-emerald-600 hover:text-emerald-800 font-medium disabled:opacity-50 cursor-pointer"
+                                  title="Mark as sold"
+                                >
+                                  Sold
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => updateOwnership(card.id, 'owned')}
+                                  disabled={updatingOwnershipId === card.id}
+                                  className="text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50 cursor-pointer"
+                                  title="Move back into your collection"
+                                >
+                                  {updatingOwnershipId === card.id ? '...' : 'Still mine'}
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
                                 disabled={deletingCardId === card.id}
@@ -2559,7 +2737,135 @@ function CollectionPageContent() {
         selectedCards={cards.filter(c => selectedCardIds.has(c.id)) as any}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
+
+      {sellCard && (
+        <MarkAsSoldModal
+          card={sellCard}
+          busy={updatingOwnershipId === sellCard.id}
+          onCancel={() => setSellCard(null)}
+          onConfirm={(details) => updateOwnership(sellCard.id, 'sold', details)}
+          onArchive={() => updateOwnership(sellCard.id, 'archived')}
+        />
+      )}
     </main>
+  )
+}
+
+/**
+ * Mark-as-sold dialog.
+ *
+ * Sale price and date are optional — plenty of people won't want to record
+ * them, and demanding a price would push users back toward deleting. The
+ * dialog's real job is to make clear that selling ISN'T deleting: the buyer
+ * keeps a working QR code, and the seller keeps the record.
+ *
+ * "Archive instead" is here because not every card that leaves a collection
+ * was sold — some were traded, gifted, or lost.
+ */
+function MarkAsSoldModal({
+  card,
+  busy,
+  onCancel,
+  onConfirm,
+  onArchive,
+}: {
+  card: Card
+  busy: boolean
+  onCancel: () => void
+  onConfirm: (details: { sold_price?: string; sold_at?: string; sold_note?: string }) => void
+  onArchive: () => void
+}) {
+  const [price, setPrice] = useState('')
+  const [soldAt, setSoldAt] = useState(() => new Date().toISOString().slice(0, 10))
+  const [note, setNote] = useState('')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-gray-900">Mark as sold</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          {getPlayerName(card)}
+          {card.serial ? <span className="text-gray-400"> · {card.serial}</span> : null}
+        </p>
+
+        <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900">
+          This removes the card from your collection and from the eBay listing picker —
+          but <strong>keeps its grade page online</strong>, so the buyer can still scan the
+          QR code on the label and verify it.
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Sale price <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Sale date</label>
+            <input
+              type="date"
+              value={soldAt}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setSoldAt(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Note <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Sold at the Portland show"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center gap-2">
+          <button
+            onClick={() => onConfirm({
+              sold_price: price || undefined,
+              sold_at: soldAt ? new Date(soldAt).toISOString() : undefined,
+              sold_note: note || undefined,
+            })}
+            disabled={busy}
+            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Mark as sold'}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <button
+          onClick={onArchive}
+          disabled={busy}
+          className="mt-3 w-full text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+        >
+          Didn&apos;t sell it? Archive instead
+        </button>
+      </div>
+    </div>
   )
 }
 

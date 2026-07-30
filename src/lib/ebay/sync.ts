@@ -55,6 +55,8 @@ export interface SyncUserResult {
   sold: number;
   ended: number;
   getItemCalls: number;
+  /** Cards moved out of the owner's active collection because their listing sold. */
+  cardsMarkedSold: number;
 }
 
 export interface SyncUserOptions {
@@ -83,7 +85,7 @@ export async function syncUser(
       .update({ last_synced_at: new Date().toISOString() })
       .eq('user_id', userId)
       .eq('status', 'active');
-    return { updated: 0, sold: 0, ended: 0, getItemCalls: 0 };
+    return { updated: 0, sold: 0, ended: 0, getItemCalls: 0, cardsMarkedSold: 0 };
   }
 
   const accessToken = await getValidAccessToken(userId);
@@ -325,7 +327,102 @@ export async function syncUser(
     }
   }
 
-  return { updated, sold, ended, getItemCalls };
+  const cardsMarkedSold = await reconcileSoldCards(userId);
+
+  return { updated, sold, ended, getItemCalls, cardsMarkedSold };
+}
+
+/**
+ * Move cards whose eBay listing has SOLD out of the owner's active collection.
+ *
+ * Written as a reconciliation over current state rather than as a hook on each
+ * status transition, because several passes above can flip a row to 'sold'.
+ * Reconciling once at the end is idempotent, and it self-heals cards that sold
+ * before this feature existed.
+ *
+ * The card is NOT deleted — the printed slab's QR points at /verify/<serial>,
+ * so the row has to outlive the sale for the buyer. It just stops appearing in
+ * the owner's collection and in the "list a card" picker.
+ *
+ * Respects a manual override: if the owner said "Still mine" (a cancelled or
+ * returned sale) we leave it alone unless a NEWER sale post-dates that call.
+ */
+async function reconcileSoldCards(userId: string): Promise<number> {
+  const { data: soldRows, error: listErr } = await supabaseAdmin
+    .from('ebay_listings')
+    .select('card_id, sold_at, price')
+    .eq('user_id', userId)
+    .eq('status', 'sold')
+    .not('card_id', 'is', null);
+
+  if (listErr || !soldRows?.length) return 0;
+
+  // Most-recent sale wins if a card somehow has several sold rows.
+  const byCard = new Map<string, { sold_at: string | null; price: number | null }>();
+  for (const row of soldRows) {
+    const prev = byCard.get(row.card_id);
+    if (!prev || (row.sold_at && prev.sold_at && row.sold_at > prev.sold_at) || !prev.sold_at) {
+      byCard.set(row.card_id, { sold_at: row.sold_at, price: row.price });
+    }
+  }
+
+  const { data: candidates, error: cardErr } = await supabaseAdmin
+    .from('cards')
+    .select('id, serial, ownership_status, ownership_overridden_at')
+    .eq('user_id', userId)
+    .in('id', [...byCard.keys()])
+    .eq('ownership_status', 'owned');
+
+  if (cardErr) {
+    // Migration window: columns not applied yet. Listings still sync correctly;
+    // cards just aren't stamped until the migration lands.
+    if (cardErr.code === '42703') {
+      console.warn('[ebay-sync] ownership columns missing — skipping card reconciliation.');
+      return 0;
+    }
+    console.error('[ebay-sync] card reconciliation query failed:', cardErr.message);
+    return 0;
+  }
+  if (!candidates?.length) return 0;
+
+  let marked = 0;
+  for (const card of candidates) {
+    const sale = byCard.get(card.id);
+    if (!sale) continue;
+
+    // Manual override wins unless this sale is newer than the override.
+    if (card.ownership_overridden_at) {
+      const overriddenAt = new Date(card.ownership_overridden_at).getTime();
+      const soldAt = sale.sold_at ? new Date(sale.sold_at).getTime() : 0;
+      if (soldAt <= overriddenAt) continue;
+    }
+
+    const { error: updErr } = await supabaseAdmin
+      .from('cards')
+      .update({
+        ownership_status: 'sold',
+        sold_at: sale.sold_at ?? new Date().toISOString(),
+        // ebay_listings.price holds the FINAL sale price once sold — see
+        // finalSalePrice() above, not the original ask.
+        sold_price: sale.price ?? null,
+        sold_channel: 'ebay',
+        // A sold card must stay viewable or the buyer's QR resolves to nothing.
+        visibility: 'public',
+      })
+      .eq('id', card.id)
+      .eq('user_id', userId)
+      // Guard against a concurrent manual change between read and write.
+      .eq('ownership_status', 'owned');
+
+    if (updErr) {
+      console.error(`[ebay-sync] failed to mark card ${card.serial} sold:`, updErr.message);
+      continue;
+    }
+    marked++;
+    console.log(`[ebay-sync] card ${card.serial} → sold (eBay${sale.price ? `, $${sale.price}` : ''})`);
+  }
+
+  return marked;
 }
 
 /**

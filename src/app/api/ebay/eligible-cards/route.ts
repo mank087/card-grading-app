@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { createSignedUrlMap } from '@/lib/signedUrlBatch';
+import { isMissingColumnError } from '@/lib/cards/ownership';
 
 /**
  * Explicit column list — the cards table carries several very large JSON /
@@ -88,18 +89,41 @@ export async function GET(request: NextRequest) {
 
     const excludeIds = new Set((activeListings ?? []).map(r => r.card_id).filter(Boolean));
 
+    // Also exclude cards whose listing already SOLD. Without this a card falls
+    // straight back into the picker the moment its listing leaves 'active',
+    // so sellers were being offered cards they no longer own. The card-level
+    // ownership_status filter below is the primary guard (it covers private
+    // sales too); this catches the window before the sync stamps the card.
+    const { data: soldListings } = await supabase
+      .from('ebay_listings')
+      .select('card_id')
+      .eq('user_id', user.id)
+      .eq('status', 'sold');
+    for (const row of soldListings ?? []) {
+      if (row.card_id) excludeIds.add(row.card_id);
+    }
+
     // Default limit bumped to 2000 (was 500) — most users have <500
     // graded cards; power users can have 500-2000+. With a server-side
     // search escape hatch above, the cap is now a safety net rather
     // than a functional limit.
     const HARD_LIMIT = q ? 100 : 2000;
-    let query = supabase
-      .from('cards')
-      .select(CARD_COLUMNS)
-      .eq('user_id', user.id)
-      .not('conversational_whole_grade', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(HARD_LIMIT);
+    // `applyOwnership` off = migration-window fallback (see below).
+    const buildQuery = (applyOwnership: boolean) => {
+      let query = supabase
+        .from('cards')
+        .select(CARD_COLUMNS)
+        .eq('user_id', user.id)
+        .not('conversational_whole_grade', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(HARD_LIMIT);
+
+      // You can't list a card you no longer hold. Covers eBay sales, private
+      // sales, and archived cards alike.
+      if (applyOwnership) query = query.eq('ownership_status', 'owned');
+      return query;
+    };
+    let query = buildQuery(true);
 
     if (q) {
       // Escape the % and _ wildcards so users searching for literal
@@ -109,7 +133,24 @@ export async function GET(request: NextRequest) {
       query = query.or(`card_name.ilike.%${safe}%,serial.ilike.%${safe}%`);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    // Migration window: ownership columns are applied by hand, so a schema
+    // that predates them falls back to the old unfiltered behaviour instead
+    // of emptying the picker. The sold-listing exclusion above still applies.
+    if (error && isMissingColumnError(error)) {
+      console.warn(
+        '[eligible-cards] ownership_status column missing — falling back to an unfiltered ' +
+        'picker. Apply supabase/migrations/20260730_add_card_ownership_status.sql.'
+      );
+      let retry = buildQuery(false);
+      if (q) {
+        const safe = q.replace(/[%_]/g, ch => `\\${ch}`);
+        retry = retry.or(`card_name.ilike.%${safe}%,serial.ilike.%${safe}%`);
+      }
+      ({ data, error } = await retry);
+    }
+
     // supabase-js can't statically parse a runtime-joined column string,
     // so type the rows explicitly (they're plain card records).
     const cards = (data ?? []) as unknown as Record<string, any>[];
