@@ -62,6 +62,32 @@ export async function createBinder(name: string): Promise<Binder> {
   return data.binder
 }
 
+export async function renameBinder(binderId: string, name: string): Promise<Binder> {
+  const res = await fetch(`${API_BASE}/api/binders/${binderId}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ name }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Could not rename binder')
+  return data.binder
+}
+
+/**
+ * Delete the BINDER ONLY. Every card in it stays in the collection — the
+ * server has no path to `cards` here at all.
+ */
+export async function deleteBinder(binderId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/binders/${binderId}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Could not delete binder')
+  }
+}
+
 /** Cards in a binder, in the user's order. */
 export async function getBinderCards(binderId: string): Promise<{
   cards: any[]

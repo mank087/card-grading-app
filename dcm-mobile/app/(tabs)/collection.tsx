@@ -12,7 +12,8 @@ import BinderStrip from '@/components/BinderStrip'
 import CardActionSheet from '@/components/CardActionSheet'
 import {
   listBinders, createBinder, getBinderCards, addCardsToBinder,
-  removeCardsFromBinder, reorderBinderCard, getCardBinders, type Binder,
+  removeCardsFromBinder, reorderBinderCard, getCardBinders,
+  renameBinder, deleteBinder, type Binder,
 } from '@/lib/bindersApi'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
@@ -120,6 +121,10 @@ export default function CollectionScreen() {
   const [newBinderFor, setNewBinderFor] = useState<string[]>([])
   // Bulk "add selected cards to a binder" picker
   const [binderPickerOpen, setBinderPickerOpen] = useState(false)
+  // Rename / delete the selected binder
+  const [manageOpen, setManageOpen] = useState(false)
+  const [manageName, setManageName] = useState('')
+  const [confirmDeleteBinder, setConfirmDeleteBinder] = useState(false)
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
   // Batch slab label options sheet — opened when user picks the single
   // "Graded Slab Label" entry from the batch print menu. Mirrors the
@@ -903,8 +908,27 @@ export default function CollectionScreen() {
               Sold cards stay verifiable — the buyer can still scan the label.
             </Text>
           )}
-          {selectedBinder && binderReorderable && (
-            <Text style={st.ownHint}>Long-press a card to reorder it or file it elsewhere.</Text>
+          {selectedBinder && (
+            <View style={st.binderBar}>
+              {binderReorderable && (
+                <Text style={[st.ownHint, { flex: 1, paddingHorizontal: 0, paddingBottom: 0 }]}>
+                  Long-press a card to reorder it or file it elsewhere.
+                </Text>
+              )}
+              {/* System binders (auto "Sold") are switched off by preference,
+                  not deleted, so they don't get an Edit button. */}
+              {!selectedBinder.system_key && (
+                <TouchableOpacity
+                  style={st.editBinderBtn}
+                  onPress={() => { setManageName(selectedBinder.name); setConfirmDeleteBinder(false); setManageOpen(true) }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit binder ${selectedBinder.name}`}
+                >
+                  <Ionicons name="create-outline" size={14} color={Colors.gray[700]} />
+                  <Text style={st.editBinderTxt}>Edit binder</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </>
       )}
@@ -1258,6 +1282,98 @@ export default function CollectionScreen() {
         </Pressable>
       </Modal>
 
+      {/* Edit binder — rename or delete. Delete leads with the reassurance
+          because a binder LOOKS like it holds cards, so deleting one reads as
+          deleting them. It doesn't: only the binder goes away. */}
+      <Modal visible={manageOpen} transparent animationType="fade" onRequestClose={() => setManageOpen(false)}>
+        <Pressable style={st.nbBackdrop} onPress={() => setManageOpen(false)}>
+          <Pressable style={st.nbCard} onPress={() => {}}>
+            {!confirmDeleteBinder ? (
+              <>
+                <Text style={st.nbTitle}>Edit binder</Text>
+                <TextInput
+                  value={manageName}
+                  onChangeText={(t) => setManageName(t.slice(0, 60))}
+                  placeholder="Binder name"
+                  placeholderTextColor={Colors.gray[400]}
+                  style={st.nbInput}
+                  returnKeyType="done"
+                />
+                <Text style={[st.nbSub, { marginTop: 6 }]}>
+                  {selectedBinder?.card_count ?? 0} card{(selectedBinder?.card_count ?? 0) === 1 ? '' : 's'} in this binder.
+                </Text>
+                <View style={st.nbRow}>
+                  <TouchableOpacity
+                    style={[st.nbPrimary, (!manageName.trim() || manageName.trim() === selectedBinder?.name || sheetBusy) && { opacity: 0.5 }]}
+                    disabled={!manageName.trim() || manageName.trim() === selectedBinder?.name || sheetBusy}
+                    onPress={async () => {
+                      if (!selectedBinder) return
+                      setSheetBusy(true)
+                      try {
+                        await renameBinder(selectedBinder.id, manageName.trim())
+                        await refreshBinders()
+                        setManageOpen(false)
+                      } catch (e: any) {
+                        Alert.alert('Could not rename', e?.message || 'Please try again.')
+                      } finally { setSheetBusy(false) }
+                    }}
+                  >
+                    <Text style={st.nbPrimaryTxt}>Save name</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={st.nbCancel} onPress={() => setManageOpen(false)} disabled={sheetBusy}>
+                    <Text style={st.nbCancelTxt}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={st.deleteBinderBtn}
+                  onPress={() => setConfirmDeleteBinder(true)}
+                  disabled={sheetBusy}
+                >
+                  <Text style={st.deleteBinderTxt}>Delete binder</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={st.nbTitle}>Delete “{selectedBinder?.name}”?</Text>
+                <View style={st.keepBox}>
+                  <Text style={st.keepTitle}>
+                    Your {selectedBinder?.card_count ?? 0} card{(selectedBinder?.card_count ?? 0) === 1 ? '' : 's'} stay in your collection.
+                  </Text>
+                  <Text style={st.keepBody}>
+                    Only the binder itself goes away — nothing is deleted, and the cards
+                    keep any other binders they’re in.
+                  </Text>
+                </View>
+                <View style={st.nbRow}>
+                  <TouchableOpacity
+                    style={[st.nbPrimary, { backgroundColor: '#dc2626' }, sheetBusy && { opacity: 0.5 }]}
+                    disabled={sheetBusy}
+                    onPress={async () => {
+                      if (!selectedBinder) return
+                      setSheetBusy(true)
+                      try {
+                        await deleteBinder(selectedBinder.id)
+                        setSelectedBinderId(null)
+                        await refreshBinders()
+                        setManageOpen(false)
+                        setConfirmDeleteBinder(false)
+                      } catch (e: any) {
+                        Alert.alert('Could not delete', e?.message || 'Please try again.')
+                      } finally { setSheetBusy(false) }
+                    }}
+                  >
+                    <Text style={st.nbPrimaryTxt}>Delete binder</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={st.nbCancel} onPress={() => setConfirmDeleteBinder(false)} disabled={sheetBusy}>
+                    <Text style={st.nbCancelTxt}>Back</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* New binder */}
       <Modal visible={newBinderOpen} transparent animationType="fade" onRequestClose={() => setNewBinderOpen(false)}>
         <Pressable style={st.nbBackdrop} onPress={() => setNewBinderOpen(false)}>
@@ -1393,6 +1509,14 @@ const st = StyleSheet.create({
   binderPickDot: { width: 12, height: 12, borderRadius: 6 },
   binderPickName: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.gray[900] },
   binderPickCount: { fontSize: 13, color: Colors.gray[400] },
+  binderBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingBottom: 8 },
+  editBinderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.gray[100] },
+  editBinderTxt: { fontSize: 12, fontWeight: '700', color: Colors.gray[700] },
+  deleteBinderBtn: { marginTop: 14, paddingVertical: 12, borderRadius: 10, backgroundColor: '#fef2f2', alignItems: 'center' },
+  deleteBinderTxt: { fontSize: 15, fontWeight: '700', color: '#b91c1c' },
+  keepBox: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  keepTitle: { fontSize: 14, fontWeight: '800', color: '#065f46' },
+  keepBody: { fontSize: 13, color: '#047857', marginTop: 4, lineHeight: 18 },
   statsText: { fontSize: 11, color: Colors.gray[500], fontWeight: '600' },
 
   // List view
