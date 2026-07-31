@@ -32,6 +32,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { SoldBanner } from '@/components/cards/SoldBanner';
 import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
+import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
@@ -6818,6 +6819,16 @@ export function PokemonCardDetails() {
       )}
 
       {/* Add this card to a binder — owner-only, hidden pre-migration */}
+      {/* Sold it off-platform? Record it here rather than going back to
+          the collection. Hidden once sold — SoldBanner takes over. */}
+      <MarkAsSoldButton
+        cardId={card.id}
+        cardName={cardInfo?.player_or_character || cardInfo?.card_name || card.card_name || 'this card'}
+        serial={card.serial}
+        ownershipStatus={card.ownership_status}
+        isOwner={Boolean(getStoredSession()?.user?.id && card.user_id && getStoredSession()?.user?.id === card.user_id)}
+      />
+
       <CardBinderPicker
         cardId={card.id}
         isOwner={Boolean(getStoredSession()?.user?.id && card.user_id && getStoredSession()?.user?.id === card.user_id)}

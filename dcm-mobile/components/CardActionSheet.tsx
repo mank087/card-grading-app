@@ -36,6 +36,9 @@ export interface CardActionSheetProps {
   onRemoveFromBinder: () => void
   onSelectMultiple: () => void
   onOpenCard: () => void
+  onMarkSold: () => void
+  /** Hides the sell action for a card that's already sold. */
+  isSold?: boolean
   onClose: () => void
 }
 
@@ -54,6 +57,8 @@ export default function CardActionSheet({
   onRemoveFromBinder,
   onSelectMultiple,
   onOpenCard,
+  onMarkSold,
+  isSold,
   onClose,
 }: CardActionSheetProps) {
   const atTop = index <= 0
@@ -141,6 +146,14 @@ export default function CardActionSheet({
             )}
 
             <Text style={s.section}>Card</Text>
+            {/* Marking a sale previously meant opening every card one at a
+                time — painful after a show. */}
+            {!isSold && (
+              <Pressable onPress={onMarkSold} disabled={busy} style={({ pressed }) => [s.row, pressed && s.pressed]}>
+                <Ionicons name="pricetag-outline" size={18} color="#047857" />
+                <Text style={[s.rowTxt, { color: '#047857' }]}>Mark as sold</Text>
+              </Pressable>
+            )}
             <Pressable onPress={onOpenCard} style={({ pressed }) => [s.row, pressed && s.pressed]}>
               <Ionicons name="eye-outline" size={18} color={Colors.gray[700]} />
               <Text style={s.rowTxt}>View card details</Text>

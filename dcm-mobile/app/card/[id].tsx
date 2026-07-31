@@ -53,6 +53,7 @@ import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
+import MarkAsSoldModal from '@/components/MarkAsSoldModal'
 
 /**
  * Resolve the grade uncertainty string for display. Prefers the
@@ -95,6 +96,8 @@ export default function CardDetailScreen() {
   const [binderList, setBinderList] = useState<Binder[]>([])
   const [cardBinderIds, setCardBinderIds] = useState<Set<string>>(new Set())
   const [binderBusy, setBinderBusy] = useState(false)
+  const [sellOpen, setSellOpen] = useState(false)
+  const [sellBusy, setSellBusy] = useState(false)
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
@@ -587,28 +590,12 @@ export default function CardDetailScreen() {
     return json
   }
 
-  const handleMarkSold = () => {
-    Alert.alert(
-      'Mark as sold',
-      "This takes the card out of your collection and stops it being offered for eBay listings — but keeps its grade page online so the buyer can still scan the label and verify it.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark as sold',
-          onPress: async () => {
-            try {
-              await callOwnershipApi(`/api/cards/${card.id}/ownership`, 'PATCH', {
-                ownership_status: 'sold',
-              })
-              router.back()
-            } catch (err: any) {
-              Alert.alert('Could not mark as sold', err?.message || 'Please try again.')
-            }
-          },
-        },
-      ]
-    )
-  }
+  /**
+   * Opens the full dialog rather than a bare Alert, so a sale recorded from
+   * the phone captures price/date/note like the web one does. Without those
+   * fields app-marked sales were second-class records.
+   */
+  const handleMarkSold = () => setSellOpen(true)
 
   /**
    * Two-step removal, mirroring the web dialog.
@@ -2885,6 +2872,25 @@ export default function CardDetailScreen() {
       </View>{/* close twoPaneRight */}
       </View>{/* close twoPaneRow */}
     </ScrollView>
+    <MarkAsSoldModal
+      visible={sellOpen}
+      cardName={cardName}
+      busy={sellBusy}
+      onCancel={() => setSellOpen(false)}
+      onConfirm={async (details) => {
+        setSellBusy(true)
+        try {
+          await callOwnershipApi(`/api/cards/${card.id}/ownership`, 'PATCH', {
+            ownership_status: 'sold',
+            ...details,
+          })
+          setSellOpen(false)
+          fetchCard()
+        } catch (err: any) {
+          Alert.alert('Could not mark as sold', err?.message || 'Please try again.')
+        } finally { setSellBusy(false) }
+      }}
+    />
     <MobileTabBar />
     <OnboardingTour
       isActive={tourActive}

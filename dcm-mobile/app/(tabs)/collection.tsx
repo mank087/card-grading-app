@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import BinderStrip from '@/components/BinderStrip'
 import CardActionSheet from '@/components/CardActionSheet'
+import MarkAsSoldModal from '@/components/MarkAsSoldModal'
 import {
   listBinders, createBinder, getBinderCards, addCardsToBinder,
   removeCardsFromBinder, reorderBinderCard, getCardBinders,
@@ -125,6 +126,9 @@ export default function CollectionScreen() {
   const [manageOpen, setManageOpen] = useState(false)
   const [manageName, setManageName] = useState('')
   const [confirmDeleteBinder, setConfirmDeleteBinder] = useState(false)
+  // Card being marked sold from the long-press sheet
+  const [sellCard, setSellCard] = useState<CardItem | null>(null)
+  const [sellBusy, setSellBusy] = useState(false)
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
   // Batch slab label options sheet — opened when user picks the single
   // "Graded Slab Label" entry from the batch print menu. Mirrors the
@@ -1264,6 +1268,8 @@ export default function CollectionScreen() {
         }}
         onMove={sheetMove}
         onRemoveFromBinder={sheetRemoveFromBinder}
+        onMarkSold={() => { setSellCard(sheetCard); setSheetCard(null) }}
+        isSold={(sheetCard as any)?.ownership_status === 'sold'}
         onSelectMultiple={() => { if (sheetCard) enterSelectionMode(sheetCard.id); setSheetCard(null) }}
         onOpenCard={() => { const id = sheetCard?.id; setSheetCard(null); if (id) router.push(`/card/${id}`) }}
         onClose={() => setSheetCard(null)}
@@ -1314,6 +1320,34 @@ export default function CollectionScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Mark as sold, with the same price/date/note fields as web */}
+      <MarkAsSoldModal
+        visible={!!sellCard}
+        cardName={sellCard ? getDisplayName(sellCard as any) : ''}
+        busy={sellBusy}
+        onCancel={() => setSellCard(null)}
+        onConfirm={async (details) => {
+          if (!sellCard) return
+          setSellBusy(true)
+          try {
+            const { data: { session: sess } } = await supabase.auth.getSession()
+            const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+            const res = await fetch(`${API_BASE}/api/cards/${sellCard.id}/ownership`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${sess?.access_token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ownership_status: 'sold', ...details }),
+            })
+            const json = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(json.error || 'Could not mark as sold')
+            setSellCard(null)
+            fetchCollection()
+            if (selectedBinderId) loadBinderCards(selectedBinderId)
+          } catch (e: any) {
+            Alert.alert('Could not mark as sold', e?.message || 'Please try again.')
+          } finally { setSellBusy(false) }
+        }}
+      />
 
       {/* Edit binder — rename or delete. Delete leads with the reassurance
           because a binder LOOKS like it holds cards, so deleting one reads as
