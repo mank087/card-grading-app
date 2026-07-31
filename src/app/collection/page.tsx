@@ -14,7 +14,7 @@ import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
-import BinderStrip from '@/components/binders/BinderStrip'
+import BinderStrip, { type BinderSummary } from '@/components/binders/BinderStrip'
 import { SortableGrid, SortableCell, CollectionDnd } from '@/components/binders/SortableCardGrid'
 import { useBinders } from '@/components/binders/useBinders'
 import CardActionSheet from '@/components/binders/CardActionSheet'
@@ -429,6 +429,9 @@ function CollectionPageContent() {
   const [newBinderFor, setNewBinderFor] = useState<string[] | null>(null)
   const [newBinderBusy, setNewBinderBusy] = useState(false)
   const [removingFromBinderId, setRemovingFromBinderId] = useState<string | null>(null)
+  // Binder being renamed / deleted
+  const [manageBinder, setManageBinder] = useState<BinderSummary | null>(null)
+  const [manageBusy, setManageBusy] = useState(false)
   // Long-press / ⋯ action sheet (touch). Holds the card plus which binders it's
   // already in, so the sheet can show ticks without a second round trip.
   const [sheetCard, setSheetCard] = useState<Card | null>(null)
@@ -2100,14 +2103,12 @@ function CollectionPageContent() {
             selectedId={selectedBinderId}
             onSelect={(id) => { setSelectedBinderId(id); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
             onCreate={() => setNewBinderFor([])}
-            onManage={async (b) => {
+            onManage={(b) => {
               if (b.system_key) {
                 toast.info('This binder is managed for you and fills itself.')
                 return
               }
-              const name = window.prompt('Rename binder', b.name)
-              if (!name?.trim() || name === b.name) return
-              try { await binderApi.renameBinder(b.id, name.trim()) } catch (e: any) { toast.error(e.message) }
+              setManageBinder(b)
             }}
           />
         )}
@@ -2118,6 +2119,18 @@ function CollectionPageContent() {
         {selectedBinder && (
           <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="font-semibold text-gray-800">{selectedBinder.name}</span>
+            {!selectedBinder.system_key && (
+              <button
+                onClick={() => setManageBinder(selectedBinder)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                title="Rename or delete this binder"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit binder
+              </button>
+            )}
             {selectedBinder.smart_filter ? (
               <span className="text-gray-500">Fills itself automatically — no manual order.</span>
             ) : canReorder ? (
@@ -3303,6 +3316,33 @@ function CollectionPageContent() {
         />
       )}
 
+      {manageBinder && (
+        <BinderSettingsModal
+          binder={manageBinder}
+          busy={manageBusy}
+          onCancel={() => setManageBinder(null)}
+          onRename={async (name) => {
+            setManageBusy(true)
+            try {
+              await binderApi.renameBinder(manageBinder.id, name)
+              toast.success(`Renamed to "${name}".`)
+              setManageBinder(null)
+            } catch (e: any) { toast.error(e.message) }
+            finally { setManageBusy(false) }
+          }}
+          onDelete={async () => {
+            setManageBusy(true)
+            try {
+              await binderApi.deleteBinder(manageBinder.id)
+              toast.success(`Deleted "${manageBinder.name}" — the cards are still in your collection.`)
+              if (selectedBinderId === manageBinder.id) setSelectedBinderId(null)
+              setManageBinder(null)
+            } catch (e: any) { toast.error(e.message) }
+            finally { setManageBusy(false) }
+          }}
+        />
+      )}
+
       {newBinderFor !== null && (
         <NewBinderModal
           cardCount={newBinderFor.length}
@@ -3421,6 +3461,111 @@ function CardTileWrapper({
       }`}
     >
       {children}
+    </div>
+  )
+}
+
+/**
+ * Rename / delete a binder.
+ *
+ * Delete is two-step and states the card count outright. This is the single
+ * highest-risk confusion in the whole feature: a binder LOOKS like it contains
+ * cards, so deleting one reads as deleting them. It doesn't — the API has no
+ * path to `cards` at all — but the UI has to say so before the click, not
+ * after.
+ */
+function BinderSettingsModal({
+  binder,
+  busy,
+  onCancel,
+  onRename,
+  onDelete,
+}: {
+  binder: BinderSummary
+  busy: boolean
+  onCancel: () => void
+  onRename: (name: string) => void
+  onDelete: () => void
+}) {
+  const [name, setName] = useState(binder.name)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const changed = name.trim() && name.trim() !== binder.name
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+        {!confirmingDelete ? (
+          <>
+            <h2 className="text-lg font-bold text-gray-900">Edit binder</h2>
+            <label className="block text-xs font-semibold text-gray-600 mt-4 mb-1">Name</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 60))}
+              onKeyDown={(e) => { if (e.key === 'Enter' && changed) onRename(name.trim()) }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {binder.card_count} card{binder.card_count === 1 ? '' : 's'} in this binder.
+            </p>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={() => onRename(name.trim())}
+                disabled={!changed || busy}
+                className="flex-1 px-4 py-2 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Save name'}
+              </button>
+              <button
+                onClick={onCancel}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              disabled={busy}
+              className="mt-4 w-full px-4 py-2 rounded-lg bg-red-50 text-red-700 font-semibold hover:bg-red-100 disabled:opacity-50"
+            >
+              Delete binder
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-gray-900">Delete &ldquo;{binder.name}&rdquo;?</h2>
+            <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900">
+              <p className="font-semibold">
+                Your {binder.card_count} card{binder.card_count === 1 ? '' : 's'} stay in your collection.
+              </p>
+              <p className="mt-1 text-emerald-800">
+                Only the binder itself goes away — nothing is deleted, and the cards
+                keep any other binders they&apos;re in.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={onDelete}
+                disabled={busy}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy ? 'Deleting…' : 'Delete binder'}
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-50"
+              >
+                Back
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
