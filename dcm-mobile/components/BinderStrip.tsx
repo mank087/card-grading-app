@@ -16,25 +16,52 @@ import type { Binder } from '@/lib/bindersApi'
 export default function BinderStrip({
   binders,
   selectedId,
+  ownershipView,
+  ownedCount,
+  soldCount,
   onSelect,
+  onSelectSold,
   onCreate,
 }: {
   binders: Binder[]
   selectedId: string | null
+  /** Sold is a scope chip here, not a separate tab row below the strip. */
+  ownershipView: 'owned' | 'sold'
+  ownedCount: number
+  soldCount: number
   onSelect: (id: string | null) => void
+  onSelectSold: () => void
   onCreate: () => void
 }) {
+  const allActive = selectedId === null && ownershipView === 'owned'
   return (
     <View style={s.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.row}>
+        {/* Scope: everything, sold, then binders. Sold used to be its own tab
+            row with a hint under it — two full-width rows for something the
+            strip can express as one chip. */}
         <Pressable
           onPress={() => onSelect(null)}
-          style={[s.chip, selectedId === null && s.chipOn]}
+          style={[s.chip, allActive && s.chipOn]}
           accessibilityRole="button"
-          accessibilityState={{ selected: selectedId === null }}
+          accessibilityState={{ selected: allActive }}
         >
-          <Text style={[s.chipTxt, selectedId === null && s.chipTxtOn]}>All Cards</Text>
+          <Text style={[s.chipTxt, allActive && s.chipTxtOn]}>All Cards</Text>
+          {ownedCount > 0 && <Text style={[s.count, allActive && s.countOn]}>{ownedCount}</Text>}
         </Pressable>
+
+        {soldCount > 0 && (
+          <Pressable
+            onPress={onSelectSold}
+            style={[s.chip, ownershipView === 'sold' && s.chipSold]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ownershipView === 'sold' }}
+            accessibilityLabel={`Sold, ${soldCount} cards`}
+          >
+            <Text style={[s.chipTxt, ownershipView === 'sold' && s.chipTxtOn]}>Sold</Text>
+            <Text style={[s.count, ownershipView === 'sold' && s.countOn]}>{soldCount}</Text>
+          </Pressable>
+        )}
 
         {binders.map(b => {
           const on = selectedId === b.id
@@ -72,6 +99,7 @@ const s = StyleSheet.create({
     maxWidth: 200,
   },
   chipOn: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[600] },
+  chipSold: { backgroundColor: '#059669', borderColor: '#059669' },
   chipNew: { borderStyle: 'dashed', borderColor: Colors.gray[300] },
   chipTxt: { fontSize: 13, fontWeight: '700', color: Colors.gray[700], flexShrink: 1 },
   chipTxtOn: { color: '#fff' },

@@ -11,6 +11,7 @@ import { Colors } from '@/lib/constants'
 import BinderStrip from '@/components/BinderStrip'
 import CardActionSheet from '@/components/CardActionSheet'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
+import FilterSheet, { activeFilterCount, type MobileFilterState } from '@/components/FilterSheet'
 import {
   listBinders, createBinder, getBinderCards, addCardsToBinder,
   removeCardsFromBinder, reorderBinderCard, getCardBinders,
@@ -94,7 +95,6 @@ export default function CollectionScreen() {
   const [subSport, setSubSport] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
-  const [showSort, setShowSort] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   // ---- Multi-select + batch printing ----------------------------------
@@ -129,6 +129,10 @@ export default function CollectionScreen() {
   // Card being marked sold from the long-press sheet
   const [sellCard, setSellCard] = useState<CardItem | null>(null)
   const [sellBusy, setSellBusy] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  // Counts for the scope chips. Head-only queries, so no rows come back.
+  const [ownedCount, setOwnedCount] = useState(0)
+  const [soldCount, setSoldCount] = useState(0)
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
   // Batch slab label options sheet — opened when user picks the single
   // "Graded Slab Label" entry from the batch print menu. Mirrors the
@@ -288,6 +292,23 @@ export default function CollectionScreen() {
 
   // ---- Binders --------------------------------------------------------
 
+  /** Owned/sold counts for the scope chips — head-only, no rows transferred. */
+  const refreshCounts = useCallback(async () => {
+    if (!session?.user?.id) return
+    try {
+      const [owned, sold] = await Promise.all(
+        (['owned', 'sold'] as const).map(status =>
+          supabase.from('cards').select('id', { count: 'exact', head: true })
+            .eq('user_id', session.user.id).is('deleted_at', null).eq('ownership_status', status)
+        )
+      )
+      setOwnedCount(owned.count ?? 0)
+      setSoldCount(sold.count ?? 0)
+    } catch { /* chips just render without counts */ }
+  }, [session?.user?.id])
+
+  useEffect(() => { refreshCounts() }, [refreshCounts, cards.length])
+
   const refreshBinders = useCallback(async () => {
     if (!session?.user?.id) return
     const { binders: list, available } = await listBinders()
@@ -313,6 +334,9 @@ export default function CollectionScreen() {
   useEffect(() => { loadBinderCards(selectedBinderId) }, [selectedBinderId, loadBinderCards])
 
   const selectedBinder = binders.find(b => b.id === selectedBinderId) || null
+
+  const filterState: MobileFilterState = { category, subSport, sortBy, sortAsc, ownershipView }
+  const activeFilters = activeFilterCount(filterState, Boolean(selectedBinderId))
 
   /** Open the long-press sheet, pre-loading which binders hold this card. */
   const openSheet = useCallback(async (card: CardItem) => {
@@ -794,13 +818,18 @@ export default function CollectionScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {/* One Filter button replaces the sort bar, the category scroller and
+            the sport sub-row. Badge shows how many are on. */}
         <TouchableOpacity
-          onPress={() => setShowSort(!showSort)}
-          style={st.viewToggle}
-          accessibilityLabel={showSort ? 'Hide sort options' : 'Show sort options'}
+          onPress={() => setFilterOpen(true)}
+          style={[st.viewToggle, activeFilters > 0 && st.viewToggleOn]}
+          accessibilityLabel={`Filter and sort${activeFilters ? `, ${activeFilters} active` : ''}`}
           accessibilityRole="button"
         >
-          <Ionicons name="swap-vertical" size={20} color={Colors.purple[600]} />
+          <Ionicons name="options-outline" size={20} color={activeFilters > 0 ? '#fff' : Colors.purple[600]} />
+          {activeFilters > 0 && (
+            <View style={st.filterBadge}><Text style={st.filterBadgeTxt}>{activeFilters}</Text></View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setViewMode(v => v === 'list' ? 'grid' : 'list')}
@@ -819,74 +848,9 @@ export default function CollectionScreen() {
         </View>
       )}
 
-      {/* Sort options */}
-      {showSort && (
-        <View style={st.sortBar}>
-          {SORT_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[st.sortChip, sortBy === opt.value && st.sortChipActive]}
-              onPress={() => {
-                if (sortBy === opt.value) { setSortAsc(!sortAsc) }
-                else { setSortBy(opt.value); setSortAsc(false) }
-              }}
-            >
-              <Text style={[st.sortChipText, sortBy === opt.value && st.sortChipTextActive]}>{opt.label}</Text>
-              {sortBy === opt.value && <Ionicons name={sortAsc ? 'arrow-up' : 'arrow-down'} size={10} color={Colors.purple[700]} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Category filter tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catContent}>
-        {CATEGORIES.map(cat => (
-          <TouchableOpacity
-            key={cat}
-            style={[st.catTab, category === cat && st.catTabActive]}
-            onPress={() => pickCategory(cat)}
-          >
-            <Text style={[st.catTabText, category === cat && st.catTabTextActive]}>{cat}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Sport sub-row — only visible when Sports is the active top-level
-          category and the user actually has sports cards. "All sports"
-          (subSport === null) is the default. */}
-      {category === 'Sports' && sportsInCollection.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={st.subCatScroll}
-          contentContainerStyle={st.subCatContent}
-        >
-          <TouchableOpacity
-            style={[st.subCatPill, subSport === null && st.subCatPillActive]}
-            onPress={() => setSubSport(null)}
-            activeOpacity={0.7}
-          >
-            <Text style={[st.subCatPillText, subSport === null && st.subCatPillTextActive]}>
-              All sports ({totalSportsCount})
-            </Text>
-          </TouchableOpacity>
-          {sportsInCollection.map(({ sport, count }) => {
-            const active = subSport === sport
-            return (
-              <TouchableOpacity
-                key={sport}
-                style={[st.subCatPill, active && st.subCatPillActive]}
-                onPress={() => setSubSport(active ? null : sport)}
-                activeOpacity={0.7}
-              >
-                <Text style={[st.subCatPillText, active && st.subCatPillTextActive]}>
-                  {sport} ({count})
-                </Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-      )}
+      {/* Sort, category and sport moved into the filter sheet — three
+          horizontal rows on a screen that also has a nav header, a tab bar,
+          a search row and the binder strip. Active picks show as chips. */}
 
       {/* Binder strip + ownership tabs — hidden entirely until the binders
           migration lands, so the screen behaves exactly as before. */}
@@ -895,34 +859,24 @@ export default function CollectionScreen() {
           <BinderStrip
             binders={binders}
             selectedId={selectedBinderId}
-            onSelect={(id) => { setSelectedBinderId(id); setSelectedIds(new Set()); setSelectionMode(false) }}
+            ownershipView={ownershipView}
+            ownedCount={ownedCount}
+            soldCount={soldCount}
+            onSelectSold={() => { setOwnershipView('sold'); setSelectedBinderId(null); setSelectedIds(new Set()); setSelectionMode(false) }}
+            onSelect={(id) => {
+              setSelectedBinderId(id)
+              // Picking a scope lands you on what you HOLD; Sold is its own
+              // chip, and inside a binder it's a filter in the sheet.
+              setOwnershipView('owned')
+              setSelectedIds(new Set()); setSelectionMode(false)
+            }}
             onCreate={() => { setNewBinderFor([]); setNewBinderName(''); setNewBinderOpen(true) }}
           />
-          <View style={st.ownRow}>
-            {(['owned', 'sold'] as const).map(v => (
-              <TouchableOpacity
-                key={v}
-                style={[st.ownTab, ownershipView === v && st.ownTabOn]}
-                onPress={() => { setOwnershipView(v); setSelectedIds(new Set()); setSelectionMode(false) }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: ownershipView === v }}
-              >
-                <Text style={[st.ownTabTxt, ownershipView === v && st.ownTabTxtOn]}>
-                  {v === 'owned' ? 'Owned' : 'Sold'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {ownershipView === 'sold' && (
-            <Text style={st.ownHint}>
-              Sold cards stay verifiable — the buyer can still scan the label.
-            </Text>
-          )}
           {selectedBinder && (
             <View style={st.binderBar}>
               {binderReorderable && (
                 <Text style={[st.ownHint, { flex: 1, paddingHorizontal: 0, paddingBottom: 0 }]}>
-                  Long-press a card to reorder it or file it elsewhere.
+                  Long-press a card to reorder or file it.
                 </Text>
               )}
               {/* System binders (auto "Sold") are switched off by preference,
@@ -941,6 +895,38 @@ export default function CollectionScreen() {
             </View>
           )}
         </>
+      )}
+
+      {/* Active filters only — state visible, controls in the sheet */}
+      {activeFilters > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.activeRow}>
+          {category !== 'All' && (
+            <Pressable style={st.activeChip} onPress={() => { setCategory('All'); setSubSport(null) }}>
+              <Text style={st.activeChipTxt}>{category}</Text>
+              <Ionicons name="close" size={12} color={Colors.purple[700]} />
+            </Pressable>
+          )}
+          {subSport && (
+            <Pressable style={st.activeChip} onPress={() => setSubSport(null)}>
+              <Text style={st.activeChipTxt}>{subSport}</Text>
+              <Ionicons name="close" size={12} color={Colors.purple[700]} />
+            </Pressable>
+          )}
+          {(sortBy !== 'created_at' || sortAsc) && (
+            <Pressable style={st.activeChip} onPress={() => { setSortBy('created_at'); setSortAsc(false) }}>
+              <Text style={st.activeChipTxt}>
+                {SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? sortBy} {sortAsc ? '↑' : '↓'}
+              </Text>
+              <Ionicons name="close" size={12} color={Colors.purple[700]} />
+            </Pressable>
+          )}
+          {selectedBinderId && ownershipView === 'sold' && (
+            <Pressable style={st.activeChip} onPress={() => setOwnershipView('owned')}>
+              <Text style={st.activeChipTxt}>Sold</Text>
+              <Ionicons name="close" size={12} color={Colors.purple[700]} />
+            </Pressable>
+          )}
+        </ScrollView>
       )}
 
       {/* Stats bar */}
@@ -1321,6 +1307,27 @@ export default function CollectionScreen() {
         </Pressable>
       </Modal>
 
+      <FilterSheet
+        visible={filterOpen}
+        state={filterState}
+        categories={CATEGORIES as unknown as string[]}
+        sports={sportsInCollection}
+        sortOptions={SORT_OPTIONS}
+        inBinder={Boolean(selectedBinderId)}
+        onChange={(patch) => {
+          if (patch.category !== undefined) { setCategory(patch.category); setSubSport(null) }
+          if (patch.subSport !== undefined) setSubSport(patch.subSport)
+          if (patch.sortBy !== undefined) setSortBy(patch.sortBy)
+          if (patch.sortAsc !== undefined) setSortAsc(patch.sortAsc)
+          if (patch.ownershipView !== undefined) setOwnershipView(patch.ownershipView)
+        }}
+        onReset={() => {
+          setCategory('All'); setSubSport(null)
+          setSortBy('created_at'); setSortAsc(false); setOwnershipView('owned')
+        }}
+        onClose={() => setFilterOpen(false)}
+      />
+
       {/* Mark as sold, with the same price/date/note fields as web */}
       <MarkAsSoldModal
         visible={!!sellCard}
@@ -1586,6 +1593,12 @@ const st = StyleSheet.create({
   keepBody: { fontSize: 13, color: '#047857', marginTop: 4, lineHeight: 18 },
   emptyCta: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: Colors.purple[600] },
   emptyCtaTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  viewToggleOn: { backgroundColor: Colors.purple[600] },
+  filterBadge: { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  filterBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  activeRow: { paddingHorizontal: 12, paddingBottom: 8, gap: 6, flexDirection: 'row' },
+  activeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: Colors.purple[100] },
+  activeChipTxt: { fontSize: 12, fontWeight: '700', color: Colors.purple[700] },
   statsText: { fontSize: 11, color: Colors.gray[500], fontWeight: '600' },
 
   // List view
