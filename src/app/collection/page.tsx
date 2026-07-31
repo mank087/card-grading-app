@@ -2538,14 +2538,55 @@ function CollectionPageContent() {
                     })()}
                   </div>
 
-                  {/* View Details Button */}
-                  <div className="p-3">
-                    <Link
-                      href={getCardLink(card)}
-                      className="inline-block w-full text-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                    >
-                      View Details
-                    </Link>
+                  {/* Sale details + actions.
+                      NOTE: grid is the DEFAULT view — the ownership actions
+                      originally only reached the list and table renderers,
+                      so "Still mine" was invisible to most people. */}
+                  <div className="p-3 space-y-2">
+                    {card.ownership_status === 'sold' && (
+                      <div className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-1.5 text-xs text-emerald-900">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">
+                            {card.sold_channel === 'ebay' ? 'Sold on eBay' : 'Sold'}
+                          </span>
+                          {typeof card.sold_price === 'number' && (
+                            <span className="font-bold">${card.sold_price.toFixed(2)}</span>
+                          )}
+                        </div>
+                        {card.sold_at && (
+                          <div className="text-emerald-700">{new Date(card.sold_at).toLocaleDateString()}</div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={getCardLink(card)}
+                        className="flex-1 text-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                      >
+                        View Details
+                      </Link>
+
+                      {card.ownership_status === 'sold' ? (
+                        <button
+                          onClick={() => updateOwnership(card.id, 'owned')}
+                          disabled={updatingOwnershipId === card.id}
+                          className="shrink-0 px-3 py-2 rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm font-semibold transition-colors disabled:opacity-50"
+                          title="Sale fell through? Move it back into your collection"
+                        >
+                          {updatingOwnershipId === card.id ? '…' : 'Still mine'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSellCard(card)}
+                          disabled={updatingOwnershipId === card.id}
+                          className="shrink-0 px-3 py-2 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-sm font-semibold transition-colors disabled:opacity-50"
+                          title="Mark as sold — keeps the grade page alive for the buyer"
+                        >
+                          Sold
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </CardSlabGrid>
                 </CardTileWrapper>
@@ -2890,7 +2931,7 @@ function CollectionPageContent() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                   </Link>
-                                  {ownershipView === 'owned' ? (
+                                  {card.ownership_status !== 'sold' ? (
                                     <button
                                       onClick={() => setSellCard(card)}
                                       disabled={updatingOwnershipId === card.id}
@@ -3145,7 +3186,7 @@ function CollectionPageContent() {
                               >
                                 View
                               </Link>
-                              {ownershipView === 'owned' ? (
+                              {card.ownership_status !== 'sold' ? (
                                 <button
                                   onClick={() => setSellCard(card)}
                                   disabled={updatingOwnershipId === card.id}

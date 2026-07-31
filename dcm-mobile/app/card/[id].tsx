@@ -2824,9 +2824,44 @@ export default function CardDetailScreen() {
               </Text>
               <Text style={s.soldBannerBody}>
                 {isOwner
-                  ? 'Out of your collection, but the grade report stays online so the buyer can verify it. The record is locked — use "Still mine" on the web to edit it.'
+                  ? 'Out of your collection, but the grade report stays online so the buyer can verify it. The record is locked while it\'s sold.'
                   : 'This card has been sold. Its grade and details are locked and cannot be changed.'}
               </Text>
+
+              {/* The ONLY way to unlock a sold card — editing, label changes,
+                  going private and deletion are all refused while it's sold.
+                  It belongs on the record itself, not just in the collection. */}
+              {isOwner && (
+                <TouchableOpacity
+                  style={s.stillMineBtn}
+                  disabled={binderBusy}
+                  onPress={() => {
+                    Alert.alert(
+                      'Sale fell through?',
+                      'This moves the card back into your collection and unlocks editing. The sale price and date are cleared.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Still mine',
+                          onPress: async () => {
+                            setBinderBusy(true)
+                            try {
+                              await callOwnershipApi(`/api/cards/${card.id}/ownership`, 'PATCH', {
+                                ownership_status: 'owned',
+                              })
+                              fetchCard()
+                            } catch (e: any) {
+                              Alert.alert('Could not move it back', e?.message || 'Please try again.')
+                            } finally { setBinderBusy(false) }
+                          },
+                        },
+                      ]
+                    )
+                  }}
+                >
+                  <Text style={s.stillMineTxt}>Sale fell through — still mine</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -3116,4 +3151,6 @@ const s = StyleSheet.create({
   binderChipTxt: { fontSize: 13, fontWeight: '700', color: Colors.gray[700], flexShrink: 1 },
   binderChipTxtOn: { color: '#fff' },
   binderChipMark: { fontSize: 13, fontWeight: '800', color: Colors.gray[400] },
+  stillMineBtn: { marginTop: 12, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 2, borderColor: '#047857', backgroundColor: '#fff' },
+  stillMineTxt: { fontSize: 13, fontWeight: '800', color: '#065f46' },
 })

@@ -2751,6 +2751,7 @@ export function PokemonCardDetails() {
         {/* Sold: the record is locked and stays online for the buyer */}
         {card?.ownership_status === 'sold' && (
           <SoldBanner
+                    cardId={card.id}
             soldAt={card.sold_at}
             soldPrice={card.sold_price}
             soldChannel={card.sold_channel}
