@@ -97,10 +97,11 @@ export async function syncUser(
 
   const { data: dbRows } = await supabaseAdmin
     .from('ebay_listings')
-    .select('id, listing_id, status, last_synced_at')
+    // sold_at + quantity_sold feed the Pass 0c evidence check below
+    .select('id, listing_id, status, last_synced_at, sold_at, quantity_sold')
     .eq('user_id', userId);
 
-  const dbByListingId = new Map<string, { id: string; status: string; last_synced_at: string | null }>();
+  const dbByListingId = new Map<string, { id: string; status: string; last_synced_at: string | null; sold_at: string | null; quantity_sold: number | null }>();
   for (const row of dbRows ?? []) {
     if (row.listing_id) dbByListingId.set(row.listing_id, row);
   }
@@ -206,6 +207,29 @@ export async function syncUser(
       .eq('id', dbRow.id);
     updated++;
     dbByListingId.set(item.itemId, { ...dbRow, status: 'active' });
+  }
+
+  // -------- Pass 0c: re-open UNVERIFIED sold rows --------
+  // A row can claim status 'sold' while carrying no evidence of a sale: no
+  // sold_at and quantity_sold 0. Every path that legitimately marks a sale
+  // writes both. Nine such rows were found in production across five users,
+  // and seven cards had been dragged into their owners' Sold category — where
+  // the sold-lock then blocked editing and deleting them.
+  //
+  // They were unreachable: Pass 1 only walks 'active' rows, and Passes 0/0b
+  // only see listings eBay still returns (a 60-day window). Anything wrongly
+  // terminal and older than that was stuck permanently.
+  //
+  // Demoting them to orphan status here hands the question to eBay via GetItem
+  // rather than trusting an unverified claim forever.
+  for (const [listingId, dbRow] of dbByListingId.entries()) {
+    if (dbRow.status !== 'sold') continue;
+    if (dbRow.sold_at || (dbRow.quantity_sold ?? 0) > 0) continue;
+    if (activeByListingId.has(listingId) || soldByListingId.has(listingId) || unsoldByListingId.has(listingId)) {
+      continue; // one of the passes above will settle it with real data
+    }
+    console.warn(`[ebay-sync] listing ${listingId} claims sold with no sale evidence — re-resolving`);
+    orphans.push({ id: dbRow.id, listing_id: listingId, last_synced_at: dbRow.last_synced_at });
   }
 
   // -------- Pass 1: bulk reconciliation --------
