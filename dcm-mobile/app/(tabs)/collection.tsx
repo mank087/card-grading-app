@@ -8,6 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
+import BinderStrip from '@/components/BinderStrip'
+import CardActionSheet from '@/components/CardActionSheet'
+import {
+  listBinders, createBinder, getBinderCards, addCardsToBinder,
+  removeCardsFromBinder, reorderBinderCard, getCardBinders, type Binder,
+} from '@/lib/bindersApi'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
 import { supabase, hasActiveSession } from '@/lib/supabase'
@@ -95,6 +101,25 @@ export default function CollectionScreen() {
   // Bottom action bar appears when at least one card is selected.
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // ---- Binders + ownership view ---------------------------------------
+  // `ownershipView` mirrors the web tabs: what you hold vs what you've sold.
+  // `selectedBinderId` null = All Cards (never manually ordered).
+  const [ownershipView, setOwnershipView] = useState<'owned' | 'sold'>('owned')
+  const [binders, setBinders] = useState<Binder[]>([])
+  const [bindersAvailable, setBindersAvailable] = useState(false)
+  const [selectedBinderId, setSelectedBinderId] = useState<string | null>(null)
+  const [binderCards, setBinderCards] = useState<CardItem[] | null>(null)
+  const [binderReorderable, setBinderReorderable] = useState(false)
+  // Long-press sheet
+  const [sheetCard, setSheetCard] = useState<CardItem | null>(null)
+  const [sheetMemberOf, setSheetMemberOf] = useState<Set<string>>(new Set())
+  const [sheetBusy, setSheetBusy] = useState(false)
+  const [newBinderOpen, setNewBinderOpen] = useState(false)
+  const [newBinderName, setNewBinderName] = useState('')
+  const [newBinderFor, setNewBinderFor] = useState<string[]>([])
+  // Bulk "add selected cards to a binder" picker
+  const [binderPickerOpen, setBinderPickerOpen] = useState(false)
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
   // Batch slab label options sheet — opened when user picks the single
   // "Graded Slab Label" entry from the batch print menu. Mirrors the
@@ -173,10 +198,10 @@ export default function CollectionScreen() {
     if (!(await hasActiveSession())) return
     setFetchError(null)
     try {
-      // Ownership filter: sold and archived cards leave the collection (their
-      // grade page stays online for the buyer), and soft-deleted ones are
-      // hidden entirely. `applyOwnership` off = pre-migration fallback so an
-      // app build that ships ahead of the schema still lists cards.
+      // Ownership filter: sold cards leave the collection (their grade page
+      // stays online for the buyer) and soft-deleted ones are hidden entirely.
+      // `applyOwnership` off = pre-migration fallback so an app build that
+      // ships ahead of the schema still lists cards.
       const runQuery = (applyOwnership: boolean) => {
         let q = supabase
         .from('cards')
@@ -193,7 +218,7 @@ export default function CollectionScreen() {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1000)
-        if (applyOwnership) q = q.eq('ownership_status', 'owned').is('deleted_at', null)
+        if (applyOwnership) q = q.eq('ownership_status', ownershipView).is('deleted_at', null)
         return q
       }
 
@@ -246,15 +271,142 @@ export default function CollectionScreen() {
       setIsLoading(false)
       setRefreshing(false)
     }
-  }, [session?.user?.id])
+  }, [session?.user?.id, ownershipView])
 
   useEffect(() => { fetchCollection() }, [fetchCollection])
 
-  const onRefresh = () => { setRefreshing(true); fetchCollection() }
+  const onRefresh = () => { setRefreshing(true); fetchCollection(); refreshBinders() }
+
+  // ---- Binders --------------------------------------------------------
+
+  const refreshBinders = useCallback(async () => {
+    if (!session?.user?.id) return
+    const { binders: list, available } = await listBinders()
+    setBinders(list)
+    setBindersAvailable(available)
+  }, [session?.user?.id])
+
+  useEffect(() => { refreshBinders() }, [refreshBinders])
+
+  /** Load the selected binder's cards, in the user's order. */
+  const loadBinderCards = useCallback(async (binderId: string | null) => {
+    if (!binderId) { setBinderCards(null); return }
+    try {
+      const { cards: list, reorderable } = await getBinderCards(binderId)
+      setBinderCards(list as CardItem[])
+      setBinderReorderable(reorderable)
+    } catch (e: any) {
+      Alert.alert('Could not open binder', e?.message || 'Please try again.')
+      setBinderCards([])
+    }
+  }, [])
+
+  useEffect(() => { loadBinderCards(selectedBinderId) }, [selectedBinderId, loadBinderCards])
+
+  const selectedBinder = binders.find(b => b.id === selectedBinderId) || null
+
+  /** Open the long-press sheet, pre-loading which binders hold this card. */
+  const openSheet = useCallback(async (card: CardItem) => {
+    setSheetCard(card)
+    setSheetMemberOf(new Set())
+    const ids = await getCardBinders(card.id)
+    setSheetMemberOf(new Set(ids))
+  }, [])
+
+  const sheetToggleBinder = async (binderId: string) => {
+    if (!sheetCard) return
+    const inIt = sheetMemberOf.has(binderId)
+    const binder = binders.find(b => b.id === binderId)
+    setSheetBusy(true)
+    setSheetMemberOf(prev => {
+      const next = new Set(prev)
+      if (inIt) next.delete(binderId); else next.add(binderId)
+      return next
+    })
+    try {
+      if (inIt) await removeCardsFromBinder(binderId, [sheetCard.id])
+      else await addCardsToBinder(binderId, [sheetCard.id])
+      await refreshBinders()
+      if (selectedBinderId === binderId) await loadBinderCards(binderId)
+    } catch (e: any) {
+      setSheetMemberOf(prev => {
+        const next = new Set(prev)
+        if (inIt) next.add(binderId); else next.delete(binderId)
+        return next
+      })
+      Alert.alert(`Could not update ${binder?.name ?? 'binder'}`, e?.message || 'Please try again.')
+    } finally { setSheetBusy(false) }
+  }
+
+  /**
+   * Step a card through the binder order. Uses the same "put this after that
+   * card" API the web drag uses, so ordering lives in one place on the server.
+   */
+  const sheetMove = async (to: 'top' | 'up' | 'down' | 'bottom') => {
+    if (!sheetCard || !selectedBinderId || !binderCards) return
+    const list = binderCards
+    const i = list.findIndex(c => c.id === sheetCard.id)
+    if (i === -1) return
+
+    let afterId: string | null
+    if (to === 'top') afterId = null
+    else if (to === 'up') afterId = i >= 2 ? list[i - 2].id : null
+    else if (to === 'down') afterId = list[i + 1]?.id ?? null
+    else afterId = list[list.length - 1]?.id ?? null
+    if (to === 'bottom' && afterId === sheetCard.id) return
+
+    const without = list.filter(c => c.id !== sheetCard.id)
+    const at = afterId === null ? 0 : without.findIndex(c => c.id === afterId) + 1
+    const next = [...without.slice(0, at), sheetCard, ...without.slice(at)]
+
+    setSheetBusy(true)
+    setBinderCards(next)  // optimistic so "3 of 12" updates instantly
+    try {
+      await reorderBinderCard(selectedBinderId, sheetCard.id, afterId)
+    } catch (e: any) {
+      setBinderCards(list)
+      Alert.alert('Could not reorder', e?.message || 'Please try again.')
+    } finally { setSheetBusy(false) }
+  }
+
+  const sheetRemoveFromBinder = async () => {
+    if (!sheetCard || !selectedBinderId) return
+    setSheetBusy(true)
+    try {
+      await removeCardsFromBinder(selectedBinderId, [sheetCard.id])
+      setBinderCards(prev => (prev ?? []).filter(c => c.id !== sheetCard.id))
+      await refreshBinders()
+      setSheetCard(null)
+    } catch (e: any) {
+      Alert.alert('Could not remove', e?.message || 'Please try again.')
+    } finally { setSheetBusy(false) }
+  }
+
+  const confirmNewBinder = async () => {
+    const name = newBinderName.trim()
+    if (!name) return
+    setSheetBusy(true)
+    try {
+      const b = await createBinder(name)
+      if (newBinderFor.length) await addCardsToBinder(b.id, newBinderFor)
+      await refreshBinders()
+      setNewBinderOpen(false)
+      setNewBinderName('')
+      setNewBinderFor([])
+      setSheetCard(null)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    } catch (e: any) {
+      Alert.alert('Could not create binder', e?.message || 'Please try again.')
+    } finally { setSheetBusy(false) }
+  }
 
   // Filter + sort + search
   const filteredCards = useMemo(() => {
-    let result = cards
+    // Inside a binder the source is the binder's cards, already in the user's
+    // order; everything downstream (category, search, sort) then works within
+    // that scope exactly as it does for All Cards.
+    let result = selectedBinderId ? (binderCards ?? []) : cards
 
     // Category filter. "Sports" expands across every sport-specific
     // category present in the user's collection; a sub-sport narrows
@@ -300,7 +452,7 @@ export default function CollectionScreen() {
     })
 
     return result
-  }, [cards, category, subSport, search, sortBy, sortAsc])
+  }, [cards, binderCards, selectedBinderId, category, subSport, search, sortBy, sortAsc])
 
   // Sports actually present in the user's collection, with per-sport
   // counts. Powers the sub-row that appears under the category tabs
@@ -444,7 +596,10 @@ export default function CollectionScreen() {
           if (selectionMode) toggleSelected(item.id)
           else router.push(`/card/${item.id}`)
         }}
-        onLongPress={() => enterSelectionMode(item.id)}
+        // Long-press opens the action sheet (add to binder, reorder). The
+        // sheet carries "Select multiple" so the old long-press-to-select
+        // behaviour is still one tap away rather than gone.
+        onLongPress={() => { if (bindersAvailable) openSheet(item); else enterSelectionMode(item.id) }}
         delayLongPress={350}
         activeOpacity={0.7}
         accessibilityLabel={`${name}, grade ${item.conversational_whole_grade ?? 'pending'}. ${selectionMode ? (isSelected ? 'Selected' : 'Not selected') : 'Tap to view details'}`}
@@ -484,7 +639,7 @@ export default function CollectionScreen() {
         )}
       </TouchableOpacity>
     )
-  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router])
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, bindersAvailable, openSheet])
 
   const renderGridItem = useCallback(({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
@@ -500,7 +655,10 @@ export default function CollectionScreen() {
           if (selectionMode) toggleSelected(item.id)
           else router.push(`/card/${item.id}`)
         }}
-        onLongPress={() => enterSelectionMode(item.id)}
+        // Long-press opens the action sheet (add to binder, reorder). The
+        // sheet carries "Select multiple" so the old long-press-to-select
+        // behaviour is still one tap away rather than gone.
+        onLongPress={() => { if (bindersAvailable) openSheet(item); else enterSelectionMode(item.id) }}
         delayLongPress={350}
         activeOpacity={0.85}
         accessibilityLabel={`${name}, grade ${item.conversational_whole_grade ?? 'pending'}. ${selectionMode ? (isSelected ? 'Selected' : 'Not selected') : 'Tap to view details'}`}
@@ -548,7 +706,7 @@ export default function CollectionScreen() {
         </View>
       </TouchableOpacity>
     )
-  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, labelStyle, colorOverrides])
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, labelStyle, colorOverrides, bindersAvailable, openSheet])
 
   if (isLoading) {
     return <View style={st.loadingContainer}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
@@ -715,6 +873,42 @@ export default function CollectionScreen() {
         </ScrollView>
       )}
 
+      {/* Binder strip + ownership tabs — hidden entirely until the binders
+          migration lands, so the screen behaves exactly as before. */}
+      {bindersAvailable && (
+        <>
+          <BinderStrip
+            binders={binders}
+            selectedId={selectedBinderId}
+            onSelect={(id) => { setSelectedBinderId(id); setSelectedIds(new Set()); setSelectionMode(false) }}
+            onCreate={() => { setNewBinderFor([]); setNewBinderName(''); setNewBinderOpen(true) }}
+          />
+          <View style={st.ownRow}>
+            {(['owned', 'sold'] as const).map(v => (
+              <TouchableOpacity
+                key={v}
+                style={[st.ownTab, ownershipView === v && st.ownTabOn]}
+                onPress={() => { setOwnershipView(v); setSelectedIds(new Set()); setSelectionMode(false) }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: ownershipView === v }}
+              >
+                <Text style={[st.ownTabTxt, ownershipView === v && st.ownTabTxtOn]}>
+                  {v === 'owned' ? 'Owned' : 'Sold'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {ownershipView === 'sold' && (
+            <Text style={st.ownHint}>
+              Sold cards stay verifiable — the buyer can still scan the label.
+            </Text>
+          )}
+          {selectedBinder && binderReorderable && (
+            <Text style={st.ownHint}>Long-press a card to reorder it or file it elsewhere.</Text>
+          )}
+        </>
+      )}
+
       {/* Stats bar */}
       <View style={st.statsBar}>
         <Text style={st.statsText}>{filteredCards.length} cards</Text>
@@ -760,6 +954,18 @@ export default function CollectionScreen() {
           Two buttons mirror web's "Print" + "Download" dropdowns. */}
       {selectionMode && selectedIds.size > 0 && (
         <View style={[st.batchBar, { paddingBottom: insets.bottom + 10 }]}>
+          {/* Bulk file — the fast path when you've already ticked a stack */}
+          {bindersAvailable && (
+            <TouchableOpacity
+              style={[st.batchBtn, { backgroundColor: Colors.purple[600] }]}
+              onPress={() => { setNewBinderFor([...selectedIds]); setBinderPickerOpen(true) }}
+              accessibilityLabel={`Add ${selectedIds.size} selected cards to a binder`}
+              accessibilityRole="button"
+            >
+              <Ionicons name="folder-open" size={18} color="#fff" />
+              <Text style={st.batchBtnText}>Binder ({selectedIds.size})</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[st.batchBtn, st.batchBtnPrint]}
             onPress={() => setBatchSheetOpen('print')}
@@ -981,6 +1187,114 @@ export default function CollectionScreen() {
           ReactNativeWebView and posts files back as base64; we save them to
           Documents (visible in Files app) and offer Share. */}
       <ExportRunner source={exportSource} onClose={() => setExportSource(null)} />
+
+      {/* Long-press sheet: file into binders, step position, remove */}
+      <CardActionSheet
+        visible={!!sheetCard}
+        cardName={sheetCard ? getDisplayName(sheetCard as any) : ''}
+        binders={binders.filter(b => !b.smart_filter)}
+        memberOf={sheetMemberOf}
+        currentBinder={selectedBinder && binderReorderable
+          ? { id: selectedBinder.id, name: selectedBinder.name }
+          : null}
+        index={sheetCard ? (binderCards ?? []).findIndex(c => c.id === sheetCard.id) : -1}
+        total={(binderCards ?? []).length}
+        busy={sheetBusy}
+        onToggleBinder={sheetToggleBinder}
+        onCreateBinder={() => {
+          if (!sheetCard) return
+          setNewBinderFor([sheetCard.id]); setNewBinderName(''); setNewBinderOpen(true)
+        }}
+        onMove={sheetMove}
+        onRemoveFromBinder={sheetRemoveFromBinder}
+        onSelectMultiple={() => { if (sheetCard) enterSelectionMode(sheetCard.id); setSheetCard(null) }}
+        onOpenCard={() => { const id = sheetCard?.id; setSheetCard(null); if (id) router.push(`/card/${id}`) }}
+        onClose={() => setSheetCard(null)}
+      />
+
+      {/* Bulk: add the ticked cards to a binder */}
+      <Modal visible={binderPickerOpen} transparent animationType="slide" onRequestClose={() => setBinderPickerOpen(false)}>
+        <Pressable style={st.sheetBackdrop} onPress={() => setBinderPickerOpen(false)}>
+          <Pressable style={[st.sheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
+            <View style={st.sheetHandle} />
+            <Text style={st.sheetTitle}>Add {newBinderFor.length} card{newBinderFor.length === 1 ? '' : 's'} to…</Text>
+            <Text style={st.sheetSubtitle}>
+              A card can live in as many binders as you like.
+            </Text>
+            <ScrollView style={{ maxHeight: 340 }}>
+              {binders.filter(b => !b.smart_filter).map(b => (
+                <TouchableOpacity
+                  key={b.id}
+                  style={st.binderPickRow}
+                  onPress={async () => {
+                    try {
+                      const r = await addCardsToBinder(b.id, newBinderFor)
+                      await refreshBinders()
+                      if (selectedBinderId === b.id) await loadBinderCards(b.id)
+                      setBinderPickerOpen(false)
+                      setSelectedIds(new Set())
+                      setSelectionMode(false)
+                      Alert.alert('Added', r.skipped
+                        ? `Added ${r.added} to "${b.name}" (${r.skipped} already there).`
+                        : `Added ${r.added} card${r.added === 1 ? '' : 's'} to "${b.name}".`)
+                    } catch (e: any) {
+                      Alert.alert('Could not add', e?.message || 'Please try again.')
+                    }
+                  }}
+                >
+                  <View style={[st.binderPickDot, { backgroundColor: b.accent_color || Colors.purple[400] }]} />
+                  <Text style={st.binderPickName} numberOfLines={1}>{b.name}</Text>
+                  <Text style={st.binderPickCount}>{b.card_count}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[st.nbPrimary, { marginTop: 12 }]}
+              onPress={() => { setBinderPickerOpen(false); setNewBinderName(''); setNewBinderOpen(true) }}
+            >
+              <Text style={st.nbPrimaryTxt}>＋ New binder with these cards</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* New binder */}
+      <Modal visible={newBinderOpen} transparent animationType="fade" onRequestClose={() => setNewBinderOpen(false)}>
+        <Pressable style={st.nbBackdrop} onPress={() => setNewBinderOpen(false)}>
+          <Pressable style={st.nbCard} onPress={() => {}}>
+            <Text style={st.nbTitle}>New binder</Text>
+            <Text style={st.nbSub}>
+              {newBinderFor.length > 0
+                ? `${newBinderFor.length} card${newBinderFor.length === 1 ? '' : 's'} will go straight into it.`
+                : 'Group your cards however you like.'}
+            </Text>
+            <TextInput
+              autoFocus
+              value={newBinderName}
+              onChangeText={(t) => setNewBinderName(t.slice(0, 60))}
+              placeholder="e.g. Vintage Football, PC, For sale"
+              placeholderTextColor={Colors.gray[400]}
+              style={st.nbInput}
+              returnKeyType="done"
+              onSubmitEditing={confirmNewBinder}
+            />
+            <View style={st.nbRow}>
+              <TouchableOpacity
+                style={[st.nbPrimary, (!newBinderName.trim() || sheetBusy) && { opacity: 0.5 }]}
+                onPress={confirmNewBinder}
+                disabled={!newBinderName.trim() || sheetBusy}
+              >
+                <Text style={st.nbPrimaryTxt}>
+                  {newBinderFor.length > 0 ? `Create and add ${newBinderFor.length}` : 'Create binder'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={st.nbCancel} onPress={() => setNewBinderOpen(false)} disabled={sheetBusy}>
+                <Text style={st.nbCancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }
@@ -1059,6 +1373,26 @@ const st = StyleSheet.create({
 
   // Stats
   statsBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.gray[50] },
+  ownRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
+  ownTab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.gray[100] },
+  ownTabOn: { backgroundColor: Colors.purple[600] },
+  ownTabTxt: { fontSize: 13, fontWeight: '700', color: Colors.gray[600] },
+  ownTabTxtOn: { color: '#fff' },
+  ownHint: { fontSize: 12, color: Colors.gray[500], paddingHorizontal: 14, paddingBottom: 8 },
+  nbBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  nbCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
+  nbTitle: { fontSize: 17, fontWeight: '800', color: Colors.gray[900] },
+  nbSub: { fontSize: 13, color: Colors.gray[600], marginTop: 4 },
+  nbInput: { marginTop: 14, borderWidth: 1, borderColor: Colors.gray[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: Colors.gray[900] },
+  nbRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  nbPrimary: { flex: 1, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  nbPrimaryTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  nbCancel: { paddingHorizontal: 18, backgroundColor: Colors.gray[100], borderRadius: 10, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  nbCancelTxt: { color: Colors.gray[700], fontWeight: '700', fontSize: 15 },
+  binderPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 10, borderWidth: 2, borderColor: Colors.gray[200], marginBottom: 8 },
+  binderPickDot: { width: 12, height: 12, borderRadius: 6 },
+  binderPickName: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.gray[900] },
+  binderPickCount: { fontSize: 13, color: Colors.gray[400] },
   statsText: { fontSize: 11, color: Colors.gray[500], fontWeight: '600' },
 
   // List view

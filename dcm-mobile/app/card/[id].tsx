@@ -52,6 +52,7 @@ import ParallelPicker from '@/components/ParallelPicker'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
+import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
 
 /**
  * Resolve the grade uncertainty string for display. Prefers the
@@ -90,6 +91,10 @@ export default function CardDetailScreen() {
   const [card, setCard] = useState<Card | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // Binders this card can be filed into, and which it's already in.
+  const [binderList, setBinderList] = useState<Binder[]>([])
+  const [cardBinderIds, setCardBinderIds] = useState<Set<string>>(new Set())
+  const [binderBusy, setBinderBusy] = useState(false)
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
@@ -364,6 +369,23 @@ export default function CardDetailScreen() {
   }, [id])
 
   useEffect(() => { fetchCard() }, [fetchCard])
+
+  // Binders for the picker. Both calls fail soft — pre-migration this section
+  // just doesn't render rather than erroring the whole card page.
+  useEffect(() => {
+    if (!isUuid(id) || !session?.access_token) return
+    let cancelled = false
+    ;(async () => {
+      const [{ binders, available }, ids] = await Promise.all([
+        listBinders(),
+        getCardBinders(id),
+      ])
+      if (cancelled || !available) return
+      setBinderList(binders)
+      setCardBinderIds(new Set(ids))
+    })()
+    return () => { cancelled = true }
+  }, [id, session?.access_token])
 
   // Card-detail freshness (July 2026): top up THIS card's price if it's
   // >7 days stale. Fire-and-forget — owner check, stale gate, and a 60s
@@ -2747,6 +2769,51 @@ export default function CardDetailScreen() {
           )
         })()}
 
+        {/* ══════ BINDERS ══════ */}
+        {/* Filing a card while looking at it is the obvious moment to do it.
+            Owner-only; renders nothing until the binders migration lands. */}
+        {isOwner && binderList.length > 0 && (
+          <View style={s.binderBox}>
+            <Text style={s.binderTitle}>Add to a binder</Text>
+            <Text style={s.binderSub}>It can be in as many binders as you want.</Text>
+            <View style={s.binderChips}>
+              {binderList.filter(b => !b.smart_filter).map(b => {
+                const inIt = cardBinderIds.has(b.id)
+                return (
+                  <TouchableOpacity
+                    key={b.id}
+                    style={[s.binderChip, inIt && s.binderChipOn]}
+                    disabled={binderBusy}
+                    onPress={async () => {
+                      setBinderBusy(true)
+                      setCardBinderIds(prev => {
+                        const next = new Set(prev)
+                        if (inIt) next.delete(b.id); else next.add(b.id)
+                        return next
+                      })
+                      try {
+                        if (inIt) await removeCardsFromBinder(b.id, [card.id])
+                        else await addCardsToBinder(b.id, [card.id])
+                      } catch (e: any) {
+                        setCardBinderIds(prev => {
+                          const next = new Set(prev)
+                          if (inIt) next.add(b.id); else next.delete(b.id)
+                          return next
+                        })
+                        Alert.alert('Could not update binder', e?.message || 'Please try again.')
+                      } finally { setBinderBusy(false) }
+                    }}
+                  >
+                    <View style={[s.binderChipDot, { backgroundColor: b.accent_color || '#a78bfa' }]} />
+                    <Text style={[s.binderChipTxt, inIt && s.binderChipTxtOn]} numberOfLines={1}>{b.name}</Text>
+                    <Text style={[s.binderChipMark, inIt && s.binderChipTxtOn]}>{inIt ? '✓' : '＋'}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+        )}
+
         {/* ══════ SOLD BANNER ══════ */}
         {card.ownership_status === 'sold' && (
           <View style={s.soldBanner}>
@@ -3039,4 +3106,14 @@ const s = StyleSheet.create({
   soldBanner: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 24, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' },
   soldBannerTitle: { fontSize: 13, fontWeight: '800', color: '#065f46', letterSpacing: 0.5 },
   soldBannerBody: { fontSize: 13, color: '#047857', marginTop: 3, lineHeight: 18 },
+  binderBox: { marginTop: 24, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: '#fff' },
+  binderTitle: { fontSize: 15, fontWeight: '800', color: Colors.gray[900] },
+  binderSub: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  binderChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  binderChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: Colors.gray[300], backgroundColor: '#fff', maxWidth: 220 },
+  binderChipOn: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[600] },
+  binderChipDot: { width: 8, height: 8, borderRadius: 4 },
+  binderChipTxt: { fontSize: 13, fontWeight: '700', color: Colors.gray[700], flexShrink: 1 },
+  binderChipTxtOn: { color: '#fff' },
+  binderChipMark: { fontSize: 13, fontWeight: '800', color: Colors.gray[400] },
 })
