@@ -16,6 +16,7 @@ import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 import BinderStrip, { type BinderSummary } from '@/components/binders/BinderStrip'
 import MarkAsSoldDialog from '@/components/cards/MarkAsSoldDialog'
+import FilterSheet, { activeFilterCount, type FilterState } from '@/components/collection/FilterSheet'
 import { SortableGrid, SortableCell, CollectionDnd } from '@/components/binders/SortableCardGrid'
 import { useBinders } from '@/components/binders/useBinders'
 import CardActionSheet from '@/components/binders/CardActionSheet'
@@ -433,6 +434,7 @@ function CollectionPageContent() {
   // Binder being renamed / deleted
   const [manageBinder, setManageBinder] = useState<BinderSummary | null>(null)
   const [manageBusy, setManageBusy] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
   // Long-press / ⋯ action sheet (touch). Holds the card plus which binders it's
   // already in, so the sheet can show ticks without a second round trip.
   const [sheetCard, setSheetCard] = useState<Card | null>(null)
@@ -1589,6 +1591,28 @@ function CollectionPageContent() {
   // Reordering requires a manual binder AND no active sort — otherwise the sort
   // would immediately re-order whatever the user just arranged.
   const canReorder = Boolean(selectedBinderId) && binderReorderable && !sortColumn
+
+  const filterState: FilterState = {
+    category: selectedCategory,
+    subSport: selectedSport,
+    sortColumn,
+    sortDirection,
+    ownershipView,
+  }
+  const activeFilters = activeFilterCount(filterState, Boolean(selectedBinderId))
+
+  // Sports present in the collection, for the filter sheet's sub-row.
+  const sportsForFilter = (() => {
+    const SPORTS_SUB = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling']
+    const counts = new Map<string, number>()
+    for (const c of cards) {
+      const cat = c.category || ''
+      if (SPORTS_SUB.includes(cat)) counts.set(cat, (counts.get(cat) || 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .map(([sport, count]) => ({ sport, count }))
+      .sort((a, b) => b.count - a.count)
+  })()
   const selectedBinder = binderApi.binders.find(b => b.id === selectedBinderId) || null
   // Dragging is available whenever there's somewhere to drop — you can drag a
   // card onto a binder chip from any view, including All Cards.
@@ -1944,6 +1968,8 @@ function CollectionPageContent() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl sm:text-3xl font-bold">My Collection</h1>
+              {/* Badges are decorative and cost a full stacked row on phones */}
+              <div className="hidden sm:flex items-center gap-3">
               {isFounder && (
                 <span className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 text-sm font-semibold px-3 py-1 rounded-full shadow">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1968,6 +1994,7 @@ function CollectionPageContent() {
                   Card Lover
                 </span>
               )}
+              </div>
             </div>
             {searchQuery && (
               <p className="text-gray-600 mt-2">
@@ -2109,7 +2136,20 @@ function CollectionPageContent() {
           <BinderStrip
             binders={binderApi.binders}
             selectedId={selectedBinderId}
-            onSelect={(id) => { setSelectedBinderId(id); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
+            ownershipView={ownershipView}
+            ownedCount={ownershipCounts.owned}
+            soldCount={ownershipCounts.sold}
+            onSelectSold={() => {
+              setOwnershipView('sold'); setSelectedBinderId(null)
+              setDisplayLimit(20); setSelectedCardIds(new Set())
+            }}
+            onSelect={(id) => {
+              setSelectedBinderId(id)
+              // Picking a scope always lands you on what you HOLD; Sold is its
+              // own chip, and inside a binder it's a filter.
+              setOwnershipView('owned')
+              setDisplayLimit(20); setSelectedCardIds(new Set())
+            }}
             onCreate={() => setNewBinderFor([])}
             onManage={(b) => {
               if (b.system_key) {
@@ -2189,74 +2229,74 @@ function CollectionPageContent() {
           </div>
         )}
 
-        {/* Ownership tabs — Owned / Sold / Archived. Sold and archived cards
-            keep their public grade page (the slab QR depends on it); they just
-            leave the working collection and the eBay listing picker. */}
-        {ownershipReady && (
-          <div className="mb-4">
-            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-              {([
-                { key: 'owned' as const, label: 'Owned', count: ownershipCounts.owned },
-                { key: 'sold' as const, label: 'Sold', count: ownershipCounts.sold },
-              ]).map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => { setOwnershipView(tab.key); setDisplayLimit(20); setSelectedCardIds(new Set()) }}
-                  className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
-                    ownershipView === tab.key
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`ml-2 text-xs ${ownershipView === tab.key ? 'text-purple-100' : 'text-gray-400'}`}>
-                    {tab.count}
-                  </span>
+        {/* ── Toolbar: search + filter, one sticky row ──────────────────
+            Replaces the Owned/Sold tab row, its hint, the search block and
+            the 8-chip category row (which wrapped to two lines on phones).
+            Everything not ACTIVE now lives behind the Filter button. */}
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-white/95 backdrop-blur border-b border-gray-100 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search your collection…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Clear search">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-              ))}
+              )}
             </div>
-            {ownershipView === 'sold' && (
-              <p className="text-sm text-gray-500 mt-2">
-                Sold cards stay verifiable — the buyer can still scan the QR on the label and see the full grade report.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Search Input */}
-        <div className="mb-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by player, card name, set, number, year..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
-            />
-            <svg
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+                activeFilters > 0 ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                title="Clear search"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 12h12M10 20h4" />
+              </svg>
+              <span className="hidden sm:inline">Filter</span>
+              {activeFilters > 0 && <span className="text-xs">{activeFilters}</span>}
+            </button>
           </div>
-          {searchTerm && (
-            <p className="mt-2 text-sm text-gray-500">
-              Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching "{searchTerm}"
-            </p>
+
+          {/* Active filters as removable chips — state visible, controls hidden */}
+          {(selectedCategory !== 'all' || selectedSport || sortColumn || searchTerm) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                  “{searchTerm}”
+                  <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-700">✕</button>
+                </span>
+              )}
+              {selectedCategory !== 'all' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold">
+                  {selectedCategory}
+                  <button onClick={() => { setSelectedCategory('all'); setSelectedSport(null) }} className="text-purple-400 hover:text-purple-800">✕</button>
+                </span>
+              )}
+              {selectedSport && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold">
+                  {selectedSport}
+                  <button onClick={() => setSelectedSport(null)} className="text-purple-400 hover:text-purple-800">✕</button>
+                </span>
+              )}
+              {sortColumn && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                  {sortColumn} {sortDirection === 'asc' ? '▲' : '▼'}
+                  <button onClick={() => setSortColumn(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+                </span>
+              )}
+              <span className="text-xs text-gray-400 ml-1">{filteredCards.length} shown</span>
+            </div>
           )}
         </div>
 
@@ -2336,85 +2376,10 @@ function CollectionPageContent() {
           </div>
         )}
 
-        {/* Category Filter Tabs */}
-        <div className="mb-3 flex flex-wrap gap-2">
-          {[
-            { id: 'all', label: 'All Cards', icon: '🎴' },
-            { id: 'Sports', label: 'Sports', icon: '⚾' },
-            { id: 'Pokemon', label: 'Pokemon', icon: '⚡' },
-            { id: 'MTG', label: 'Magic', icon: '🎴' },
-            { id: 'Lorcana', label: 'Lorcana', icon: '✨' },
-            { id: 'One Piece', label: 'One Piece', icon: '🏴‍☠️' },
-            { id: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: '🔮' },
-            { id: 'Other', label: 'Other', icon: '🃏' }
-          ].map((category) => (
-            <button
-              key={category.id}
-              onClick={() => {
-                setSelectedCategory(category.id);
-                // Reset the sport drill-down whenever the top-level
-                // category changes so the sub-row never leaks state
-                // from a previous Sports visit.
-                if (category.id !== 'Sports') setSelectedSport(null);
-              }}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                selectedCategory === category.id
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="mr-2">{category.icon}</span>
-              {category.label}
-            </button>
-          ))}
-        </div>
+        {/* Category and sub-sport chips moved into the filter sheet — on a
+            phone the 8 category chips wrapped to two full rows. Active
+            selections appear as removable chips in the toolbar instead. */}
 
-        {/* Sport sub-row — only visible when Sports is the active
-            top-level category and the user actually has sport-tagged
-            cards. "All sports" (selectedSport === null) is the default. */}
-        {selectedCategory === 'Sports' && (() => {
-          const SPORTS_SUB = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
-          const counts = new Map<string, number>();
-          for (const c of cards) {
-            const cat = c.category || '';
-            if (SPORTS_SUB.includes(cat)) counts.set(cat, (counts.get(cat) || 0) + 1);
-          }
-          const sportsInCollection = Array.from(counts.entries())
-            .map(([sport, count]) => ({ sport, count }))
-            .sort((a, b) => b.count - a.count);
-          const total = sportsInCollection.reduce((sum, s) => sum + s.count, 0);
-          if (sportsInCollection.length === 0) return null;
-          return (
-            <div className="mb-6 flex flex-wrap gap-2 items-center">
-              <button
-                onClick={() => setSelectedSport(null)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                  selectedSport === null
-                    ? 'bg-purple-50 border-purple-600 text-purple-700'
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                All sports ({total})
-              </button>
-              {sportsInCollection.map(({ sport, count }) => {
-                const active = selectedSport === sport;
-                return (
-                  <button
-                    key={sport}
-                    onClick={() => setSelectedSport(active ? null : sport)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                      active
-                        ? 'bg-purple-50 border-purple-600 text-purple-700'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {sport} ({count})
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
 
         {/* Grid View */}
         {viewMode === 'grid' && (
@@ -3331,6 +3296,38 @@ function CollectionPageContent() {
           onMove={sheetMove}
           onRemoveFromBinder={async () => { await removeFromCurrentBinder(sheetCard); setSheetCard(null) }}
           onClose={() => setSheetCard(null)}
+        />
+      )}
+
+      {filterOpen && (
+        <FilterSheet
+          state={filterState}
+          inBinder={Boolean(selectedBinderId)}
+          categories={[
+            { key: 'all', label: 'All Cards', icon: '🎴' },
+            { key: 'Sports', label: 'Sports', icon: '⚾' },
+            { key: 'Pokemon', label: 'Pokemon', icon: '⚡' },
+            { key: 'MTG', label: 'Magic', icon: '🎴' },
+            { key: 'Lorcana', label: 'Lorcana', icon: '✨' },
+            { key: 'One Piece', label: 'One Piece', icon: '🏴‍☠️' },
+            { key: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: '🔮' },
+            { key: 'Other', label: 'Other', icon: '🃏' },
+          ]}
+          sports={sportsForFilter}
+          onChange={(patch) => {
+            if (patch.category !== undefined) setSelectedCategory(patch.category)
+            if (patch.subSport !== undefined) setSelectedSport(patch.subSport)
+            if (patch.sortColumn !== undefined) setSortColumn(patch.sortColumn)
+            if (patch.sortDirection !== undefined) setSortDirection(patch.sortDirection)
+            if (patch.ownershipView !== undefined) setOwnershipView(patch.ownershipView)
+            setDisplayLimit(20)
+          }}
+          onReset={() => {
+            setSelectedCategory('all'); setSelectedSport(null)
+            setSortColumn(null); setSortDirection('asc')
+            setOwnershipView('owned'); setDisplayLimit(20)
+          }}
+          onClose={() => setFilterOpen(false)}
         />
       )}
 

@@ -29,13 +29,22 @@ export interface BinderSummary {
 export function BinderStrip({
   binders,
   selectedId,
+  ownershipView,
+  ownedCount,
+  soldCount,
   onSelect,
+  onSelectSold,
   onCreate,
   onManage,
 }: {
   binders: BinderSummary[];
   selectedId: string | null;
+  /** Sold is a scope chip here, not a separate tab row. */
+  ownershipView: 'owned' | 'sold';
+  ownedCount: number;
+  soldCount: number;
   onSelect: (id: string | null) => void;
+  onSelectSold: () => void;
   onCreate: () => void;
   onManage: (binder: BinderSummary) => void;
 }) {
@@ -49,9 +58,34 @@ export function BinderStrip({
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-        <button className={chip(selectedId === null)} onClick={() => onSelect(null)}>
+        {/* Scope: everything, sold, then binders. Sold used to be its own tab
+            row with its own hint line — but it's already a smart binder
+            internally, so expressing it as a chip here removes two full-width
+            rows and makes the model one idea instead of two. */}
+        <button
+          className={chip(selectedId === null && ownershipView === 'owned')}
+          onClick={() => onSelect(null)}
+        >
           All Cards
+          <span className={`text-xs ${selectedId === null && ownershipView === 'owned' ? 'text-purple-100' : 'text-gray-400'}`}>
+            {ownedCount}
+          </span>
         </button>
+
+        {soldCount > 0 && (
+          <button
+            className={`${chip(ownershipView === 'sold')} ${
+              ownershipView === 'sold' ? '!bg-emerald-600 !border-emerald-600' : ''
+            }`}
+            onClick={onSelectSold}
+            title="Cards you've sold — still verifiable by the buyer"
+          >
+            Sold
+            <span className={`text-xs ${ownershipView === 'sold' ? 'text-emerald-100' : 'text-gray-400'}`}>
+              {soldCount}
+            </span>
+          </button>
+        )}
 
         {binders.map(b => {
           const active = selectedId === b.id;
@@ -104,15 +138,13 @@ export function BinderStrip({
 
       {/* Empty state: a bare "+ New binder" chip on its own reads as broken, so
           say what a binder is for exactly once. */}
-      {binders.length === 0 ? (
+      {/* The "drag a card onto a binder" hint used to live here permanently.
+          It's a one-time teach, not a fixture — it now only shows while the
+          user has no binders at all, and disappears the moment they make one. */}
+      {binders.length === 0 && (
         <p className="text-sm text-gray-500 mt-1">
-          Binders let you group cards however you like — by set, by player, by what&apos;s
-          for sale. Make one, then drag cards onto it.
-        </p>
-      ) : (
-        <p className="text-sm text-gray-500 mt-1">
-          Drag any card onto a binder to file it — or tick cards and use{' '}
-          <span className="font-semibold">Add to binder</span>.
+          Binders group cards however you like — by set, by player, by what&apos;s for
+          sale. Make one, then drag cards onto it.
         </p>
       )}
     </div>
