@@ -1477,7 +1477,14 @@ function CollectionPageContent() {
   // Inside a binder the source list is the binder's cards, already in the
   // user's order. Everything downstream — sort, category filter, search,
   // bulk select — then works unchanged within that scope.
-  const baseCards = selectedBinderId ? (binderCards ?? []) : cards
+  //
+  // The ownership tab has to be applied HERE for binders. The binder endpoint
+  // returns every card in the binder regardless of owned/sold, and switching
+  // tabs only refetches the main `cards` list — so inside a binder the Sold
+  // tab did nothing at all.
+  const baseCards = selectedBinderId
+    ? (binderCards ?? []).filter(c => (c.ownership_status ?? 'owned') === ownershipView)
+    : cards
 
   // Custom order IS "no sort column". Picking a sort overrides the binder's
   // arrangement (and disables dragging, below) — the Notion/Airtable rule that
@@ -2416,7 +2423,12 @@ function CollectionPageContent() {
                 ownershipView={ownershipView}
                 binderName={selectedBinder?.name || null}
                 category={selectedCategory}
-                onBackToOwned={() => { setOwnershipView('owned'); setSelectedBinderId(null) }}
+                // From a binder's empty Sold view, stay in the binder and just
+                // switch back to Owned; only leave the binder when IT is empty.
+                onBackToOwned={() => {
+                  if (ownershipView === 'sold') setOwnershipView('owned')
+                  else { setOwnershipView('owned'); setSelectedBinderId(null) }
+                }}
               />
             ) : (
               <>
@@ -2632,7 +2644,12 @@ function CollectionPageContent() {
                 ownershipView={ownershipView}
                 binderName={selectedBinder?.name || null}
                 category={selectedCategory}
-                onBackToOwned={() => { setOwnershipView('owned'); setSelectedBinderId(null) }}
+                // From a binder's empty Sold view, stay in the binder and just
+                // switch back to Owned; only leave the binder when IT is empty.
+                onBackToOwned={() => {
+                  if (ownershipView === 'sold') setOwnershipView('owned')
+                  else { setOwnershipView('owned'); setSelectedBinderId(null) }
+                }}
               />
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -3652,7 +3669,12 @@ function EmptyView({
   let title: string
   let body: string | null = null
 
-  if (binderName) {
+  if (binderName && ownershipView === 'sold') {
+    // The binder isn't empty — it just has nothing sold in it. Saying "empty"
+    // here would read as data loss.
+    title = `No sold cards in "${binderName}"`
+    body = 'Nothing in this binder has been marked as sold yet.'
+  } else if (binderName) {
     title = `"${binderName}" is empty`
     body = 'Select cards in your collection and use "Add to binder" to file them here.'
   } else if (ownershipView === 'sold') {
@@ -3673,7 +3695,7 @@ function EmptyView({
           onClick={onBackToOwned}
           className="mt-4 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700"
         >
-          Back to my collection
+          {binderName && ownershipView === 'sold' ? 'Show owned cards' : 'Back to my collection'}
         </button>
       )}
     </div>

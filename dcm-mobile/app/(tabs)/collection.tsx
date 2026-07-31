@@ -411,7 +411,13 @@ export default function CollectionScreen() {
     // Inside a binder the source is the binder's cards, already in the user's
     // order; everything downstream (category, search, sort) then works within
     // that scope exactly as it does for All Cards.
-    let result = selectedBinderId ? (binderCards ?? []) : cards
+    //
+    // The ownership tab has to be applied HERE for binders: the binder endpoint
+    // returns every card regardless of owned/sold, and switching tabs only
+    // refetches the main list — so inside a binder the Sold tab did nothing.
+    let result = selectedBinderId
+      ? (binderCards ?? []).filter(c => ((c as any).ownership_status ?? 'owned') === ownershipView)
+      : cards
 
     // Category filter. "Sports" expands across every sport-specific
     // category present in the user's collection; a sub-sport narrows
@@ -457,7 +463,7 @@ export default function CollectionScreen() {
     })
 
     return result
-  }, [cards, binderCards, selectedBinderId, category, subSport, search, sortBy, sortAsc])
+  }, [cards, binderCards, selectedBinderId, ownershipView, category, subSport, search, sortBy, sortAsc])
 
   // Sports actually present in the user's collection, with per-sport
   // counts. Powers the sub-row that appears under the category tabs
@@ -965,10 +971,37 @@ export default function CollectionScreen() {
         ListEmptyComponent={
           <View style={st.empty}>
             <Ionicons name="albums-outline" size={72} color={Colors.gray[300]} />
-            <Text style={st.emptyTitle}>{category !== 'All' ? `No ${category} cards` : 'No cards yet'}</Text>
-            <Text style={st.emptySubtitle}>
-              {category !== 'All' ? 'Try a different category or grade a new card' : 'Grade your first card to start building your collection'}
-            </Text>
+            {/* Scoped to what the user is actually looking at. "No cards yet"
+                on a binder's empty Sold tab reads as data loss. */}
+            {selectedBinder && ownershipView === 'sold' ? (
+              <>
+                <Text style={st.emptyTitle}>No sold cards in “{selectedBinder.name}”</Text>
+                <Text style={st.emptySubtitle}>Nothing in this binder has been marked as sold yet.</Text>
+                <TouchableOpacity style={st.emptyCta} onPress={() => setOwnershipView('owned')}>
+                  <Text style={st.emptyCtaTxt}>Show owned cards</Text>
+                </TouchableOpacity>
+              </>
+            ) : selectedBinder ? (
+              <>
+                <Text style={st.emptyTitle}>“{selectedBinder.name}” is empty</Text>
+                <Text style={st.emptySubtitle}>Long-press a card in your collection to file it here.</Text>
+                <TouchableOpacity style={st.emptyCta} onPress={() => setSelectedBinderId(null)}>
+                  <Text style={st.emptyCtaTxt}>Back to all cards</Text>
+                </TouchableOpacity>
+              </>
+            ) : ownershipView === 'sold' ? (
+              <>
+                <Text style={st.emptyTitle}>No sold cards yet</Text>
+                <Text style={st.emptySubtitle}>Cards you mark as sold move here and stay verifiable for the buyer.</Text>
+              </>
+            ) : (
+              <>
+                <Text style={st.emptyTitle}>{category !== 'All' ? `No ${category} cards` : 'No cards yet'}</Text>
+                <Text style={st.emptySubtitle}>
+                  {category !== 'All' ? 'Try a different category or grade a new card' : 'Grade your first card to start building your collection'}
+                </Text>
+              </>
+            )}
           </View>
         }
         contentContainerStyle={[viewMode === 'grid' ? st.gridContainer : st.listContainer, selectionMode && selectedIds.size > 0 ? { paddingBottom: 96 } : undefined]}
@@ -1517,6 +1550,8 @@ const st = StyleSheet.create({
   keepBox: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
   keepTitle: { fontSize: 14, fontWeight: '800', color: '#065f46' },
   keepBody: { fontSize: 13, color: '#047857', marginTop: 4, lineHeight: 18 },
+  emptyCta: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: Colors.purple[600] },
+  emptyCtaTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
   statsText: { fontSize: 11, color: Colors.gray[500], fontWeight: '600' },
 
   // List view
