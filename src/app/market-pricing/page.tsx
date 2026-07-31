@@ -7,6 +7,7 @@ import LoggedOutPreview from '@/components/market-pricing/LoggedOutPreview';
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart';
 import TopCardsTable from '@/components/market-pricing/TopCardsTable';
 import MoversTable from '@/components/market-pricing/MoversTable';
+import SoldTab from '@/components/market-pricing/SoldTab';
 import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart';
 import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart';
 import ValueByGradeChart from '@/components/market-pricing/ValueByGradeChart';
@@ -45,6 +46,8 @@ interface PortfolioData {
 
 export default function MarketPricingPage() {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
+  // Holdings vs realised sales. Sold is NOT Card Lovers-gated.
+  const [portfolioTab, setPortfolioTab] = useState<'holdings' | 'sold'>('holdings');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshFeedback, setRefreshFeedback] = useState<
@@ -251,8 +254,35 @@ export default function MarketPricingPage() {
           <div className="max-w-7xl mx-auto px-4 py-8">
             <h1 className="text-3xl md:text-4xl font-bold">Portfolio</h1>
             <p className="text-white/80 mt-1">Track your collection&apos;s market value in real time</p>
+
+            {/* Holdings vs Sold. Kept as separate views on purpose: mixing what
+                you still hold with what you've already sold produces a number
+                that means neither. Total Value stays "what you hold". */}
+            <div className="inline-flex mt-5 rounded-lg bg-white/15 p-1">
+              {([
+                { key: 'holdings' as const, label: 'Holdings' },
+                { key: 'sold' as const, label: 'Sold' },
+              ]).map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setPortfolioTab(t.key)}
+                  className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    portfolioTab === t.key ? 'bg-white text-purple-700' : 'text-white/90 hover:bg-white/10'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
+
+        {portfolioTab === 'sold' ? (
+          <section className="max-w-7xl mx-auto px-4 py-8">
+            <SoldTab />
+          </section>
+        ) : (
+        <>
 
         {/* Value Summary */}
         <section className="max-w-7xl mx-auto px-4 -mt-6">
@@ -510,6 +540,8 @@ export default function MarketPricingPage() {
           </div>
 
         </section>
+        </>
+        )}
       </main>
   );
 }

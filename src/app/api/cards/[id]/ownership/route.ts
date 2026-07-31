@@ -63,7 +63,7 @@ export async function PATCH(
 
     const { data: card, error: fetchError } = await supabase
       .from('cards')
-      .select('id, user_id, serial, card_name')
+      .select('id, user_id, serial, card_name, ownership_status')
       .eq('id', id)
       .maybeSingle();
 
@@ -101,7 +101,11 @@ export async function PATCH(
 
       // Accept a supplied date (sold last month, entering it now) but never
       // let it be in the future.
-      let soldAt = new Date();
+      //
+      // When the card is ALREADY sold and no date is supplied, keep the one on
+      // record. Otherwise filling in a missing price later — which the sold
+      // view invites — would silently re-date the sale to today, and an
+      // eBay-detected sale would lose its real date.
       if (body?.sold_at) {
         const parsed = new Date(body.sold_at);
         if (isNaN(parsed.getTime())) {
@@ -110,11 +114,18 @@ export async function PATCH(
         if (parsed.getTime() > Date.now()) {
           return NextResponse.json({ error: "sold_at cannot be in the future." }, { status: 400 });
         }
-        soldAt = parsed;
+        update.sold_at = parsed.toISOString();
+      } else if (card.ownership_status !== 'sold') {
+        update.sold_at = new Date().toISOString();
       }
-      update.sold_at = soldAt.toISOString();
 
-      update.sold_channel = isSoldChannel(body?.sold_channel) ? body.sold_channel : 'manual';
+      // Same reasoning for the channel: don't relabel an eBay sale 'manual'
+      // just because someone typed in the price afterwards.
+      if (isSoldChannel(body?.sold_channel)) {
+        update.sold_channel = body.sold_channel;
+      } else if (card.ownership_status !== 'sold') {
+        update.sold_channel = 'manual';
+      }
       if (typeof body?.sold_note === 'string') {
         update.sold_note = body.sold_note.trim().slice(0, 500) || null;
       }
