@@ -166,18 +166,13 @@ ${[
   </ul>
 </section>
 
-<h2>Logo treatments</h2>
-<p class="lede">A bare navy mark on ivory reads as a smudge at 2.8&Prime;, which defeats the point of
-moving it to the bottom centre. Six ways of buying it presence, each costing a different amount of ink.
-Everything else is held constant &mdash; same card, same diamond band, same grade &mdash; so the only
-variable is the mark. <strong>All six are selectable in Label Lab.</strong></p>
+<h2>Logo treatment</h2>
+<p class="lede">Settled: a <strong>brand-purple rounded plate carrying the white mark</strong>, sized as a
+fitted badge rather than a bar. The other five treatments are gone. Plain is kept only as a reference for
+what it replaces.</p>
 ${[
-  ['logo-plain.png',     'Plain',           'least ink', 'Bare navy mark on ivory. Honest but quiet — this is the Round 3 default you flagged.'],
-  ['logo-rules.png',     'Flanking rules',  'almost free', 'Two gold hairlines running out toward the edges. Adds emphasis with essentially no extra ink, and the mark itself is untouched.'],
-  ['logo-plate.png',     'Dark plate',      'strongest contrast', 'White mark knocked out of a dark rounded plate. The most obviously deliberate, and the most print-predictable — no gradient, no spot colour.'],
-  ['logo-medallion.png', 'Gold medallion',  'most premium', 'Dark mark on a gold disc; reads as a seal or hallmark. Prettiest on screen and the one I would trust least on a cheap printer — gold is the hardest colour to hold consistent.'],
-  ['logo-bar.png',       'Bottom bar',      'most ink', 'Full-width bar in the band colour with a white mark. Ties the band into the mark and anchors the whole label.'],
-  ['logo-tab.png',       'Notched tab',     'distinctive silhouette', 'A rounded tab breaking the bottom edge in the band colour. Recognisable before you read it. Squared rather than angled — an angled notch closes up in print and reads as a fault.'],
+  ['logo-plate.png', 'Purple plate', 'chosen', 'Brand purple #7C3AED with the white mark, 172&times;64 mockup-px and the mark filling 80% of the plate width. Flat colour, no gradient and no spot ink, so it prints identically every time.'],
+  ['logo-plain.png', 'Plain', 'reference only', 'The bare navy mark this replaces. At 2.8&Prime; it reads as a smudge from arm&rsquo;s length, which is what prompted the change.'],
 ].map(([f, name, tag, note]) => `
   <section class="card">
     <div class="meta"><span class="tag">${tag}</span><span class="dim">${name}</span></div>
@@ -186,15 +181,12 @@ ${[
   </section>`).join('')}
 
 <div class="q">
-  <strong>My read</strong>
-  <ul>
-    <li><strong>Plate and Bar are the two real contenders.</strong> Plate is safest and prints identically
-        every time; Bar is more striking and ties the band into the mark, at the cost of ink coverage.</li>
-    <li><strong>Medallion is a trap.</strong> It looks best here and is the one most likely to disappoint
-        on paper — a flat gold disc at ~0.2&Prime; across is exactly where cheap printers shift colour.</li>
-    <li><strong>Rules is the sleeper.</strong> Nearly free, does not commit the design to a shape, and
-        still stops the mark floating unanchored.</li>
-  </ul>
+  <strong>These now come from one source</strong>
+  <p style="margin:8px 0 0">The bands used to be drawn twice &mdash; once in @react-pdf for Label Lab and
+  once in SVG for these PNGs. Two implementations of the same eleven patterns is exactly how the diagonal
+  stripes stayed broken here after being fixed in the lab. Both renderers now consume
+  <code>src/lib/labelLab/bandGeometry.ts</code>, which emits renderer-agnostic path data; neither computes
+  geometry any more. <strong>What you see here and what the lab prints are the same maths.</strong></p>
 </div>
 
 <h3>Backs with the same bands</h3>

@@ -32,12 +32,8 @@ const LABELS = [
   ['Back · Round 3', 'r3-back.png'],
 
   ['— Logo treatments (diamond band, grade 9) —', null],
-  ['Logo · Plain', 'logo-plain.png'],
-  ['Logo · Flanking rules', 'logo-rules.png'],
-  ['Logo · Dark plate', 'logo-plate.png'],
-  ['Logo · Gold medallion', 'logo-medallion.png'],
-  ['Logo · Bottom bar', 'logo-bar.png'],
-  ['Logo · Notched tab', 'logo-tab.png'],
+  ['Logo · Purple plate (chosen)', 'logo-plate.png'],
+  ['Logo · Plain (reference)', 'logo-plain.png'],
 
   ['— Band fronts (card palette) —', null],
   ['Band · Diamond mosaic', 'band-diamond.png'],
