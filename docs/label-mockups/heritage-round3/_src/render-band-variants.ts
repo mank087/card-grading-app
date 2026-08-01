@@ -42,26 +42,69 @@ function chip(x: number, c: Grade): string {
     <text x="${x + 120}" y="292" font-family="Arial, Helvetica, sans-serif" font-size="${c.label.length > 8 ? 26 : 30}" font-weight="bold" letter-spacing="4" fill="${c.ink}" opacity="0.9" text-anchor="middle">${c.label}</text>`;
 }
 
-function body(name: string, context: string, serial: string, grade: Grade): string {
-  const lw = 200, lh = 78;
+const LOGO_WHITE_URI = `data:image/png;base64,${fs.readFileSync('public/DCM Logo white.png').toString('base64')}`;
+
+export type LogoTreatment = 'plain' | 'rules' | 'plate' | 'medallion' | 'bar' | 'tab';
+
+/**
+ * The bottom-centre mark plus whatever makes it visible. A bare navy mark on
+ * ivory reads as a smudge at 2.8", which defeats the point of moving it there.
+ * Only the backing changes between treatments — the mark never moves or resizes.
+ */
+function logoBlock(t: LogoTreatment, band: string): string {
+  const mw = 190, mh = 70;
+  const left = (W - mw) / 2, top = H - mh - 10;
+  const mark = (uri: string, x: number, y: number, w: number, h: number) =>
+    `<image href="${uri}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>`;
+
+  if (t === 'bar') {
+    const barH = 96;
+    return `<rect x="${BAND + RULE}" y="${H - barH}" width="${W - BAND - RULE}" height="${barH}" fill="${band}"/>
+      ${mark(LOGO_WHITE_URI, (W - mw * 0.78) / 2, H - barH + (barH - mh * 0.78) / 2, mw * 0.78, mh * 0.78)}`;
+  }
+  if (t === 'tab') {
+    const tw = 260, th = 86, x = (W - tw) / 2;
+    return `<path d="M ${x} ${H} L ${x} ${H - th + 20} Q ${x} ${H - th} ${x + 20} ${H - th} L ${x + tw - 20} ${H - th} Q ${x + tw} ${H - th} ${x + tw} ${H - th + 20} L ${x + tw} ${H} Z" fill="${band}"/>
+      ${mark(LOGO_WHITE_URI, (W - mw * 0.78) / 2, H - th + (th - mh * 0.78) / 2, mw * 0.78, mh * 0.78)}`;
+  }
+  if (t === 'plate') {
+    const pw = 250, ph = 88, x = (W - pw) / 2, y = H - ph - 6;
+    return `<rect x="${x}" y="${y}" width="${pw}" height="${ph}" rx="18" fill="${INK}"/>
+      ${mark(LOGO_WHITE_URI, (W - mw * 0.78) / 2, y + (ph - mh * 0.78) / 2, mw * 0.78, mh * 0.78)}`;
+  }
+  if (t === 'medallion') {
+    const d = 104, cx = W / 2, cy = H - d / 2 - 4;
+    return `<circle cx="${cx}" cy="${cy}" r="${d / 2}" fill="${GOLD}"/>
+      ${mark(LOGO_URI, cx - (d * 0.62) / 2, cy - (d * 0.62) / 2, d * 0.62, d * 0.62)}`;
+  }
+  if (t === 'rules') {
+    const y = H - mh / 2 - 10, gap = 24;
+    return `<line x1="${BAND + RULE + 40}" y1="${y}" x2="${left - gap}" y2="${y}" stroke="${GOLD}" stroke-width="2" opacity="0.75"/>
+      <line x1="${left + mw + gap}" y1="${y}" x2="${W - 40}" y2="${y}" stroke="${GOLD}" stroke-width="2" opacity="0.75"/>
+      ${mark(LOGO_URI, left, top, mw, mh)}`;
+  }
+  return mark(LOGO_URI, left, top, mw, mh);
+}
+
+function body(name: string, context: string, serial: string, grade: Grade, logo: LogoTreatment = 'plain', band = GOLD): string {
   return `
     <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="bold" fill="${INK}">${name}</text>
     <text x="150" y="198" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="4" fill="${INK_SOFT}">${context}</text>
     <line x1="150" y1="236" x2="1090" y2="236" stroke="#d9d2c4" stroke-width="2"/>
     <text x="150" y="292" font-family="Courier New, monospace" font-size="36" letter-spacing="4" fill="${INK_SOFT}">DCM ${serial}</text>
     ${chip(1130, grade)}
-    <image href="${LOGO_URI}" x="${(W - lw) / 2}" y="${H - lh - 10}" width="${lw}" height="${lh}" preserveAspectRatio="xMidYMid meet"/>`;
+    ${logoBlock(logo, band)}`;
 }
 
 // Everything the band draws is clipped to the band, so a pattern can be
 // generated loosely and still land inside a clean edge.
-const label = (bandInner: string, rule: string, grade: Grade, name: string, ctx: string, serial: string) => `
+const label = (bandInner: string, rule: string, grade: Grade, name: string, ctx: string, serial: string, logo: LogoTreatment = 'plain', band = GOLD) => `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs><clipPath id="band"><rect x="0" y="0" width="${BAND}" height="${H}"/></clipPath></defs>
   <rect width="${W}" height="${H}" fill="${IVORY}"/>
   <g clip-path="url(#band)">${bandInner}</g>
   <rect x="${BAND}" y="0" width="${RULE}" height="${H}" fill="${rule}"/>
-  ${body(name, ctx, serial, grade)}
+  ${body(name, ctx, serial, grade, logo, band)}
   <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#e5decf" stroke-width="2"/>
 </svg>`;
 
@@ -141,6 +184,60 @@ function bandFractured(p: string[]): string {
   return s;
 }
 
+// ── Band: Diamond mosaic — the Round 1 Front C treatment ───────────────────
+function bandDiamond(p: string[]): string {
+  const q = pick(p), size = H / 9, half = size * 0.62;
+  let s = '', n = 0;
+  for (let row = -1; row <= Math.ceil(H / size) + 1; row++) {
+    for (let col = 0; col < 2; col++) {
+      const cx = BAND * (col === 0 ? 0.25 : 0.75);
+      const cy = row * size + (col === 1 ? size / 2 : 0);
+      s += `<path d="M ${cx} ${cy - half} L ${cx + half} ${cy} L ${cx} ${cy + half} L ${cx - half} ${cy} Z" fill="${q(n++)}" stroke="rgba(0,0,0,0.55)" stroke-width="1.2"/>`;
+    }
+  }
+  return s;
+}
+
+// ── Band: Chevron — real Vs, apex on the centre line ───────────────────────
+function bandChevron(p: string[]): string {
+  const q = pick(p), n = 7, step = H / n, depth = step * 0.75;
+  const vAt = (y: number) => `M 0 ${y} L ${BAND / 2} ${y + depth} L ${BAND} ${y}`;
+  let s = '';
+  for (let i = -2; i <= n + 1; i++) {
+    const y = i * step;
+    s += `<path d="${vAt(y)} L ${BAND} ${y + step} L ${BAND / 2} ${y + depth + step} L 0 ${y + step} Z" fill="${q(i + 2)}"/>`;
+    s += `<path d="${vAt(y)}" ${DIV}/>`;
+  }
+  return s;
+}
+
+// ── Band: Scales — overlapping arcs, laps downward ─────────────────────────
+function bandScales(p: string[]): string {
+  const q = pick(p), cols = 2, r = (BAND / cols) * 0.78, stepY = r * 0.85;
+  let s = '', n = 0;
+  for (let row = -1; row * stepY < H + r; row++) {
+    const offset = row % 2 === 0 ? 0 : r;
+    for (let col = -1; col <= cols; col++) {
+      const cx = col * (r * 2) + offset, cy = row * stepY;
+      s += `<path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy} Z" fill="${q(n++)}" stroke="rgba(0,0,0,0.55)" stroke-width="1"/>`;
+    }
+  }
+  return s;
+}
+
+// ── Band: Prism — interlocking triangles off alternating edges ─────────────
+function bandPrism(p: string[]): string {
+  const q = pick(p), n = 8, step = H / n;
+  let s = '';
+  for (let i = -1; i <= n; i++) {
+    const y = i * step;
+    s += `<path d="M 0 ${y} L ${BAND} ${y + step / 2} L 0 ${y + step} Z" fill="${q(i * 2)}"/>`;
+    s += `<path d="M ${BAND} ${y + step / 2} L ${BAND} ${y + step * 1.5} L 0 ${y + step} Z" fill="${q(i * 2 + 1)}"/>`;
+    s += `<path d="M 0 ${y} L ${BAND} ${y + step / 2} L 0 ${y + step}" ${DIV}/>`;
+  }
+  return s;
+}
+
 // ── Band 6: Gradient — the quiet one ────────────────────────────────────────
 function bandGradient(p: string[], id: string): string {
   return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
@@ -207,11 +304,24 @@ async function main() {
     ['band-fractured.png',  label(bandFractured(CARD),       GOLD, G9,  NAME, CTX, SER)],
     ['band-gradient.png',   label(bandGradient(CARD, 'gc'),  GOLD, G9,  NAME, CTX, SER)],
     ['band-split.png',      label(bandSplit(CARD),           GOLD, G9,  NAME, CTX, SER)],
+    // Four added Aug 2026 after the 8x audit.
+    ['band-diamond.png',   label(bandDiamond(CARD),  GOLD, G9, NAME, CTX, SER)],
+    ['band-chevron.png',   label(bandChevron(CARD),  GOLD, G9, NAME, CTX, SER)],
+    ['band-scales.png',    label(bandScales(CARD),   GOLD, G9, NAME, CTX, SER)],
+    ['band-prism.png',     label(bandPrism(CARD),    GOLD, G9, NAME, CTX, SER)],
     // Same treatments on the brand palette, to show the band carries either.
     ['band-mosaic-brand.png',    label(bandMosaic(BRAND),         GOLD, G10, PNAME, PCTX, PSER)],
     ['band-lightning-brand.png', label(bandLightning(BRAND),      GOLD, G10, PNAME, PCTX, PSER)],
     ['band-gradient-brand.png',  label(bandGradient(BRAND, 'gb'), GOLD, G10, PNAME, PCTX, PSER)],
+    ['band-diamond-brand.png',   label(bandDiamond(BRAND),        GOLD, G10, PNAME, PCTX, PSER)],
   ];
+
+  // Logo treatments: one label each, everything else held constant so the only
+  // variable is how hard the mark works to be seen.
+  const LOGOS: LogoTreatment[] = ['plain', 'rules', 'plate', 'medallion', 'bar', 'tab'];
+  for (const t of LOGOS) {
+    jobs.push([`logo-${t}.png`, label(bandDiamond(CARD), GOLD, G9, NAME, CTX, SER, t, CARD[0])]);
+  }
   // Error correction H so the centre mark does not break scanning.
   const qrBuf = await QRCode.toBuffer('https://dcmgrading.com/verify/773412', {
     errorCorrectionLevel: 'H', margin: 1, width: 560, color: { dark: '#141414', light: '#ffffff' },
@@ -229,6 +339,10 @@ async function main() {
     ['back-band-lightning.png', bandLightning(CARD)],
     ['back-band-shattered.png', bandShattered(CARD)],
     ['back-band-fractured.png', bandFractured(CARD)],
+    ['back-band-diamond.png',   bandDiamond(CARD)],
+    ['back-band-chevron.png',   bandChevron(CARD)],
+    ['back-band-scales.png',    bandScales(CARD)],
+    ['back-band-prism.png',     bandPrism(CARD)],
   ];
   for (const [f, band] of backs) jobs.push([f, backWithBand(band, qrUri, '9', 'MINT')]);
 

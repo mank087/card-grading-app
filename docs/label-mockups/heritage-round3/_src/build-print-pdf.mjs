@@ -31,7 +31,19 @@ const LABELS = [
   ['Front C · Mosaic band · grade 10', 'r3-c-pattern.png'],
   ['Back · Round 3', 'r3-back.png'],
 
+  ['— Logo treatments (diamond band, grade 9) —', null],
+  ['Logo · Plain', 'logo-plain.png'],
+  ['Logo · Flanking rules', 'logo-rules.png'],
+  ['Logo · Dark plate', 'logo-plate.png'],
+  ['Logo · Gold medallion', 'logo-medallion.png'],
+  ['Logo · Bottom bar', 'logo-bar.png'],
+  ['Logo · Notched tab', 'logo-tab.png'],
+
   ['— Band fronts (card palette) —', null],
+  ['Band · Diamond mosaic', 'band-diamond.png'],
+  ['Band · Chevron', 'band-chevron.png'],
+  ['Band · Scales', 'band-scales.png'],
+  ['Band · Prism', 'band-prism.png'],
   ['Band · Gradient', 'band-gradient.png'],
   ['Band · Split', 'band-split.png'],
   ['Band · Mosaic tiles', 'band-mosaic.png'],
@@ -44,6 +56,7 @@ const LABELS = [
   ['Band · Gradient · brand', 'band-gradient-brand.png'],
   ['Band · Mosaic · brand', 'band-mosaic-brand.png'],
   ['Band · Lightning · brand', 'band-lightning-brand.png'],
+  ['Band · Diamond · brand', 'band-diamond-brand.png'],
 
   ['— Band backs —', null],
   ['Back · Gradient', 'back-band-gradient.png'],
@@ -53,6 +66,10 @@ const LABELS = [
   ['Back · Lightning bolt', 'back-band-lightning.png'],
   ['Back · Shattered glass', 'back-band-shattered.png'],
   ['Back · Fractured', 'back-band-fractured.png'],
+  ['Back · Diamond mosaic', 'back-band-diamond.png'],
+  ['Back · Chevron', 'back-band-chevron.png'],
+  ['Back · Scales', 'back-band-scales.png'],
+  ['Back · Prism', 'back-band-prism.png'],
 
   ['— Full-bleed custom styles —', null],
   ['Custom · Gradient', 'cs-gradient.png'],

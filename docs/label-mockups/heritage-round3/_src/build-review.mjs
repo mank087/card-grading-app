@@ -104,6 +104,10 @@ narrow, so each is re-proportioned to the aspect it actually has to live in. Div
 too &mdash; 2.5px reads as a hairline across a full label and as a fat rule inside a band.</p>
 
 ${[
+  ['band-diamond.png',   'Diamond mosaic',  'the Front C treatment', 'The Round 1 variant C pattern, brought back as a band. Rotated squares in two offset columns. The most "graded card" of the set.'],
+  ['band-chevron.png',   'Chevron',         'directional', 'Real Vs with the apex on the centre line. My first attempt drew a single slanted edge per step, which just reproduced stripes at a different angle.'],
+  ['band-scales.png',    'Scales',          'texture, not shapes', 'Overlapping arcs lapping downward. At slab distance this reads as a foil texture rather than as individual shapes.'],
+  ['band-prism.png',     'Prism',           'sharp / modern', 'Interlocking triangles alternating off each edge. Each pair tiles a full step so there is no gap between them.'],
   ['band-gradient.png',  'Gradient',        'quietest', 'Vertical multi-stop through the sampled palette. The safest of the set and the closest to Round 1 variant A.'],
   ['band-split.png',     'Split',           'two-colour cards', 'Hard stack, no blend. Built for team or dual-colour cards.'],
   ['band-mosaic.png',    'Mosaic tiles',    '2 × 9 tiles', 'Flat tiles, no gradients anywhere, so nothing to band on a cheap printer. Closest in spirit to the Round 1 variant C you liked.'],
@@ -123,6 +127,7 @@ ${[
 These also run a grade 10, so you can see the gold chip against a purple band.</p>
 ${[
   ['band-gradient-brand.png',  'Gradient — brand'],
+  ['band-diamond-brand.png',   'Diamond — brand'],
   ['band-mosaic-brand.png',    'Mosaic — brand'],
   ['band-lightning-brand.png', 'Lightning — brand'],
 ].map(([f, name]) => `
@@ -161,6 +166,37 @@ ${[
   </ul>
 </section>
 
+<h2>Logo treatments</h2>
+<p class="lede">A bare navy mark on ivory reads as a smudge at 2.8&Prime;, which defeats the point of
+moving it to the bottom centre. Six ways of buying it presence, each costing a different amount of ink.
+Everything else is held constant &mdash; same card, same diamond band, same grade &mdash; so the only
+variable is the mark. <strong>All six are selectable in Label Lab.</strong></p>
+${[
+  ['logo-plain.png',     'Plain',           'least ink', 'Bare navy mark on ivory. Honest but quiet — this is the Round 3 default you flagged.'],
+  ['logo-rules.png',     'Flanking rules',  'almost free', 'Two gold hairlines running out toward the edges. Adds emphasis with essentially no extra ink, and the mark itself is untouched.'],
+  ['logo-plate.png',     'Dark plate',      'strongest contrast', 'White mark knocked out of a dark rounded plate. The most obviously deliberate, and the most print-predictable — no gradient, no spot colour.'],
+  ['logo-medallion.png', 'Gold medallion',  'most premium', 'Dark mark on a gold disc; reads as a seal or hallmark. Prettiest on screen and the one I would trust least on a cheap printer — gold is the hardest colour to hold consistent.'],
+  ['logo-bar.png',       'Bottom bar',      'most ink', 'Full-width bar in the band colour with a white mark. Ties the band into the mark and anchors the whole label.'],
+  ['logo-tab.png',       'Notched tab',     'distinctive silhouette', 'A rounded tab breaking the bottom edge in the band colour. Recognisable before you read it. Squared rather than angled — an angled notch closes up in print and reads as a fault.'],
+].map(([f, name, tag, note]) => `
+  <section class="card">
+    <div class="meta"><span class="tag">${tag}</span><span class="dim">${name}</span></div>
+    <img src="${b64(f)}" alt="${name}">
+    <ul><li>${note}</li></ul>
+  </section>`).join('')}
+
+<div class="q">
+  <strong>My read</strong>
+  <ul>
+    <li><strong>Plate and Bar are the two real contenders.</strong> Plate is safest and prints identically
+        every time; Bar is more striking and ties the band into the mark, at the cost of ink coverage.</li>
+    <li><strong>Medallion is a trap.</strong> It looks best here and is the one most likely to disappoint
+        on paper — a flat gold disc at ~0.2&Prime; across is exactly where cheap printers shift colour.</li>
+    <li><strong>Rules is the sleeper.</strong> Nearly free, does not commit the design to a shape, and
+        still stops the mark floating unanchored.</li>
+  </ul>
+</div>
+
 <h3>Backs with the same bands</h3>
 <p class="lede">Each back carries the band treatment of its front, so a slab can be judged as a matched
 pair rather than two unrelated faces. Everything else is the Round 3 back unchanged &mdash; QR with the
@@ -173,6 +209,10 @@ ${[
   ['back-band-lightning.png', 'Lightning bolt'],
   ['back-band-shattered.png', 'Shattered glass'],
   ['back-band-fractured.png', 'Fractured'],
+  ['back-band-diamond.png',   'Diamond mosaic'],
+  ['back-band-chevron.png',   'Chevron'],
+  ['back-band-scales.png',    'Scales'],
+  ['back-band-prism.png',     'Prism'],
 ].map(([f, name]) => `
   <section class="card">
     <div class="meta"><span class="tag">back</span><span class="dim">${name}</span></div>
