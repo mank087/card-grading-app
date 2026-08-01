@@ -101,6 +101,14 @@ export interface HeritageInputs {
   whiteLogoDataUrl?: string | null
   /** How hard the mark works to be seen at the bottom edge. */
   logoTreatment?: LogoTreatment
+  /**
+   * Which mark to use. Black is the default: the navy house logo carries its
+   * own hue and argues with the coloured grade numeral and the purple accents,
+   * whereas black belongs to no palette and so cannot clash with one.
+   */
+  logoColor?: LogoColor
+  /** Black mark, generated from the white one (negate RGB, keep alpha). */
+  blackLogoDataUrl?: string | null
   /** QR with the mark knocked into the centre, built by the caller. */
   qrDataUrl?: string | null
   /**
@@ -124,6 +132,14 @@ const pickFrom = (p: string[]) => (i: number) => p[i % p.length] || '#7C3AED'
  * moving it to the bottom centre in the first place. Each treatment below buys
  * presence a different way, and they cost different amounts of ink.
  */
+export type LogoColor = 'black' | 'color' | 'white'
+
+export const LOGO_COLORS: { id: LogoColor; name: string }[] = [
+  { id: 'black', name: 'Black' },
+  { id: 'color', name: 'Colour' },
+  { id: 'white', name: 'White' },
+]
+
 export type LogoTreatment = 'plate' | 'rules' | 'plain'
 
 export const LOGO_TREATMENTS: { id: LogoTreatment; name: string; note: string }[] = [
@@ -211,39 +227,41 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
  * only the backing changes, never the mark's size or position.
  */
 function LogoBlock({ i }: { i: HeritageInputs }) {
-  const T = theme(!!i.printHardened)
   const t = i.logoTreatment ?? 'rules'
-  const MARK_W = u(215), MARK_H = u(80)
+  const c = i.logoColor ?? 'black'
+  const MARK_W = u(238), MARK_H = u(88)
+
+  const src =
+    c === 'white' ? (i.whiteLogoDataUrl ?? i.colorLogoDataUrl)
+    : c === 'color' ? i.colorLogoDataUrl
+    : (i.blackLogoDataUrl ?? i.colorLogoDataUrl)
 
   if (t === 'plain' || t === 'rules') {
     const left = (LABEL_W - MARK_W) / 2
-    const top = LABEL_H - MARK_H - u(10)
-    // Short rules flanking the mark. Deliberately SHORT rather than running to
-    // the edges: a full-width rule turns into a second horizontal divider and
-    // starts arguing with the one above the serial.
-    const ruleLen = u(110)
-    const gap = u(18)
+    const top = LABEL_H - MARK_H - u(8)
+    // Accent lines in the same ink as the mark so the group reads as one
+    // object. Short on purpose — a full-width rule becomes a second divider and
+    // argues with the one above the serial.
+    const ruleLen = u(112)
+    const gap = u(20)
     const ruleY = top + MARK_H / 2
+    const ink = c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
     return (
       <>
         {t === 'rules' ? (
           <>
-            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: BRAND_PURPLE, opacity: 1 }} />
-            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(5), backgroundColor: T.rule, opacity: 0.9 }} />
+            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
+            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
           </>
         ) : null}
         <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
-          {i.colorLogoDataUrl ? <Image src={i.colorLogoDataUrl} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null}
+          {src ? <Image src={src} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null}
         </View>
       </>
     )
   }
 
-  // Brand-purple rounded plate, white mark. Sized tighter than the first pass:
-  // the plate should read as a fitted badge around the mark, not as a bar that
-  // happens to contain it.
   const plateW = u(172), plateH = u(64)
-  const src = i.whiteLogoDataUrl ?? i.colorLogoDataUrl
   return (
     <View
       style={{
@@ -252,7 +270,7 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
         alignItems: 'center', justifyContent: 'center',
       }}
     >
-      {src ? <Image src={src} style={{ width: plateW * 0.80, height: plateH * 0.74, objectFit: 'contain' }} /> : null}
+      {i.whiteLogoDataUrl ? <Image src={i.whiteLogoDataUrl} style={{ width: plateW * 0.80, height: plateH * 0.74, objectFit: 'contain' }} /> : null}
     </View>
   )
 }

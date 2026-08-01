@@ -25,7 +25,7 @@ import {
   resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
-import { BAND_PATTERNS, LOGO_TREATMENTS, type BandPattern, type LogoTreatment } from '@/lib/labelLab/heritageSlabPdfDoc'
+import { BAND_PATTERNS, LOGO_TREATMENTS, LOGO_COLORS, type BandPattern, type LogoTreatment, type LogoColor } from '@/lib/labelLab/heritageSlabPdfDoc'
 
 // ============================================================================
 // Types
@@ -113,6 +113,7 @@ export default function LabelLabClient() {
   const [heritageColorsTouched, setHeritageColorsTouched] = useState(false)
   const [heritageLogo, setHeritageLogo] = useState<LogoTreatment>('rules')
   const [heritageHardened, setHeritageHardened] = useState(true)
+  const [heritageLogoColor, setHeritageLogoColor] = useState<LogoColor>('black')
   const [heritageFounder, setHeritageFounder] = useState(false)
   const [heritageCardLover, setHeritageCardLover] = useState(false)
   const [heritageVip, setHeritageVip] = useState(false)
@@ -123,6 +124,7 @@ export default function LabelLabClient() {
   // --- Logos (fetched once and cached as base64) ---
   const [whiteLogoDataUrl, setWhiteLogoDataUrl] = useState<string | null>(null)
   const [colorLogoDataUrl, setColorLogoDataUrl] = useState<string | null>(null)
+  const [blackLogoDataUrl, setBlackLogoDataUrl] = useState<string | null>(null)
 
   // --- Render state ---
   const [vectorPdfBlobUrl, setVectorPdfBlobUrl] = useState<string | null>(null)
@@ -152,10 +154,12 @@ export default function LabelLabClient() {
     Promise.all([
       fetchAsDataUrl('/DCM%20Logo%20white.png').catch(() => null),
       fetchAsDataUrl('/DCM-logo.png').catch(() => null),
-    ]).then(([whiteUrl, colorUrl]) => {
+      fetchAsDataUrl('/DCM-logo-black.png').catch(() => null),
+    ]).then(([whiteUrl, colorUrl, blackUrl]) => {
       if (cancelled) return
       setWhiteLogoDataUrl(whiteUrl)
       setColorLogoDataUrl(colorUrl)
+      setBlackLogoDataUrl(blackUrl)
     })
     return () => { cancelled = true }
   }, [])
@@ -344,6 +348,8 @@ export default function LabelLabClient() {
               colorLogoDataUrl,
               whiteLogoDataUrl,
               logoTreatment: heritageLogo,
+              logoColor: heritageLogoColor,
+              blackLogoDataUrl,
               printHardened: heritageHardened,
               qrDataUrl,
               showFounder: heritageFounder,
@@ -403,7 +409,7 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageHardened, heritageFounder, heritageCardLover, heritageVip])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageHardened, heritageLogoColor, blackLogoDataUrl, heritageFounder, heritageCardLover, heritageVip])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
@@ -459,6 +465,8 @@ export default function LabelLabClient() {
               cardPalette={cardDerivedColors}
               logo={heritageLogo}
               onLogo={setHeritageLogo}
+              logoColor={heritageLogoColor}
+              onLogoColor={setHeritageLogoColor}
               hardened={heritageHardened}
               onHardened={setHeritageHardened}
               bandColors={heritageBandColors}
@@ -717,6 +725,8 @@ function HeritagePanel(props: {
   cardPalette: string[] | null
   logo: LogoTreatment
   onLogo: (t: LogoTreatment) => void
+  logoColor: LogoColor
+  onLogoColor: (c: LogoColor) => void
   hardened: boolean
   onHardened: (v: boolean) => void
   bandColors: string[]
@@ -872,6 +882,27 @@ function HeritagePanel(props: {
         </div>
         <p className="text-[11px] text-gray-500 mt-2">
           {LOGO_TREATMENTS.find(t => t.id === props.logo)?.note}
+        </p>
+
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mt-3 mb-1.5">Mark colour</p>
+        <div className="flex gap-1.5">
+          {LOGO_COLORS.map(c => (
+            <button
+              key={c.id}
+              onClick={() => props.onLogoColor(c.id)}
+              className={`flex-1 px-2 py-1.5 rounded-lg border text-xs font-medium ${
+                props.logoColor === c.id
+                  ? 'border-purple-500 bg-purple-50 text-purple-900'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-500 mt-1.5">
+          Black is the default — the navy mark carries its own hue and argues with the coloured grade
+          numeral; black belongs to no palette so it cannot clash.
         </p>
       </div>
 

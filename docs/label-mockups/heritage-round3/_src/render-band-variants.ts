@@ -92,6 +92,16 @@ function chip(x: number, c: Grade): string {
 }
 
 const LOGO_WHITE_URI = `data:image/png;base64,${fs.readFileSync('public/DCM Logo white.png').toString('base64')}`;
+// Black mark, generated from the white one by negating RGB and keeping alpha.
+// The navy house logo carries its own hue and started arguing with the coloured
+// grade numeral and the purple accents; black belongs to no palette, so it
+// cannot clash with any of them.
+const LOGO_BLACK_URI = `data:image/png;base64,${fs.readFileSync('public/DCM-logo-black.png').toString('base64')}`;
+
+export type LogoColor = 'black' | 'color' | 'white';
+const LOGO_SRC: Record<LogoColor, string> = {
+  black: LOGO_BLACK_URI, color: LOGO_URI, white: LOGO_WHITE_URI,
+};
 
 export type LogoTreatment = 'plate' | 'rules' | 'plain';
 
@@ -103,17 +113,19 @@ export type LogoTreatment = 'plate' | 'rules' | 'plain';
 const BRAND_PURPLE = '#7c3aed';
 
 /** Brand-purple rounded plate, white mark. Fitted badge, not a bar. */
-function logoBlock(t: LogoTreatment): string {
-  const mw = 215, mh = 80;
+function logoBlock(t: LogoTreatment, color: LogoColor = 'black'): string {
+  const mw = 238, mh = 88;
+  const src = LOGO_SRC[color];
   if (t === 'plain' || t === 'rules') {
-    const left = (W - mw) / 2, top = H - mh - 10;
-    const mark = `<image href="${LOGO_URI}" x="${left}" y="${top}" width="${mw}" height="${mh}" preserveAspectRatio="xMidYMid meet"/>`;
+    const left = (W - mw) / 2, top = H - mh - 8;
+    const mark = `<image href="${src}" x="${left}" y="${top}" width="${mw}" height="${mh}" preserveAspectRatio="xMidYMid meet"/>`;
     if (t === 'plain') return mark;
-    // Short flanking rules. Kept short on purpose — a full-width rule becomes a
-    // second horizontal divider and argues with the one above the serial.
-    const len = 110, gap = 18, y = top + mh / 2;
-    return `<rect x="${left - gap - len}" y="${y}" width="${len}" height="5" fill="${PURPLE}" opacity="1"/>
-      <rect x="${left + mw + gap}" y="${y}" width="${len}" height="5" fill="${PURPLE}" opacity="1"/>
+    // Accent lines in the same ink as the mark, so the group reads as one
+    // object. Kept short — a full-width rule becomes a second divider and
+    // argues with the one above the serial.
+    const len = 112, gap = 20, y = top + mh / 2, ink = color === 'white' ? '#ffffff' : (color === 'black' ? '#101014' : BRAND_PURPLE);
+    return `<rect x="${left - gap - len}" y="${y}" width="${len}" height="6" fill="${ink}"/>
+      <rect x="${left + mw + gap}" y="${y}" width="${len}" height="6" fill="${ink}"/>
       ${mark}`;
   }
   const pw = 172, ph = 64, x = (W - pw) / 2, y = H - ph - 8;
