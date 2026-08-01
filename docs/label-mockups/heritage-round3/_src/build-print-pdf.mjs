@@ -53,6 +53,17 @@ const SECTIONS = [
     items: PATTERNS.map(([id, name]) => [name, `p-brand-${id}.png`]),
   },
   {
+    title: 'GRADE RAMP — ALL TEN GRADES',
+    sub: 'Same band and palette throughout, so the chip is the only thing that moves. 10 and 9 are inverted: flat ink cannot imitate metal, so contrast implies it instead.',
+    items: [
+      ['10 · Gem Mint', 'g-10.png'], ['9 · Mint', 'g-9.png'],
+      ['8 · NM-Mint', 'g-8.png'], ['7 · Near Mint', 'g-7.png'],
+      ['6 · EX-NM', 'g-6.png'], ['5 · Excellent', 'g-5.png'],
+      ['4 · VG-EX', 'g-4.png'], ['3 · Very Good', 'g-3.png'],
+      ['2 · Good', 'g-2.png'], ['1 · Poor', 'g-1.png'],
+    ],
+  },
+  {
     title: 'LOGO STYLES × BAND',
     sub: 'Each mark treatment against a busy band and a quiet one — the mark has to survive both.',
     items: ['diamond', 'mosaic', 'gradient', 'lightning'].flatMap((p) =>

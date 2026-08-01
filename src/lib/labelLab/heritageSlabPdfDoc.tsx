@@ -273,7 +273,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
         </Text>
         <View style={{ height: 0.5, backgroundColor: T.divider, marginTop: u(30), width: u(940) }} />
         <Text style={{ fontFamily: 'Courier', fontSize: u(36), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
-          DCM {i.serial}
+          Serial: {i.serial}
         </Text>
       </View>
 

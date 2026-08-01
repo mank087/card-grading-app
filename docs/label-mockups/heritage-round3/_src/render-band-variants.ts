@@ -54,8 +54,26 @@ const PALETTES: { id: string; name: string; colors: string[] }[] = [
 const DIV = `stroke="rgba(0,0,0,0.55)" stroke-width="2" fill="none"`;
 
 interface Grade { g: number; label: string; fill: string; ink: string }
-const G9: Grade  = { g: 9,  label: 'MINT',     fill: '#15171A', ink: '#D8DEE6' };
-const G10: Grade = { g: 10, label: 'GEM MINT', fill: '#1A1206', ink: '#E8C25A' };
+/**
+ * The print-hardened ramp, mirroring GRADE_CHIPS_PRINT in labelPresets.
+ * 10 and 9 are inverted — near-black chip, metallic-toned numeral — because
+ * flat ink cannot imitate metal and light neutrals pick up a colour cast.
+ * 8 down are already saturated mid-to-dark colours that reproduce cleanly.
+ */
+const GRADES: Grade[] = [
+  { g: 10, label: 'GEM MINT',  fill: '#1A1206', ink: '#E8C25A' },
+  { g: 9,  label: 'MINT',      fill: '#15171A', ink: '#D8DEE6' },
+  { g: 8,  label: 'NM-MINT',   fill: '#1D4ED8', ink: '#FFFFFF' },
+  { g: 7,  label: 'NEAR MINT', fill: '#0E7490', ink: '#FFFFFF' },
+  { g: 6,  label: 'EX-NM',     fill: '#15803D', ink: '#FFFFFF' },
+  { g: 5,  label: 'EXCELLENT', fill: '#A16207', ink: '#FFFFFF' },
+  { g: 4,  label: 'VG-EX',     fill: '#EA580C', ink: '#FFFFFF' },
+  { g: 3,  label: 'VERY GOOD', fill: '#DC2626', ink: '#FFFFFF' },
+  { g: 2,  label: 'GOOD',      fill: '#7F1D1D', ink: '#FFFFFF' },
+  { g: 1,  label: 'POOR',      fill: '#3F3F46', ink: '#FFFFFF' },
+];
+const G9  = GRADES.find(g => g.g === 9)!;
+const G10 = GRADES.find(g => g.g === 10)!;
 
 function chip(x: number, c: Grade): string {
   const big = String(c.g).length > 1;
@@ -102,7 +120,7 @@ function body(name: string, context: string, serial: string, grade: Grade, logo:
     <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="bold" fill="${INK}">${name}</text>
     <text x="150" y="198" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="4" fill="${INK_SOFT}">${context}</text>
     <line x1="150" y1="236" x2="1090" y2="236" stroke="#9ca3af" stroke-width="2"/>
-    <text x="150" y="292" font-family="Courier New, monospace" font-size="36" letter-spacing="4" fill="${INK_SOFT}">DCM ${serial}</text>
+    <text x="150" y="292" font-family="Courier New, monospace" font-size="36" letter-spacing="4" fill="${INK_SOFT}">Serial: ${serial}</text>
     ${chip(1130, grade)}
     ${logoBlock(logo)}`;
 }
@@ -220,6 +238,27 @@ async function main() {
         label(band(p.id, pal.colors, `g-${pal.id}-${p.id}`), GOLD, G9, NAME, CTX, SER, 'plate'),
       ]);
     }
+  }
+
+  // ── Grade ramp ────────────────────────────────────────────────────────────
+  // Every grade on the same card, band and palette, so the chip is the only
+  // thing that moves. Card names change with the grade so the sheet does not
+  // read as ten copies of one card.
+  const RAMP_CARDS: Record<number, [string, string, string]> = {
+    10: ['Charizard ex',      'OBSIDIAN FLAMES · SAR · #234/197 · 2023', '773412'],
+    9:  ['Mega Sharpedo EX',  'PHANTASMAL FLAMES · FULL ART · #127/094 · 2025', '580976'],
+    8:  ['Jaxson Dart',       'TOPPS CHROME · REFRACTOR RC · #74 · 2025', '412117'],
+    7:  ['Xerosic',           'PHANTOM FORCES · #110/119 · 2014', '284401'],
+    6:  ['Roberto Clemente',  'TOPPS CHROME · /99 · #12 · 2023', '901233'],
+    5:  ['LeBron James',      'DONRUSS OPTIC · #44 · 2019', '556018'],
+    4:  ['Eddy Pineiro',      'DONRUSS · #188 · 2021', '330277'],
+    3:  ['Andre the Giant',   'WRESTLEMANIA III · #22 · 1987', '119845'],
+    2:  ['Giratina',          'LOST ORIGIN · #131/196 · 2022', '677310'],
+    1:  ['Gengar',            'TRIUMPHANT · #26/102 · 2010', '204119'],
+  };
+  for (const g of GRADES) {
+    const [n, c, sr] = RAMP_CARDS[g.g];
+    jobs.push([`g-${g.g}.png`, label(band('diamond', BRAND, `gr-${g.g}`), GOLD, g, n, c, sr, 'plate')]);
   }
 
   // Logo styles crossed with a few representative patterns, so the mark can be
