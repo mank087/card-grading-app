@@ -489,19 +489,20 @@ export const GRADE_CHIP_FALLBACK: GradeChip = {
 export const GRADE_CHIP_BLACK = '#101014';
 
 export const GRADE_CHIPS_PRINT: GradeChip[] = [
-  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_BLACK, ink: '#A78BFA' }, // brand purple
-  // 10 is DCM purple rather than gold so the top grade carries the brand.
-  // Not the exact #7C3AED though: on the black chip that measures 3.33:1,
-  // which would make the most important grade the dimmest thing on the ramp.
-  // #A78BFA is the same hue lifted to 6.98:1 — recognisably brand purple and
-  // actually legible at 2.8".
+  // 10 is a bright yellow-gold, not the earlier dark gold. To make room for it
+  // the warm end moved OUT of yellow: 5/4/3 are peach, orange and burnt orange,
+  // separated by lightness rather than hue. Gold now sits 19 degrees clear of
+  // the nearest warm colour instead of 1. Grade 10 additionally carries a gold
+  // keyline on its chip, so the top grade is structurally unique and not
+  // relying on hue alone.
+  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_BLACK, ink: '#FFDA2B' }, // gold
   { grade: 9,  label: 'MINT',      fill: GRADE_CHIP_BLACK, ink: '#D8DEE6' }, // silver
   { grade: 8,  label: 'NM-MINT',   fill: GRADE_CHIP_BLACK, ink: '#60A5FA' }, // blue
   { grade: 7,  label: 'NEAR MINT', fill: GRADE_CHIP_BLACK, ink: '#4ADE80' }, // green
   { grade: 6,  label: 'EX-NM',     fill: GRADE_CHIP_BLACK, ink: '#A3E635' }, // lime
-  { grade: 5,  label: 'EXCELLENT', fill: GRADE_CHIP_BLACK, ink: '#FDE047' }, // yellow
-  { grade: 4,  label: 'VG-EX',     fill: GRADE_CHIP_BLACK, ink: '#FBBF24' }, // amber
-  { grade: 3,  label: 'VERY GOOD', fill: GRADE_CHIP_BLACK, ink: '#FB923C' }, // orange
+  { grade: 5,  label: 'EXCELLENT', fill: GRADE_CHIP_BLACK, ink: '#FDBA74' }, // peach
+  { grade: 4,  label: 'VG-EX',     fill: GRADE_CHIP_BLACK, ink: '#FB923C' }, // orange
+  { grade: 3,  label: 'VERY GOOD', fill: GRADE_CHIP_BLACK, ink: '#F97316' }, // burnt orange
   { grade: 2,  label: 'GOOD',      fill: GRADE_CHIP_BLACK, ink: '#F87171' }, // salmon
   { grade: 1,  label: 'POOR',      fill: GRADE_CHIP_BLACK, ink: '#EF4444' }, // red
 ];

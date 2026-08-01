@@ -68,14 +68,14 @@ interface Grade { g: number; label: string; fill: string; ink: string }
  */
 const BLACK = '#101014';
 const GRADES: Grade[] = [
-  { g: 10, label: 'GEM MINT',  fill: BLACK, ink: '#A78BFA' },  // brand purple, lifted for the black ground
+  { g: 10, label: 'GEM MINT',  fill: BLACK, ink: '#FFDA2B' },  // bright yellow-gold
   { g: 9,  label: 'MINT',      fill: BLACK, ink: '#D8DEE6' },
   { g: 8,  label: 'NM-MINT',   fill: BLACK, ink: '#60A5FA' },
   { g: 7,  label: 'NEAR MINT', fill: BLACK, ink: '#4ADE80' },
   { g: 6,  label: 'EX-NM',     fill: BLACK, ink: '#A3E635' },
-  { g: 5,  label: 'EXCELLENT', fill: BLACK, ink: '#FDE047' },
-  { g: 4,  label: 'VG-EX',     fill: BLACK, ink: '#FBBF24' },
-  { g: 3,  label: 'VERY GOOD', fill: BLACK, ink: '#FB923C' },
+  { g: 5,  label: 'EXCELLENT', fill: BLACK, ink: '#FDBA74' },  // peach — moved out
+  { g: 4,  label: 'VG-EX',     fill: BLACK, ink: '#FB923C' },  // of yellow so gold
+  { g: 3,  label: 'VERY GOOD', fill: BLACK, ink: '#F97316' },  // has the range to itself
   { g: 2,  label: 'GOOD',      fill: BLACK, ink: '#F87171' },
   { g: 1,  label: 'POOR',      fill: BLACK, ink: '#EF4444' },
 ];
@@ -86,7 +86,7 @@ function chip(x: number, c: Grade): string {
   const big = String(c.g).length > 1;
   return `
     <rect x="${x}" y="64" width="240" height="252" rx="28" fill="${c.fill}"/>
-    <rect x="${x + 6}" y="70" width="228" height="240" rx="24" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="3"/>
+    <rect x="${x + 6}" y="70" width="228" height="240" rx="24" fill="none" stroke="${c.g === 10 ? c.ink : 'rgba(255,255,255,0.28)'}" stroke-width="${c.g === 10 ? 6 : 3}"/>
     <text x="${x + 120}" y="${big ? 236 : 238}" font-family="Arial, Helvetica, sans-serif" font-size="${big ? 150 : 168}" font-weight="bold" fill="${c.ink}" text-anchor="middle">${c.g}</text>
     <text x="${x + 120}" y="292" font-family="Arial, Helvetica, sans-serif" font-size="${c.label.length > 8 ? 26 : 30}" font-weight="bold" letter-spacing="4" fill="${c.ink}" opacity="0.9" text-anchor="middle">${c.label}</text>`;
 }
