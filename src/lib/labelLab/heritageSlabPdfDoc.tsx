@@ -45,16 +45,21 @@ const GOLD = '#A67C1B'
 const EDGE = '#E5DECF'
 
 export type BandPattern =
-  | 'gradient' | 'split' | 'mosaic' | 'stripes' | 'lightning' | 'shattered' | 'fractured'
+  | 'gradient' | 'split' | 'mosaic' | 'diamond' | 'stripes' | 'chevron'
+  | 'lightning' | 'shattered' | 'fractured' | 'scales' | 'prism'
 
 export const BAND_PATTERNS: { id: BandPattern; name: string; note: string }[] = [
   { id: 'gradient',  name: 'Gradient',         note: 'Quietest. Vertical multi-stop.' },
   { id: 'split',     name: 'Split',            note: 'Hard stack, no blend.' },
   { id: 'mosaic',    name: 'Mosaic tiles',     note: '2 x 9 flat tiles. No gradients — nothing to band in print.' },
+  { id: 'diamond',   name: 'Diamond mosaic',   note: 'The Round 1 Front C treatment: rotated squares in two columns. Most "graded card" of the set.' },
   { id: 'stripes',   name: 'Diagonal stripes', note: '45deg across the strip.' },
+  { id: 'chevron',   name: 'Chevron',          note: 'Nested Vs pointing into the label. Directional without being loud.' },
   { id: 'lightning', name: 'Lightning bolt',   note: 'Single zigzag down the band.' },
-  { id: 'shattered', name: 'Shattered glass',  note: 'Ten shards. Most detail — first to lose definition in print.' },
+  { id: 'shattered', name: 'Shattered glass',  note: 'Shards from a focal point. Most detail — first to lose definition in print.' },
   { id: 'fractured', name: 'Fractured',        note: 'Five stacked regions, angled cuts.' },
+  { id: 'scales',    name: 'Scales',           note: 'Overlapping arcs, like a foil texture. Reads as pattern rather than shapes at slab distance.' },
+  { id: 'prism',     name: 'Prism',            note: 'Interlocking triangles off alternating edges. Sharp and modern.' },
 ]
 
 export interface HeritageInputs {
@@ -67,8 +72,12 @@ export interface HeritageInputs {
   /** Band colours, sampled from the card or a brand set. At least 2. */
   bandColors: string[]
   pattern: BandPattern
-  /** DCM mark, dark version — the ivory field never needs the white one. */
+  /** DCM mark, dark version — used on ivory and on the gold medallion. */
   colorLogoDataUrl?: string | null
+  /** DCM mark, white version — needed by the plate and bar treatments. */
+  whiteLogoDataUrl?: string | null
+  /** How hard the mark works to be seen at the bottom edge. */
+  logoTreatment?: LogoTreatment
   /** QR with the mark knocked into the centre, built by the caller. */
   qrDataUrl?: string | null
   showFounder?: boolean
@@ -78,16 +87,38 @@ export interface HeritageInputs {
 
 const pickFrom = (p: string[]) => (i: number) => p[i % p.length] || '#7C3AED'
 
+/**
+ * How the DCM mark is presented at the bottom edge.
+ *
+ * On the ivory field a bare navy mark at 200x78 mockup-px is honest but quiet —
+ * at 2.8" it reads as a smudge from arm's length, which defeats the point of
+ * moving it to the bottom centre in the first place. Each treatment below buys
+ * presence a different way, and they cost different amounts of ink.
+ */
+export type LogoTreatment = 'plain' | 'plate' | 'medallion' | 'rules' | 'bar' | 'tab'
+
+export const LOGO_TREATMENTS: { id: LogoTreatment; name: string; note: string }[] = [
+  { id: 'plain',     name: 'Plain',        note: 'Bare navy mark on ivory. Least ink, least presence — the current Round 3 behaviour.' },
+  { id: 'rules',     name: 'Flanking rules', note: 'Two gold hairlines running out to the edges. Adds emphasis with almost no ink; the mark itself is unchanged.' },
+  { id: 'plate',     name: 'Dark plate',   note: 'White mark knocked out of a dark rounded plate. Strongest contrast of the set and the most obviously deliberate.' },
+  { id: 'medallion', name: 'Gold medallion', note: 'Dark mark on a gold disc. Reads as a seal or hallmark — most premium, but gold is the hardest colour to keep consistent in print.' },
+  { id: 'bar',       name: 'Bottom bar',   note: 'Full-width bar in the band colour with a white mark. Ties the band to the mark and anchors the whole label. Most ink.' },
+  { id: 'tab',       name: 'Notched tab',  note: 'A tab breaking the bottom edge, in the band colour. Distinctive silhouette even before you read it.' },
+]
+
 // ---------------------------------------------------------------------------
 // Band patterns. Geometry mirrors the approved Round 3 mockups, which in turn
 // re-cut customSlabLabelGenerator's patterns for a tall narrow strip.
 // ---------------------------------------------------------------------------
-function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string[]; id: string }) {
+export function BandArt({
+  pattern, colors, id, w, h,
+}: { pattern: BandPattern; colors: string[]; id: string; w?: number; h?: number }) {
   const q = pickFrom(colors)
-  const W = BAND_W, H = LABEL_H
+  const W = w ?? BAND_W
+  const H = h ?? LABEL_H
   // Divider weight scaled for the strip; 2.5px across a full label is a
   // hairline, inside a 90px band it is a fat rule.
-  const dw = u(2)
+  const dw = (W / BAND_W) * u(2)
   const dc = 'rgba(0,0,0,0.55)'
 
   if (pattern === 'gradient') {
@@ -106,6 +137,10 @@ function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string
   }
 
   const shapes: React.ReactNode[] = []
+  // Every pattern paints a base fill first. Without it, any gap left by the
+  // geometry shows the ivory field through the band and reads as a printing
+  // fault -- which is exactly what the diagonal stripes were doing.
+  shapes.push(<Rect key="base" x={0} y={0} width={W} height={H} fill={q(0)} />)
 
   if (pattern === 'split') {
     shapes.push(<Rect key="a" x={0} y={0} width={W} height={H / 2} fill={q(0)} />)
@@ -124,17 +159,63 @@ function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string
       shapes.push(<Line key={`h${r}`} x1={0} y1={r * th} x2={W} y2={r * th} strokeWidth={dw} stroke={dc} />)
   }
 
+  if (pattern === 'diamond') {
+    // The Round 1 Front C treatment: squares rotated 45deg in two columns,
+    // clipped by the band so the edge ones read as half-diamonds.
+    const size = H / 9
+    const half = size * 0.62
+    let n = 0
+    for (let row = -1; row <= Math.ceil(H / size) + 1; row++) {
+      for (let col = 0; col < 2; col++) {
+        const cx = W * (col === 0 ? 0.25 : 0.75)
+        const cy = row * size + (col === 1 ? size / 2 : 0)
+        shapes.push(
+          <Path
+            key={`d${row}${col}`}
+            d={`M ${cx} ${cy - half} L ${cx + half} ${cy} L ${cx} ${cy + half} L ${cx - half} ${cy} Z`}
+            fill={q(n++)}
+            stroke={dc}
+            strokeWidth={dw * 0.6}
+          />
+        )
+      }
+    }
+  }
+
   if (pattern === 'stripes') {
-    const n = 9, h = H / n, skew = W
-    for (let i = -1; i <= n; i++) {
+    // Sheared bands. The shear pushes coverage sideways, so the loop has to run
+    // past both ends by skew/h stripes or the corner nearest the shear
+    // direction is left unpainted -- it was showing as a white wedge.
+    const h = H / 9, skew = W
+    const extra = Math.ceil(skew / h) + 1
+    for (let i = -1; i <= 9 + extra; i++) {
       const y0 = i * h
       shapes.push(
         <Path key={`s${i}`} d={`M 0 ${y0} L ${W} ${y0 - skew} L ${W} ${y0 - skew + h} L 0 ${y0 + h} Z`} fill={q(i + 1)} />
       )
     }
-    for (let i = 0; i <= n; i++) {
+    for (let i = -1; i <= 9 + extra; i++) {
       const y0 = i * h
       shapes.push(<Path key={`sd${i}`} d={`M 0 ${y0} L ${W} ${y0 - skew}`} strokeWidth={dw} stroke={dc} fill="none" />)
+    }
+  }
+
+  if (pattern === 'chevron') {
+    // Real Vs: apex on the band's centre line, arms running back to both edges.
+    // A single slanted edge per step just reproduces the stripes pattern at a
+    // different angle, which is what the first attempt did.
+    const n = 7, step = H / n, depth = step * 0.75
+    const vAt = (y: number) => `M 0 ${y} L ${W / 2} ${y + depth} L ${W} ${y}`
+    for (let i = -2; i <= n + 1; i++) {
+      const y = i * step
+      shapes.push(
+        <Path
+          key={`c${i}`}
+          d={`${vAt(y)} L ${W} ${y + step} L ${W / 2} ${y + depth + step} L 0 ${y + step} Z`}
+          fill={q(i + 2)}
+        />
+      )
+      shapes.push(<Path key={`cd${i}`} d={vAt(y)} strokeWidth={dw} stroke={dc} fill="none" />)
     }
   }
 
@@ -144,23 +225,33 @@ function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string
       [W * 0.30, H * 0.66], [W * 0.66, H * 0.86], [W * 0.40, H],
     ]
     const zig = z.map(([x, y]) => `L ${x} ${y}`).join(' ')
-    shapes.push(<Rect key="base" x={0} y={0} width={W} height={H} fill={q(0)} />)
     shapes.push(<Path key="l" d={`M 0 0 L ${z[0][0]} ${z[0][1]} ${zig} L 0 ${H} Z`} fill={q(0)} />)
     shapes.push(<Path key="r" d={`M ${W} 0 L ${z[0][0]} ${z[0][1]} ${zig} L ${W} ${H} Z`} fill={q(1)} />)
     shapes.push(<Path key="d" d={`M ${z[0][0]} ${z[0][1]} ${zig}`} strokeWidth={dw} stroke={dc} fill="none" />)
   }
 
   if (pattern === 'shattered') {
-    const cx = W * 0.45, cy = H * 0.38
+    // Shards from a focal point to a CLOSED perimeter loop. The perimeter must
+    // be walked in order and wrap back to the first point, or the last shard is
+    // missing and a wedge of ivory shows through.
+    const cx = W * 0.42, cy = H * 0.36
     const pts: [number, number][] = [
-      [0, 0], [W, 0], [W, H * 0.25], [W, H * 0.5], [W, H * 0.75], [W, H],
-      [0, H], [0, H * 0.72], [0, H * 0.45], [0, H * 0.2],
+      [0, 0], [W * 0.55, 0], [W, 0],
+      [W, H * 0.18], [W, H * 0.40], [W, H * 0.62], [W, H * 0.82], [W, H],
+      [W * 0.45, H], [0, H],
+      [0, H * 0.78], [0, H * 0.56], [0, H * 0.34], [0, H * 0.16],
     ]
     for (let i = 0; i < pts.length; i++) {
-      const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length]
+      const [ax, ay] = pts[i]
+      const [bx, by] = pts[(i + 1) % pts.length]   // wraps -- closes the loop
       const d = `M ${cx} ${cy} L ${ax} ${ay} L ${bx} ${by} Z`
       shapes.push(<Path key={`f${i}`} d={d} fill={q(i)} />)
-      shapes.push(<Path key={`o${i}`} d={d} strokeWidth={dw} stroke={dc} fill="none" />)
+    }
+    for (let i = 0; i < pts.length; i++) {
+      const [ax, ay] = pts[i]
+      shapes.push(
+        <Path key={`o${i}`} d={`M ${cx} ${cy} L ${ax} ${ay}`} strokeWidth={dw * 0.8} stroke={dc} fill="none" />
+      )
     }
   }
 
@@ -177,6 +268,47 @@ function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string
     }
   }
 
+  if (pattern === 'scales') {
+    // Overlapping arcs, painted top-down so each row laps the one above.
+    // Reads as a foil texture rather than as individual shapes at slab size.
+    const cols = 2, r = W / cols * 0.78, stepY = r * 0.85
+    let n = 0
+    for (let row = -1; row * stepY < H + r; row++) {
+      const offset = row % 2 === 0 ? 0 : r
+      for (let col = -1; col <= cols; col++) {
+        const cx = col * (r * 2) + offset
+        const cy = row * stepY
+        shapes.push(
+          <Path
+            key={`sc${row}-${col}`}
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy} Z`}
+            fill={q(n++)}
+            stroke={dc}
+            strokeWidth={dw * 0.5}
+          />
+        )
+      }
+    }
+  }
+
+  if (pattern === 'prism') {
+    // Interlocking triangles alternating off the left and right edges. Each
+    // pair tiles a full step, so there is no gap between them.
+    const n = 8, step = H / n
+    for (let i = -1; i <= n; i++) {
+      const y = i * step
+      shapes.push(
+        <Path key={`p1${i}`} d={`M 0 ${y} L ${W} ${y + step / 2} L 0 ${y + step} Z`} fill={q(i * 2)} />
+      )
+      shapes.push(
+        <Path key={`p2${i}`} d={`M ${W} ${y + step / 2} L ${W} ${y + step * 1.5} L 0 ${y + step} Z`} fill={q(i * 2 + 1)} />
+      )
+      shapes.push(
+        <Path key={`pd${i}`} d={`M 0 ${y} L ${W} ${y + step / 2} L 0 ${y + step}`} strokeWidth={dw * 0.7} stroke={dc} fill="none" />
+      )
+    }
+  }
+
   // Clip so a loosely-generated pattern still lands inside a clean band edge.
   return (
     <Svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0 }}>
@@ -189,6 +321,10 @@ function BandArt({ pattern, colors, id }: { pattern: BandPattern; colors: string
     </Svg>
   )
 }
+
+/** Exported for the band-audit script only. */
+export const __BandArtForAudit = BandArt
+
 
 // ---------------------------------------------------------------------------
 
@@ -213,6 +349,87 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
       >
         {chip.label}
       </Text>
+    </View>
+  )
+}
+
+/**
+ * The bottom-centre mark and whatever is doing the work of making it visible.
+ *
+ * Everything is sized off one box so the treatments are directly comparable —
+ * only the backing changes, never the mark's size or position.
+ */
+function LogoBlock({ i }: { i: HeritageInputs }) {
+  const t = i.logoTreatment ?? 'plain'
+  const dark = i.colorLogoDataUrl
+  const white = i.whiteLogoDataUrl
+  const band = i.bandColors[0] || '#7C3AED'
+
+  const MARK_W = u(190), MARK_H = u(70)
+  const left = (LABEL_W - MARK_W) / 2
+  const bottomPad = u(10)
+  const top = LABEL_H - MARK_H - bottomPad
+
+  const mark = (src: string | null | undefined) =>
+    src ? <Image src={src} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null
+
+  if (t === 'bar') {
+    // Bar spans from the gold rule to the right edge so it reads as part of the
+    // band system rather than a floating block.
+    const barH = u(96)
+    return (
+      <View style={{ position: 'absolute', left: BAND_W + RULE_W, top: LABEL_H - barH, right: 0, height: barH, backgroundColor: band, alignItems: 'center', justifyContent: 'center' }}>
+        {mark(white ?? dark)}
+      </View>
+    )
+  }
+
+  if (t === 'tab') {
+    // A tab hanging off the bottom edge. Squared rather than notched: at 2.8"
+    // an angled notch closes up in print and just looks like a printing fault.
+    const tabW = u(260), tabH = u(86)
+    return (
+      <View style={{ position: 'absolute', left: (LABEL_W - tabW) / 2, top: LABEL_H - tabH, width: tabW, height: tabH, backgroundColor: band, borderTopLeftRadius: u(20), borderTopRightRadius: u(20), alignItems: 'center', justifyContent: 'center' }}>
+        {mark(white ?? dark)}
+      </View>
+    )
+  }
+
+  if (t === 'plate') {
+    const plateW = u(250), plateH = u(88)
+    return (
+      <View style={{ position: 'absolute', left: (LABEL_W - plateW) / 2, top: LABEL_H - plateH - u(6), width: plateW, height: plateH, backgroundColor: INK, borderRadius: u(18), alignItems: 'center', justifyContent: 'center' }}>
+        {mark(white ?? dark)}
+      </View>
+    )
+  }
+
+  if (t === 'medallion') {
+    const d = u(104)
+    return (
+      <View style={{ position: 'absolute', left: (LABEL_W - d) / 2, top: LABEL_H - d - u(4), width: d, height: d, backgroundColor: GOLD, borderRadius: d / 2, alignItems: 'center', justifyContent: 'center' }}>
+        {dark ? <Image src={dark} style={{ width: d * 0.62, height: d * 0.62, objectFit: 'contain' }} /> : null}
+      </View>
+    )
+  }
+
+  if (t === 'rules') {
+    const ruleY = LABEL_H - MARK_H / 2 - bottomPad
+    const gap = u(24)
+    return (
+      <>
+        <View style={{ position: 'absolute', left: BAND_W + RULE_W + u(40), top: ruleY, width: left - (BAND_W + RULE_W) - u(40) - gap, height: 0.6, backgroundColor: GOLD, opacity: 0.75 }} />
+        <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: LABEL_W - (left + MARK_W + gap) - u(40), height: 0.6, backgroundColor: GOLD, opacity: 0.75 }} />
+        <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
+          {mark(dark)}
+        </View>
+      </>
+    )
+  }
+
+  return (
+    <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
+      {mark(dark)}
     </View>
   )
 }
@@ -243,11 +460,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
       </View>
 
       {/* Mark, bottom-centre, hugging the edge */}
-      {i.colorLogoDataUrl ? (
-        <View style={{ position: 'absolute', left: (LABEL_W - u(200)) / 2, top: LABEL_H - u(78) - u(10), width: u(200), height: u(78), alignItems: 'center', justifyContent: 'center' }}>
-          <Image src={i.colorLogoDataUrl} style={{ width: u(200), height: u(78), objectFit: 'contain' }} />
-        </View>
-      ) : null}
+      <LogoBlock i={i} />
     </View>
   )
 }

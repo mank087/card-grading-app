@@ -24,7 +24,7 @@ import {
   resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
-import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/heritageSlabPdfDoc'
+import { BAND_PATTERNS, LOGO_TREATMENTS, type BandPattern, type LogoTreatment } from '@/lib/labelLab/heritageSlabPdfDoc'
 
 // ============================================================================
 // Types
@@ -102,8 +102,15 @@ export default function LabelLabClient() {
   const [angleDeg, setAngleDeg] = useState<number>(135)
   const [geomPattern, setGeomPattern] = useState<number>(0)
   // --- Heritage (Round 3) ---
-  const [heritagePattern, setHeritagePattern] = useState<BandPattern>('mosaic')
+  const [heritagePattern, setHeritagePattern] = useState<BandPattern>('diamond')
   const [heritagePaletteSource, setHeritagePaletteSource] = useState<'card' | 'brand'>('card')
+  // Editable band colours. The source buttons LOAD into this; every swatch is
+  // then independently editable, because a sampled palette is a starting point
+  // rather than an answer — extraction routinely returns two near-identical
+  // darks that need pulling apart by hand.
+  const [heritageColors, setHeritageColors] = useState<string[]>(['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'])
+  const [heritageColorsTouched, setHeritageColorsTouched] = useState(false)
+  const [heritageLogo, setHeritageLogo] = useState<LogoTreatment>('plate')
   const [heritageFounder, setHeritageFounder] = useState(false)
   const [heritageCardLover, setHeritageCardLover] = useState(false)
   const [heritageVip, setHeritageVip] = useState(false)
@@ -201,11 +208,28 @@ export default function LabelLabClient() {
     if (cc.primary) return [cc.primary, cc.secondary || cc.primary]
     return null
   }, [cardColorInput])
-  const heritageBandColors = useMemo<string[]>(() => {
-    if (heritagePaletteSource === 'brand') return HERITAGE_BRAND
-    return cardDerivedColors ?? HERITAGE_BRAND
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heritagePaletteSource, cardDerivedColors])
+  const heritageBandColors = heritageColors
+
+  // Auto-load the card's palette when the selection changes, but never clobber
+  // hand-edited swatches — losing a tuned palette because you clicked the next
+  // card is the kind of thing that makes a design tool annoying to use.
+  useEffect(() => {
+    if (heritageColorsTouched) return
+    if (heritagePaletteSource !== 'card') return
+    if (cardDerivedColors && cardDerivedColors.length >= 2) setHeritageColors(cardDerivedColors)
+  }, [cardDerivedColors, heritagePaletteSource, heritageColorsTouched])
+
+  const loadHeritagePalette = (src: 'card' | 'brand') => {
+    setHeritagePaletteSource(src)
+    setHeritageColorsTouched(false)
+    if (src === 'brand') setHeritageColors(HERITAGE_BRAND)
+    else if (cardDerivedColors && cardDerivedColors.length >= 2) setHeritageColors(cardDerivedColors)
+  }
+
+  const setHeritageColorAt = (i: number, hex: string) => {
+    setHeritageColorsTouched(true)
+    setHeritageColors(prev => prev.map((c, idx) => (idx === i ? hex : c)))
+  }
 
   const activeStyleSpec = useMemo<LabStyleSpec | null>(() => {
     if (styleMode === 'preset') return presetSpec(presetId)
@@ -316,6 +340,8 @@ export default function LabelLabClient() {
               bandColors: heritageBandColors,
               pattern: heritagePattern,
               colorLogoDataUrl,
+              whiteLogoDataUrl,
+              logoTreatment: heritageLogo,
               qrDataUrl,
               showFounder: heritageFounder,
               showCardLover: heritageCardLover,
@@ -374,7 +400,7 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, cardDerivedColors, heritageFounder, heritageCardLover, heritageVip])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageFounder, heritageCardLover, heritageVip])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
@@ -424,7 +450,12 @@ export default function LabelLabClient() {
               pattern={heritagePattern}
               onPattern={setHeritagePattern}
               paletteSource={heritagePaletteSource}
-              onPaletteSource={setHeritagePaletteSource}
+              onLoadPalette={loadHeritagePalette}
+              onColorAt={setHeritageColorAt}
+              touched={heritageColorsTouched}
+              cardPalette={cardDerivedColors}
+              logo={heritageLogo}
+              onLogo={setHeritageLogo}
               bandColors={heritageBandColors}
               hasCardColors={!!cardDerivedColors}
               grade={slabInputs?.grade ?? null}
@@ -675,7 +706,12 @@ function HeritagePanel(props: {
   pattern: BandPattern
   onPattern: (p: BandPattern) => void
   paletteSource: 'card' | 'brand'
-  onPaletteSource: (s: 'card' | 'brand') => void
+  onLoadPalette: (s: 'card' | 'brand') => void
+  onColorAt: (i: number, hex: string) => void
+  touched: boolean
+  cardPalette: string[] | null
+  logo: LogoTreatment
+  onLogo: (t: LogoTreatment) => void
   bandColors: string[]
   hasCardColors: boolean
   grade: string | null
@@ -717,35 +753,105 @@ function HeritagePanel(props: {
         {active ? <p className="text-[11px] text-gray-500 mt-2">{active.note}</p> : null}
       </div>
 
-      {/* Palette */}
+      {/* Palette — loaders, then per-swatch editing */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Band colours</p>
         <div className="flex gap-1.5">
           {(['card', 'brand'] as const).map(s => (
             <button
               key={s}
-              onClick={() => props.onPaletteSource(s)}
+              onClick={() => props.onLoadPalette(s)}
               disabled={s === 'card' && !props.hasCardColors}
               className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium disabled:opacity-40 ${
-                props.paletteSource === s
+                props.paletteSource === s && !props.touched
                   ? 'border-purple-500 bg-purple-50 text-purple-900'
                   : 'border-gray-200 text-gray-700 hover:border-gray-300'
               }`}
             >
-              {s === 'card' ? 'From card' : 'DCM brand'}
+              {s === 'card' ? 'Load from card' : 'Load DCM brand'}
             </button>
           ))}
         </div>
-        <div className="flex gap-1 mt-2">
+
+        {/* Each swatch independently editable. */}
+        <div className="mt-2 space-y-1.5">
           {props.bandColors.map((c, i) => (
-            <div key={i} className="flex-1 h-6 rounded" style={{ background: c }} title={c} />
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-gray-400 w-3">{i + 1}</span>
+              <input
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#7c3aed'}
+                onChange={e => props.onColorAt(i, e.target.value)}
+                className="w-8 h-7 rounded border border-gray-200 cursor-pointer p-0"
+                title={`Band colour ${i + 1}`}
+              />
+              <input
+                type="text"
+                value={c}
+                onChange={e => props.onColorAt(i, e.target.value)}
+                spellCheck={false}
+                className="flex-1 px-2 py-1 rounded border border-gray-200 text-[11px] font-mono uppercase"
+              />
+              <div className="w-10 h-7 rounded border border-gray-200" style={{ background: c }} />
+            </div>
           ))}
         </div>
+
+        {/* Click a card-extracted colour to drop it into the first slot. */}
+        {props.cardPalette && props.cardPalette.length > 0 && (
+          <div className="mt-2.5">
+            <p className="text-[10px] text-gray-500 mb-1">
+              Picked from this card — click to send to slot 1, shift-click for slot 2
+            </p>
+            <div className="flex gap-1 flex-wrap">
+              {props.cardPalette.map((c, i) => (
+                <button
+                  key={i}
+                  onClick={e => props.onColorAt(e.shiftKey ? 1 : 0, c)}
+                  className="w-7 h-7 rounded border border-gray-200 hover:scale-110 transition-transform"
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {!props.hasCardColors && (
           <p className="text-[11px] text-amber-600 mt-1.5">
-            This card has no extracted colours — using the brand palette.
+            This card has no extracted colours — edit the swatches by hand or load the brand palette.
           </p>
         )}
+        {props.touched && (
+          <p className="text-[11px] text-gray-400 mt-1.5">
+            Hand-edited — changing card will no longer reload the palette.
+          </p>
+        )}
+      </div>
+
+      {/* Logo treatment */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+          Logo treatment <span className="normal-case font-normal text-gray-400">— bottom centre</span>
+        </p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {LOGO_TREATMENTS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => props.onLogo(t.id)}
+              className={`text-left px-2.5 py-1.5 rounded-lg border text-xs font-medium ${
+                props.logo === t.id
+                  ? 'border-purple-500 bg-purple-50 text-purple-900'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-500 mt-2">
+          {LOGO_TREATMENTS.find(t => t.id === props.logo)?.note}
+        </p>
       </div>
 
       {/* Grade chip — read-only: it is derived, not chosen */}
