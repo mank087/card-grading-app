@@ -71,12 +71,12 @@ function theme(hardened: boolean) {
   return hardened
     ? {
         field: '#FFFFFF',        // zero ink: no dither, no banding
-        ink: '#000000',          // true black; small grey type goes mushy
-        inkSoft: '#3F3F46',      // was #5A5A5A -- lifted for dot gain
+        ink: '#1F2937',          // TRADITIONAL.textDark — production's white-ground theme
+        inkSoft: '#4B5563',      // TRADITIONAL.textMedium
         rule: '#8A6A14',         // darker gold; thin gold on cream is invisible
         edge: '#141414',         // real keyline, so it reads as a finished object
         edgeWidth: 1,
-        divider: '#9CA3AF',
+        divider: '#7C3AED',      // TRADITIONAL.purplePrimary
       }
     : {
         field: IVORY, ink: INK, inkSoft: INK_SOFT,
@@ -212,8 +212,8 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
  */
 function LogoBlock({ i }: { i: HeritageInputs }) {
   const T = theme(!!i.printHardened)
-  const t = i.logoTreatment ?? 'plate'
-  const MARK_W = u(190), MARK_H = u(70)
+  const t = i.logoTreatment ?? 'rules'
+  const MARK_W = u(215), MARK_H = u(80)
 
   if (t === 'plain' || t === 'rules') {
     const left = (LABEL_W - MARK_W) / 2
@@ -228,7 +228,7 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
       <>
         {t === 'rules' ? (
           <>
-            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: T.rule, opacity: 0.9 }} />
+            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: BRAND_PURPLE, opacity: 1 }} />
             <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(5), backgroundColor: T.rule, opacity: 0.9 }} />
           </>
         ) : null}
@@ -272,8 +272,8 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
         <Text style={{ fontFamily: 'Helvetica', fontSize: u(29), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
           {i.contextLine.toUpperCase()}
         </Text>
-        <View style={{ height: 0.5, backgroundColor: T.divider, marginTop: u(30), width: u(940) }} />
-        <Text style={{ fontFamily: 'Courier', fontSize: u(36), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
+        <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(30), width: u(940) }} />
+        <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(22) }}>
           Serial: {i.serial}
         </Text>
       </View>

@@ -111,7 +111,7 @@ export default function LabelLabClient() {
   // darks that need pulling apart by hand.
   const [heritageColors, setHeritageColors] = useState<string[]>(['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'])
   const [heritageColorsTouched, setHeritageColorsTouched] = useState(false)
-  const [heritageLogo, setHeritageLogo] = useState<LogoTreatment>('plate')
+  const [heritageLogo, setHeritageLogo] = useState<LogoTreatment>('rules')
   const [heritageHardened, setHeritageHardened] = useState(true)
   const [heritageFounder, setHeritageFounder] = useState(false)
   const [heritageCardLover, setHeritageCardLover] = useState(false)

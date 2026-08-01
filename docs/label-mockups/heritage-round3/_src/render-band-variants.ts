@@ -24,8 +24,12 @@ const LOGO_URI = `data:image/png;base64,${fs.readFileSync('public/DCM-logo.png')
 // darkens, because consumer printers are good at dark solids and bad at light
 // tints and light neutrals.
 const IVORY = '#ffffff';
-const INK = '#000000';
-const INK_SOFT = '#3f3f46';
+// Typography and colour matched to the production "Traditional" slab theme
+// (slabLabelPdfDoc TRADITIONAL): it is already tuned for a white ground, and
+// its Helvetica serial reads better at 2.8" than the monospace did.
+const INK = '#1f2937';        // TRADITIONAL.textDark
+const INK_SOFT = '#4b5563';   // TRADITIONAL.textMedium
+const PURPLE = '#7c3aed';     // TRADITIONAL.purplePrimary — divider + rules
 const GOLD = '#8a6a14';
 const KEYLINE = '#141414';
 
@@ -98,7 +102,7 @@ const BRAND_PURPLE = '#7c3aed';
 
 /** Brand-purple rounded plate, white mark. Fitted badge, not a bar. */
 function logoBlock(t: LogoTreatment): string {
-  const mw = 190, mh = 70;
+  const mw = 215, mh = 80;
   if (t === 'plain' || t === 'rules') {
     const left = (W - mw) / 2, top = H - mh - 10;
     const mark = `<image href="${LOGO_URI}" x="${left}" y="${top}" width="${mw}" height="${mh}" preserveAspectRatio="xMidYMid meet"/>`;
@@ -106,8 +110,8 @@ function logoBlock(t: LogoTreatment): string {
     // Short flanking rules. Kept short on purpose — a full-width rule becomes a
     // second horizontal divider and argues with the one above the serial.
     const len = 110, gap = 18, y = top + mh / 2;
-    return `<rect x="${left - gap - len}" y="${y}" width="${len}" height="5" fill="${GOLD}" opacity="0.85"/>
-      <rect x="${left + mw + gap}" y="${y}" width="${len}" height="5" fill="${GOLD}" opacity="0.85"/>
+    return `<rect x="${left - gap - len}" y="${y}" width="${len}" height="5" fill="${PURPLE}" opacity="1"/>
+      <rect x="${left + mw + gap}" y="${y}" width="${len}" height="5" fill="${PURPLE}" opacity="1"/>
       ${mark}`;
   }
   const pw = 172, ph = 64, x = (W - pw) / 2, y = H - ph - 8;
@@ -116,19 +120,19 @@ function logoBlock(t: LogoTreatment): string {
     <image href="${LOGO_WHITE_URI}" x="${(W - iw) / 2}" y="${y + (ph - ih) / 2}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 
-function body(name: string, context: string, serial: string, grade: Grade, logo: LogoTreatment = 'plate'): string {
+function body(name: string, context: string, serial: string, grade: Grade, logo: LogoTreatment = 'rules'): string {
   return `
     <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="bold" fill="${INK}">${name}</text>
     <text x="150" y="198" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="4" fill="${INK_SOFT}">${context}</text>
-    <line x1="150" y1="236" x2="1090" y2="236" stroke="#9ca3af" stroke-width="2"/>
-    <text x="150" y="292" font-family="Courier New, monospace" font-size="36" letter-spacing="4" fill="${INK_SOFT}">Serial: ${serial}</text>
+    <line x1="150" y1="236" x2="1090" y2="236" stroke="${PURPLE}" stroke-width="3"/>
+    <text x="150" y="292" font-family="Arial, Helvetica, sans-serif" font-size="34" letter-spacing="2" fill="${INK_SOFT}">Serial: ${serial}</text>
     ${chip(1130, grade)}
     ${logoBlock(logo)}`;
 }
 
 // Everything the band draws is clipped to the band, so a pattern can be
 // generated loosely and still land inside a clean edge.
-const label = (bandInner: string, rule: string, grade: Grade, name: string, ctx: string, serial: string, logo: LogoTreatment = 'plate') => `
+const label = (bandInner: string, rule: string, grade: Grade, name: string, ctx: string, serial: string, logo: LogoTreatment = 'rules') => `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs><clipPath id="band"><rect x="0" y="0" width="${BAND}" height="${H}"/></clipPath></defs>
   <rect width="${W}" height="${H}" fill="${IVORY}"/>
@@ -229,7 +233,7 @@ async function main() {
 
   // Logo treatments: one label each, everything else held constant so the only
   // variable is how hard the mark works to be seen.
-  const LOGOS: LogoTreatment[] = ['plate', 'rules', 'plain'];
+  const LOGOS: LogoTreatment[] = ['rules', 'plate', 'plain'];
   for (const t of LOGOS) {
     jobs.push([`logo-${t}.png`, label(band('diamond', CARD), GOLD, G9, NAME, CTX, SER, t)]);
   }
@@ -242,7 +246,7 @@ async function main() {
     for (const p of BAND_PATTERNS) {
       jobs.push([
         `p-${pal.id}-${p.id}.png`,
-        label(band(p.id, pal.colors, `g-${pal.id}-${p.id}`), GOLD, G9, NAME, CTX, SER, 'plate'),
+        label(band(p.id, pal.colors, `g-${pal.id}-${p.id}`), GOLD, G9, NAME, CTX, SER, 'rules'),
       ]);
     }
   }
@@ -265,7 +269,7 @@ async function main() {
   };
   for (const g of GRADES) {
     const [n, c, sr] = RAMP_CARDS[g.g];
-    jobs.push([`g-${g.g}.png`, label(band('diamond', BRAND, `gr-${g.g}`), GOLD, g, n, c, sr, 'plate')]);
+    jobs.push([`g-${g.g}.png`, label(band('diamond', BRAND, `gr-${g.g}`), GOLD, g, n, c, sr, 'rules')]);
   }
 
   // Logo styles crossed with a few representative patterns, so the mark can be
