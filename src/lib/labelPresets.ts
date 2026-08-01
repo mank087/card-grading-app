@@ -468,16 +468,50 @@ export const GRADE_CHIP_FALLBACK: GradeChip = {
 };
 
 /**
+ * Print-hardened chips. Same grades, chosen for what a consumer inkjet can
+ * actually reproduce.
+ *
+ * The screen ramp asks ink to imitate metal, and the two grades that matter
+ * most are the two it does worst:
+ *
+ *   - Silver #AFB3B8 is a LIGHT NEUTRAL grey. Neutrals need precisely balanced
+ *     C/M/Y and consumer printers drift, so it lands with a green or magenta
+ *     cast — dirty grey-lavender, not silver.
+ *   - Gold #C8A02C has no metallic behaviour as a flat tint. It prints mustard.
+ *
+ * So 10 and 9 invert: a near-black chip carrying a metallic-TONED numeral. Dark
+ * saturated solids are the easiest thing a consumer printer does, and contrast
+ * implies the metal instead of ink trying to be it. 8 and below are already
+ * saturated mid-to-dark colours that print cleanly, so they are unchanged —
+ * which also keeps the ramp's ordering intact.
+ */
+export const GRADE_CHIPS_PRINT: GradeChip[] = [
+  { grade: 10, label: 'GEM MINT',  fill: '#1A1206', ink: '#E8C25A' },
+  { grade: 9,  label: 'MINT',      fill: '#15171A', ink: '#D8DEE6' },
+  ...GRADE_CHIPS.filter(c => c.grade <= 8),
+];
+
+export const GRADE_CHIP_FALLBACK_PRINT: GradeChip = {
+  grade: 0, label: 'AUTHENTIC', fill: '#1F2937', ink: '#FFFFFF',
+};
+
+/**
  * Resolve the chip for a grade. Accepts the string form the label pipeline
  * carries ('9', '9.5', 'A', '—'). Half grades round to nearest whole, matching
  * the whole-number scale the slab prints.
  */
-export function resolveGradeChip(grade: number | string | null | undefined): GradeChip {
-  if (grade == null) return GRADE_CHIP_FALLBACK;
+export function resolveGradeChip(
+  grade: number | string | null | undefined,
+  /** Use the print-hardened ramp. See GRADE_CHIPS_PRINT for why it differs. */
+  forPrint = false
+): GradeChip {
+  const table = forPrint ? GRADE_CHIPS_PRINT : GRADE_CHIPS;
+  const fallback = forPrint ? GRADE_CHIP_FALLBACK_PRINT : GRADE_CHIP_FALLBACK;
+  if (grade == null) return fallback;
   const n = typeof grade === 'number' ? grade : Number(String(grade).trim());
-  if (!isFinite(n)) return GRADE_CHIP_FALLBACK;
+  if (!isFinite(n)) return fallback;
   const whole = Math.round(n);
-  return GRADE_CHIPS.find(c => c.grade === whole) ?? GRADE_CHIP_FALLBACK;
+  return table.find(c => c.grade === whole) ?? fallback;
 }
 
 export interface FontScalePreset {

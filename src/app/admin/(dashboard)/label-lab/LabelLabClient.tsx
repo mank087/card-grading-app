@@ -21,6 +21,7 @@ import {
   LAYOUT_STYLES,
   GEOMETRIC_PATTERNS,
   GRADE_CHIPS,
+  GRADE_CHIPS_PRINT,
   resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
@@ -111,6 +112,7 @@ export default function LabelLabClient() {
   const [heritageColors, setHeritageColors] = useState<string[]>(['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'])
   const [heritageColorsTouched, setHeritageColorsTouched] = useState(false)
   const [heritageLogo, setHeritageLogo] = useState<LogoTreatment>('plate')
+  const [heritageHardened, setHeritageHardened] = useState(true)
   const [heritageFounder, setHeritageFounder] = useState(false)
   const [heritageCardLover, setHeritageCardLover] = useState(false)
   const [heritageVip, setHeritageVip] = useState(false)
@@ -342,6 +344,7 @@ export default function LabelLabClient() {
               colorLogoDataUrl,
               whiteLogoDataUrl,
               logoTreatment: heritageLogo,
+              printHardened: heritageHardened,
               qrDataUrl,
               showFounder: heritageFounder,
               showCardLover: heritageCardLover,
@@ -400,7 +403,7 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageFounder, heritageCardLover, heritageVip])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageHardened, heritageFounder, heritageCardLover, heritageVip])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
@@ -456,6 +459,8 @@ export default function LabelLabClient() {
               cardPalette={cardDerivedColors}
               logo={heritageLogo}
               onLogo={setHeritageLogo}
+              hardened={heritageHardened}
+              onHardened={setHeritageHardened}
               bandColors={heritageBandColors}
               hasCardColors={!!cardDerivedColors}
               grade={slabInputs?.grade ?? null}
@@ -712,6 +717,8 @@ function HeritagePanel(props: {
   cardPalette: string[] | null
   logo: LogoTreatment
   onLogo: (t: LogoTreatment) => void
+  hardened: boolean
+  onHardened: (v: boolean) => void
   bandColors: string[]
   hasCardColors: boolean
   grade: string | null
@@ -719,7 +726,7 @@ function HeritagePanel(props: {
   cardLover: boolean; onCardLover: (v: boolean) => void
   vip: boolean; onVip: (v: boolean) => void
 }) {
-  const chip = resolveGradeChip(props.grade)
+  const chip = resolveGradeChip(props.grade, props.hardened)
   const active = BAND_PATTERNS.find(p => p.id === props.pattern)
 
   return (
@@ -829,6 +836,20 @@ function HeritagePanel(props: {
         )}
       </div>
 
+      {/* Print hardening */}
+      <div className="rounded-lg border border-gray-200 p-3">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input type="checkbox" checked={props.hardened} onChange={e => props.onHardened(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="text-xs font-semibold text-gray-900">Print-hardened</span>
+            <span className="block text-[11px] text-gray-500 mt-0.5">
+              Paper-white field instead of the ivory tint, gold/silver chips inverted to dark with a
+              metallic-toned numeral, real keyline, punchier type. Turn off to see the screen version.
+            </span>
+          </span>
+        </label>
+      </div>
+
       {/* Logo treatment */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
@@ -872,7 +893,7 @@ function HeritagePanel(props: {
           </div>
         </div>
         <div className="flex gap-0.5 mt-2">
-          {GRADE_CHIPS.map(c => (
+          {(props.hardened ? GRADE_CHIPS_PRINT : GRADE_CHIPS).map(c => (
             <div
               key={c.grade}
               className="flex-1 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold"

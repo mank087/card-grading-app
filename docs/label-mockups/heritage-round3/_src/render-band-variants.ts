@@ -17,10 +17,16 @@ const RULE = 6;               // gold hairline separating band from field
 const OUT = process.argv[2] || '.';
 const LOGO_URI = `data:image/png;base64,${fs.readFileSync('public/DCM-logo.png').toString('base64')}`;
 
-const IVORY = '#faf8f4';
-const INK = '#141414';
-const INK_SOFT = '#5a5a5a';
-const GOLD = '#a67c1b';
+// Print-hardened theme. A 2% ivory tint dithers into speckle on a consumer
+// inkjet and costs ink across the whole label to look like blank paper, so the
+// field is paper white (zero coverage = perfectly flat). Everything structural
+// darkens, because consumer printers are good at dark solids and bad at light
+// tints and light neutrals.
+const IVORY = '#ffffff';
+const INK = '#000000';
+const INK_SOFT = '#3f3f46';
+const GOLD = '#8a6a14';
+const KEYLINE = '#141414';
 
 // Sampled card palette, same set used for the full-bleed custom styles so the
 // two sections compare like for like.
@@ -48,14 +54,14 @@ const PALETTES: { id: string; name: string; colors: string[] }[] = [
 const DIV = `stroke="rgba(0,0,0,0.55)" stroke-width="2" fill="none"`;
 
 interface Grade { g: number; label: string; fill: string; ink: string }
-const G9: Grade  = { g: 9,  label: 'MINT',     fill: '#AFB3B8', ink: '#15171a' };
-const G10: Grade = { g: 10, label: 'GEM MINT', fill: '#C8A02C', ink: '#1a1206' };
+const G9: Grade  = { g: 9,  label: 'MINT',     fill: '#15171A', ink: '#D8DEE6' };
+const G10: Grade = { g: 10, label: 'GEM MINT', fill: '#1A1206', ink: '#E8C25A' };
 
 function chip(x: number, c: Grade): string {
   const big = String(c.g).length > 1;
   return `
     <rect x="${x}" y="64" width="240" height="252" rx="28" fill="${c.fill}"/>
-    <rect x="${x + 6}" y="70" width="228" height="240" rx="24" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="3"/>
+    <rect x="${x + 6}" y="70" width="228" height="240" rx="24" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="3"/>
     <text x="${x + 120}" y="${big ? 236 : 238}" font-family="Arial, Helvetica, sans-serif" font-size="${big ? 150 : 168}" font-weight="bold" fill="${c.ink}" text-anchor="middle">${c.g}</text>
     <text x="${x + 120}" y="292" font-family="Arial, Helvetica, sans-serif" font-size="${c.label.length > 8 ? 26 : 30}" font-weight="bold" letter-spacing="4" fill="${c.ink}" opacity="0.9" text-anchor="middle">${c.label}</text>`;
 }
@@ -95,7 +101,7 @@ function body(name: string, context: string, serial: string, grade: Grade, logo:
   return `
     <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="bold" fill="${INK}">${name}</text>
     <text x="150" y="198" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="4" fill="${INK_SOFT}">${context}</text>
-    <line x1="150" y1="236" x2="1090" y2="236" stroke="#d9d2c4" stroke-width="2"/>
+    <line x1="150" y1="236" x2="1090" y2="236" stroke="#9ca3af" stroke-width="2"/>
     <text x="150" y="292" font-family="Courier New, monospace" font-size="36" letter-spacing="4" fill="${INK_SOFT}">DCM ${serial}</text>
     ${chip(1130, grade)}
     ${logoBlock(logo)}`;
@@ -110,7 +116,7 @@ const label = (bandInner: string, rule: string, grade: Grade, name: string, ctx:
   <g clip-path="url(#band)">${bandInner}</g>
   <rect x="${BAND}" y="0" width="${RULE}" height="${H}" fill="${rule}"/>
   ${body(name, ctx, serial, grade, logo)}
-  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#e5decf" stroke-width="2"/>
+  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="${KEYLINE}" stroke-width="4"/>
 </svg>`;
 
 const pick = (p: string[]) => (i: number) => p[i % p.length];
@@ -156,7 +162,7 @@ function backWithBand(bandInner: string, qrUri: string, grade: string, cond: str
   <g clip-path="url(#bandb)">${bandInner}</g>
   <rect x="${BAND}" y="0" width="${RULE}" height="${H}" fill="${GOLD}"/>
 
-  <rect x="132" y="52" width="296" height="296" fill="#ffffff" stroke="#d9d2c4" stroke-width="2"/>
+  <rect x="132" y="52" width="296" height="296" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
   <image href="${qrUri}" x="140" y="60" width="280" height="280"/>
 
   ${emblem(486, '&#9733;', 'FOUNDER', '#b45309')}
@@ -165,14 +171,13 @@ function backWithBand(bandInner: string, qrUri: string, grade: string, cond: str
 
   <text x="880" y="212" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="bold" fill="${INK}" text-anchor="middle">${grade}</text>
   <text x="880" y="266" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="7" fill="${INK}" text-anchor="middle">${cond}</text>
-  <text x="880" y="332" font-family="Arial, Helvetica, sans-serif" font-size="24" letter-spacing="3" fill="${GOLD}" text-anchor="middle">DCMGRADING.COM/VERIFY</text>
 
   <text x="1330" y="118" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Centering: 9</text>
   <text x="1330" y="182" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Corners: 9</text>
   <text x="1330" y="246" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Edges: 10</text>
   <text x="1330" y="310" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Surface: 10</text>
 
-  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#e5decf" stroke-width="2"/>
+  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="${KEYLINE}" stroke-width="4"/>
 </svg>`;
 }
 

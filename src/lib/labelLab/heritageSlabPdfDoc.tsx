@@ -51,6 +51,38 @@ const EDGE = '#E5DECF'
 /** DCM brand purple — the plate behind the bottom-centre mark. */
 const BRAND_PURPLE = '#7C3AED'
 
+/**
+ * Screen vs print theme.
+ *
+ * The ivory field is roughly a 2% tint. A consumer inkjet cannot lay that down
+ * as a flat film -- it dithers into sparse isolated dots, so instead of smooth
+ * cream you get faint speckle and nozzle banding across 85% of the label, and
+ * you pay ink over the whole surface to get something indistinguishable from
+ * blank paper at arm's length. Printing NOTHING is perfectly flat by
+ * definition, so the hardened theme drops to paper white and lets the stock
+ * carry any warmth.
+ *
+ * The rest follows from the same logic: consumer printers are good at dark
+ * saturated solids and bad at light tints and light neutrals, so contrast goes
+ * up and every light structural element gets darker.
+ */
+function theme(hardened: boolean) {
+  return hardened
+    ? {
+        field: '#FFFFFF',        // zero ink: no dither, no banding
+        ink: '#000000',          // true black; small grey type goes mushy
+        inkSoft: '#3F3F46',      // was #5A5A5A -- lifted for dot gain
+        rule: '#8A6A14',         // darker gold; thin gold on cream is invisible
+        edge: '#141414',         // real keyline, so it reads as a finished object
+        edgeWidth: 1,
+        divider: '#9CA3AF',
+      }
+    : {
+        field: IVORY, ink: INK, inkSoft: INK_SOFT,
+        rule: GOLD, edge: EDGE, edgeWidth: 0.5, divider: '#D9D2C4',
+      }
+}
+
 
 export interface HeritageInputs {
   primaryName: string
@@ -70,6 +102,12 @@ export interface HeritageInputs {
   logoTreatment?: LogoTreatment
   /** QR with the mark knocked into the centre, built by the caller. */
   qrDataUrl?: string | null
+  /**
+   * Print-hardened rendering: paper-white field instead of the ivory tint,
+   * inverted gold/silver chips, a keyline, and punchier type. See the theme
+   * block below for why each one exists.
+   */
+  printHardened?: boolean
   showFounder?: boolean
   showCardLover?: boolean
   showVip?: boolean
@@ -172,6 +210,7 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
  * only the backing changes, never the mark's size or position.
  */
 function LogoBlock({ i }: { i: HeritageInputs }) {
+  const T = theme(!!i.printHardened)
   const t = i.logoTreatment ?? 'plate'
   const MARK_W = u(190), MARK_H = u(70)
 
@@ -188,8 +227,8 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
       <>
         {t === 'rules' ? (
           <>
-            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: GOLD, opacity: 0.85 }} />
-            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(5), backgroundColor: GOLD, opacity: 0.85 }} />
+            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: T.rule, opacity: 0.9 }} />
+            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(5), backgroundColor: T.rule, opacity: 0.9 }} />
           </>
         ) : null}
         <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
@@ -218,21 +257,22 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
 }
 
 function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+  const T = theme(!!i.printHardened)
   return (
-    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: IVORY, position: 'relative', border: `0.5pt solid ${EDGE}` }}>
+    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
         <BandArt pattern={i.pattern} colors={i.bandColors} id="f" />
       </View>
-      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: GOLD }} />
+      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
 
       {/* Text block */}
       <View style={{ position: 'absolute', left: u(150), top: u(56), width: u(920) }}>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(84), color: INK }}>{i.primaryName}</Text>
-        <Text style={{ fontFamily: 'Helvetica', fontSize: u(29), color: INK_SOFT, letterSpacing: u(4), marginTop: u(22) }}>
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(84), color: T.ink }}>{i.primaryName}</Text>
+        <Text style={{ fontFamily: 'Helvetica', fontSize: u(29), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
           {i.contextLine.toUpperCase()}
         </Text>
-        <View style={{ height: 0.5, backgroundColor: '#D9D2C4', marginTop: u(30), width: u(940) }} />
-        <Text style={{ fontFamily: 'Courier', fontSize: u(36), color: INK_SOFT, letterSpacing: u(4), marginTop: u(22) }}>
+        <View style={{ height: 0.5, backgroundColor: T.divider, marginTop: u(30), width: u(940) }} />
+        <Text style={{ fontFamily: 'Courier', fontSize: u(36), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
           DCM {i.serial}
         </Text>
       </View>
@@ -287,19 +327,20 @@ function Emblem({ symbol, word, color, left }: { symbol: string; word: string; c
 }
 
 function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+  const T = theme(!!i.printHardened)
   const sg = i.subgrades
   const row = (label: string, v: number | null) =>
     v == null ? null : (
-      <Text key={label} style={{ fontFamily: 'Helvetica', fontSize: u(30), color: INK_SOFT, textAlign: 'right', marginBottom: u(20) }}>
+      <Text key={label} style={{ fontFamily: 'Helvetica', fontSize: u(30), color: T.inkSoft, textAlign: 'right', marginBottom: u(20) }}>
         {label}: {v}
       </Text>
     )
   return (
-    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: IVORY, position: 'relative', border: `0.5pt solid ${EDGE}` }}>
+    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
         <BandArt pattern={i.pattern} colors={i.bandColors} id="b" />
       </View>
-      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: GOLD }} />
+      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
 
       {/* QR carrying the mark. Caller builds it at error-correction H. */}
       {i.qrDataUrl ? (
@@ -314,14 +355,11 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
 
       {/* Grade + condition, centred. No serial — the QR encodes it. */}
       <View style={{ position: 'absolute', left: u(700), top: u(60), width: u(360), alignItems: 'center' }}>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: INK, lineHeight: 1 }}>
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: T.ink, lineHeight: 1 }}>
           {chip.grade === 0 ? 'A' : chip.grade}
         </Text>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(34), color: INK, letterSpacing: u(7), marginTop: u(14) }}>
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(34), color: T.ink, letterSpacing: u(7), marginTop: u(14) }}>
           {(i.condition || chip.label).toUpperCase()}
-        </Text>
-        <Text style={{ fontFamily: 'Helvetica', fontSize: u(24), color: GOLD, letterSpacing: u(3), marginTop: u(30) }}>
-          DCMGRADING.COM/VERIFY
         </Text>
       </View>
 
@@ -338,14 +376,14 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
 
 export function HeritageSlabPdfDoc(props: { inputs: HeritageInputs; note?: string }) {
   const { inputs, note } = props
-  const chip = resolveGradeChip(inputs.grade)
+  const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
   const patternName = BAND_PATTERNS.find(p => p.id === inputs.pattern)?.name ?? inputs.pattern
 
   return (
     <Document>
       <Page size={[PAGE_W, PAGE_H]} style={{ paddingTop: 40, paddingHorizontal: 40, backgroundColor: '#FFFFFF' }}>
         <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, color: '#141414' }}>
-          Heritage (Round 3) — {patternName} — true size 2.8&quot; x 0.8&quot;
+          Heritage (Round 3) — {patternName}{inputs.printHardened ? ' — PRINT-HARDENED' : ''} — true size 2.8&quot; x 0.8&quot;
         </Text>
         <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: '#6B7280', marginTop: 4 }}>
           Print at 100% / Actual size. &quot;Fit to page&quot; rescales and the measurement will be wrong.
