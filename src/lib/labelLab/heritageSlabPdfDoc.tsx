@@ -27,6 +27,7 @@ import { Document, Page, View, Text, Image, Svg, Path, Rect, Line, G, Defs, Line
 import { resolveGradeChip, type GradeChip } from '@/lib/labelPresets'
 import { bandGeometry, BAND_STROKE_COLOR, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
+import { fitLines } from './textFit'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -73,7 +74,7 @@ function theme(hardened: boolean) {
         field: '#FFFFFF',        // zero ink: no dither, no banding
         ink: '#1F2937',          // TRADITIONAL.textDark — production's white-ground theme
         inkSoft: '#4B5563',      // TRADITIONAL.textMedium
-        rule: '#8A6A14',         // darker gold; thin gold on cream is invisible
+        rule: '#101014',         // black, matching the mark and keyline
         edge: '#141414',         // real keyline, so it reads as a finished object
         edgeWidth: 1,
         divider: '#7C3AED',      // TRADITIONAL.purplePrimary
@@ -202,7 +203,11 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
       style={{
         width: size, height: size * (252 / 240), borderRadius: u(28),
         backgroundColor: chip.fill, alignItems: 'center', justifyContent: 'center',
-        borderWidth: u(3), borderColor: chip.ink === '#FFFFFF' ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.18)',
+        // Grade 10 alone carries a coloured keyline. It is the strongest
+        // signal on the label and it only works while it is scarce — extend it
+        // to 9 and 8 and "outlined" stops meaning Gem Mint.
+        borderWidth: chip.grade === 10 ? u(6) : u(3),
+        borderColor: chip.grade === 10 ? chip.ink : 'rgba(255,255,255,0.28)',
       }}
     >
       <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: chip.ink, lineHeight: 1 }}>
@@ -275,8 +280,15 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
   )
 }
 
+/** Tracking applied to the context line, and therefore part of its fit. */
+const ctxTracking = (size: number) => (size > 24 ? 4 : 2)
+
 function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   const T = theme(!!i.printHardened)
+  // Box runs from the text origin to where the grade chip starts.
+  const BOX = 940
+  const name = fitLines(i.primaryName, BOX, 84, 30, 3)
+  const ctx = fitLines((i.contextLine || '').toUpperCase(), BOX, 29, 14, 3, ctxTracking)
   return (
     <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
@@ -284,14 +296,28 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
       </View>
       <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
 
-      {/* Text block */}
-      <View style={{ position: 'absolute', left: u(150), top: u(56), width: u(920) }}>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(84), color: T.ink }}>{i.primaryName}</Text>
-        <Text style={{ fontFamily: 'Helvetica', fontSize: u(29), color: T.inkSoft, letterSpacing: u(4), marginTop: u(22) }}>
-          {i.contextLine.toUpperCase()}
-        </Text>
-        <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(30), width: u(940) }} />
-        <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(22) }}>
+      {/* Text block — fitted, never truncated. Real card names run to 119
+          characters and set lines to 128; both used to run under the chip. */}
+      <View style={{ position: 'absolute', left: u(150), top: u(50), width: u(940) }}>
+        {name.rows.map((r, ri) => (
+          <Text key={`n${ri}`} style={{ fontFamily: 'Helvetica-Bold', fontSize: u(name.size), color: T.ink, lineHeight: 1.06 }}>
+            {r}
+          </Text>
+        ))}
+        {ctx.rows.map((r, ri) => (
+          <Text
+            key={`c${ri}`}
+            style={{
+              fontFamily: 'Helvetica', fontSize: u(ctx.size), color: T.inkSoft,
+              letterSpacing: u(ctxTracking(ctx.size)), lineHeight: 1.2,
+              marginTop: ri === 0 ? u(Math.max(name.size * 0.28, 18)) : 0,
+            }}
+          >
+            {r}
+          </Text>
+        ))}
+        <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(24), width: u(940) }} />
+        <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(18) }}>
           Serial: {i.serial}
         </Text>
       </View>
