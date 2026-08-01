@@ -20,8 +20,11 @@ import {
   CARD_COLOR_STYLES,
   LAYOUT_STYLES,
   GEOMETRIC_PATTERNS,
+  GRADE_CHIPS,
+  resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
+import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/heritageSlabPdfDoc'
 
 // ============================================================================
 // Types
@@ -48,6 +51,7 @@ interface LabCard {
 }
 
 type LabFormat =
+  | 'heritage'
   | 'calibration'
   | 'custom-style'
   | 'style-gauntlet'
@@ -59,6 +63,7 @@ type LabFormat =
   | 'card-image'
 
 const LAB_FORMATS: { id: LabFormat; label: string; live: boolean; description: string }[] = [
+  { id: 'heritage', label: 'Heritage — Round 3 redesign (front + back)', live: true, description: '2.8" × 0.8" — ivory field, patterned left band, grade-coloured chip, mark bottom-centre. NOT in production: reads GRADE_CHIPS, which the live generators do not yet use.' },
   { id: 'calibration', label: 'Print Calibration Sheet', live: true, description: 'One-page test matrix — raster vs vector A/B, knockout size ladder, tweak strip, halo test, scale ruler. Print at 100%.' },
   { id: 'custom-style', label: 'Custom Style (single label)', live: true, description: 'Any Studio style — presets, card-color styles, custom designer — with a live WCAG legibility verdict.' },
   { id: 'style-gauntlet', label: 'Style Gauntlet (all styles)', live: true, description: 'Every Studio style for the selected card on one sheet, each with its verdict, plus guard tests for the worst failure.' },
@@ -96,6 +101,13 @@ export default function LabelLabClient() {
   const [layoutId, setLayoutId] = useState<string>('color-gradient')
   const [angleDeg, setAngleDeg] = useState<number>(135)
   const [geomPattern, setGeomPattern] = useState<number>(0)
+  // --- Heritage (Round 3) ---
+  const [heritagePattern, setHeritagePattern] = useState<BandPattern>('mosaic')
+  const [heritagePaletteSource, setHeritagePaletteSource] = useState<'card' | 'brand'>('card')
+  const [heritageFounder, setHeritageFounder] = useState(false)
+  const [heritageCardLover, setHeritageCardLover] = useState(false)
+  const [heritageVip, setHeritageVip] = useState(false)
+
   const [borderEnabled, setBorderEnabled] = useState<boolean>(false)
   const [borderColor, setBorderColor] = useState<string>('#7c3aed')
 
@@ -178,6 +190,23 @@ export default function LabelLabClient() {
   }, [selectedCard])
 
   // --- Active custom-style spec + verdict ---
+  // Heritage band palette. Prefers the card's extracted palette so the band
+  // genuinely samples the card; falls back to primary/secondary, then brand.
+  const HERITAGE_BRAND = ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd']
+  const cardDerivedColors = useMemo<string[] | null>(() => {
+    const cc = cardColorInput
+    if (!cc) return null
+    if (cc.palette && cc.palette.length >= 2) return cc.palette.slice(0, 5)
+    if (cc.topEdgeColors && cc.topEdgeColors.length >= 2) return cc.topEdgeColors.slice(0, 5)
+    if (cc.primary) return [cc.primary, cc.secondary || cc.primary]
+    return null
+  }, [cardColorInput])
+  const heritageBandColors = useMemo<string[]>(() => {
+    if (heritagePaletteSource === 'brand') return HERITAGE_BRAND
+    return cardDerivedColors ?? HERITAGE_BRAND
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heritagePaletteSource, cardDerivedColors])
+
   const activeStyleSpec = useMemo<LabStyleSpec | null>(() => {
     if (styleMode === 'preset') return presetSpec(presetId)
     if (styleMode === 'card-style') {
@@ -270,6 +299,32 @@ export default function LabelLabClient() {
             rasterModernDataUrl: rasterModern,
             rasterTraditionalDataUrl: rasterTraditional,
           })
+        } else if (format === 'heritage') {
+          const [{ HeritageSlabPdfDoc }, QRCode] = await Promise.all([
+            import('@/lib/labelLab/heritageSlabPdfDoc'),
+            import('qrcode'),
+          ])
+          // Error-correction H is what allows the mark to punch out the centre
+          // without breaking the scan.
+          const qrDataUrl = await QRCode.toDataURL(
+            `https://dcmgrading.com/verify/${selectedCard.serial}`,
+            { errorCorrectionLevel: 'H', margin: 1, width: 560, color: { dark: '#141414', light: '#ffffff' } }
+          )
+          doc = HeritageSlabPdfDoc({
+            inputs: {
+              ...slabInputs,
+              bandColors: heritageBandColors,
+              pattern: heritagePattern,
+              colorLogoDataUrl,
+              qrDataUrl,
+              showFounder: heritageFounder,
+              showCardLover: heritageCardLover,
+              showVip: heritageVip,
+            },
+            note: heritagePaletteSource === 'card' && !cardDerivedColors
+              ? 'This card has no extracted colours — falling back to the brand palette.'
+              : undefined,
+          })
         } else if (format === 'custom-style') {
           if (!activeStyleSpec) {
             throw new Error('This card has no extracted colors — card-color styles need card_colors. Pick a preset or custom style, or run the color backfill for this card.')
@@ -319,7 +374,7 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, cardDerivedColors, heritageFounder, heritageCardLover, heritageVip])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
@@ -363,6 +418,24 @@ export default function LabelLabClient() {
             selectedCard={selectedCard}
             onSelect={setSelectedCard}
           />
+
+          {format === 'heritage' ? (
+            <HeritagePanel
+              pattern={heritagePattern}
+              onPattern={setHeritagePattern}
+              paletteSource={heritagePaletteSource}
+              onPaletteSource={setHeritagePaletteSource}
+              bandColors={heritageBandColors}
+              hasCardColors={!!cardDerivedColors}
+              grade={slabInputs?.grade ?? null}
+              founder={heritageFounder}
+              onFounder={setHeritageFounder}
+              cardLover={heritageCardLover}
+              onCardLover={setHeritageCardLover}
+              vip={heritageVip}
+              onVip={setHeritageVip}
+            />
+          ) : null}
 
           {format === 'custom-style' ? (
             <StyleDesignerPanel
@@ -597,6 +670,151 @@ function ContrastReportPanel(props: {
 // ============================================================================
 // Custom style designer
 // ============================================================================
+
+function HeritagePanel(props: {
+  pattern: BandPattern
+  onPattern: (p: BandPattern) => void
+  paletteSource: 'card' | 'brand'
+  onPaletteSource: (s: 'card' | 'brand') => void
+  bandColors: string[]
+  hasCardColors: boolean
+  grade: string | null
+  founder: boolean; onFounder: (v: boolean) => void
+  cardLover: boolean; onCardLover: (v: boolean) => void
+  vip: boolean; onVip: (v: boolean) => void
+}) {
+  const chip = resolveGradeChip(props.grade)
+  const active = BAND_PATTERNS.find(p => p.id === props.pattern)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+      <div>
+        <h3 className="font-semibold text-gray-900">Heritage — Round 3</h3>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Lab only. The band pattern and the grade chip are independent, so a busy band can never
+          make the grade unreadable.
+        </p>
+      </div>
+
+      {/* Band pattern */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Band pattern</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {BAND_PATTERNS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => props.onPattern(p.id)}
+              className={`text-left px-2.5 py-1.5 rounded-lg border text-xs font-medium ${
+                props.pattern === p.id
+                  ? 'border-purple-500 bg-purple-50 text-purple-900'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+        {active ? <p className="text-[11px] text-gray-500 mt-2">{active.note}</p> : null}
+      </div>
+
+      {/* Palette */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">Band colours</p>
+        <div className="flex gap-1.5">
+          {(['card', 'brand'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => props.onPaletteSource(s)}
+              disabled={s === 'card' && !props.hasCardColors}
+              className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium disabled:opacity-40 ${
+                props.paletteSource === s
+                  ? 'border-purple-500 bg-purple-50 text-purple-900'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {s === 'card' ? 'From card' : 'DCM brand'}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 mt-2">
+          {props.bandColors.map((c, i) => (
+            <div key={i} className="flex-1 h-6 rounded" style={{ background: c }} title={c} />
+          ))}
+        </div>
+        {!props.hasCardColors && (
+          <p className="text-[11px] text-amber-600 mt-1.5">
+            This card has no extracted colours — using the brand palette.
+          </p>
+        )}
+      </div>
+
+      {/* Grade chip — read-only: it is derived, not chosen */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+          Grade chip <span className="normal-case font-normal text-gray-400">— derived from the grade</span>
+        </p>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-14 h-11 rounded-lg flex flex-col items-center justify-center font-extrabold leading-none"
+            style={{ background: chip.fill, color: chip.ink }}
+          >
+            <span className="text-lg">{chip.grade === 0 ? 'A' : chip.grade}</span>
+          </div>
+          <div className="text-xs text-gray-600">
+            <div className="font-semibold">{chip.label}</div>
+            <div className="font-mono text-[11px] text-gray-400">{chip.fill} / ink {chip.ink}</div>
+          </div>
+        </div>
+        <div className="flex gap-0.5 mt-2">
+          {GRADE_CHIPS.map(c => (
+            <div
+              key={c.grade}
+              className="flex-1 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold"
+              style={{
+                background: c.fill,
+                color: c.ink,
+                outline: c.grade === chip.grade ? '2px solid #111' : 'none',
+                outlineOffset: 1,
+              }}
+              title={`${c.grade} ${c.label} ${c.fill}`}
+            >
+              {c.grade}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Emblems */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+          Back emblems <span className="normal-case font-normal text-gray-400">— rotated 90&deg; CCW</span>
+        </p>
+        <div className="flex gap-1.5">
+          {([
+            ['Founder', props.founder, props.onFounder],
+            ['Card Lover', props.cardLover, props.onCardLover],
+            ['VIP', props.vip, props.onVip],
+          ] as const).map(([label, on, set]) => (
+            <button
+              key={label}
+              onClick={() => set(!on)}
+              className={`flex-1 px-2 py-1.5 rounded-lg border text-xs font-medium ${
+                on ? 'border-purple-500 bg-purple-50 text-purple-900' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-[11px] text-gray-400 border-t border-gray-100 pt-3">
+        Not in production. The live generators still hardcode the grade colour; this reads{' '}
+        <code className="font-mono">GRADE_CHIPS</code> from labelPresets.
+      </p>
+    </div>
+  )
+}
 
 function StyleDesignerPanel(props: {
   styleMode: 'preset' | 'card-style' | 'custom'

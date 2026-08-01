@@ -416,6 +416,70 @@ export function resolveGradeColor(
   return lightTheme ? GRADE_PURPLE : '#ffffff';
 }
 
+// ============================================================================
+// GRADE CHIP RAMP (Aug 2026 — Round 3 label redesign)
+// ============================================================================
+
+/**
+ * Colour of the grade chip, keyed by whole grade.
+ *
+ * Distinct from GRADE_PURPLE / resolveGradeColor above: that governs the grade
+ * DIGIT on the existing labels, where colour is decoration. This governs the
+ * chip the digit sits inside on the Round 3 designs, where colour is
+ * information — a collector should be able to read quality across a case
+ * without focusing on the number.
+ *
+ * 10 / 9 / 8 (gold / silver / blue) are fixed by the client. 7 down to 1 run a
+ * cool-to-warm-to-dark descent chosen so that ADJACENT grades never look alike;
+ * nobody confuses a 10 with a 4, they confuse an 8 with a 7. An earlier pass
+ * had 5 and 4 as amber and orange and they were indistinguishable in print.
+ *
+ * `ink` is functional, not styling. White on gold is roughly 2.4:1 and worse on
+ * silver — both fail WCAG and go muddy on paper — so those two carry dark type
+ * while everything from 8 down carries white. Never hardcode a text colour
+ * against a chip; read it from here.
+ */
+export interface GradeChip {
+  grade: number;
+  /** Short label under the numeral. */
+  label: string;
+  /** Chip background. */
+  fill: string;
+  /** Numeral + label colour, chosen for contrast against `fill`. */
+  ink: string;
+}
+
+export const GRADE_CHIPS: GradeChip[] = [
+  { grade: 10, label: 'GEM MINT',  fill: '#C8A02C', ink: '#1A1206' },
+  { grade: 9,  label: 'MINT',      fill: '#AFB3B8', ink: '#15171A' },
+  { grade: 8,  label: 'NM-MINT',   fill: '#1D4ED8', ink: '#FFFFFF' },
+  { grade: 7,  label: 'NEAR MINT', fill: '#0E7490', ink: '#FFFFFF' },
+  { grade: 6,  label: 'EX-NM',     fill: '#15803D', ink: '#FFFFFF' },
+  { grade: 5,  label: 'EXCELLENT', fill: '#A16207', ink: '#FFFFFF' },
+  { grade: 4,  label: 'VG-EX',     fill: '#EA580C', ink: '#FFFFFF' },
+  { grade: 3,  label: 'VERY GOOD', fill: '#DC2626', ink: '#FFFFFF' },
+  { grade: 2,  label: 'GOOD',      fill: '#7F1D1D', ink: '#FFFFFF' },
+  { grade: 1,  label: 'POOR',      fill: '#3F3F46', ink: '#FFFFFF' },
+];
+
+/** Authentic / altered cards and anything unparseable land here. */
+export const GRADE_CHIP_FALLBACK: GradeChip = {
+  grade: 0, label: 'AUTHENTIC', fill: '#4B5563', ink: '#FFFFFF',
+};
+
+/**
+ * Resolve the chip for a grade. Accepts the string form the label pipeline
+ * carries ('9', '9.5', 'A', '—'). Half grades round to nearest whole, matching
+ * the whole-number scale the slab prints.
+ */
+export function resolveGradeChip(grade: number | string | null | undefined): GradeChip {
+  if (grade == null) return GRADE_CHIP_FALLBACK;
+  const n = typeof grade === 'number' ? grade : Number(String(grade).trim());
+  if (!isFinite(n)) return GRADE_CHIP_FALLBACK;
+  const whole = Math.round(n);
+  return GRADE_CHIPS.find(c => c.grade === whole) ?? GRADE_CHIP_FALLBACK;
+}
+
 export interface FontScalePreset {
   id: string;
   name: string;
