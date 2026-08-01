@@ -26,6 +26,7 @@ import React from 'react'
 import { Document, Page, View, Text, Image, Svg, Path, Rect, Line, G, Defs, LinearGradient, Stop, ClipPath } from '@react-pdf/renderer'
 import { resolveGradeChip, type GradeChip } from '@/lib/labelPresets'
 import { bandGeometry, BAND_STROKE_COLOR, BAND_PATTERNS, type BandPattern } from './bandGeometry'
+import { EMBLEMS } from './emblemShapes'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -301,25 +302,30 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
 const EMBLEM_SLOT = u(56)
 const EMBLEM_TRACK = u(240)   // long enough for the longest word, "CARD LOVER"
 
-function Emblem({ symbol, word, color, left }: { symbol: string; word: string; color: string; left: number }) {
-  // Centre the track on the slot so rotation keeps the word in its column.
+function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
+  const e = EMBLEMS[id]
   const trackLeft = (EMBLEM_SLOT - EMBLEM_TRACK) / 2
+  const glyph = u(46)
   return (
     <View style={{ position: 'absolute', left, top: u(40), width: EMBLEM_SLOT, height: u(320) }}>
-      <Text style={{ fontFamily: 'Helvetica', fontSize: u(46), color, textAlign: 'center', width: EMBLEM_SLOT }}>
-        {symbol}
-      </Text>
+      {/* Drawn, not typed: Helvetica has no star/heart/diamond glyph, so a
+          <Text> renders blank — which is what was happening here. */}
+      <View style={{ width: EMBLEM_SLOT, alignItems: 'center' }}>
+        <Svg width={glyph} height={glyph} viewBox="0 0 100 100">
+          <Path d={e.path} fill={e.color} />
+        </Svg>
+      </View>
       <View
         style={{
-          position: 'absolute', top: u(70), left: trackLeft,
+          position: 'absolute', top: u(74), left: trackLeft,
           width: EMBLEM_TRACK, height: u(34),
           transform: 'rotate(-90deg)',
         }}
       >
-        {/* right-aligned so the word ENDS at the symbol, i.e. tops align once
+        {/* right-aligned so the word ENDS at the mark, i.e. tops align once
             rotated — bottom-aligning leaves the tops ragged across emblems. */}
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(27), color, letterSpacing: u(3), textAlign: 'right' }}>
-          {word}
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(27), color: e.color, letterSpacing: u(3), textAlign: 'right' }}>
+          {e.word}
         </Text>
       </View>
     </View>
@@ -349,9 +355,9 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
         </View>
       ) : null}
 
-      {i.showFounder ? <Emblem symbol="*" word="FOUNDER" color="#B45309" left={u(458)} /> : null}
-      {i.showCardLover ? <Emblem symbol="♥" word="CARD LOVER" color="#BE185D" left={u(532)} /> : null}
-      {i.showVip ? <Emblem symbol="◆" word="VIP" color="#4F46E5" left={u(606)} /> : null}
+      {i.showFounder ? <Emblem id="founder" left={u(458)} /> : null}
+      {i.showCardLover ? <Emblem id="cardLover" left={u(532)} /> : null}
+      {i.showVip ? <Emblem id="vip" left={u(606)} /> : null}
 
       {/* Grade + condition, centred. No serial — the QR encodes it. */}
       <View style={{ position: 'absolute', left: u(700), top: u(60), width: u(360), alignItems: 'center' }}>

@@ -10,6 +10,7 @@ import sharp from 'sharp';
 import * as fs from 'fs';
 import QRCode from 'qrcode';
 import { bandGeometry, BAND_STROKE_COLOR, BAND_PATTERNS, type BandPattern } from '../../../../src/lib/labelLab/bandGeometry';
+import { EMBLEMS } from '../../../../src/lib/labelLab/emblemShapes';
 
 const W = 1400, H = 400;
 const BAND = 90;              // band width, unchanged from Round 1
@@ -167,10 +168,16 @@ const PNAME = 'Mega Sharpedo EX', PCTX = 'PHANTASMAL FLAMES · FULL ART · #127/
 // Identical to the Round 3 back (QR carrying the mark, rotated emblems, centred
 // grade, right-aligned sub-grades) with the flat purple band swapped for a
 // patterned one, so a front and back can be judged as a matched pair.
-function emblem(x: number, symbol: string, word: string, color: string): string {
+function emblem(x: number, id: 'founder' | 'cardLover' | 'vip'): string {
+  const e = EMBLEMS[id];
+  const size = 52;
+  // Drawn as a path, not a text glyph: the mark has to survive whatever font
+  // the renderer has, and @react-pdf's Helvetica has no star/heart/diamond.
+  // Colours are production's hues pulled dark enough to hold on a white field
+  // (production's originals sit on a DARK back label).
   return `
-    <text x="${x}" y="88" font-family="Arial, Helvetica, sans-serif" font-size="46" fill="${color}" text-anchor="middle">${symbol}</text>
-    <text transform="translate(${x + 13} 122) rotate(-90)" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="bold" letter-spacing="3" fill="${color}">${word}</text>`;
+    <g transform="translate(${x - size / 2} 52) scale(${size / 100})"><path d="${e.path}" fill="${e.color}"/></g>
+    <text transform="translate(${x + 13} 126) rotate(-90)" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="bold" letter-spacing="3" fill="${e.color}">${e.word}</text>`;
 }
 
 function backWithBand(bandInner: string, qrUri: string, grade: string, cond: string): string {
@@ -183,9 +190,9 @@ function backWithBand(bandInner: string, qrUri: string, grade: string, cond: str
   <rect x="132" y="52" width="296" height="296" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
   <image href="${qrUri}" x="140" y="60" width="280" height="280"/>
 
-  ${emblem(486, '&#9733;', 'FOUNDER', '#b45309')}
-  ${emblem(560, '&#9829;', 'CARD LOVER', '#be185d')}
-  ${emblem(634, '&#9670;', 'VIP', '#4f46e5')}
+  ${emblem(486, 'founder')}
+  ${emblem(560, 'cardLover')}
+  ${emblem(634, 'vip')}
 
   <text x="880" y="212" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="bold" fill="${INK}" text-anchor="middle">${grade}</text>
   <text x="880" y="266" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="7" fill="${INK}" text-anchor="middle">${cond}</text>
