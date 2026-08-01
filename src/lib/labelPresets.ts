@@ -489,7 +489,12 @@ export const GRADE_CHIP_FALLBACK: GradeChip = {
 export const GRADE_CHIP_BLACK = '#101014';
 
 export const GRADE_CHIPS_PRINT: GradeChip[] = [
-  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_BLACK, ink: '#E8C25A' }, // gold
+  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_BLACK, ink: '#A78BFA' }, // brand purple
+  // 10 is DCM purple rather than gold so the top grade carries the brand.
+  // Not the exact #7C3AED though: on the black chip that measures 3.33:1,
+  // which would make the most important grade the dimmest thing on the ramp.
+  // #A78BFA is the same hue lifted to 6.98:1 — recognisably brand purple and
+  // actually legible at 2.8".
   { grade: 9,  label: 'MINT',      fill: GRADE_CHIP_BLACK, ink: '#D8DEE6' }, // silver
   { grade: 8,  label: 'NM-MINT',   fill: GRADE_CHIP_BLACK, ink: '#60A5FA' }, // blue
   { grade: 7,  label: 'NEAR MINT', fill: GRADE_CHIP_BLACK, ink: '#4ADE80' }, // green

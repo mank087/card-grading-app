@@ -68,7 +68,7 @@ interface Grade { g: number; label: string; fill: string; ink: string }
  */
 const BLACK = '#101014';
 const GRADES: Grade[] = [
-  { g: 10, label: 'GEM MINT',  fill: BLACK, ink: '#E8C25A' },
+  { g: 10, label: 'GEM MINT',  fill: BLACK, ink: '#A78BFA' },  // brand purple, lifted for the black ground
   { g: 9,  label: 'MINT',      fill: BLACK, ink: '#D8DEE6' },
   { g: 8,  label: 'NM-MINT',   fill: BLACK, ink: '#60A5FA' },
   { g: 7,  label: 'NEAR MINT', fill: BLACK, ink: '#4ADE80' },
