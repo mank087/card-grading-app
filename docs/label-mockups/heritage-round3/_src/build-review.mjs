@@ -3,7 +3,7 @@
 // or emailed without the image folder.
 import * as fs from 'fs';
 
-const DIR = 'docs/label-mockups/heritage-round3';
+const DIR = process.argv[2] || 'docs/label-mockups/heritage-round3';
 const b64 = (f) => `data:image/png;base64,${fs.readFileSync(`${DIR}/${f}`).toString('base64')}`;
 const COLORS = JSON.parse(fs.readFileSync(`${DIR}/grade-colors.json`, 'utf8'));
 
@@ -59,7 +59,7 @@ const html = `<!DOCTYPE html>
 <body><div class="wrap">
 
 <p class="eyebrow">Label redesign · Round 3 · For review</p>
-<h1>Round 1, cleaned up &mdash; plus every custom style</h1>
+<h1>Round 1 cleaned up, band variants, and every custom style</h1>
 <p class="lede">Same three front variants as Round 1. Everything below is your Aug 1 list applied:
 logo moved to the bottom centre, grade chip colour-coded by grade, and the back rebuilt around the
 QR. Still exact 2.8&Prime; &times; 0.8&Prime;, 500 DPI, inside the Round 1 print-safe spec.</p>
@@ -93,6 +93,59 @@ ${front('r3-c-pattern.png', 'Front C — Mosaic pattern', 'most decorative', b64
   'Grade 10 &rarr; gold chip. On this variant the gold chip and the gold hairline now agree by design.',
   'Two-digit 10 is set slightly smaller so it occupies the same optical width as a single digit.',
 ])}
+
+<h2>Band variants</h2>
+<p class="lede">The same idea as Front C, generalised: the design lives <strong>only in the left band</strong>
+and the field stays ivory. You get the decoration without paying for it in legibility, because the card
+name never sits on a pattern and needs no halo.</p>
+<p class="lede">The patterns are the same five, but re-cut for a 90&times;400 strip rather than a
+1400&times;400 landscape. A 5&times;2 mosaic or a 7-band 30&deg; stripe set means nothing in a strip that
+narrow, so each is re-proportioned to the aspect it actually has to live in. Divider strokes are thinner
+too &mdash; 2.5px reads as a hairline across a full label and as a fat rule inside a band.</p>
+
+${[
+  ['band-gradient.png',  'Gradient',        'quietest', 'Vertical multi-stop through the sampled palette. The safest of the set and the closest to Round 1 variant A.'],
+  ['band-split.png',     'Split',           'two-colour cards', 'Hard stack, no blend. Built for team or dual-colour cards.'],
+  ['band-mosaic.png',    'Mosaic tiles',    '2 × 9 tiles', 'Flat tiles, no gradients anywhere, so nothing to band on a cheap printer. Closest in spirit to the Round 1 variant C you liked.'],
+  ['band-stripes.png',   'Diagonal stripes','45° across the strip', 'Sheared to 45° rather than 30° — across 90px, a 30° stripe barely leaves the edge it started on.'],
+  ['band-lightning.png', 'Lightning bolt',  'most brand-forward', 'A single zigzag running the height of the band. Works far better here than full-bleed, where it fought the card name.'],
+  ['band-shattered.png', 'Shattered glass', 'busiest', 'Ten shards from a focal point at 45% / 38%. The most detailed, and the one most likely to lose definition at 500 DPI on matte stock.'],
+  ['band-fractured.png', 'Fractured',       'five regions', 'Five stacked regions with angled cuts. Reads as geological strata in a strip, which is a different feel from the full-bleed version.'],
+].map(([f, name, tag, note]) => `
+  <section class="card">
+    <div class="meta"><span class="tag">${tag}</span><span class="dim">${name}</span></div>
+    <img src="${b64(f)}" alt="${name}">
+    <ul><li>${note}</li></ul>
+  </section>`).join('')}
+
+<h3>Same treatments on the brand palette</h3>
+<p class="lede">To show the band carries either source: sampled card colours above, DCM purple here.
+These also run a grade 10, so you can see the gold chip against a purple band.</p>
+${[
+  ['band-gradient-brand.png',  'Gradient — brand'],
+  ['band-mosaic-brand.png',    'Mosaic — brand'],
+  ['band-lightning-brand.png', 'Lightning — brand'],
+].map(([f, name]) => `
+  <section class="card">
+    <div class="meta"><span class="tag">brand palette</span><span class="dim">${name}</span></div>
+    <img src="${b64(f)}" alt="${name}">
+  </section>`).join('')}
+
+<div class="q">
+  <strong>Why I think this is the stronger direction</strong>
+  <ul>
+    <li><strong>Nothing needs a halo.</strong> Every full-bleed custom style needs stroked type to stay
+        readable. Band variants keep the ivory field, so the type is flat black on near-white and the
+        logo can stay navy &mdash; no polarity switching, no per-style special-casing.</li>
+    <li><strong>The pattern survives the shrink better than the type would.</strong> At 2.8&Prime; wide the
+        card name is the thing that has to stay crisp; confining decoration to 6% of the width protects it.</li>
+    <li><strong>One variable to tune, not two.</strong> Band pattern and grade colour are independent, so
+        a customer picking a wild band can never make the grade unreadable.</li>
+    <li><strong>The trade:</strong> far less visual impact at arm's length than a full-bleed Lightning or
+        Mosaic. If the goal is a slab that shouts across a case, the full-bleed set wins; if it is a slab
+        that reads as graded and professional, this does.</li>
+  </ul>
+</div>
 
 <h2>Back</h2>
 <section class="card">
