@@ -485,14 +485,24 @@ export const GRADE_CHIP_FALLBACK: GradeChip = {
  * saturated mid-to-dark colours that print cleanly, so they are unchanged —
  * which also keeps the ramp's ordering intact.
  */
+/** One black for every chip. Colour lives entirely in the numeral. */
+export const GRADE_CHIP_BLACK = '#101014';
+
 export const GRADE_CHIPS_PRINT: GradeChip[] = [
-  { grade: 10, label: 'GEM MINT',  fill: '#1A1206', ink: '#E8C25A' },
-  { grade: 9,  label: 'MINT',      fill: '#15171A', ink: '#D8DEE6' },
-  ...GRADE_CHIPS.filter(c => c.grade <= 8),
+  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_BLACK, ink: '#E8C25A' }, // gold
+  { grade: 9,  label: 'MINT',      fill: GRADE_CHIP_BLACK, ink: '#D8DEE6' }, // silver
+  { grade: 8,  label: 'NM-MINT',   fill: GRADE_CHIP_BLACK, ink: '#60A5FA' }, // blue
+  { grade: 7,  label: 'NEAR MINT', fill: GRADE_CHIP_BLACK, ink: '#4ADE80' }, // green
+  { grade: 6,  label: 'EX-NM',     fill: GRADE_CHIP_BLACK, ink: '#A3E635' }, // lime
+  { grade: 5,  label: 'EXCELLENT', fill: GRADE_CHIP_BLACK, ink: '#FDE047' }, // yellow
+  { grade: 4,  label: 'VG-EX',     fill: GRADE_CHIP_BLACK, ink: '#FBBF24' }, // amber
+  { grade: 3,  label: 'VERY GOOD', fill: GRADE_CHIP_BLACK, ink: '#FB923C' }, // orange
+  { grade: 2,  label: 'GOOD',      fill: GRADE_CHIP_BLACK, ink: '#F87171' }, // salmon
+  { grade: 1,  label: 'POOR',      fill: GRADE_CHIP_BLACK, ink: '#EF4444' }, // red
 ];
 
 export const GRADE_CHIP_FALLBACK_PRINT: GradeChip = {
-  grade: 0, label: 'AUTHENTIC', fill: '#1F2937', ink: '#FFFFFF',
+  grade: 0, label: 'AUTHENTIC', fill: GRADE_CHIP_BLACK, ink: '#E5E7EB',
 };
 
 /**

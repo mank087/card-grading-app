@@ -60,22 +60,24 @@ const DIV = `stroke="rgba(0,0,0,0.55)" stroke-width="2" fill="none"`;
 
 interface Grade { g: number; label: string; fill: string; ink: string }
 /**
- * The print-hardened ramp, mirroring GRADE_CHIPS_PRINT in labelPresets.
- * 10 and 9 are inverted — near-black chip, metallic-toned numeral — because
- * flat ink cannot imitate metal and light neutrals pick up a colour cast.
- * 8 down are already saturated mid-to-dark colours that reproduce cleanly.
+ * Black chip, coloured numeral. Mirrors GRADE_CHIPS_PRINT in labelPresets:
+ * a black solid is the easiest thing a consumer printer does, and a bright
+ * numeral on black holds its hue far better than the same hue as a large flat
+ * fill. Gold, silver, blue, green, then down through lime/yellow/amber/orange
+ * into red at 1.
  */
+const BLACK = '#101014';
 const GRADES: Grade[] = [
-  { g: 10, label: 'GEM MINT',  fill: '#1A1206', ink: '#E8C25A' },
-  { g: 9,  label: 'MINT',      fill: '#15171A', ink: '#D8DEE6' },
-  { g: 8,  label: 'NM-MINT',   fill: '#1D4ED8', ink: '#FFFFFF' },
-  { g: 7,  label: 'NEAR MINT', fill: '#0E7490', ink: '#FFFFFF' },
-  { g: 6,  label: 'EX-NM',     fill: '#15803D', ink: '#FFFFFF' },
-  { g: 5,  label: 'EXCELLENT', fill: '#A16207', ink: '#FFFFFF' },
-  { g: 4,  label: 'VG-EX',     fill: '#EA580C', ink: '#FFFFFF' },
-  { g: 3,  label: 'VERY GOOD', fill: '#DC2626', ink: '#FFFFFF' },
-  { g: 2,  label: 'GOOD',      fill: '#7F1D1D', ink: '#FFFFFF' },
-  { g: 1,  label: 'POOR',      fill: '#3F3F46', ink: '#FFFFFF' },
+  { g: 10, label: 'GEM MINT',  fill: BLACK, ink: '#E8C25A' },
+  { g: 9,  label: 'MINT',      fill: BLACK, ink: '#D8DEE6' },
+  { g: 8,  label: 'NM-MINT',   fill: BLACK, ink: '#60A5FA' },
+  { g: 7,  label: 'NEAR MINT', fill: BLACK, ink: '#4ADE80' },
+  { g: 6,  label: 'EX-NM',     fill: BLACK, ink: '#A3E635' },
+  { g: 5,  label: 'EXCELLENT', fill: BLACK, ink: '#FDE047' },
+  { g: 4,  label: 'VG-EX',     fill: BLACK, ink: '#FBBF24' },
+  { g: 3,  label: 'VERY GOOD', fill: BLACK, ink: '#FB923C' },
+  { g: 2,  label: 'GOOD',      fill: BLACK, ink: '#F87171' },
+  { g: 1,  label: 'POOR',      fill: BLACK, ink: '#EF4444' },
 ];
 const G9  = GRADES.find(g => g.g === 9)!;
 const G10 = GRADES.find(g => g.g === 10)!;
