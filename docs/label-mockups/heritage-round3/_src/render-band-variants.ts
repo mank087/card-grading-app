@@ -30,7 +30,7 @@ const IVORY = '#ffffff';
 const INK = '#1f2937';        // TRADITIONAL.textDark
 const INK_SOFT = '#4b5563';   // TRADITIONAL.textMedium
 const PURPLE = '#7c3aed';     // TRADITIONAL.purplePrimary — divider + rules
-const GOLD = '#8a6a14';
+const GOLD = '#101014';   // band rule, now black to match the mark and keyline
 const KEYLINE = '#141414';
 
 // Sampled card palette, same set used for the full-bleed custom styles so the
@@ -134,14 +134,138 @@ function logoBlock(t: LogoTreatment, color: LogoColor = 'black'): string {
     <image href="${LOGO_WHITE_URI}" x="${(W - iw) / 2}" y="${y + (ph - ih) / 2}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 
+/**
+ * Width of a string at 1em, approximated per character class.
+ *
+ * A flat "0.55em per char" estimate is wrong by 40% on strings that are mostly
+ * capitals or mostly narrow letters, and the names that actually break the
+ * layout are exactly the unusual ones. CJK is treated as full-width.
+ */
+function textWidthEm(t: string): number {
+  let w = 0;
+  for (const ch of t) {
+    if (/[　-鿿＀-￯]/.test(ch)) w += 1.0;   // CJK / full-width
+    else if (/[MW@%]/.test(ch)) w += 0.90;
+    else if (/[mw]/.test(ch)) w += 0.85;
+    else if (/[A-Z0-9#&]/.test(ch)) w += 0.64;
+    else if (/[iljtfrI1.,'’!\[\]()|]/.test(ch)) w += 0.30;
+    else if (ch === ' ') w += 0.28;
+    else w += 0.53;
+  }
+  return w;
+}
+
+/**
+ * Fit text into a box by shrinking, then wrapping. Never truncates: if the
+ * string will not fit at the minimum size on maxLines, it still renders — it
+ * just overflows the ideal box rather than losing information. Card names run
+ * to 119 characters in the real data (an eight-player Leaf Trinity), and a
+ * label that silently drops six of those players is worse than a small one.
+ */
+/**
+ * The whole point of this layout is that nothing is dropped, so prove it:
+ * the wrapped rows must rejoin to the original string with whitespace
+ * collapsed. Fails loudly rather than shipping a label missing a player.
+ */
+function assertLossless(original: string, rows: string[]): void {
+  const norm = (t: string) => t.replace(/\s+/g, ' ').trim();
+  if (norm(rows.join(' ')) !== norm(original)) {
+    throw new Error(
+      `Text wrapping lost characters.\n  in:  ${JSON.stringify(original)}\n  out: ${JSON.stringify(rows.join(' '))}`
+    );
+  }
+}
+
+/**
+ * Rendered width in px, including letter-spacing.
+ *
+ * Leaving tracking out of the measurement is not a rounding error: the context
+ * line is set in caps with 4px tracking, so a 64-character row gains 256px —
+ * a quarter of the available box. That is exactly how the long Japanese set
+ * name ended up running underneath the grade chip.
+ */
+function widthPx(t: string, size: number, tracking: number): number {
+  return textWidthEm(t) * size + Math.max(0, t.length - 1) * tracking
+}
+
+function fitLines(
+  text: string, maxWidthPx: number, maxSize: number, minSize: number, maxLines: number,
+  /** px of letter-spacing applied at render time, or a function of size. */
+  tracking: (size: number) => number = () => 0
+) {
+  // NOTE: \s+, not s+. A dropped backslash here splits on the letter "s",
+  // which silently ate a character out of every name containing one —
+  // "Ted Williams" rendered as "Ted William". Caught by asserting the wrapped
+  // rows rejoin to the original string; see the lossless check below.
+  const words = text.split(/\s+/).filter(Boolean);
+  const wrapAt = (size: number) => {
+    const tr = tracking(size);
+    const rows: string[] = [];
+    let cur = '';
+    for (const word of words) {
+      const next = cur ? cur + ' ' + word : word;
+      if (widthPx(next, size, tr) <= maxWidthPx || !cur) cur = next;
+      else { rows.push(cur); cur = word; }
+    }
+    if (cur) rows.push(cur);
+    return rows;
+  };
+
+  for (let lines = 1; lines <= maxLines; lines++) {
+    for (let size = maxSize; size >= minSize; size -= 1) {
+      const rows = wrapAt(size);
+      // Every row must genuinely fit, including tracking — a single long
+      // unbreakable word can still exceed the box, which is what the floor
+      // below is for.
+      if (rows.length <= lines && rows.every(r => widthPx(r, size, tracking(size)) <= maxWidthPx)) {
+        assertLossless(text, rows);
+        return { size, rows };
+      }
+    }
+  }
+  // Floor: hard-wrap at the minimum size. Overflows rather than dropping text.
+  const rows = wrapAt(minSize);
+  assertLossless(text, rows);
+  return { size: minSize, rows };
+}
+
 function body(name: string, context: string, serial: string, grade: Grade, logo: LogoTreatment = 'rules'): string {
+  const BOX = 940;                       // x 150 -> 1090, where the chip starts
+  const n = fitLines(name, BOX, 84, 30, 3);
+  // The context line is set in caps with tracking, so the fit has to know
+  // about it. 3 lines and a 14px floor because real set names run to 128
+  // characters and nothing may be dropped.
+  const ctxTracking = (size: number) => (size > 24 ? 4 : 2);
+  const c = fitLines(context, BOX, 29, 14, 3, ctxTracking);
+
+  let y = 132 - (n.rows.length - 1) * (n.size * 0.5);
+  if (y < 70) y = 70;
+  const nameRows = n.rows.map((r, i) =>
+    `<text x="150" y="${y + i * n.size * 1.06}" font-family="Arial, Helvetica, sans-serif" font-size="${n.size}" font-weight="bold" fill="${INK}">${esc(r)}</text>`
+  ).join('');
+  const nameBottom = y + (n.rows.length - 1) * n.size * 1.06;
+
+  const cy = nameBottom + Math.max(n.size * 0.72, 46);
+  const ctxRows = c.rows.map((r, i) =>
+    `<text x="150" y="${cy + i * c.size * 1.2}" font-family="Arial, Helvetica, sans-serif" font-size="${c.size}" letter-spacing="${ctxTracking(c.size)}" fill="${INK_SOFT}">${esc(r)}</text>`
+  ).join('');
+  const ctxBottom = cy + (c.rows.length - 1) * c.size * 1.2;
+
+  const dy = Math.min(ctxBottom + 34, 252);
+  const sy = Math.min(dy + 54, 300);
+
   return `
-    <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="bold" fill="${INK}">${name}</text>
-    <text x="150" y="198" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="4" fill="${INK_SOFT}">${context}</text>
-    <line x1="150" y1="236" x2="1090" y2="236" stroke="${PURPLE}" stroke-width="3"/>
-    <text x="150" y="292" font-family="Arial, Helvetica, sans-serif" font-size="34" letter-spacing="2" fill="${INK_SOFT}">Serial: ${serial}</text>
+    ${nameRows}
+    ${ctxRows}
+    <line x1="150" y1="${dy}" x2="1090" y2="${dy}" stroke="${PURPLE}" stroke-width="3"/>
+    <text x="150" y="${sy}" font-family="Arial, Helvetica, sans-serif" font-size="34" letter-spacing="2" fill="${INK_SOFT}">Serial: ${esc(serial)}</text>
     ${chip(1130, grade)}
     ${logoBlock(logo)}`;
+}
+
+/** SVG-safe. Real card names contain & and quotes. */
+function esc(t: string): string {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // Everything the band draws is clipped to the band, so a pattern can be
@@ -284,6 +408,22 @@ async function main() {
   for (const g of GRADES) {
     const [n, c, sr] = RAMP_CARDS[g.g];
     jobs.push([`g-${g.g}.png`, label(band('diamond', BRAND, `gr-${g.g}`), GOLD, g, n, c, sr, 'rules')]);
+  }
+
+  // ── Stress tests ──────────────────────────────────────────────────────────
+  // Real rows from the database, picked as the longest names and context lines
+  // in ~8k graded cards. If the layout survives these it survives everything.
+  const STRESS: Array<[string, string, string, string, number]> = [
+    ['stress-8player', 'Babe Ruth / Ted Williams / Mickey Mantle / Roberto Clemente / Roy Campanella / Willie Mays / Stan Musial / Joe DiMaggio', 'LEAF TRINITY THE GREATEST · #TG-11 · 2025', '396509', 9],
+    ['stress-jp-context', 'Dragonite', 'ADV3-B SKYRIDGE CONQUEROR / JAPANESE EX DRAGON FRONTIERS BLOCK - EXACT ENGLISH SET NAME NOT PRINTED · #038 · 2003', '096181', 8],
+    ['stress-leaf-proof', 'Trey Gregory-Alford', '2023 LEAF PERFECT GAME ALL-AMERICAN METAL AUTO PRE-PRODUCTION PROOF RAINBOW - PURPLE 1/1 · #MA-TGA · 2023', '764522', 9],
+    ['stress-4player', 'Franklin Arias / Jhostynxon Garcia / Payton Tolle / Yophery Rodriguez', "2025 BOWMAN'S BEST BASEBALL · #QA-AGTR · 2025", '125038', 8],
+    ['stress-monsters', 'The Monsters 10th Anniversary Key Visual (Shanghai Version)', 'THE MONSTERS 10TH ANNIVERSARY · #4 · 2025', '710889', 10],
+    ['stress-typical', 'Charizard ex', 'OBSIDIAN FLAMES · SAR · #234/197 · 2023', '773412', 9],
+  ];
+  for (const [id, nm, cx, sr, gr] of STRESS) {
+    const g = GRADES.find(x => x.g === gr)!;
+    jobs.push([`${id}.png`, label(band('diamond', BRAND, `gs-${id}`), GOLD, g, nm, cx, sr, 'rules')]);
   }
 
   // Logo styles crossed with a few representative patterns, so the mark can be

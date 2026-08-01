@@ -64,6 +64,18 @@ const SECTIONS = [
     ],
   },
   {
+    title: 'STRESS TEST — REAL WORST-CASE CARDS',
+    sub: 'The longest names and set lines in ~8,000 graded cards. Nothing is ever truncated: type shrinks, then wraps to up to 3 lines. Names run to 119 characters and set lines to 128 in the real data.',
+    items: [
+      ['119-char name · 8-player Leaf Trinity', 'stress-8player.png'],
+      ['128-char set line · Japanese Pokémon', 'stress-jp-context.png'],
+      ['105-char set line · Leaf proof 1/1', 'stress-leaf-proof.png'],
+      ['4-player Bowman auto', 'stress-4player.png'],
+      ['Long name + parenthetical', 'stress-monsters.png'],
+      ['Typical card, for scale', 'stress-typical.png'],
+    ],
+  },
+  {
     title: 'LOGO STYLES × BAND',
     sub: 'Each mark treatment against a busy band and a quiet one — the mark has to survive both.',
     items: ['diamond', 'mosaic', 'gradient', 'lightning'].flatMap((p) =>
