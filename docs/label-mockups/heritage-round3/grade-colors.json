@@ -1,0 +1,72 @@
+[
+  {
+    "grade": 10,
+    "label": "GEM MINT",
+    "fill": "#C8A02C",
+    "ink": "#1a1206",
+    "note": "gold — locked"
+  },
+  {
+    "grade": 9,
+    "label": "MINT",
+    "fill": "#AFB3B8",
+    "ink": "#15171a",
+    "note": "silver — locked"
+  },
+  {
+    "grade": 8,
+    "label": "NM-MINT",
+    "fill": "#1D4ED8",
+    "ink": "#ffffff",
+    "note": "blue — locked"
+  },
+  {
+    "grade": 7,
+    "label": "NEAR MINT",
+    "fill": "#0E7490",
+    "ink": "#ffffff",
+    "note": "teal — cool, clearly not the 8 blue"
+  },
+  {
+    "grade": 6,
+    "label": "EX-NM",
+    "fill": "#15803D",
+    "ink": "#ffffff",
+    "note": "green — last of the \"good\" band"
+  },
+  {
+    "grade": 5,
+    "label": "EXCELLENT",
+    "fill": "#A16207",
+    "ink": "#ffffff",
+    "note": "dark amber — the turn into warm"
+  },
+  {
+    "grade": 4,
+    "label": "VG-EX",
+    "fill": "#EA580C",
+    "ink": "#ffffff",
+    "note": "bright orange — pulled away from 5"
+  },
+  {
+    "grade": 3,
+    "label": "VERY GOOD",
+    "fill": "#DC2626",
+    "ink": "#ffffff",
+    "note": "true red — separates from the orange above and maroon below"
+  },
+  {
+    "grade": 2,
+    "label": "GOOD",
+    "fill": "#7F1D1D",
+    "ink": "#ffffff",
+    "note": "dark maroon — separated from 3 by lightness, not hue"
+  },
+  {
+    "grade": 1,
+    "label": "POOR",
+    "fill": "#3F3F46",
+    "ink": "#ffffff",
+    "note": "charcoal — deliberately not red, so 1 reads as \"no colour left\" rather than \"very bad 2\""
+  }
+]
