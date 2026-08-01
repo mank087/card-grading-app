@@ -27,6 +27,23 @@ const GOLD = '#a67c1b';
 const CARD = ['#EA580C', '#F59E0B', '#DC2626', '#7C2D12', '#FBBF24'];
 const BRAND = ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'];
 
+/**
+ * Palettes for the preview sheets.
+ *
+ * BRAND is the default every label ships with until a user changes it in Label
+ * Studio; the rest exist to show that the same eleven patterns hold up when the
+ * colours move, which is the thing that actually needs proving before we let
+ * customers pick their own.
+ */
+const PALETTES: { id: string; name: string; colors: string[] }[] = [
+  { id: 'brand',   name: 'DCM brand purple (default)', colors: BRAND },
+  { id: 'ember',   name: 'Ember — sampled from a Charizard', colors: CARD },
+  { id: 'ocean',   name: 'Ocean blue', colors: ['#0284C7', '#0C4A6E', '#38BDF8', '#082F49', '#7DD3FC'] },
+  { id: 'crimson', name: 'Crimson', colors: ['#DC2626', '#7F1D1D', '#F87171', '#450A0A', '#FCA5A5'] },
+  { id: 'forest',  name: 'Forest green', colors: ['#16A34A', '#14532D', '#4ADE80', '#052E16', '#86EFAC'] },
+  { id: 'slate',   name: 'Graphite — the neutral test', colors: ['#475569', '#1E293B', '#94A3B8', '#0F172A', '#CBD5E1'] },
+];
+
 // Dividers scale down with the band: 2.5px at 400 wide would swamp a 90px strip.
 const DIV = `stroke="rgba(0,0,0,0.55)" stroke-width="2" fill="none"`;
 
@@ -185,6 +202,30 @@ async function main() {
   const LOGOS: LogoTreatment[] = ['plate', 'rules', 'plain'];
   for (const t of LOGOS) {
     jobs.push([`logo-${t}.png`, label(band('diamond', CARD), GOLD, G9, NAME, CTX, SER, t)]);
+  }
+
+  // ── Palette sheets ────────────────────────────────────────────────────────
+  // Every pattern in every palette. The brand set is what ships by default;
+  // the others prove the patterns survive a colour change before we hand the
+  // picker to customers.
+  for (const pal of PALETTES) {
+    for (const p of BAND_PATTERNS) {
+      jobs.push([
+        `p-${pal.id}-${p.id}.png`,
+        label(band(p.id, pal.colors, `g-${pal.id}-${p.id}`), GOLD, G9, NAME, CTX, SER, 'plate'),
+      ]);
+    }
+  }
+
+  // Logo styles crossed with a few representative patterns, so the mark can be
+  // judged against a busy band and a quiet one rather than only one of each.
+  for (const p of ['diamond', 'mosaic', 'gradient', 'lightning'] as const) {
+    for (const t of LOGOS) {
+      jobs.push([
+        `lx-${t}-${p}.png`,
+        label(band(p, BRAND, `gx-${t}-${p}`), GOLD, G9, NAME, CTX, SER, t),
+      ]);
+    }
   }
   // Error correction H so the centre mark does not break scanning.
   const qrBuf = await QRCode.toBuffer('https://dcmgrading.com/verify/773412', {
