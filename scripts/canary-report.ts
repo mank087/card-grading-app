@@ -53,7 +53,7 @@ async function pageAll(table: string, select: string, apply: (q: any) => any) {
   try {
     cards = await pageAll(
       'cards',
-      'id, created_at, grading_model, conversational_whole_grade, conversational_condition_label, category, centering_score, corners_score, edges_score, surface_score',
+      'id, created_at, grading_model, conversational_whole_grade, conversational_condition_label, category, conversational_sub_scores',
       (q) => q.gte('created_at', since).not('grading_model', 'is', null)
     );
   } catch (e: any) {
@@ -82,7 +82,10 @@ async function pageAll(table: string, select: string, apply: (q: any) => any) {
   console.log(`CANARY REPORT  --  last ${DAYS}d  --  ${cards.length} attributed grades`);
   console.log('='.repeat(84));
 
-  const sub = (rows: any[], k: string) => rows.map(r => Number(r[k])).filter(n => Number.isFinite(n) && n > 0);
+  // Weighted sub-grades live in conversational_sub_scores as
+  // {centering:{front,back,weighted}, corners:{...}, ...}.
+  const sub = (rows: any[], k: string) =>
+    rows.map(r => Number(r.conversational_sub_scores?.[k]?.weighted)).filter(n => Number.isFinite(n) && n > 0);
 
   const summary: any[] = [];
   for (const [model, rows] of arms) {
@@ -94,10 +97,10 @@ async function pageAll(table: string, select: string, apply: (q: any) => any) {
       meanGrade: mean(grades), medianGrade: median(grades),
       tenRate: grades.length ? (tens / grades.length) * 100 : 0,
       lowRate: grades.length ? (low / grades.length) * 100 : 0,
-      centering: mean(sub(rows, 'centering_score')),
-      corners: mean(sub(rows, 'corners_score')),
-      edges: mean(sub(rows, 'edges_score')),
-      surface: mean(sub(rows, 'surface_score')),
+      centering: mean(sub(rows, 'centering')),
+      corners: mean(sub(rows, 'corners')),
+      edges: mean(sub(rows, 'edges')),
+      surface: mean(sub(rows, 'surface')),
     });
   }
   summary.sort((a, b) => b.n - a.n);
