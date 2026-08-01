@@ -793,6 +793,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         }
 
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'pokemon', {
+          // v9.12: routes this card to baseline or canary model, deterministically.
+          routingKey: cardId,
           userConditionReport: userConditionReport
         });
         conversationalGradingResult = conversationalResult.markdown_report;

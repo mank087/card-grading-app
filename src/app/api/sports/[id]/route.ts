@@ -598,6 +598,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         }
 
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports', {
+          // v9.12: routes this card to baseline or canary model, deterministically.
+          routingKey: cardId,
           userConditionReport: userConditionReport
         });
         conversationalGradingResult = conversationalResult.markdown_report;

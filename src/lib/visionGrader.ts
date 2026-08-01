@@ -29,6 +29,7 @@ import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim } from './zoomInspection';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
+import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
@@ -1694,17 +1695,26 @@ export async function gradeCardConversational(
   backImageUrl: string,
   cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other' = 'sports',
   options?: {
-    model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
+    model?: string;
     temperature?: number;
     max_tokens?: number;
     seed?: number;
     top_p?: number;
     userConditionReport?: ProcessedConditionReport; // Optional user-reported condition hints
     categoryHint?: string; // Owner-selected franchise/sub-category (e.g. "Weiss Schwarz") — identification context for generic card types
+    /**
+     * Stable per-card key (card id, or front image path before the row exists)
+     * that decides baseline vs canary model. Omit it and the card goes to
+     * baseline — see modelRouter for why that is deliberate.
+     */
+    routingKey?: string | null;
   }
 ): Promise<ConversationalGradeResultV3_3> {
   const {
-    model = 'gpt-5.1',  // 🆕 GPT-5.1 - Latest model (November 2025) with improved vision + accuracy
+    // v9.12: the model is now resolved by the canary router rather than
+    // hardcoded. An explicit options.model still wins so the calibration
+    // harness and one-off scripts can pin a model.
+    model = resolveGradingModel(options?.routingKey).model,
     temperature = 0.3,  // 🎯 v8.9: with the real n=3 ensemble, moderate diversity between the
                         // independent completions HELPS — the server-side median absorbs the noise.
                         // (At 0.1 the 3 samples are near-clones and the ensemble degenerates.)
@@ -1714,6 +1724,13 @@ export async function gradeCardConversational(
     userConditionReport = undefined, // Optional user-reported condition hints
     categoryHint = undefined // Owner-selected franchise (identification context, not condition info)
   } = options || {};
+
+  // v9.12 canary: log the routing decision and stamp the card so the finished
+  // grade can be attributed to the model that produced it. Both are
+  // side-effect-free with respect to grading.
+  const modelDecision = resolveGradingModel(options?.routingKey);
+  console.log(`[CONVERSATIONAL] model: ${describeDecision({ ...modelDecision, model })}`);
+  recordGradingModel(options?.routingKey, model);
 
   // Owner-provided franchise context: goes in the per-card USER message (the
   // cached system-prompt prefix is untouched). Identification only — it must
@@ -1749,8 +1766,13 @@ export async function gradeCardConversational(
   // v8.9 STAGE B: regioned zoom inspection runs IN PARALLEL with the main ensemble call
   // (both need only the image URLs), so it adds ~zero wall-clock. Findings merge into the
   // recalc below and can only LOWER scores. A zoom failure never fails the grade.
+  //
+  // v9.12: the zoom passes MUST run on the same model as the ensemble. A card
+  // graded half on one model and half on another is uninterpretable and would
+  // silently corrupt the canary comparison, so `model` is threaded explicitly
+  // rather than letting zoomInspection fall back to its own default.
   const zoomPromise: Promise<ZoomResult> | null =
-    outputFormat === 'json' ? runZoomInspection(frontImageUrl, backImageUrl) : null;
+    outputFormat === 'json' ? runZoomInspection(frontImageUrl, backImageUrl, { model }) : null;
 
   // Retry configuration for transient failures
   const MAX_RETRIES = 3;
@@ -1843,7 +1865,15 @@ Provide detailed analysis as markdown with all required sections.`
     }
 
     const ensembleCallStart = Date.now();
-    const response = await openai.chat.completions.create(apiConfig);
+    // v9.12: strip params the target model rejects. gpt-5.6-* 400s on
+    // temperature/top_p rather than ignoring them, so without this every
+    // canary grade fails outright. `n` and `seed` are preserved, so the
+    // ensemble stays intact.
+    const { config: compatConfig, stripped: strippedParams } = applyModelCompat(apiConfig, model);
+    if (strippedParams.length) {
+      console.log(`[CONVERSATIONAL] ${model}: stripped unsupported params [${strippedParams.join(', ')}]`);
+    }
+    const response = await openai.chat.completions.create(compatConfig);
 
     console.log('[CONVERSATIONAL] Received API response');
 
@@ -2467,7 +2497,7 @@ Provide detailed analysis as markdown with all required sections.`
           // co-hallucinated a "crease" in a Pokemon back's printed swirl streaks
           // (grade 4 on a clean card, 9 on the re-shoot minutes later).
           const zoomFoundNoStructural = !!(zoom?.ok && zoom.structuralFindings.length === 0);
-          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural });
+          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model });
           structuralVerified = verdict.confirmed;
           structuralVerifyReason = verdict.reason;
 

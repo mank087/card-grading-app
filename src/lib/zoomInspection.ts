@@ -21,6 +21,7 @@ import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
+import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 
 export interface ZoomDefect {
   region: string;
@@ -109,6 +110,8 @@ export async function verifyStructuralClaim(
      *  findings, its magnified read is counter-evidence — a holistic-only crease
      *  claim then needs UNANIMOUS verifier confirmation, not a majority. */
     requireUnanimous?: boolean;
+    /** v9.12: must match the model grading the rest of this card. */
+    model?: string;
   }
 ): Promise<{ ok: boolean; confirmed: boolean; reason: string; strongEvidence: boolean }> {
   try {
@@ -204,18 +207,20 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const verifyStart = Date.now();
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5.1',
+    const verifyModel = opts?.model || BASELINE_MODEL;
+    const { config: verifyConfig } = applyModelCompat({
+      model: verifyModel,
       temperature: 0,
       seed: 7,
       n: 3,
       max_completion_tokens: 1200,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content }],
-    }, { timeout: 60_000 });
+    }, verifyModel);
+    const response = await openai.chat.completions.create(verifyConfig as any, { timeout: 60_000 });
     logOpenAIUsage({
       operation: 'zoom_structural_verify',
-      model: 'gpt-5.1',
+      model: verifyModel,
       usage: (response as any).usage,
       durationMs: Date.now() - verifyStart,
       metadata: { n: 3 },
@@ -681,8 +686,8 @@ export async function runZoomInspection(
     const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
     try {
       const gateStart = Date.now();
-      const fillRes = await openaiGate.chat.completions.create({
-        model: options?.model || 'gpt-5.1',
+      const { config: gateConfig } = applyModelCompat({
+        model: options?.model || BASELINE_MODEL,
         temperature: 0,
         max_completion_tokens: 400,
         response_format: { type: 'json_object' },
@@ -702,10 +707,11 @@ export async function runZoomInspection(
             ] as any,
           },
         ],
-      }, { timeout: 45_000 });
+      }, options?.model || BASELINE_MODEL);
+      const fillRes = await openaiGate.chat.completions.create(gateConfig as any, { timeout: 45_000 });
       logOpenAIUsage({
         operation: 'zoom_geometry_gate',
-        model: options?.model || 'gpt-5.1',
+        model: options?.model || BASELINE_MODEL,
         usage: (fillRes as any).usage,
         durationMs: Date.now() - gateStart,
       });
@@ -777,8 +783,8 @@ export async function runZoomInspection(
       }
       content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });
       const batchStart = Date.now();
-      const response = await openai.chat.completions.create({
-        model: options?.model || 'gpt-5.1',
+      const { config: batchConfig } = applyModelCompat({
+        model: options?.model || BASELINE_MODEL,
         temperature: 0.1,
         seed: 7,
         n: 5,
@@ -788,10 +794,11 @@ export async function runZoomInspection(
           { role: 'system', content: ZOOM_SYSTEM_PROMPT },
           { role: 'user', content },
         ],
-      }, { timeout: 90_000 });
+      }, options?.model || BASELINE_MODEL);
+      const response = await openai.chat.completions.create(batchConfig as any, { timeout: 90_000 });
       logOpenAIUsage({
         operation: 'zoom_batch',
-        model: options?.model || 'gpt-5.1',
+        model: options?.model || BASELINE_MODEL,
         usage: (response as any).usage,
         durationMs: Date.now() - batchStart,
         metadata: { n: 5, regions: batch.length },

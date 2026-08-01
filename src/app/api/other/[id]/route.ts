@@ -505,6 +505,8 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         }
 
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'other', {
+          // v9.12: routes this card to baseline or canary model, deterministically.
+          routingKey: cardId,
           userConditionReport: userConditionReport,
           // The owner told us the franchise at upload — the model was previously
           // identifying every "Other" card completely blind

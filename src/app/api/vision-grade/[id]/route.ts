@@ -474,6 +474,8 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
         );
         console.log(`[CONVERSATIONAL AI] cardType=${engineCardType} (category=${card.category}), conditionReport=${userConditionReport ? 'present' : 'none'}`);
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, engineCardType as any, {
+          // v9.12: routes this card to baseline or canary model, deterministically.
+          routingKey: cardId,
           userConditionReport,
         });
         conversationalGradingResult = conversationalResult.markdown_report;
