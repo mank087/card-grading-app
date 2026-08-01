@@ -8,6 +8,7 @@
 // narrow, so each is re-proportioned to the aspect it actually has to live in.
 import sharp from 'sharp';
 import * as fs from 'fs';
+import QRCode from 'qrcode';
 
 const W = 1400, H = 400;
 const BAND = 90;              // band width, unchanged from Round 1
@@ -160,6 +161,43 @@ function bandSplit(p: string[]): string {
 const NAME = 'Charizard ex', CTX = 'OBSIDIAN FLAMES · SAR · #234/197 · 2023', SER = '773412';
 const PNAME = 'Mega Sharpedo EX', PCTX = 'PHANTASMAL FLAMES · FULL ART · #127/094 · 2025', PSER = '580976';
 
+// ── Back, with the same band treatment ──────────────────────────────────────
+// Identical to the Round 3 back (QR carrying the mark, rotated emblems, centred
+// grade, right-aligned sub-grades) with the flat purple band swapped for a
+// patterned one, so a front and back can be judged as a matched pair.
+function emblem(x: number, symbol: string, word: string, color: string): string {
+  return `
+    <text x="${x}" y="88" font-family="Arial, Helvetica, sans-serif" font-size="46" fill="${color}" text-anchor="middle">${symbol}</text>
+    <text transform="translate(${x + 13} 122) rotate(-90)" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="bold" letter-spacing="3" fill="${color}">${word}</text>`;
+}
+
+function backWithBand(bandInner: string, qrUri: string, grade: string, cond: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs><clipPath id="bandb"><rect x="0" y="0" width="${BAND}" height="${H}"/></clipPath></defs>
+  <rect width="${W}" height="${H}" fill="${IVORY}"/>
+  <g clip-path="url(#bandb)">${bandInner}</g>
+  <rect x="${BAND}" y="0" width="${RULE}" height="${H}" fill="${GOLD}"/>
+
+  <rect x="132" y="52" width="296" height="296" fill="#ffffff" stroke="#d9d2c4" stroke-width="2"/>
+  <image href="${qrUri}" x="140" y="60" width="280" height="280"/>
+
+  ${emblem(486, '&#9733;', 'FOUNDER', '#b45309')}
+  ${emblem(560, '&#9829;', 'CARD LOVER', '#be185d')}
+  ${emblem(634, '&#9670;', 'VIP', '#4f46e5')}
+
+  <text x="880" y="212" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="bold" fill="${INK}" text-anchor="middle">${grade}</text>
+  <text x="880" y="266" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="7" fill="${INK}" text-anchor="middle">${cond}</text>
+  <text x="880" y="332" font-family="Arial, Helvetica, sans-serif" font-size="24" letter-spacing="3" fill="${GOLD}" text-anchor="middle">DCMGRADING.COM/VERIFY</text>
+
+  <text x="1330" y="118" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Centering: 9</text>
+  <text x="1330" y="182" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Corners: 9</text>
+  <text x="1330" y="246" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Edges: 10</text>
+  <text x="1330" y="310" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="${INK_SOFT}" text-anchor="end">Surface: 10</text>
+
+  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#e5decf" stroke-width="2"/>
+</svg>`;
+}
+
 async function main() {
   const jobs: Array<[string, string]> = [
     ['band-mosaic.png',     label(bandMosaic(CARD),          GOLD, G9,  NAME, CTX, SER)],
@@ -174,6 +212,26 @@ async function main() {
     ['band-lightning-brand.png', label(bandLightning(BRAND),      GOLD, G10, PNAME, PCTX, PSER)],
     ['band-gradient-brand.png',  label(bandGradient(BRAND, 'gb'), GOLD, G10, PNAME, PCTX, PSER)],
   ];
+  // Error correction H so the centre mark does not break scanning.
+  const qrBuf = await QRCode.toBuffer('https://dcmgrading.com/verify/773412', {
+    errorCorrectionLevel: 'H', margin: 1, width: 560, color: { dark: '#141414', light: '#ffffff' },
+  });
+  const mark = await sharp('public/DCM-logo.png').resize(132, 132, { fit: 'inside' }).png().toBuffer();
+  const plate = await sharp({ create: { width: 168, height: 168, channels: 4, background: '#ffffff' } })
+    .composite([{ input: mark, gravity: 'centre' }]).png().toBuffer();
+  const qrUri = `data:image/png;base64,${(await sharp(qrBuf).composite([{ input: plate, gravity: 'centre' }]).png().toBuffer()).toString('base64')}`;
+
+  const backs: Array<[string, string]> = [
+    ['back-band-gradient.png',  bandGradient(CARD, 'bg1')],
+    ['back-band-split.png',     bandSplit(CARD)],
+    ['back-band-mosaic.png',    bandMosaic(CARD)],
+    ['back-band-stripes.png',   bandStripes(CARD)],
+    ['back-band-lightning.png', bandLightning(CARD)],
+    ['back-band-shattered.png', bandShattered(CARD)],
+    ['back-band-fractured.png', bandFractured(CARD)],
+  ];
+  for (const [f, band] of backs) jobs.push([f, backWithBand(band, qrUri, '9', 'MINT')]);
+
   for (const [f, s] of jobs) {
     await sharp(Buffer.from(s)).png().toFile(`${OUT}/${f}`);
     console.log('rendered', f);

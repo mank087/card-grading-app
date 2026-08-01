@@ -161,6 +161,24 @@ ${[
   </ul>
 </section>
 
+<h3>Backs with the same bands</h3>
+<p class="lede">Each back carries the band treatment of its front, so a slab can be judged as a matched
+pair rather than two unrelated faces. Everything else is the Round 3 back unchanged &mdash; QR with the
+mark, rotated emblems, centred grade, right-aligned sub-grades.</p>
+${[
+  ['back-band-gradient.png',  'Gradient'],
+  ['back-band-split.png',     'Split'],
+  ['back-band-mosaic.png',    'Mosaic tiles'],
+  ['back-band-stripes.png',   'Diagonal stripes'],
+  ['back-band-lightning.png', 'Lightning bolt'],
+  ['back-band-shattered.png', 'Shattered glass'],
+  ['back-band-fractured.png', 'Fractured'],
+].map(([f, name]) => `
+  <section class="card">
+    <div class="meta"><span class="tag">back</span><span class="dim">${name}</span></div>
+    <img src="${b64(f)}" alt="Back — ${name}">
+  </section>`).join('')}
+
 <h2>Grade colour ramp</h2>
 <p class="lede">10, 9 and 8 are yours. 7 through 1 are my suggestion. The ordering principle is that
 <strong>adjacent grades must never look alike</strong> &mdash; nobody confuses a 10 with a 4, they confuse
