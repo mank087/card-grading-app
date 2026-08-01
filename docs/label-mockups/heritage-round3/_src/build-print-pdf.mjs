@@ -70,23 +70,25 @@ const SECTIONS = [
       LOGOS.map(([t, label]) => [`${label} · ${p}`, `lx-${t}-${p}.png`])
     ),
   },
-  ...PALETTES.filter(([id]) => id !== 'brand').map(([id, name, note]) => ({
-    title: `PALETTE — ${name.toUpperCase()}`,
-    sub: note || 'Same eleven patterns, different colours.',
-    items: PATTERNS.map(([pid, pname]) => [pname, `p-${id}-${pid}.png`]),
-  })),
+  // Brand backs sit immediately after the brand fronts so the default pair can
+  // be judged together; every other palette then gets fronts-then-backs.
   {
-    title: 'BACKS',
-    sub: 'One per band treatment, so a slab can be judged as a matched pair.',
-    items: [
-      ['Diamond mosaic', 'back-band-diamond.png'], ['Mosaic tiles', 'back-band-mosaic.png'],
-      ['Gradient', 'back-band-gradient.png'], ['Split', 'back-band-split.png'],
-      ['Diagonal stripes', 'back-band-stripes.png'], ['Chevron', 'back-band-chevron.png'],
-      ['Lightning bolt', 'back-band-lightning.png'], ['Shattered glass', 'back-band-shattered.png'],
-      ['Fractured', 'back-band-fractured.png'], ['Scales', 'back-band-scales.png'],
-      ['Prism', 'back-band-prism.png'],
-    ],
+    title: 'DEFAULT BACKS — DCM BRAND PURPLE',
+    sub: 'The matching back for each front on page 1. Same band, same palette — a slab is a pair, not two unrelated faces.',
+    items: PATTERNS.map(([id, name]) => [name, `pb-brand-${id}.png`]),
   },
+  ...PALETTES.filter(([id]) => id !== 'brand').flatMap(([id, name, note]) => [
+    {
+      title: `PALETTE — ${name.toUpperCase()} · FRONTS`,
+      sub: note || 'Same eleven patterns, different colours.',
+      items: PATTERNS.map(([pid, pname]) => [pname, `p-${id}-${pid}.png`]),
+    },
+    {
+      title: `PALETTE — ${name.toUpperCase()} · BACKS`,
+      sub: 'The matching back for each front on the previous page.',
+      items: PATTERNS.map(([pid, pname]) => [pname, `pb-${id}-${pid}.png`]),
+    },
+  ]),
   {
     title: 'FULL-BLEED CUSTOM STYLES (existing product)',
     sub: 'For contrast: the current Label Studio styles, where the pattern covers the whole label.',

@@ -302,6 +302,17 @@ async function main() {
   ];
   for (const [f, band] of backs) jobs.push([f, backWithBand(band, qrUri, '9', 'MINT')]);
 
+  // Matching backs for every palette, so each front on the palette sheets has
+  // the back it would actually ship with rather than one in a different colour.
+  for (const pal of PALETTES) {
+    for (const p of BAND_PATTERNS) {
+      jobs.push([
+        `pb-${pal.id}-${p.id}.png`,
+        backWithBand(band(p.id, pal.colors, `gb-${pal.id}-${p.id}`), qrUri, '9', 'MINT'),
+      ]);
+    }
+  }
+
   for (const [f, s] of jobs) {
     await sharp(Buffer.from(s)).png().toFile(`${OUT}/${f}`);
     console.log('rendered', f);
