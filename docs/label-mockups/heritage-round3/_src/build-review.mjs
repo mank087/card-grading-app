@@ -167,12 +167,12 @@ ${[
 </section>
 
 <h2>Logo treatment</h2>
-<p class="lede">Settled: a <strong>brand-purple rounded plate carrying the white mark</strong>, sized as a
-fitted badge rather than a bar. The other five treatments are gone. Plain is kept only as a reference for
-what it replaces.</p>
+<p class="lede">Two options now. The other four treatments are gone. Plain is kept only as a reference for what
+both replace.</p>
 ${[
-  ['logo-plate.png', 'Purple plate', 'chosen', 'Brand purple #7C3AED with the white mark, 172&times;64 mockup-px and the mark filling 80% of the plate width. Flat colour, no gradient and no spot ink, so it prints identically every time.'],
-  ['logo-plain.png', 'Plain', 'reference only', 'The bare navy mark this replaces. At 2.8&Prime; it reads as a smudge from arm&rsquo;s length, which is what prompted the change.'],
+  ['logo-plate.png', 'Purple plate', 'option A', 'Brand purple #7C3AED with the white mark, 172&times;64 mockup-px and the mark filling 80% of the plate width. Flat colour, no gradient and no spot ink, so it prints identically every time.'],
+  ['logo-rules.png', 'Colour mark + rules', 'option B', 'The navy mark with a short gold rule either side. Rules kept short on purpose &mdash; run them to the edges and they become a second horizontal divider arguing with the one above the serial. Almost no extra ink, and it anchors the mark without committing the design to a shape.'],
+  ['logo-plain.png', 'Plain', 'reference only', 'The bare navy mark both options replace. At 2.8&Prime; it reads as a smudge from arm&rsquo;s length, which is what prompted the change.'],
 ].map(([f, name, tag, note]) => `
   <section class="card">
     <div class="meta"><span class="tag">${tag}</span><span class="dim">${name}</span></div>

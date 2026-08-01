@@ -45,7 +45,7 @@ function chip(x: number, c: Grade): string {
 
 const LOGO_WHITE_URI = `data:image/png;base64,${fs.readFileSync('public/DCM Logo white.png').toString('base64')}`;
 
-export type LogoTreatment = 'plate' | 'plain';
+export type LogoTreatment = 'plate' | 'rules' | 'plain';
 
 /**
  * The bottom-centre mark plus whatever makes it visible. A bare navy mark on
@@ -57,8 +57,16 @@ const BRAND_PURPLE = '#7c3aed';
 /** Brand-purple rounded plate, white mark. Fitted badge, not a bar. */
 function logoBlock(t: LogoTreatment): string {
   const mw = 190, mh = 70;
-  if (t === 'plain') {
-    return `<image href="${LOGO_URI}" x="${(W - mw) / 2}" y="${H - mh - 10}" width="${mw}" height="${mh}" preserveAspectRatio="xMidYMid meet"/>`;
+  if (t === 'plain' || t === 'rules') {
+    const left = (W - mw) / 2, top = H - mh - 10;
+    const mark = `<image href="${LOGO_URI}" x="${left}" y="${top}" width="${mw}" height="${mh}" preserveAspectRatio="xMidYMid meet"/>`;
+    if (t === 'plain') return mark;
+    // Short flanking rules. Kept short on purpose — a full-width rule becomes a
+    // second horizontal divider and argues with the one above the serial.
+    const len = 110, gap = 18, y = top + mh / 2;
+    return `<rect x="${left - gap - len}" y="${y}" width="${len}" height="5" fill="${GOLD}" opacity="0.85"/>
+      <rect x="${left + mw + gap}" y="${y}" width="${len}" height="5" fill="${GOLD}" opacity="0.85"/>
+      ${mark}`;
   }
   const pw = 172, ph = 64, x = (W - pw) / 2, y = H - ph - 8;
   const iw = pw * 0.80, ih = ph * 0.74;
@@ -174,7 +182,7 @@ async function main() {
 
   // Logo treatments: one label each, everything else held constant so the only
   // variable is how hard the mark works to be seen.
-  const LOGOS: LogoTreatment[] = ['plate', 'plain'];
+  const LOGOS: LogoTreatment[] = ['plate', 'rules', 'plain'];
   for (const t of LOGOS) {
     jobs.push([`logo-${t}.png`, label(band('diamond', CARD), GOLD, G9, NAME, CTX, SER, t)]);
   }

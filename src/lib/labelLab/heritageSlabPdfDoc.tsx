@@ -85,10 +85,11 @@ const pickFrom = (p: string[]) => (i: number) => p[i % p.length] || '#7C3AED'
  * moving it to the bottom centre in the first place. Each treatment below buys
  * presence a different way, and they cost different amounts of ink.
  */
-export type LogoTreatment = 'plate' | 'plain'
+export type LogoTreatment = 'plate' | 'rules' | 'plain'
 
 export const LOGO_TREATMENTS: { id: LogoTreatment; name: string; note: string }[] = [
-  { id: 'plate', name: 'Purple plate', note: 'White mark knocked out of a brand-purple rounded plate. The chosen treatment.' },
+  { id: 'plate', name: 'Purple plate', note: 'White mark knocked out of a brand-purple rounded plate.' },
+  { id: 'rules', name: 'Colour mark + rules', note: 'The navy mark with a short horizontal rule either side. Almost no extra ink, and it anchors the mark without committing the design to a shape.' },
   { id: 'plain', name: 'Plain (reference)', note: 'Bare navy mark on ivory, kept only for comparison.' },
 ]
 
@@ -174,11 +175,27 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
   const t = i.logoTreatment ?? 'plate'
   const MARK_W = u(190), MARK_H = u(70)
 
-  if (t === 'plain') {
+  if (t === 'plain' || t === 'rules') {
+    const left = (LABEL_W - MARK_W) / 2
+    const top = LABEL_H - MARK_H - u(10)
+    // Short rules flanking the mark. Deliberately SHORT rather than running to
+    // the edges: a full-width rule turns into a second horizontal divider and
+    // starts arguing with the one above the serial.
+    const ruleLen = u(110)
+    const gap = u(18)
+    const ruleY = top + MARK_H / 2
     return (
-      <View style={{ position: 'absolute', left: (LABEL_W - MARK_W) / 2, top: LABEL_H - MARK_H - u(10), width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
-        {i.colorLogoDataUrl ? <Image src={i.colorLogoDataUrl} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null}
-      </View>
+      <>
+        {t === 'rules' ? (
+          <>
+            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(5), backgroundColor: GOLD, opacity: 0.85 }} />
+            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(5), backgroundColor: GOLD, opacity: 0.85 }} />
+          </>
+        ) : null}
+        <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
+          {i.colorLogoDataUrl ? <Image src={i.colorLogoDataUrl} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null}
+        </View>
+      </>
     )
   }
 

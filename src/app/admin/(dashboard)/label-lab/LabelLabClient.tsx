@@ -834,7 +834,7 @@ function HeritagePanel(props: {
         <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
           Logo treatment <span className="normal-case font-normal text-gray-400">— bottom centre</span>
         </p>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {LOGO_TREATMENTS.map(t => (
             <button
               key={t.id}

@@ -32,7 +32,8 @@ const LABELS = [
   ['Back · Round 3', 'r3-back.png'],
 
   ['— Logo treatments (diamond band, grade 9) —', null],
-  ['Logo · Purple plate (chosen)', 'logo-plate.png'],
+  ['Logo · A — Purple plate', 'logo-plate.png'],
+  ['Logo · B — Colour mark + rules', 'logo-rules.png'],
   ['Logo · Plain (reference)', 'logo-plain.png'],
 
   ['— Band fronts (card palette) —', null],
