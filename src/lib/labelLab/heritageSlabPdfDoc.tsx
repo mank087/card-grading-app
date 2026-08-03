@@ -310,11 +310,10 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
       style={{
         width: size, height: size * (252 / 240), borderRadius: u(28),
         backgroundColor: chip.fill, alignItems: 'center', justifyContent: 'center',
-        // Grade 10 alone carries a coloured keyline. It is the strongest
-        // signal on the label and it only works while it is scarce — extend it
-        // to 9 and 8 and "outlined" stops meaning Gem Mint.
-        borderWidth: chip.grade === 10 ? u(6) : u(3),
-        borderColor: chip.grade === 10 ? chip.ink : 'rgba(255,255,255,0.28)',
+        // No border here, ever: grade 10 alone carries a keyline (the foil
+        // ring in FoilChipBlock), and it only signals Gem Mint while it is
+        // scarce. The old faint rgba() keyline also rendered with a green
+        // cast in @react-pdf, which is what finally killed it.
       }}
     >
       <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: chip.ink, lineHeight: 1 }}>
@@ -341,7 +340,10 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
 function LogoBlock({ i }: { i: HeritageInputs }) {
   const t = i.logoTreatment ?? 'rules'
   const c = i.logoColor ?? 'black'
-  const MARK_W = u(238), MARK_H = u(88)
+  // 260x96 with the mark at 0.85 of the box (was 238x88 at 0.78) — about 20%
+  // more visible mark. The box top moves up only 16 mockup-px, which the
+  // densest fitted text stack still clears.
+  const MARK_W = u(260), MARK_H = u(96)
 
   const src =
     c === 'white' ? (i.whiteLogoDataUrl ?? i.colorLogoDataUrl)
@@ -369,7 +371,7 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
           </>
         ) : null}
         <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
-          {src ? <Image src={src} style={{ width: MARK_W * 0.78, height: MARK_H * 0.78, objectFit: 'contain' }} /> : null}
+          {src ? <Image src={src} style={{ width: MARK_W * 0.85, height: MARK_H * 0.85, objectFit: 'contain' }} /> : null}
         </View>
       </>
     )
