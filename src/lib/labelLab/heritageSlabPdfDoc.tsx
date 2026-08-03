@@ -256,7 +256,8 @@ function FoilChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
   const r = u(28)
   const numSize = u(150)
   const baseline = h * 0.40 + numSize * 0.36
-  const labelSize = u(chip.label.length > 8 ? 26 : 30)
+  // Matches GradeChipBlock's knockout floor: 28/32, ~4pt at true size.
+  const labelSize = u(chip.label.length > 8 ? 28 : 32)
   // Digit box for the sweep, in diagonal coordinates c = x + y.
   const numW = numSize * 1.3
   const c0 = (w - numW) / 2 + (baseline - numSize * 0.72)
@@ -319,10 +320,13 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
       <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: chip.ink, lineHeight: 1 }}>
         {chip.grade === 0 ? 'A' : chip.grade}
       </Text>
+      {/* 28/32 (4.0/4.6pt), up from 26/30, and no opacity: this is KNOCKOUT
+          type — light on a dark chip — which fills in on inkjet below ~4pt,
+          and dimming it to 90% only helps it disappear. */}
       <Text
         style={{
-          fontFamily: 'Helvetica-Bold', fontSize: u(chip.label.length > 8 ? 26 : 30),
-          color: chip.ink, opacity: 0.9, letterSpacing: u(4), marginTop: u(6),
+          fontFamily: 'Helvetica-Bold', fontSize: u(chip.label.length > 8 ? 28 : 32),
+          color: chip.ink, letterSpacing: u(4), marginTop: u(6),
         }}
       >
         {chip.label}
@@ -337,7 +341,7 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
  * Everything is sized off one box so the treatments are directly comparable —
  * only the backing changes, never the mark's size or position.
  */
-function LogoBlock({ i }: { i: HeritageInputs }) {
+function LogoBlock({ i, showRules = true }: { i: HeritageInputs; showRules?: boolean }) {
   const t = i.logoTreatment ?? 'rules'
   const c = i.logoColor ?? 'black'
   // 260x96 with the mark at 0.85 of the box (was 238x88 at 0.78) — about 20%
@@ -364,7 +368,7 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
     const ink = c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
     return (
       <>
-        {t === 'rules' ? (
+        {t === 'rules' && showRules ? (
           <>
             <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
             <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
@@ -399,7 +403,24 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   // Box runs from the text origin to where the grade chip starts.
   const BOX = 940
   const name = fitLines(i.primaryName, BOX, 84, 30, 3)
-  const ctx = fitLines((i.contextLine || '').toUpperCase(), BOX, 29, 14, 3, ctxTracking)
+  // Context floor is 24 (3.5pt at true size), not the old 14 (2.0pt): a
+  // consumer inkjet dithers 2pt type into noise, so below ~3.5pt the line is
+  // ink spent on nothing. The fitter never truncates — the raised floor just
+  // means the longest context lines wrap a row earlier. The measured maximum
+  // (128ch) fits 3 rows at this floor.
+  const ctx = fitLines((i.contextLine || '').toUpperCase(), BOX, 30, 24, 3, ctxTracking)
+  // Approximate bottom of the fitted stack, in mockup px: block top, name and
+  // context rows at their line heights, gap, divider (+margins), serial row.
+  // When the stack runs into the bottom strip the logo's accent bars would
+  // underline the serial, so they yield — the bars are decoration, the serial
+  // is identification.
+  const textBottom =
+    50 +
+    name.rows.length * name.size * 1.06 +
+    Math.max(name.size * 0.28, 18) +
+    ctx.rows.length * ctx.size * 1.2 +
+    (24 + 6) + (18 + 34 * 1.2)
+  const rulesOk = textBottom < 300
   return (
     <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
@@ -439,7 +460,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
       </View>
 
       {/* Mark, bottom-centre, hugging the edge */}
-      <LogoBlock i={i} />
+      <LogoBlock i={i} showRules={rulesOk} />
     </View>
   )
 }
@@ -484,7 +505,9 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
       >
         {/* right-aligned so the word ENDS at the mark, i.e. tops align once
             rotated — bottom-aligning leaves the tops ragged across emblems. */}
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(27), color: e.color, letterSpacing: u(3), textAlign: 'right' }}>
+        {/* 30 (4.3pt) — 27 was under the ~4pt small-caps floor, and these are
+            coloured, not black, so they need the extra size to hold on paper. */}
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(30), color: e.color, letterSpacing: u(3), textAlign: 'right' }}>
           {e.word}
         </Text>
       </View>
