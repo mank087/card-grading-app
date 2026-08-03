@@ -22,6 +22,8 @@ import {
   GEOMETRIC_PATTERNS,
   GRADE_CHIPS,
   GRADE_CHIPS_PRINT,
+  GRADE_CHIP_BLACK,
+  GRADE_10_FOIL_CSS,
   resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
@@ -914,13 +916,33 @@ function HeritagePanel(props: {
         <div className="flex items-center gap-3">
           <div
             className="w-14 h-11 rounded-lg flex flex-col items-center justify-center font-extrabold leading-none"
-            style={{ background: chip.fill, color: chip.ink }}
+            style={
+              chip.grade === 10
+                ? {
+                    // Foil: rainbow keyline (double background trick) and a
+                    // rainbow numeral, matching the PDF's strip-clipped sweep.
+                    border: '2px solid transparent',
+                    background: `linear-gradient(${GRADE_CHIP_BLACK}, ${GRADE_CHIP_BLACK}) padding-box, ${GRADE_10_FOIL_CSS} border-box`,
+                  }
+                : { background: chip.fill, color: chip.ink }
+            }
           >
-            <span className="text-lg">{chip.grade === 0 ? 'A' : chip.grade}</span>
+            <span
+              className="text-lg"
+              style={
+                chip.grade === 10
+                  ? { backgroundImage: GRADE_10_FOIL_CSS, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }
+                  : undefined
+              }
+            >
+              {chip.grade === 0 ? 'A' : chip.grade}
+            </span>
           </div>
           <div className="text-xs text-gray-600">
             <div className="font-semibold">{chip.label}</div>
-            <div className="font-mono text-[11px] text-gray-400">{chip.fill} / ink {chip.ink}</div>
+            <div className="font-mono text-[11px] text-gray-400">
+              {chip.grade === 10 ? 'foil ramp (GRADE_10_FOIL_STOPS)' : `${chip.fill} / ink ${chip.ink}`}
+            </div>
           </div>
         </div>
         <div className="flex gap-0.5 mt-2">
@@ -929,14 +951,18 @@ function HeritagePanel(props: {
               key={c.grade}
               className="flex-1 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold"
               style={{
-                background: c.fill,
+                background: c.grade === 10 ? GRADE_CHIP_BLACK : c.fill,
                 color: c.ink,
                 outline: c.grade === chip.grade ? '2px solid #111' : 'none',
                 outlineOffset: 1,
               }}
-              title={`${c.grade} ${c.label} ${c.fill}`}
+              title={`${c.grade} ${c.label} ${c.grade === 10 ? 'foil' : c.fill}`}
             >
-              {c.grade}
+              {c.grade === 10 ? (
+                <span style={{ backgroundImage: GRADE_10_FOIL_CSS, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                  10
+                </span>
+              ) : c.grade}
             </div>
           ))}
         </div>

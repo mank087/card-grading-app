@@ -488,6 +488,25 @@ export const GRADE_CHIP_FALLBACK: GradeChip = {
 /** One black for every chip. Colour lives entirely in the numeral. */
 export const GRADE_CHIP_BLACK = '#101014';
 
+/**
+ * Grade-10 foil ramp (Aug 2026). Gem Mint no longer renders as flat gold: the
+ * numeral and the chip keyline carry this rainbow sweep instead, on the black
+ * chip. Ordered warm-to-cool so the sweep reads as one foil catch-light rather
+ * than a colour test strip. Both the Heritage PDF renderer and the Label Lab
+ * panel preview read these stops — change them here, nowhere else.
+ */
+export const GRADE_10_FOIL_STOPS = [
+  '#FF3B5C', // red
+  '#FF9F0A', // orange
+  '#FFE81A', // yellow
+  '#34D96C', // green
+  '#3B9BFF', // blue
+  '#B45AF2', // violet
+];
+
+/** CSS equivalent of the foil sweep, for browser previews. */
+export const GRADE_10_FOIL_CSS = `linear-gradient(135deg, ${GRADE_10_FOIL_STOPS.join(', ')})`;
+
 export const GRADE_CHIPS_PRINT: GradeChip[] = [
   // 10 is a bright yellow-gold, not the earlier dark gold. To make room for it
   // the warm end moved OUT of yellow: 5/4/3 are peach, orange and burnt orange,

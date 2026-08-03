@@ -23,8 +23,10 @@
  * authored at 1400 x 400px, so `u()` maps mockup px to points.
  */
 import React from 'react'
-import { Document, Page, View, Text, Image, Svg, Path, Rect, Line, G, Defs, LinearGradient, Stop, ClipPath } from '@react-pdf/renderer'
-import { resolveGradeChip, type GradeChip } from '@/lib/labelPresets'
+// `Text as SvgText`: the same component renders as SVG <text> inside <Svg>,
+// where — unlike ordinary Text — its fill can reference a gradient def.
+import { Document, Page, View, Text, Text as SvgText, Image, Svg, Path, Rect, G, Defs, LinearGradient, Stop, ClipPath, Font } from '@react-pdf/renderer'
+import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS, type GradeChip } from '@/lib/labelPresets'
 import { bandGeometry, BAND_STROKE_COLOR, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
 import { fitLines } from './textFit'
@@ -32,6 +34,32 @@ import { fitLines } from './textFit'
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
 export type { BandPattern }
+
+/**
+ * CJK support. The base-14 PDF fonts carry no CJK glyphs at all — a Japanese
+ * card name set in Helvetica comes out as WinAnsi mojibake, which is what was
+ * happening in the lab. Noto Sans JP is registered as a fallback family and
+ * selected per text run; fontkit subsets it on embed, so the PDF only carries
+ * the glyphs actually used. The ~5MB TTF is only fetched when a CJK card is
+ * rendered, and only once per session.
+ */
+const FONT_BASE = typeof window === 'undefined' ? `${process.cwd()}/public` : ''
+Font.register({
+  family: 'NotoSansJP',
+  fonts: [
+    { src: `${FONT_BASE}/fonts/NotoSansJP-Regular.ttf`, fontWeight: 400 },
+    { src: `${FONT_BASE}/fonts/NotoSansJP-Bold.ttf`, fontWeight: 700 },
+  ],
+})
+
+/** CJK + full-width ranges: kana, CJK unified (+ext A), compat, full-width forms. */
+const CJK_RE = /[　-ヿ㐀-鿿豈-﫿＀-￯]/
+
+/** Font face for a text run: Helvetica normally, Noto Sans JP when CJK is present. */
+const faceFor = (t: string, bold: boolean) =>
+  CJK_RE.test(t)
+    ? { fontFamily: 'NotoSansJP', fontWeight: (bold ? 700 : 400) as 700 | 400 }
+    : { fontFamily: bold ? 'Helvetica-Bold' : 'Helvetica' }
 
 const INCH = 72
 const LABEL_W = 2.8 * INCH        // 201.6
@@ -77,7 +105,7 @@ function theme(hardened: boolean) {
         rule: '#101014',         // black, matching the mark and keyline
         edge: '#141414',         // real keyline, so it reads as a finished object
         edgeWidth: 1,
-        divider: '#7C3AED',      // TRADITIONAL.purplePrimary
+        divider: '#101014',      // black, matching the logo accent rules
       }
     : {
         field: IVORY, ink: INK, inkSoft: INK_SOFT,
@@ -122,8 +150,6 @@ export interface HeritageInputs {
   showCardLover?: boolean
   showVip?: boolean
 }
-
-const pickFrom = (p: string[]) => (i: number) => p[i % p.length] || '#7C3AED'
 
 /**
  * How the DCM mark is presented at the bottom edge.
@@ -196,7 +222,88 @@ function BandArt({
 
 // ---------------------------------------------------------------------------
 
+/** Interpolate along GRADE_10_FOIL_STOPS at t in [0,1]. */
+const foilAt = (() => {
+  const rgb = GRADE_10_FOIL_STOPS.map(c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)))
+  return (t: number) => {
+    const x = Math.min(Math.max(t, 0), 1) * (rgb.length - 1)
+    const i = Math.min(Math.floor(x), rgb.length - 2)
+    const f = x - i
+    const mix = rgb[i].map((v, k) => Math.round(v + (rgb[i + 1][k] - v) * f))
+    return `#${mix.map(v => v.toString(16).padStart(2, '0')).join('')}`
+  }
+})()
+
+/**
+ * Gem Mint 10 renders as foil, not gold: rainbow sweep through the numeral and
+ * the keyline around it, on the black chip.
+ *
+ * Two @react-pdf limitations shape the drawing (verified empirically — both
+ * fail SILENTLY, falling back to a solid):
+ *   - gradient `stroke` is not supported on any SVG element, so the keyline is
+ *     a gradient-FILLED rounded rect with a black rounded rect painted on top;
+ *   - gradient `fill` is not supported on SVG <text>, so the numeral is drawn
+ *     once per diagonal strip, each copy clipped to its strip and tinted by
+ *     foilAt(). The strips span the DIGIT box, not the chip, so the numeral
+ *     carries the full ramp rather than the middle slice of it.
+ */
+const FOIL_STRIPS = 24
+
+function FoilChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
+  const w = size
+  const h = size * (252 / 240)
+  const bw = u(6)
+  const r = u(28)
+  const numSize = u(150)
+  const baseline = h * 0.40 + numSize * 0.36
+  const labelSize = u(chip.label.length > 8 ? 26 : 30)
+  // Digit box for the sweep, in diagonal coordinates c = x + y.
+  const numW = numSize * 1.3
+  const c0 = (w - numW) / 2 + (baseline - numSize * 0.72)
+  const c1 = (w + numW) / 2 + baseline
+  const strips = Array.from({ length: FOIL_STRIPS }, (_, s) => ({
+    lo: c0 + ((c1 - c0) * s) / FOIL_STRIPS,
+    hi: c0 + ((c1 - c0) * (s + 1)) / FOIL_STRIPS + 0.5,
+    color: foilAt((s + 0.5) / FOIL_STRIPS),
+  }))
+  return (
+    <Svg width={w} height={h}>
+      <Defs>
+        <LinearGradient id="foil-ring" x1="0" y1="0" x2="1" y2="1">
+          {GRADE_10_FOIL_STOPS.map((c, i) => (
+            <Stop key={i} offset={i / (GRADE_10_FOIL_STOPS.length - 1)} stopColor={c} />
+          ))}
+        </LinearGradient>
+        {strips.map((s, i) => (
+          <ClipPath key={i} id={`foil-strip-${i}`}>
+            <Path d={`M ${s.lo} 0 L ${s.hi} 0 L 0 ${s.hi} L 0 ${s.lo} Z`} />
+          </ClipPath>
+        ))}
+      </Defs>
+      <Rect x={0} y={0} width={w} height={h} rx={r} ry={r} fill="url(#foil-ring)" />
+      <Rect x={bw} y={bw} width={w - 2 * bw} height={h - 2 * bw} rx={r - bw} ry={r - bw} fill={GRADE_CHIP_BLACK} />
+      {strips.map((s, i) => (
+        <G key={i} clipPath={`url(#foil-strip-${i})`}>
+          <SvgText
+            x={w / 2} y={baseline} textAnchor="middle" fill={s.color}
+            style={{ fontFamily: 'Helvetica-Bold', fontSize: numSize }}
+          >
+            {String(chip.grade)}
+          </SvgText>
+        </G>
+      ))}
+      <SvgText
+        x={w / 2} y={baseline + u(44)} textAnchor="middle"
+        fill="#F4EFE4" style={{ fontFamily: 'Helvetica-Bold', fontSize: labelSize, letterSpacing: u(4) }}
+      >
+        {chip.label}
+      </SvgText>
+    </Svg>
+  )
+}
+
 function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
+  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} />
   const isBig = String(chip.grade).length > 1 || chip.grade === 0
   return (
     <View
@@ -249,7 +356,9 @@ function LogoBlock({ i }: { i: HeritageInputs }) {
     // argues with the one above the serial.
     const ruleLen = u(112)
     const gap = u(20)
-    const ruleY = top + MARK_H / 2
+    // Bar height is u(6), so back the top off by half of it — otherwise the
+    // bars hang below the mark's centreline instead of sitting on it.
+    const ruleY = top + MARK_H / 2 - u(3)
     const ink = c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
     return (
       <>
@@ -300,7 +409,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
           characters and set lines to 128; both used to run under the chip. */}
       <View style={{ position: 'absolute', left: u(150), top: u(50), width: u(940) }}>
         {name.rows.map((r, ri) => (
-          <Text key={`n${ri}`} style={{ fontFamily: 'Helvetica-Bold', fontSize: u(name.size), color: T.ink, lineHeight: 1.06 }}>
+          <Text key={`n${ri}`} style={{ ...faceFor(r, true), fontSize: u(name.size), color: T.ink, lineHeight: 1.06 }}>
             {r}
           </Text>
         ))}
@@ -308,7 +417,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
           <Text
             key={`c${ri}`}
             style={{
-              fontFamily: 'Helvetica', fontSize: u(ctx.size), color: T.inkSoft,
+              ...faceFor(r, false), fontSize: u(ctx.size), color: T.inkSoft,
               letterSpacing: u(ctxTracking(ctx.size)), lineHeight: 1.2,
               marginTop: ri === 0 ? u(Math.max(name.size * 0.28, 18)) : 0,
             }}
@@ -359,9 +468,14 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
           <Path d={e.path} fill={e.color} />
         </Svg>
       </View>
+      {/* Track centre at u(180): rotation maps the track's right edge to the
+          TOP of the rotated box, so a right-aligned word's first letter lands
+          at centre - TRACK/2 = u(60) — just below the glyph, whatever the word
+          length. The previous top of u(74) put the centre at u(91), which sent
+          long words 29px ABOVE the container and straight through the glyph. */}
       <View
         style={{
-          position: 'absolute', top: u(74), left: trackLeft,
+          position: 'absolute', top: u(180) - u(34) / 2, left: trackLeft,
           width: EMBLEM_TRACK, height: u(34),
           transform: 'rotate(-90deg)',
         }}
@@ -392,10 +506,22 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
       </View>
       <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
 
-      {/* QR carrying the mark. Caller builds it at error-correction H. */}
+      {/* QR carrying the mark: the DCM logo sits on a white disc at the QR's
+          centre, matching production (generateQRCodeWithLogo: logo ~20% of the
+          QR, disc slightly larger). Error-correction H absorbs the occlusion.
+          Composited here rather than baked into the raster so it stays sharp
+          and works for any caller that passes a plain QR. */}
       {i.qrDataUrl ? (
         <View style={{ position: 'absolute', left: u(132), top: u(52), width: u(296), height: u(296), backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#D9D2C4', alignItems: 'center', justifyContent: 'center' }}>
           <Image src={i.qrDataUrl} style={{ width: u(280), height: u(280) }} />
+          {i.colorLogoDataUrl ? (
+            <>
+              <View style={{ position: 'absolute', left: u(113), top: u(113), width: u(70), height: u(70), borderRadius: u(35), backgroundColor: '#FFFFFF' }} />
+              <View style={{ position: 'absolute', left: u(120), top: u(120), width: u(56), height: u(56), alignItems: 'center', justifyContent: 'center' }}>
+                <Image src={i.colorLogoDataUrl} style={{ width: u(56), height: u(56), objectFit: 'contain' }} />
+              </View>
+            </>
+          ) : null}
         </View>
       ) : null}
 
@@ -408,7 +534,7 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
         <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: T.ink, lineHeight: 1 }}>
           {chip.grade === 0 ? 'A' : chip.grade}
         </Text>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(34), color: T.ink, letterSpacing: u(7), marginTop: u(14) }}>
+        <Text style={{ ...faceFor(i.condition || chip.label, true), fontSize: u(34), color: T.ink, letterSpacing: u(7), marginTop: u(14) }}>
           {(i.condition || chip.label).toUpperCase()}
         </Text>
       </View>
