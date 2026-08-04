@@ -19,6 +19,7 @@ import {
 } from '@/lib/bindersApi'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
+import { resolveHeritageBandColors } from '@/lib/heritage'
 import { supabase, hasActiveSession } from '@/lib/supabase'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { resolveCardValue } from '@/lib/resolveCardValue'
@@ -721,6 +722,7 @@ export default function CollectionScreen() {
           size="sm"
           labelStyle={labelStyle}
           colorOverrides={colorOverrides}
+          heritageBandColors={resolveHeritageBandColors((item as any).card_colors)}
         />
         {item.conversational_whole_grade == null && (
           <View style={st.gridPendingBadge}><Text style={st.gridPendingText}>Grading...</Text></View>
@@ -1495,12 +1497,13 @@ export default function CollectionScreen() {
 // as the single-card flow on card/[id].tsx); Avery variants prompt
 // for sheet starting position; card-image variants are direct.
 const BATCH_PRINT_TYPES: Array<{ id: string; name: string; desc: string; icon: string; opensSlabOptions?: boolean }> = [
-  { id: 'slab-options',        name: 'Graded Slab Label',         desc: 'Pick style + format (Modern / Traditional / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
+  { id: 'slab-options',        name: 'Graded Slab Label',         desc: 'Pick style + format (Modern / Traditional / Heritage / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
   { id: 'onetouch',            name: 'Magnetic One-Touch',        desc: 'Avery 6871 — pick starting position', icon: 'magnet' },
   { id: 'toploader',           name: 'Toploader Front + Back',    desc: 'Avery 8167 — pick starting position', icon: 'copy' },
   { id: 'foldover',            name: 'Fold-Over Toploader',       desc: 'Avery 8167 fold-over — pick start position', icon: 'reader' },
   { id: 'card-image-modern',   name: 'Card Image — Modern',       desc: 'JPG with modern dark slab label', icon: 'image' },
   { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
+  { id: 'card-image-heritage', name: 'Card Image — Heritage',    desc: 'JPG with ivory Heritage slab label', icon: 'ribbon-outline' },
 ]
 
 const BATCH_REPORT_TYPES: Array<{ id: string; name: string; desc: string; icon: string }> = [

@@ -34,7 +34,11 @@ export interface LabelConfig {
   colorPreset: string
   gradientStart: string
   gradientEnd: string
-  style: 'modern' | 'traditional'
+  style: 'modern' | 'traditional' | 'heritage'
+  heritagePattern?: string
+  heritageColorSource?: 'card' | 'brand'
+  heritageBandColors?: string[]
+  heritageGradeColors?: Record<string, string>
   borderEnabled: boolean
   borderColor: string
   borderWidth: number
@@ -79,7 +83,7 @@ export interface LabelWebRendererProps {
   /** Which preset type to use as the base config — defaults to 'slab-custom'
    *  so the customizer config flows through. Slab-modern/traditional should
    *  pass their own preset to anchor the colors. */
-  type?: 'slab-modern' | 'slab-traditional' | 'slab-custom' | 'slab-bordered'
+  type?: 'slab-modern' | 'slab-traditional' | 'slab-custom' | 'slab-bordered' | 'slab-heritage'
 }
 
 // ---------------------------------------------------------------------------

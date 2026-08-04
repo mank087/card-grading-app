@@ -20,6 +20,7 @@ import { Colors } from '@/lib/constants'
 export type LabelTypeId =
   | 'slab-modern'
   | 'slab-traditional'
+  | 'slab-heritage'
   | 'onetouch'
   | 'toploader'
   | 'foldover'
@@ -32,6 +33,7 @@ type Holder = 'slab' | 'onetouch' | 'toploader' | 'digital'
 const HOLDER_BY_TYPE: Record<LabelTypeId, Holder> = {
   'slab-modern': 'slab',
   'slab-traditional': 'slab',
+  'slab-heritage': 'slab',
   'custom': 'slab',
   'onetouch': 'onetouch',
   'toploader': 'toploader',
@@ -111,6 +113,7 @@ export default function LabelMockup({
   const cardSrc = side === 'back' ? (cardBackImageUrl || cardImageUrl) : cardImageUrl
   const styleFor = (t: LabelTypeId): SlabStyle => {
     if (t === 'slab-traditional' || t === 'card-image-traditional') return 'traditional'
+    if (t === 'slab-heritage') return 'heritage'
     if (t === 'custom') return 'custom'
     return 'modern'
   }
@@ -161,7 +164,7 @@ export default function LabelMockup({
 // HELPERS
 // ============================================================================
 
-type SlabStyle = 'modern' | 'traditional' | 'custom'
+type SlabStyle = 'modern' | 'traditional' | 'heritage' | 'custom'
 
 function gradeStr(grade: number | null | undefined, alt?: boolean): string {
   if (grade !== null && grade !== undefined) return Math.round(grade).toString()
@@ -202,12 +205,15 @@ function RealQR({ qrUrl, size }: { qrUrl?: string; size: number }) {
 
 const MODERN_LABEL_GRADIENT: readonly string[] = ['#1a1625', '#2d1f47', '#1a1625']
 const TRADITIONAL_LABEL_GRADIENT: readonly string[] = ['#f9fafb', '#ffffff', '#f9fafb']
+// Heritage: paper-white field (print-hardened theme).
+const HERITAGE_LABEL_GRADIENT: readonly string[] = ['#ffffff', '#ffffff', '#ffffff']
 
 function getLabelGradient(slabStyle: SlabStyle, customOverrides?: CustomColorOverrides): readonly string[] {
   if (slabStyle === 'custom' && customOverrides?.labelGradient && customOverrides.labelGradient.length >= 2) {
     return customOverrides.labelGradient
   }
   if (slabStyle === 'traditional') return TRADITIONAL_LABEL_GRADIENT
+  if (slabStyle === 'heritage') return HERITAGE_LABEL_GRADIENT
   return MODERN_LABEL_GRADIENT
 }
 
@@ -237,6 +243,7 @@ function isDarkSlab(slabStyle: SlabStyle, customOverrides?: CustomColorOverrides
   if (customOverrides?.textColorMode === 'dark') return false
   if (!customOverrides && slabStyle === 'modern') return true
   if (!customOverrides && slabStyle === 'traditional') return false
+  if (!customOverrides && slabStyle === 'heritage') return false
   const stops = (customOverrides?.layoutStyle === 'card-extension' && customOverrides.topEdgeGradient?.length
     ? customOverrides.topEdgeGradient
     : customOverrides?.labelGradient) || []

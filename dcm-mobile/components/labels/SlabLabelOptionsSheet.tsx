@@ -28,6 +28,7 @@ import type { SavedCustomStyle } from '@/hooks/useLabelStyle'
 type StyleChoice =
   | { kind: 'modern' }
   | { kind: 'traditional' }
+  | { kind: 'heritage' }
   | { kind: 'custom'; id: string; name: string }
 
 type Format = 'duplex' | 'foldover'
@@ -45,7 +46,7 @@ interface Props {
   /**
    * Called when the user taps Generate. The parent's openWebDownload
    * helper takes care of the actual URL build + browser/WebView launch.
-   * - type: 'slab-modern' | 'slab-traditional' | 'slab-custom'
+   * - type: 'slab-modern' | 'slab-traditional' | 'slab-heritage' | 'slab-custom'
    * - format: 'duplex' | 'foldover'
    * - labelStyle: only set when type is 'slab-custom' — the specific
    *   custom-N id to render. Server reads this from the URL param.
@@ -66,6 +67,7 @@ export default function SlabLabelOptionsSheet({
   // Falls back to Modern if the saved style isn't recognized.
   const initialStyle: StyleChoice = useMemo(() => {
     if (defaultStyleId === 'traditional') return { kind: 'traditional' }
+    if (defaultStyleId === 'heritage') return { kind: 'heritage' }
     if (defaultStyleId?.startsWith('custom-')) {
       const found = customStyles.find(s => s.id === defaultStyleId)
       if (found) return { kind: 'custom', id: found.id, name: found.name }
@@ -88,6 +90,7 @@ export default function SlabLabelOptionsSheet({
   const handleGenerate = () => {
     if (style.kind === 'modern') onGenerate('slab-modern', format)
     else if (style.kind === 'traditional') onGenerate('slab-traditional', format)
+    else if (style.kind === 'heritage') onGenerate('slab-heritage', format)
     else onGenerate('slab-custom', format, style.id)
     onClose()
   }
@@ -124,6 +127,12 @@ export default function SlabLabelOptionsSheet({
               icon="card-outline"
               selected={isSelectedStyle({ kind: 'traditional' })}
               onPress={() => setStyle({ kind: 'traditional' })}
+            />
+            <StyleChip
+              label="Heritage"
+              icon="ribbon-outline"
+              selected={isSelectedStyle({ kind: 'heritage' })}
+              onPress={() => setStyle({ kind: 'heritage' })}
             />
             {customStyles.map(cs => (
               <StyleChip

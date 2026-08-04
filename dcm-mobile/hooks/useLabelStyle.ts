@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
-export type LabelStyleId = 'modern' | 'traditional' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4'
+export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4'
 
 export interface CustomLabelConfig {
   colorPreset?: string
@@ -14,6 +14,13 @@ export interface CustomLabelConfig {
   borderColor?: string
   borderWidth?: number
   topEdgeGradient?: string[]
+  /** 'heritage' marks the Round 3 ivory design; other values are modern/traditional. */
+  style?: string
+  /** Heritage-only fields (mirror web CustomLabelConfig). */
+  heritagePattern?: string
+  heritageColorSource?: 'card' | 'brand'
+  heritageBandColors?: string[]
+  heritageGradeColors?: Record<string, string>
 }
 
 export interface SavedCustomStyle {
@@ -31,6 +38,11 @@ export interface LabelColorOverrides {
   isNeonOutline?: boolean
   isCardExtension?: boolean
   topEdgeGradient?: string[]
+  /** Set when a saved custom style's config carries style === 'heritage'. */
+  isHeritage?: boolean
+  heritagePattern?: string
+  heritageBandColors?: string[]
+  heritageGradeColors?: Record<string, string>
 }
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
@@ -47,6 +59,12 @@ function extractColorOverrides(config: CustomLabelConfig | null | undefined): La
     isNeonOutline: config.colorPreset === 'neon-outline',
     isCardExtension: config.colorPreset === 'card-extension',
     topEdgeGradient: config.topEdgeGradient,
+    // Heritage custom styles: consumers (SlabCard, export URL builders) need
+    // to know the config is Heritage rather than a gradient recolour.
+    isHeritage: config.style === 'heritage',
+    heritagePattern: config.heritagePattern,
+    heritageBandColors: config.heritageBandColors,
+    heritageGradeColors: config.heritageGradeColors,
   }
 }
 

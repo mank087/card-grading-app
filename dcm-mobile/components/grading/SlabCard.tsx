@@ -29,15 +29,32 @@ interface SlabCardProps {
   labelStyle?: LabelStyleId
   colorOverrides?: LabelColorOverrides
   qrUrl?: string
+  /** Heritage band palette (from card.card_colors); brand purples when absent. */
+  heritageBandColors?: string[]
   showFounderEmblem?: boolean
   showVipEmblem?: boolean
   showCardLoversEmblem?: boolean
 }
 
+import {
+  HERITAGE_BRAND_COLORS,
+  HERITAGE_CHIP_BLACK,
+  HERITAGE_GRADE_INKS,
+  HERITAGE_FALLBACK_INK,
+  HERITAGE_THEME,
+  GRADE_10_FOIL_STOPS,
+} from '@/lib/heritage'
+
 const EMBLEMS = {
   founder: { icon: 'star', label: 'Founder', iconColor: '#FFD700', textColor: '#FFFFFF' },
   vip: { icon: 'diamond', label: 'VIP', iconColor: '#6366f1', textColor: '#FFFFFF' },
   cardLovers: { icon: 'heart', label: 'Card Lover', iconColor: '#f43f5e', textColor: '#FFFFFF' },
+} as const
+
+const HERITAGE_EMBLEMS = {
+  founder: { ...EMBLEMS.founder, iconColor: '#A67C1B', textColor: '#A67C1B' },
+  vip: { ...EMBLEMS.vip, iconColor: '#4338CA', textColor: '#4338CA' },
+  cardLovers: { ...EMBLEMS.cardLovers, iconColor: '#E11D48', textColor: '#E11D48' },
 } as const
 
 const TRADITIONAL_EMBLEMS = {
@@ -91,6 +108,7 @@ function SlabCardImpl({
   showFounderEmblem = false,
   showVipEmblem = false,
   showCardLoversEmblem = false,
+  heritageBandColors,
 }: SlabCardProps) {
   const gradeText = grade !== null ? Math.round(grade).toString() : 'N/A'
   const conditionText = condition?.toUpperCase() || ''
@@ -100,22 +118,35 @@ function SlabCardImpl({
   const labelHeight = size === 'sm' ? 70 : size === 'md' ? 84 : 110
   const fontScale = size === 'sm' ? 0.85 : size === 'md' ? 1 : 1.15
   const isTraditional = labelStyle === 'traditional'
+  // Heritage: built-in id, or a saved custom style whose config is Heritage.
+  const isHeritage = labelStyle === 'heritage' || !!colorOverrides?.isHeritage
+  const bandColors = (colorOverrides?.heritageBandColors && colorOverrides.heritageBandColors.length >= 2)
+    ? colorOverrides.heritageBandColors
+    : (heritageBandColors && heritageBandColors.length >= 2 ? heritageBandColors : HERITAGE_BRAND_COLORS)
+  const isLight = isTraditional || isHeritage
   const qrSize = size === 'sm' ? 44 : size === 'md' ? 56 : 70
   // Allow the context line (Set • #Num • Year) to wrap to 2 lines on the card detail
   // page (size=lg) where there's enough vertical room. Keep 1 line on sm/md.
   const contextLines = size === 'lg' ? 2 : 1
 
-  const wrapperColors = isTraditional ? ['#e5e7eb', '#f3f4f6', '#e5e7eb'] : getWrapperColors(colorOverrides)
-  const labelColors = isTraditional ? ['#f9fafb', '#ffffff', '#f9fafb'] : (colorOverrides?.isCardExtension ? wrapperColors : (colorOverrides?.isRainbow ? ['#1a1625', '#2d1f47', '#1a1625'] : (colorOverrides ? [colorOverrides.gradientStart, colorOverrides.gradientEnd, colorOverrides.gradientStart] : DEFAULT_MODERN_COLORS)))
+  const wrapperColors = isLight ? ['#e5e7eb', '#f3f4f6', '#e5e7eb'] : getWrapperColors(colorOverrides)
+  const labelColors = isHeritage ? ['#FFFFFF', '#FFFFFF', '#FFFFFF'] : isTraditional ? ['#f9fafb', '#ffffff', '#f9fafb'] : (colorOverrides?.isCardExtension ? wrapperColors : (colorOverrides?.isRainbow ? ['#1a1625', '#2d1f47', '#1a1625'] : (colorOverrides ? [colorOverrides.gradientStart, colorOverrides.gradientEnd, colorOverrides.gradientStart] : DEFAULT_MODERN_COLORS)))
 
   // Text colors: traditional = dark on light, modern = white on dark
-  const nameColor = isTraditional ? Colors.gray[900] : 'rgba(255,255,255,0.95)'
-  const contextColor = isTraditional ? Colors.gray[600] : 'rgba(255,255,255,0.7)'
-  const featureColor = isTraditional ? Colors.blue[600] : 'rgba(96,165,250,0.95)'
-  const serialColor = isTraditional ? Colors.gray[500] : 'rgba(255,255,255,0.65)'
-  const gradeColor = isTraditional ? Colors.purple[700] : Colors.white
-  const conditionColor = isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.85)'
-  const logoTint = isTraditional ? undefined : 'rgba(255,255,255,0.9)'
+  const nameColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.gray[900] : 'rgba(255,255,255,0.95)'
+  const contextColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[600] : 'rgba(255,255,255,0.7)'
+  const featureColor = isLight ? Colors.blue[600] : 'rgba(96,165,250,0.95)'
+  const serialColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[500] : 'rgba(255,255,255,0.65)'
+  const gradeColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[700] : Colors.white
+  const conditionColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.85)'
+  const logoTint = isHeritage ? HERITAGE_THEME.rule : isTraditional ? undefined : 'rgba(255,255,255,0.9)'
+
+  // Heritage grade chip: numeral ink per grade (overridable), 10 = rainbow.
+  const wholeGrade = grade !== null ? Math.round(grade) : null
+  const heritageInkOverride = wholeGrade != null ? colorOverrides?.heritageGradeColors?.[String(wholeGrade)] : undefined
+  const heritageInk = heritageInkOverride
+    || (wholeGrade != null ? HERITAGE_GRADE_INKS[wholeGrade]?.ink : undefined)
+    || HERITAGE_FALLBACK_INK.ink
 
   const nameFontSize = dynamicNameFontSize(displayName, 12 * fontScale)
 
@@ -136,10 +167,22 @@ function SlabCardImpl({
             styles.label,
             { height: labelHeight },
             isTraditional && { borderWidth: 1, borderColor: Colors.gray[200] },
+            isHeritage && { borderWidth: 1, borderColor: HERITAGE_THEME.edge },
           ]}
         >
+          {isHeritage && (
+            <>
+              <LinearGradient
+                colors={bandColors.slice(0, 5) as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.heritageBand}
+              />
+              <View style={styles.heritageBandRule} />
+            </>
+          )}
           {isBack ? (
-            <View style={styles.backLabelContent}>
+            <View style={[styles.backLabelContent, isHeritage && { paddingLeft: 16 }]}>
               {/* QR code + emblems clustered on the left */}
               <View style={styles.backLeftCluster}>
                 {qrUrl ? (
@@ -156,7 +199,7 @@ function SlabCardImpl({
                   showCardLoversEmblem ? 'cardLovers' : null,
                   showVipEmblem ? 'vip' : null,
                 ].filter(Boolean) as Array<keyof typeof EMBLEMS>).map(key => {
-                  const e = isTraditional ? TRADITIONAL_EMBLEMS[key] : EMBLEMS[key]
+                  const e = isHeritage ? HERITAGE_EMBLEMS[key] : isTraditional ? TRADITIONAL_EMBLEMS[key] : EMBLEMS[key]
                   const iconSize = size === 'sm' ? 11 : size === 'md' ? 13 : 15
                   // Vertical box height = the label's available height minus icon + paddings.
                   // Sized so even the longest label ("CARD LOVER", 10 chars) fits without truncating.
@@ -212,7 +255,7 @@ function SlabCardImpl({
               )}
             </View>
           ) : (
-            <View style={styles.frontLabelContent}>
+            <View style={[styles.frontLabelContent, isHeritage && { paddingLeft: 16 }]}>
               <Image
                 source={require('@/assets/images/dcm-logo.png')}
                 style={[styles.labelLogo, { width: 22 * fontScale, height: 22 * fontScale }]}
@@ -241,13 +284,53 @@ function SlabCardImpl({
               </View>
 
               <View style={styles.labelGradeSection}>
-                <Text style={[styles.labelGrade, { fontSize: 26 * fontScale, color: gradeColor }]}>{gradeText}</Text>
-                {conditionText ? (
+                {isHeritage ? (
                   <>
-                    <View style={[styles.gradeUnderline, { backgroundColor: isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.5)' }]} />
-                    <Text style={[styles.labelCondition, { fontSize: 7 * fontScale, color: conditionColor }]} numberOfLines={1}>{conditionText}</Text>
+                    {wholeGrade === 10 && !heritageInkOverride ? (
+                      // Rainbow-foil ring via gradient wrapper; per-glyph tints
+                      // approximate the foil numeral without SVG.
+                      <LinearGradient
+                        colors={GRADE_10_FOIL_STOPS as any}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.heritageChipRing}
+                      >
+                        <View style={styles.heritageChip}>
+                          <Text style={{ fontSize: 17 * fontScale, fontWeight: '800' }}>
+                            <Text style={{ color: GRADE_10_FOIL_STOPS[1] }}>1</Text>
+                            <Text style={{ color: GRADE_10_FOIL_STOPS[3] }}>0</Text>
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <View
+                        style={[
+                          styles.heritageChip,
+                          wholeGrade === 10 && { borderWidth: 1.5, borderColor: heritageInk },
+                        ]}
+                      >
+                        <Text style={{ fontSize: (gradeText.length > 1 ? 15 : 18) * fontScale, fontWeight: '800', color: heritageInk }}>
+                          {gradeText}
+                        </Text>
+                      </View>
+                    )}
+                    {conditionText ? (
+                      <Text style={[styles.labelCondition, { fontSize: 6.5 * fontScale, color: conditionColor, marginTop: 2 }]} numberOfLines={1}>
+                        {conditionText}
+                      </Text>
+                    ) : null}
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <Text style={[styles.labelGrade, { fontSize: 26 * fontScale, color: gradeColor }]}>{gradeText}</Text>
+                    {conditionText ? (
+                      <>
+                        <View style={[styles.gradeUnderline, { backgroundColor: isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.5)' }]} />
+                        <Text style={[styles.labelCondition, { fontSize: 7 * fontScale, color: conditionColor }]} numberOfLines={1}>{conditionText}</Text>
+                      </>
+                    ) : null}
+                  </>
+                )}
               </View>
             </View>
           )}
@@ -255,7 +338,9 @@ function SlabCardImpl({
 
         {/* Separator */}
         <LinearGradient
-          colors={isTraditional
+          colors={isHeritage
+            ? ['rgba(16,16,20,0.15)', 'rgba(16,16,20,0.55)', 'rgba(16,16,20,0.15)']
+            : isTraditional
             ? ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.05)']
             : ['rgba(139,92,246,0.1)', 'rgba(139,92,246,0.4)', 'rgba(139,92,246,0.1)']}
           start={{ x: 0, y: 0 }}
@@ -285,6 +370,10 @@ const SlabCard = memo(SlabCardImpl);
 export default SlabCard;
 
 const styles = StyleSheet.create({
+  heritageBand: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 10 },
+  heritageBandRule: { position: 'absolute', left: 10, top: 0, bottom: 0, width: 1.5, backgroundColor: '#101014' },
+  heritageChipRing: { borderRadius: 9, padding: 2 },
+  heritageChip: { minWidth: 34, height: 34, borderRadius: 7, backgroundColor: HERITAGE_CHIP_BLACK, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   slabWrapper: {
     borderRadius: 14,
     overflow: 'hidden',

@@ -56,11 +56,12 @@ const LABEL_GALLERY: Array<{
   useCase: string
   description: string
   howToApply: string
-  forcedStyle?: 'modern' | 'traditional'
+  forcedStyle?: 'modern' | 'traditional' | 'heritage'
   needsFormat?: boolean
 }> = [
   { id: 'slab-modern',         name: 'Graded Slab (Modern)',      holderLabel: 'Graded Card Slab', shortName: 'Modern Slab',      dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Dark gradient label matching DCM modern style. Duplex printing with front grade and back QR code.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'modern', needsFormat: true },
   { id: 'slab-traditional',    name: 'Graded Slab (Traditional)', holderLabel: 'Graded Card Slab', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Light/white label with classic grading style. Clean, professional look for any slab.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'traditional', needsFormat: true },
+  { id: 'slab-heritage',       name: 'Graded Slab (Heritage)',    holderLabel: 'Graded Card Slab', shortName: 'Heritage Slab',    dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Ivory Round 3 design — patterned side band in the card colors, grade-colored chip, rainbow-foil Gem Mint 10.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'heritage', needsFormat: true },
   { id: 'onetouch',            name: 'Magnetic One-Touch',        holderLabel: 'Mag One Touch',    shortName: 'One-Touch',        dimensions: '1.25" × 2.375"',  useCase: 'Avery 6871 for magnetic cases',     description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders perfectly.', howToApply: 'Print on Avery 6871 label sheets. Peel and stick to one-touch magnetic case.' },
   { id: 'toploader',           name: 'Toploader Front+Back',      holderLabel: 'Top Loader',       shortName: 'Toploader',        dimensions: '1.75" × 0.5"',    useCase: 'Avery 8167, front grade + back QR', description: 'Two small labels per card — grade info on front, QR code on back of toploader.', howToApply: 'Print on Avery 8167 sheets. Apply front label to toploader front, back label to rear.' },
   { id: 'foldover',            name: 'Fold-Over Toploader',       holderLabel: 'Top Loader',       shortName: 'Fold-Over',        dimensions: '1.75" × 0.5"',    useCase: 'Single label, fold over toploader tab', description: 'One label that folds over the toploader opening. Grade visible on front, QR on back.', howToApply: 'Print on Avery 8167. Apply to toploader top edge and fold over to seal.' },
@@ -86,7 +87,7 @@ interface DesignerConfig {
   colorPreset: string
   gradientStart: string
   gradientEnd: string
-  style: 'modern' | 'traditional'
+  style: 'modern' | 'traditional' | 'heritage'
   borderEnabled: boolean
   borderColor: string
   borderWidth: number
@@ -103,7 +104,9 @@ interface DesignerConfig {
   /** Typography scale for grade + card text (matches web fontScale; 1 = standard). */
   fontScale?: number
   // Dimension preset bookkeeping (matches CustomLabelConfig in src/lib/labelPresets.ts)
-  preset?: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
+  preset?: 'dcm' | 'dcm-traditional' | 'dcm-heritage' | 'dcm-bordered' | 'custom'
+  /** Heritage band pattern id (web BAND_PATTERNS); only read when style==='heritage'. */
+  heritagePattern?: string
   width?: number
   height?: number
 }
@@ -550,6 +553,18 @@ export default function LabelStudioScreen() {
         borderColor: '#7c3aed',
       }
     }
+    if (activeTile?.id === 'slab-heritage') {
+      return {
+        ...baseDims,
+        colorPreset: 'traditional',
+        gradientStart: '#f9fafb',
+        gradientEnd: '#ffffff',
+        style: 'heritage',
+        heritagePattern: config.heritagePattern || 'diamond',
+        borderEnabled: false,
+        borderColor: '#7c3aed',
+      }
+    }
     if (activeTile?.id === 'slab-traditional' || activeTile?.id === 'card-image-traditional') {
       return {
         ...baseDims,
@@ -587,7 +602,7 @@ export default function LabelStudioScreen() {
   // memo above). When the user starts customizing, hop them to the Custom
   // Label tile so their changes actually show up in the preview.
   const switchToCustomTileIfForced = useCallback(() => {
-    const FORCED_TILES = ['slab-modern', 'slab-traditional', 'card-image-modern', 'card-image-traditional']
+    const FORCED_TILES = ['slab-modern', 'slab-traditional', 'slab-heritage', 'card-image-modern', 'card-image-traditional']
     const currentTile = LABEL_GALLERY[activeGalleryIdx]
     if (!currentTile || !FORCED_TILES.includes(currentTile.id)) return
     const customIdx = LABEL_GALLERY.findIndex(t => t.id === 'custom')
@@ -660,6 +675,13 @@ export default function LabelStudioScreen() {
       base.gradientStart = '#f9fafb'
       base.gradientEnd = '#ffffff'
       base.style = 'traditional'
+      base.borderEnabled = false
+    } else if (preset.id === 'dcm-heritage') {
+      base.colorPreset = 'traditional'
+      base.gradientStart = '#f9fafb'
+      base.gradientEnd = '#ffffff'
+      base.style = 'heritage'
+      base.heritagePattern = 'diamond'
       base.borderEnabled = false
     } else if (preset.id === 'dcm-bordered') {
       base.colorPreset = 'traditional'
@@ -876,6 +898,11 @@ export default function LabelStudioScreen() {
     if (opts?.position != null) params.set('position', String(opts.position))
     if (opts?.position2 != null) params.set('position2', String(opts.position2))
     params.set('labelStyle', config.style || 'modern')
+    // Heritage exports read the band pattern from the URL (web bridge
+    // resolveHeritagePattern); band colours resolve per card server-side.
+    if (exportType === 'slab-heritage' || exportType === 'card-image-heritage' || config.style === 'heritage') {
+      params.set('heritagePattern', config.heritagePattern || 'diamond')
+    }
     params.set('download', '1')
 
     // For custom slab, ship the customizer's CURRENT in-flight config so the
@@ -899,6 +926,7 @@ export default function LabelStudioScreen() {
         textColorMode: config.textColorMode,
         gradeColor: config.gradeColor,
         fontScale: config.fontScale,
+        heritagePattern: config.heritagePattern,
         preset: config.preset,
         width: config.width,
         height: config.height,
@@ -936,7 +964,8 @@ export default function LabelStudioScreen() {
     // ReactNativeWebView bridge present, the page postMessages back.
     params.delete('download')
     const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
-    const title = exportType === 'slab-custom' ? 'Custom Slab Label'
+    const title = exportType === 'slab-heritage' ? 'Heritage Slab Label'
+      : exportType === 'slab-custom' ? 'Custom Slab Label'
       : exportType === 'slab' ? 'Slab Label'
       : exportType === 'onetouch' ? 'One-Touch Label'
       : exportType === 'toploader' ? 'Toploader Label'

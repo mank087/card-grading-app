@@ -38,6 +38,7 @@ import GradeBadge from '@/components/ui/GradeBadge'
 import SubgradeBar from '@/components/grading/SubgradeBar'
 import CollapsibleSection from '@/components/ui/CollapsibleSection'
 import SlabCard from '@/components/grading/SlabCard'
+import { resolveHeritageBandColors } from '@/lib/heritage'
 import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
 import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
@@ -745,12 +746,13 @@ export default function CardDetailScreen() {
                 // both formats (Duplex / Fold-Over). Mirrors web's
                 // single "Label for Graded Slab" menu item.
                 const items: Array<{ id: string; name: string; desc: string; icon: string; opensSlabOptions?: boolean }> = [
-                  { id: 'slab-options', name: 'Graded Slab Label', desc: 'Pick style + format (Modern / Traditional / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
+                  { id: 'slab-options', name: 'Graded Slab Label', desc: 'Pick style + format (Modern / Traditional / Heritage / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
                   { id: 'onetouch', name: 'Magnetic One-Touch', desc: 'Avery 6871 PDF for magnetic cases', icon: 'magnet' },
                   { id: 'toploader', name: 'Toploader Front+Back', desc: 'Avery 8167 — front grade + back QR', icon: 'copy' },
                   { id: 'foldover', name: 'Fold-Over Toploader', desc: 'Avery 8167 — single label, fold over tab', icon: 'reader' },
                   { id: 'card-image-modern', name: 'Card Image — Modern', desc: 'JPG with modern dark slab label', icon: 'image' },
                   { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
+                  { id: 'card-image-heritage', name: 'Card Image — Heritage', desc: 'JPG with ivory Heritage slab label', icon: 'ribbon-outline' },
                   { id: 'mini-report', name: 'Mini Grade Report', desc: 'Foldable summary card with QR + sub-grades', icon: 'document-text' },
                 ]
                 return items
@@ -1371,6 +1373,7 @@ export default function CardDetailScreen() {
             showFounderEmblem={emblems.showFounder}
             showVipEmblem={emblems.showVip}
             showCardLoversEmblem={emblems.showCardLovers}
+            heritageBandColors={resolveHeritageBandColors((card as any).card_colors)}
           />
         </TouchableOpacity>
         </View>

@@ -20,10 +20,23 @@ export default function LabelStylePicker({ labelStyle, customStyles, onSwitch, c
   const displayName = (id: LabelStyleId): string => {
     if (id === 'modern') return 'Modern (DCM)'
     if (id === 'traditional') return 'Traditional'
+    if (id === 'heritage') return 'Heritage'
     return customStyles.find(s => s.id === id)?.name || id
   }
 
+  // Ivory field with the purple band on the left — Heritage in miniature.
+  const HeritageDot = () => (
+    <LinearGradient
+      colors={['#7c3aed', '#7c3aed', '#FAF8F4', '#FFFFFF'] as any}
+      locations={[0, 0.3, 0.3, 1] as any}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.dot}
+    />
+  )
+
   const ColorDot = ({ config }: { config: SavedCustomStyle['config'] }) => {
+    if (config.style === 'heritage') return <HeritageDot />
     const isRainbow = config.colorPreset === 'rainbow'
     const colors = isRainbow
       ? ['#ff0000', '#ff8800', '#ffff00', '#00cc00', '#0066ff', '#8800ff', '#ff00ff'] as const
@@ -69,6 +82,7 @@ export default function LabelStylePicker({ labelStyle, customStyles, onSwitch, c
             <ScrollView style={{ maxHeight: 400 }}>
               <StyleRow id="modern" name="Modern (DCM)" />
               <StyleRow id="traditional" name="Traditional" />
+              <StyleRow id="heritage" name="Heritage" dot={<HeritageDot />} />
               {customStyles.length > 0 && <View style={styles.divider} />}
               {customStyles.map(s => (
                 <StyleRow key={s.id} id={s.id as LabelStyleId} name={s.name} dot={<ColorDot config={s.config} />} />

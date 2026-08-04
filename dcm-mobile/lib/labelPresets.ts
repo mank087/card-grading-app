@@ -23,7 +23,7 @@ export const COLOR_PRESETS: ColorPreset[] = [
 
 // Dimension presets — 1:1 with src/lib/labelPresets.ts so saved configs round-trip with web.
 export interface DimensionPreset {
-  id: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
+  id: 'dcm' | 'dcm-traditional' | 'dcm-heritage' | 'dcm-bordered' | 'custom'
   name: string
   width: number
   height: number
@@ -33,6 +33,7 @@ export interface DimensionPreset {
 export const DIMENSION_PRESETS: DimensionPreset[] = [
   { id: 'dcm',             name: 'DCM Modern',      width: 2.8, height: 0.8, description: 'Modern dark gradient style' },
   { id: 'dcm-traditional', name: 'DCM Traditional', width: 2.8, height: 0.8, description: 'Classic light style' },
+  { id: 'dcm-heritage',    name: 'DCM Heritage',    width: 2.8, height: 0.8, description: 'Ivory field, patterned band, grade-colour chip' },
   { id: 'dcm-bordered',    name: 'DCM Bordered',    width: 2.8, height: 0.8, description: 'Traditional with purple border' },
   { id: 'custom',          name: 'Custom',          width: 2.8, height: 0.8, description: 'Custom dimensions & border' },
 ]
