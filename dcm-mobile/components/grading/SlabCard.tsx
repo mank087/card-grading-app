@@ -387,6 +387,9 @@ const styles = StyleSheet.create({
   label: {
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
+    // Clip children to the radius — the Heritage band strip is an absolute
+    // square-cornered fill that otherwise pokes past the rounded corner.
+    overflow: 'hidden',
     paddingHorizontal: 8,
     paddingVertical: 8,
     justifyContent: 'center',

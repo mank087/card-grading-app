@@ -47,13 +47,21 @@ function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): strin
   const host = document.createElement('div')
   const root = createRoot(host)
   flushSync(() => root.render(el))
-  const markup = host.innerHTML
+  let markup = host.innerHTML
   root.unmount()
-  // renderless namespace fix: an <svg> serialized from the DOM keeps xmlns,
-  // but guard anyway — without it the blob renders as nothing.
-  return markup.includes('xmlns=')
-    ? markup
-    : markup.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
+  // Namespace guard — without xmlns the blob renders as nothing.
+  if (!markup.includes('xmlns=')) {
+    markup = markup.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
+  }
+  // Intrinsic size: the component sizes itself with CSS (width:100%), which
+  // leaves the serialized SVG dimensionless. Desktop Chrome tolerates that
+  // when drawing to canvas; Android WebView does NOT (decodes as 0x0 and
+  // paints nothing — this is why mobile previews came back blank). Explicit
+  // width/height attributes give every engine a real raster size.
+  if (!/<svg[^>]*\swidth=/.test(markup)) {
+    markup = markup.replace('<svg ', '<svg width="1400" height="400" ')
+  }
+  return markup
 }
 
 /** Render the Heritage label to a PNG data URL at the requested width. */

@@ -28,6 +28,14 @@ const GEOMETRIC_PATTERNS = [
   { id: 4, name: 'Lightning' },
 ] as const
 import LabelWebRenderer, { type LabelConfig, type LabelCardData } from '@/components/labels/LabelWebRenderer'
+import {
+  HERITAGE_PATTERNS,
+  HERITAGE_BRAND_COLORS,
+  HERITAGE_CHIP_BLACK,
+  HERITAGE_GRADE_INKS,
+  GRADE_10_FOIL_STOPS,
+  resolveHeritageBandColors,
+} from '@/lib/heritage'
 import ColorPickerModal from '@/components/labels/ColorPickerModal'
 import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
 import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
@@ -105,8 +113,11 @@ interface DesignerConfig {
   fontScale?: number
   // Dimension preset bookkeeping (matches CustomLabelConfig in src/lib/labelPresets.ts)
   preset?: 'dcm' | 'dcm-traditional' | 'dcm-heritage' | 'dcm-bordered' | 'custom'
-  /** Heritage band pattern id (web BAND_PATTERNS); only read when style==='heritage'. */
+  /** Heritage fields (mirror web CustomLabelConfig); only read when style==='heritage'. */
   heritagePattern?: string
+  heritageColorSource?: 'card' | 'brand'
+  heritageBandColors?: string[]
+  heritageGradeColors?: Record<string, string>
   width?: number
   height?: number
 }
@@ -561,6 +572,9 @@ export default function LabelStudioScreen() {
         gradientEnd: '#ffffff',
         style: 'heritage',
         heritagePattern: config.heritagePattern || 'diamond',
+        heritageColorSource: config.heritageColorSource,
+        heritageBandColors: config.heritageBandColors,
+        heritageGradeColors: config.heritageGradeColors,
         borderEnabled: false,
         borderColor: '#7c3aed',
       }
@@ -595,6 +609,16 @@ export default function LabelStudioScreen() {
       fontScale: config.fontScale,
     }
   }, [config, activeGalleryIdx])
+
+  // Heritage band palette as currently resolved (custom edits win, then the
+  // brand toggle, then the card's extracted colours).
+  const heritageResolvedBand = useMemo(() => {
+    const custom = (config.heritageBandColors || []).filter(c => /^#[0-9a-fA-F]{6}$/.test(c))
+    if (custom.length >= 2) return custom
+    if (config.heritageColorSource === 'brand') return HERITAGE_BRAND_COLORS
+    return resolveHeritageBandColors(cardColors)
+  }, [config.heritageBandColors, config.heritageColorSource, cardColors])
+  const isHeritageTile = LABEL_GALLERY[activeGalleryIdx]?.id === 'slab-heritage'
 
   // ---- Handlers ----
   // Slab-modern, slab-traditional, and the matching card-image tiles render
@@ -743,6 +767,22 @@ export default function LabelStudioScreen() {
   }, [config])
 
   const handlePickerSelect = useCallback((hex: string) => {
+    if (pickerSlot <= -100) {
+      // Heritage per-grade chip colour (slot = -100 - grade)
+      const grade = -(pickerSlot + 100)
+      updateConfig({ heritageGradeColors: { ...(config.heritageGradeColors || {}), [String(grade)]: hex } })
+      setPickerVisible(false)
+      return
+    }
+    if (pickerSlot <= -10) {
+      // Heritage band swatch (slot = -10 - index). Editing pins the palette.
+      const i = -(pickerSlot + 10)
+      const next = [...heritageResolvedBand]
+      next[i] = hex
+      updateConfig({ heritageBandColors: next })
+      setPickerVisible(false)
+      return
+    }
     if (pickerSlot === -2) {
       // Grade digit color (July 2026 feature; slot convention: -1 border, -2 grade)
       updateConfig({ gradeColor: hex })
@@ -766,7 +806,7 @@ export default function LabelStudioScreen() {
       layoutStyle: layout,
     })
     setPickerVisible(false)
-  }, [config, pickerSlot, customColorCount, updateConfig])
+  }, [config, pickerSlot, customColorCount, updateConfig, heritageResolvedBand])
 
   // ---- Saved styles (server-synced via useLabelStyle hook) ----
   // DesignerConfig is field-compatible with the CustomLabelConfig shape the
@@ -775,7 +815,12 @@ export default function LabelStudioScreen() {
   // gradientAngle, geometricPattern, textColorMode) AND any future web-side
   // additions (e.g. gradeColor, fontScale) flowing through unchanged —
   // previously geometric/split/5-color designs corrupted on save.
-  const buildSaveConfig = useCallback(() => ({ ...config }), [config])
+  const buildSaveConfig = useCallback(() => {
+    if (LABEL_GALLERY[activeGalleryIdx]?.id === 'slab-heritage') {
+      return { ...config, style: 'heritage', preset: 'dcm-heritage', heritagePattern: config.heritagePattern || 'diamond' }
+    }
+    return { ...config }
+  }, [config, activeGalleryIdx])
 
   const saveStyle = useCallback(async () => {
     if (customStyles.length >= 4) {
@@ -909,7 +954,7 @@ export default function LabelStudioScreen() {
     // generated PDF matches exactly what the user is designing — without
     // forcing them to save it to a slot first. Web /label-export reads this
     // base64-encoded JSON via ?customConfig=...
-    if (exportType === 'slab-custom') {
+    if (exportType === 'slab-custom' || exportType === 'slab-heritage') {
       const inlineConfig = {
         colorPreset: config.colorPreset,
         gradientStart: config.gradientStart,
@@ -927,6 +972,9 @@ export default function LabelStudioScreen() {
         gradeColor: config.gradeColor,
         fontScale: config.fontScale,
         heritagePattern: config.heritagePattern,
+        heritageColorSource: config.heritageColorSource,
+        heritageBandColors: config.heritageBandColors,
+        heritageGradeColors: config.heritageGradeColors,
         preset: config.preset,
         width: config.width,
         height: config.height,
@@ -1347,6 +1395,96 @@ export default function LabelStudioScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* ============ Heritage Options ============ */}
+            {isHeritageTile && (
+              <View style={s.section}>
+                <Text style={s.sectionTitle}>Heritage Options</Text>
+
+                <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginTop: 4, marginBottom: 6 }}>Band Pattern</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {HERITAGE_PATTERNS.map(pt => {
+                    const active = (config.heritagePattern || 'diamond') === pt.id
+                    return (
+                      <TouchableOpacity
+                        key={pt.id}
+                        onPress={() => updateConfig({ heritagePattern: pt.id })}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: active ? Colors.purple[500] : Colors.gray[200], backgroundColor: active ? Colors.purple[50] : '#fff' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: active ? Colors.purple[700] : Colors.gray[600] }}>{pt.name}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+
+                <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginTop: 14, marginBottom: 6 }}>Band Colors</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {([['card', 'Card Colors'], ['brand', 'DCM Brand']] as const).map(([id, label]) => {
+                    const active = (config.heritageColorSource || 'card') === id && !config.heritageBandColors
+                    return (
+                      <TouchableOpacity
+                        key={id}
+                        onPress={() => updateConfig({ heritageColorSource: id, heritageBandColors: undefined })}
+                        style={{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: 'center', borderColor: active ? Colors.purple[500] : Colors.gray[200], backgroundColor: active ? Colors.purple[50] : '#fff' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: active ? Colors.purple[700] : Colors.gray[600] }}>{label}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                  {heritageResolvedBand.slice(0, 5).map((c, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => { setPickerSlot(-10 - i); setPickerCurrentColor(c); setPickerVisible(true) }}
+                      style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: c, borderWidth: 1, borderColor: Colors.gray[200] }}
+                    />
+                  ))}
+                  {config.heritageBandColors && (
+                    <TouchableOpacity onPress={() => updateConfig({ heritageBandColors: undefined })}>
+                      <Text style={{ fontSize: 11, color: Colors.purple[600], textDecorationLine: 'underline' }}>Reset</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 4 }}>
+                  {config.heritageBandColors ? 'Hand-edited — changing cards keeps these colors.' : 'Tap a swatch to fine-tune. Colors follow the selected source.'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.gray[500] }}>Grade Chip Colors</Text>
+                  {config.heritageGradeColors && Object.keys(config.heritageGradeColors).length > 0 && (
+                    <TouchableOpacity onPress={() => updateConfig({ heritageGradeColors: undefined })}>
+                      <Text style={{ fontSize: 11, color: Colors.purple[600], textDecorationLine: 'underline' }}>Reset all</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(g => {
+                    const override = config.heritageGradeColors?.[String(g)]
+                    const ink = override || HERITAGE_GRADE_INKS[g]?.ink || '#E5E7EB'
+                    return (
+                      <TouchableOpacity
+                        key={g}
+                        onPress={() => { setPickerSlot(-100 - g); setPickerCurrentColor(ink); setPickerVisible(true) }}
+                        style={{ width: 44, height: 34, borderRadius: 8, backgroundColor: HERITAGE_CHIP_BLACK, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: override ? Colors.purple[500] : 'transparent' }}
+                      >
+                        {g === 10 && !override ? (
+                          <Text style={{ fontSize: 13, fontWeight: '800' }}>
+                            <Text style={{ color: GRADE_10_FOIL_STOPS[1] }}>1</Text>
+                            <Text style={{ color: GRADE_10_FOIL_STOPS[3] }}>0</Text>
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: ink }}>{g}</Text>
+                        )}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+                <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 4 }}>
+                  Tap a chip to set a custom color for that grade. 10 defaults to the rainbow foil.
+                </Text>
+              </View>
+            )}
 
             {/* ============ Dimensions ============ */}
             <View style={s.section}>

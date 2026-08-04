@@ -554,9 +554,19 @@ export default function LabelExportPage() {
             showVipEmblem,
             showCardLoversEmblem,
           };
+          // Mobile Label Studio ships its in-flight heritage customizations
+          // (pattern, hand-edited band colours, per-grade chip colours) via
+          // ?customConfig — honor them the same way slab-custom does.
+          let heritageCfg: any = null;
+          if (inlineCustomConfigRaw) {
+            try { heritageCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall back below */ }
+          }
+          const { resolveHeritageSelection } = await import('@/lib/labels/labelStyleResolution');
+          const sel = resolveHeritageSelection('heritage', heritageCfg ? { ...heritageCfg, style: 'heritage' } : null);
           const opts = {
-            bandColors: resolveHeritageBandColors(card.card_colors),
-            pattern: gen.resolveHeritagePattern(sp.get('heritagePattern')),
+            bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors),
+            pattern: heritageCfg?.heritagePattern ? sel.pattern : gen.resolveHeritagePattern(sp.get('heritagePattern')),
+            gradeColors: sel.gradeColors,
           };
           const blob = format === 'foldover'
             ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)
