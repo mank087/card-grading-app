@@ -224,7 +224,7 @@ export default function CollectionScreen() {
           card_number, release_date, manufacturer_name, visibility,
           rookie_card, autographed, serial_numbering,
           conversational_whole_grade, conversational_condition_label,
-          conversational_card_info, front_path,
+          conversational_card_info, front_path, card_colors,
           ebay_price_median, dcm_price_estimate,
           dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
           created_at

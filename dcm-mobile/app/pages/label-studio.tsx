@@ -708,12 +708,17 @@ export default function LabelStudioScreen() {
       base.gradientEnd = '#2d1f47'
       base.style = 'modern'
       base.borderEnabled = false
+      // Forced tiles ignore config — move the gallery so the preview follows.
+      // (Same fix as dcm-heritage: clicking a preset while another forced
+      // tile is active previously changed nothing visibly.)
+      jumpToTile('slab-modern')
     } else if (preset.id === 'dcm-traditional') {
       base.colorPreset = 'traditional'
       base.gradientStart = '#f9fafb'
       base.gradientEnd = '#ffffff'
       base.style = 'traditional'
       base.borderEnabled = false
+      jumpToTile('slab-traditional')
     } else if (preset.id === 'dcm-heritage') {
       base.colorPreset = 'traditional'
       base.gradientStart = '#f9fafb'
@@ -731,6 +736,9 @@ export default function LabelStudioScreen() {
       base.borderEnabled = true
       base.borderColor = '#7c3aed'
       base.borderWidth = 0.04
+      // Bordered previews through the custom tile — the forced traditional
+      // tile would hide the border.
+      jumpToTile('custom')
     }
     setActiveCardColorStyle(null)
     updateConfig(base)
