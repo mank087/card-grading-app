@@ -92,11 +92,14 @@ function getWrapperColors(overrides?: LabelColorOverrides): readonly string[] {
 function HeritageBandArt({ pattern, colors }: { pattern: string; colors: string[] }) {
   const c = (i: number) => colors[i % colors.length] || '#7c3aed'
   if (pattern === 'diamond') {
+    // Base is colors[0]; diamonds cycle the REST so none disappears into it.
+    const gem = (i: number) =>
+      colors.length > 1 ? (colors[1 + (i % (colors.length - 1))] || '#7c3aed') : '#7c3aed'
     return (
-      <View style={{ flex: 1, backgroundColor: c(1) }}>
+      <View style={{ flex: 1, backgroundColor: c(0) }}>
         {Array.from({ length: 9 }, (_, i) => (
           <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{ width: 7, height: 7, transform: [{ rotate: '45deg' }], backgroundColor: c(i === 1 ? 4 : i) }} />
+            <View style={{ width: 7, height: 7, transform: [{ rotate: '45deg' }], backgroundColor: gem(i) }} />
           </View>
         ))}
       </View>

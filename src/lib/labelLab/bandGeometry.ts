@@ -85,13 +85,18 @@ export function bandGeometry(
 
   if (pattern === 'diamond') {
     const size = H / 9, half = size * 0.62
+    // Diamonds sit ON the base colour (q(0)) — cycling the full palette made
+    // every len-th diamond base-on-base: outlined but invisible ("blank"
+    // diamonds"). Cycle the non-base colours only.
+    const gem = (i: number) =>
+      colors.length > 1 ? (colors[1 + (i % (colors.length - 1))] || '#7C3AED') : '#7C3AED'
     let n = 0
     for (let row = -1; row <= Math.ceil(H / size) + 1; row++) {
       for (let col = 0; col < 2; col++) {
         const cx = W * (col === 0 ? 0.25 : 0.75)
         const cy = row * size + (col === 1 ? size / 2 : 0)
         const d = `M ${cx} ${cy - half} L ${cx + half} ${cy} L ${cx} ${cy + half} L ${cx - half} ${cy} Z`
-        fills.push({ d, fill: q(n++) })
+        fills.push({ d, fill: gem(n++) })
         strokes.push({ d })
       }
     }
