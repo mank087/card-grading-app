@@ -212,6 +212,21 @@ export default function EbayImagePrepPage() {
         const backImageUrl = signed?.find(u => u.path === card.back_path)?.signedUrl;
         if (!frontImageUrl || !backImageUrl) throw new Error('Card images not signable');
 
+        // Resolve a custom-N style id to its saved config (needed to detect
+        // Heritage custom slots and their pattern/band/grade customisations).
+        let activeStyleConfig: any = null;
+        if (labelStyleParam.startsWith('custom-')) {
+          try {
+            const { data: credits } = await supabase
+              .from('user_credits')
+              .select('custom_label_styles')
+              .single();
+            const styles = (credits?.custom_label_styles || []) as Array<{ id: string; config: any }>;
+            activeStyleConfig = styles.find(st => st.id === labelStyleParam)?.config || null;
+          } catch { /* fall through — style renders as its non-heritage default */ }
+        }
+        const heritageSel = resolveHeritageSelection(labelStyleParam, activeStyleConfig);
+
         const labelData = getCardLabelData(card);
         const weightedScores = card.conversational_weighted_sub_scores || {};
         const subScoresData = card.conversational_sub_scores || {};
@@ -237,12 +252,13 @@ export default function EbayImagePrepPage() {
           backImageUrl,
           showFounderEmblem: false,
           labelStyle: labelStyleParam,
-          heritage: (() => {
-            const sel = resolveHeritageSelection(labelStyleParam, null);
-            return sel.active
-              ? { pattern: sel.pattern, bandColors: resolveHeritageBandColors(card.card_colors) }
-              : undefined;
-          })(),
+          heritage: heritageSel.active
+            ? {
+                pattern: heritageSel.pattern,
+                bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors),
+                gradeColors: heritageSel.gradeColors,
+              }
+            : undefined,
           subScores,
         };
 
@@ -355,6 +371,9 @@ export default function EbayImagePrepPage() {
             conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
             labelCondition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
             gradeRange: card.conversational_grade_uncertainty || '±0.5',
+            heritage: heritageSel.active
+              ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: heritageSel.gradeColors }
+              : undefined,
             professionalGrades: {
               psa: card.estimated_professional_grades?.psa?.grade || '-',
               bgs: card.estimated_professional_grades?.bgs?.grade || '-',

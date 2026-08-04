@@ -404,6 +404,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         specialFeaturesString: safeFeaturesLine || '',
         cardUrl: cardUrl,
         qrCodeDataUrl: qrCodeDataUrl,
+        heritage: (() => {
+          const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
+          return sel.active
+            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
+            : undefined;
+        })(),
         professionalGrades: {
           psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
           bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',

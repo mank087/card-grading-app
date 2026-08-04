@@ -1,11 +1,53 @@
 import React from 'react';
 import { Document, Page, Text, View, Image } from '@react-pdf/renderer';
 import { reportStyles } from './ReportStyles';
+import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS } from '@/lib/labelPresets';
 
 /**
  * Card Grading Report PDF Component
  * Generates a professional PDF report for card grading results
  */
+
+/** Vertical band stripe — the Heritage side band in miniature. */
+const HeritageStripe = ({ colors }: { colors: string[] }) => (
+  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 7, flexDirection: 'column' }}>
+    {colors.slice(0, 5).map((color, i) => (
+      <View key={i} style={{ flex: 1, backgroundColor: color }} />
+    ))}
+    <View style={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 1, backgroundColor: '#101014' }} />
+  </View>
+);
+
+/** Heritage grade chip: black field, per-grade ink, two-tone foil-style 10. */
+const HeritageReportChip = ({ grade, gradeFormatted, condition, gradeColors }: {
+  grade: number; gradeFormatted: string; condition: string;
+  gradeColors?: Record<string, string> | null;
+}) => {
+  const whole = Math.round(grade);
+  const chip = resolveGradeChip(String(whole), true);
+  const override = gradeColors?.[String(whole)];
+  const ink = override || chip.ink;
+  const isFoil10 = whole === 10 && !override;
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <View style={{
+        backgroundColor: GRADE_CHIP_BLACK, borderRadius: 4, paddingVertical: 2, paddingHorizontal: 6,
+        alignItems: 'center', minWidth: 26,
+        ...(whole === 10 ? { borderWidth: 1, borderColor: override || GRADE_10_FOIL_STOPS[2] } : {}),
+      }}>
+        {isFoil10 ? (
+          <Text style={{ fontSize: 12, fontWeight: 'bold' }}>
+            <Text style={{ color: GRADE_10_FOIL_STOPS[1] }}>1</Text>
+            <Text style={{ color: GRADE_10_FOIL_STOPS[3] }}>0</Text>
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 12, fontWeight: 'bold', color: ink }}>{gradeFormatted}</Text>
+        )}
+      </View>
+      <Text style={{ fontSize: 4.5, color: '#4B5563', fontWeight: 'bold', marginTop: 1 }}>{condition}</Text>
+    </View>
+  );
+};
 
 export interface ReportCardData {
   // Unified Label Data (matches card detail page exactly)
@@ -16,6 +58,13 @@ export interface ReportCardData {
   grade: number;              // Numeric grade
   gradeFormatted: string;     // Display format (7 or 7.5)
   condition: string;          // Condition label (Near Mint, Excellent, etc.)
+
+  /**
+   * Heritage label depiction (Aug 2026): when set, the slab-label headers in
+   * the report render the Heritage skin (band stripe in the card's colours,
+   * black grade chip) so the report matches the user's selected label style.
+   */
+  heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null;
 
   // Legacy fields (kept for backward compatibility with other report sections)
   cardName: string;
@@ -196,8 +245,9 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
           <View style={reportStyles.slabOuterContainer}>
             <View style={reportStyles.slabInnerContainer}>
               {/* Front Label - Unified 4-Line Structure (matches card detail page) */}
-              <View style={reportStyles.cardLabelContainer}>
-                <View style={reportStyles.cardLabelRow}>
+              <View style={[reportStyles.cardLabelContainer, cardData.heritage ? { backgroundColor: '#FFFFFF' } : {}]}>
+                {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
+                <View style={[reportStyles.cardLabelRow, cardData.heritage ? { paddingLeft: 10 } : {}]}>
                   <View style={reportStyles.cardLabelLeft}>
                     <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
                   </View>
@@ -223,6 +273,9 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                       {cardData.serial}
                     </Text>
                   </View>
+                  {cardData.heritage ? (
+                    <HeritageReportChip grade={cardData.grade} gradeFormatted={cardData.gradeFormatted} condition={cardData.condition} gradeColors={cardData.heritage.gradeColors} />
+                  ) : (
                   <View style={reportStyles.cardLabelRight}>
                     <Text style={reportStyles.cardLabelGrade}>
                       {cardData.gradeFormatted}
@@ -232,6 +285,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                       {cardData.condition}
                     </Text>
                   </View>
+                  )}
                 </View>
               </View>
 
@@ -309,7 +363,8 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
           <View style={reportStyles.slabOuterContainer}>
             <View style={reportStyles.slabInnerContainer}>
               {/* Back Label - QR Code Centered OR Unified Label */}
-              <View style={reportStyles.cardLabelContainer}>
+              <View style={[reportStyles.cardLabelContainer, cardData.heritage ? { backgroundColor: '#FFFFFF' } : {}]}>
+                {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
                 {cardData.qrCodeDataUrl ? (
                   <View style={reportStyles.qrCodeContainer}>
                     <Image src={cardData.qrCodeDataUrl} style={reportStyles.qrCodeImage} />
@@ -341,6 +396,9 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                         {cardData.serial}
                       </Text>
                     </View>
+                    {cardData.heritage ? (
+                      <HeritageReportChip grade={cardData.grade} gradeFormatted={cardData.gradeFormatted} condition={cardData.condition} gradeColors={cardData.heritage.gradeColors} />
+                    ) : (
                     <View style={reportStyles.cardLabelRight}>
                       <Text style={reportStyles.cardLabelGrade}>
                         {cardData.gradeFormatted}
@@ -350,6 +408,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                         {cardData.condition}
                       </Text>
                     </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -540,8 +599,9 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
           <View style={reportStyles.slabOuterContainer}>
             <View style={reportStyles.slabInnerContainer}>
               {/* Front Label - Unified 4-Line Structure */}
-              <View style={reportStyles.cardLabelContainer}>
-                <View style={reportStyles.cardLabelRow}>
+              <View style={[reportStyles.cardLabelContainer, cardData.heritage ? { backgroundColor: '#FFFFFF' } : {}]}>
+                {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
+                <View style={[reportStyles.cardLabelRow, cardData.heritage ? { paddingLeft: 10 } : {}]}>
                   <View style={reportStyles.cardLabelLeft}>
                     <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
                   </View>
@@ -563,6 +623,9 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                       {cardData.serial}
                     </Text>
                   </View>
+                  {cardData.heritage ? (
+                    <HeritageReportChip grade={cardData.grade} gradeFormatted={cardData.gradeFormatted} condition={cardData.condition} gradeColors={cardData.heritage.gradeColors} />
+                  ) : (
                   <View style={reportStyles.cardLabelRight}>
                     <Text style={reportStyles.cardLabelGrade}>
                       {cardData.gradeFormatted}
@@ -572,6 +635,7 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                       {cardData.condition}
                     </Text>
                   </View>
+                  )}
                 </View>
               </View>
 
@@ -636,7 +700,8 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
 
           <View style={reportStyles.slabOuterContainer}>
             <View style={reportStyles.slabInnerContainer}>
-              <View style={reportStyles.cardLabelContainer}>
+              <View style={[reportStyles.cardLabelContainer, cardData.heritage ? { backgroundColor: '#FFFFFF' } : {}]}>
+                {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
                 {cardData.qrCodeDataUrl ? (
                   <View style={reportStyles.qrCodeContainer}>
                     <Image src={cardData.qrCodeDataUrl} style={reportStyles.qrCodeImage} />
@@ -664,6 +729,9 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                         {cardData.serial}
                       </Text>
                     </View>
+                    {cardData.heritage ? (
+                      <HeritageReportChip grade={cardData.grade} gradeFormatted={cardData.gradeFormatted} condition={cardData.condition} gradeColors={cardData.heritage.gradeColors} />
+                    ) : (
                     <View style={reportStyles.cardLabelRight}>
                       <Text style={reportStyles.cardLabelGrade}>
                         {cardData.gradeFormatted}
@@ -673,6 +741,7 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                         {cardData.condition}
                       </Text>
                     </View>
+                    )}
                   </View>
                 )}
               </View>

@@ -109,6 +109,7 @@ export interface CardImageData {
   heritage?: {
     pattern: string;
     bandColors: string[];
+    gradeColors?: Record<string, string> | null;
   } | null;
 }
 
@@ -1007,6 +1008,7 @@ async function drawHeritageLabel(
     pattern,
     bandColors: data.heritage?.bandColors?.length ? data.heritage.bandColors : ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'],
     widthPx: width * 2,
+    gradeColors: data.heritage?.gradeColors ?? null,
   });
   ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
 }

@@ -55,6 +55,7 @@ import { pdf } from '@react-pdf/renderer';
 import { BatchCardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 
 declare global {
   interface Window {
@@ -185,10 +186,11 @@ function BatchLabelExportInner() {
         // Emblems
         let showFounderEmblem = false, showVipEmblem = false, showCardLoversEmblem = false;
         let savedCustomStyles: Array<{ id: string; name: string; config: any }> = [];
+        let userLabelStyle = 'modern';
         try {
           const { data: creditsRow } = await supabase
             .from('user_credits')
-            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles')
+            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles, label_style')
             .single();
           if (creditsRow) {
             const emblems = resolveEmblemVisibility(creditsRow);
@@ -197,6 +199,9 @@ function BatchLabelExportInner() {
             showCardLoversEmblem = emblems.showCardLoversEmblem;
             if (Array.isArray(creditsRow.custom_label_styles)) {
               savedCustomStyles = creditsRow.custom_label_styles as any[];
+            }
+            if (typeof (creditsRow as any).label_style === 'string') {
+              userLabelStyle = (creditsRow as any).label_style;
             }
           }
         } catch { /* non-fatal */ }
@@ -580,6 +585,13 @@ function BatchLabelExportInner() {
               specialFeaturesString: safeFeatures || '',
               cardUrl,
               qrCodeDataUrl,
+              heritage: (() => {
+                const cfg = savedCustomStyles.find(st => st.id === userLabelStyle)?.config || null;
+                const sel = resolveHeritageSelection(userLabelStyle, cfg);
+                return sel.active
+                  ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors }
+                  : undefined;
+              })(),
               professionalGrades: {
                 psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
                 bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',

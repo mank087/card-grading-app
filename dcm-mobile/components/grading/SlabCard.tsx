@@ -167,7 +167,6 @@ function SlabCardImpl({
             styles.label,
             { height: labelHeight },
             isTraditional && { borderWidth: 1, borderColor: Colors.gray[200] },
-            isHeritage && { borderWidth: 1, borderColor: HERITAGE_THEME.edge },
           ]}
         >
           {isHeritage && (
@@ -192,6 +191,27 @@ function SlabCardImpl({
                       style={{ width: qrSize, height: qrSize }}
                       resizeMode="contain"
                     />
+                    {/* DCM mark knocked into the centre — matches the printed
+                        labels (ecc=H absorbs the occlusion). */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: 4 + qrSize / 2 - qrSize * 0.15,
+                        top: 4 + qrSize / 2 - qrSize * 0.15,
+                        width: qrSize * 0.3,
+                        height: qrSize * 0.3,
+                        borderRadius: qrSize * 0.15,
+                        backgroundColor: '#fff',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Image
+                        source={require('@/assets/images/dcm-logo.png')}
+                        style={{ width: qrSize * 0.24, height: qrSize * 0.24 }}
+                        resizeMode="contain"
+                      />
+                    </View>
                   </View>
                 ) : null}
                 {([

@@ -35,6 +35,7 @@ import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 
 declare global {
   interface Window {
@@ -313,6 +314,13 @@ export default function LabelExportPage() {
             specialFeaturesString: safeFeatures || '',
             cardUrl,
             qrCodeDataUrl,
+            heritage: (() => {
+              const cfg = savedCustomStyles.find(st => st.id === labelStyleParam)?.config || null;
+              const sel = resolveHeritageSelection(labelStyleParam, cfg);
+              return sel.active
+                ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors }
+                : undefined;
+            })(),
             professionalGrades: {
               psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
               bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',

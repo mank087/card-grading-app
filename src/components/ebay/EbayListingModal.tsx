@@ -1060,6 +1060,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         labelCondition: labelData.condition || getConditionLabel(grade),
         gradeRange: card.conversational_grade_uncertainty || '±0.5',
         // Professional grades
+        heritage: (() => {
+          const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
+          return sel.active
+            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
+            : undefined;
+        })(),
         professionalGrades: {
           psa: card.estimated_professional_grades?.psa?.grade || '-',
           bgs: card.estimated_professional_grades?.bgs?.grade || '-',
