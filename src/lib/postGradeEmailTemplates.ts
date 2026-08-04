@@ -765,6 +765,6 @@ export function categoryToRouteSlug(category: string | null | undefined): string
   if (c === 'yu-gi-oh' || c === 'yugioh') return 'yugioh';
   if (c === 'star wars' || c === 'starwars') return 'starwars';
   // Sports sub-categories all route to /sports
-  if (['sports', 'football', 'baseball', 'basketball', 'hockey', 'soccer'].includes(c)) return 'sports';
+  if (['sports', 'football', 'baseball', 'basketball', 'hockey', 'soccer', 'wrestling', 'racing', 'boxing', 'mma', 'tennis', 'golf'].includes(c)) return 'sports';
   return 'other';
 }

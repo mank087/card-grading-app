@@ -29,6 +29,7 @@ import { generateCardImages, generateRawCardImages, type CardImageData } from '@
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
@@ -247,7 +248,7 @@ export default function EbayImagePrepPage() {
           englishName,
           grade: labelData.grade ?? 0,
           conditionLabel: labelData.condition,
-          cardUrl: `${window.location.origin}/${(card.category || 'other').toLowerCase().replace(' ', '')}/${card.id}`,
+          cardUrl: `${window.location.origin}/${categoryToRouteSlug(card.category)}/${card.id}`,
           frontImageUrl,
           backImageUrl,
           showFounderEmblem: false,

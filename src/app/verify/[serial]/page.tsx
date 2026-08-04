@@ -2,23 +2,16 @@ import { redirect, notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { withColumnFallback } from '@/lib/cards/ownership';
 import { Metadata } from 'next';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 
 interface PageProps {
   params: Promise<{ serial: string }>;
 }
 
-const SPORT_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
-
+// Canonical category -> route slug (case-insensitive, covers every category
+// incl. Star Wars — the old local map silently sent those to /sports).
 function getCardRoute(category: string | null, id: string): string {
-  if (category && SPORT_CATEGORIES.includes(category)) return `/sports/${id}`;
-  if (category === 'Pokemon') return `/pokemon/${id}`;
-  if (category === 'MTG') return `/mtg/${id}`;
-  if (category === 'Lorcana') return `/lorcana/${id}`;
-  if (category === 'One Piece') return `/onepiece/${id}`;
-  if (category === 'Yu-Gi-Oh') return `/yugioh/${id}`;
-  if (category === 'Other') return `/other/${id}`;
-  // Fallback — try sports as default since it was the original card type
-  return `/sports/${id}`;
+  return `/${categoryToRouteSlug(category)}/${id}`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
