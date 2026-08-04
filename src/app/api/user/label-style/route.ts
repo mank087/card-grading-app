@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-const VALID_BUILT_IN = ['modern', 'traditional'];
+const VALID_BUILT_IN = ['modern', 'traditional', 'heritage'];
 const VALID_CUSTOM_IDS = ['custom-1', 'custom-2', 'custom-3', 'custom-4'];
 const MAX_CUSTOM_STYLES = 4;
 

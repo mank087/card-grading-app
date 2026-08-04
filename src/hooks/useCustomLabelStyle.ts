@@ -5,7 +5,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import type { SavedCustomStyle, LabelColorOverrides, CustomLabelConfig } from '@/lib/labelPresets';
 import { extractColorOverrides } from '@/lib/labelPresets';
 
-export type LabelStyleId = 'modern' | 'traditional' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
+export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
 
 interface UseCustomLabelStyleReturn {
   labelStyle: LabelStyleId;

@@ -56,6 +56,9 @@ import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
@@ -1561,6 +1564,21 @@ export function MTGCardDetails() {
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
   const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyle();
+  // Heritage label selection — built-in 'heritage' id or a saved custom config
+  // whose style is 'heritage'. Renders through the shared SVG preview.
+  const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
+  const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
+  useEffect(() => {
+    // currentUrl is declared after the loading early-returns, so rebuild it here
+    const heritageQrUrl = origin && cardId ? `${origin}/lorcana/${cardId}` : '';
+    if (!heritageSel.active || !heritageQrUrl) return;
+    let cancelled = false;
+    import('qrcode')
+      .then(q => q.default.toDataURL(heritageQrUrl, { errorCorrectionLevel: 'H', margin: 1, width: 300, color: { dark: '#141414', light: '#ffffff' } }))
+      .then(u => { if (!cancelled) setHeritageQrDataUrl(u); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [heritageSel.active, origin, cardId]);
   // 💰 DCM Price data state (for price callout)
   const [dcmPriceData, setDcmPriceData] = useState<{
     estimatedValue: number | null;
@@ -2580,6 +2598,28 @@ export function MTGCardDetails() {
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
   const labelData = getCardLabelData(card);
 
+  // Heritage label data — feeds the shared SVG preview when heritage is active
+  const heritageData = heritageSel.active ? {
+    primaryName: labelData.primaryName,
+    contextLine: labelData.contextLine || '',
+    features: labelData.features || [],
+    serial: labelData.serial,
+    grade: labelData.grade,
+    condition: labelData.condition,
+    isAlteredAuthentic: labelData.isAlteredAuthentic,
+    qrCodeDataUrl: heritageQrDataUrl,
+    subScores: card?.conversational_sub_scores ? {
+      centering: card.conversational_sub_scores.centering?.weighted ?? 0,
+      corners: card.conversational_sub_scores.corners?.weighted ?? 0,
+      edges: card.conversational_sub_scores.edges?.weighted ?? 0,
+      surface: card.conversational_sub_scores.surface?.weighted ?? 0,
+    } : undefined,
+    showFounderEmblem,
+    showVipEmblem,
+    showCardLoversEmblem,
+  } : null;
+  const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
+
   // 🎯 Lorcana cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {
     recommended_decimal_grade: card.conversational_decimal_grade,
@@ -2824,7 +2864,15 @@ export function MTGCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Front Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="front"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernFrontLabel
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine || 'Card Details'}
@@ -2967,7 +3015,15 @@ export function MTGCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Back Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="back"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernBackLabel
                   serial={labelData.serial}
                   grade={labelData.grade}
@@ -5485,6 +5541,7 @@ export function MTGCardDetails() {
                       cardType="lorcana"
                       showFounderEmblem={showFounderEmblem}
                       labelStyle={labelStyle}
+                      customLabelConfig={activeConfig}
                       className="w-full"
                     />
                   </CollapsibleSection>

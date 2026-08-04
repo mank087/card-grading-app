@@ -359,7 +359,158 @@ function SlabVectorDoc({
   return <Document>{pages}</Document>
 }
 
+// ------- Fold-over (vector) -------
+//
+// Geometry mirrors the raster fold-over (slabLabelGenerator
+// generateFoldOverSlabLabel): BACK panel on top rotated 180°, FRONT below,
+// flush at the fold seam. The blocks paint bleed on every side, so each panel
+// is wrapped in an overflow-hidden box that keeps bleed on its three OUTER
+// edges and crops the fold side — the vector equivalent of the raster path's
+// cropBleedEdge (uncropped fold-side bleed would paint over the other panel).
+
+const FOLD_H = LABEL_H * 2
+
+function FoldPanel({
+  x, y, cropEdge, children,
+}: { x: number; y: number; cropEdge: 'top' | 'bottom'; children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: x - BLEED,
+        top: cropEdge === 'bottom' ? y - BLEED : y,
+        width: LABEL_W + BLEED * 2,
+        height: LABEL_H + BLEED,
+        overflow: 'hidden',
+      }}
+    >
+      <View style={{ position: 'absolute', left: BLEED, top: cropEdge === 'bottom' ? BLEED : 0, width: LABEL_W, height: LABEL_H }}>
+        {children}
+      </View>
+    </View>
+  )
+}
+
+/** Dashed cut outline around the fold pair + grey fold ticks at the seam. */
+function FoldCutGuides({ x, y, color }: { x: number; y: number; color: string }) {
+  const foldY = y + LABEL_H
+  return (
+    <>
+      <Rect x={x} y={y} width={LABEL_W} height={FOLD_H} fill="none" stroke={color} strokeWidth={0.5} strokeDasharray="3 3" />
+      <Line x1={x - 16} y1={foldY} x2={x - 4} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
+      <Line x1={x + LABEL_W + 4} y1={foldY} x2={x + LABEL_W + 16} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
+      <ScissorGlyph x={x - 9} y={y + 2} color={color} />
+      <ScissorGlyph x={x + LABEL_W + 2} y={y + 2} color={color} />
+    </>
+  )
+}
+
+// Fold-over batch grid — same cell math as the raster generateBatchFoldOverSlabLabels.
+const FOLD_ROW_MARGIN = 0.15 * INCH
+const FOLD_COL_MARGIN = 0.2 * INCH
+const FOLD_CELL_W = LABEL_W + FOLD_COL_MARGIN
+const FOLD_CELL_H = FOLD_H + FOLD_ROW_MARGIN
+const FOLD_COLS = 2
+const FOLD_ROWS = Math.floor((PAGE_H - 1 * INCH) / FOLD_CELL_H)
+export const FOLD_PER_PAGE = FOLD_COLS * FOLD_ROWS
+const FOLD_GRID_X = (PAGE_W - FOLD_COLS * FOLD_CELL_W + FOLD_COL_MARGIN) / 2
+const FOLD_GRID_Y = (PAGE_H - FOLD_ROWS * FOLD_CELL_H + FOLD_ROW_MARGIN) / 2
+
+function FoldPairAt({ e, spec, x, y, idSuffix }: { e: VectorEntry; spec: LabStyleSpec; x: number; y: number; idSuffix: string }) {
+  return (
+    <>
+      <FoldPanel x={x} y={y} cropEdge="bottom">
+        <View style={{ width: LABEL_W, height: LABEL_H, transform: 'rotate(180deg)' }}>
+          <CustomSlabBackBlock inputs={e.back} spec={spec} idSuffix={`${idSuffix}b`} bleedPt={BLEED} />
+        </View>
+      </FoldPanel>
+      <FoldPanel x={x} y={y + LABEL_H} cropEdge="top">
+        <CustomSlabLabelBlock inputs={e.front} spec={spec} idSuffix={`${idSuffix}f`} bleedPt={BLEED} />
+      </FoldPanel>
+    </>
+  )
+}
+
+function SlabFoldOverDoc({
+  entries, spec, guideColor,
+}: { entries: VectorEntry[]; spec: LabStyleSpec; guideColor: string }) {
+  // Single label: centered pair.
+  if (entries.length === 1) {
+    const x = (PAGE_W - LABEL_W) / 2
+    const y = (PAGE_H - FOLD_H) / 2
+    return (
+      <Document>
+        <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+          <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 1.6" fold-over'} />
+          <FoldPairAt e={entries[0]} spec={spec} x={x} y={y} idSuffix="fo" />
+          <GuidesLayer>
+            <FoldCutGuides x={x} y={y} color={guideColor} />
+          </GuidesLayer>
+          <Text style={{ position: 'absolute', left: x, top: y + FOLD_H + 8, fontSize: 7, color: '#9ca3af' }}>
+            2.8&quot; × 1.6&quot; total — fold top panel behind front
+          </Text>
+        </Page>
+      </Document>
+    )
+  }
+  // Batch: 2-column fold grid, single-sided pages.
+  const totalSheets = Math.ceil(entries.length / FOLD_PER_PAGE)
+  const pages: React.ReactElement[] = []
+  for (let sheet = 0; sheet < totalSheets; sheet++) {
+    const slice = entries.slice(sheet * FOLD_PER_PAGE, (sheet + 1) * FOLD_PER_PAGE)
+    pages.push(
+      <Page key={sheet} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={'2.8" × 1.6" fold-over'} />
+        {slice.map((e, i) => {
+          const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W
+          const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H
+          return <FoldPairAt key={i} e={e} spec={spec} x={x} y={y} idSuffix={`fo${sheet}-${i}`} />
+        })}
+        <GuidesLayer>
+          {slice.map((_, i) => {
+            const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W
+            const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H
+            return <FoldCutGuides key={i} x={x} y={y} color={guideColor} />
+          })}
+        </GuidesLayer>
+      </Page>,
+    )
+  }
+  return <Document>{pages}</Document>
+}
+
+/** Standard slab fold-over (Modern/Traditional), single label, one page. */
+export async function generateFoldOverSlabLabelVector(
+  data: SlabLabelData,
+  style: 'modern' | 'traditional',
+): Promise<Blob> {
+  const spec = specForStyle(style)
+  const guideColor = style === 'modern' ? '#999999' : '#000000'
+  const entries = [{ front: mapFrontInputs(data), back: mapBackInputs(data) }]
+  return renderDocToBlob(
+    <SlabFoldOverDoc entries={entries} spec={spec} guideColor={guideColor} />,
+  )
+}
+
+/** Standard slab fold-over batch — single-sided fold grid. */
+export async function generateBatchFoldOverSlabLabelsVector(
+  dataArray: SlabLabelData[],
+  style: 'modern' | 'traditional',
+): Promise<Blob> {
+  const spec = specForStyle(style)
+  const guideColor = style === 'modern' ? '#999999' : '#000000'
+  const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
+  return renderDocToBlob(
+    <SlabFoldOverDoc entries={entries} spec={spec} guideColor={guideColor} />,
+  )
+}
+
 // ------- Public generators -------
+
+// Page chrome + geometry shared with the Heritage generator
+// (labels/heritageSlabGenerator), so all slab styles print with identical
+// sheets, guides, and duplex behaviour.
+export { PageHeader, CornerMarks, FrontCutGuides, GuidesLayer, LabelAt, gridPos, SINGLE_X, SINGLE_Y }
 
 async function renderDocToBlob(doc: React.ReactElement): Promise<Blob> {
   const { pdf } = await import('@react-pdf/renderer')

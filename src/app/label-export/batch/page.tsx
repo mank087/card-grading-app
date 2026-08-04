@@ -54,6 +54,7 @@ import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator
 import { pdf } from '@react-pdf/renderer';
 import { BatchCardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 
 declare global {
   interface Window {
@@ -226,9 +227,46 @@ function BatchLabelExportInner() {
         }));
 
         // ------------------------------------------------------------
+        // SLAB LABELS — HERITAGE (vector, per-card band colours)
+        // ------------------------------------------------------------
+        if (type === 'slab-heritage') {
+          setStatus(`Generating ${cardIds.length} Heritage slab labels (${format})…`);
+          const gen = await import('@/lib/labels/heritageSlabGenerator');
+          const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
+          const items = perCard.map(({ card, labelData, subScores, grade }) => ({
+            data: {
+              primaryName: labelData.primaryName,
+              contextLine: labelData.contextLine || '',
+              features: [],
+              serial: labelData.serial,
+              grade,
+              condition: labelData.condition,
+              isAlteredAuthentic: !!(labelData as any).isAlteredAuthentic,
+              qrCodeDataUrl: '',
+              subScores,
+              logoDataUrl,
+              whiteLogoDataUrl,
+              showFounderEmblem,
+              showVipEmblem,
+              showCardLoversEmblem,
+            } as any,
+            bandColors: resolveHeritageBandColors(card.card_colors),
+          }));
+          const pattern = gen.resolveHeritagePattern(sp.get('heritagePattern'));
+          const blob = format === 'foldover'
+            ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern)
+            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern);
+          blobs.push({
+            name: `DCM-Slab-heritage-${format}-${cardIds.length}cards.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        }
+
+        // ------------------------------------------------------------
         // SLAB LABELS (modern / traditional)
         // ------------------------------------------------------------
-        if (type === 'slab-modern' || type === 'slab-traditional') {
+        else if (type === 'slab-modern' || type === 'slab-traditional') {
           setStatus(`Generating ${cardIds.length} slab labels (${format})…`);
           const slabStyle: 'modern' | 'traditional' = type === 'slab-traditional' ? 'traditional' : 'modern';
           const slabPayloads = perCard.map(({ card, labelData, subScores, grade, qrCodeDataUrl }) => ({
@@ -583,7 +621,7 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         // CARD IMAGE batch — one JPG pair (front + back) per card
         // ------------------------------------------------------------
-        else if (type === 'card-image-modern' || type === 'card-image-traditional') {
+        else if (type === 'card-image-modern' || type === 'card-image-traditional' || type === 'card-image-heritage') {
           setStatus(`Generating ${cardIds.length} card image pairs…`);
           const labelStyle: 'modern' | 'traditional' = type === 'card-image-traditional' ? 'traditional' : 'modern';
           for (let i = 0; i < perCard.length; i++) {

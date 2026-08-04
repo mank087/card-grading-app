@@ -14,7 +14,8 @@
  *
  * URL params:
  *   ?token=<jwt>                    — Supabase auth token
- *   &type=slab-modern|slab-traditional|slab-custom
+ *   &type=slab-modern|slab-traditional|slab-custom|slab-heritage
+ *   &heritagePattern=<band pattern id>  — optional, slab-heritage only
  *   &side=front|back
  *   &customConfig=<base64-json>     — optional, used for slab-custom
  *
@@ -87,6 +88,16 @@ function traditionalConfig(side: 'front' | 'back'): CustomLabelConfig {
   };
 }
 
+/** Heritage preset → CustomLabelConfig (band colours resolve per card). */
+function heritageConfig(side: 'front' | 'back', pattern?: string | null): CustomLabelConfig {
+  return {
+    ...traditionalConfig(side),
+    preset: 'dcm-heritage',
+    style: 'heritage',
+    heritagePattern: pattern || 'diamond',
+  };
+}
+
 /** DCM Bordered preset → CustomLabelConfig */
 function borderedConfig(side: 'front' | 'back'): CustomLabelConfig {
   return {
@@ -109,6 +120,7 @@ export default function LabelPreviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const slabDataRef = useRef<SlabLabelData | null>(null);
+  const cardColorsRef = useRef<any>(null);
   const renderIdRef = useRef(0);
 
   // Decode initial config from URL if provided
@@ -128,6 +140,7 @@ export default function LabelPreviewPage() {
       return { ...custom, side };
     }
     if (type === 'slab-traditional') return traditionalConfig(side);
+    if (type === 'slab-heritage') return heritageConfig(side, sp.get('heritagePattern'));
     if (type === 'slab-bordered' || type === 'dcm-bordered') return borderedConfig(side);
     return modernConfig(side);
   }
@@ -166,6 +179,7 @@ export default function LabelPreviewPage() {
           }
         } catch { /* non-fatal */ }
 
+        cardColorsRef.current = card.card_colors || null;
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
         const s = card.conversational_sub_scores || {};
@@ -242,6 +256,28 @@ export default function LabelPreviewPage() {
     try {
       const data = slabDataRef.current;
       const side = (config.side as 'front' | 'back') || 'front';
+      // Heritage renders through the shared SVG rasterizer (the canvas
+      // generators only know modern/traditional layouts).
+      if (config.style === 'heritage') {
+        const [{ renderHeritageLabelPng }, { resolveHeritageSelection }, { resolveHeritageBandColors }] = await Promise.all([
+          import('@/lib/labels/heritageRaster'),
+          import('@/lib/labels/labelStyleResolution'),
+          import('@/lib/labelLab/heritageLayout'),
+        ]);
+        const sel = resolveHeritageSelection('heritage', config);
+        const url = await renderHeritageLabelPng({
+          data: data as any,
+          side,
+          pattern: sel.pattern,
+          bandColors: sel.bandColors ?? resolveHeritageBandColors(cardColorsRef.current),
+          gradeColors: sel.gradeColors,
+          widthPx: 806,
+        });
+        if (renderId !== renderIdRef.current) return;
+        setImageUrl(url);
+        postToRN({ type: 'label-preview-ready', dataUrl: url, side });
+        return;
+      }
       const canvas = side === 'front'
         ? await renderFrontCanvas(data as any, config, PREVIEW_DPI)
         : await renderBackCanvas(data as any, config, PREVIEW_DPI);

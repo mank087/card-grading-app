@@ -34,19 +34,25 @@ export function LabelStyleDropdown({
   const getDisplayName = (id: LabelStyleId): string => {
     if (id === 'modern') return 'Modern (DCM)'
     if (id === 'traditional') return 'Traditional'
+    if (id === 'heritage') return 'Heritage'
     const custom = customStyles.find(s => s.id === id)
     return custom?.name || id
   }
+
+  // Ivory field with the purple band on the left — Heritage in miniature.
+  const HERITAGE_DOT_BG = 'linear-gradient(90deg, #7c3aed 0%, #7c3aed 30%, #FFFFFF 30%, #FAF8F4 100%)'
 
   // Color dot for custom styles
   const ColorDot = ({ config }: { config: SavedCustomStyle['config'] }) => (
     <span
       className="inline-block w-3 h-3 rounded-full flex-shrink-0"
       style={{
-        background: config.colorPreset === 'rainbow'
+        background: config.style === 'heritage'
+          ? HERITAGE_DOT_BG
+          : config.colorPreset === 'rainbow'
           ? 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00cc00, #0066ff, #8800ff, #ff00ff)'
           : `linear-gradient(135deg, ${config.gradientStart}, ${config.gradientEnd})`,
-        border: config.borderEnabled ? `1px solid ${config.borderColor}` : '1px solid rgba(0,0,0,0.15)',
+        border: config.style !== 'heritage' && config.borderEnabled ? `1px solid ${config.borderColor}` : '1px solid rgba(0,0,0,0.15)',
       }}
     />
   )
@@ -95,6 +101,24 @@ export function LabelStyleDropdown({
           >
             <span className="font-medium text-sm">Traditional</span>
             {labelStyle === 'traditional' && (
+              <svg className="w-4 h-4 ml-auto text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            onClick={() => { onSwitch('heritage'); setOpen(false); }}
+            className={`w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors ${
+              labelStyle === 'heritage' ? 'bg-purple-50 text-purple-700' : 'hover:bg-gray-50 text-gray-900'
+            }`}
+          >
+            <span
+              className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+              style={{ background: HERITAGE_DOT_BG, border: '1px solid rgba(0,0,0,0.15)' }}
+            />
+            <span className="font-medium text-sm">Heritage</span>
+            {labelStyle === 'heritage' && (
               <svg className="w-4 h-4 ml-auto text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>

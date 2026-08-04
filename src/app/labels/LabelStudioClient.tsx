@@ -5,10 +5,14 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine, formatCardNumberForContext } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops } from '@/lib/labelPresets'
+import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops, GRADE_CHIPS_PRINT, GRADE_CHIP_BLACK, GRADE_10_FOIL_CSS } from '@/lib/labelPresets'
 import { contrastRatioHex } from '@/lib/contrastWCAG'
+import { getStoredSession } from '@/lib/directAuth'
 import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
 import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
+import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/bandGeometry'
+import { resolveHeritageBandColors, HERITAGE_BRAND_COLORS } from '@/lib/labelLab/heritageLayout'
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { LabelMockup } from '@/components/labels/LabelMockup'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
 import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '@/lib/customSlabLabelGenerator'
@@ -38,6 +42,22 @@ interface Props {
 
 type SlabPrintFormat = 'duplex' | 'foldover'
 const PRINT_FORMAT_KEY = 'labelStudio_slabPrintFormat'
+
+/**
+ * The designer config persists per IDENTITY, not per browser. With a single
+ * shared key, a guest's experiments (grade chip colors, patterns, ...) were
+ * still sitting in localStorage when someone signed in on the same machine
+ * and silently became "their" settings. Guests get their own bucket; the
+ * legacy un-namespaced key is only ever read as guest data.
+ */
+function customConfigKey(): string {
+  try {
+    const uid = getStoredSession()?.user?.id
+    return uid ? `labelStudio_customConfig:${uid}` : 'labelStudio_customConfig:guest'
+  } catch {
+    return 'labelStudio_customConfig:guest'
+  }
+}
 
 function getStoredPrintFormat(): SlabPrintFormat | null {
   if (typeof window === 'undefined') return null
@@ -597,9 +617,20 @@ function CustomLabelTile({
     prevSerialRef.current = currentSerial
   }, [slabData?.serial])
 
+  // Heritage renders via SVG, not the canvas previewer.
+  const isHeritage = tileConfig.style === 'heritage'
+  const tileBandColors = useMemo(
+    () => (tileConfig.heritageColorSource === 'brand' ? HERITAGE_BRAND_COLORS : resolveHeritageBandColors(selectedCard?.card_colors)),
+    [tileConfig.heritageColorSource, selectedCard]
+  )
+  const tilePattern = useMemo<BandPattern>(
+    () => (BAND_PATTERNS.some((p) => p.id === tileConfig.heritagePattern) ? tileConfig.heritagePattern : 'diamond') as BandPattern,
+    [tileConfig.heritagePattern]
+  )
+
   const { isRendering, previewDataUrl: tilePreviewUrl } = useLabelPreview({
     config: tileConfig,
-    data: tileData,
+    data: isHeritage ? null : tileData,
     canvasRef,
   })
 
@@ -628,7 +659,15 @@ function CustomLabelTile({
                 <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-            {tilePreviewUrl ? (
+            {isHeritage && tileData ? (
+              <HeritageLabelPreview
+                data={tileData}
+                side={side}
+                pattern={tilePattern}
+                bandColors={tileBandColors}
+                className="w-full"
+              />
+            ) : tilePreviewUrl ? (
               <img src={tilePreviewUrl} alt="Custom label preview" className="w-full h-auto" />
             ) : slabData ? (
               <canvas
@@ -992,12 +1031,14 @@ function CustomDesigner({
   config,
   setConfig,
   onPreviewDataChange,
+  isAuthenticated,
 }: {
   selectedCard: any | null
   slabData: SlabLabelData | null
   config: CustomLabelConfig
   setConfig: React.Dispatch<React.SetStateAction<CustomLabelConfig>>
   onPreviewDataChange: (data: SlabLabelData | null) => void
+  isAuthenticated: boolean
 }) {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -1056,6 +1097,25 @@ function CustomDesigner({
       topEdgeColors: cardColors.topEdgeColors,
     }
   }, [cardColors])
+
+  // Heritage style inputs — the band palette is sampled from the card's
+  // extracted colors (brand purples when a card has none); the pattern is the
+  // only user choice. Both feed the SVG preview and the PDF download.
+  // Hand-edited swatches pin the palette; the source buttons load card/brand.
+  const heritageBandColors = useMemo(() => {
+    const custom = config.heritageBandColors?.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
+    if (custom && custom.length >= 2) return custom
+    return config.heritageColorSource === 'brand' ? HERITAGE_BRAND_COLORS : resolveHeritageBandColors(cardColors)
+  }, [config.heritageBandColors, config.heritageColorSource, cardColors])
+  const setHeritageBandColorAt = useCallback((i: number, hex: string) => {
+    const next = [...heritageBandColors]
+    next[i] = hex
+    updateConfig({ heritageBandColors: next })
+  }, [heritageBandColors, updateConfig])
+  const heritagePattern = useMemo<BandPattern>(
+    () => (BAND_PATTERNS.some((p) => p.id === config.heritagePattern) ? config.heritagePattern : 'diamond') as BandPattern,
+    [config.heritagePattern]
+  )
 
   const handleCardColorStyle = useCallback((style: CardColorStyle) => {
     if (!cardColorInput) return
@@ -1303,6 +1363,12 @@ function CustomDesigner({
     if (!b || !selectedCard) return
     // Show the card's generated values in the fields
     setLabelFields((prev) => ({ ...prev, cardNumber: b.cardNumber, setName: b.setName, year: b.year }))
+    // Guests: update the fields locally but never call the API — sample cards
+    // are shared, and an unauthenticated PUT just yields a raw JWT error.
+    if (!isAuthenticated) {
+      setStaleOverrideDismissed(true)
+      return
+    }
     // Persist: drop those keys from the stored override, keep other customizations
     const existing: Record<string, any> = { ...(selectedCard.custom_label_data || {}) }
     delete existing.cardNumber
@@ -1360,13 +1426,15 @@ function CustomDesigner({
   // Save preferences to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('labelStudio_customConfig', JSON.stringify(config))
+      localStorage.setItem(customConfigKey(), JSON.stringify(config))
     } catch { /* ignore */ }
   }, [config])
 
   const { isRendering, previewDataUrl } = useLabelPreview({
     config,
-    data: previewData,
+    // The canvas previewer only knows modern/traditional — Heritage renders
+    // through <HeritageLabelPreview> (SVG) instead, so starve the canvas.
+    data: config.style === 'heritage' ? null : previewData,
     canvasRef,
   })
 
@@ -1393,6 +1461,15 @@ function CustomDesigner({
         gradientEnd: '#ffffff',
         style: 'traditional' as const,
         borderEnabled: false,
+      })
+    } else if (preset.id === 'dcm-heritage') {
+      // DCM Heritage: ivory Round 3 design. Ignores gradient/border fields;
+      // band palette comes from the card at render time.
+      Object.assign(base, {
+        colorPreset: 'traditional',
+        style: 'heritage' as const,
+        borderEnabled: false,
+        heritagePattern: config.heritagePattern || 'diamond',
       })
     } else if (preset.id === 'dcm-bordered') {
       // DCM Bordered: traditional + purple border
@@ -1460,7 +1537,14 @@ function CustomDesigner({
     setShowCustomPrintChoice(false)
     setIsDownloading(true)
     try {
-      if (format === 'foldover') {
+      if (config.style === 'heritage') {
+        // Heritage has its own vector documents. Dynamic import keeps
+        // @react-pdf out of the initial bundle.
+        const gen = await import('@/lib/labels/heritageSlabGenerator')
+        const opts = { bandColors: heritageBandColors, pattern: heritagePattern, gradeColors: config.heritageGradeColors ?? null }
+        if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(previewData, opts)
+        else await gen.downloadHeritageSlabLabel(previewData, opts)
+      } else if (format === 'foldover') {
         await downloadFoldOverSlabLabel(previewData, config)
       } else {
         await downloadCustomSlabLabel(previewData, config)
@@ -1474,6 +1558,14 @@ function CustomDesigner({
 
   const handleSaveToCard = async () => {
     if (!selectedCard) return
+    // Guests browse sample cards: edits are preview-only. Without this guard
+    // the PUT goes out with a missing bearer token and surfaces a raw
+    // "invalid JWT" error from the API.
+    if (!isAuthenticated) {
+      setSaveResult('error')
+      setSaveError('Sign in to save label edits to your own cards.')
+      return
+    }
     setIsSaving(true)
     setSaveResult(null)
     setSaveError(null)
@@ -1584,7 +1676,15 @@ function CustomDesigner({
                     className="absolute inset-0 w-full h-full object-contain"
                   />
                   <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
-                    {previewDataUrl ? (
+                    {config.style === 'heritage' && previewData ? (
+                      <HeritageLabelPreview
+                        data={previewData}
+                        side={config.side}
+                        pattern={heritagePattern}
+                        bandColors={heritageBandColors}
+                        className="w-full"
+                      />
+                    ) : previewDataUrl ? (
                       <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
                     ) : (
                       <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
@@ -1661,8 +1761,9 @@ function CustomDesigner({
               )}
             </div>
 
-            {/* Color Theme */}
-            <div>
+            {/* Color Theme — hidden for Heritage, whose look is fixed apart
+                from the band (colors come from the card, pattern below). */}
+            <div className={config.style === 'heritage' ? 'hidden' : undefined}>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Color Theme</h3>
               <div className="grid grid-cols-4 gap-2">
                 {COLOR_PRESETS.map((c) => {
@@ -2055,32 +2156,176 @@ function CustomDesigner({
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Style</h3>
               <div className="flex gap-2">
-                <button
-                  onClick={() => updateConfig({ style: 'modern' })}
-                  className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
-                    config.style === 'modern'
-                      ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
-                      : 'border-gray-200 text-gray-600 hover:border-purple-300'
-                  }`}
-                >
-                  Modern
-                </button>
-                <button
-                  onClick={() => updateConfig({ style: 'traditional' })}
-                  className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
-                    config.style === 'traditional'
-                      ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
-                      : 'border-gray-200 text-gray-600 hover:border-purple-300'
-                  }`}
-                >
-                  Traditional
-                </button>
+                {([
+                  { id: 'modern', label: 'Modern' },
+                  { id: 'traditional', label: 'Traditional' },
+                  { id: 'heritage', label: 'Heritage' },
+                ] as const).map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      if (s.id === 'heritage') {
+                        updateConfig({ style: 'heritage', preset: 'dcm-heritage', borderEnabled: false, heritagePattern: config.heritagePattern || 'diamond' })
+                      } else if (config.style === 'heritage') {
+                        // Leaving Heritage: it ignored the gradient fields, so
+                        // they may hold stale colors from an earlier style —
+                        // load the full preset or Traditional renders on a
+                        // dark Modern background.
+                        updateConfig(
+                          s.id === 'traditional'
+                            ? { style: 'traditional', preset: 'dcm-traditional', colorPreset: 'traditional', gradientStart: '#f9fafb', gradientEnd: '#ffffff', borderEnabled: false }
+                            : { style: 'modern', preset: 'dcm', colorPreset: 'modern-dark', gradientStart: '#1a1625', gradientEnd: '#2d1f47', borderEnabled: false }
+                        )
+                      } else {
+                        updateConfig({ style: s.id })
+                      }
+                    }}
+                    className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
+                      config.style === s.id
+                        ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                        : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* Heritage options — the band pattern is the one user choice;
+                colours are sampled from the card so the band always matches it. */}
+            {config.style === 'heritage' && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Band Pattern</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {BAND_PATTERNS.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => updateConfig({ heritagePattern: p.id })}
+                      className={`text-xs px-2 py-1.5 rounded border transition-colors text-left ${
+                        heritagePattern === p.id
+                          ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                          : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  {BAND_PATTERNS.find((p) => p.id === heritagePattern)?.note}
+                </p>
+                <div className="mt-3">
+                  <label className="text-[10px] text-gray-500 font-medium">Band Colors</label>
+                  <div className="flex gap-2 mt-1">
+                    {([
+                      { id: 'card', label: 'Card Colors' },
+                      { id: 'brand', label: 'DCM Brand' },
+                    ] as const).map((srcOpt) => (
+                      <button
+                        key={srcOpt.id}
+                        onClick={() => updateConfig({ heritageColorSource: srcOpt.id, heritageBandColors: undefined })}
+                        className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
+                          (config.heritageColorSource || 'card') === srcOpt.id && !config.heritageBandColors
+                            ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                            : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                        }`}
+                      >
+                        {srcOpt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Each swatch independently editable — loading a source is a
+                      starting point, not an answer. */}
+                  <div className="flex gap-1.5 mt-2 items-center">
+                    {heritageBandColors.map((c, i) => (
+                      <input
+                        key={i}
+                        type="color"
+                        value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#7c3aed'}
+                        onChange={(e) => setHeritageBandColorAt(i, e.target.value)}
+                        className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0"
+                        title={`Band color ${i + 1} — ${c}`}
+                      />
+                    ))}
+                    {config.heritageBandColors && (
+                      <button
+                        onClick={() => updateConfig({ heritageBandColors: undefined })}
+                        className="text-[10px] text-purple-600 hover:text-purple-800 underline ml-1"
+                        title="Discard edits and reload from the selected source"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {config.heritageBandColors
+                      ? 'Hand-edited — changing cards keeps these colors. Reset to reload from the source.'
+                      : config.heritageColorSource === 'brand'
+                      ? 'DCM brand purples on every card. Click a swatch to fine-tune.'
+                      : cardColors
+                      ? 'Sampled from the card image. Click a swatch to fine-tune.'
+                      : 'No extracted card colors — using the DCM brand palette. Click a swatch to fine-tune.'}
+                  </p>
+                </div>
+
+                {/* Grade chip colors — defaults from GRADE_CHIPS_PRINT; any
+                    grade can carry a custom ink. 10 defaults to rainbow foil,
+                    and a custom color replaces the foil with a solid. */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-gray-500 font-medium">Grade Chip Colors</label>
+                    {config.heritageGradeColors && Object.keys(config.heritageGradeColors).length > 0 && (
+                      <button
+                        onClick={() => updateConfig({ heritageGradeColors: undefined })}
+                        className="text-[10px] text-purple-600 hover:text-purple-800 underline"
+                      >
+                        Reset all
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5 mt-1">
+                    {GRADE_CHIPS_PRINT.map((c) => {
+                      const override = config.heritageGradeColors?.[String(c.grade)]
+                      return (
+                        <label
+                          key={c.grade}
+                          className={`relative h-9 rounded-md flex items-center justify-center font-extrabold text-sm cursor-pointer border-2 transition-colors ${
+                            override ? 'border-purple-500' : 'border-transparent hover:border-gray-300'
+                          }`}
+                          style={{ background: GRADE_CHIP_BLACK }}
+                          title={`Grade ${c.grade}${override ? ` — custom ${override}` : c.grade === 10 ? ' — rainbow foil (default)' : ` — default ${c.ink}`}`}
+                        >
+                          {c.grade === 10 && !override ? (
+                            <span style={{ backgroundImage: GRADE_10_FOIL_CSS, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                              10
+                            </span>
+                          ) : (
+                            <span style={{ color: override || c.ink }}>{c.grade}</span>
+                          )}
+                          <input
+                            type="color"
+                            value={override || c.ink}
+                            onChange={(e) => updateConfig({
+                              heritageGradeColors: { ...(config.heritageGradeColors || {}), [String(c.grade)]: e.target.value },
+                            })}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Click a chip to set a custom color for that grade. 10 defaults to the rainbow foil;
+                    a custom color replaces it with a solid.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Text Color — Auto picks white vs dark by WCAG contrast against
                 the actual background; Light/Dark are explicit overrides. */}
-            <div>
+            <div className={config.style === 'heritage' ? 'hidden' : undefined}>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Text Color</h3>
               <div className="flex gap-2">
                 {([
@@ -2108,8 +2353,9 @@ function CustomDesigner({
 
             {/* Grade Color (July 2026, client-requested) — Auto keeps the
                 historical purple-on-light / white-on-dark pair; a swatch or
-                custom hex overrides the grade digit everywhere it renders. */}
-            <div>
+                custom hex overrides the grade digit everywhere it renders.
+                Hidden for Heritage: its chip color is grade-derived (GRADE_CHIPS). */}
+            <div className={config.style === 'heritage' ? 'hidden' : undefined}>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Grade Color</h3>
               <div className="flex gap-2 items-center flex-wrap">
                 <button
@@ -2155,7 +2401,7 @@ function CustomDesigner({
             {/* Grade & Text Size (July 2026, client-requested) — scales the
                 grade digit and the card-text starting sizes; the fit logic
                 still shrinks long text so it never overflows the label. */}
-            <div>
+            <div className={config.style === 'heritage' ? 'hidden' : undefined}>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Grade &amp; Text Size</h3>
               <div className="flex gap-2">
                 {FONT_SCALE_PRESETS.map((p) => (
@@ -2325,17 +2571,23 @@ function CustomDesigner({
                 <DetailField label="Features (comma-separated)" value={labelFields.features} baseline={generatedBaselineRef.current?.features ?? null}
                   onChange={(v) => setLabelFields((prev) => ({ ...prev, features: v }))} />
 
-                <button
-                  onClick={handleSaveToCard}
-                  disabled={isSaving}
-                  className={`w-full text-[10px] py-1 rounded font-medium ${
-                    saveResult === 'saved'
-                      ? 'text-green-600 border border-green-300'
-                      : 'text-purple-600 hover:text-purple-800 border border-purple-300'
-                  }`}
-                >
-                  {isSaving ? 'Saving...' : saveResult === 'saved' ? 'Saved ✓' : 'Save to Card'}
-                </button>
+                {isAuthenticated ? (
+                  <button
+                    onClick={handleSaveToCard}
+                    disabled={isSaving}
+                    className={`w-full text-[10px] py-1 rounded font-medium ${
+                      saveResult === 'saved'
+                        ? 'text-green-600 border border-green-300'
+                        : 'text-purple-600 hover:text-purple-800 border border-purple-300'
+                    }`}
+                  >
+                    {isSaving ? 'Saving...' : saveResult === 'saved' ? 'Saved ✓' : 'Save to Card'}
+                  </button>
+                ) : (
+                  <p className="text-[10px] text-gray-500 border border-gray-200 rounded py-1 px-2 text-center">
+                    Edits update the preview — <Link href="/login?redirect=/labels" className="text-purple-600 underline">sign in</Link> to save them to your own cards.
+                  </p>
+                )}
                 <p className="text-[9px] text-gray-400 leading-snug">
                   Text changes save to this card and apply everywhere its label appears.
                   Colors &amp; layout are saved separately as reusable styles below.
@@ -2380,7 +2632,10 @@ function CustomDesigner({
                     <span className="font-medium text-gray-900">Front + Back (Duplex)</span>
                     <span className="block text-xs text-gray-500">2-page PDF — requires double-sided printing</span>
                   </button>
-                  <button onClick={() => { storePrintFormat('foldover'); setPrintFormatPref('foldover'); handleDownload('foldover') }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                  <button
+                    onClick={() => { storePrintFormat('foldover'); setPrintFormatPref('foldover'); handleDownload('foldover') }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm"
+                  >
                     <span className="font-medium text-gray-900">Fold-Over (Single-Sided)</span>
                     <span className="block text-xs text-gray-500">1-page PDF — cut and fold, no duplex needed</span>
                   </button>
@@ -2399,7 +2654,7 @@ function CustomDesigner({
             </div>
 
             {/* Mobile bottom preview */}
-            {previewDataUrl && (
+            {(config.style === 'heritage' ? !!previewData : !!previewDataUrl) && (
               <div className="lg:hidden flex flex-col items-center mt-2">
                 <div className="relative bg-gray-100 rounded-lg p-3 w-full flex items-center justify-center">
                   {isRendering && (
@@ -2407,7 +2662,17 @@ function CustomDesigner({
                       <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                     </div>
                   )}
-                  <img src={previewDataUrl} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
+                  {config.style === 'heritage' && previewData ? (
+                    <HeritageLabelPreview
+                      data={previewData}
+                      side={config.side}
+                      pattern={heritagePattern}
+                      bandColors={heritageBandColors}
+                      className="max-w-full shadow-lg rounded"
+                    />
+                  ) : (
+                    <img src={previewDataUrl!} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-1 text-center">
                   {config.width}" × {config.height}"
@@ -2435,7 +2700,15 @@ function CustomDesigner({
                         <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                       </div>
                     )}
-                    {previewDataUrl ? (
+                    {config.style === 'heritage' && previewData ? (
+                      <HeritageLabelPreview
+                        data={previewData}
+                        side={config.side}
+                        pattern={heritagePattern}
+                        bandColors={heritageBandColors}
+                        className="w-full"
+                      />
+                    ) : previewDataUrl ? (
                       <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
                     ) : (
                       <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
@@ -2532,7 +2805,7 @@ function SavedStylesManager({
     setConfig(style.config)
     // Also persist to localStorage so it survives page refresh
     try {
-      localStorage.setItem('labelStudio_customConfig', JSON.stringify(style.config))
+      localStorage.setItem(customConfigKey(), JSON.stringify(style.config))
     } catch { /* ignore */ }
   }
 
@@ -2743,7 +3016,11 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
   const [customConfig, setCustomConfig] = useState<CustomLabelConfig>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('labelStudio_customConfig')
+        const key = customConfigKey()
+        // Legacy un-namespaced key counts as GUEST data only — signed-in users
+        // never inherit it (that inheritance was the bug).
+        const saved = localStorage.getItem(key)
+          ?? (key.endsWith(':guest') ? localStorage.getItem('labelStudio_customConfig') : null)
         if (saved) return { ...DEFAULT_CUSTOM_CONFIG, ...JSON.parse(saved) }
       } catch { /* use default */ }
     }
@@ -3117,7 +3394,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         {/* Section 2: Slab Label Designer — the main event: most users are
             here to customize their graded slab label, so it leads the page.
             Other formats (Avery, card images) live in "More Label Formats". */}
-        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} />
+        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} isAuthenticated={isAuthenticated} />
 
         {/* Section 4: Save & Manage Custom Styles */}
         {isAuthenticated && (

@@ -52,6 +52,9 @@ import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
@@ -1530,6 +1533,21 @@ export function SportsCardDetails() {
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
   const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyle();
+  // Heritage label selection — built-in 'heritage' id or a saved custom config
+  // whose style is 'heritage'. Renders through the shared SVG preview.
+  const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
+  const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
+  useEffect(() => {
+    // currentUrl is declared after the loading early-returns, so rebuild it here
+    const heritageQrUrl = origin && cardId ? `${origin}/sports/${cardId}` : '';
+    if (!heritageSel.active || !heritageQrUrl) return;
+    let cancelled = false;
+    import('qrcode')
+      .then(q => q.default.toDataURL(heritageQrUrl, { errorCorrectionLevel: 'H', margin: 1, width: 300, color: { dark: '#141414', light: '#ffffff' } }))
+      .then(u => { if (!cancelled) setHeritageQrDataUrl(u); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [heritageSel.active, origin, cardId]);
   // Defect overlay state
   const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
   const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
@@ -2505,6 +2523,28 @@ export function SportsCardDetails() {
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
   const labelData = getCardLabelData(card);
 
+  // Heritage label data — feeds the shared SVG preview when heritage is active
+  const heritageData = heritageSel.active ? {
+    primaryName: labelData.primaryName,
+    contextLine: labelData.contextLine || '',
+    features: labelData.features || [],
+    serial: labelData.serial,
+    grade: labelData.grade,
+    condition: labelData.condition,
+    isAlteredAuthentic: labelData.isAlteredAuthentic,
+    qrCodeDataUrl: heritageQrDataUrl,
+    subScores: card?.conversational_sub_scores ? {
+      centering: card.conversational_sub_scores.centering?.weighted ?? 0,
+      corners: card.conversational_sub_scores.corners?.weighted ?? 0,
+      edges: card.conversational_sub_scores.edges?.weighted ?? 0,
+      surface: card.conversational_sub_scores.surface?.weighted ?? 0,
+    } : undefined,
+    showFounderEmblem,
+    showVipEmblem,
+    showCardLoversEmblem,
+  } : null;
+  const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
+
   const recommendedGrade = dvgGrading.recommended_grade || {};
   // Note: centering is now defined later using centeringData after parsedCenteringFromJSON is computed
   const imageQuality = dvgGrading.image_quality || {};
@@ -2746,7 +2786,15 @@ export function SportsCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Front Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="front"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernFrontLabel
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine || 'Card Details'}
@@ -2882,7 +2930,15 @@ export function SportsCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Back Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="back"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernBackLabel
                   serial={labelData.serial}
                   grade={labelData.grade}
@@ -5253,6 +5309,7 @@ export function SportsCardDetails() {
                       cardType="sports"
                       showFounderEmblem={showFounderEmblem}
                       labelStyle={labelStyle}
+                      customLabelConfig={activeConfig}
                       className="w-full"
                     />
                   </CollapsibleSection>

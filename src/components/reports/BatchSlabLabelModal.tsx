@@ -7,6 +7,7 @@ import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '..
 import { getCardLabelData } from '../../lib/useLabelData';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 
 interface CardData {
   id: string;
@@ -35,6 +36,11 @@ interface CardData {
   show_card_lover_badge?: boolean;
   // User-edited label overrides
   custom_label_data?: Record<string, unknown> | null;
+  // Extracted card palette — drives the Heritage band per card
+  card_colors?: {
+    primary?: string; secondary?: string;
+    palette?: string[]; topEdgeColors?: string[];
+  } | null;
 }
 
 interface BatchSlabLabelModalProps {
@@ -85,7 +91,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
   // Resolve the active custom config for the local style
   const localActiveConfig = useMemo(() => {
-    if (localStyle === 'modern' || localStyle === 'traditional') return null;
+    if (localStyle === 'modern' || localStyle === 'traditional' || localStyle === 'heritage') return null;
     return customStyles.find(s => s.id === localStyle)?.config || null;
   }, [localStyle, customStyles]);
 
@@ -159,7 +165,20 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
       let blob: Blob;
 
-      if (printFormat === 'foldover') {
+      // Heritage — built-in id or a saved custom config with style 'heritage'.
+      // Its band palette is per-card, so it can't ride the config generators.
+      const heritageSel = resolveHeritageSelection(localStyle, localActiveConfig);
+      if (heritageSel.active) {
+        const gen = await import('@/lib/labels/heritageSlabGenerator');
+        const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
+        const items = labelDataArray.map((data, i) => ({
+          data,
+          bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(selectedCards[i]?.card_colors),
+        }));
+        blob = printFormat === 'foldover'
+          ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors)
+          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors);
+      } else if (printFormat === 'foldover') {
         // Fold-over batch: multiple fold-over labels per page in a single PDF
         if (localActiveConfig) {
           blob = await generateBatchFoldOverCustomLabels(labelDataArray, localActiveConfig);

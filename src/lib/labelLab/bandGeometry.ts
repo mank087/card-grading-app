@@ -132,19 +132,31 @@ export function bandGeometry(
   }
 
   if (pattern === 'lightning') {
-    const z: [number, number][] = [
-      [W * 0.62, 0], [W * 0.28, H * 0.22], [W * 0.70, H * 0.44],
-      [W * 0.30, H * 0.66], [W * 0.66, H * 0.86], [W * 0.40, H],
-    ]
-    const zig = z.map(([x, y]) => `L ${x} ${y}`).join(' ')
-    fills.push({ d: `M 0 0 L ${z[0][0]} ${z[0][1]} ${zig} L 0 ${H} Z`, fill: q(0) })
-    fills.push({ d: `M ${W} 0 L ${z[0][0]} ${z[0][1]} ${zig} L ${W} ${H} Z`, fill: q(1) })
-    strokes.push({ d: `M ${z[0][0]} ${z[0][1]} ${zig}` })
+    // A thick jagged RIBBON, not a wiggly divider: the old single zigzag line
+    // between two fills read as a crack at band size. Two zigzag edges offset
+    // horizontally bound a bright bolt over darker flanks.
+    const zig: [number, number][] = [
+      [0.42, 0], [0.10, 0.20], [0.47, 0.28], [0.14, 0.50],
+      [0.50, 0.58], [0.18, 0.80], [0.44, 1.0],
+    ].map(([x, y]) => [x * W, y * H])
+    const off = 0.34 * W
+    const leftEdge = zig.map(([x, y]) => `${x} ${y}`).join(' L ')
+    const rightPts = [...zig].reverse().map(([x, y]) => [x + off, y] as [number, number])
+    const rightEdge = rightPts.map(([x, y]) => `${x} ${y}`).join(' L ')
+    // Flanks first (left flank is the base rect), then the bolt on top.
+    fills.push({
+      d: `M ${zig[0][0] + off} 0 L ${W} 0 L ${W} ${H} L ${zig[zig.length - 1][0] + off} ${H} L ${rightPts.slice(0, -1).map(([x, y]) => `${x} ${y}`).join(' L ')} Z`,
+      fill: q(1),
+    })
+    fills.push({ d: `M ${leftEdge} L ${rightEdge} Z`, fill: q(4) })
+    strokes.push({ d: `M ${leftEdge}` })
+    strokes.push({ d: `M ${rightEdge}` })
   }
 
   if (pattern === 'shattered') {
-    // Shards fan from a focal point to a CLOSED perimeter walk. The wrap on the
-    // last segment is what stops a wedge of ivory showing at the seam.
+    // Radial cracks PLUS concentric fracture rings, like real tempered glass —
+    // the plain single-focal fan read as pie slices at band size. Cells between
+    // rings tile each fan triangle exactly, so coverage stays gap-free.
     const cx = W * 0.42, cy = H * 0.36
     const pts: [number, number][] = [
       [0, 0], [W * 0.55, 0], [W, 0],
@@ -152,26 +164,59 @@ export function bandGeometry(
       [W * 0.45, H], [0, H],
       [0, H * 0.78], [0, H * 0.56], [0, H * 0.34], [0, H * 0.16],
     ]
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+    const at = (p: [number, number], t: number): [number, number] => [lerp(cx, p[0], t), lerp(cy, p[1], t)]
+    const rings = [0, 0.34, 0.66, 1]
     for (let i = 0; i < pts.length; i++) {
-      const [ax, ay] = pts[i]
-      const [bx, by] = pts[(i + 1) % pts.length]
-      fills.push({ d: `M ${cx} ${cy} L ${ax} ${ay} L ${bx} ${by} Z`, fill: q(i) })
+      const A = pts[i]
+      const B = pts[(i + 1) % pts.length]
+      for (let r = 0; r < rings.length - 1; r++) {
+        const [a1x, a1y] = at(A, rings[r])
+        const [b1x, b1y] = at(B, rings[r])
+        const [b2x, b2y] = at(B, rings[r + 1])
+        const [a2x, a2y] = at(A, rings[r + 1])
+        fills.push({
+          d: `M ${a1x} ${a1y} L ${b1x} ${b1y} L ${b2x} ${b2y} L ${a2x} ${a2y} Z`,
+          // Stride keeps radial AND ring neighbours on different colours.
+          fill: q(i * 2 + r * 3),
+        })
+      }
     }
-    for (const [ax, ay] of pts) strokes.push({ d: `M ${cx} ${cy} L ${ax} ${ay}` })
+    for (const p of pts) strokes.push({ d: `M ${cx} ${cy} L ${p[0]} ${p[1]}` })
+    for (const t of [rings[1], rings[2]]) {
+      const ring = pts.map(p => at(p, t))
+      strokes.push({
+        d: `M ${ring.map(([x, y]) => `${x} ${y}`).join(' L ')} Z`,
+      })
+    }
   }
 
   if (pattern === 'fractured') {
-    const ys = [0, H * 0.18, H * 0.40, H * 0.58, H * 0.80, H]
-    const jog = W * 0.34
-    for (let i = 0; i < 5; i++) {
-      const yA = ys[i], yB = ys[i + 1]
-      const oA = i % 2 === 0 ? 0 : jog, oB = (i + 1) % 2 === 0 ? 0 : jog
-      fills.push({
-        d: `M 0 ${yA} L ${W} ${yA + oA * 0.5} L ${W} ${yB + oB * 0.5} L 0 ${yB} Z`,
-        fill: q(i),
-      })
-      if (i > 0) strokes.push({ d: `M 0 ${yA} L ${W} ${yA + oA * 0.5}` })
+    // Sharp break lines, not gentle shears: each fracture is a steep kinked
+    // polyline — left edge, a hard mid-jag, right edge — with the slopes
+    // alternating direction so consecutive breaks visibly oppose each other.
+    // Regions fill between consecutive break lines; the outer two "lines" are
+    // the band's top and bottom edges.
+    const breaks: [number, number, number, number][] = [
+      // [left y, kink x, kink y, right y] — all fractions of H / W
+      [0.26, 0.60, 0.10, 0.20],
+      [0.38, 0.35, 0.50, 0.30],
+      [0.64, 0.68, 0.52, 0.60],
+      [0.78, 0.30, 0.88, 0.86],
+    ]
+    const line = (b: [number, number, number, number]) =>
+      `M 0 ${b[0] * H} L ${b[1] * W} ${b[2] * H} L ${W} ${b[3] * H}`
+    // Region between line i and line i+1: walk line i left-to-right, then
+    // line i+1 right-to-left.
+    const back = (b: [number, number, number, number]) =>
+      `L ${W} ${b[3] * H} L ${b[1] * W} ${b[2] * H} L 0 ${b[0] * H}`
+    const top: [number, number, number, number] = [0, 0.5, 0, 0]
+    const bottom: [number, number, number, number] = [1, 0.5, 1, 1]
+    const all = [top, ...breaks, bottom]
+    for (let i = 0; i < all.length - 1; i++) {
+      fills.push({ d: `${line(all[i])} ${back(all[i + 1])} Z`, fill: q(i) })
     }
+    for (const b of breaks) strokes.push({ d: line(b) })
   }
 
   if (pattern === 'scales') {
@@ -201,4 +246,13 @@ export function bandGeometry(
   return { base: q(0), fills, strokes, strokeWidth }
 }
 
+/**
+ * Divider stroke: express as hex + opacity, NOT an rgba() string. @react-pdf
+ * mis-parses rgba() (a 0.55-alpha black renders with a blue/navy cast —
+ * verified in a side-by-side probe), while #000 + strokeOpacity matches what
+ * browsers paint for the same value. Both renderers must use this pair.
+ */
+export const BAND_STROKE_HEX = '#000000'
+export const BAND_STROKE_OPACITY = 0.55
+/** @deprecated legacy rgba form — kept only for old mockup scripts. */
 export const BAND_STROKE_COLOR = 'rgba(0,0,0,0.55)'

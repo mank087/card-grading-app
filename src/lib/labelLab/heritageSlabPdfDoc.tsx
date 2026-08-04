@@ -2,10 +2,11 @@
 /**
  * Round 3 "Heritage" slab label — vector PDF, front + back.
  *
- * Lab-only for now. This is the Aug 2026 redesign rendered through the same
- * @react-pdf path the lab already uses for the production slab formats, so it
- * can be printed at true size and compared against a real slab before any of
- * it touches Label Studio.
+ * IN PRODUCTION since Aug 2026: Label Studio renders it via
+ * labels/heritageSlabGenerator (which reuses the exported HeritageFront /
+ * HeritageBack blocks inside the standard duplex cut-guide document), and the
+ * admin Label Lab still renders the captioned proof sheet below. Shared layout
+ * math lives in heritageLayout.ts so the Studio's SVG preview cannot drift.
  *
  * What it is:
  *   front — ivory field, patterned left band, dark type, grade CHIP coloured
@@ -14,10 +15,8 @@
  *           with the symbol on top, grade + condition centred, sub-grades
  *           right-aligned. No serial: the QR already encodes it.
  *
- * Deliberately NOT wired into production generators yet. Those still hardcode
- * '#7c3aed' for the grade in three places (customSlabPdfBlock, slabLabelPdfDoc,
- * customSlabLabelGenerator); this reads GRADE_CHIPS instead, and reconciling
- * the two is the real migration work.
+ * Unlike the modern/traditional generators (which hardcode '#7c3aed'), the
+ * grade chip colour resolves from GRADE_CHIPS / GRADE_10_FOIL_STOPS.
  *
  * Units: @react-pdf is points. 2.8" x 0.8" = 201.6 x 57.6pt. Mockups were
  * authored at 1400 x 400px, so `u()` maps mockup px to points.
@@ -27,9 +26,9 @@ import React from 'react'
 // where — unlike ordinary Text — its fill can reference a gradient def.
 import { Document, Page, View, Text, Text as SvgText, Image, Svg, Path, Rect, G, Defs, LinearGradient, Stop, ClipPath, Font } from '@react-pdf/renderer'
 import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS, type GradeChip } from '@/lib/labelPresets'
-import { bandGeometry, BAND_STROKE_COLOR, BAND_PATTERNS, type BandPattern } from './bandGeometry'
+import { bandGeometry, BAND_STROKE_HEX, BAND_STROKE_OPACITY, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
-import { fitLines } from './textFit'
+import { heritageTheme, fitHeritageFront, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE } from './heritageLayout'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -52,12 +51,10 @@ Font.register({
   ],
 })
 
-/** CJK + full-width ranges: kana, CJK unified (+ext A), compat, full-width forms. */
-const CJK_RE = /[　-ヿ㐀-鿿豈-﫿＀-￯]/
 
 /** Font face for a text run: Helvetica normally, Noto Sans JP when CJK is present. */
 const faceFor = (t: string, bold: boolean) =>
-  CJK_RE.test(t)
+  HERITAGE_CJK_RE.test(t)
     ? { fontFamily: 'NotoSansJP', fontWeight: (bold ? 700 : 400) as 700 | 400 }
     : { fontFamily: bold ? 'Helvetica-Bold' : 'Helvetica' }
 
@@ -73,46 +70,8 @@ const u = (px: number) => (px / 1400) * LABEL_W
 const BAND_W = u(90)
 const RULE_W = u(6)
 
-const IVORY = '#FAF8F4'
-const INK = '#141414'
-const INK_SOFT = '#5A5A5A'
-const GOLD = '#A67C1B'
-const EDGE = '#E5DECF'
 /** DCM brand purple — the plate behind the bottom-centre mark. */
 const BRAND_PURPLE = '#7C3AED'
-
-/**
- * Screen vs print theme.
- *
- * The ivory field is roughly a 2% tint. A consumer inkjet cannot lay that down
- * as a flat film -- it dithers into sparse isolated dots, so instead of smooth
- * cream you get faint speckle and nozzle banding across 85% of the label, and
- * you pay ink over the whole surface to get something indistinguishable from
- * blank paper at arm's length. Printing NOTHING is perfectly flat by
- * definition, so the hardened theme drops to paper white and lets the stock
- * carry any warmth.
- *
- * The rest follows from the same logic: consumer printers are good at dark
- * saturated solids and bad at light tints and light neutrals, so contrast goes
- * up and every light structural element gets darker.
- */
-function theme(hardened: boolean) {
-  return hardened
-    ? {
-        field: '#FFFFFF',        // zero ink: no dither, no banding
-        ink: '#1F2937',          // TRADITIONAL.textDark — production's white-ground theme
-        inkSoft: '#4B5563',      // TRADITIONAL.textMedium
-        rule: '#101014',         // black, matching the mark and keyline
-        edge: '#141414',         // real keyline, so it reads as a finished object
-        edgeWidth: 1,
-        divider: '#101014',      // black, matching the logo accent rules
-      }
-    : {
-        field: IVORY, ink: INK, inkSoft: INK_SOFT,
-        rule: GOLD, edge: EDGE, edgeWidth: 0.5, divider: '#D9D2C4',
-      }
-}
-
 
 export interface HeritageInputs {
   primaryName: string
@@ -146,6 +105,12 @@ export interface HeritageInputs {
    * block below for why each one exists.
    */
   printHardened?: boolean
+  /**
+   * Per-grade chip colour overrides, keyed by grade ('1'..'10'). Overrides the
+   * numeral/label ink (and, for 10, replaces the foil with a solid). Absent
+   * grades keep the GRADE_CHIPS defaults.
+   */
+  gradeColors?: Record<string, string> | null
   showFounder?: boolean
   showCardLover?: boolean
   showVip?: boolean
@@ -213,7 +178,7 @@ function BandArt({
         <Rect x={0} y={0} width={W} height={H} fill={g.base} />
         {g.fills.map((f, i) => <Path key={`f${i}`} d={f.d} fill={f.fill} />)}
         {g.strokes.map((s, i) => (
-          <Path key={`s${i}`} d={s.d} fill="none" stroke={BAND_STROKE_COLOR} strokeWidth={g.strokeWidth} />
+          <Path key={`s${i}`} d={s.d} fill="none" stroke={BAND_STROKE_HEX} strokeOpacity={BAND_STROKE_OPACITY} strokeWidth={g.strokeWidth} />
         ))}
       </G>
     </Svg>
@@ -249,7 +214,7 @@ const foilAt = (() => {
  */
 const FOIL_STRIPS = 24
 
-function FoilChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
+function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; solid?: string | null }) {
   const w = size
   const h = size * (252 / 240)
   const bw = u(6)
@@ -262,6 +227,24 @@ function FoilChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
   const numW = numSize * 1.3
   const c0 = (w - numW) / 2 + (baseline - numSize * 0.72)
   const c1 = (w + numW) / 2 + baseline
+  // A custom grade-10 colour replaces the foil: solid keyline + solid numeral,
+  // still on the black chip so the top grade keeps its structural border.
+  if (solid) {
+    return (
+      <Svg width={w} height={h}>
+        <Rect x={bw / 2} y={bw / 2} width={w - bw} height={h - bw} rx={r} ry={r}
+          fill={GRADE_CHIP_BLACK} stroke={solid} strokeWidth={bw} />
+        <SvgText x={w / 2} y={baseline} textAnchor="middle" fill={solid}
+          style={{ fontFamily: 'Helvetica-Bold', fontSize: numSize }}>
+          {String(chip.grade)}
+        </SvgText>
+        <SvgText x={w / 2} y={baseline + u(44)} textAnchor="middle" fill="#F4EFE4"
+          style={{ fontFamily: 'Helvetica-Bold', fontSize: labelSize, letterSpacing: u(4) }}>
+          {chip.label}
+        </SvgText>
+      </Svg>
+    )
+  }
   const strips = Array.from({ length: FOIL_STRIPS }, (_, s) => ({
     lo: c0 + ((c1 - c0) * s) / FOIL_STRIPS,
     hi: c0 + ((c1 - c0) * (s + 1)) / FOIL_STRIPS + 0.5,
@@ -303,8 +286,9 @@ function FoilChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
   )
 }
 
-function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
-  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} />
+function GradeChipBlock({ chip, size, inkOverride }: { chip: GradeChip; size: number; inkOverride?: string | null }) {
+  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} solid={inkOverride} />
+  const ink = inkOverride || chip.ink
   const isBig = String(chip.grade).length > 1 || chip.grade === 0
   return (
     <View
@@ -317,7 +301,7 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
         // cast in @react-pdf, which is what finally killed it.
       }}
     >
-      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: chip.ink, lineHeight: 1 }}>
+      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: ink, lineHeight: 1 }}>
         {chip.grade === 0 ? 'A' : chip.grade}
       </Text>
       {/* 28/32 (4.0/4.6pt), up from 26/30, and no opacity: this is KNOCKOUT
@@ -326,7 +310,7 @@ function GradeChipBlock({ chip, size }: { chip: GradeChip; size: number }) {
       <Text
         style={{
           fontFamily: 'Helvetica-Bold', fontSize: u(chip.label.length > 8 ? 28 : 32),
-          color: chip.ink, letterSpacing: u(4), marginTop: u(6),
+          color: ink, letterSpacing: u(4), marginTop: u(6),
         }}
       >
         {chip.label}
@@ -395,32 +379,14 @@ function LogoBlock({ i, showRules = true }: { i: HeritageInputs; showRules?: boo
   )
 }
 
-/** Tracking applied to the context line, and therefore part of its fit. */
-const ctxTracking = (size: number) => (size > 24 ? 4 : 2)
-
-function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
-  const T = theme(!!i.printHardened)
-  // Box runs from the text origin to where the grade chip starts.
-  const BOX = 940
-  const name = fitLines(i.primaryName, BOX, 84, 30, 3)
-  // Context floor is 24 (3.5pt at true size), not the old 14 (2.0pt): a
-  // consumer inkjet dithers 2pt type into noise, so below ~3.5pt the line is
-  // ink spent on nothing. The fitter never truncates — the raised floor just
-  // means the longest context lines wrap a row earlier. The measured maximum
-  // (128ch) fits 3 rows at this floor.
-  const ctx = fitLines((i.contextLine || '').toUpperCase(), BOX, 30, 24, 3, ctxTracking)
-  // Approximate bottom of the fitted stack, in mockup px: block top, name and
-  // context rows at their line heights, gap, divider (+margins), serial row.
-  // When the stack runs into the bottom strip the logo's accent bars would
-  // underline the serial, so they yield — the bars are decoration, the serial
-  // is identification.
-  const textBottom =
-    50 +
-    name.rows.length * name.size * 1.06 +
-    Math.max(name.size * 0.28, 18) +
-    ctx.rows.length * ctx.size * 1.2 +
-    (24 + 6) + (18 + 34 * 1.2)
-  const rulesOk = textBottom < 300
+/**
+ * Exported for the production generator (heritageSlabGenerator) and reused by
+ * the lab doc below. Fitting, the accent-bar yield rule, and the theme all come
+ * from heritageLayout so the Studio's SVG preview renders the same geometry.
+ */
+export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+  const T = heritageTheme(!!i.printHardened)
+  const { name, ctx, rulesOk } = fitHeritageFront(i.primaryName, i.contextLine, i.serial)
   return (
     <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
@@ -441,7 +407,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
             key={`c${ri}`}
             style={{
               ...faceFor(r, false), fontSize: u(ctx.size), color: T.inkSoft,
-              letterSpacing: u(ctxTracking(ctx.size)), lineHeight: 1.2,
+              letterSpacing: u(heritageCtxTracking(ctx.size)), lineHeight: 1.2,
               marginTop: ri === 0 ? u(Math.max(name.size * 0.28, 18)) : 0,
             }}
           >
@@ -456,7 +422,7 @@ function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
 
       {/* Grade chip */}
       <View style={{ position: 'absolute', left: u(1130), top: u(64) }}>
-        <GradeChipBlock chip={chip} size={u(240)} />
+        <GradeChipBlock chip={chip} size={u(240)} inkOverride={i.gradeColors?.[String(chip.grade)]} />
       </View>
 
       {/* Mark, bottom-centre, hugging the edge */}
@@ -515,8 +481,8 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
   )
 }
 
-function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
-  const T = theme(!!i.printHardened)
+export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+  const T = heritageTheme(!!i.printHardened)
   const sg = i.subgrades
   const row = (label: string, v: number | null) =>
     v == null ? null : (
@@ -550,19 +516,43 @@ function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
         </View>
       ) : null}
 
-      {i.showFounder ? <Emblem id="founder" left={u(458)} /> : null}
-      {i.showCardLover ? <Emblem id="cardLover" left={u(532)} /> : null}
-      {i.showVip ? <Emblem id="vip" left={u(606)} /> : null}
+      {(() => {
+        // Shared layout: emblems compact leftward, the grade column centres
+        // in the space between the left cluster and the sub-grades, and the
+        // condition shrinks to fit rather than running under either.
+        const condition = (i.condition || chip.label).toUpperCase()
+        const hasSubgrades = [sg.centering, sg.corners, sg.edges, sg.surface].some(v => v != null)
+        const L = heritageBackLayout({
+          showFounder: i.showFounder,
+          showCardLover: i.showCardLover,
+          showVip: i.showVip,
+          hasSubgrades,
+          condition,
+        })
+        const shownEmblems = ([
+          ['founder', i.showFounder],
+          ['cardLover', i.showCardLover],
+          ['vip', i.showVip],
+        ] as const).filter(([, on]) => on).map(([id]) => id)
+        return (
+          <>
+            {shownEmblems.map((id, idx) => (
+              <Emblem key={id} id={id} left={u(L.emblemXs[idx])} />
+            ))}
 
-      {/* Grade + condition, centred. No serial — the QR encodes it. */}
-      <View style={{ position: 'absolute', left: u(700), top: u(60), width: u(360), alignItems: 'center' }}>
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: T.ink, lineHeight: 1 }}>
-          {chip.grade === 0 ? 'A' : chip.grade}
-        </Text>
-        <Text style={{ ...faceFor(i.condition || chip.label, true), fontSize: u(34), color: T.ink, letterSpacing: u(7), marginTop: u(14) }}>
-          {(i.condition || chip.label).toUpperCase()}
-        </Text>
-      </View>
+            {/* Grade + condition, centred in the free span. No serial — the
+                QR encodes it. */}
+            <View style={{ position: 'absolute', left: u(L.left), top: u(60), width: u(L.right - L.left), alignItems: 'center' }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: T.ink, lineHeight: 1 }}>
+                {chip.grade === 0 ? 'A' : chip.grade}
+              </Text>
+              <Text style={{ ...faceFor(condition, true), fontSize: u(L.condSize), color: T.ink, letterSpacing: u(L.condTracking), marginTop: u(14) }}>
+                {condition}
+              </Text>
+            </View>
+          </>
+        )
+      })()}
 
       {/* Sub-grades, right-aligned, matching ModernBackLabel. */}
       <View style={{ position: 'absolute', right: u(70), top: u(84), width: u(300) }}>

@@ -29,6 +29,8 @@ import { generateCardImages, generateRawCardImages, type CardImageData } from '@
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
@@ -174,7 +176,7 @@ export default function EbayImagePrepPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
   const labelStyleParam = (searchParams.get('labelStyle') || 'modern') as
-    | 'modern' | 'traditional' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
+    | 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
   // Chunked bridge protocol requested by new app builds (see header comment).
   const chunkedBridge = searchParams.get('bridge') === '2';
   const [status, setStatus] = useState('Initializing…');
@@ -235,6 +237,12 @@ export default function EbayImagePrepPage() {
           backImageUrl,
           showFounderEmblem: false,
           labelStyle: labelStyleParam,
+          heritage: (() => {
+            const sel = resolveHeritageSelection(labelStyleParam, null);
+            return sel.active
+              ? { pattern: sel.pattern, bandColors: resolveHeritageBandColors(card.card_colors) }
+              : undefined;
+          })(),
           subScores,
         };
 

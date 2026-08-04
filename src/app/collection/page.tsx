@@ -23,6 +23,8 @@ import CardActionSheet from '@/components/binders/CardActionSheet'
 import { useLongPress } from '@/components/binders/useLongPress'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 
 type Card = {
   id: string
@@ -461,7 +463,8 @@ function CollectionPageContent() {
   const [showLabelTypeSelector, setShowLabelTypeSelector] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const { labelStyle, customStyles, colorOverrides, switchStyle } = useCustomLabelStyle()
+  const { labelStyle, customStyles, activeConfig, colorOverrides, switchStyle } = useCustomLabelStyle()
+  const heritageSel = resolveHeritageSelection(labelStyle, activeConfig)
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
   const [isRescanningPrices, setIsRescanningPrices] = useState(false)
@@ -2382,6 +2385,156 @@ function CollectionPageContent() {
 
 
         {/* Grid View */}
+        {/* Bulk Action Bar — one bar for BOTH views; grid and list share the same selection set. Sticky so it stays reachable while scrolling. */}
+        {isSomeSelected && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-3 md:px-4 mb-4 sticky top-2 z-30 shadow-sm">
+            {/* Mobile: Stack vertically */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center justify-between md:justify-start gap-3">
+                <span className="text-sm font-medium text-indigo-700">
+                  {selectedCardIds.size} card{selectedCardIds.size !== 1 ? 's' : ''} selected
+                </span>
+                <button
+                  onClick={deselectAll}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  Clear
+                </button>
+              </div>
+              {/* Action buttons - wrap on mobile */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Print Labels Button with Label Type Selector */}
+                {selectedCardIds.size > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowLabelTypeSelector(!showLabelTypeSelector)}
+                      disabled={isDeleting}
+                      className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      title="Print Labels"
+                    >
+                      <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      <span className="hidden md:inline">Print ({selectedCardIds.size})</span>
+                      <svg className="w-3 h-3 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {/* Label Type Selector Dropdown */}
+                    {showLabelTypeSelector && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowLabelTypeSelector(false)}
+                        />
+                        <div className="fixed inset-x-4 bottom-20 md:absolute md:inset-auto md:right-0 md:bottom-auto md:mt-2 w-auto md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                          <div className="p-2">
+                            <p className="text-xs text-gray-500 px-2 py-1 mb-1">Select label type:</p>
+                            <button
+                              onClick={() => {
+                                setShowLabelTypeSelector(false);
+                                setIsBatchLabelModalOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                            >
+                              <div className="font-medium text-gray-800 text-sm">Foldable Labels</div>
+                              <div className="text-xs text-gray-500">Avery 6871 - 2.5" × 1.75"</div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowLabelTypeSelector(false);
+                                setIsBatch8167ModalOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                            >
+                              <div className="font-medium text-gray-800 text-sm">Toploader Labels</div>
+                              <div className="text-xs text-gray-500">Avery 8167 - 1.75" × 0.5"</div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowLabelTypeSelector(false);
+                                setIsBatchSlabLabelModalOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                            >
+                              <div className="font-medium text-gray-800 text-sm">Graded Slab Labels</div>
+                              <div className="text-xs text-gray-500">2.8" × 0.8" — Duplex PDF with cut guides</div>
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                {/* Add to binder — the primary way cards get filed */}
+                {selectedCardIds.size > 0 && binderApi.available && (
+                  <button
+                    onClick={() => setAddToBinderOpen(true)}
+                    disabled={isDeleting}
+                    className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    title="Add selected cards to a binder"
+                  >
+                    <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <span className="hidden md:inline">Add to binder ({selectedCardIds.size})</span>
+                  </button>
+                )}
+
+                {/* Remove from THIS binder — membership only, the cards stay */}
+                {selectedCardIds.size > 0 && selectedBinderId && binderReorderable && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await binderApi.removeCards(selectedBinderId, [...selectedCardIds])
+                        toast.success(`Removed from binder — the card${selectedCardIds.size === 1 ? ' is' : 's are'} still in your collection.`)
+                        setSelectedCardIds(new Set())
+                        setRefreshKey(k => k + 1)
+                      } catch (e: any) { toast.error(e.message) }
+                    }}
+                    disabled={isDeleting}
+                    className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    title="Remove from this binder (keeps the cards)"
+                  >
+                    <span className="hidden md:inline">Remove from binder</span>
+                    <span className="md:hidden">－</span>
+                  </button>
+                )}
+
+                {/* Download Reports Button */}
+                {selectedCardIds.size > 0 && (
+                  <button
+                    onClick={() => setIsBatchDownloadModalOpen(true)}
+                    disabled={isDeleting}
+                    className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Download Reports"
+                  >
+                    <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="hidden md:inline">Download ({selectedCardIds.size})</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  title="Delete Selected"
+                >
+                  {isDeleting ? (
+                    <div className="animate-spin rounded-full h-5 w-5 md:h-4 md:w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
+                  <span className="hidden md:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {viewMode === 'grid' && (
           <>
             {filteredCards.length === 0 ? (
@@ -2486,6 +2639,7 @@ function CollectionPageContent() {
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   labelStyle={labelStyle}
                   colorOverrides={colorOverrides}
+                  heritage={heritageSel.active ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors((card as any).card_colors), gradeColors: heritageSel.gradeColors } : null}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility & Price Badges */}
@@ -2619,155 +2773,6 @@ function CollectionPageContent() {
               />
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                {/* Bulk Action Bar - Responsive */}
-                {isSomeSelected && viewMode === 'list' && (
-                  <div className="bg-indigo-50 border-b border-indigo-200 px-3 py-3 md:px-4">
-                    {/* Mobile: Stack vertically */}
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div className="flex items-center justify-between md:justify-start gap-3">
-                        <span className="text-sm font-medium text-indigo-700">
-                          {selectedCardIds.size} card{selectedCardIds.size !== 1 ? 's' : ''} selected
-                        </span>
-                        <button
-                          onClick={deselectAll}
-                          className="text-sm text-indigo-600 hover:text-indigo-800 underline"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      {/* Action buttons - wrap on mobile */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Print Labels Button with Label Type Selector */}
-                        {selectedCardIds.size > 0 && (
-                          <div className="relative">
-                            <button
-                              onClick={() => setShowLabelTypeSelector(!showLabelTypeSelector)}
-                              disabled={isDeleting}
-                              className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                              title="Print Labels"
-                            >
-                              <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                              </svg>
-                              <span className="hidden md:inline">Print ({selectedCardIds.size})</span>
-                              <svg className="w-3 h-3 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                            {/* Label Type Selector Dropdown */}
-                            {showLabelTypeSelector && (
-                              <>
-                                <div
-                                  className="fixed inset-0 z-40"
-                                  onClick={() => setShowLabelTypeSelector(false)}
-                                />
-                                <div className="fixed inset-x-4 bottom-20 md:absolute md:inset-auto md:right-0 md:bottom-auto md:mt-2 w-auto md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                  <div className="p-2">
-                                    <p className="text-xs text-gray-500 px-2 py-1 mb-1">Select label type:</p>
-                                    <button
-                                      onClick={() => {
-                                        setShowLabelTypeSelector(false);
-                                        setIsBatchLabelModalOpen(true);
-                                      }}
-                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
-                                    >
-                                      <div className="font-medium text-gray-800 text-sm">Foldable Labels</div>
-                                      <div className="text-xs text-gray-500">Avery 6871 - 2.5" × 1.75"</div>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setShowLabelTypeSelector(false);
-                                        setIsBatch8167ModalOpen(true);
-                                      }}
-                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
-                                    >
-                                      <div className="font-medium text-gray-800 text-sm">Toploader Labels</div>
-                                      <div className="text-xs text-gray-500">Avery 8167 - 1.75" × 0.5"</div>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setShowLabelTypeSelector(false);
-                                        setIsBatchSlabLabelModalOpen(true);
-                                      }}
-                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
-                                    >
-                                      <div className="font-medium text-gray-800 text-sm">Graded Slab Labels</div>
-                                      <div className="text-xs text-gray-500">2.8" × 0.8" — Duplex PDF with cut guides</div>
-                                    </button>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                        {/* Add to binder — the primary way cards get filed */}
-                        {selectedCardIds.size > 0 && binderApi.available && (
-                          <button
-                            onClick={() => setAddToBinderOpen(true)}
-                            disabled={isDeleting}
-                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                            title="Add selected cards to a binder"
-                          >
-                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                            </svg>
-                            <span className="hidden md:inline">Add to binder ({selectedCardIds.size})</span>
-                          </button>
-                        )}
-
-                        {/* Remove from THIS binder — membership only, the cards stay */}
-                        {selectedCardIds.size > 0 && selectedBinderId && binderReorderable && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                await binderApi.removeCards(selectedBinderId, [...selectedCardIds])
-                                toast.success(`Removed from binder — the card${selectedCardIds.size === 1 ? ' is' : 's are'} still in your collection.`)
-                                setSelectedCardIds(new Set())
-                                setRefreshKey(k => k + 1)
-                              } catch (e: any) { toast.error(e.message) }
-                            }}
-                            disabled={isDeleting}
-                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                            title="Remove from this binder (keeps the cards)"
-                          >
-                            <span className="hidden md:inline">Remove from binder</span>
-                            <span className="md:hidden">－</span>
-                          </button>
-                        )}
-
-                        {/* Download Reports Button */}
-                        {selectedCardIds.size > 0 && (
-                          <button
-                            onClick={() => setIsBatchDownloadModalOpen(true)}
-                            disabled={isDeleting}
-                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                            title="Download Reports"
-                          >
-                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span className="hidden md:inline">Download ({selectedCardIds.size})</span>
-                          </button>
-                        )}
-                        <button
-                          onClick={handleBulkDelete}
-                          disabled={isDeleting}
-                          className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                          title="Delete Selected"
-                        >
-                          {isDeleting ? (
-                            <div className="animate-spin rounded-full h-5 w-5 md:h-4 md:w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          )}
-                          <span className="hidden md:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {/* Mobile Card Layout */}
                 <div className="md:hidden">
                   {/* Mobile Header with Select All */}

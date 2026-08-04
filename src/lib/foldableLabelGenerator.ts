@@ -222,6 +222,11 @@ export async function loadWhiteLogoAsBase64(): Promise<string> {
   return fetchAsDataUrl('/DCM%20Logo%20white.png');
 }
 
+/** Black DCM mark — the Heritage label's default logo colour. */
+export async function loadBlackLogoAsBase64(): Promise<string> {
+  return fetchAsDataUrl('/DCM-logo-black.png');
+}
+
 /**
  * Draw rounded rectangle helper
  */

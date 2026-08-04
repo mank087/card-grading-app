@@ -99,6 +99,17 @@ export interface CardImageData {
   labelStyle?: string;
   // Sub-scores for modern back label
   subScores?: SubScores;
+  /**
+   * Heritage label channel (Aug 2026). When set, the label band renders the
+   * Heritage design (rasterized from the same SVG the Studio previews) instead
+   * of the modern/traditional canvas renderers. Callers populate it via
+   * resolveHeritageSelection + resolveHeritageBandColors; leave undefined for
+   * every other style.
+   */
+  heritage?: {
+    pattern: string;
+    bandColors: string[];
+  } | null;
 }
 
 /**
@@ -958,6 +969,49 @@ async function drawModernBackLabel(
 }
 
 /**
+ * Draw the Heritage label band by rasterizing the same SVG the Studio
+ * previews (heritageRaster), so the composite matches print exactly. Rendered
+ * at 2x the band width for sharpness. The 1400:400 design is drawn into the
+ * 800x220 band — a ~3% vertical stretch, invisible at listing sizes.
+ */
+async function drawHeritageLabel(
+  ctx: CanvasRenderingContext2D,
+  data: CardImageData,
+  side: 'front' | 'back',
+  logoDataUrl: string | undefined,
+  qrCodeDataUrl: string,
+  x: number,
+  width: number,
+  y: number
+): Promise<void> {
+  const { renderHeritageLabelCanvas } = await import('@/lib/labels/heritageRaster');
+  const { BAND_PATTERNS } = await import('@/lib/labelLab/bandGeometry');
+  const pattern = (BAND_PATTERNS.some(p => p.id === data.heritage?.pattern) ? data.heritage!.pattern : 'diamond') as import('@/lib/labelLab/bandGeometry').BandPattern;
+  const slabData = {
+    primaryName: data.cardName,
+    contextLine: data.contextLine,
+    features: [],
+    serial: data.serial,
+    grade: data.grade,
+    condition: data.conditionLabel,
+    qrCodeDataUrl,
+    subScores: data.subScores,
+    showFounderEmblem: data.showFounderEmblem,
+    showVipEmblem: data.showVipEmblem,
+    showCardLoversEmblem: data.showCardLoversEmblem,
+    logoDataUrl,
+  };
+  const labelCanvas = await renderHeritageLabelCanvas({
+    data: slabData as any,
+    side,
+    pattern,
+    bandColors: data.heritage?.bandColors?.length ? data.heritage.bandColors : ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'],
+    widthPx: width * 2,
+  });
+  ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
+}
+
+/**
  * Generate a card image (front or back) with label
  */
 async function generateCardImage(
@@ -980,7 +1034,9 @@ async function generateCardImage(
 
   const borderWidth = 8;
   const cornerRadius = 16;
-  const isModern = data.labelStyle !== 'traditional';
+  const isHeritage = !!data.heritage;
+  // Heritage is a light label — it takes the traditional (light) frame.
+  const isModern = !isHeritage && data.labelStyle !== 'traditional';
 
   // Background - white for traditional, dark for modern
   if (isModern) {
@@ -1001,8 +1057,10 @@ async function generateCardImage(
   const contentWidth = canvas.width - borderWidth * 2;
   const contentX = borderWidth;
 
-  // Draw appropriate label - modern or traditional
-  if (isModern) {
+  // Draw appropriate label - heritage, modern, or traditional
+  if (isHeritage) {
+    await drawHeritageLabel(ctx, data, side, logoDataUrl, qrCodeDataUrl, borderWidth, contentWidth, borderWidth);
+  } else if (isModern) {
     if (side === 'front') {
       await drawModernFrontLabel(ctx, data, logoDataUrl, borderWidth, contentWidth, borderWidth);
     } else {

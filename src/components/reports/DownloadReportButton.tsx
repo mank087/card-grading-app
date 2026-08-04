@@ -25,6 +25,8 @@ import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
 import { FoldOverLabelModal } from './FoldOverLabelModal';
 import { getCardLabelData } from '../../lib/useLabelData';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 
 /**
@@ -801,6 +803,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         showVipEmblem, // Show VIP emblem on back label if user is VIP with badge enabled
         showCardLoversEmblem, // Show Card Lovers emblem on back label if user is Card Lover with badge enabled
         labelStyle, // Use modern or traditional label style
+        heritage: resolveHeritageSelection(labelStyle, customLabelConfig).active
+          ? {
+              pattern: resolveHeritageSelection(labelStyle, customLabelConfig).pattern,
+              bandColors: resolveHeritageSelection(labelStyle, customLabelConfig).bandColors ?? resolveHeritageBandColors(card?.card_colors),
+            }
+          : undefined,
         subScores: {
           centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,
@@ -1160,7 +1168,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       const slabData = await buildSlabData();
 
-      if (format === 'foldover') {
+      // Heritage — built-in id or a saved custom config with style 'heritage'
+      const heritageSel = resolveHeritageSelection(labelStyle, customLabelConfig);
+      if (heritageSel.active) {
+        const gen = await import('@/lib/labels/heritageSlabGenerator');
+        const opts = { bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card?.card_colors), pattern: heritageSel.pattern, gradeColors: heritageSel.gradeColors };
+        if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(slabData, opts);
+        else await gen.downloadHeritageSlabLabel(slabData, opts);
+      } else if (format === 'foldover') {
         if (customLabelConfig) {
           await downloadFoldOverSlabLabel(slabData, customLabelConfig);
         } else {

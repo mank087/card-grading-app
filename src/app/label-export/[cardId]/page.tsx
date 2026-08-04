@@ -34,6 +34,7 @@ import { generateFoldableLabel } from '@/lib/foldableLabelGenerator';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 
 declare global {
   interface Window {
@@ -217,7 +218,7 @@ export default function LabelExportPage() {
 
         const blobs: Array<{ name: string; mime: string; dataUrl: string }> = [];
 
-        if (type === 'card-image-modern' || type === 'card-image-traditional') {
+        if (type === 'card-image-modern' || type === 'card-image-traditional' || type === 'card-image-heritage') {
           postStatus('Generating slab card images…');
           const imageData: CardImageData = {
             cardName: labelData.primaryName,
@@ -230,7 +231,10 @@ export default function LabelExportPage() {
             cardUrl,
             frontImageUrl,
             backImageUrl,
-            labelStyle: type === 'card-image-traditional' ? 'traditional' : 'modern',
+            labelStyle: type === 'card-image-heritage' ? 'heritage' : type === 'card-image-traditional' ? 'traditional' : 'modern',
+            heritage: type === 'card-image-heritage'
+              ? { pattern: sp.get('heritagePattern') || 'diamond', bandColors: resolveHeritageBandColors(card.card_colors) }
+              : undefined,
             subScores,
             showFounderEmblem,
             showVipEmblem,
@@ -525,6 +529,40 @@ export default function LabelExportPage() {
             : await generateCustomSlabLabel(slabPayload, config);
           blobs.push({
             name: `DCM-Slab-Custom-${format}-${namePrefix}.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        } else if (type === 'slab-heritage') {
+          // Heritage — vector docs with per-card band colours. Ready for the
+          // mobile app to request once its style picker knows the new type.
+          postStatus('Generating Heritage slab label PDF…');
+          const gen = await import('@/lib/labels/heritageSlabGenerator');
+          const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
+          const slabPayload: any = {
+            primaryName: labelData.primaryName,
+            contextLine: labelData.contextLine || '',
+            features: [],
+            serial: labelData.serial,
+            grade: labelData.grade,
+            condition: labelData.condition,
+            isAlteredAuthentic: labelData.isAlteredAuthentic,
+            qrCodeDataUrl: '',
+            subScores,
+            logoDataUrl: await loadLogoAsBase64().catch(() => ''),
+            whiteLogoDataUrl: await loadWhiteLogoAsBase64().catch(() => ''),
+            showFounderEmblem,
+            showVipEmblem,
+            showCardLoversEmblem,
+          };
+          const opts = {
+            bandColors: resolveHeritageBandColors(card.card_colors),
+            pattern: gen.resolveHeritagePattern(sp.get('heritagePattern')),
+          };
+          const blob = format === 'foldover'
+            ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)
+            : await gen.generateHeritageSlabLabelVector(slabPayload, opts);
+          blobs.push({
+            name: `DCM-Slab-heritage-${format}-${namePrefix}.pdf`,
             mime: 'application/pdf',
             dataUrl: await blobToDataUrl(blob),
           });

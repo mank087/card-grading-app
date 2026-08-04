@@ -22,6 +22,7 @@ export interface DimensionPreset {
 export const DIMENSION_PRESETS: DimensionPreset[] = [
   { id: 'dcm', name: 'DCM Modern', width: 2.8, height: 0.8, description: 'Modern dark gradient style' },
   { id: 'dcm-traditional', name: 'DCM Traditional', width: 2.8, height: 0.8, description: 'Classic light style' },
+  { id: 'dcm-heritage', name: 'DCM Heritage', width: 2.8, height: 0.8, description: 'Ivory field, patterned band, grade-colour chip' },
   { id: 'dcm-bordered', name: 'DCM Bordered', width: 2.8, height: 0.8, description: 'Traditional with purple border' },
   { id: 'custom', name: 'Custom', width: 2.8, height: 0.8, description: 'Custom dimensions & border' },
 ];
@@ -297,7 +298,15 @@ export interface CustomLabelConfig {
   colorPreset: string;     // color preset id
   gradientStart: string;
   gradientEnd: string;
-  style: 'modern' | 'traditional';
+  /**
+   * 'heritage' (Aug 2026) is the Round 3 ivory design promoted from the Label
+   * Lab. It ignores the gradient/color/border fields entirely — its look is
+   * fixed apart from `heritagePattern` and the band palette, which is sampled
+   * from the card's extracted colors at render time. Renderers that only know
+   * modern/traditional must treat 'heritage' explicitly, not default it into
+   * either branch.
+   */
+  style: 'modern' | 'traditional' | 'heritage';
   side: 'front' | 'back';
   borderEnabled: boolean;
   borderColor: string;
@@ -329,6 +338,29 @@ export interface CustomLabelConfig {
    * larger scale is a request, not a guarantee, on crowded labels.
    */
   fontScale?: number;
+  /**
+   * Heritage band pattern id (a BandPattern from labelLab/bandGeometry, e.g.
+   * 'diamond', 'gradient', 'chevron'). Only read when style === 'heritage'.
+   * Kept as string here so labelPresets stays free of labelLab imports.
+   */
+  heritagePattern?: string;
+  /**
+   * Where the Heritage band palette comes from. 'card' (default) samples the
+   * card's extracted colors per card; 'brand' locks the band to the DCM
+   * purples (HERITAGE_BRAND_COLORS) on every card.
+   */
+  heritageColorSource?: 'card' | 'brand';
+  /**
+   * Hand-edited Heritage band palette. When present (>= 2 entries) it wins
+   * over heritageColorSource — the source buttons LOAD a palette, edits pin it.
+   */
+  heritageBandColors?: string[];
+  /**
+   * Per-grade Heritage chip colour overrides, keyed by grade ('1'..'10').
+   * Absent grades keep the GRADE_CHIPS defaults; a '10' entry replaces the
+   * rainbow foil with that solid colour.
+   */
+  heritageGradeColors?: Record<string, string>;
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {

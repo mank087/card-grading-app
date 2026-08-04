@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { QRCodeCanvas } from 'qrcode.react'
 import { ModernFrontLabel } from './labels/ModernFrontLabel'
 import { ModernBackLabel } from './labels/ModernBackLabel'
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
 
 // Sub-scores interface for modern labels
@@ -59,6 +60,9 @@ export interface CardSlabProps {
   // Badge/emblem options (for back labels)
   showFounderEmblem?: boolean
   showCardLoversEmblem?: boolean
+
+  /** Heritage label channel — when set, the label renders the Heritage design. */
+  heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null
 }
 
 // Helper: Format grade for display - v6.0: Always whole numbers
@@ -93,6 +97,7 @@ export function CardSlab({
   subScores,
   showFounderEmblem = false,
   showCardLoversEmblem = false,
+  heritage = null,
 }: CardSlabProps) {
   const isModern = labelStyle !== 'traditional'
   // Size configurations - heights match between front/back labels for consistency
@@ -414,7 +419,25 @@ export function CardSlab({
           style={slabBorderStyle}
         >
           <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
-            {isModern ? (
+            {heritage ? (
+              <HeritageLabelPreview
+                data={{
+                  primaryName: displayName,
+                  contextLine: setLineText || '',
+                  features: features || [],
+                  serial,
+                  grade,
+                  condition,
+                  isAlteredAuthentic,
+                  qrCodeDataUrl: '',
+                  showFounderEmblem,
+                  showCardLoversEmblem,
+                } as any}
+                side="front"
+                pattern={heritage.pattern as any}
+                bandColors={heritage.bandColors}
+              />
+            ) : isModern ? (
               <ModernFrontLabel
                 displayName={displayName}
                 setLineText={setLineText}
@@ -448,7 +471,25 @@ export function CardSlab({
             style={slabBorderStyle}
           >
             <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
-              {isModern ? (
+              {heritage ? (
+                <HeritageLabelPreview
+                  data={{
+                    primaryName: displayName,
+                    contextLine: setLineText || '',
+                    features: features || [],
+                    serial,
+                    grade,
+                    condition,
+                    isAlteredAuthentic,
+                    qrCodeDataUrl: '',
+                    showFounderEmblem,
+                    showCardLoversEmblem,
+                  } as any}
+                  side="back"
+                  pattern={heritage.pattern as any}
+                  bandColors={heritage.bandColors}
+                />
+              ) : isModern ? (
                 <ModernBackLabel
                   serial={serial}
                   grade={grade}
@@ -498,6 +539,8 @@ export interface CardSlabGridProps {
   className?: string
   labelStyle?: string
   colorOverrides?: LabelColorOverrides
+  /** Heritage label channel — when set, the label renders the Heritage design. */
+  heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null
 }
 
 export function CardSlabGrid({
@@ -513,6 +556,7 @@ export function CardSlabGrid({
   className = '',
   labelStyle = 'modern',
   colorOverrides,
+  heritage = null,
 }: CardSlabGridProps) {
   const isModern = labelStyle !== 'traditional'
 
@@ -646,7 +690,23 @@ export function CardSlabGrid({
     >
       <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
         {/* Label */}
-        {isModern ? (
+        {heritage ? (
+          <HeritageLabelPreview
+            data={{
+              primaryName: displayName,
+              contextLine: setLineText || '',
+              features: features || [],
+              serial,
+              grade,
+              condition,
+              isAlteredAuthentic,
+              qrCodeDataUrl: '',
+            } as any}
+            side="front"
+            pattern={heritage.pattern as any}
+            bandColors={heritage.bandColors}
+          />
+        ) : isModern ? (
           <ModernFrontLabel
             displayName={displayName}
             setLineText={setLineText}

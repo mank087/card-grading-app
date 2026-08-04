@@ -56,6 +56,9 @@ import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 
@@ -1543,6 +1546,22 @@ export function OtherCardDetails() {
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyle();
+  // Heritage label selection — built-in 'heritage' id or a saved custom config
+  // whose style is 'heritage'. Renders through the shared SVG preview.
+  const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
+  const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
+  useEffect(() => {
+    // Same URL as the back-label QR (currentUrl, declared after the early
+    // returns); rebuilt here because hooks must stay unconditional.
+    const qrUrl = origin && cardId ? `${origin}/other/${cardId}` : '';
+    if (!heritageSel.active || !qrUrl) return;
+    let cancelled = false;
+    import('qrcode')
+      .then(q => q.default.toDataURL(qrUrl, { errorCorrectionLevel: 'H', margin: 1, width: 300, color: { dark: '#141414', light: '#ffffff' } }))
+      .then(u => { if (!cancelled) setHeritageQrDataUrl(u); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [heritageSel.active, origin, cardId]);
   const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
   const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
   const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
@@ -2528,6 +2547,28 @@ export function OtherCardDetails() {
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
   const labelData = getCardLabelData(card);
 
+  // Heritage label data — feeds the shared SVG preview when active
+  const heritageData = heritageSel.active ? {
+    primaryName: labelData.primaryName,
+    contextLine: labelData.contextLine || '',
+    features: labelData.features || [],
+    serial: labelData.serial,
+    grade: labelData.grade,
+    condition: labelData.condition,
+    isAlteredAuthentic: labelData.isAlteredAuthentic,
+    qrCodeDataUrl: heritageQrDataUrl,
+    subScores: card?.conversational_sub_scores ? {
+      centering: card.conversational_sub_scores.centering?.weighted ?? 0,
+      corners: card.conversational_sub_scores.corners?.weighted ?? 0,
+      edges: card.conversational_sub_scores.edges?.weighted ?? 0,
+      surface: card.conversational_sub_scores.surface?.weighted ?? 0,
+    } : undefined,
+    showFounderEmblem,
+    showVipEmblem,
+    showCardLoversEmblem,
+  } : null;
+  const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
+
   // 🎯 Other cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {
     recommended_decimal_grade: card.conversational_decimal_grade,
@@ -2772,7 +2813,15 @@ export function OtherCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Front Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="front"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernFrontLabel
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine || 'Card Details'}
@@ -2915,7 +2964,15 @@ export function OtherCardDetails() {
             >
               <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Back Label */}
-              {labelStyle !== 'traditional' ? (
+              {heritageSel.active && heritageData ? (
+                <HeritageLabelPreview
+                  data={heritageData as any}
+                  side="back"
+                  pattern={heritageSel.pattern}
+                  bandColors={heritageBandColors}
+                    gradeColors={heritageSel.gradeColors}
+                />
+              ) : labelStyle !== 'traditional' ? (
                 <ModernBackLabel
                   serial={labelData.serial}
                   grade={labelData.grade}
@@ -5328,6 +5385,7 @@ export function OtherCardDetails() {
                       cardType="other"
                       showFounderEmblem={showFounderEmblem}
                       labelStyle={labelStyle}
+                      customLabelConfig={activeConfig}
                       className="w-full"
                     />
                   </CollapsibleSection>

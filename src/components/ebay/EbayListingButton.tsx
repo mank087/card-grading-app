@@ -9,6 +9,7 @@ interface EbayListingButtonProps {
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: string;
+  customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null;
   variant?: 'default' | 'compact' | 'icon';
   className?: string;
 }
@@ -18,6 +19,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
   cardType = 'sports',
   showFounderEmblem = false,
   labelStyle = 'modern',
+  customLabelConfig = null,
   variant = 'default',
   className = '',
 }) => {
@@ -98,6 +100,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
           cardType={cardType}
           showFounderEmblem={showFounderEmblem}
           labelStyle={labelStyle}
+          customLabelConfig={customLabelConfig}
         />
       </>
     );
@@ -124,6 +127,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
           cardType={cardType}
           showFounderEmblem={showFounderEmblem}
           labelStyle={labelStyle}
+          customLabelConfig={customLabelConfig}
         />
       </>
     );
@@ -155,6 +159,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
         cardType={cardType}
         showFounderEmblem={showFounderEmblem}
         labelStyle={labelStyle}
+          customLabelConfig={customLabelConfig}
       />
     </>
   );

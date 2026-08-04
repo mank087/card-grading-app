@@ -6,6 +6,8 @@ import { generateCardImages, generateRawCardImages, CardImageData } from '@/lib/
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { getStoredSession } from '@/lib/directAuth';
 import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
@@ -132,6 +134,8 @@ interface EbayListingModalProps {
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: string;
+  /** Active saved style config — needed to detect a Heritage custom style. */
+  customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null;
 }
 
 type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
@@ -143,6 +147,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   cardType = 'sports',
   showFounderEmblem = false,
   labelStyle = 'modern',
+  customLabelConfig = null,
 }) => {
   const [step, setStep] = useState<ListingStep>('images');
   const [isLoading, setIsLoading] = useState(false);
@@ -745,6 +750,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         backImageUrl,
         showFounderEmblem,
         labelStyle,
+        heritage: (() => {
+          const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
+          return sel.active
+            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
+            : undefined;
+        })(),
         subScores: {
           centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,

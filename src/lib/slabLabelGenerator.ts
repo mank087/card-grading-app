@@ -983,7 +983,27 @@ async function cropBleedEdge(dataUrl: string, edge: 'top' | 'bottom'): Promise<s
  * Fold the top panel down behind the front — the back label flips right-side up.
  * Total size: width × (height × 2), e.g. 2.8" × 1.6" for standard slab labels.
  */
+/**
+ * Vector-first routing (Aug 2026 — fold-over joins the duplex path's quality
+ * tier). Same halo gate as generateSlabLabel: styles whose text needs the
+ * raster halo stay raster, everything else renders as true vector text.
+ */
 export async function generateFoldOverSlabLabel(
+  data: SlabLabelData,
+  style: 'modern' | 'traditional'
+): Promise<Blob> {
+  try {
+    const vector = await import('./labels/vectorSlabGenerator');
+    if (!vector.standardStyleNeedsTextHalo(style)) {
+      return await vector.generateFoldOverSlabLabelVector(data, style);
+    }
+  } catch (err) {
+    console.warn('[SLAB LABEL] vector fold-over failed, falling back to raster:', err);
+  }
+  return generateFoldOverSlabLabelRaster(data, style);
+}
+
+export async function generateFoldOverSlabLabelRaster(
   data: SlabLabelData,
   style: 'modern' | 'traditional'
 ): Promise<Blob> {
@@ -1096,7 +1116,23 @@ export async function generateBatchFoldOverSlabLabels(
   style: 'modern' | 'traditional'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
-  if (dataArray.length === 1) return generateFoldOverSlabLabel(dataArray[0], style);
+  try {
+    const vector = await import('./labels/vectorSlabGenerator');
+    if (!vector.standardStyleNeedsTextHalo(style)) {
+      return await vector.generateBatchFoldOverSlabLabelsVector(dataArray, style);
+    }
+  } catch (err) {
+    console.warn('[SLAB LABEL] vector batch fold-over failed, falling back to raster:', err);
+  }
+  return generateBatchFoldOverSlabLabelsRaster(dataArray, style);
+}
+
+export async function generateBatchFoldOverSlabLabelsRaster(
+  dataArray: SlabLabelData[],
+  style: 'modern' | 'traditional'
+): Promise<Blob> {
+  if (dataArray.length === 0) throw new Error('No label data provided');
+  if (dataArray.length === 1) return generateFoldOverSlabLabelRaster(dataArray[0], style);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
