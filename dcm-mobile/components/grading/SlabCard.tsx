@@ -370,7 +370,10 @@ const SlabCard = memo(SlabCardImpl);
 export default SlabCard;
 
 const styles = StyleSheet.create({
-  heritageBand: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 10 },
+  // Top-left radius matches the label's own corner; clipping stays INSIDE the
+  // band (no children), avoiding the Android bug where overflow:hidden on the
+  // label's LinearGradient hid every child (all label text vanished).
+  heritageBand: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 10, borderTopLeftRadius: 10, overflow: 'hidden' },
   heritageBandRule: { position: 'absolute', left: 10, top: 0, bottom: 0, width: 1.5, backgroundColor: '#101014' },
   heritageChipRing: { borderRadius: 9, padding: 2 },
   heritageChip: { minWidth: 34, height: 34, borderRadius: 7, backgroundColor: HERITAGE_CHIP_BLACK, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
@@ -387,9 +390,6 @@ const styles = StyleSheet.create({
   label: {
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    // Clip children to the radius — the Heritage band strip is an absolute
-    // square-cornered fill that otherwise pokes past the rounded corner.
-    overflow: 'hidden',
     paddingHorizontal: 8,
     paddingVertical: 8,
     justifyContent: 'center',
