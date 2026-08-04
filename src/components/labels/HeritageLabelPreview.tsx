@@ -43,6 +43,12 @@ interface Props {
    */
   blackLogoHref?: string
   colorLogoHref?: string
+  /**
+   * Rasterization mode: omit every nested <image> (logos, QR). Engines drop
+   * SVG-as-image subresources when the SVG is drawn to a canvas, so the
+   * rasterizer suppresses them here and composites the bitmaps natively.
+   */
+  suppressImages?: boolean
   /** Per-grade chip colour overrides ('1'..'10'); 10 replaces the foil with a solid. */
   gradeColors?: Record<string, string> | null
 }
@@ -150,7 +156,7 @@ function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; 
   )
 }
 
-function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string; gradeColors?: Record<string, string> | null }) {
+function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors, suppressImages }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string; gradeColors?: Record<string, string> | null; suppressImages?: boolean }) {
   const T = heritageTheme(true)
   const { name, ctx, rulesOk } = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial)
 
@@ -199,19 +205,19 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors 
           <rect x={markLeft + PX.MARK_W + PX.RULE_GAP} y={ruleY} width={PX.RULE_LEN} height={6} fill="#101014" />
         </>
       )}
-      <image
+      {!suppressImages && <image
         href={blackLogoHref}
         x={markLeft + (PX.MARK_W - markW) / 2}
         y={markTop + (PX.MARK_H - markH) / 2}
         width={markW}
         height={markH}
         preserveAspectRatio="xMidYMid meet"
-      />
+      />}
     </>
   )
 }
 
-function BackSide({ data, pattern, bandColors, colorLogoHref, uid }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; colorLogoHref: string; uid: string }) {
+function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImages }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; colorLogoHref: string; uid: string; suppressImages?: boolean }) {
   const T = heritageTheme(true)
   const grade = gradeString(data)
   const chip = resolveGradeChip(grade, true)
@@ -251,16 +257,16 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid }: { data: Sla
       {data.qrCodeDataUrl ? (
         <>
           <rect x={PX.QR_X} y={PX.QR_Y} width={PX.QR_BOX} height={PX.QR_BOX} fill="#FFFFFF" stroke="#D9D2C4" strokeWidth={2} />
-          <image href={data.qrCodeDataUrl} x={PX.QR_X + 8} y={PX.QR_Y + 8} width={PX.QR_IMG} height={PX.QR_IMG} />
+          {!suppressImages && <image href={data.qrCodeDataUrl} x={PX.QR_X + 8} y={PX.QR_Y + 8} width={PX.QR_IMG} height={PX.QR_IMG} />}
           <circle cx={PX.QR_X + PX.QR_BOX / 2} cy={PX.QR_Y + PX.QR_BOX / 2} r={PX.QR_LOGO_DISC / 2} fill="#FFFFFF" />
-          <image
+          {!suppressImages && <image
             href={colorLogoHref}
             x={PX.QR_X + (PX.QR_BOX - PX.QR_LOGO) / 2}
             y={PX.QR_Y + (PX.QR_BOX - PX.QR_LOGO) / 2}
             width={PX.QR_LOGO}
             height={PX.QR_LOGO}
             preserveAspectRatio="xMidYMid meet"
-          />
+          />}
         </>
       ) : null}
 
@@ -310,7 +316,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid }: { data: Sla
   )
 }
 
-export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null }: Props) {
+export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false }: Props) {
   // Unique per instance: several previews render on one page (desktop slab,
   // hidden mobile block, gallery tile), and duplicated gradient/clip ids make
   // url(#...) resolve to the FIRST one in the document — if that copy sits in
@@ -328,8 +334,8 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
     >
       <rect x={0} y={0} width={PX.W} height={PX.H} fill={T.field} stroke={T.edge} strokeWidth={T.edgeWidth * 7} />
       {side === 'front'
-        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} />
-        : <BackSide data={data} pattern={pattern} bandColors={bandColors} colorLogoHref={colorLogoHref} uid={uid} />}
+        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} suppressImages={suppressImages} />
+        : <BackSide data={data} pattern={pattern} bandColors={bandColors} colorLogoHref={colorLogoHref} uid={uid} suppressImages={suppressImages} />}
     </svg>
   )
 }

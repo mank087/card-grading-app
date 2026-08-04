@@ -30,6 +30,7 @@ import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
+import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
@@ -216,16 +217,20 @@ export default function EbayImagePrepPage() {
         // Resolve a custom-N style id to its saved config (needed to detect
         // Heritage custom slots and their pattern/band/grade customisations).
         let activeStyleConfig: any = null;
-        if (labelStyleParam.startsWith('custom-')) {
-          try {
-            const { data: credits } = await supabase
-              .from('user_credits')
-              .select('custom_label_styles')
-              .single();
-            const styles = (credits?.custom_label_styles || []) as Array<{ id: string; config: any }>;
-            activeStyleConfig = styles.find(st => st.id === labelStyleParam)?.config || null;
-          } catch { /* fall through — style renders as its non-heritage default */ }
-        }
+        let emblemFlags = { showFounderEmblem: false, showVipEmblem: false, showCardLoversEmblem: false };
+        try {
+          const { data: credits } = await supabase
+            .from('user_credits')
+            .select('custom_label_styles, is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
+            .single();
+          if (credits) {
+            emblemFlags = resolveEmblemVisibility(credits);
+            if (labelStyleParam.startsWith('custom-')) {
+              const styles = (credits.custom_label_styles || []) as Array<{ id: string; config: any }>;
+              activeStyleConfig = styles.find(st => st.id === labelStyleParam)?.config || null;
+            }
+          }
+        } catch { /* badges + custom styles degrade gracefully */ }
         const heritageSel = resolveHeritageSelection(labelStyleParam, activeStyleConfig);
 
         const labelData = getCardLabelData(card);
@@ -251,7 +256,9 @@ export default function EbayImagePrepPage() {
           cardUrl: `${window.location.origin}/${categoryToRouteSlug(card.category)}/${card.id}`,
           frontImageUrl,
           backImageUrl,
-          showFounderEmblem: false,
+          showFounderEmblem: emblemFlags.showFounderEmblem,
+          showVipEmblem: emblemFlags.showVipEmblem,
+          showCardLoversEmblem: emblemFlags.showCardLoversEmblem,
           labelStyle: labelStyleParam,
           heritage: heritageSel.active
             ? {

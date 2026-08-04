@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { HERITAGE_BRAND_COLORS } from '@/lib/heritage'
 
 export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4'
 
@@ -63,7 +64,13 @@ function extractColorOverrides(config: CustomLabelConfig | null | undefined): La
     // to know the config is Heritage rather than a gradient recolour.
     isHeritage: config.style === 'heritage',
     heritagePattern: config.heritagePattern,
-    heritageBandColors: config.heritageBandColors,
+    // Brand source pins the band to the DCM purples; hand-edited colours win.
+    heritageBandColors:
+      (config.heritageBandColors && config.heritageBandColors.length >= 2)
+        ? config.heritageBandColors
+        : config.heritageColorSource === 'brand'
+        ? HERITAGE_BRAND_COLORS
+        : undefined,
     heritageGradeColors: config.heritageGradeColors,
   }
 }

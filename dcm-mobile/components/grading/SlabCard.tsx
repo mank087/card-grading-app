@@ -83,6 +83,55 @@ function getWrapperColors(overrides?: LabelColorOverrides): readonly string[] {
   return [overrides.gradientStart, overrides.gradientEnd, overrides.gradientStart]
 }
 
+/**
+ * Native band renderer. Diamond mosaic (the Heritage default) is drawn with
+ * rotated squares so tiles match the printed design's texture; mosaic and
+ * split get simple native equivalents; everything else approximates with the
+ * vertical gradient (full geometry needs SVG, which isn't in the binary).
+ */
+function HeritageBandArt({ pattern, colors }: { pattern: string; colors: string[] }) {
+  const c = (i: number) => colors[i % colors.length] || '#7c3aed'
+  if (pattern === 'diamond') {
+    return (
+      <View style={{ flex: 1, backgroundColor: c(1) }}>
+        {Array.from({ length: 9 }, (_, i) => (
+          <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 7, height: 7, transform: [{ rotate: '45deg' }], backgroundColor: c(i === 1 ? 4 : i) }} />
+          </View>
+        ))}
+      </View>
+    )
+  }
+  if (pattern === 'mosaic') {
+    return (
+      <View style={{ flex: 1 }}>
+        {Array.from({ length: 9 }, (_, r) => (
+          <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
+            <View style={{ flex: 1, backgroundColor: c(r * 2) }} />
+            <View style={{ flex: 1, backgroundColor: c(r * 2 + 1) }} />
+          </View>
+        ))}
+      </View>
+    )
+  }
+  if (pattern === 'split') {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: c(0) }} />
+        <View style={{ flex: 1, backgroundColor: c(3) }} />
+      </View>
+    )
+  }
+  return (
+    <LinearGradient
+      colors={colors.slice(0, 5) as any}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={{ flex: 1 }}
+    />
+  )
+}
+
 function dynamicNameFontSize(name: string, base: number): number {
   if (!name) return base
   if (name.length > 30) return base * 0.75
@@ -124,6 +173,7 @@ function SlabCardImpl({
     ? colorOverrides.heritageBandColors
     : (heritageBandColors && heritageBandColors.length >= 2 ? heritageBandColors : HERITAGE_BRAND_COLORS)
   const isLight = isTraditional || isHeritage
+  const heritagePattern = colorOverrides?.heritagePattern || 'diamond'
   const qrSize = size === 'sm' ? 44 : size === 'md' ? 56 : 70
   // Allow the context line (Set • #Num • Year) to wrap to 2 lines on the card detail
   // page (size=lg) where there's enough vertical room. Keep 1 line on sm/md.
@@ -171,12 +221,9 @@ function SlabCardImpl({
         >
           {isHeritage && (
             <>
-              <LinearGradient
-                colors={bandColors.slice(0, 5) as any}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.heritageBand}
-              />
+              <View style={styles.heritageBand}>
+                <HeritageBandArt pattern={heritagePattern} colors={bandColors} />
+              </View>
               <View style={styles.heritageBandRule} />
             </>
           )}

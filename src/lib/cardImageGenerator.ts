@@ -10,7 +10,7 @@
  * Output: High-resolution JPG images suitable for online listings
  */
 
-import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from './foldableLabelGenerator';
+import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from './foldableLabelGenerator';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets } from './labelDataGenerator';
 
 // Canvas dimensions - card ratio 2.5" x 3.5" (standard trading card)
@@ -1153,7 +1153,12 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
 
   try {
     console.log('[CARD IMAGE GEN] Generating QR code for:', data.cardUrl);
-    qrCodeDataUrl = await generateQRCodePlain(data.cardUrl);
+    // Heritage composites the DCM mark over the QR itself (vector-crisp disc
+    // in the raster); every other style embeds it at QR-generation time so
+    // downloaded card images match the printed labels.
+    qrCodeDataUrl = data.heritage
+      ? await generateQRCodePlain(data.cardUrl)
+      : await generateQRCodeWithLogo(data.cardUrl);
     console.log('[CARD IMAGE GEN] QR code generated successfully');
   } catch (err) {
     console.error('[CARD IMAGE GEN] QR code generation failed:', err);

@@ -9,6 +9,7 @@ import { getCardLabelData } from '@/lib/useLabelData';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { getStoredSession } from '@/lib/directAuth';
+import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
@@ -736,6 +737,19 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const subScoresData = card.conversational_sub_scores || {};
       const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
+      // Resolve badges from the profile — the prop chain only ever carried
+      // the founder flag, so VIP / Card Lover badges were missing from
+      // listing images.
+      let emblemFlags = { showFounderEmblem, showVipEmblem: false, showCardLoversEmblem: false };
+      try {
+        const sb = getAuthenticatedClient();
+        const { data: creditsRow } = await sb
+          .from('user_credits')
+          .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
+          .single();
+        if (creditsRow) emblemFlags = resolveEmblemVisibility(creditsRow);
+      } catch { /* keep prop fallback */ }
+
       // Generate card images (front & back with labels)
       const cardImageData: CardImageData = {
         cardName: labelData.primaryName,
@@ -748,7 +762,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
         frontImageUrl,
         backImageUrl,
-        showFounderEmblem,
+        showFounderEmblem: emblemFlags.showFounderEmblem,
+        showVipEmblem: emblemFlags.showVipEmblem,
+        showCardLoversEmblem: emblemFlags.showCardLoversEmblem,
         labelStyle,
         heritage: (() => {
           const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
