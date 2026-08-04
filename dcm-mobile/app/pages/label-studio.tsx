@@ -277,6 +277,16 @@ export default function LabelStudioScreen() {
   const [renamingStyleId, setRenamingStyleId] = useState<string | null>(null)
   const [renamingValue, setRenamingValue] = useState('')
   const [activeGalleryIdx, setActiveGalleryIdx] = useState(0)
+  const galleryListRef = useRef<FlatList<any>>(null)
+  // Jump the swipe gallery to a tile programmatically (e.g. tapping the
+  // "DCM Heritage" dimension preset) — the preview and per-tile option
+  // sections key off activeGalleryIdx, which swipes alone used to control.
+  const jumpToTile = useCallback((tileId: string) => {
+    const idx = LABEL_GALLERY.findIndex(t => t.id === tileId)
+    if (idx < 0 || idx === activeGalleryIdx) return
+    setActiveGalleryIdx(idx)
+    try { galleryListRef.current?.scrollToIndex({ index: idx, animated: true }) } catch { /* not mounted yet */ }
+  }, [activeGalleryIdx])
 
   // Color picker modal
   const [pickerVisible, setPickerVisible] = useState(false)
@@ -607,6 +617,10 @@ export default function LabelStudioScreen() {
       textColorMode: config.textColorMode,
       gradeColor: config.gradeColor,
       fontScale: config.fontScale,
+      heritagePattern: config.heritagePattern,
+      heritageColorSource: config.heritageColorSource,
+      heritageBandColors: config.heritageBandColors,
+      heritageGradeColors: config.heritageGradeColors,
     }
   }, [config, activeGalleryIdx])
 
@@ -705,8 +719,10 @@ export default function LabelStudioScreen() {
       base.gradientStart = '#f9fafb'
       base.gradientEnd = '#ffffff'
       base.style = 'heritage'
-      base.heritagePattern = 'diamond'
+      base.heritagePattern = config.heritagePattern || 'diamond'
       base.borderEnabled = false
+      // The preview + Heritage Options follow the gallery tile — bring it along.
+      jumpToTile('slab-heritage')
     } else if (preset.id === 'dcm-bordered') {
       base.colorPreset = 'traditional'
       base.gradientStart = '#f9fafb'
@@ -718,7 +734,7 @@ export default function LabelStudioScreen() {
     }
     setActiveCardColorStyle(null)
     updateConfig(base)
-  }, [updateConfig])
+  }, [updateConfig, jumpToTile, config.heritagePattern])
 
   const handleCardColorStyle = useCallback((styleId: string) => {
     if (!cardColors) return
@@ -1285,6 +1301,7 @@ export default function LabelStudioScreen() {
                 <Text style={{ fontSize: 11, color: Colors.gray[400] }}>{LABEL_GALLERY.length} label types</Text>
               </View>
               <FlatList
+                ref={galleryListRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -1299,6 +1316,13 @@ export default function LabelStudioScreen() {
                 // Without this, panels are wider than the viewport and the
                 // holder PNG bleeds into the neighboring slide.
                 style={{ marginHorizontal: -16 }}
+                // Momentum-end does not fire on slow drags (long-standing RN
+                // quirk), which left activeGalleryIdx stale — the tile LOOKED
+                // selected but preview + option sections tracked the old one.
+                onScrollEndDrag={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
+                  setActiveGalleryIdx(idx)
+                }}
                 onMomentumScrollEnd={(e) => {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
                   // Only track the visible tile — do NOT mutate config here.
@@ -1397,7 +1421,7 @@ export default function LabelStudioScreen() {
             </View>
 
             {/* ============ Heritage Options ============ */}
-            {isHeritageTile && (
+            {(isHeritageTile || config.style === 'heritage') && (
               <View style={s.section}>
                 <Text style={s.sectionTitle}>Heritage Options</Text>
 
