@@ -32,6 +32,12 @@ export interface HeritageRasterOptions {
   /** Output raster width in px; height follows the 1400:400 aspect. Default 1400. */
   widthPx?: number
   gradeColors?: Record<string, string> | null
+  /**
+   * Org-branding override for the FRONT-label mark (black-variant data URL).
+   * The back's QR-centre disc keeps data.logoDataUrl (the DCM verification
+   * anchor). Absent = DCM mark, loaded internally, as before.
+   */
+  logoBlack?: string
 }
 
 function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): string {
@@ -71,7 +77,7 @@ function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): strin
 
 /** Render the Heritage label to a PNG data URL at the requested width. */
 export async function renderHeritageLabelPng(opts: HeritageRasterOptions): Promise<string> {
-  const blackLogo = await loadBlackLogoAsBase64().catch(() => null)
+  const blackLogo = opts.logoBlack ?? await loadBlackLogoAsBase64().catch(() => null)
   const markup = svgMarkup(opts, blackLogo)
   const blob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(blob)

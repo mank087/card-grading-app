@@ -111,6 +111,11 @@ export interface CardImageData {
     bandColors: string[];
     gradeColors?: Record<string, string> | null;
   } | null;
+  /**
+   * Org-branding logo overrides (data URLs). When present, used instead of
+   * the DCM asset loads — enterprise store cards print with the store's mark.
+   */
+  logoOverrides?: { color?: string; white?: string; black?: string } | null;
 }
 
 /**
@@ -988,6 +993,10 @@ async function drawHeritageLabel(
   const { renderHeritageLabelCanvas } = await import('@/lib/labels/heritageRaster');
   const { BAND_PATTERNS } = await import('@/lib/labelLab/bandGeometry');
   const pattern = (BAND_PATTERNS.some(p => p.id === data.heritage?.pattern) ? data.heritage!.pattern : 'diamond') as import('@/lib/labelLab/bandGeometry').BandPattern;
+  // The QR-centre disc must ALWAYS carry the DCM mark (verification anchor) —
+  // never a store logo, even when logoOverrides is set. Store identity on
+  // heritage goes through logoBlack (the front-label mark) only.
+  const dcmQrMark = await loadLogoAsBase64().catch(() => undefined);
   const slabData = {
     primaryName: data.cardName,
     contextLine: data.contextLine,
@@ -1000,7 +1009,7 @@ async function drawHeritageLabel(
     showFounderEmblem: data.showFounderEmblem,
     showVipEmblem: data.showVipEmblem,
     showCardLoversEmblem: data.showCardLoversEmblem,
-    logoDataUrl,
+    logoDataUrl: dcmQrMark ?? logoDataUrl,
   };
   const labelCanvas = await renderHeritageLabelCanvas({
     data: slabData as any,
@@ -1009,6 +1018,7 @@ async function drawHeritageLabel(
     bandColors: data.heritage?.bandColors?.length ? data.heritage.bandColors : ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'],
     widthPx: width * 2,
     gradeColors: data.heritage?.gradeColors ?? null,
+    logoBlack: data.logoOverrides?.black,
   });
   ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
 }
@@ -1168,8 +1178,8 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
   try {
     console.log('[CARD IMAGE GEN] Loading logo, isModern:', isModern);
     logoDataUrl = isModern
-      ? await loadWhiteLogoAsBase64().catch(() => undefined)
-      : await loadLogoAsBase64().catch(() => undefined);
+      ? (data.logoOverrides?.white || await loadWhiteLogoAsBase64().catch(() => undefined))
+      : (data.logoOverrides?.color || await loadLogoAsBase64().catch(() => undefined));
     console.log('[CARD IMAGE GEN] Logo loaded:', logoDataUrl ? 'success' : 'failed (using fallback)');
   } catch (err) {
     console.error('[CARD IMAGE GEN] Logo loading failed:', err);
