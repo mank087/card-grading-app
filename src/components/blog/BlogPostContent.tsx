@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Image from 'next/image';
 import EbayListingMonitor from '@/components/EbayListingMonitor';
+import CreditPacksShowcase from '@/components/blog/CreditPacksShowcase';
 
 interface BlogPostContentProps {
   content: string;
@@ -60,6 +61,9 @@ export default function BlogPostContent({ content }: BlogPostContentProps) {
               <EbayListingMonitor />
             </span>
           );
+        }
+        if (text === '[[credit-packs]]') {
+          return <CreditPacksShowcase />;
         }
         return (
           <p className="text-gray-700 leading-relaxed mb-4" {...props}>

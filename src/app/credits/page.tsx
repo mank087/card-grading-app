@@ -16,69 +16,13 @@ import { getStoredSession, getValidSession } from '@/lib/directAuth'
 import { loadStripe } from '@stripe/stripe-js'
 import Image from 'next/image'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
+import { pricingTiers, BASE_PRICE_PER_CREDIT, type PricingTier } from '@/lib/creditPackages'
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
-interface PricingTier {
-  id: 'basic' | 'pro' | 'elite'
-  name: string
-  price: number
-  credits: number
-  bonusCredits: number
-  description: string
-  popular?: boolean
-  icon: string
-  color: string
-  bgGradient: string
-  savingsPercent?: number
-  perGradeCost: number
-}
-
-// Base price per credit (Basic tier: $2.99/credit)
-const BASE_PRICE_PER_CREDIT = 2.99
-
-const pricingTiers: PricingTier[] = [
-  {
-    id: 'basic',
-    name: 'Basic',
-    price: 2.99,
-    credits: 1,
-    bonusCredits: 1,
-    description: 'Perfect for trying out DCM Grading',
-    icon: '⭐',
-    color: 'blue',
-    bgGradient: 'from-blue-500 to-blue-600',
-    perGradeCost: 2.99,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 9.99,
-    credits: 5,
-    bonusCredits: 3,
-    description: 'Best value for casual collectors',
-    popular: true,
-    icon: '🚀',
-    color: 'purple',
-    bgGradient: 'from-purple-600 to-indigo-600',
-    savingsPercent: 33,
-    perGradeCost: 2.00,
-  },
-  {
-    id: 'elite',
-    name: 'Elite',
-    price: 19.99,
-    credits: 20,
-    bonusCredits: 5,
-    description: 'For serious collectors and dealers',
-    icon: '👑',
-    color: 'amber',
-    bgGradient: 'from-amber-500 to-orange-600',
-    savingsPercent: 67,
-    perGradeCost: 1.00,
-  },
-]
+// Pack pricing lives in @/lib/creditPackages so marketing surfaces (blog
+// embeds, landing pages) render the same numbers checkout charges.
 
 
 function CreditsPageContent() {
