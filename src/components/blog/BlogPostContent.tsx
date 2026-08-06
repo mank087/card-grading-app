@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Image from 'next/image';
+import EbayListingMonitor from '@/components/EbayListingMonitor';
 
 interface BlogPostContentProps {
   content: string;
@@ -44,11 +45,28 @@ export default function BlogPostContent({ content }: BlogPostContentProps) {
       ),
 
       // Paragraphs
-      p: ({ children, ...props }: any) => (
-        <p className="text-gray-700 leading-relaxed mb-4" {...props}>
-          {children}
-        </p>
-      ),
+      p: ({ children, ...props }: any) => {
+        // Embed markers: a paragraph containing only [[name]] renders a live
+        // component instead of text, so posts can drop in real UI. Flattened
+        // from all string children — remark can split a paragraph's text into
+        // several nodes, so comparing a single child is not reliable.
+        const text = (Array.isArray(children) ? children : [children])
+          .map((c: any) => (typeof c === 'string' ? c : ''))
+          .join('')
+          .trim();
+        if (text === '[[ebay-monitor]]') {
+          return (
+            <span className="not-prose block my-8">
+              <EbayListingMonitor />
+            </span>
+          );
+        }
+        return (
+          <p className="text-gray-700 leading-relaxed mb-4" {...props}>
+            {children}
+          </p>
+        );
+      },
 
       // Links
       a: ({ href, children, ...props }: any) => (
@@ -103,11 +121,25 @@ export default function BlogPostContent({ content }: BlogPostContentProps) {
       ),
 
       // Blockquotes
+      // Speech-bubble callout. `not-prose` so Tailwind Typography's own
+      // blockquote rules (left rule, italics, auto quote marks) don't fight
+      // the bubble. First paragraph is the quote, a following paragraph is
+      // treated as the attribution line.
       blockquote: ({ children, ...props }: any) => (
         <blockquote
-          className="border-l-4 border-purple-500 pl-4 py-2 my-4 bg-purple-50 rounded-r-lg italic text-gray-700"
+          className="not-prose relative my-7 rounded-2xl border border-purple-200 bg-white px-6 py-5 pl-14 shadow-sm
+            after:absolute after:-bottom-2 after:left-10 after:h-4 after:w-4 after:rotate-45 after:border-b after:border-r after:border-purple-200 after:bg-white after:content-['']
+            [&>p]:my-0
+            [&>p:first-of-type]:text-[17px] [&>p:first-of-type]:leading-relaxed [&>p:first-of-type]:text-gray-800
+            [&>p:last-of-type:not(:first-of-type)]:mt-3 [&>p:last-of-type:not(:first-of-type)]:text-sm [&>p:last-of-type:not(:first-of-type)]:font-semibold [&>p:last-of-type:not(:first-of-type)]:text-purple-700"
           {...props}
         >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-4 top-2 select-none font-serif text-5xl leading-none text-purple-300"
+          >
+            &ldquo;
+          </span>
           {children}
         </blockquote>
       ),
