@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getStoredSession } from '@/lib/directAuth';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 
 /**
  * Realised sales view for the portfolio page.
@@ -56,16 +57,7 @@ const money = (n: number) =>
 /** A group where nothing has a price yet reads as "sold for $0" otherwise. */
 const groupMoney = (n: number) => (n > 0 ? money(n) : '—');
 
-const routeFor = (category: string | null, id: string) => {
-  const sports = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
-  if (category && sports.includes(category)) return `/sports/${id}`;
-  if (category === 'Pokemon') return `/pokemon/${id}`;
-  if (category === 'MTG') return `/mtg/${id}`;
-  if (category === 'Lorcana') return `/lorcana/${id}`;
-  if (category === 'One Piece') return `/onepiece/${id}`;
-  if (category === 'Yu-Gi-Oh') return `/yugioh/${id}`;
-  return `/other/${id}`;
-};
+const routeFor = (category: string | null, id: string) => `/${categoryToRouteSlug(category)}/${id}`;
 
 export function SoldTab() {
   const [data, setData] = useState<SoldData | null>(null);

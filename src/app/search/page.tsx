@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { CardSlabGrid } from '@/components/CardSlab';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 
 interface CardResult {
   id: string;
@@ -95,27 +96,12 @@ function SearchPageContent() {
   };
 
   // Helper to get the correct card detail link based on category
-  const getCardLink = (card: CardResult) => {
-    const category = card.category || card.sport_type;
-    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
-
-    if (category && sportCategories.includes(category)) {
-      return `/sports/${card.id}`;
-    }
-    if (category === 'Pokemon') {
-      return `/pokemon/${card.id}`;
-    }
-    if (category === 'MTG') {
-      return `/mtg/${card.id}`;
-    }
-    if (category === 'Lorcana') {
-      return `/lorcana/${card.id}`;
-    }
-    if (category === 'Other') {
-      return `/other/${card.id}`;
-    }
-    return `/sports/${card.id}`; // Default fallback
-  };
+  // categoryToRouteSlug is the one place category -> route is decided. The
+  // old local map here had no One Piece / Yu-Gi-Oh / Star Wars case and fell
+  // back to /sports, so those cards linked to a page that cannot load them
+  // and reported the card as missing.
+  const getCardLink = (card: CardResult) =>
+    `/${categoryToRouteSlug(card.category || card.sport_type)}/${card.id}`;
 
   // Helper to get the grade
   const getGrade = (card: CardResult) => {

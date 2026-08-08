@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel'
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel'
 import { getCardLabelData } from '@/lib/useLabelData'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 import { GradeHeroBanner } from '@/components/grading/GradeHeroBanner'
 import { SubScoresDisplay } from '@/components/grading/SubScoresDisplay'
 import { PriceEstimateBadge } from '@/components/grading/PriceEstimateBadge'
@@ -23,16 +24,7 @@ const separatorStyle = {
 }
 
 function getCardLink(card: any): string {
-  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-  if (card.category && sportCategories.includes(card.category)) return `/sports/${card.id}`
-  if (card.category === 'Pokemon') return `/pokemon/${card.id}`
-  if (card.category === 'MTG') return `/mtg/${card.id}`
-  if (card.category === 'Lorcana') return `/lorcana/${card.id}`
-  if (card.category === 'One Piece') return `/onepiece/${card.id}`
-  if (card.category === 'Yu-Gi-Oh') return `/yugioh/${card.id}`
-  if (card.category === 'Star Wars') return `/starwars/${card.id}`
-  if (card.category === 'Other') return `/other/${card.id}`
-  return `/card/${card.id}`
+  return `/${categoryToRouteSlug(card.category)}/${card.id}`
 }
 
 function getEstimatedValue(card: any): number | null {

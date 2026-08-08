@@ -15,6 +15,7 @@ import ValueDistributionChart from '@/components/market-pricing/ValueDistributio
 import TopSetsChart from '@/components/market-pricing/TopSetsChart'
 import PriceSourceChart from '@/components/market-pricing/PriceSourceChart'
 import EbayListingMonitor from '@/components/EbayListingMonitor'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 // Static mock data for decorative background charts
 const MOCK_CATEGORIES = [
@@ -1172,7 +1173,7 @@ export default function WhyDcmPage() {
             <SectionHeading title="Real Grades from Real Collectors" subtitle="Browse cards graded by the DCM community" />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
               {featuredCards.slice(0, 8).map((card) => (
-                <Link key={card.id} href={`/${card.category?.toLowerCase() || 'other'}/${card.id}`} className="group">
+                <Link key={card.id} href={`/${categoryToRouteSlug(card.category)}/${card.id}`} className="group">
                   <FeaturedCardSlab card={card} />
                   <div className="text-center mt-2">
                     <p className="text-sm font-medium text-gray-900 truncate group-hover:text-purple-600 transition-colors">{card.card_name || 'Graded Card'}</p>

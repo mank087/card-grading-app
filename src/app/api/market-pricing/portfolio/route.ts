@@ -5,19 +5,10 @@ import { resolveCardValue, type CardForPricing, type PriceSource } from '@/lib/p
 import { isCacheStale } from '@/lib/pricing/batchPriceRefresh';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { isMissingColumnError } from '@/lib/cards/ownership';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 
-// DB stores: Pokemon, MTG, Lorcana, One Piece, Other, or sport names (Football, Baseball, etc.)
-const SPORTS_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
-
-function getCategoryPath(category: string): string {
-  if (category === 'Pokemon') return 'pokemon';
-  if (category === 'MTG') return 'mtg';
-  if (category === 'Lorcana') return 'lorcana';
-  if (category === 'One Piece') return 'onepiece';
-  if (category === 'Other') return 'other';
-  // Sports categories use the /sports/ path
-  return 'sports';
-}
+// DB stores: Pokemon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, Other, or
+// sport names (Football, Baseball, etc.) — categoryToRouteSlug handles them all.
 
 /**
  * Single price-resolution path. Mirrors the version every other surface
@@ -58,7 +49,7 @@ function getCardName(card: Record<string, unknown>): string {
 
 function getCardPath(card: Record<string, unknown>): string {
   const category = (card.category as string) || 'Other';
-  return `/${getCategoryPath(category)}/${card.id}`;
+  return `/${categoryToRouteSlug(category)}/${card.id}`;
 }
 
 export async function GET(request: NextRequest) {

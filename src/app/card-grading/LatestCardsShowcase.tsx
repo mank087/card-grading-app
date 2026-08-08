@@ -4,17 +4,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 // Get card detail page link based on category
-const getCardLink = (card: any) => {
-  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-  if (card.category && sportCategories.includes(card.category)) return `/sports/${card.id}`
-  if (card.category === 'Pokemon') return `/pokemon/${card.id}`
-  if (card.category === 'MTG') return `/mtg/${card.id}`
-  if (card.category === 'Lorcana') return `/lorcana/${card.id}`
-  if (card.category === 'Other') return `/other/${card.id}`
-  return `/card/${card.id}`
-}
+const getCardLink = (card: any) => `/${categoryToRouteSlug(card.category)}/${card.id}`
 
 // Category badge colors and labels
 const getCategoryColor = (category: string) => {

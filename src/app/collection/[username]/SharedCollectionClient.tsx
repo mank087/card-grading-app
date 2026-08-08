@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import FeaturedCardTile from '@/components/FeaturedCardTile'
 import { getCardLabelData } from '@/lib/useLabelData'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 interface CollectionStats {
   totalCards: number
@@ -32,16 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 function getCardLink(card: any): string {
-  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-  if (card.category && sportCategories.includes(card.category)) return `/sports/${card.id}`
-  if (card.category === 'Pokemon') return `/pokemon/${card.id}`
-  if (card.category === 'MTG') return `/mtg/${card.id}`
-  if (card.category === 'Lorcana') return `/lorcana/${card.id}`
-  if (card.category === 'One Piece') return `/onepiece/${card.id}`
-  if (card.category === 'Yu-Gi-Oh') return `/yugioh/${card.id}`
-  if (card.category === 'Star Wars') return `/starwars/${card.id}`
-  if (card.category === 'Other') return `/other/${card.id}`
-  return `/card/${card.id}`
+  return `/${categoryToRouteSlug(card.category)}/${card.id}`
 }
 
 function getGradeColor(grade: number): string {

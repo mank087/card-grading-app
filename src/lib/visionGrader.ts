@@ -37,7 +37,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.11';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.12';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -2722,6 +2722,45 @@ Provide detailed analysis as markdown with all required sections.`
               gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
             }
             console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}; dissent shown in: ${dissentCats.join(',') || 'none identified'})`);
+          }
+        }
+
+        // v9.12 WEAKEST-LINK DISPLAY INVARIANT: the final grade is MIN(subgrades),
+        // so a card must never show four subgrades above its own grade. The v9.9
+        // dissent reflection only ran inside the unanimity branch — the uncertainty
+        // and rigid-case gates (and the unanimity fallback where no per-category
+        // dissent was identifiable) each dropped the final to 9 and left 10/10/10/10
+        // on the tiles. Customer-visible as "perfect everywhere, came back a 9";
+        // measured at 4.3% of graded cards, including cards on the current prompt.
+        //
+        // Attribution rule: if a pass actually scored a category lower, that
+        // category carries the drop (real finding). If nothing did — the cap came
+        // from evidence quality, not a defect — every category is capped, since the
+        // cap means "cannot confirm better than this anywhere" rather than
+        // inventing a flaw in one specific category.
+        {
+          const cats = ['centering', 'corners', 'edges', 'surface'] as const;
+          const minSub = Math.min(...cats.map(c => serverRounded[c] ?? 10));
+          if (minSub > finalGrade) {
+            const attributable = cats.filter(
+              c => Math.min(pass1[c] ?? 10, pass2[c] ?? 10, pass3[c] ?? 10) < (serverRounded[c] ?? 10)
+            );
+            const targets = attributable.length > 0 ? attributable : [...cats];
+            for (const cat of targets) {
+              const minAcross = Math.min(pass1[cat] ?? 10, pass2[cat] ?? 10, pass3[cat] ?? 10);
+              const shown = attributable.length > 0 ? Math.max(minAcross, finalGrade) : finalGrade;
+              if (shown < (serverRounded[cat] ?? 10)) {
+                serverRounded[cat] = shown;
+                for (const face of ['front', 'back'] as const) {
+                  const key = `${cat}_${face}`;
+                  if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > shown) {
+                    jsonData.raw_sub_scores[key] = shown;
+                  }
+                }
+              }
+            }
+            threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+            console.log(`[GRADE RECALC] 🔗 weakest-link display: subgrades capped to final ${finalGrade} (${attributable.length > 0 ? `attributed to ${attributable.join(',')}` : 'evidence-quality cap, all categories'})`);
           }
         }
 

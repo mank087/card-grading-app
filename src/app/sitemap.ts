@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { POP_CATEGORIES } from '@/lib/popReport';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://dcmgrading.com';
@@ -190,19 +191,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Error fetching cards for sitemap:', cardsError);
   }
 
-  // Map category to URL path
-  const categoryToPath: Record<string, string> = {
-    sports: 'sports',
-    pokemon: 'pokemon',
-    mtg: 'mtg',
-    lorcana: 'lorcana',
-    onepiece: 'onepiece',
-    other: 'other',
-  };
-
-  // Generate sitemap entries for each public card
+  // Generate sitemap entries for each public card.
+  // categoryToRouteSlug is the single source of truth for category → route: the
+  // DB stores 'One Piece', 'Yu-Gi-Oh', 'Star Wars' and per-sport categories, none
+  // of which match the route slugs directly.
   const cardPages: MetadataRoute.Sitemap = (cards || []).map((card) => {
-    const path = categoryToPath[card.category] || 'sports';
+    const path = categoryToRouteSlug(card.category);
 
     return {
       url: `${baseUrl}/${path}/${card.id}`,

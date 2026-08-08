@@ -8,6 +8,7 @@ import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
 import AppStoreBadge, { APP_STORE_URL } from '@/components/AppStoreBadge'
 import GooglePlayBadge, { GOOGLE_PLAY_URL } from '@/components/GooglePlayBadge'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 // Pre-redesign homepage preserved at src/app/page.tsx.backup_pre_redesign_20260707
 // (July 2026 redesign: outcome-led hero, evergreen New Grader offer replacing the
@@ -57,15 +58,7 @@ const formatGrade = (grade: number): string => {
   return Math.round(grade).toString()
 }
 
-const getCardLink = (card: any) => {
-  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-  if (card.category && sportCategories.includes(card.category)) return `/sports/${card.id}`
-  if (card.category === 'Pokemon') return `/pokemon/${card.id}`
-  if (card.category === 'MTG') return `/mtg/${card.id}`
-  if (card.category === 'Lorcana') return `/lorcana/${card.id}`
-  if (card.category === 'Other') return `/other/${card.id}`
-  return `/card/${card.id}`
-}
+const getCardLink = (card: any) => `/${categoryToRouteSlug(card.category)}/${card.id}`
 
 /**
  * Live graded-card counter. `target` is the exact live database count (same
