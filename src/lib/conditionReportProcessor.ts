@@ -36,7 +36,7 @@ import {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 
-const PROCESSOR_VERSION = '3.1.0'; // v9.13.1: clarification-aware notes parsing
+const PROCESSOR_VERSION = '3.2.0'; // v9.13.2: clarifiable-feature vocabulary (swirls, color wash, …)
 const MAX_NOTE_LENGTH = 500;
 const MAX_PARSED_DEFECTS = 10;
 
@@ -232,8 +232,19 @@ export function filterPositiveClaims(text: string): string {
 //     "holo pattern", "factory texture", "meant to look").
 //   DIRECT DENIAL: negation immediately before the defect noun or before
 //     damage/defect words ("not a stain", "isn't a crease", "no actual damage").
-const INTENTIONAL_RE = /\b(art\s*(work|style)?|design(ed)?|print(ed|ing)?( that way)?|holo(graphic)?|foil|textur\w+|pattern|illustration|intentional(ly)?|part of the (card|art|design|set)|factory (pattern|design|texture)|meant to (be|look)|card'?s? (own )?(art|design|style))\b/i;
-const DIRECT_DENIAL_RE = /\b(not?|isn'?t|aren'?t|never|without)\s+(actually\s+|really\s+|a\s+|an\s+|any\s+)*\s*(damage[ds]?|defects?|flaws?|stain(ed|s)?|scratch(es|ed)?|creas(e|es|ed)|dents?|tears?|marks?|spots?)\b/i;
+const INTENTIONAL_RE = /\b(art\s*(work|style)?|design(ed)?|print(ed|ing)?( that way)?|holo(graphic)?|foil|textur\w+|pattern|illustration|intentional(ly)?|part of the (card|art|design|set)|factory (pattern|design|texture)|meant to (be|look)|supposed to (be|look)|card'?s? (own )?(art|design|style)|(special )?effect|finish|refractor|prism(atic)?|etch(ed|ing)?|emboss(ed|ing)?|acetate|die[\s-]?cut)\b/i;
+const DIRECT_DENIAL_RE = /\b(not?|isn'?t|aren'?t|never|without)\s+(actually\s+|really\s+|a\s+|an\s+|any\s+)*\s*(damage[ds]?|defects?|flaws?|issues?|problems?|stain(ed|s)?|scratch(es|ed)?|creas(e|es|ed)|dents?|tears?|marks?|spots?|swirls?|splotch(es)?|blotch(es)?|discolou?rations?|whitening|wear)\b/i;
+
+// v9.13.2: appearance features owners excuse that are NOT defect keywords —
+// "the swirls are part of the artwork", "the color wash is the design".
+// Checked ONLY inside clarifying sentences, so being generous here is safe:
+// these can never create a defect, only a clarification.
+const CLARIFIABLE_FEATURES: string[] = [
+  'swirl', 'holo swirl', 'holo pattern', 'foil pattern', 'color splash',
+  'color wash', 'colour wash', 'splotch', 'blotch', 'gradient', 'glitter',
+  'sparkle', 'shimmer', 'streak', 'speckle', 'dot pattern', 'line pattern',
+  'coloring', 'colouring', 'shading', 'shadow', 'haze', 'cloudiness',
+];
 
 function splitSentences(text: string): string[] {
   return text
@@ -263,10 +274,24 @@ export function parseNotesEntries(
     const sentenceLower = sentence.toLowerCase();
     const clarifying = isClarifyingSentence(sentence);
 
+    // Clarifying sentences also register excused appearance FEATURES (swirls,
+    // color wash, …) that aren't defect keywords — without this, "the swirls
+    // are part of the artwork" produced no clarification at all and the model
+    // never got the explicit treat-as-design instruction.
+    if (clarifying) {
+      for (const feature of CLARIFIABLE_FEATURES) {
+        const featureRegex = new RegExp(`\\b${feature.replace(/\s+/g, '\\s+')}(?:es|s|ing|ed)?\\b`, 'i');
+        if (featureRegex.test(sentenceLower)) {
+          clarifications.push({ category: 'surface', type: feature, raw_sentence: sentence });
+        }
+      }
+    }
+
     for (const [, { category, types }] of Object.entries(DEFECT_KEYWORDS)) {
       for (const defectType of types) {
-        // (?:es|s)? — "scratches"/"creases" previously never matched `scratchs?`
-        const typeRegex = new RegExp(`\\b${defectType.replace(/\s+/g, '\\s+')}(?:es|s)?\\b`, 'i');
+        // Suffixes: plurals ("scratches") and verb forms ("scuffing",
+        // "stained") — bare (?:es|s)? missed the -ing/-ed reports entirely.
+        const typeRegex = new RegExp(`\\b${defectType.replace(/\s+/g, '\\s+')}(?:es|s|ing|ed)?\\b`, 'i');
         if (!typeRegex.test(sentenceLower)) continue;
 
         if (clarifying) {
