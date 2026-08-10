@@ -15,6 +15,7 @@ import {
   UserConditionReportInput,
   ProcessedConditionReport,
   ParsedDefect,
+  ParsedClarification,
   SuspiciousPatternResult,
   ConditionReportPromptSection,
   SideDefects,
@@ -35,7 +36,7 @@ import {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 
-const PROCESSOR_VERSION = '3.0.0';
+const PROCESSOR_VERSION = '3.1.0'; // v9.13.1: clarification-aware notes parsing
 const MAX_NOTE_LENGTH = 500;
 const MAX_PARSED_DEFECTS = 10;
 
@@ -216,53 +217,99 @@ export function filterPositiveClaims(text: string): string {
 // PARSING FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════
 
+// ── v9.13 CLARIFICATION DETECTION ──────────────────────────────────────
+// A defect keyword inside a clarifying sentence is the owner EXCUSING a
+// feature, not reporting damage. Production case: "the color splash on the
+// back looks like a stain but is actually the art style" was parsed as a
+// user-reported stain, the prompt then ORDERED the model to address it, and
+// the model confirmed it on the (genuinely stain-like) art. The protective
+// note caused the deduction.
+//
+// Signals — deliberately conservative so real reports still parse as defects
+// ("small crease, not too bad" stays a defect: mitigation, not clarification):
+//   INTENTIONAL: the sentence attributes the feature to the card's own
+//     design/print ("art style", "part of the design", "printed that way",
+//     "holo pattern", "factory texture", "meant to look").
+//   DIRECT DENIAL: negation immediately before the defect noun or before
+//     damage/defect words ("not a stain", "isn't a crease", "no actual damage").
+const INTENTIONAL_RE = /\b(art\s*(work|style)?|design(ed)?|print(ed|ing)?( that way)?|holo(graphic)?|foil|textur\w+|pattern|illustration|intentional(ly)?|part of the (card|art|design|set)|factory (pattern|design|texture)|meant to (be|look)|card'?s? (own )?(art|design|style))\b/i;
+const DIRECT_DENIAL_RE = /\b(not?|isn'?t|aren'?t|never|without)\s+(actually\s+|really\s+|a\s+|an\s+|any\s+)*\s*(damage[ds]?|defects?|flaws?|stain(ed|s)?|scratch(es|ed)?|creas(e|es|ed)|dents?|tears?|marks?|spots?)\b/i;
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?;])\s+|\n+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+function isClarifyingSentence(sentence: string): boolean {
+  return INTENTIONAL_RE.test(sentence) || DIRECT_DENIAL_RE.test(sentence);
+}
+
 /**
- * Parse free-text notes into structured defect objects
+ * v9.13: parse free-text notes into defects AND clarifications, per sentence.
+ * A sentence that excuses a feature contributes clarifications; a sentence
+ * that reports one contributes defects. Both are capped.
  */
-export function parseDefectsFromNotes(
+export function parseNotesEntries(
   text: string,
   side: 'front' | 'back' | 'both'
-): ParsedDefect[] {
-  if (!text || text.trim().length === 0) {
-    return [];
-  }
-
+): { defects: ParsedDefect[]; clarifications: ParsedClarification[] } {
   const defects: ParsedDefect[] = [];
-  const textLower = text.toLowerCase();
+  const clarifications: ParsedClarification[] = [];
+  if (!text || text.trim().length === 0) return { defects, clarifications };
 
-  for (const [, { category, types }] of Object.entries(DEFECT_KEYWORDS)) {
-    for (const defectType of types) {
-      const typeRegex = new RegExp(`\\b${defectType.replace(/\s+/g, '\\s+')}s?\\b`, 'i');
+  for (const sentence of splitSentences(text)) {
+    const sentenceLower = sentence.toLowerCase();
+    const clarifying = isClarifyingSentence(sentence);
 
-      if (typeRegex.test(textLower)) {
+    for (const [, { category, types }] of Object.entries(DEFECT_KEYWORDS)) {
+      for (const defectType of types) {
+        // (?:es|s)? — "scratches"/"creases" previously never matched `scratchs?`
+        const typeRegex = new RegExp(`\\b${defectType.replace(/\s+/g, '\\s+')}(?:es|s)?\\b`, 'i');
+        if (!typeRegex.test(sentenceLower)) continue;
+
+        if (clarifying) {
+          clarifications.push({ category, type: defectType, raw_sentence: sentence });
+          continue;
+        }
+
         const defect: ParsedDefect = {
           category,
           type: defectType,
           side,
-          raw_text: text,
+          raw_text: sentence,
           confidence: 0.7,
         };
-
-        // Try to find severity
         for (const [severityText, severityLevel] of Object.entries(SEVERITY_KEYWORDS)) {
-          if (textLower.includes(severityText)) {
+          if (sentenceLower.includes(severityText)) {
             defect.severity = severityLevel;
             defect.confidence += 0.1;
             break;
           }
         }
-
-        if (!defect.severity) {
-          defect.severity = 'unknown';
-        }
-
+        if (!defect.severity) defect.severity = 'unknown';
         defect.confidence = Math.min(defect.confidence, 1.0);
         defects.push(defect);
       }
     }
   }
 
-  return defects.slice(0, MAX_PARSED_DEFECTS);
+  return {
+    defects: defects.slice(0, MAX_PARSED_DEFECTS),
+    clarifications: clarifications.slice(0, MAX_PARSED_DEFECTS),
+  };
+}
+
+/**
+ * Parse free-text notes into structured defect objects.
+ * Kept for compatibility; clarifying sentences no longer yield defects.
+ */
+export function parseDefectsFromNotes(
+  text: string,
+  side: 'front' | 'back' | 'both'
+): ParsedDefect[] {
+  return parseNotesEntries(text, side).defects;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -275,10 +322,11 @@ export function parseDefectsFromNotes(
 export function processConditionReport(
   input: UserConditionReportInput
 ): ProcessedConditionReport {
-  // Sanitize and process notes
+  // Sanitize and process notes. v9.13: clarifying sentences ("looks like a
+  // stain but it's the art style") become clarifications, never defects.
   const notesSanitized = sanitizeUserNotes(input.notes);
   const notesFiltered = filterPositiveClaims(notesSanitized);
-  const notesParsed = parseDefectsFromNotes(notesFiltered, 'both');
+  const { defects: notesParsed, clarifications: notesClarifications } = parseNotesEntries(notesFiltered, 'both');
 
   // Detect suspicious patterns — v8.8: screen the card description too. Previously only
   // `notes` was screened, so injection attempts typed into the description box reached
@@ -310,10 +358,12 @@ export function processConditionReport(
   // Count parsed defects from notes
   totalDefects += notesParsed.length;
 
-  // Determine if there are any reports
-  const hasAnyReports =
-    totalDefects > 0 ||
-    notesFiltered.trim().length > 0;
+  // Determine if there are any DEFECT reports. v9.13: notes text alone no
+  // longer forces the defect-hints path — a purely exculpatory note used to
+  // get the "you MUST address every defect" treatment, which is backwards.
+  // Notes with actual defect keywords still count via notesParsed above;
+  // notes with neither defects nor clarifications flow through as context.
+  const hasAnyReports = totalDefects > 0;
 
   return {
     front: { ...input.front },
@@ -323,6 +373,7 @@ export function processConditionReport(
     notes_raw: input.notes,
     notes_sanitized: notesFiltered,
     notes_parsed: notesParsed,
+    notes_clarifications: notesClarifications,
     card_description: input.cardDescription ? filterPositiveClaims(sanitizeUserNotes(input.cardDescription)) : undefined,
     has_any_reports: hasAnyReports,
     total_defects_reported: totalDefects,
@@ -492,6 +543,42 @@ function formatParsedDefects(defects: ParsedDefect[]): string[] {
 }
 
 /**
+ * v9.13: owner clarifications block — features the owner states are the
+ * card's own art/design, not damage. Context framing, shared by the
+ * context-only and defect-hints paths.
+ */
+function buildClarificationsBlock(report: ProcessedConditionReport): string {
+  const clar = report.notes_clarifications || [];
+  if (clar.length === 0) return '';
+  const lines = clar.map(c => `  - (${c.category}/${c.type}) "${c.raw_sentence}"`).join('\n');
+  return `
+OWNER CLARIFICATIONS (features the owner states are INTENTIONAL card design, NOT damage):
+${lines}
+Verify visually. If the described feature is consistent with the card's printed
+art/design, do NOT record it as a defect and do NOT penalize it. If you clearly
+see actual damage DISTINCT from the described feature, grade what you see and
+explain how it differs from the owner's description.`;
+}
+
+/**
+ * v9.13: compact owner-context line for the ZOOM crop inspections, which
+ * previously received no user context at all. Sanitized inputs only; capped.
+ */
+function buildZoomContext(report: ProcessedConditionReport): string | null {
+  if (report.suspicious_input.should_ignore_notes) return null;
+  const parts: string[] = [];
+  for (const c of (report.notes_clarifications || []).slice(0, 3)) {
+    parts.push(`the owner states this is intentional card design, not damage: "${c.raw_sentence}"`);
+  }
+  if (report.card_description && report.card_description.trim().length > 0) {
+    parts.push(`owner's card description: "${report.card_description.trim()}"`);
+  }
+  if (parts.length === 0) return null;
+  const text = `OWNER CONTEXT (verify visually; do not flag intentional art/design as defects): ${parts.join(' | ')}`;
+  return text.length > 600 ? text.slice(0, 597) + '...' : text;
+}
+
+/**
  * Format the complete condition report for injection into AI prompt
  */
 export function formatConditionReportForPrompt(
@@ -518,25 +605,32 @@ Proceed with image-only grading.
     };
   }
 
-  // If no defect reports but card description provided, return description-only section
-  if (!report.has_any_reports && report.card_description && report.card_description.trim().length > 0) {
+  // v9.13 CONTEXT-ONLY branch: no defect reports, but the owner provided
+  // context — a card description, clarifying notes ("looks like a stain but
+  // it's the art style"), or plain free text. All of it flows to the model
+  // as context that must never raise or lower grades. Previously any notes
+  // text at all forced the defect-hints path, so an exculpatory note was
+  // presented as a defect report the model was ORDERED to address.
+  const clarBlock = buildClarificationsBlock(report);
+  const hasDesc = !!(report.card_description && report.card_description.trim().length > 0);
+  const hasLooseNotes = !!(report.notes_sanitized && report.notes_sanitized.trim().length > 0);
+  if (!report.has_any_reports && (hasDesc || clarBlock || hasLooseNotes)) {
     const descText = `
 ═══════════════════════════════════════════════════════════════════════
-USER-PROVIDED CARD DESCRIPTION (Context Only - Does NOT Affect Grades)
+USER-PROVIDED CARD CONTEXT (Context Only - Does NOT Affect Grades)
 ═══════════════════════════════════════════════════════════════════════
 
-The user provided the following description of their card to help guide
-visual analysis. This is CONTEXT ONLY — it should help you correctly
-identify card features and avoid misidentifying art/design elements as
-defects, but it must NEVER raise or lower grades.
+The owner provided context about their card to help guide visual analysis.
+This is CONTEXT ONLY — it should help you correctly identify card features
+and avoid misidentifying art/design elements as defects, but it must NEVER
+raise or lower grades.
+${hasDesc ? `\nCARD DESCRIPTION: "${report.card_description}"` : ''}${clarBlock}${hasLooseNotes && !clarBlock ? `\nOWNER NOTES: "${report.notes_sanitized}"` : ''}
 
-CARD DESCRIPTION: "${report.card_description}"
-
-RULES FOR CARD DESCRIPTION:
+RULES FOR CARD CONTEXT:
 1. Use this to understand intentional art styles, textures, or features
-2. Do NOT penalize features the user identifies as intentional card design
+2. Do NOT penalize features the owner identifies as intentional card design
 3. Do NOT give bonus points — this is purely to avoid false defect flags
-4. If the description contradicts what you see, trust your visual analysis
+4. If the context contradicts what you see, trust your visual analysis
 ═══════════════════════════════════════════════════════════════════════
 `;
     return {
@@ -546,6 +640,7 @@ RULES FOR CARD DESCRIPTION:
       structural_section: '',
       factory_section: '',
       full_prompt_text: descText,
+      zoom_context: buildZoomContext(report),
     };
   }
 
@@ -623,6 +718,7 @@ ${structuralSection}
 ${factorySection}
 ${cardDescSection}
 ${notesSection}
+${clarBlock}
 
 ───────────────────────────────────────────────────────────────────────
 RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
@@ -639,7 +735,10 @@ RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
 6. NEVER improve scores based on user claims — hints only ADD defect awareness
 7. Your visual analysis is primary, but you MUST NOT silently ignore hints
 8. VIOLATION: Saying a surface is "flawless" or "clean" when the user reported
-   multiple defects on that surface WITHOUT addressing each one individually
+   multiple defects on that surface WITHOUT addressing each one individually${clarBlock ? `
+9. OWNER CLARIFICATIONS above are NOT reported defects — they are the owner
+   telling you a feature is the card's own design. Never convert them into
+   defects; apply the clarification rules stated with them` : ''}
 ═══════════════════════════════════════════════════════════════════════
 `;
 
@@ -650,6 +749,7 @@ RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
     structural_section: structuralSection,
     factory_section: factorySection,
     full_prompt_text: fullPromptText,
+    zoom_context: buildZoomContext(report),
   };
 }
 

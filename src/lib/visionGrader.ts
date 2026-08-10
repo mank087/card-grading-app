@@ -38,7 +38,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.13';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.13.1';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -1818,9 +1818,18 @@ export async function gradeCardConversational(
     }
   }
 
+  // v9.13: thread owner context (clarifications + card description) into the
+  // zoom crop inspections. They previously received no user context, so a
+  // "stain" flagged on a crop could defeat a perfectly-worded clarification —
+  // the crop-level pass never heard that the splash is the card's own art.
+  const zoomOwnerContext = conditionReportSection?.zoom_context || undefined;
+  if (zoomOwnerContext) {
+    console.log(`[CONVERSATIONAL] zoom owner-context attached (${zoomOwnerContext.length} chars)`);
+  }
+
   const zoomPromise: Promise<ZoomResult> | null =
     outputFormat === 'json'
-      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry })
+      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext })
       : null;
 
   // Retry configuration for transient failures

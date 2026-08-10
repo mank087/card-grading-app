@@ -373,6 +373,20 @@ export interface ParsedDefect {
 }
 
 /**
+ * A defect keyword the owner used in a CLARIFYING way — "looks like a stain
+ * but is actually the art style". These must reach the model as context
+ * ("this is intentional design, verify visually") and must NEVER be turned
+ * into a user-reported defect. v9.13: previously the negation-blind keyword
+ * parser converted exactly these sentences into defect reports, so a
+ * protective note caused the very deduction it was written to prevent.
+ */
+export interface ParsedClarification {
+  category: ParsedDefect['category'];
+  type: string;
+  raw_sentence: string;
+}
+
+/**
  * Result of suspicious pattern detection
  */
 export interface SuspiciousPatternResult {
@@ -393,6 +407,8 @@ export interface ProcessedConditionReport {
   notes_raw: string;
   notes_sanitized: string;
   notes_parsed: ParsedDefect[];
+  /** Owner statements that a feature is intentional design, not damage (v9.13). */
+  notes_clarifications?: ParsedClarification[];
   card_description?: string;
 
   has_any_reports: boolean;
@@ -413,4 +429,10 @@ export interface ConditionReportPromptSection {
   structural_section: string;
   factory_section?: string;
   full_prompt_text: string;
+  /**
+   * Short sanitized owner-context line for the ZOOM crop inspections (v9.13).
+   * The zoom calls previously received no user context at all, so a stain
+   * flagged on a crop could defeat a perfectly-worded clarification.
+   */
+  zoom_context?: string | null;
 }

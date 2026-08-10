@@ -561,12 +561,15 @@ export default function UserConditionReport({
               📝 Additional Notes
             </h4>
             <p className="text-xs text-gray-500 mb-2">
-              Describe any other defects or provide details about specific issues
+              Describe any other defects or provide details about specific issues.
+              Pointing out something that&apos;s part of the card&apos;s design rather than
+              damage? Say so clearly — e.g. &quot;the splash on the back is the printed
+              art style, not a stain&quot; — and the grader will treat it as context.
             </p>
             <NotesInput
               value={value.notes}
               onChange={updateNotes}
-              placeholder="E.g., 'Light scratch near center of front', 'Small white dot at top-left corner', 'Factory print line visible under certain lighting'..."
+              placeholder="E.g., 'Light scratch near center of front', 'Small white dot at top-left corner', 'The color splash on the back is the printed art, not a stain'..."
             />
           </div>
 
