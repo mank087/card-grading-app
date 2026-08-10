@@ -26,7 +26,8 @@ import {
 import { ProcessedConditionReport } from '@/types/conditionReport';
 import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
-import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim } from './zoomInspection';
+import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
+import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -37,7 +38,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.12';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.13';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -1771,8 +1772,56 @@ export async function gradeCardConversational(
   // graded half on one model and half on another is uninterpretable and would
   // silently corrupt the canary comparison, so `model` is threaded explicitly
   // rather than letting zoomInspection fall back to its own default.
+  // v9.13 CV-CENTERING ADVISORY (env CV_CENTERING_ADVISORY=1): run the geometry
+  // gate BEFORE the ensemble, measure the borders deterministically, and hand
+  // the reading to the grading prompt as a SECOND OPINION for the centering
+  // category only. The model arbitrates — a wrong measurement (angle, sleeve,
+  // full-art) gets discounted rather than dictating the grade, which is the
+  // core difference from CV_CENTERING_MODE=active. The gate result is passed
+  // into runZoomInspection so there is still exactly ONE gate call per grade;
+  // the cost is that its ~2-4s happens before the ensemble instead of in
+  // parallel. Any failure falls back to exactly the pre-advisory behavior.
+  let cvAdvisorySection = '';
+  let advisoryGeometry: CardGeometry | undefined;
+  let advisoryMeasurement: { front: CenteringMeasurement | null; back: CenteringMeasurement | null } | null = null;
+  if (outputFormat === 'json' && process.env.CV_CENTERING_ADVISORY === '1') {
+    try {
+      const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
+      if (frontRes.ok && backRes.ok) {
+        const [frontBuf, backBuf] = await Promise.all([
+          frontRes.arrayBuffer().then(b => Buffer.from(b)),
+          backRes.arrayBuffer().then(b => Buffer.from(b)),
+        ]);
+        advisoryGeometry = await detectCardGeometry(frontBuf, backBuf, model);
+        advisoryMeasurement = {
+          front: advisoryGeometry.front ? await measureCentering(frontBuf, advisoryGeometry.front) : null,
+          back: advisoryGeometry.back ? await measureCentering(backBuf, advisoryGeometry.back) : null,
+        };
+        const faceLine = (label: string, m: CenteringMeasurement | null): string | null => {
+          if (!m) return null;
+          const parts = [
+            m.leftRight ? `left/right ${m.leftRight}` : null,
+            m.topBottom ? `top/bottom ${m.topBottom}` : null,
+          ].filter(Boolean);
+          return parts.length ? `- ${label}: ${parts.join(', ')}` : null;
+        };
+        const lines = [faceLine('Front', advisoryMeasurement.front), faceLine('Back', advisoryMeasurement.back)].filter(Boolean);
+        if (lines.length > 0) {
+          cvAdvisorySection = `\n📐 AUTOMATED CENTERING MEASUREMENT (advisory only): a deterministic border-width measurement of these exact photos estimates:\n${lines.join('\n')}\nThis measurement can be wrong (camera angle, sleeve edges, borderless/full-art designs). Treat it as a second opinion for the CENTERING category only: verify it against what you SEE, and if your visual assessment clearly disagrees, trust your eyes and note the disagreement in the centering summary. It must not influence corners, edges, or surface scoring.\n`;
+          console.log(`[CONVERSATIONAL] 📐 CV centering advisory injected: ${lines.join(' | ')}`);
+        } else {
+          console.log('[CONVERSATIONAL] 📐 CV centering advisory: no confident measurement — prompt unchanged');
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[CONVERSATIONAL] CV centering advisory failed (${e.message}) — proceeding without it`);
+    }
+  }
+
   const zoomPromise: Promise<ZoomResult> | null =
-    outputFormat === 'json' ? runZoomInspection(frontImageUrl, backImageUrl, { model }) : null;
+    outputFormat === 'json'
+      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry })
+      : null;
 
   // Retry configuration for transient failures
   const MAX_RETRIES = 3;
@@ -1837,7 +1886,7 @@ export async function gradeCardConversational(
 - If the card appears clean after thorough inspection, Grade 10 is the correct result
 - Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
-${categoryHintSection}${conditionReportSection?.has_user_hints ? `
+${categoryHintSection}${cvAdvisorySection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
@@ -1849,7 +1898,7 @@ Return ONLY the JSON object with all required fields filled.`
 - If the card appears clean after thorough inspection, Grade 10 is the correct result
 - Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
-${categoryHintSection}${conditionReportSection?.has_user_hints ? `
+${categoryHintSection}${cvAdvisorySection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
 Provide detailed analysis as markdown with all required sections.`
             }
@@ -2339,6 +2388,24 @@ Provide detailed analysis as markdown with all required sections.`
             .map(f => { const m = zoom.centering![f]; return m ? `${f}: L/R ${m.leftRight ?? '-'} T/B ${m.topBottom ?? '-'} (full=${m.bothAxes})` : `${f}: no measurement`; })
             .join(' | ');
           console.log(`[GRADE RECALC] 📐 CV centering SHADOW (not applied): ${mNote} | model: front ${jsonData.centering?.front?.left_right ?? '?'} / ${jsonData.centering?.front?.top_bottom ?? '?'}`);
+        }
+        // v9.13: persist the measurement + the model's estimate on the card row
+        // (fire-and-forget). This is the production dataset the whole CV-centering
+        // effort has been missing — until now shadow readings evaporated into logs.
+        if (zoom?.centering && (zoom.centering.front || zoom.centering.back)) {
+          recordCvCentering(options?.routingKey, {
+            measured_at: new Date().toISOString(),
+            mode: cvAdvisorySection ? 'advisory' : 'shadow',
+            grading_model: model,
+            front: zoom.centering.front ?? null,
+            back: zoom.centering.back ?? null,
+            model_front: jsonData.centering?.front
+              ? { left_right: jsonData.centering.front.left_right ?? null, top_bottom: jsonData.centering.front.top_bottom ?? null }
+              : null,
+            model_back: jsonData.centering?.back
+              ? { left_right: jsonData.centering.back.left_right ?? null, top_bottom: jsonData.centering.back.top_bottom ?? null }
+              : null,
+          });
         }
         if (zoom?.ok && zoom.centering && !rigidCaseForZoom && process.env.CV_CENTERING_MODE === 'active') {
           const scoreFromWorstPct = (p: number): number =>

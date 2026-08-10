@@ -638,10 +638,68 @@ card_area is decided FIRST for each findings entry, before its defects:
 - "none": no card material in this crop at all
 When card_area is "some" or "none", the crop is dominated by the surface the card is lying on — fabric weave, leather grain, desk texture. Fibers, specks and shadows there belong to the BACKGROUND, not the card. Only report a defect from such a crop if it is unmistakably ON the card portion.`;
 
+/**
+ * Card geometry from the gate call: frame-fill percentages + corner quads.
+ * Exported so the CV-centering advisory path can run the gate BEFORE the
+ * grading ensemble and hand the result to runZoomInspection (which then
+ * skips its own gate call — one gate per grade either way).
+ */
+export interface CardGeometry {
+  frontFill: number | null;
+  backFill: number | null;
+  front?: Pt[];
+  back?: Pt[];
+}
+
+export async function detectCardGeometry(
+  frontBuf: Buffer,
+  backBuf: Buffer,
+  model?: string
+): Promise<CardGeometry> {
+  const out: CardGeometry = { frontFill: null, backFill: null };
+  const openaiGate = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const gateStart = Date.now();
+  const { config: gateConfig } = applyModelCompat({
+    model: model || BASELINE_MODEL,
+    temperature: 0,
+    max_completion_tokens: 400,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system', content: 'You locate a trading card in each photo. Reply ONLY with JSON:\n' +
+          '{"front_fill_percent": <0-100>, "front_corners": [{"x":<0-1000>,"y":<0-1000>} x4], "back_fill_percent": <0-100>, "back_corners": [{"x":<0-1000>,"y":<0-1000>} x4]}\n' +
+          'fill_percent = share of the image area covered by the card itself (not sleeve/holder/background).\n' +
+          'corners = the card\'s four outer corners in NORMALIZED coordinates (x: 0=left edge of image, 1000=right; y: 0=top, 1000=bottom), ordered [top-left, top-right, bottom-right, bottom-left]. Locate them precisely at the card\'s printed corner tips.'
+      },
+      {
+        role: 'user', content: [
+          { type: 'text', text: 'Photo 1 (front):' },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: 'high' } },
+          { type: 'text', text: 'Photo 2 (back):' },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: 'high' } },
+        ] as any,
+      },
+    ],
+  }, model || BASELINE_MODEL);
+  const fillRes = await openaiGate.chat.completions.create(gateConfig as any, { timeout: 45_000 });
+  logOpenAIUsage({
+    operation: 'zoom_geometry_gate',
+    model: model || BASELINE_MODEL,
+    usage: (fillRes as any).usage,
+    durationMs: Date.now() - gateStart,
+  });
+  const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
+  out.frontFill = Number.isFinite(Number(fill.front_fill_percent)) ? Number(fill.front_fill_percent) : null;
+  out.backFill = Number.isFinite(Number(fill.back_fill_percent)) ? Number(fill.back_fill_percent) : null;
+  if (quadPlausible(fill.front_corners)) out.front = fill.front_corners;
+  if (quadPlausible(fill.back_corners)) out.back = fill.back_corners;
+  return out;
+}
+
 export async function runZoomInspection(
   frontImageUrl: string,
   backImageUrl: string,
-  options?: { priorityNote?: string; model?: string }
+  options?: { priorityNote?: string; model?: string; precomputedGeometry?: CardGeometry }
 ): Promise<ZoomResult> {
   const empty: ZoomResult = { ok: false, regionsInspected: 0, defects: [], faceCaps: {}, structuralFindings: [] };
   try {
@@ -680,54 +738,31 @@ export async function runZoomInspection(
     //  - fill < MIN_FILL + no plausible quad: skip zoom with a persisted reason.
     // detail:'high' on the gate images (~1.1K tok each): corner coordinates need more
     // precision than the 512px 'low' thumbnail provides.
-    const openaiGate = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const MIN_FILL_PERCENT = 68;
     const geometry: { front?: Pt[]; back?: Pt[] } = {};
     const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
     try {
-      const gateStart = Date.now();
-      const { config: gateConfig } = applyModelCompat({
-        model: options?.model || BASELINE_MODEL,
-        temperature: 0,
-        max_completion_tokens: 400,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system', content: 'You locate a trading card in each photo. Reply ONLY with JSON:\n' +
-              '{"front_fill_percent": <0-100>, "front_corners": [{"x":<0-1000>,"y":<0-1000>} x4], "back_fill_percent": <0-100>, "back_corners": [{"x":<0-1000>,"y":<0-1000>} x4]}\n' +
-              'fill_percent = share of the image area covered by the card itself (not sleeve/holder/background).\n' +
-              'corners = the card\'s four outer corners in NORMALIZED coordinates (x: 0=left edge of image, 1000=right; y: 0=top, 1000=bottom), ordered [top-left, top-right, bottom-right, bottom-left]. Locate them precisely at the card\'s printed corner tips.'
-          },
-          {
-            role: 'user', content: [
-              { type: 'text', text: 'Photo 1 (front):' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: 'high' } },
-              { type: 'text', text: 'Photo 2 (back):' },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: 'high' } },
-            ] as any,
-          },
-        ],
-      }, options?.model || BASELINE_MODEL);
-      const fillRes = await openaiGate.chat.completions.create(gateConfig as any, { timeout: 45_000 });
-      logOpenAIUsage({
-        operation: 'zoom_geometry_gate',
-        model: options?.model || BASELINE_MODEL,
-        usage: (fillRes as any).usage,
-        durationMs: Date.now() - gateStart,
-      });
-      const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
-      const worst = Math.min(Number(fill.front_fill_percent ?? 100), Number(fill.back_fill_percent ?? 100));
-      console.log(`[ZOOM] frame-fill: front ${fill.front_fill_percent}% / back ${fill.back_fill_percent}%`);
+      // v9.13: when the caller already ran the gate (CV-centering advisory path
+      // runs it BEFORE the grading ensemble), reuse its result — same single
+      // gate call per grade, just earlier in the pipeline.
+      const gate = options?.precomputedGeometry
+        ? options.precomputedGeometry
+        : await detectCardGeometry(frontBuf, backBuf, options?.model);
+      if (options?.precomputedGeometry) {
+        console.log('[ZOOM] geometry gate: reusing precomputed result from advisory path');
+      }
+      const worst = Math.min(gate.frontFill ?? 100, gate.backFill ?? 100);
+      console.log(`[ZOOM] frame-fill: front ${gate.frontFill}% / back ${gate.backFill}%`);
       // v9.5: quads are captured for CENTERING MEASUREMENT whenever plausible,
       // independent of the fill decision (measureGeometry). Card-relative CROPS
       // still engage only for margin photos (fill < threshold) — for full-frame
       // photos blind edge-hugging crops remain better (they hug the cut edges).
-      if (quadPlausible(fill.front_corners)) measureGeometry.front = fill.front_corners;
-      if (quadPlausible(fill.back_corners)) measureGeometry.back = fill.back_corners;
+      if (gate.front) measureGeometry.front = gate.front;
+      if (gate.back) measureGeometry.back = gate.back;
       if (Number.isFinite(worst) && worst < MIN_FILL_PERCENT) {
-        if (quadPlausible(fill.front_corners) && quadPlausible(fill.back_corners)) {
-          geometry.front = fill.front_corners;
-          geometry.back = fill.back_corners;
+        if (gate.front && gate.back) {
+          geometry.front = gate.front;
+          geometry.back = gate.back;
           console.log(`[ZOOM] card fills ~${worst}% of frame — using CARD-RELATIVE crops from detected corner quads`);
         } else {
           console.log(`[ZOOM] card fills only ~${worst}% of frame and no plausible corner quad detected — skipping regioned inspection`);
