@@ -134,7 +134,7 @@ export function ModernFrontLabel({
 
   return (
     <div
-      className={`${config.height} ${config.padding} relative overflow-hidden`}
+      className={`${config.height} ${config.padding} relative overflow-hidden flex`}
       style={{
         background: bgGradient,
         containerType: 'inline-size',

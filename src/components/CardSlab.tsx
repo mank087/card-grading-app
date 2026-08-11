@@ -185,8 +185,8 @@ export function CardSlab({
 
   // Traditional label component (reused for front and back)
   const FrontLabel = () => (
-    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`} style={{ containerType: 'inline-size' }}>
-      <div className="flex items-center justify-between h-full gap-1.5">
+    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`} style={{ containerType: 'inline-size' }}>
+      <div className="flex items-center justify-between h-full w-full gap-1.5">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
           <img
@@ -617,8 +617,8 @@ export function CardSlabGrid({
 
   // Traditional label for grid
   const TraditionalLabel = () => (
-    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px]" style={{ containerType: 'inline-size' }}>
-      <div className="flex items-center justify-between gap-1.5 h-full">
+    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px] flex" style={{ containerType: 'inline-size' }}>
+      <div className="flex items-center justify-between gap-1.5 h-full w-full">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0 -ml-1">
           <img

@@ -16,6 +16,8 @@ interface ModernBackLabelProps {
   grade: number | null
   condition?: string
   qrCodeUrl?: string
+  /** Optional center mark baked into the QR (org color logo on branded labels). */
+  qrLogoSrc?: string | null
   subScores?: SubScores
   isAlteredAuthentic?: boolean
   size?: 'sm' | 'md' | 'lg'
@@ -75,6 +77,7 @@ export function ModernBackLabel({
   grade,
   condition = '',
   qrCodeUrl,
+  qrLogoSrc = null,
   subScores,
   isAlteredAuthentic = false,
   size = 'md',
@@ -126,7 +129,7 @@ export function ModernBackLabel({
 
   return (
     <div
-      className={`${config.height} ${config.padding} relative overflow-hidden`}
+      className={`${config.height} ${config.padding} relative overflow-hidden flex`}
       style={{
         background: bgGradient,
         ...borderStyle,
@@ -140,7 +143,7 @@ export function ModernBackLabel({
         }}
       />
 
-      <div className="relative flex items-center justify-between h-full gap-2">
+      <div className="relative flex items-center justify-between h-full w-full gap-2">
         {/* LEFT: QR Code with styled background + Founder badge */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* QR Code with modern styled background */}
@@ -161,6 +164,12 @@ export function ModernBackLabel({
                   includeMargin={false}
                   fgColor="#000000"
                   bgColor="#FFFFFF"
+                  imageSettings={qrLogoSrc ? {
+                    src: qrLogoSrc,
+                    height: Math.round(config.qrSize * 0.28),
+                    width: Math.round(config.qrSize * 0.28),
+                    excavate: true,
+                  } : undefined}
                 />
               </div>
             </div>

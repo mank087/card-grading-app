@@ -2894,8 +2894,8 @@ export function YugiohCardDetails() {
                   colorOverrides={colorOverrides}
                 />
               ) : (
-                <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px]">
-                  <div className="flex items-center justify-between h-full">
+                <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px] flex">
+                  <div className="flex items-center justify-between h-full w-full">
                     {/* Left: DCM Logo */}
                     <div className="flex-shrink-0">
                       <img
