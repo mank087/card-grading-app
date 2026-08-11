@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel'
-import { ModernBackLabel } from '@/components/labels/ModernBackLabel'
+import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 import { GradeHeroBanner } from '@/components/grading/GradeHeroBanner'
@@ -83,6 +83,34 @@ export default function FeaturedCardTile({ card, hidePricing = false }: Featured
     surface:   flatWeighted.surface_weighted   ?? subScores?.surface?.weighted   ?? 0,
   } : undefined
 
+  // Heritage is the site default label — featured tiles render it with each
+  // card's extracted palette. The back label's QR disc consumes a data URL.
+  const heritageBandColors = resolveHeritageBandColors(card.card_colors)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  useEffect(() => {
+    if (!qrCodeUrl) return
+    let cancelled = false
+    import('qrcode')
+      .then(q => q.default.toDataURL(qrCodeUrl, { errorCorrectionLevel: 'H', margin: 1, width: 300, color: { dark: '#141414', light: '#ffffff' } }))
+      .then(url => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [qrCodeUrl])
+
+  const heritageData: any = {
+    primaryName: labelData.primaryName,
+    contextLine: labelData.contextLine || '',
+    features: labelData.features,
+    featuresLine: labelData.featuresLine,
+    serial: labelData.serial,
+    grade: labelData.grade,
+    gradeFormatted: labelData.gradeFormatted,
+    condition: labelData.condition,
+    isAlteredAuthentic: labelData.isAlteredAuthentic,
+    subScores: backLabelSubScores,
+    qrCodeDataUrl: qrDataUrl,
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
       {/* Card Images with Labels — inline rendering matching card detail pages */}
@@ -91,16 +119,12 @@ export default function FeaturedCardTile({ card, hidePricing = false }: Featured
           {/* Front Card with Label — Metallic Slab */}
           <Link href={cardLink} className="rounded-xl p-1 overflow-hidden block hover:opacity-95 transition-opacity" style={slabBorderStyle}>
             <div className="rounded-lg overflow-hidden">
-              {/* Front Label */}
-              <ModernFrontLabel
-                displayName={labelData.primaryName}
-                setLineText={labelData.contextLine || 'Card Details'}
-                features={labelData.features}
-                serial={labelData.serial}
-                grade={labelData.grade}
-                condition={labelData.condition}
-                isAlteredAuthentic={labelData.isAlteredAuthentic}
-                size="lg"
+              {/* Front Label — heritage, banded in the card's own colors */}
+              <HeritageLabelPreview
+                data={heritageData}
+                side="front"
+                pattern="diamond"
+                bandColors={heritageBandColors}
               />
 
               {/* Separator */}
@@ -129,15 +153,12 @@ export default function FeaturedCardTile({ card, hidePricing = false }: Featured
           {/* Back Card with Label — Metallic Slab */}
           <Link href={cardLink} className="rounded-xl p-1 overflow-hidden block hover:opacity-95 transition-opacity" style={slabBorderStyle}>
             <div className="rounded-lg overflow-hidden">
-              {/* Back Label */}
-              <ModernBackLabel
-                serial={labelData.serial}
-                grade={labelData.grade}
-                condition={labelData.condition}
-                qrCodeUrl={qrCodeUrl}
-                subScores={backLabelSubScores}
-                isAlteredAuthentic={labelData.isAlteredAuthentic}
-                size="lg"
+              {/* Back Label — heritage with QR + sub-grades */}
+              <HeritageLabelPreview
+                data={heritageData}
+                side="back"
+                pattern="diamond"
+                bandColors={heritageBandColors}
               />
 
               {/* Separator */}

@@ -39,8 +39,10 @@ function colorDistance(a: RGB, b: RGB): number {
   return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2)
 }
 
-function kMeans(pixels: RGB[], k: number = 6, iterations: number = 12): RGB[] {
-  if (pixels.length <= k) return pixels
+interface WeightedColor { color: RGB; count: number }
+
+function kMeansWeighted(pixels: RGB[], k: number = 6, iterations: number = 12): WeightedColor[] {
+  if (pixels.length <= k) return pixels.map(p => ({ color: p, count: 1 }))
 
   const centroids: RGB[] = []
   const step = Math.floor(pixels.length / k)
@@ -74,12 +76,17 @@ function kMeans(pixels: RGB[], k: number = 6, iterations: number = 12): RGB[] {
   }
 
   return centroids.map((c, i) => ({ color: c, count: counts[i] }))
+    .filter(x => x.count > 0)
     .sort((a, b) => b.count - a.count)
-    .map(x => x.color)
 }
 
-function filterInteresting(colors: RGB[]): RGB[] {
-  return colors.filter(c => {
+/** Count-ranked colors (legacy ordering) for zones where frequency IS the signal. */
+function kMeans(pixels: RGB[], k: number = 6, iterations: number = 12): RGB[] {
+  return kMeansWeighted(pixels, k, iterations).map(x => x.color)
+}
+
+function filterInterestingWeighted(colors: WeightedColor[]): WeightedColor[] {
+  return colors.filter(({ color: c }) => {
     const lum = luminance(c)
     if (lum < 0.08 || lum > 0.92) return false
     const max = Math.max(c.r, c.g, c.b)
@@ -87,6 +94,31 @@ function filterInteresting(colors: RGB[]): RGB[] {
     if (max > 0 && (max - min) / max < 0.1 && lum > 0.3 && lum < 0.7) return false
     return true
   })
+}
+
+// --- Vibrancy ranking (2026-08-10) ---------------------------------------
+// Pure count-ranking made dark cards band in mud: big charcoal/olive
+// clusters outranked the (smaller) vivid character colors, so the heritage
+// band looked like "no colors applied". Rank artwork clusters by pixel
+// share × vibrancy instead — saturation dominates, value lifts colors out
+// of the dark, and a 2% share floor stops a neon speck from taking over.
+// Low-saturation cards score uniformly low, so their ordering is unchanged.
+function saturation(c: RGB): number {
+  const max = Math.max(c.r, c.g, c.b)
+  return max === 0 ? 0 : (max - Math.min(c.r, c.g, c.b)) / max
+}
+
+function vibrancyScore(x: WeightedColor, totalPixels: number): number {
+  const share = x.count / totalPixels
+  const v = Math.max(x.color.r, x.color.g, x.color.b) / 255
+  const vib = (0.15 + 0.85 * Math.pow(saturation(x.color), 1.2)) * (0.4 + 0.6 * v)
+  return share * vib
+}
+
+function vibrancyOrder(colors: WeightedColor[], totalPixels: number): WeightedColor[] {
+  const floored = colors.filter(x => x.count >= totalPixels * 0.02)
+  const pool = floored.length >= 2 ? floored : colors
+  return [...pool].sort((a, b) => vibrancyScore(b, totalPixels) - vibrancyScore(a, totalPixels))
 }
 
 /** Sample pixels from a rectangular zone of a raw pixel buffer. */
@@ -188,13 +220,14 @@ export async function extractAndSaveCardColors(cardId: string, frontPath: string
     // --- Background detection & exclusion ---
     const bgColor = detectBackground(outerPixels, artworkPixels)
 
-    // --- Artwork colors ---
-    const artClusters = kMeans(artworkPixels, 8, 12)
-    let artInteresting = filterInteresting(artClusters)
+    // --- Artwork colors (vibrancy-ranked, see note above) ---
+    const artClusters = kMeansWeighted(artworkPixels, 8, 12)
+    let artInteresting = filterInterestingWeighted(artClusters)
     if (bgColor) {
-      artInteresting = artInteresting.filter(c => colorDistance(c, bgColor) > 50)
+      artInteresting = artInteresting.filter(x => colorDistance(x.color, bgColor) > 50)
     }
-    const finalArt = artInteresting.length >= 2 ? artInteresting : artClusters
+    const pool = artInteresting.length >= 2 ? artInteresting : artClusters
+    const finalArt = vibrancyOrder(pool, artworkPixels.length).map(x => x.color)
 
     let primary = finalArt[0]
     let secondary = finalArt.length > 1 ? finalArt[1] : finalArt[0]

@@ -5,14 +5,13 @@ import Image from 'next/image'
 import { QRCodeCanvas } from 'qrcode.react'
 import { ModernFrontLabel } from './labels/ModernFrontLabel'
 import { ModernBackLabel } from './labels/ModernBackLabel'
+import { ScaleToFit } from './labels/ScaleToFit'
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
 
-// Width-aware font size: hits the design max at ~300px label width and scales
-// down with the container below that (needs containerType: 'inline-size' on
-// the label root). Mirrors ModernFrontLabel's cqFont.
-const cqFont = (maxPx: number, minPx: number): string =>
-  `clamp(${minPx}px, ${((maxPx / 300) * 100).toFixed(2)}cqw, ${maxPx}px)`
+// Below this width labels transform-scale down as one unit (ScaleToFit)
+// instead of reflowing piecewise — same behavior as the heritage SVG.
+const LABEL_DESIGN_WIDTH = 360
 
 // Sub-scores interface for modern labels
 export interface SubScores {
@@ -185,7 +184,8 @@ export function CardSlab({
 
   // Traditional label component (reused for front and back)
   const FrontLabel = () => (
-    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`} style={{ containerType: 'inline-size' }}>
+    <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
+    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`}>
       <div className="flex items-center justify-between h-full w-full gap-1.5">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
@@ -202,7 +202,7 @@ export function CardSlab({
           <div
             className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: cqFont(nameFontSize, 7),
+              fontSize: `${nameFontSize}px`,
               lineHeight: '1.2',
               wordBreak: 'break-word'
             }}
@@ -215,7 +215,7 @@ export function CardSlab({
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: cqFont(parseInt(config.setFontSize), 7),
+              fontSize: config.setFontSize,
               wordBreak: 'break-word'
             }}
             title={setLineText}
@@ -255,6 +255,7 @@ export function CardSlab({
         </div>
       </div>
     </div>
+    </ScaleToFit>
   )
 
   // Back label with QR code, grade, and sub-scores (matches modern layout)
@@ -268,8 +269,9 @@ export function CardSlab({
     const backConfig = backLabelConfig[size]
 
     return (
-      <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`}>
-        <div className="flex items-center justify-between h-full gap-2">
+      <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
+      <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`}>
+        <div className="flex items-center justify-between h-full w-full gap-2">
           {/* LEFT: QR Code + Founder badge */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {qrCodeUrl ? (
@@ -372,6 +374,7 @@ export function CardSlab({
           )}
         </div>
       </div>
+      </ScaleToFit>
     )
   }
 
@@ -617,7 +620,8 @@ export function CardSlabGrid({
 
   // Traditional label for grid
   const TraditionalLabel = () => (
-    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px] flex" style={{ containerType: 'inline-size' }}>
+    <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
+    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px] flex">
       <div className="flex items-center justify-between gap-1.5 h-full w-full">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0 -ml-1">
@@ -634,7 +638,7 @@ export function CardSlabGrid({
           <div
             className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: cqFont(nameFontSize, 7),
+              fontSize: `${nameFontSize}px`,
               lineHeight: '1.2',
               wordBreak: 'break-word'
             }}
@@ -647,7 +651,7 @@ export function CardSlabGrid({
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: cqFont(parseInt(gridConfig.setFontSize), 7),
+              fontSize: gridConfig.setFontSize,
               wordBreak: 'break-word'
             }}
             title={setLineText}
@@ -687,6 +691,7 @@ export function CardSlabGrid({
         </div>
       </div>
     </div>
+    </ScaleToFit>
   )
 
   return (

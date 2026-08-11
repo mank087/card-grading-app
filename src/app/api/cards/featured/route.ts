@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
         serial_numbering, rarity_tier, rarity_description,
         autographed, autograph_type, memorabilia_type,
         rookie_card, first_print_rookie,
-        dcm_price_estimate, scryfall_price_usd
+        dcm_price_estimate, scryfall_price_usd,
+        card_colors, label_data
       `)
       .eq('visibility', 'public')
       .eq('is_featured', true)

@@ -20,7 +20,8 @@ interface UseCustomLabelStyleReturn {
 }
 
 export function useCustomLabelStyle(): UseCustomLabelStyleReturn {
-  const [labelStyle, setLabelStyle] = useState<LabelStyleId>('modern');
+  // Heritage is the product default for users who never picked a style.
+  const [labelStyle, setLabelStyle] = useState<LabelStyleId>('heritage');
   const [customStyles, setCustomStyles] = useState<SavedCustomStyle[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +46,7 @@ export function useCustomLabelStyle(): UseCustomLabelStyleReturn {
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {
-          setLabelStyle(data.labelStyle || 'modern');
+          setLabelStyle(data.labelStyle || 'heritage');
           setCustomStyles(data.customStyles || []);
         }
       })

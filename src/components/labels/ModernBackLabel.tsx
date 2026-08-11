@@ -3,6 +3,7 @@
 import { QRCodeCanvas } from 'qrcode.react'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
 import { RAINBOW_GRADIENT } from '@/lib/labelPresets'
+import { ScaleToFit } from './ScaleToFit'
 
 interface SubScores {
   centering: number
@@ -128,6 +129,7 @@ export function ModernBackLabel({
     : { grade: colorOverrides?.gradeColor ?? '#ffffff', condition: 'rgba(255, 255, 255, 0.8)', sub: 'rgba(255, 255, 255, 0.9)', badgeLabel: '#FFFFFF' }
 
   return (
+    <ScaleToFit designWidth={360}>
     <div
       className={`${config.height} ${config.padding} relative overflow-hidden flex`}
       style={{
@@ -294,6 +296,7 @@ export function ModernBackLabel({
         )}
       </div>
     </div>
+    </ScaleToFit>
   )
 }
 

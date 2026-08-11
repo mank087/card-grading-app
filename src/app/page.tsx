@@ -6,6 +6,7 @@ import { getStoredSession } from '../lib/directAuth'
 import ScrollingCardBackground from './ui/ScrollingCardBackground'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import AppStoreBadge, { APP_STORE_URL } from '@/components/AppStoreBadge'
 import GooglePlayBadge, { GOOGLE_PLAY_URL } from '@/components/GooglePlayBadge'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
@@ -731,6 +732,7 @@ function FeaturedCardsCarousel({
                   condition={labelData.condition}
                   frontImageUrl={card.front_url}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
+                  heritage={{ pattern: 'diamond', bandColors: resolveHeritageBandColors(card.card_colors) }}
                   className="hover:shadow-xl transition-shadow duration-200"
                 />
               </Link>

@@ -54,6 +54,7 @@ import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { ScaleToFit } from '@/components/labels/ScaleToFit'
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
@@ -2894,7 +2895,7 @@ export function YugiohCardDetails() {
                   colorOverrides={colorOverrides}
                 />
               ) : (
-                <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px] flex">
+                <ScaleToFit designWidth={360}><div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px] flex">
                   <div className="flex items-center justify-between h-full w-full">
                     {/* Left: DCM Logo */}
                     <div className="flex-shrink-0">
@@ -2967,7 +2968,7 @@ export function YugiohCardDetails() {
                       )}
                     </div>
                   </div>
-                </div>
+                </div></ScaleToFit>
               )}
 
               {/* Separator */}
@@ -3053,7 +3054,7 @@ export function YugiohCardDetails() {
                   colorOverrides={colorOverrides}
                 />
               ) : (
-                <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
+                <ScaleToFit designWidth={360}><div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
                   <div className="flex items-center justify-between h-full gap-2">
                     {/* LEFT: QR Code + Founder badge */}
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -3165,7 +3166,7 @@ export function YugiohCardDetails() {
                       </div>
                     )}
                   </div>
-                </div>
+                </div></ScaleToFit>
               )}
 
               {/* Separator */}

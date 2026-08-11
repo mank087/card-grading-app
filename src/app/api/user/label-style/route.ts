@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch preference' }, { status: 500 });
     }
 
-    const labelStyle = data?.label_style || 'modern';
+    // Default for new/unset users: heritage (product decision 2026-08-11).
+    const labelStyle = data?.label_style || 'heritage';
     const customStyles = data?.custom_label_styles || [];
 
     return NextResponse.json({
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const currentCustomStyles: any[] = currentData?.custom_label_styles || [];
-    const currentLabelStyle = currentData?.label_style || 'modern';
+    const currentLabelStyle = currentData?.label_style || 'heritage';
 
     // === SWITCH STYLE (no action field, just labelStyle) ===
     if (!action && body.labelStyle) {

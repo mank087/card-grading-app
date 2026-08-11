@@ -49,8 +49,17 @@ export interface LabelColorOverrides {
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 const CACHE_KEY = 'dcm_label_style_cache'
 
+// Mirrors web resolveHeritageSelection (src/lib/labels/labelStyleResolution.ts):
+// only well-formed #RRGGBB values survive into the overrides.
+const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
 function extractColorOverrides(config: CustomLabelConfig | null | undefined): LabelColorOverrides | undefined {
   if (!config) return undefined
+  // Hand-edited palette wins over the source toggle (same precedence as web).
+  const customBand = config.heritageBandColors?.filter(c => HEX_RE.test(c))
+  const gradeEntries = config.heritageGradeColors
+    ? Object.entries(config.heritageGradeColors).filter(([, v]) => HEX_RE.test(v))
+    : []
   return {
     gradientStart: config.gradientStart,
     gradientEnd: config.gradientEnd,
@@ -66,18 +75,20 @@ function extractColorOverrides(config: CustomLabelConfig | null | undefined): La
     heritagePattern: config.heritagePattern,
     // Brand source pins the band to the DCM purples; hand-edited colours win.
     heritageBandColors:
-      (config.heritageBandColors && config.heritageBandColors.length >= 2)
-        ? config.heritageBandColors
+      customBand && customBand.length >= 2
+        ? customBand
         : config.heritageColorSource === 'brand'
         ? HERITAGE_BRAND_COLORS
         : undefined,
-    heritageGradeColors: config.heritageGradeColors,
+    heritageGradeColors: gradeEntries.length ? Object.fromEntries(gradeEntries) : undefined,
   }
 }
 
 export function useLabelStyle() {
   const { session, user } = useAuth()
-  const [labelStyle, setLabelStyle] = useState<LabelStyleId>('modern')
+  // Heritage is the product default for users who never picked a style
+  // (mirrors the web useCustomLabelStyle + /api/user/label-style defaults).
+  const [labelStyle, setLabelStyle] = useState<LabelStyleId>('heritage')
   const [customStyles, setCustomStyles] = useState<SavedCustomStyle[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -120,7 +131,7 @@ export function useLabelStyle() {
             return
           }
           const next = {
-            labelStyle: ((data?.label_style as LabelStyleId) || 'modern'),
+            labelStyle: ((data?.label_style as LabelStyleId) || 'heritage'),
             customStyles: (Array.isArray(data?.custom_label_styles) ? data.custom_label_styles : []) as SavedCustomStyle[],
           }
           console.log('[useLabelStyle] loaded:', next.labelStyle, `(${next.customStyles.length} custom)`)

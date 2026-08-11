@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { CardSlabGrid } from '@/components/CardSlab'
+import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
@@ -163,6 +164,7 @@ export default function FeaturedCardsShowcase() {
                         condition={labelData.condition}
                         frontImageUrl={card.front_url}
                         isAlteredAuthentic={labelData.isAlteredAuthentic}
+                        heritage={{ pattern: 'diamond', bandColors: resolveHeritageBandColors((card as any).card_colors) }}
                         className="hover:shadow-xl transition-shadow duration-200"
                       />
                     </div>
@@ -187,6 +189,7 @@ export default function FeaturedCardsShowcase() {
                       condition={labelData.condition}
                       frontImageUrl={card.front_url}
                       isAlteredAuthentic={labelData.isAlteredAuthentic}
+                      heritage={{ pattern: 'diamond', bandColors: resolveHeritageBandColors((card as any).card_colors) }}
                     />
                   </div>
                 )}
