@@ -658,10 +658,12 @@ export default function CollectionScreen() {
           <View style={[st.listThumb, st.placeholder]}><Text style={st.placeholderText}>DCM</Text></View>
         )}
         <View style={st.listInfo}>
-          <Text style={st.listName} numberOfLines={1}>{name}</Text>
-          <Text style={st.listSet} numberOfLines={1}>{contextParts}</Text>
+          {/* Card name may wrap to a second row; details shrink-to-fit \u2014
+              list rows must never ellipsize what card it is. */}
+          <Text style={st.listName} numberOfLines={2}>{name}</Text>
+          <Text style={st.listSet} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{contextParts}</Text>
           {featuresArr.length > 0 && (
-            <Text style={st.listFeatures} numberOfLines={1}>{featuresArr.join(' \u2022 ')}</Text>
+            <Text style={st.listFeatures} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{featuresArr.join(' \u2022 ')}</Text>
           )}
           <View style={st.listMeta}>
             <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', flex: 1 }}>

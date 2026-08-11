@@ -387,21 +387,15 @@ function cleanValue(value: string | null | undefined): string | null {
   // Remove trailing " - " or " – " if the explanation was at the end
   cleaned = cleaned.replace(/\s*[-–]\s*$/, '').trim();
 
-  // If still too long (over 60 chars), truncate at a reasonable break point
-  if (cleaned.length > 60) {
-    // Try to break at a delimiter
-    const breakPoints = [' - ', ' – ', ' • ', ', '];
-    for (const bp of breakPoints) {
-      const idx = cleaned.indexOf(bp);
-      if (idx > 10 && idx < 50) {
-        cleaned = cleaned.substring(0, idx).trim();
-        break;
-      }
-    }
-    // If still too long, hard truncate
-    if (cleaned.length > 60) {
-      cleaned = cleaned.substring(0, 57) + '...';
-    }
+  // v9.13.2: no more hard 57-char "..." truncation — this fed every label
+  // type (it capped primaryName itself), so long card names arrived at the
+  // renderers pre-ellipsized and no amount of renderer fitting could recover
+  // them. On-screen labels now shrink/wrap to fit, and the heritage print
+  // path has its own no-truncation fitting. A generous bound remains purely
+  // as a garbage-input guard, cut at a word boundary without an ellipsis.
+  if (cleaned.length > 140) {
+    const cut = cleaned.lastIndexOf(' ', 140);
+    cleaned = cleaned.substring(0, cut > 80 ? cut : 140).trim();
   }
 
   return cleaned || null;

@@ -39,7 +39,7 @@ const formatSubScore = (score: number): string => {
 // Size configurations for modern back label - heights match ModernFrontLabel for consistency
 const sizeConfig = {
   sm: {
-    height: 'h-[85px]',
+    height: 'min-h-[85px]',
     padding: 'px-2 py-1.5',
     qrSize: 50,
     gradeSize: 'text-2xl',
@@ -49,7 +49,7 @@ const sizeConfig = {
     founderTextSize: '7px',
   },
   md: {
-    height: 'h-[95px]',
+    height: 'min-h-[95px]',
     padding: 'px-3 py-2',
     qrSize: 58,
     gradeSize: 'text-3xl',
@@ -59,7 +59,7 @@ const sizeConfig = {
     founderTextSize: '8px',
   },
   lg: {
-    height: 'h-[110px]',
+    height: 'min-h-[110px]',
     padding: 'px-4 py-2.5',
     qrSize: 66,
     gradeSize: 'text-4xl',

@@ -8,6 +8,12 @@ import { ModernBackLabel } from './labels/ModernBackLabel'
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
 
+// Width-aware font size: hits the design max at ~300px label width and scales
+// down with the container below that (needs containerType: 'inline-size' on
+// the label root). Mirrors ModernFrontLabel's cqFont.
+const cqFont = (maxPx: number, minPx: number): string =>
+  `clamp(${minPx}px, ${((maxPx / 300) * 100).toFixed(2)}cqw, ${maxPx}px)`
+
 // Sub-scores interface for modern labels
 export interface SubScores {
   centering: number
@@ -114,7 +120,7 @@ export function CardSlab({
       conditionSize: 'text-[0.55rem]',
       dividerWidth: 'w-6',
       padding: 'p-2',
-      labelHeight: 'h-[85px]',
+      labelHeight: 'min-h-[85px]',
       imageWidth: 300,
       imageHeight: 420,
       qrSize: 45,
@@ -132,7 +138,7 @@ export function CardSlab({
       conditionSize: 'text-[0.65rem]',
       dividerWidth: 'w-8',
       padding: 'p-3',
-      labelHeight: 'h-[95px]',
+      labelHeight: 'min-h-[95px]',
       imageWidth: 350,
       imageHeight: 490,
       qrSize: 55,
@@ -150,7 +156,7 @@ export function CardSlab({
       conditionSize: 'text-[0.7rem]',
       dividerWidth: 'w-10',
       padding: 'p-4',
-      labelHeight: 'h-[110px]',
+      labelHeight: 'min-h-[110px]',
       imageWidth: 400,
       imageHeight: 560,
       qrSize: 58,
@@ -179,7 +185,7 @@ export function CardSlab({
 
   // Traditional label component (reused for front and back)
   const FrontLabel = () => (
-    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`}>
+    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`} style={{ containerType: 'inline-size' }}>
       <div className="flex items-center justify-between h-full gap-1.5">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
@@ -196,7 +202,7 @@ export function CardSlab({
           <div
             className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: `${nameFontSize}px`,
+              fontSize: cqFont(nameFontSize, 7),
               lineHeight: '1.2',
               wordBreak: 'break-word'
             }}
@@ -209,7 +215,7 @@ export function CardSlab({
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: config.setFontSize,
+              fontSize: cqFont(parseInt(config.setFontSize), 7),
               wordBreak: 'break-word'
             }}
             title={setLineText}
@@ -611,7 +617,7 @@ export function CardSlabGrid({
 
   // Traditional label for grid
   const TraditionalLabel = () => (
-    <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[95px]">
+    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px]" style={{ containerType: 'inline-size' }}>
       <div className="flex items-center justify-between gap-1.5 h-full">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0 -ml-1">
@@ -628,7 +634,7 @@ export function CardSlabGrid({
           <div
             className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: `${nameFontSize}px`,
+              fontSize: cqFont(nameFontSize, 7),
               lineHeight: '1.2',
               wordBreak: 'break-word'
             }}
@@ -641,7 +647,7 @@ export function CardSlabGrid({
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: gridConfig.setFontSize,
+              fontSize: cqFont(parseInt(gridConfig.setFontSize), 7),
               wordBreak: 'break-word'
             }}
             title={setLineText}

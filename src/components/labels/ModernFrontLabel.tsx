@@ -32,7 +32,7 @@ const sizeConfig = {
     gradeSize: 'text-2xl',
     conditionSize: 'text-[8px]',
     padding: 'px-2 py-1.5',
-    height: 'h-[85px]',
+    height: 'min-h-[85px]',
     maxNameChars: 18,
   },
   md: {
@@ -45,7 +45,7 @@ const sizeConfig = {
     gradeSize: 'text-3xl',
     conditionSize: 'text-[9px]',
     padding: 'px-3 py-2',
-    height: 'h-[95px]',
+    height: 'min-h-[95px]',
     maxNameChars: 22,
   },
   lg: {
@@ -58,10 +58,16 @@ const sizeConfig = {
     gradeSize: 'text-4xl',
     conditionSize: 'text-[10px]',
     padding: 'px-4 py-2.5',
-    height: 'h-[110px]',
+    height: 'min-h-[110px]',
     maxNameChars: 26,
   },
 }
+
+// Width-aware font size: reaches the design max at ~300px label width and
+// scales down proportionally below that, never under min. Requires
+// containerType: 'inline-size' on the label root (100cqw = label width).
+const cqFont = (maxPx: number, minPx: number): string =>
+  `clamp(${minPx}px, ${((maxPx / 300) * 100).toFixed(2)}cqw, ${maxPx}px)`
 
 export function ModernFrontLabel({
   displayName,
@@ -131,6 +137,7 @@ export function ModernFrontLabel({
       className={`${config.height} ${config.padding} relative overflow-hidden`}
       style={{
         background: bgGradient,
+        containerType: 'inline-size',
         ...borderStyle,
       }}
     >
@@ -158,7 +165,7 @@ export function ModernFrontLabel({
           <div
             className="font-semibold leading-tight"
             style={{
-              fontSize: `${nameFontSize}px`,
+              fontSize: cqFont(nameFontSize, Math.min(config.nameMinFontSize, 7)),
               color: tx.name,
               wordBreak: 'break-word',
             }}
@@ -171,7 +178,7 @@ export function ModernFrontLabel({
           <div
             className="leading-tight"
             style={{
-              fontSize: config.detailFontSize,
+              fontSize: cqFont(parseInt(config.detailFontSize), 6),
               color: tx.detail,
               wordBreak: 'break-word',
             }}
@@ -185,7 +192,7 @@ export function ModernFrontLabel({
             <div
               className="font-medium leading-tight"
               style={{
-                fontSize: config.featureFontSize,
+                fontSize: cqFont(parseInt(config.featureFontSize), 6),
                 color: tx.feature,
                 wordBreak: 'break-word',
               }}
@@ -198,7 +205,7 @@ export function ModernFrontLabel({
           <div
             className="font-mono leading-tight"
             style={{
-              fontSize: config.serialFontSize,
+              fontSize: cqFont(parseInt(config.serialFontSize), 6),
               color: tx.serial,
             }}
           >

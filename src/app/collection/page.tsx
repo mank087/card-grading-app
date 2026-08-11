@@ -2842,12 +2842,12 @@ function CollectionPageContent() {
                             {/* Card Info */}
                             <div className="flex-1 min-w-0">
                               {/* Name - Primary */}
-                              <div className="font-medium text-gray-900 truncate">
+                              <div className="font-medium text-gray-900 break-words">
                                 {getPlayerName(card)}
                               </div>
 
                               {/* Set & Year - Secondary */}
-                              <div className="text-sm text-gray-500 truncate mt-0.5">
+                              <div className="text-sm text-gray-500 break-words mt-0.5">
                                 {getCardSet(card)} {getYear(card) ? `• ${getYear(card)}` : ''}
                               </div>
 

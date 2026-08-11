@@ -2807,7 +2807,7 @@ export function SportsCardDetails() {
                   colorOverrides={colorOverrides}
                 />
               ) : (
-                <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[110px]">
+                <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px]">
                   <div className="flex items-center justify-between h-full">
                     {/* Left: DCM Logo */}
                     <div className="flex-shrink-0">
@@ -2821,10 +2821,14 @@ export function SportsCardDetails() {
                     {/* Center: Card Information */}
                     <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
                       <div
-                        className="font-bold text-gray-900 leading-tight truncate"
+                        className="font-bold text-gray-900 leading-tight break-words"
                         style={{
                           fontSize: (() => {
                             const name = labelData.primaryName;
+                            if (name.length > 60) return '9px';
+
+                            if (name.length > 45) return '10px';
+
                             if (name.length > 35) return '11px';
                             if (name.length > 25) return '12px';
                             return '14px';
@@ -2838,21 +2842,18 @@ export function SportsCardDetails() {
                         className="text-gray-700 leading-tight"
                         style={{
                           fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
+                          wordBreak: 'break-word'
                         }}
                         title={labelData.contextLine}
                       >
                         {labelData.contextLine || 'Card Details'}
                       </div>
                       {labelData.featuresLine && (
-                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                        <div className="text-blue-600 font-semibold text-[10px] leading-tight break-words">
                           {labelData.featuresLine}
                         </div>
                       )}
-                      <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
+                      <div className="text-gray-500 text-[10px] leading-tight font-mono">
                         {labelData.serial}
                       </div>
                     </div>
