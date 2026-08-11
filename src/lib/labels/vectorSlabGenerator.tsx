@@ -15,7 +15,11 @@
  */
 
 import React from 'react'
-import { Document, Page, View, Text, Svg, Rect, Line, Path } from '@react-pdf/renderer'
+import { Document, Page, View, Text, Svg, Rect, Line, Path, Font } from '@react-pdf/renderer'
+
+// Never hyphenate label text: react-pdf's default line breaker splits words
+// with a hyphen ("Kurt Warn-\ner" on printed labels). Whole words only.
+Font.registerHyphenationCallback((word) => [word])
 import {
   CustomSlabLabelBlock,
   CustomSlabBackBlock,

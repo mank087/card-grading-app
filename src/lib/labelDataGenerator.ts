@@ -362,6 +362,35 @@ function isValidSerialNumber(serial: string | null | undefined): boolean {
          lower !== 'null';
 }
 
+// ── Title-casing for shouty names (2026-08-11) ─────────────────────────────
+// Source data often arrives ALL-CAPS ("ONE HUNDRED AND ONE DALMATIANS");
+// labels should read "One Hundred And One Dalmatians". Only fully-uppercase
+// words are recased — mixed-case input ("McDavid", "ex") is someone's
+// deliberate spelling and passes through untouched.
+const TITLECASE_KEEP = new Set([
+  // Card-variant / grading tokens that are genuinely all-caps
+  'EX', 'GX', 'V', 'VMAX', 'VSTAR', 'SP', 'SSP', 'RC', 'HP', 'MVP', 'HOF',
+  'USA', 'UK', 'NBA', 'NFL', 'MLB', 'NHL', 'WWE', 'UFC', 'TCG', 'CPU',
+  'AI', 'DJ', 'MC', 'OG', 'BGS', 'PSA', 'CGC', 'SGC', 'DCM',
+]);
+
+function titleCaseShoutyWords(name: string): string {
+  return name.replace(/[A-Z][A-Z0-9'.\-/&]*[A-Z0-9]/g, (word) => {
+    // Subwords keep their separators: O'NEAL, J.R., SMITH-JONES, AND/OR
+    return word.replace(/[A-Z]+/g, (letters, offset) => {
+      if (TITLECASE_KEEP.has(letters)) return letters;
+      if (/^[IVXLCDM]+$/.test(letters) && letters.length >= 2 && letters.length <= 4) return letters; // roman numerals
+      if (letters.length === 1) return letters; // initials: J.R., middle initials
+      // Mc/Mac prefixes: MCDAVID → McDavid, MACKINNON stays Mackinnon
+      // (can't distinguish MacKinnon from Mack without a dictionary — Mc is safe)
+      if (letters.startsWith('MC') && letters.length > 2) {
+        return 'Mc' + letters[2] + letters.slice(3).toLowerCase();
+      }
+      return letters[0] + letters.slice(1).toLowerCase();
+    });
+  });
+}
+
 /**
  * Clean a value by removing parenthetical explanations and truncating
  * E.g., "XY – Flashfire (assumed from card number...)" → "XY – Flashfire"
@@ -1078,7 +1107,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
   }
 
   // Clean the primary name to remove any explanatory text
-  const primaryName = cleanValue(rawPrimaryName) || 'Card';
+  const primaryName = titleCaseShoutyWords(cleanValue(rawPrimaryName) || 'Card');
 
   // ========================================
   // LINE 2: Context (Set • Subset • #Number • Year)
@@ -1254,9 +1283,13 @@ export function generateLabelData(card: CardForLabel): LabelData {
  * Falls back to generating if not present
  */
 export function getLabelData(card: CardForLabel & { label_data?: LabelData | null }): LabelData {
-  // If label_data is already stored, use it
+  // If label_data is already stored, use it. Cached blobs predate
+  // title-casing, so the display transform applies over the stored value.
   if (card.label_data) {
-    return card.label_data;
+    return {
+      ...card.label_data,
+      primaryName: titleCaseShoutyWords(card.label_data.primaryName || 'Card'),
+    };
   }
 
   // Otherwise generate it

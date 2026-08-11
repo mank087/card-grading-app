@@ -153,8 +153,21 @@ export function heritageBackLayout(opts: {
   return { emblemXs, centerX, left, right, condSize, condTracking }
 }
 
+/**
+ * Bold-width compensation for the name fit. textWidthEm measures regular
+ * weight; Helvetica-Bold runs ~6% wider on mixed case and ~12% on capitals
+ * (bold caps are 0.72em vs the table's 0.64) — all-caps names like "ONE
+ * HUNDRED AND ONE DALMATIANS" sat visibly into the grade chip at a flat 6%.
+ */
+export function boldFitFactor(text: string): number {
+  const letters = (text.match(/[A-Za-z]/g) || []).length
+  if (!letters) return 1.06
+  const caps = (text.match(/[A-Z]/g) || []).length
+  return 1.06 + 0.06 * (caps / letters)
+}
+
 export function fitHeritageFront(primaryName: string, contextLine: string, serial?: string): HeritageFrontFit {
-  const name = fitLines(primaryName, HERITAGE_PX.TEXT_BOX, 84, 30, 3)
+  const name = fitLines(primaryName, HERITAGE_PX.TEXT_BOX / boldFitFactor(primaryName), 84, 30, 3)
   // Context floor is 24 (3.5pt at true size): below that an inkjet dithers the
   // line into noise. The fitter never truncates — long lines wrap a row earlier.
   const ctx = fitLines((contextLine || '').toUpperCase(), HERITAGE_PX.TEXT_BOX, 30, 24, 3, heritageCtxTracking)

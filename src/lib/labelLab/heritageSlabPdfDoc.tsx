@@ -42,6 +42,10 @@ export type { BandPattern }
  * the glyphs actually used. The ~5MB TTF is only fetched when a CJK card is
  * rendered, and only once per session.
  */
+// Never hyphenate label text: react-pdf's default line breaker splits words
+// with a hyphen ("Kurt Warn-\ner" on a printed label). Whole words only.
+Font.registerHyphenationCallback((word) => [word])
+
 const FONT_BASE = typeof window === 'undefined' ? `${process.cwd()}/public` : ''
 Font.register({
   family: 'NotoSansJP',

@@ -286,7 +286,9 @@ async function drawFrontLabel(
 
   // Center: Card Information (4 lines)
   const infoX = logoX + logoSize + 24;
-  const infoMaxWidth = gradeX - infoX - 50; // Extra padding from grade
+  // gradeX is the grade column's CENTER: "GEM MINT" at 20px bold extends
+  // ~55px left of it, so -50 let long names brush the condition text.
+  const infoMaxWidth = gradeX - infoX - 110;
   let currentY = labelY + 24;
 
   // Helper: Wrap text to multiple lines
@@ -703,7 +705,8 @@ async function drawModernFrontLabel(
 
   // Center: Card Information
   const infoX = logoX + logoSize + 24;
-  const infoMaxWidth = gradeX - infoX - 50;
+  // Same clearance note as the light banner: gradeX is the column center.
+  const infoMaxWidth = gradeX - infoX - 110;
   let currentY = labelY + 28;
 
   // Helper: Wrap text to multiple lines

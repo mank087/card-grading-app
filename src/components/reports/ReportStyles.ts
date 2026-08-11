@@ -5,6 +5,12 @@ import { StyleSheet, Font } from '@react-pdf/renderer';
  * Using react-pdf/renderer StyleSheet API
  */
 
+// Never hyphenate: react-pdf's default breaks words with a hyphen when a
+// line is tight ("Kurt Warn-\ner" on printed labels). Whole words only —
+// the fitters/wrapping handle long text. Global for every PDF this bundle
+// renders (Font is a react-pdf singleton).
+Font.registerHyphenationCallback((word) => [word]);
+
 export const reportStyles = StyleSheet.create({
   // Page layout - compact for single page fit
   // IMPORTANT: overflow: 'hidden' ensures content never spills to a second page

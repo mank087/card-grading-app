@@ -59,6 +59,8 @@ import {
   Path,
 } from '@react-pdf/renderer'
 import { printColorTweaksHex } from './contrastWCAG'
+import { textWidthEm } from './textFit'
+import { boldFitFactor } from './heritageLayout'
 
 // ------- Geometry -------
 
@@ -774,7 +776,12 @@ function fitConditionSize(text: string, maxWidth: number): number {
 
 /** Char-count width estimate — same em-width heuristic as fitFontSize. */
 function estTextWidth(text: string, pt: number, bold: boolean): number {
-  return (text || '').length * pt * (bold ? 0.58 : 0.52)
+  // Per-character-class measurement (textFit.textWidthEm) instead of a flat
+  // per-char guess: the flat 0.58 underestimated mixed-case bold names, so
+  // the fitter picked sizes react-pdf couldn't actually fit and the name
+  // wrapped into the grade chip. Bold widening is caps-aware (~6% mixed
+  // case, ~12% all-caps) — see boldFitFactor.
+  return textWidthEm(text || '') * pt * (bold ? boldFitFactor(text || '') : 1.0)
 }
 
 /** Greedy word-wrap on estimated widths — mirrors production wrapText(). */
