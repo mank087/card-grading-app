@@ -37,6 +37,8 @@ interface CardInfoLike {
 
 interface CardLike {
   serial?: string | null
+  org_serial_display?: string | null
+  conversational_condition_label?: string | null
   category?: string | null
   sub_category?: string | null
   card_name?: string | null
@@ -71,6 +73,47 @@ export interface CustomLabelOverrides {
   features?: string[] | null
 }
 
+/**
+ * Deterministic grade → condition label, ports web conditionAssessment
+ * getConditionFromGrade (v6.1: same grade always gets the same label,
+ * never the raw conversational_condition_label).
+ */
+export function getConditionFromGrade(rawGrade: number | null | undefined): string {
+  if (rawGrade === null || rawGrade === undefined) return ''
+  // Web rounds before mapping (labelDataGenerator getCondition).
+  const grade = Math.round(rawGrade)
+  if (grade >= 10) return 'Gem Mint'
+  if (grade >= 9) return 'Mint'
+  if (grade >= 8) return 'Near Mint-Mint'
+  if (grade >= 7) return 'Near Mint'
+  if (grade >= 6) return 'Excellent-Mint'
+  if (grade >= 5) return 'Excellent'
+  if (grade >= 4) return 'Very Good-Excellent'
+  if (grade >= 3) return 'Very Good'
+  if (grade >= 2) return 'Good'
+  return 'Poor'
+}
+
+/**
+ * Label serial: enterprise org serial wins over the DCM serial — mirrors
+ * web labelDataGenerator.ts:1256.
+ */
+export function getLabelSerial(card: CardLike): string {
+  return card.org_serial_display || card.serial || ''
+}
+
+/**
+ * Altered/Authentic detection, ports web labelDataGenerator
+ * checkAlteredAuthentic (~:555). When true the front label shows grade "A"
+ * and condition "Authentic" instead of a numeric grade.
+ */
+export function checkAlteredAuthentic(card: CardLike): boolean {
+  const label = card.conversational_condition_label?.toLowerCase() || ''
+  return label.includes('altered') ||
+         label.includes('authentic altered') ||
+         label.includes('(aa)')
+}
+
 function getOverrides(card: CardLike): CustomLabelOverrides | null {
   const o = card.custom_label_data
   if (!o || typeof o !== 'object') return null
@@ -94,6 +137,30 @@ const isValid = (v?: string | null): boolean => {
 
 const SPORTS_CATEGORIES = new Set(['Sports', 'Baseball', 'Basketball', 'Football', 'Hockey', 'Soccer'])
 
+// ── Title-casing for shouty names (mirrors web labelDataGenerator) ──────────
+// Only fully-uppercase words are recased ("ONE HUNDRED AND ONE DALMATIANS" →
+// "One Hundred And One Dalmatians"); mixed-case input is deliberate spelling
+// and passes through. Keep the KEEP set in sync with the web copy.
+const TITLECASE_KEEP = new Set([
+  'EX', 'GX', 'V', 'VMAX', 'VSTAR', 'SP', 'SSP', 'RC', 'HP', 'MVP', 'HOF',
+  'USA', 'UK', 'NBA', 'NFL', 'MLB', 'NHL', 'WWE', 'UFC', 'TCG', 'CPU',
+  'AI', 'DJ', 'MC', 'OG', 'BGS', 'PSA', 'CGC', 'SGC', 'DCM',
+])
+
+function titleCaseShoutyWords(name: string): string {
+  return name.replace(/[A-Z][A-Z0-9'.\-/&]*[A-Z0-9]/g, (word) =>
+    word.replace(/[A-Z]+/g, (letters) => {
+      if (TITLECASE_KEEP.has(letters)) return letters
+      if (/^[IVXLCDM]+$/.test(letters) && letters.length >= 2 && letters.length <= 4) return letters
+      if (letters.length === 1) return letters
+      if (letters.startsWith('MC') && letters.length > 2) {
+        return 'Mc' + letters[2] + letters.slice(3).toLowerCase()
+      }
+      return letters[0] + letters.slice(1).toLowerCase()
+    })
+  )
+}
+
 /**
  * Get the primary display name for a card (e.g., player or character name).
  * Critical: for sports cards, player_or_character WINS over card_name —
@@ -107,6 +174,10 @@ export function getDisplayName(card: CardLike): string {
   if (overrides && overrides.primaryName !== undefined && overrides.primaryName !== null) {
     return overrides.primaryName
   }
+  return titleCaseShoutyWords(rawDisplayName(card))
+}
+
+function rawDisplayName(card: CardLike): string {
 
   const ci = card.conversational_card_info || {}
   const category = card.category || 'Other'

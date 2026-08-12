@@ -123,6 +123,9 @@ function BatchLabelExportInner() {
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
   const inlineCustomConfigRaw = sp.get('customConfig');
+  // The style id the user actually picked in the app (e.g. 'custom-2') —
+  // may differ from their account-wide saved label_style.
+  const labelStyleParam = sp.get('labelStyle');
   // Avery printer calibration offsets (per BatchAveryLabelModal). Mobile app
   // can pass &calibration=eyJ4Ijo...== (base64-encoded {"x":0,"y":0}) to
   // shift all printed labels by that delta in points. Defaults to (0,0)
@@ -238,6 +241,27 @@ function BatchLabelExportInner() {
           setStatus(`Generating ${cardIds.length} Heritage slab labels (${format})…`);
           const gen = await import('@/lib/labels/heritageSlabGenerator');
           const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
+          // Honor the caller's SAVED heritage customizations (pattern, pinned
+          // band palette, per-grade chip colors) like BatchSlabLabelModal and
+          // the single label-export do — this branch used to drop them and
+          // every app batch export fell back to diamond/card-sampled defaults.
+          // An explicit heritagePattern URL param still wins over the saved one.
+          // Precedence for the heritage config itself:
+          //   1. inline ?customConfig (mobile picked a heritage-styled custom
+          //      slot that may not be the account's saved style),
+          //   2. the custom slot named by ?labelStyle,
+          //   3. the account's saved label_style slot.
+          let inlineHeritageCfg: any = null;
+          if (inlineCustomConfigRaw) {
+            try { inlineHeritageCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall back below */ }
+          }
+          const savedCfg =
+            savedCustomStyles.find(st => st.id === labelStyleParam)?.config
+            || savedCustomStyles.find(st => st.id === userLabelStyle)?.config
+            || null;
+          const heritageSel = inlineHeritageCfg
+            ? resolveHeritageSelection(labelStyleParam || userLabelStyle, { ...inlineHeritageCfg, style: 'heritage' })
+            : resolveHeritageSelection(userLabelStyle, savedCfg);
           const items = perCard.map(({ card, labelData, subScores, grade }) => ({
             data: {
               primaryName: labelData.primaryName,
@@ -255,12 +279,15 @@ function BatchLabelExportInner() {
               showVipEmblem,
               showCardLoversEmblem,
             } as any,
-            bandColors: resolveHeritageBandColors(card.card_colors),
+            bandColors: (heritageSel.active ? heritageSel.bandColors : null) ?? resolveHeritageBandColors(card.card_colors),
           }));
-          const pattern = gen.resolveHeritagePattern(sp.get('heritagePattern'));
+          const pattern = sp.get('heritagePattern')
+            ? gen.resolveHeritagePattern(sp.get('heritagePattern'))
+            : heritageSel.active ? heritageSel.pattern : gen.resolveHeritagePattern(null);
+          const gradeColors = heritageSel.active ? heritageSel.gradeColors : null;
           const blob = format === 'foldover'
-            ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern)
-            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern);
+            ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern, gradeColors)
+            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors);
           blobs.push({
             name: `DCM-Slab-heritage-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -312,6 +339,10 @@ function BatchLabelExportInner() {
           if (inlineCustomConfigRaw) {
             try { config = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch {}
           }
+          // No inline config: prefer the slot named by ?labelStyle, then the
+          // user's saved account style, and only then fall back positionally.
+          if (!config) config = savedCustomStyles.find(st => st.id === labelStyleParam)?.config;
+          if (!config) config = savedCustomStyles.find(st => st.id === userLabelStyle)?.config;
           if (!config) config = savedCustomStyles[0]?.config;
           if (!config) throw new Error('No custom label config available — save one in Label Studio first.');
 
@@ -701,7 +732,7 @@ function BatchLabelExportInner() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, cardIdsParam, type, format, positionsParam, inlineCustomConfigRaw, downloadMode]);
+  }, [token, cardIdsParam, type, format, positionsParam, inlineCustomConfigRaw, labelStyleParam, downloadMode]);
 
   if (downloadMode) {
     return (

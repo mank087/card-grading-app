@@ -59,6 +59,14 @@ export const HERITAGE_THEME = {
   edge: '#141414',
 }
 
+/**
+ * On-screen (non-hardened) theme values, mirrors web heritageTheme(false):
+ * the ivory field + soft keyline the browser preview shows. Print output
+ * still uses the hardened HERITAGE_THEME above.
+ */
+export const HERITAGE_SCREEN_FIELD = '#FAF8F4'
+export const HERITAGE_SCREEN_EDGE = '#E5DECF'
+
 /** Band pattern ids + display names, mirrors web BAND_PATTERNS. */
 export const HERITAGE_PATTERNS: { id: string; name: string }[] = [
   { id: 'diamond', name: 'Diamond mosaic' },

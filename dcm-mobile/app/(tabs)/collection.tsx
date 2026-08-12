@@ -541,7 +541,7 @@ export default function CollectionScreen() {
   // download manager).
   const openBatchDownload = useCallback(async (
     type: string,
-    opts?: { format?: 'duplex' | 'foldover'; positions?: number[]; customConfig?: string }
+    opts?: { format?: 'duplex' | 'foldover'; positions?: number[]; customConfig?: string; labelStyle?: string }
   ) => {
     if (!session?.access_token) { Alert.alert('Not signed in'); return }
     if (selectedIds.size === 0) { Alert.alert('Select cards first'); return }
@@ -571,6 +571,9 @@ export default function CollectionScreen() {
     // from the SlabLabelOptionsSheet. The web batch handler decodes it
     // and applies the colors/gradient/border to every selected card.
     if (opts?.customConfig) params.set('customConfig', opts.customConfig)
+    // The picked style id (custom-N) — the batch receiver prefers this over
+    // the account's saved label_style when picking a saved-slot fallback.
+    if (opts?.labelStyle) params.set('labelStyle', opts.labelStyle)
 
     // Both iOS and Android: load /label-export/batch in a hidden WebView via
     // ExportRunner. The page detects ReactNativeWebView and posts files back
@@ -1211,11 +1214,14 @@ export default function CollectionScreen() {
         defaultStyleId={labelStyle}
         onGenerate={(type, format, customLabelStyleId) => {
           let customConfigB64: string | undefined
-          if (type === 'slab-custom' && customLabelStyleId) {
+          if (customLabelStyleId) {
             // Resolve the picked custom-N to its saved config and
             // base64-encode for the customConfig URL param. The web
             // batch handler decodes it via atob and applies to every
-            // selected card.
+            // selected card. Sent for BOTH slab-custom and heritage-styled
+            // custom slots (type='slab-heritage') — the selected slot may
+            // not be the account's saved label_style, so the receiver
+            // can't always resolve it server-side.
             const cs = customStyles.find(s => s.id === customLabelStyleId)
             if (cs?.config) {
               try {
@@ -1230,7 +1236,7 @@ export default function CollectionScreen() {
               }
             }
           }
-          openBatchDownload(type, { format, customConfig: customConfigB64 })
+          openBatchDownload(type, { format, customConfig: customConfigB64, labelStyle: customLabelStyleId })
         }}
       />
 

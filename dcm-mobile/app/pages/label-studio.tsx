@@ -272,7 +272,7 @@ export default function LabelStudioScreen() {
   // Saved styles — synced with web via useLabelStyle hook (server source of truth).
   // Replaces the previous AsyncStorage-only flow so users see the same custom-1..4
   // slots they have on the web account.
-  const { customStyles, saveCustomStyle, deleteCustomStyle, renameCustomStyle } = useLabelStyle()
+  const { customStyles, saveCustomStyle, deleteCustomStyle, renameCustomStyle, switchStyle } = useLabelStyle()
   const [savingStyle, setSavingStyle] = useState(false)
   const [renamingStyleId, setRenamingStyleId] = useState<string | null>(null)
   const [renamingValue, setRenamingValue] = useState('')
@@ -854,18 +854,27 @@ export default function LabelStudioScreen() {
     setSavingStyle(true)
     const slotNumber = customStyles.length + 1
     const saved = await saveCustomStyle({ name: `Custom Label ${slotNumber}`, config: buildSaveConfig() })
+    if (saved) {
+      // Apply across the account: saving alone only wrote the config into
+      // custom_label_styles — label_style (which every surface reads, and
+      // which defaults to 'heritage') stayed untouched, so the new design
+      // never showed up anywhere. switchStyle persists label_style via the
+      // API and updates the hook's local state + cache immediately.
+      await switchStyle(saved.id as any)
+    }
     setSavingStyle(false)
-    if (saved) Alert.alert('Saved', `"${saved.name}" saved to slot ${saved.id}.`)
+    if (saved) Alert.alert('Saved', `"${saved.name}" saved to slot ${saved.id} and applied across your account.`)
     else Alert.alert('Save failed', 'Could not save the style. Try again.')
-  }, [customStyles.length, saveCustomStyle, buildSaveConfig])
+  }, [customStyles.length, saveCustomStyle, buildSaveConfig, switchStyle])
 
   const updateExistingStyle = useCallback(async (id: string, name: string) => {
     setSavingStyle(true)
     const saved = await saveCustomStyle({ id, name, config: buildSaveConfig() })
+    if (saved) await switchStyle(saved.id as any)
     setSavingStyle(false)
-    if (saved) Alert.alert('Updated', `"${saved.name}" updated with current design.`)
+    if (saved) Alert.alert('Updated', `"${saved.name}" updated and applied across your account.`)
     else Alert.alert('Update failed', 'Could not update the style.')
-  }, [saveCustomStyle, buildSaveConfig])
+  }, [saveCustomStyle, buildSaveConfig, switchStyle])
 
   const deleteStyle = useCallback(async (id: string) => {
     Alert.alert('Delete saved style?', 'This cannot be undone.', [
@@ -959,6 +968,14 @@ export default function LabelStudioScreen() {
     opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number },
   ) => {
     if (!selectedCard?.id || !session?.access_token) return
+    // A Heritage-based design (dcm-heritage preset / heritage tile) must go
+    // through the web's HERITAGE generators. 'slab-custom' would route it to
+    // customSlabLabelGenerator, which treats any non-'modern' style as the
+    // flat traditional layout — the user's pattern/band colours were dropped
+    // and the PDF came out traditional-styled.
+    if (exportType === 'slab-custom' && config.style === 'heritage') {
+      exportType = 'slab-heritage'
+    }
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
     const params = new URLSearchParams()
     params.set('token', session.access_token)

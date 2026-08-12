@@ -31,7 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { supabase } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
 import { useAuth } from '@/contexts/AuthContext'
-import { Colors, GradeColors, ConfidenceColors } from '@/lib/constants'
+import { Colors, GradeColors, ConfidenceColors, categoryToRouteSlug } from '@/lib/constants'
 import { formatDate } from '@/lib/locale'
 import { Card } from '@/lib/types'
 import GradeBadge from '@/components/ui/GradeBadge'
@@ -43,7 +43,7 @@ import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
 import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
-import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
+import { getDisplayName, getContextLine, getFeatures, getConditionFromGrade, getLabelSerial, checkAlteredAuthentic } from '@/lib/labelData'
 import { resolveCardValue } from '@/lib/resolveCardValue'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
@@ -559,7 +559,7 @@ export default function CardDetailScreen() {
   const gradingJson = gradingJsonEarly
 
   const handleShare = async () => {
-    const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+    const catPath = categoryToRouteSlug(card.category)
     await Share.share({ message: `Check out this ${cardName} graded ${grade}/10 by DCM! https://dcmgrading.com/${catPath}/${card.id}` })
   }
 
@@ -1361,9 +1361,10 @@ export default function CardDetailScreen() {
             displayName={getDisplayName(card as any)}
             contextLine={getContextLine(card as any)}
             features={getFeatures(card as any)}
-            serial={card.serial}
+            serial={getLabelSerial(card as any)}
             grade={grade}
-            condition={card.conversational_condition_label || ''}
+            condition={getConditionFromGrade(grade)}
+            isAlteredAuthentic={checkAlteredAuthentic(card as any)}
             size="lg"
             isBack={activeImage === 'back'}
             subScores={sub as any}
@@ -1628,7 +1629,7 @@ export default function CardDetailScreen() {
         <TouchableOpacity
           style={s.shareBtn}
           onPress={async () => {
-            const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+            const catPath = categoryToRouteSlug(card.category)
             const url = `https://dcmgrading.com/${catPath}/${card.id}`
             await Clipboard.setStringAsync(url)
             Alert.alert('Link Copied', url)

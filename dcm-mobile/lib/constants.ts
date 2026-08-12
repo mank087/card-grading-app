@@ -122,3 +122,21 @@ export const CardCategories = [
   { key: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: 'prism' },
   { key: 'Other', label: 'Other', icon: 'layers' },
 ] as const
+
+// Category → web card-detail route slug (dcmgrading.com/<slug>/<id>).
+// Mirrors categoryToRouteSlug in the web app's src/lib/postGradeEmailTemplates.ts.
+// The mobile app is a hard fork, so this deliberately duplicates that logic —
+// keep the two in sync when routes change.
+export function categoryToRouteSlug(category: string | null | undefined): string {
+  if (!category) return 'other'
+  const c = category.toLowerCase()
+  if (c === 'pokemon') return 'pokemon'
+  if (c === 'mtg' || c === 'magic') return 'mtg'
+  if (c === 'lorcana') return 'lorcana'
+  if (c === 'one piece' || c === 'onepiece') return 'onepiece'
+  if (c === 'yu-gi-oh' || c === 'yugioh') return 'yugioh'
+  if (c === 'star wars' || c === 'starwars') return 'starwars'
+  // Sports sub-categories all route to /sports
+  if (['sports', 'football', 'baseball', 'basketball', 'hockey', 'soccer', 'wrestling', 'racing', 'boxing', 'mma', 'tennis', 'golf'].includes(c)) return 'sports'
+  return 'other'
+}

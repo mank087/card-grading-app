@@ -48,8 +48,10 @@ interface Props {
    * helper takes care of the actual URL build + browser/WebView launch.
    * - type: 'slab-modern' | 'slab-traditional' | 'slab-heritage' | 'slab-custom'
    * - format: 'duplex' | 'foldover'
-   * - labelStyle: only set when type is 'slab-custom' — the specific
-   *   custom-N id to render. Server reads this from the URL param.
+   * - labelStyle: only set when the user picked a custom-N slot — the
+   *   specific custom-N id to render. Server reads this from the URL param.
+   *   Heritage-styled custom slots arrive as type='slab-heritage' with the
+   *   custom-N id still in labelStyle.
    */
   onGenerate: (type: string, format: Format, labelStyle?: string) => void
 }
@@ -91,7 +93,17 @@ export default function SlabLabelOptionsSheet({
     if (style.kind === 'modern') onGenerate('slab-modern', format)
     else if (style.kind === 'traditional') onGenerate('slab-traditional', format)
     else if (style.kind === 'heritage') onGenerate('slab-heritage', format)
-    else onGenerate('slab-custom', format, style.id)
+    else {
+      // A custom-N slot whose saved config is a Heritage design (Studio's
+      // "style: 'heritage'") must render through the HERITAGE generators on
+      // the web receiver, not the gradient/custom one — otherwise the band
+      // pattern + palette are dropped and the PDF comes out modern/traditional.
+      // Keep the custom-N id in labelStyle so the receiver's
+      // resolveHeritageSelection picks up pattern/bandColors/gradeColors.
+      const cfg = customStyles.find(s => s.id === style.id)?.config
+      const type = cfg?.style === 'heritage' ? 'slab-heritage' : 'slab-custom'
+      onGenerate(type, format, style.id)
+    }
     onClose()
   }
 

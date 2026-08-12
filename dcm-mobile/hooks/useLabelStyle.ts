@@ -15,6 +15,8 @@ export interface CustomLabelConfig {
   borderColor?: string
   borderWidth?: number
   topEdgeGradient?: string[]
+  /** 'light' | 'dark' force the text polarity; 'auto'/absent = WCAG pick. */
+  textColorMode?: 'auto' | 'light' | 'dark'
   /** 'heritage' marks the Round 3 ivory design; other values are modern/traditional. */
   style?: string
   /** Heritage-only fields (mirror web CustomLabelConfig). */
@@ -35,6 +37,11 @@ export interface LabelColorOverrides {
   gradientEnd: string
   borderEnabled: boolean
   borderColor: string
+  /** Border thickness in inches (web convention); consumers convert to px. */
+  borderWidth?: number
+  /** Resolved text polarity — 'dark' text on light custom gradients.
+      Mirrors web labelPresets extractColorOverrides.textPolarity. */
+  textPolarity?: 'light' | 'dark'
   isRainbow?: boolean
   isNeonOutline?: boolean
   isCardExtension?: boolean
@@ -53,6 +60,54 @@ const CACHE_KEY = 'dcm_label_style_cache'
 // only well-formed #RRGGBB values survive into the overrides.
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
+// ── Text polarity (compact port of web contrastWCAG + labelPresets) ─────────
+// resolveConfigTextPolarity: an explicit textColorMode wins; 'auto' (and
+// configs saved before the field existed) picks light vs dark text by the
+// better worst-case WCAG contrast over the background the text sits on.
+function srgbToLinear(channel: number): number {
+  const c = channel / 255
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
+function luminance(hex: string): number | null {
+  const h = hex?.trim().replace(/^#/, '') || ''
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
+  const r = srgbToLinear(parseInt(h.slice(0, 2), 16))
+  const g = srgbToLinear(parseInt(h.slice(2, 4), 16))
+  const b = srgbToLinear(parseInt(h.slice(4, 6), 16))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+// Contrast vs near-white #fafafa / near-black #0a0a0a (same candidates as web).
+const LUM_NEAR_WHITE = luminance('#fafafa')!
+const LUM_NEAR_BLACK = luminance('#0a0a0a')!
+const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+
+function resolveConfigTextPolarity(config: CustomLabelConfig): 'light' | 'dark' {
+  if (config.textColorMode === 'light') return 'light'
+  if (config.textColorMode === 'dark') return 'dark'
+  // Background stops — mirrors web configBackgroundStops for the presets the
+  // mobile config carries (rainbow / card-extension / plain gradient).
+  const stops =
+    config.colorPreset === 'rainbow'
+      ? ['#ff0000', '#ff8800', '#ffff00', '#00cc00', '#0066ff', '#8800ff', '#ff00ff']
+      : config.colorPreset === 'card-extension' && config.topEdgeGradient && config.topEdgeGradient.length >= 3
+      ? config.topEdgeGradient
+      : [config.gradientStart, config.gradientEnd]
+  const lums = stops.map(luminance).filter((l): l is number => l !== null)
+  if (!lums.length) return 'light'
+  // Worst-case contrast of each text candidate across the stops (web samples
+  // inside gradient segments too; endpoint stops bound the worst case for the
+  // monotone two-stop gradients mobile renders).
+  let minWhite = Infinity
+  let minBlack = Infinity
+  for (const l of lums) {
+    minWhite = Math.min(minWhite, contrast(l, LUM_NEAR_WHITE))
+    minBlack = Math.min(minBlack, contrast(l, LUM_NEAR_BLACK))
+  }
+  return minWhite >= minBlack ? 'light' : 'dark'
+}
+
 function extractColorOverrides(config: CustomLabelConfig | null | undefined): LabelColorOverrides | undefined {
   if (!config) return undefined
   // Hand-edited palette wins over the source toggle (same precedence as web).
@@ -65,6 +120,8 @@ function extractColorOverrides(config: CustomLabelConfig | null | undefined): La
     gradientEnd: config.gradientEnd,
     borderEnabled: config.borderEnabled ?? false,
     borderColor: config.borderColor || config.gradientEnd,
+    borderWidth: config.borderWidth,
+    textPolarity: resolveConfigTextPolarity(config),
     isRainbow: config.colorPreset === 'rainbow',
     isNeonOutline: config.colorPreset === 'neon-outline',
     isCardExtension: config.colorPreset === 'card-extension',
@@ -91,6 +148,16 @@ export function useLabelStyle() {
   const [labelStyle, setLabelStyle] = useState<LabelStyleId>('heritage')
   const [customStyles, setCustomStyles] = useState<SavedCustomStyle[]>([])
   const [loading, setLoading] = useState(true)
+  // Latest customStyles for callbacks that fire right after a save — the
+  // saveCustomStyle → switchStyle sequence runs before React commits the
+  // setCustomStyles state, so the switchStyle closure would otherwise cache
+  // a styles array that's missing the style that was just saved. Updated
+  // synchronously via setStyles below (an effect would commit too late).
+  const customStylesRef = useRef<SavedCustomStyle[]>([])
+  const setStyles = useCallback((styles: SavedCustomStyle[]) => {
+    customStylesRef.current = styles
+    setCustomStyles(styles)
+  }, [])
 
   // Hydrate from cache for instant render
   useEffect(() => {
@@ -99,7 +166,7 @@ export function useLabelStyle() {
         try {
           const parsed = JSON.parse(cached)
           if (parsed.labelStyle) setLabelStyle(parsed.labelStyle)
-          if (Array.isArray(parsed.customStyles)) setCustomStyles(parsed.customStyles)
+          if (Array.isArray(parsed.customStyles)) setStyles(parsed.customStyles)
         } catch {}
       }
     })
@@ -136,7 +203,7 @@ export function useLabelStyle() {
           }
           console.log('[useLabelStyle] loaded:', next.labelStyle, `(${next.customStyles.length} custom)`)
           setLabelStyle(next.labelStyle)
-          setCustomStyles(next.customStyles)
+          setStyles(next.customStyles)
           AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next))
           setLoading(false)
         })
@@ -156,7 +223,7 @@ export function useLabelStyle() {
         if (cached) {
           try {
             const parsed = JSON.parse(cached)
-            if (Array.isArray(parsed.customStyles)) setCustomStyles(parsed.customStyles)
+            if (Array.isArray(parsed.customStyles)) setStyles(parsed.customStyles)
             if (parsed.labelStyle) setLabelStyle(parsed.labelStyle)
           } catch {}
         }
@@ -167,7 +234,7 @@ export function useLabelStyle() {
 
   const switchStyle = useCallback(async (id: LabelStyleId) => {
     setLabelStyle(id)
-    AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ labelStyle: id, customStyles }))
+    AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ labelStyle: id, customStyles: customStylesRef.current }))
     const token = session?.access_token
     if (!token) return
     try {
@@ -183,7 +250,7 @@ export function useLabelStyle() {
     } catch (err) {
       console.warn('[useLabelStyle] switchStyle network error:', err)
     }
-  }, [session?.access_token, customStyles])
+  }, [session?.access_token])
 
   // Save (create or update) a custom style. Mirrors web's useCustomLabelStyle.saveCustomStyle.
   // The server slot-assigns a custom-N id when one isn't passed.
@@ -201,7 +268,7 @@ export function useLabelStyle() {
         console.warn('[useLabelStyle] saveCustomStyle failed:', data.error || res.status)
         return null
       }
-      if (Array.isArray(data.customStyles)) setCustomStyles(data.customStyles)
+      if (Array.isArray(data.customStyles)) setStyles(data.customStyles)
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ labelStyle, customStyles: data.customStyles ?? customStyles }))
       return data.savedStyle ?? null
     } catch (err) {
@@ -221,7 +288,7 @@ export function useLabelStyle() {
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || !data.success) return false
-      if (Array.isArray(data.customStyles)) setCustomStyles(data.customStyles)
+      if (Array.isArray(data.customStyles)) setStyles(data.customStyles)
       if (data.labelStyle) setLabelStyle(data.labelStyle)
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
         labelStyle: data.labelStyle ?? labelStyle,
@@ -245,7 +312,7 @@ export function useLabelStyle() {
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || !data.success) return false
-      if (Array.isArray(data.customStyles)) setCustomStyles(data.customStyles)
+      if (Array.isArray(data.customStyles)) setStyles(data.customStyles)
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ labelStyle, customStyles: data.customStyles ?? customStyles }))
       return true
     } catch (err) {

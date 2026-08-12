@@ -116,7 +116,8 @@ export default function LabelExportPage() {
   const token = sp.get('token') || '';
   const type = sp.get('type') || 'slab-modern';
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
-  const labelStyleParam = (sp.get('labelStyle') || 'modern') as 'modern' | 'traditional';
+  // Any style id: 'modern' | 'traditional' | 'heritage' | 'custom-N'.
+  const labelStyleParam = sp.get('labelStyle') || 'modern';
   // Inline custom config (base64-encoded JSON) — lets the mobile Label Studio
   // ship the user's IN-FLIGHT customizer config (colors, gradient angle,
   // geometric pattern, layout style, custom colors array, dimensions, border)
@@ -568,6 +569,13 @@ export default function LabelExportPage() {
           let heritageCfg: any = null;
           if (inlineCustomConfigRaw) {
             try { heritageCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall back below */ }
+          }
+          // No inline config: the app may have picked a heritage-styled
+          // custom-N slot (labelStyle='custom-N', type='slab-heritage') —
+          // resolve its saved config so the pattern / pinned band palette /
+          // per-grade chip colors survive into the PDF.
+          if (!heritageCfg) {
+            heritageCfg = savedCustomStyles.find(st => st.id === labelStyleParam)?.config || null;
           }
           const { resolveHeritageSelection } = await import('@/lib/labels/labelStyleResolution');
           const sel = resolveHeritageSelection('heritage', heritageCfg ? { ...heritageCfg, style: 'heritage' } : null);

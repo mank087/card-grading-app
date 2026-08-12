@@ -25,6 +25,7 @@ import {
   BAND_PATTERNS,
 } from '@/lib/labelLab/heritageSlabPdfDoc'
 import { resolveGradeChip } from '@/lib/labelPresets'
+import { heritageTheme } from '@/lib/labelLab/heritageLayout'
 import {
   PageHeader,
   CornerMarks,
@@ -121,6 +122,11 @@ function HeritageProductionDoc({ inputs }: { inputs: HeritageInputs }) {
     <Document>
       <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
         <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 0.8" — Heritage'} />
+        {/* Duplex instruction — matches the standard vector sheet's PageHeader wording. */}
+        <View style={{ position: 'absolute', top: 33, left: 50, right: 50, alignItems: 'center' }}>
+          <Text style={{ fontSize: 7, color: '#9ca3af' }}>Print duplex (flip on long edge) • Cut along dotted lines</Text>
+        </View>
+        <PanelBleed x={SINGLE_X} y={SINGLE_Y} inputs={inputs} />
         <LabelAt x={SINGLE_X} y={SINGLE_Y}>
           <HeritageFront i={inputs} chip={chip} />
         </LabelAt>
@@ -130,6 +136,10 @@ function HeritageProductionDoc({ inputs }: { inputs: HeritageInputs }) {
       </Page>
       <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
         <PageHeader pageType="back" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 0.8" — Heritage'} />
+        <View style={{ position: 'absolute', top: 33, left: 50, right: 50, alignItems: 'center' }}>
+          <Text style={{ fontSize: 7, color: '#9ca3af' }}>BACK SIDE • Print duplex (flip on long edge)</Text>
+        </View>
+        <PanelBleed x={SINGLE_X} y={SINGLE_Y} inputs={inputs} />
         <LabelAt x={SINGLE_X} y={SINGLE_Y}>
           <HeritageBack i={inputs} chip={chip} />
         </LabelAt>
@@ -185,11 +195,50 @@ const PAGE_W = 8.5 * INCH
 const PAGE_H = 11 * INCH
 const FOLD_H = LABEL_H * 2
 
+// Print bleed matching the modern fold-over (slabLabelGenerator BLEED_IN
+// 0.08"): the heritage panels draw their field flush at the cut line, so a
+// slightly wide cut used to leave unprinted paper — and the ink block itself
+// measured 0.16" smaller than the modern label's, which printed "smaller" to
+// anyone trimming along the ink edge (reported Aug 12). The underlays extend
+// the field — and the band colour along the band edge — past the cut on the
+// pair's outer edges only; the fold seam stays flush.
+const FOLD_BLEED = 0.08 * INCH
+const BAND_W_PT = (90 / 1400) * LABEL_W // heritageSlabPdfDoc BAND_W = u(90)
+
+/** Field + band-edge bleed underlay for ONE heritage panel at (x, y) — the
+ *  band sits on the panel's left in both front and back blocks. Used by the
+ *  single and batch-duplex docs; FoldPair composes its own pair-shaped bleed
+ *  because the rotated back panel moves its band to the pair's other edge. */
+function PanelBleed({ x, y, inputs }: { x: number; y: number; inputs: HeritageInputs }) {
+  const B = FOLD_BLEED
+  const field = heritageTheme(!!inputs.printHardened).field
+  const band = inputs.bandColors?.[0] || '#101014'
+  return (
+    <>
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: LABEL_W + B * 2, height: LABEL_H + B * 2, backgroundColor: field }} />
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: B, height: LABEL_H + B * 2, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x, top: y - B, width: BAND_W_PT, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x, top: y + LABEL_H, width: BAND_W_PT, height: B, backgroundColor: band }} />
+    </>
+  )
+}
+
 /** One fold pair: rotated back over front, at (x, y) = top-left of the pair. */
 function FoldPair({ inputs, x, y }: { inputs: HeritageInputs; x: number; y: number }) {
   const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+  const B = FOLD_BLEED
+  const field = heritageTheme(!!inputs.printHardened).field
+  const band = inputs.bandColors?.[0] || '#101014'
   return (
     <>
+      {/* field bleed under the whole pair (left/right/top/bottom overhang) */}
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: LABEL_W + B * 2, height: FOLD_H + B * 2, backgroundColor: field }} />
+      {/* band-colour bleed: front band sits on the pair's bottom-left edge;
+          the 180°-rotated back puts its band on the top-right edge */}
+      <View style={{ position: 'absolute', left: x - B, top: y + LABEL_H, width: B, height: LABEL_H + B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x - B, top: y + FOLD_H, width: B + BAND_W_PT, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x + LABEL_W, top: y - B, width: B, height: LABEL_H + B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x + LABEL_W - BAND_W_PT, top: y - B, width: B + BAND_W_PT, height: B, backgroundColor: band }} />
       <View style={{ position: 'absolute', left: x, top: y, width: LABEL_W, height: LABEL_H, transform: 'rotate(180deg)' }}>
         <HeritageBack i={inputs} chip={chip} />
       </View>
@@ -281,9 +330,12 @@ function HeritageBatchDuplexDoc({ entries }: { entries: HeritageInputs[] }) {
           const { x, y } = gridPos(i, false)
           const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
           return (
-            <LabelAt key={i} x={x} y={y}>
-              <HeritageFront i={inputs} chip={chip} />
-            </LabelAt>
+            <React.Fragment key={i}>
+              <PanelBleed x={x} y={y} inputs={inputs} />
+              <LabelAt x={x} y={y}>
+                <HeritageFront i={inputs} chip={chip} />
+              </LabelAt>
+            </React.Fragment>
           )
         })}
         <GuidesLayer>
@@ -301,9 +353,12 @@ function HeritageBatchDuplexDoc({ entries }: { entries: HeritageInputs[] }) {
           const { x, y } = gridPos(i, true)
           const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
           return (
-            <LabelAt key={i} x={x} y={y}>
-              <HeritageBack i={inputs} chip={chip} />
-            </LabelAt>
+            <React.Fragment key={i}>
+              <PanelBleed x={x} y={y} inputs={inputs} />
+              <LabelAt x={x} y={y}>
+                <HeritageBack i={inputs} chip={chip} />
+              </LabelAt>
+            </React.Fragment>
           )
         })}
         <GuidesLayer>

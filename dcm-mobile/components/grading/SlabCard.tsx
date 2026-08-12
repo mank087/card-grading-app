@@ -25,6 +25,8 @@ interface SlabCardProps {
   features?: string[]
   size?: 'sm' | 'md' | 'lg'
   isBack?: boolean
+  /** Altered/Authentic card: shows grade "A" / condition "Authentic" (web parity). */
+  isAlteredAuthentic?: boolean
   subScores?: { centering: number; corners: number; edges: number; surface: number } | null
   labelStyle?: LabelStyleId
   colorOverrides?: LabelColorOverrides
@@ -42,6 +44,8 @@ import {
   HERITAGE_GRADE_INKS,
   HERITAGE_FALLBACK_INK,
   HERITAGE_THEME,
+  HERITAGE_SCREEN_FIELD,
+  HERITAGE_SCREEN_EDGE,
   GRADE_10_FOIL_STOPS,
   resolveHeritagePattern,
 } from '@/lib/heritage'
@@ -652,6 +656,7 @@ function SlabCardImpl({
   features = [],
   size = 'md',
   isBack = false,
+  isAlteredAuthentic = false,
   subScores,
   labelStyle = 'modern',
   colorOverrides,
@@ -661,16 +666,25 @@ function SlabCardImpl({
   showCardLoversEmblem = false,
   heritageBandColors,
 }: SlabCardProps) {
-  const gradeText = grade !== null ? Math.round(grade).toString() : 'N/A'
-  const conditionText = condition?.toUpperCase() || ''
-  // Front and back labels share the same height so they line up across the slab —
-  // matches the web (ModernFrontLabel heights match ModernBackLabel by design).
-  // The taller dimension wins so the back label still fits the full sub-grade names.
-  const labelHeight = size === 'sm' ? 70 : size === 'md' ? 84 : 110
+  // Altered/Authentic parity with web ModernFrontLabel: grade "A", condition
+  // "Authentic", only when there is no numeric grade to show.
+  const gradeText = grade !== null ? Math.round(grade).toString() : (isAlteredAuthentic ? 'A' : 'N/A')
+  const conditionText = (isAlteredAuthentic && grade === null ? 'Authentic' : condition || '').toUpperCase()
   const fontScale = size === 'sm' ? 0.85 : size === 'md' ? 1 : 1.15
   const isTraditional = labelStyle === 'traditional'
   // Heritage: built-in id, or a saved custom style whose config is Heritage.
   const isHeritage = labelStyle === 'heritage' || !!colorOverrides?.isHeritage
+  // Front and back labels share the same height so they line up across the slab —
+  // matches the web (ModernFrontLabel heights match ModernBackLabel by design).
+  // Aspect-locked to the measured slab width so the proportions match the web:
+  // heritage is a 1400x400 canvas (w/3.5); modern/traditional render a 360px
+  // design at min-height ~110 (w/3.27). Until layout runs (or below the
+  // legibility floor) we fall back to the historical fixed heights.
+  const [slabW, setSlabW] = useState(0)
+  const labelAspect = isHeritage ? 3.5 : 3.27
+  const fallbackLabelHeight = size === 'sm' ? 70 : size === 'md' ? 84 : 110
+  // slabGradient pads 4px per side; the label spans the remainder.
+  const labelHeight = slabW > 0 ? Math.max(56, (slabW - 8) / labelAspect) : fallbackLabelHeight
   const bandColors = (colorOverrides?.heritageBandColors && colorOverrides.heritageBandColors.length >= 2)
     ? colorOverrides.heritageBandColors
     : (heritageBandColors && heritageBandColors.length >= 2 ? heritageBandColors : HERITAGE_BRAND_COLORS)
@@ -682,16 +696,28 @@ function SlabCardImpl({
   const contextLines = size === 'lg' ? 2 : 1
 
   const wrapperColors = isLight ? ['#e5e7eb', '#f3f4f6', '#e5e7eb'] : getWrapperColors(colorOverrides)
-  const labelColors = isHeritage ? ['#FFFFFF', '#FFFFFF', '#FFFFFF'] : isTraditional ? ['#f9fafb', '#ffffff', '#f9fafb'] : (colorOverrides?.isCardExtension ? wrapperColors : (colorOverrides?.isRainbow ? ['#1a1625', '#2d1f47', '#1a1625'] : (colorOverrides ? [colorOverrides.gradientStart, colorOverrides.gradientEnd, colorOverrides.gradientStart] : DEFAULT_MODERN_COLORS)))
+  // Heritage field: the web on-screen (non-hardened) ivory, not flat white.
+  const labelColors = isHeritage ? [HERITAGE_SCREEN_FIELD, HERITAGE_SCREEN_FIELD, HERITAGE_SCREEN_FIELD] : isTraditional ? ['#f9fafb', '#ffffff', '#f9fafb'] : (colorOverrides?.isCardExtension ? wrapperColors : (colorOverrides?.isRainbow ? ['#1a1625', '#2d1f47', '#1a1625'] : (colorOverrides ? [colorOverrides.gradientStart, colorOverrides.gradientEnd, colorOverrides.gradientStart] : DEFAULT_MODERN_COLORS)))
 
-  // Text colors: traditional = dark on light, modern = white on dark
-  const nameColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.gray[900] : 'rgba(255,255,255,0.95)'
-  const contextColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[600] : 'rgba(255,255,255,0.7)'
-  const featureColor = isLight ? Colors.blue[600] : 'rgba(96,165,250,0.95)'
-  const serialColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[500] : 'rgba(255,255,255,0.65)'
-  const gradeColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[700] : Colors.white
-  const conditionColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.85)'
-  const logoTint = isHeritage ? HERITAGE_THEME.rule : isTraditional ? undefined : 'rgba(255,255,255,0.9)'
+  // Modern text polarity — dark text on light custom gradients (web
+  // ModernFrontLabel's `tx` sets, resolved by useLabelStyle from the saved
+  // config's textColorMode / WCAG auto pick).
+  const darkText = !isLight && colorOverrides?.textPolarity === 'dark'
+
+  // Text colors: traditional/heritage = dark on light, modern = polarity-picked
+  const nameColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.gray[900] : darkText ? 'rgba(31,41,55,0.95)' : 'rgba(255,255,255,0.95)'
+  const contextColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[600] : darkText ? '#4b5563' : 'rgba(255,255,255,0.7)'
+  const featureColor = isLight ? Colors.blue[600] : darkText ? '#2563eb' : 'rgba(34,197,94,0.9)'
+  const serialColor = isHeritage ? HERITAGE_THEME.inkSoft : isTraditional ? Colors.gray[500] : darkText ? '#6b7280' : 'rgba(255,255,255,0.65)'
+  const gradeColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[700] : darkText ? '#7c3aed' : Colors.white
+  const conditionColor = isHeritage ? HERITAGE_THEME.ink : isTraditional ? Colors.purple[600] : darkText ? '#6b46c1' : 'rgba(255,255,255,0.85)'
+  const logoTint = isHeritage ? HERITAGE_THEME.rule : (isTraditional || darkText) ? undefined : 'rgba(255,255,255,0.9)'
+
+  // Custom-style border on the modern label (web applies borderWidth inches
+  // x 96dpi; heritage/traditional draw their own edges).
+  const customBorder = !isHeritage && !isTraditional && colorOverrides?.borderEnabled
+    ? { borderWidth: Math.max(1, Math.round((colorOverrides.borderWidth ?? 0.04) * 96)), borderColor: colorOverrides.borderColor }
+    : null
 
   // Heritage grade chip: numeral ink per grade (overridable), 10 = rainbow.
   const wholeGrade = grade !== null ? Math.round(grade) : null
@@ -699,6 +725,11 @@ function SlabCardImpl({
   const heritageInk = heritageInkOverride
     || (wholeGrade != null ? HERITAGE_GRADE_INKS[wholeGrade]?.ink : undefined)
     || HERITAGE_FALLBACK_INK.ink
+  // Chip condition line: an empty condition falls back to the chip's own
+  // label (web resolveGradeChip .label — GEM MINT / MINT / ... / AUTHENTIC).
+  const heritageChipLabel = conditionText
+    || (wholeGrade != null ? HERITAGE_GRADE_INKS[wholeGrade]?.label : undefined)
+    || HERITAGE_FALLBACK_INK.label
 
   const nameFontSize = dynamicNameFontSize(displayName, 12 * fontScale)
 
@@ -712,13 +743,13 @@ function SlabCardImpl({
   const hChipR = 28 * hs
   const hChipB = Math.max(1.25, 6 * hs)
   const hNumSize = (gradeText.length > 2 ? 90 : gradeText.length > 1 ? 150 : 168) * hs
-  const hCondSize = (conditionText.length > 8 ? 28 : 32) * hs
+  const hCondSize = (heritageChipLabel.length > 8 ? 28 : 32) * hs
   // Collection tiles (sm) are too small for a legible bottom mark — hide it
   // there; md/lg (labelHeight >= 84) keep the mark + accent rules.
   const showHeritageMark = size !== 'sm'
 
   return (
-    <View style={styles.slabWrapper}>
+    <View style={styles.slabWrapper} onLayout={e => setSlabW(e.nativeEvent.layout.width)}>
       <LinearGradient
         colors={wrapperColors as any}
         start={{ x: 0, y: 0 }}
@@ -734,6 +765,9 @@ function SlabCardImpl({
             styles.label,
             { height: labelHeight },
             isTraditional && { borderWidth: 1, borderColor: Colors.gray[200] },
+            // Heritage: subtle edge keyline around the ivory field (web theme).
+            isHeritage && { borderWidth: StyleSheet.hairlineWidth, borderColor: HERITAGE_SCREEN_EDGE },
+            customBorder,
           ]}
         >
           {isHeritage && (
@@ -853,14 +887,17 @@ function SlabCardImpl({
                 {contextLine ? (
                   <Text
                     style={[styles.heritageContext, { fontSize: 30 * hs, lineHeight: 30 * hs * 1.25, color: contextColor }]}
-                    numberOfLines={contextLines}
+                    numberOfLines={3}
                     adjustsFontSizeToFit
                     minimumFontScale={0.55}
                   >
                     {contextLine}
                   </Text>
                 ) : null}
-                <Text style={[styles.labelSerial, { fontSize: 34 * hs, color: serialColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{serial}</Text>
+                {/* Divider rule + "Serial:" prefix, mirrors HeritageLabelPreview's
+                    front serial row (rect + "Serial: {serial}" text). */}
+                <View style={[styles.heritageSerialRule, { height: Math.max(1, 6 * hs), marginTop: 24 * hs }]} />
+                <Text style={[styles.labelSerial, { fontSize: 34 * hs, marginTop: 18 * hs, color: serialColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Serial: {serial}</Text>
               </View>
 
               <View style={{ paddingTop: Math.max(0, 64 * hs - 8) }}>
@@ -878,11 +915,9 @@ function SlabCardImpl({
                         <Text style={{ color: GRADE_10_FOIL_STOPS[1] }}>1</Text>
                         <Text style={{ color: GRADE_10_FOIL_STOPS[3] }}>0</Text>
                       </Text>
-                      {conditionText ? (
-                        <Text style={[styles.heritageChipLabel, { fontSize: hCondSize, color: '#F4EFE4' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                          {conditionText}
-                        </Text>
-                      ) : null}
+                      <Text style={[styles.heritageChipLabel, { fontSize: hCondSize, color: '#F4EFE4' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                        {heritageChipLabel}
+                      </Text>
                     </View>
                   </LinearGradient>
                 ) : (
@@ -896,11 +931,9 @@ function SlabCardImpl({
                     <Text style={{ fontSize: hNumSize, lineHeight: hNumSize * 1.05, fontWeight: '800', color: heritageInk }}>
                       {gradeText}
                     </Text>
-                    {conditionText ? (
-                      <Text style={[styles.heritageChipLabel, { fontSize: hCondSize, color: heritageInk }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                        {conditionText}
-                      </Text>
-                    ) : null}
+                    <Text style={[styles.heritageChipLabel, { fontSize: hCondSize, color: heritageInk }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                      {heritageChipLabel}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -955,7 +988,7 @@ function SlabCardImpl({
                 <Text style={[styles.labelGrade, { fontSize: 26 * fontScale, color: gradeColor }]}>{gradeText}</Text>
                 {conditionText ? (
                   <>
-                    <View style={[styles.gradeUnderline, { backgroundColor: isTraditional ? Colors.purple[600] : 'rgba(255,255,255,0.5)' }]} />
+                    <View style={[styles.gradeUnderline, { backgroundColor: (isTraditional || darkText) ? Colors.purple[600] : 'rgba(255,255,255,0.5)' }]} />
                     <Text style={[styles.labelCondition, { fontSize: 7 * fontScale, color: conditionColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{conditionText}</Text>
                   </>
                 ) : null}
@@ -1006,6 +1039,7 @@ const styles = StyleSheet.create({
   heritageFrontContent: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   heritageTextCol: { flex: 1, minWidth: 0 },
   heritageContext: { marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.5 },
+  heritageSerialRule: { alignSelf: 'stretch', backgroundColor: '#101014', marginRight: 8 },
   heritageChip: { backgroundColor: HERITAGE_CHIP_BLACK, alignItems: 'center', justifyContent: 'center' },
   heritageChipLabel: { fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
   heritageMarkRow: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },

@@ -1024,6 +1024,8 @@ export async function generateCustomSlabLabelRaster(
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#9ca3af');
   doc.text('FRONT — Custom Label', 50, 40);
+  // Same duplex instruction the standard vector sheet prints (vectorSlabGenerator PageHeader).
+  doc.text('Print duplex (flip on long edge) • Cut along dotted lines', PAGE_W / 2, 40, { align: 'center' });
   doc.text(`${config.width}" × ${config.height}"`, PAGE_W - 50, 40, { align: 'right' });
 
   // Place front image with bleed
@@ -1072,6 +1074,7 @@ export async function generateCustomSlabLabelRaster(
   doc.setFontSize(7);
   doc.setTextColor('#9ca3af');
   doc.text('BACK — Custom Label', 50, 40);
+  doc.text('BACK SIDE • Print duplex (flip on long edge)', PAGE_W / 2, 40, { align: 'center' });
   doc.text(`${config.width}" × ${config.height}"`, PAGE_W - 50, 40, { align: 'right' });
 
   doc.addImage(backImg, 'PNG',
