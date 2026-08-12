@@ -38,7 +38,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.13.2';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.14';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -2731,17 +2731,26 @@ Provide detailed analysis as markdown with all required sections.`
         // v9.1 UNCERTAINTY GATE: never award Gem Mint on evidence the system
         // itself distrusts — a 10 at ±2 literally reads "could be an 8".
         // (Validated regrade awarded 10 (±2) on images flagged as soft.)
-        // v9.2b STRICT UNANIMITY GATE: Gem Mint requires all three ensemble
-        // completions at 10. The v9.1b `allSubgrades10` escape hatch (10 kept
-        // when the four ROUNDED subgrades hit 10 despite a dissenting pass) is
-        // REMOVED: since the final follows weakest-link, a final of 10 implies
-        // all-10 subgrades, so the hatch was open on essentially every 10 and
-        // the unanimity requirement never fired. Measured (Jul 5-10 production):
-        // 35.6% of grade-10s were non-unanimous splits ([9,10,10] etc.) that
-        // survived only through the hatch, and the 10-rate ran 47-56% vs the
-        // 24.5% baseline — the exact over-grading customers reported. A 2-vs-1
-        // split straddling the 10 line is a coin flip; it reads Mint (9).
+        // v9.2b STRICT UNANIMITY GATE (relaxed to majority in v9.14): Gem Mint
+        // originally required all three ensemble completions at 10 — measured
+        // (Jul 5-10 production) 35.6% of grade-10s were non-unanimous splits
+        // and the 10-rate ran 47-56% vs the 24.5% baseline.
         // (docs/GRADING_TEN_INFLUX_2026-07-10.md)
+        //
+        // v9.14 MAJORITY GEM GATE: unanimity over-corrected. Audited Aug 1-12:
+        // the 10-rate had fallen to 17.4%, and 131 cards were held 10→9 by a
+        // single dissenting evaluation. In a 24-card sample of those dissents,
+        // 24/24 cited NO defect anywhere — a bare lower number (96% of lone
+        // dissents were centering, the category with no discrete defect to
+        // point at). That is ensemble noise, which the per-category median
+        // already absorbs everywhere below the 10 line. So: a 2-of-3 majority
+        // at 10 now keeps the 10, but ONLY when the dissent is evidence-free —
+        // the dissenting completion cited no defect in the category it marked
+        // down AND the magnified zoom inspection applied no cap there. An
+        // evidence-backed 2-vs-1 split (the July refund shape) still holds at
+        // 9, as do the photo-uncertainty and rigid-case gates below, which are
+        // about evidence QUALITY, not pass disagreement. Projected 10-rate at
+        // this policy: ~24.7%, back on the healthy baseline.
         // v9.2b CASE GATE: a card inspected through a rigid holder (top loader /
         // semi-rigid / slab, or any case the model says has moderate+ impact)
         // cannot be CONFIRMED flawless — production gave 10/10/10/10 to a card
@@ -2753,7 +2762,42 @@ Provide detailed analysis as markdown with all required sections.`
         const rigidCase =
           ['top_loader', 'semi_rigid', 'slab'].includes(caseInfo.case_type) ||
           ['moderate', 'high'].includes(caseInfo.impact_level);
-        if (finalGrade === 10 && (uncertaintyValue >= 2 || rigidCase || !unanimous10)) {
+
+        // v9.14: does a 2-of-3 majority at 10 survive the evidence check?
+        // (pass1/2/3 category values are post-fold, but at finalGrade===10 no
+        // cap below 10 can have applied, so they equal the raw completions.)
+        const DISSENT_EVIDENCE_RX: Record<'centering' | 'corners' | 'edges' | 'surface', RegExp> = {
+          centering: /center|centre|border|off-?cent|shift|tilt/i,
+          corners: /corner|tip/i,
+          edges: /edge|chip|fray|rough/i,
+          surface: /surface|scratch|print|stain|whiten|dent|crease|mark|cloud|indent|scuff|line/i,
+        };
+        let majorityTenAwarded = false;
+        let majorityDissentCats = '';
+        let majorityDissentScore = 0;
+        if (finalGrade === 10 && !unanimous10) {
+          const votes = [{ f: f1, p: pass1 }, { f: f2, p: pass2 }, { f: f3, p: pass3 }];
+          if (votes.filter(v => v.f >= 10).length === 2) {
+            const dissenter = votes.reduce((lo, v) => (v.f < lo.f ? v : lo));
+            const dissentCats = (['centering', 'corners', 'edges', 'surface'] as const)
+              .filter(c => typeof dissenter.p[c] === 'number' && dissenter.p[c] < 10);
+            const defects: string[] = Array.isArray(dissenter.p.defects_noted)
+              ? dissenter.p.defects_noted.filter((x: any) => typeof x === 'string')
+              : [];
+            const citedEvidence = dissentCats.some(c => defects.some(d => DISSENT_EVIDENCE_RX[c].test(d)));
+            const zoomEvidence = dissentCats.some(
+              c => typeof appliedFaceCaps[`${c}_front`] === 'number' || typeof appliedFaceCaps[`${c}_back`] === 'number'
+            );
+            if (!citedEvidence && !zoomEvidence && !structuralDetected && !structuralFlagged) {
+              majorityTenAwarded = true;
+              majorityDissentCats = dissentCats.join(' and ') || 'card';
+              majorityDissentScore = dissentCats.length
+                ? Math.min(...dissentCats.map(c => dissenter.p[c] as number))
+                : dissenter.f;
+            }
+          }
+        }
+        if (finalGrade === 10 && (uncertaintyValue >= 2 || rigidCase || (!unanimous10 && !majorityTenAwarded))) {
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uncertaintyValue >= 2) {
@@ -2799,6 +2843,21 @@ Provide detailed analysis as markdown with all required sections.`
             }
             console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}; dissent shown in: ${dissentCats.join(',') || 'none identified'})`);
           }
+        }
+
+        // v9.14: the majority-awarded 10 survived every gate — surface the lone
+        // outlier honestly instead of hiding it. (Emitted only HERE, after the
+        // uncertainty/rigid-case gates above had their chance to hold the grade;
+        // a note claiming "majority awards the 10" on a card those gates dropped
+        // to 9 would contradict the displayed grade.)
+        if (majorityTenAwarded && finalGrade === 10) {
+          gradeCapNote = `Two of the three independent evaluations scored this card a perfect 10; the third scored the ${majorityDissentCats} at ${majorityDissentScore} without citing a flaw, and the magnified inspection found nothing to support it - the majority result stands.`;
+          if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            jsonData.grading_passes.consensus_notes.push(
+              `Gem Mint majority (v9.14): pass finals ${f1}/${f2}/${f3} - the lone dissent (${majorityDissentCats}) cited no defect and had no zoom corroboration, so the 2-of-3 majority awards the 10.`
+            );
+          }
+          console.log(`[GRADE RECALC] ⚖️ majority gem gate: 10 KEPT on 2-of-3 (pass finals ${f1}/${f2}/${f3}; evidence-free dissent in: ${majorityDissentCats})`);
         }
 
         // v9.12 WEAKEST-LINK DISPLAY INVARIANT: the final grade is MIN(subgrades),
