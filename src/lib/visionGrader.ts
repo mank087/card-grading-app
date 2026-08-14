@@ -38,7 +38,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.14';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.15';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -2067,20 +2067,90 @@ Provide detailed analysis as markdown with all required sections.`
       console.log(`[CONVERSATIONAL JSON] Ensemble finals: [${scored.map(x => x.final).join(', ')}] → base=${base.final}${structuralDetectors.length ? ` (structural detections: ${structuralDetectors.length})` : ''}`);
 
       // Compact per-completion defect list for the synthesized pass records (keeps the
-      // stored/display shape informative with REAL per-evaluation content)
+      // stored/display shape informative with REAL per-evaluation content).
+      //
+      // v9.15: the rubric emits defects as OBJECTS
+      // ({type, severity, location, description}) in corners/edges/surface. The
+      // original implementation kept only `typeof d === 'string'` entries, so
+      // this list was empty on every card ever graded — which silently disabled
+      // the v9.14 majority gem gate's "did the dissenter cite a flaw?" test
+      // (it reads defects_noted) and left the stored per-pass record blank.
+      //
+      // Each entry is prefixed with its CATEGORY (and face/position when known)
+      // because the gate matches defects to the dissenting category by keyword:
+      // a bare "fiber_exposure" carries no hint that it belongs to corners.
+      // severity 'none' is dropped — the schema allows explicit "no defect"
+      // entries, and those are not evidence.
       const defectListOf = (j: any): string[] => {
         const out: string[] = [];
-        const walk = (node: any, depth: number) => {
+        const describe = (d: any, path: string[]): string | null => {
+          if (typeof d === 'string') return d.trim() ? `${path.join(' ')}: ${d.trim()}` : null;
+          if (!d || typeof d !== 'object') return null;
+          const severity = typeof d.severity === 'string' ? d.severity.toLowerCase() : '';
+          if (severity === 'none') return null;
+          const type = typeof d.type === 'string' ? d.type.replace(/_/g, ' ') : '';
+          const location = typeof d.location === 'string' ? d.location : '';
+          const description = typeof d.description === 'string' ? d.description : '';
+          // Nothing but a severity is not a citation.
+          if (!type && !location && !description) return null;
+          const head = [path.join(' '), type].filter(Boolean).join(' ');
+          const tail = [severity, location].filter(Boolean).join(', ');
+          return `${head}${tail ? ` (${tail})` : ''}${description ? `: ${description}` : ''}`.slice(0, 240);
+        };
+        const walk = (node: any, depth: number, path: string[]) => {
           if (!node || typeof node !== 'object' || depth > 4 || out.length >= 6) return;
           if (Array.isArray((node as any).defects)) {
             for (const d of (node as any).defects) {
-              if (out.length < 6 && typeof d === 'string') out.push(d);
+              if (out.length >= 6) break;
+              const line = describe(d, path);
+              if (line && !out.includes(line)) out.push(line);
             }
           }
-          for (const v of Object.values(node)) walk(v, depth + 1);
+          for (const [key, v] of Object.entries(node)) {
+            if (key === 'defects') continue;
+            // Keys like 'front' / 'top_left' / 'bottom' locate the defect.
+            walk(v, depth + 1, /^[a-z_]+$/.test(key) ? [...path, key.replace(/_/g, ' ')] : path);
+          }
         };
-        for (const cat of ['centering', 'corners', 'edges', 'surface']) walk(j[cat], 0);
+        for (const cat of ['centering', 'corners', 'edges', 'surface']) walk(j[cat], 0, [cat]);
         return out;
+      };
+
+      // v9.15: per-completion centering MEASUREMENTS for the pass records.
+      //
+      // Centering has no defects array by design — it is measured, not
+      // itemised — so the defect-citation test above can never speak to a
+      // centering dissent, and centering is ~all of them (13 of 13 majority
+      // 10s since Aug 13). The ratios each completion already reports are the
+      // evidence: a pass that MEASURED worse borders saw something; a pass
+      // that measured the same and just scored lower is the ensemble noise the
+      // median absorbs everywhere else.
+      //
+      // dev = half the gap between opposing borders, in points: "50/50" -> 0,
+      // "44/56" -> 6. Worst across both faces and both axes.
+      const centeringOf = (j: any): { ratios: Record<string, string>; dev: number | null } => {
+        const ratios: Record<string, string> = {};
+        const devs: number[] = [];
+        for (const face of ['front', 'back'] as const) {
+          for (const [axis, key] of [['lr', 'left_right'], ['tb', 'top_bottom']] as const) {
+            const raw = j?.centering?.[face]?.[key];
+            if (typeof raw !== 'string') continue;
+            ratios[`${face}_${axis}`] = raw;
+            // "44/56" — reject placeholders ("XX/XX") and nonsense splits.
+            const m = raw.match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+            if (!m) continue;
+            const a = Number(m[1]), b = Number(m[2]);
+            if (!Number.isFinite(a) || !Number.isFinite(b) || a + b < 90 || a + b > 110) continue;
+            devs.push(Math.abs(a - b) / 2);
+          }
+        }
+        return { ratios, dev: devs.length ? Math.max(...devs) : null };
+      };
+
+      /** Pass-record fields for the measurements (kept flat for the stored shape). */
+      const centeringFields = (j: any) => {
+        const { ratios, dev } = centeringOf(j);
+        return { centering_ratios: ratios, centering_dev: dev };
       };
 
       // Synthesize grading_passes from the REAL independent completions so every
@@ -2098,9 +2168,9 @@ Provide detailed analysis as markdown with all required sections.`
       };
       const finalSpread = Math.max(...finalsArr) - Math.min(...finalsArr);
       jsonData.grading_passes = {
-        pass_1: { ...passSrc[0].cats, final: passSrc[0].final, defects_noted: defectListOf(passSrc[0].j) },
-        pass_2: { ...passSrc[1].cats, final: passSrc[1].final, defects_noted: defectListOf(passSrc[1].j) },
-        pass_3: { ...passSrc[2].cats, final: passSrc[2].final, defects_noted: defectListOf(passSrc[2].j) },
+        pass_1: { ...passSrc[0].cats, final: passSrc[0].final, defects_noted: defectListOf(passSrc[0].j), ...centeringFields(passSrc[0].j) },
+        pass_2: { ...passSrc[1].cats, final: passSrc[1].final, defects_noted: defectListOf(passSrc[1].j), ...centeringFields(passSrc[1].j) },
+        pass_3: { ...passSrc[2].cats, final: passSrc[2].final, defects_noted: defectListOf(passSrc[2].j), ...centeringFields(passSrc[2].j) },
         // Prefilled so validateThreePassData accepts the synthesized object; the recalc
         // below recomputes and overwrites these with the authoritative values.
         averaged: { ...preMed },
@@ -2766,12 +2836,37 @@ Provide detailed analysis as markdown with all required sections.`
         // v9.14: does a 2-of-3 majority at 10 survive the evidence check?
         // (pass1/2/3 category values are post-fold, but at finalGrade===10 no
         // cap below 10 can have applied, so they equal the raw completions.)
-        const DISSENT_EVIDENCE_RX: Record<'centering' | 'corners' | 'edges' | 'surface', RegExp> = {
-          centering: /center|centre|border|off-?cent|shift|tilt/i,
-          corners: /corner|tip/i,
-          edges: /edge|chip|fray|rough/i,
-          surface: /surface|scratch|print|stain|whiten|dent|crease|mark|cloud|indent|scuff|line/i,
-        };
+        // v9.15 centering-dissent evidence, in deviation POINTS (half the gap
+        // between opposing borders: "50/50" = 0, "55/45" = 5).
+        //
+        // MEASURED arm — the card's own measurement corroborates the dissent.
+        // 5 points is 55/45, which is the rubric's own line for a centering 10
+        // ("~20% of cards achieve 55/45 or better"). A card measured at or past
+        // that line makes a centering 9 a defensible read, not noise, so the
+        // 10 holds at 9. Backtested on the Aug 1-12 held cards: 14 of the 131
+        // majority-10s hold, projecting a 23.9% 10-rate against the 24.5% July
+        // baseline (T=4 -> 23.4%, T=3 -> 22.9%). See the calibration doc.
+        const CENTERING_MEASURED_DEV_POINTS = 5;
+        // DISAGREEMENT arm — the dissenting pass MEASURED materially worse
+        // borders than the passes that said 10, i.e. it saw something they
+        // did not. Historic records carry no per-pass ratios (this release is
+        // what starts storing them), so this arm could NOT be backtested; it
+        // is deliberately set wide so it only fires on blatant disagreement,
+        // and it can only tighten the gate. Revisit once per-pass ratios have
+        // accumulated.
+        const CENTERING_DISAGREEMENT_POINTS = 4;
+
+        // v9.15: match a defect to its category by the PREFIX defectListOf
+        // writes ("corners front top-left ..."), not by keyword. The old
+        // keyword regexes were written for a list that was always empty; now
+        // that real text flows through they misfire badly — a corner defect
+        // reading "white edge wear along the left border" hits the centering
+        // regex on "border" and the edges regex on "edge", so a centering
+        // dissent would be "corroborated" by a corner ding on the other side
+        // of the card. Measured on 25 recent cards: the centering regex
+        // matched 7 of them, every one a false positive.
+        const citesCategory = (line: string, cat: string) =>
+          typeof line === 'string' && line.trim().toLowerCase().startsWith(cat);
         let majorityTenAwarded = false;
         let majorityDissentCats = '';
         let majorityDissentScore = 0;
@@ -2784,11 +2879,41 @@ Provide detailed analysis as markdown with all required sections.`
             const defects: string[] = Array.isArray(dissenter.p.defects_noted)
               ? dissenter.p.defects_noted.filter((x: any) => typeof x === 'string')
               : [];
-            const citedEvidence = dissentCats.some(c => defects.some(d => DISSENT_EVIDENCE_RX[c].test(d)));
+            const citedEvidence = dissentCats.some(c => defects.some(d => citesCategory(d, c)));
+            // v9.15: centering's evidence is its MEASUREMENT, not a defect
+            // entry. A dissent that measured materially worse borders than
+            // both 10-voters saw something real and holds the card at 9; one
+            // that measured the same borders and simply scored them lower is
+            // ensemble noise. Missing or unparseable ratios (borderless,
+            // die-cut, "XX/XX") count as NO evidence — that preserves the
+            // pre-v9.15 outcome on cards where centering cannot be measured
+            // rather than silently tightening on them.
+            let centeringMeasuredEvidence = false;
+            if (dissentCats.includes('centering')) {
+              // Arm 1 (backtested): the card as measured is at or past the
+              // rubric's own 55/45 line for a centering 10.
+              const cardDev = centeringOf(jsonData).dev;
+              if (typeof cardDev === 'number' && cardDev >= CENTERING_MEASURED_DEV_POINTS) {
+                centeringMeasuredEvidence = true;
+              }
+              // Arm 2 (not backtested — see the constant): the dissent measured
+              // materially worse borders than either 10-voter.
+              if (!centeringMeasuredEvidence) {
+                const dissenterDev = dissenter.p.centering_dev;
+                const majorityDevs = votes
+                  .filter(v => v !== dissenter)
+                  .map(v => v.p.centering_dev)
+                  .filter((n: any): n is number => typeof n === 'number');
+                if (typeof dissenterDev === 'number' && majorityDevs.length > 0) {
+                  centeringMeasuredEvidence =
+                    dissenterDev - Math.min(...majorityDevs) >= CENTERING_DISAGREEMENT_POINTS;
+                }
+              }
+            }
             const zoomEvidence = dissentCats.some(
               c => typeof appliedFaceCaps[`${c}_front`] === 'number' || typeof appliedFaceCaps[`${c}_back`] === 'number'
             );
-            if (!citedEvidence && !zoomEvidence && !structuralDetected && !structuralFlagged) {
+            if (!citedEvidence && !centeringMeasuredEvidence && !zoomEvidence && !structuralDetected && !structuralFlagged) {
               majorityTenAwarded = true;
               majorityDissentCats = dissentCats.join(' and ') || 'card';
               majorityDissentScore = dissentCats.length
@@ -2851,10 +2976,17 @@ Provide detailed analysis as markdown with all required sections.`
         // a note claiming "majority awards the 10" on a card those gates dropped
         // to 9 would contradict the displayed grade.)
         if (majorityTenAwarded && finalGrade === 10) {
-          gradeCapNote = `Two of the three independent evaluations scored this card a perfect 10; the third scored the ${majorityDissentCats} at ${majorityDissentScore} without citing a flaw, and the magnified inspection found nothing to support it - the majority result stands.`;
+          // v9.15: the note states only what was actually checked. Until this
+          // release the citation test could not fire at all, so "without citing
+          // a flaw" was unfalsifiable; centering additionally has no defect
+          // list, so it is described by its measurement instead.
+          const centeringOnly = majorityDissentCats === 'centering';
+          gradeCapNote = centeringOnly
+            ? `Two of the three independent evaluations scored this card a perfect 10; the third scored the centering at ${majorityDissentScore}. The measured borders are inside the tolerance for a perfect centering score and the magnified inspection found nothing to support a deduction, so the majority result stands.`
+            : `Two of the three independent evaluations scored this card a perfect 10; the third scored the ${majorityDissentCats} at ${majorityDissentScore} without recording a defect there, and the magnified inspection found nothing to support it - the majority result stands.`;
           if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             jsonData.grading_passes.consensus_notes.push(
-              `Gem Mint majority (v9.14): pass finals ${f1}/${f2}/${f3} - the lone dissent (${majorityDissentCats}) cited no defect and had no zoom corroboration, so the 2-of-3 majority awards the 10.`
+              `Gem Mint majority (v9.15): pass finals ${f1}/${f2}/${f3} - the lone dissent (${majorityDissentCats}) recorded no defect, its centering measurement was inside tolerance, and zoom found no corroboration, so the 2-of-3 majority awards the 10.`
             );
           }
           console.log(`[GRADE RECALC] ⚖️ majority gem gate: 10 KEPT on 2-of-3 (pass finals ${f1}/${f2}/${f3}; evidence-free dissent in: ${majorityDissentCats})`);
