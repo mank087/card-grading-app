@@ -30,12 +30,30 @@ function getAdminClient() {
 // Storage bucket name for eBay listing images
 const EBAY_IMAGES_BUCKET = 'ebay-listing-images';
 
+/**
+ * System image slots → storage filename. SINGLE SOURCE OF TRUTH: the modal
+ * uploads one slot per request, so a slot missing from this map fails the
+ * "at least one image" guard and kills the whole submit. Add new slots here
+ * and nowhere else. Keys must match EbayListingModal's OrderedImageItem keys.
+ */
+const IMAGE_SLOTS = {
+  front: 'front',
+  back: 'back',
+  miniReport: 'mini-report',
+  trustSlide: 'trust-slide',
+  rawFront: 'raw-front',
+  rawBack: 'raw-back',
+} as const;
+
+type ImageSlot = keyof typeof IMAGE_SLOTS;
+
 interface ImageUploadRequest {
   cardId: string;
   images: {
     front?: string;  // base64 data URL or raw base64
     back?: string;
     miniReport?: string;
+    trustSlide?: string;  // Generated "why this grade is trustworthy" gallery slide
     rawFront?: string;  // Card front without grading label
     rawBack?: string;   // Card back without grading label
   };
@@ -47,6 +65,7 @@ interface ImageUploadResponse {
     front?: string;
     back?: string;
     miniReport?: string;
+    trustSlide?: string;
     rawFront?: string;
     rawBack?: string;
     additional?: string[];
@@ -121,7 +140,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasAnyImages = images && (images.front || images.back || images.miniReport || images.rawFront || images.rawBack);
+    const hasAnyImages = !!images && (Object.keys(IMAGE_SLOTS) as ImageSlot[]).some(slot => !!images[slot]);
     const hasAdditional = additionalImages && additionalImages.length > 0;
 
     if (!hasAnyImages && !hasAdditional) {
@@ -195,42 +214,12 @@ export async function POST(request: NextRequest) {
     // Upload images in parallel
     const uploadPromises: Promise<void>[] = [];
 
-    if (images?.front) {
+    for (const slot of Object.keys(IMAGE_SLOTS) as ImageSlot[]) {
+      const data = images?.[slot];
+      if (!data) continue;
       uploadPromises.push(
-        uploadImage(images.front, 'front').then(url => {
-          if (url) urls.front = url;
-        })
-      );
-    }
-
-    if (images?.back) {
-      uploadPromises.push(
-        uploadImage(images.back, 'back').then(url => {
-          if (url) urls.back = url;
-        })
-      );
-    }
-
-    if (images?.miniReport) {
-      uploadPromises.push(
-        uploadImage(images.miniReport, 'mini-report').then(url => {
-          if (url) urls.miniReport = url;
-        })
-      );
-    }
-
-    if (images?.rawFront) {
-      uploadPromises.push(
-        uploadImage(images.rawFront, 'raw-front').then(url => {
-          if (url) urls.rawFront = url;
-        })
-      );
-    }
-
-    if (images?.rawBack) {
-      uploadPromises.push(
-        uploadImage(images.rawBack, 'raw-back').then(url => {
-          if (url) urls.rawBack = url;
+        uploadImage(data, IMAGE_SLOTS[slot]).then(url => {
+          if (url) urls[slot] = url;
         })
       );
     }
@@ -254,7 +243,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify at least one upload succeeded
-    const hasAnyUploaded = urls.front || urls.back || urls.miniReport || urls.rawFront || urls.rawBack || additionalUrls.length > 0;
+    const hasAnyUploaded =
+      (Object.keys(IMAGE_SLOTS) as ImageSlot[]).some(slot => !!urls[slot]) || additionalUrls.length > 0;
     if (!hasAnyUploaded) {
       return NextResponse.json(
         { error: 'Failed to upload any images' },
