@@ -40,7 +40,6 @@ const IMAGE_SLOTS = {
   front: 'front',
   back: 'back',
   miniReport: 'mini-report',
-  trustSlide: 'trust-slide',
   rawFront: 'raw-front',
   rawBack: 'raw-back',
 } as const;
@@ -53,7 +52,6 @@ interface ImageUploadRequest {
     front?: string;  // base64 data URL or raw base64
     back?: string;
     miniReport?: string;
-    trustSlide?: string;  // Generated "why this grade is trustworthy" gallery slide
     rawFront?: string;  // Card front without grading label
     rawBack?: string;   // Card back without grading label
   };
@@ -65,7 +63,6 @@ interface ImageUploadResponse {
     front?: string;
     back?: string;
     miniReport?: string;
-    trustSlide?: string;
     rawFront?: string;
     rawBack?: string;
     additional?: string[];

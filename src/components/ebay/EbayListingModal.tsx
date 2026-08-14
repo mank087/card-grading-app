@@ -25,7 +25,6 @@ import {
   type ListingDescriptionFields,
   type ListingBranding,
 } from '@/lib/ebay/listingDescription';
-import { generateTrustSlide } from '@/lib/ebay/trustSlide';
 
 // Helper: Get condition label from grade
 function getConditionLabel(grade: number): string {
@@ -71,13 +70,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
   // Saved listing defaults/templates + resolved branding (enterprise cards)
   const [listingDefaults, setListingDefaults] = useState<{
-    personal: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null; includeTrustSlide: boolean } | null;
-    org: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null; includeTrustSlide: boolean } | null;
+    personal: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
+    org: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
     orgRole: 'owner' | 'member' | null;
   } | null>(null);
   const [listingBranding, setListingBranding] = useState<ListingBranding | null>(null);
   const [descriptionFields, setDescriptionFields] = useState<ListingDescriptionFields | null>(null);
-  const [trustSlideEnabled, setTrustSlideEnabled] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
   const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
 
@@ -113,7 +111,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front?: string;
     back?: string;
     miniReport?: string;
-    trustSlide?: string;
     rawFront?: string;
     rawBack?: string;
   }>({});
@@ -121,7 +118,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front?: Blob;
     back?: Blob;
     miniReport?: Blob;
-    trustSlide?: Blob;
     rawFront?: Blob;
     rawBack?: Blob;
   }>({});
@@ -129,10 +125,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front: boolean;
     back: boolean;
     miniReport: boolean;
-    trustSlide: boolean;
     rawFront: boolean;
     rawBack: boolean;
-  }>({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true, trustSlide: false });
+  }>({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
 
   // User-uploaded additional photos
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
@@ -144,7 +139,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   // uploads share the same ordering — that's how the user controls which
   // image lands in position 1 vs 2 etc.
   type OrderedImageItem =
-    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' | 'trustSlide' }
+    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' }
     | { kind: 'custom'; id: string };
   const [imageOrder, setImageOrder] = useState<OrderedImageItem[]>([]);
 
@@ -241,7 +236,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setError(null);
       setImageUrls({});
       setImageBlobs({});
-      setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true, trustSlide: false });
+      setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
       setAdditionalImages([]);
       setImageOrder([]);
       setListingResult(null);
@@ -349,7 +344,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             ? renderDescriptionTemplate(template, descriptionFields, branding)
             : generateHtmlDescription(descriptionFields, branding)
         );
-        setTrustSlideEnabled(Boolean(activeDefaults?.includeTrustSlide));
         if (activeDefaults?.shippingDefaults && typeof activeDefaults.shippingDefaults === 'object') {
           const saved = activeDefaults.shippingDefaults as Record<string, unknown>;
           const { bestOfferEnabled: savedBestOffer, ...savedShipping } = saved;
@@ -733,19 +727,27 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // Resolve badges from the profile — the prop chain only ever carried
       // the founder flag, so VIP / Card Lover badges were missing from
       // listing images.
+      // The badge lookup and the org branding load are independent of each
+      // other; run them together rather than back to back.
+      const t0 = performance.now();
       let emblemFlags = { showFounderEmblem, showVipEmblem: false, showCardLoversEmblem: false };
-      try {
-        const sb = getAuthenticatedClient();
-        const { data: creditsRow } = await sb
-          .from('user_credits')
-          .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
-          .single();
-        if (creditsRow) emblemFlags = resolveEmblemVisibility(creditsRow);
-      } catch { /* keep prop fallback */ }
-
-      // Org branding: loaded once — logos for the label art, slug for QR
-      // targets (org cards point at their branded card page).
-      const orgLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const [, orgLogoSet] = await Promise.all([
+        (async () => {
+          try {
+            const sb = getAuthenticatedClient();
+            const { data: creditsRow } = await sb
+              .from('user_credits')
+              .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
+              .single();
+            if (creditsRow) emblemFlags = resolveEmblemVisibility(creditsRow);
+          } catch { /* keep prop fallback */ }
+        })(),
+        // Org branding: only org-graded cards have any. Every other card was
+        // paying for a round trip to /api/org/branding plus three logo fetches
+        // to be told it has no store, on the critical path of every listing.
+        card.org_id ? loadLogosForCard(card.id).catch(() => null) : Promise.resolve(null),
+      ]);
+      console.log(`[eBay Listing] prep (badges + branding): ${Math.round(performance.now() - t0)}ms`);
       const qrTargetUrl = cardQrUrl(card.id, card.serial, orgLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
 
       // Generate card images (front & back with labels)
@@ -781,16 +783,17 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           : undefined,
       };
 
-      const [{ front, back }, rawImages] = await Promise.all([
+      // The QR only needs the card URL, so it does not have to wait behind the
+      // label rendering — the mini report is what depends on it.
+      const cardUrl = qrTargetUrl;
+      const t1 = performance.now();
+      const [{ front, back }, rawImages, qrCodeDataUrl] = await Promise.all([
         generateCardImages(cardImageData),
         generateRawCardImages(frontImageUrl, backImageUrl),
+        generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
+          .catch(() => generateQRCodeWithLogo(cardUrl)),
       ]);
-
-      // Generate mini-report — org-graded cards carry the store's logo and
-      // the QR lands on the org's branded card page.
-      const cardUrl = qrTargetUrl;
-      const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
-        .catch(() => generateQRCodeWithLogo(cardUrl));
+      console.log(`[eBay Listing] card images + raw + QR: ${Math.round(performance.now() - t1)}ms (labelStyle=${labelStyle})`);
       const logoDataUrl = orgLogoSet?.mark || undefined;
 
       const miniReportData: FoldableLabelData = {
@@ -815,52 +818,27 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         logoDataUrl,
       };
 
+      const t2 = performance.now();
       const miniReport = await generateMiniReportJpg(miniReportData);
-
-      // Branded "why buy" trust slide (customer-requested). Generated for
-      // every card (org branding when present, DCM otherwise); whether it's
-      // SELECTED for upload follows the saved default / the user's toggle.
-      let trustSlide: Blob | undefined;
-      try {
-        trustSlide = await generateTrustSlide({
-          brandName: orgLogoSet?.branding?.name || 'DCM',
-          brandColor: orgLogoSet?.branding?.brandColor || null,
-          logoDataUrl: orgLogoSet?.mark || undefined,
-          grade: Math.round(labelData.grade ?? 0),
-          conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
-          serial: card.org_serial_display || card.serial || '',
-          qrUrl: qrTargetUrl,
-          subgrades: {
-            centering: Math.round(weightedScores.centering ?? subScoresData.centering?.weighted ?? 0),
-            corners: Math.round(weightedScores.corners ?? subScoresData.corners?.weighted ?? 0),
-            edges: Math.round(weightedScores.edges ?? subScoresData.edges?.weighted ?? 0),
-            surface: Math.round(weightedScores.surface ?? subScoresData.surface?.weighted ?? 0),
-          },
-        });
-      } catch (err) {
-        console.warn('[eBay Listing] Trust slide generation failed (non-fatal):', err);
-      }
+      console.log(
+        `[eBay Listing] mini report: ${Math.round(performance.now() - t2)}ms | total ${Math.round(performance.now() - t0)}ms`,
+      );
 
       // Create preview URLs
-      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back, trustSlide });
+      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back });
       setImageUrls({
         front: URL.createObjectURL(front),
         back: URL.createObjectURL(back),
         miniReport: URL.createObjectURL(miniReport),
         rawFront: URL.createObjectURL(rawImages.front),
         rawBack: URL.createObjectURL(rawImages.back),
-        trustSlide: trustSlide ? URL.createObjectURL(trustSlide) : undefined,
       });
-      if (trustSlide) {
-        setSelectedImages(s => ({ ...s, trustSlide: trustSlideEnabled }));
-      }
       // Seed the ordered list once the system images are ready. Subsequent
       // user uploads append themselves via the additionalImages-sync effect.
       setImageOrder(prev => prev.length > 0 ? prev : [
         { kind: 'system', key: 'front' },
         { kind: 'system', key: 'back' },
         { kind: 'system', key: 'miniReport' },
-        ...(trustSlide ? [{ kind: 'system', key: 'trustSlide' } as const] : []),
         { kind: 'system', key: 'rawFront' },
         { kind: 'system', key: 'rawBack' },
       ]);
@@ -1890,13 +1868,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       drag any image into position 1 (main) regardless of
                       which "bucket" it came from. */}
                   {(() => {
-                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' | 'trustSlide', string> = {
+                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack', string> = {
                       front: 'Front',
                       back: 'Back',
                       miniReport: 'Report',
                       rawFront: 'Front (Raw)',
                       rawBack: 'Back (Raw)',
-                      trustSlide: 'Trust Slide',
                     };
                     const isItemSelected = (item: OrderedImageItem): boolean => {
                       if (item.kind === 'system') return !!selectedImages[item.key];
@@ -2864,7 +2841,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <button
                   type="button"
                   disabled={savingDefaults !== null}
-                  onClick={() => saveListingDefaults({ shippingDefaults: { ...shippingForm, bestOfferEnabled }, includeTrustSlide: !!selectedImages.trustSlide }, 'shipping')}
+                  onClick={() => saveListingDefaults({ shippingDefaults: { ...shippingForm, bestOfferEnabled } }, 'shipping')}
                   className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
                   title={defaultsScope === 'org' ? 'Applied to every listing your store creates' : 'Applied to every listing you create'}
                 >
