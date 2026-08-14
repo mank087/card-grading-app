@@ -1,24 +1,43 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import AppStoreBadge from "@/components/AppStoreBadge";
 import GooglePlayBadge from "@/components/GooglePlayBadge";
+import { isStorefrontHost, isOrgPublicPath } from "@/lib/storefrontHost";
+import { useOrgContext } from "@/contexts/OrgContext";
 
 // Mirror of FULLSCREEN_ROUTES in Navigation.tsx — these download/preview
-// routes should render edge-to-edge with no site chrome.
+// routes should render edge-to-edge with no site chrome. Org Enterprise
+// space: it brings its own chrome and carries no DCM branding.
+// Pages (/enterprise/{slug}) are org space: their own chrome, no DCM branding.
 const FULLSCREEN_ROUTES = ['/label-export', '/label-preview'];
 
 export default function Footer() {
   const pathname = usePathname();
-  if (pathname && FULLSCREEN_ROUTES.some(p => pathname.startsWith(p))) {
+  // Tenant subdomains rewrite to /enterprise/{slug}/* with a '/' browser pathname —
+  // see the matching check in Navigation.tsx.
+  const [tenantHost, setTenantHost] = useState(false);
+  useEffect(() => { setTenantHost(isStorefrontHost(window.location.hostname)); }, []);
+  if (tenantHost || (pathname && (FULLSCREEN_ROUTES.some(p => pathname.startsWith(p)) || isOrgPublicPath(pathname)))) {
     return null;
   }
   const currentYear = new Date().getFullYear();
+  return <FooterInner currentYear={currentYear} />;
+}
+
+function FooterInner({ currentYear }: { currentYear: number }) {
+  // Org workspace: co-brand the footer (brand accent + org mark beside DCM)
+  // so members always know which hat they're wearing.
+  const { membership: orgMembership, isOrgScope } = useOrgContext();
 
   return (
-    <footer className="bg-gray-900 text-white relative z-10">
+    <footer
+      className="bg-gray-900 text-white relative z-10"
+      style={isOrgScope && orgMembership ? { borderTop: `3px solid ${orgMembership.brandColor || '#7C3AED'}` } : undefined}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
@@ -33,6 +52,17 @@ export default function Footer() {
                 height={48}
                 className="object-contain"
               />
+              {isOrgScope && orgMembership?.logos.white && (
+                <>
+                  <span className="h-10 w-px bg-gray-700" aria-hidden />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={orgMembership.logos.white}
+                    alt={`${orgMembership.name} logo`}
+                    className="h-11 w-11 object-contain"
+                  />
+                </>
+              )}
               <div>
                 <h3 className="text-lg font-bold">DCM</h3>
                 <p className="text-sm text-gray-400">Dynamic Collectibles Management LLC</p>
@@ -196,6 +226,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/enterprise" className="text-gray-400 hover:text-white transition-colors">
+                  Enterprise &amp; Card Stores
+                </Link>
+              </li>
+              <li>
                 <Link href="/grading-rubric" className="text-gray-400 hover:text-white transition-colors">
                   Grading Rubric
                 </Link>
@@ -287,6 +322,11 @@ export default function Footer() {
               <li>
                 <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
                   Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/enterprise/terms" className="text-gray-400 hover:text-white transition-colors">
+                  Enterprise Terms
                 </Link>
               </li>
               <li>

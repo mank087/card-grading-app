@@ -578,11 +578,13 @@ function CustomLabelTile({
   slabData,
   customConfig,
   customPreviewData,
+  orgLogoColor = null,
 }: {
   selectedCard: any | null
   slabData: SlabLabelData | null
   customConfig: CustomLabelConfig
   customPreviewData: SlabLabelData | null
+  orgLogoColor?: string | null
 }) {
   const [side, setSide] = useState<'front' | 'back'>('front')
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -665,6 +667,8 @@ function CustomLabelTile({
                 side={side}
                 pattern={tilePattern}
                 bandColors={tileBandColors}
+                blackLogoHref={orgLogoColor ?? undefined}
+                colorLogoHref={orgLogoColor ?? undefined}
                 className="w-full"
               />
             ) : tilePreviewUrl ? (
@@ -743,6 +747,7 @@ function LabelGallery({
   showFounderEmblem,
   showVipEmblem,
   showCardLoversEmblem,
+  orgLogoColor = null,
 }: {
   selectedCard: any | null
   slabData: SlabLabelData | null
@@ -751,6 +756,7 @@ function LabelGallery({
   showFounderEmblem: boolean
   showVipEmblem: boolean
   showCardLoversEmblem: boolean
+  orgLogoColor?: string | null
 }) {
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
@@ -819,7 +825,7 @@ function LabelGallery({
         const qrCodeDataUrl = await generateQRCodeWithLogo(
           `https://dcmgrading.com/verify/${selectedCard.serial}`
         ).catch(() => '')
-        const logoDataUrl = await loadLogoAsBase64().catch(() => '')
+        const logoDataUrl = orgLogoColor ?? (await loadLogoAsBase64().catch(() => ''))
         const foldableData: FoldableLabelData = {
           cardName: labelData.primaryName,
           setName: labelData.setName || '',
@@ -1015,7 +1021,7 @@ function LabelGallery({
         })}
 
         {/* Custom Label Preview tile */}
-        <CustomLabelTile selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData} />
+        <CustomLabelTile selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData} orgLogoColor={orgLogoColor} />
       </div>
     </section>
   )
@@ -1032,6 +1038,7 @@ function CustomDesigner({
   setConfig,
   onPreviewDataChange,
   isAuthenticated,
+  orgLogoColor = null,
 }: {
   selectedCard: any | null
   slabData: SlabLabelData | null
@@ -1039,6 +1046,7 @@ function CustomDesigner({
   setConfig: React.Dispatch<React.SetStateAction<CustomLabelConfig>>
   onPreviewDataChange: (data: SlabLabelData | null) => void
   isAuthenticated: boolean
+  orgLogoColor?: string | null
 }) {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -1682,6 +1690,8 @@ function CustomDesigner({
                         side={config.side}
                         pattern={heritagePattern}
                         bandColors={heritageBandColors}
+                        blackLogoHref={orgLogoColor ?? undefined}
+                        colorLogoHref={orgLogoColor ?? undefined}
                         className="w-full"
                       />
                     ) : previewDataUrl ? (
@@ -2668,6 +2678,8 @@ function CustomDesigner({
                       side={config.side}
                       pattern={heritagePattern}
                       bandColors={heritageBandColors}
+                      blackLogoHref={orgLogoColor ?? undefined}
+                      colorLogoHref={orgLogoColor ?? undefined}
                       className="max-w-full shadow-lg rounded"
                     />
                   ) : (
@@ -2706,6 +2718,8 @@ function CustomDesigner({
                         side={config.side}
                         pattern={heritagePattern}
                         bandColors={heritageBandColors}
+                        blackLogoHref={orgLogoColor ?? undefined}
+                        colorLogoHref={orgLogoColor ?? undefined}
                         className="w-full"
                       />
                     ) : previewDataUrl ? (
@@ -3012,6 +3026,45 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
     })
   }, [isAuthenticated])
 
+  // Enterprise org members preview labels with their store's logos (as data
+  // URLs — the currency the canvas/SVG renderers already consume). Non-members
+  // and guests never set this, so behavior is unchanged for them.
+  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null } | null>(null)
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const sess = getStoredSession()
+    if (!sess?.access_token) return
+    let cancelled = false
+    const toDataUrl = async (url: string | null): Promise<string | null> => {
+      if (!url) return null
+      try {
+        const res = await fetch(url)
+        if (!res.ok) return null
+        const blob = await res.blob()
+        return await new Promise<string | null>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null)
+          reader.onerror = () => resolve(null)
+          reader.readAsDataURL(blob)
+        })
+      } catch {
+        return null
+      }
+    }
+    fetch('/api/org/branding', {
+      headers: { 'Authorization': `Bearer ${sess.access_token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(async (data) => {
+        const b = data?.branding
+        if (!b) return
+        const [color, white] = await Promise.all([toDataUrl(b.logoUrl), toDataUrl(b.logoWhiteUrl)])
+        if (!cancelled && (color || white)) setOrgLogos({ color, white })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isAuthenticated])
+
   // Custom label config — shared between gallery tile and designer
   const [customConfig, setCustomConfig] = useState<CustomLabelConfig>(() => {
     if (typeof window !== 'undefined') {
@@ -3141,8 +3194,8 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         showFounderEmblem,
         showVipEmblem,
         showCardLoversEmblem,
-        logoDataUrl,
-        whiteLogoDataUrl,
+        logoDataUrl: orgLogos?.color || logoDataUrl,
+        whiteLogoDataUrl: orgLogos?.white || whiteLogoDataUrl,
       }
 
       setSlabData(data)
@@ -3150,7 +3203,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
     buildSlabData()
     return () => { cancelled = true }
-  }, [selectedCard, showFounderEmblem, showVipEmblem, showCardLoversEmblem])
+  }, [selectedCard, showFounderEmblem, showVipEmblem, showCardLoversEmblem, orgLogos])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -3394,7 +3447,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         {/* Section 2: Slab Label Designer — the main event: most users are
             here to customize their graded slab label, so it leads the page.
             Other formats (Avery, card images) live in "More Label Formats". */}
-        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} isAuthenticated={isAuthenticated} />
+        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} isAuthenticated={isAuthenticated} orgLogoColor={orgLogos?.color ?? null} />
 
         {/* Section 4: Save & Manage Custom Styles */}
         {isAuthenticated && (
@@ -3428,7 +3481,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
           </button>
           {showMoreFormats && (
             <div className="px-0 pb-2">
-              <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} />
+              <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} orgLogoColor={orgLogos?.color ?? null} />
             </div>
           )}
         </section>

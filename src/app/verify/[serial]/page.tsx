@@ -36,7 +36,7 @@ export default async function VerifyPage({ params }: PageProps) {
   const { data: card } = await withColumnFallback(
     () => supabase
       .from('cards')
-      .select('id, category')
+      .select('id, category, org_id')
       .eq('serial', serial)
       .is('deleted_at', null)
       .maybeSingle(),
@@ -50,6 +50,20 @@ export default async function VerifyPage({ params }: PageProps) {
 
   if (!card) {
     notFound();
+  }
+
+  // Org-graded cards land on the org's branded storefront page when one is
+  // live — this retroactively brands every QR already printed on their slabs.
+  const orgId = (card as { org_id?: string | null }).org_id;
+  if (orgId) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('slug, status, storefront_enabled')
+      .eq('id', orgId)
+      .maybeSingle();
+    if (org?.storefront_enabled && org.status === 'active') {
+      redirect(`/enterprise/${org.slug}/card/${card.id}`);
+    }
   }
 
   redirect(getCardRoute(card.category, card.id));

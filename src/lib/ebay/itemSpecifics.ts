@@ -900,16 +900,30 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
       break;
   }
 
-  // Add DCM Certification Number (the DCM serial) as an item specific
-  // This supplements the condition descriptor 27503 for additional visibility
-  if (card.serial) {
+  // Add Certification Number as an item specific (supplements condition
+  // descriptor 27503). Enterprise org cards use their branded serial
+  // (e.g. APX442921); consumer cards use the DCM serial.
+  const certSerial = card.org_serial_display || card.serial;
+  if (certSerial) {
     specifics.push({
       name: 'Certification Number',
-      value: card.serial,
+      value: String(certSerial),
       required: false,
       editable: true,
     });
   }
+
+  // Graded-card search facets. eBay's left-rail filters read ASPECTS, not
+  // condition descriptors — without these, graded-card searches filtered by
+  // grade/grader never surface the listing. Grades are whole numbers 1-10.
+  const grade = card.conversational_whole_grade ?? card.conversational_decimal_grade ?? card.grade_numeric;
+  const wholeGrade = typeof grade === 'number' && isFinite(grade) ? Math.round(grade) : null;
+  if (wholeGrade !== null && wholeGrade >= 1 && wholeGrade <= 10) {
+    specifics.push({ name: 'Grade', value: String(wholeGrade), required: false, editable: true });
+  }
+  specifics.push({ name: 'Graded', value: 'Yes', required: false, editable: true });
+  // DCM has no eBay grader ID, so the recognized-value list requires "Other".
+  specifics.push({ name: 'Professional Grader', value: 'Other', required: false, editable: true });
 
   return specifics;
 }

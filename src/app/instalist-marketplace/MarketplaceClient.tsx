@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { getStoredSession } from '@/lib/directAuth';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import StatsStrip from './components/StatsStrip';
 import ListNewTab from './components/ListNewTab';
 import MyListingsTab from './components/MyListingsTab';
@@ -11,6 +12,7 @@ import SoldTab from './components/SoldTab';
 import EndedTab from './components/EndedTab';
 import MarketplaceInfo from './components/MarketplaceInfo';
 import type { MarketplaceCard, MarketplaceListing, MarketplaceStats } from './types';
+import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
 
 // Loaded on demand — the listing modal pulls in @react-pdf and the whole
 // image-generation pipeline (~MBs of JS). Guests and users who never open
@@ -30,15 +32,10 @@ const EbayListingModal = dynamic(
 type TabId = 'list' | 'active' | 'sold' | 'ended';
 
 // Map DCM category strings to the cardType the EbayListingModal expects.
-function categoryToCardType(category: string | null | undefined): 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other' {
-  if (!category) return 'other';
-  const c = category.toLowerCase();
-  if (c === 'pokemon') return 'pokemon';
-  if (c === 'mtg') return 'mtg';
-  if (c === 'lorcana') return 'lorcana';
-  if (c === 'one piece' || c === 'onepiece') return 'onepiece';
-  if (['sports', 'football', 'baseball', 'basketball', 'hockey', 'soccer', 'wrestling'].includes(c)) return 'sports';
-  return 'other';
+// The modal's cardType doubles as the card-detail route slug, so this defers to
+// categoryToRouteSlug — the single source of truth for category → route.
+function categoryToCardType(category: string | null | undefined): 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other' {
+  return categoryToRouteSlug(category) as ReturnType<typeof categoryToCardType>;
 }
 
 /**
@@ -54,6 +51,10 @@ type PageState = 'loading' | 'guest' | 'no-cards' | 'connect' | 'marketplace';
 
 export default function MarketplaceClient() {
   const [pageState, setPageState] = useState<PageState>('loading');
+  // The user's saved label style — without it the listing modal silently
+  // rendered slab imagery as 'modern' even for Heritage/custom users,
+  // diverging from the card-detail listing flow.
+  const { labelStyle, activeConfig } = useCustomLabelStyle();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [ebayUsername, setEbayUsername] = useState<string | null>(null);
 
@@ -513,6 +514,8 @@ export default function MarketplaceClient() {
           onClose={handleListingPublished}
           card={modalCard}
           cardType={categoryToCardType(modalCard.category)}
+          labelStyle={labelStyle}
+          customLabelConfig={activeConfig}
         />
       )}
     </main>

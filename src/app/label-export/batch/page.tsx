@@ -49,6 +49,7 @@ import {
 import { generateAveryLabelSheetMultiPage } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelSheetMultiPage, generateFoldOverLabelSheet, type ToploaderLabelData } from '@/lib/avery8167LabelGenerator';
 import { generateBatchFoldableLabels, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard } from '@/lib/orgBranding';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { pdf } from '@react-pdf/renderer';
@@ -209,10 +210,17 @@ function BatchLabelExportInner() {
           }
         } catch { /* non-fatal */ }
 
-        const [logoDataUrl, whiteLogoDataUrl] = await Promise.all([
+        const [dcmLogoDataUrl, dcmWhiteLogoDataUrl] = await Promise.all([
           loadLogoAsBase64().catch(() => ''),
           loadWhiteLogoAsBase64().catch(() => ''),
         ]);
+        // Org branding: a batch only carries a store's logos when EVERY card
+        // was graded under the SAME org; mixed or DCM batches keep DCM logos.
+        const allSameOrg = orderedCards.length > 0 &&
+          orderedCards.every(c => (c as any).org_id && (c as any).org_id === (orderedCards[0] as any).org_id);
+        const orgLogos = allSameOrg ? await loadLogosForCard(orderedCards[0].id).catch(() => null) : null;
+        const logoDataUrl = orgLogos?.branding ? orgLogos.color : dcmLogoDataUrl;
+        const whiteLogoDataUrl = orgLogos?.branding ? orgLogos.white : dcmWhiteLogoDataUrl;
 
         const blobs: { name: string; mime: string; dataUrl: string }[] = [];
 
@@ -230,7 +238,7 @@ function BatchLabelExportInner() {
           };
           const grade = labelData.grade ?? 0;
           const cardUrl = `${window.location.origin}/verify/${card.serial}`;
-          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl).catch(() => '');
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogos?.branding ? orgLogos.color : undefined).catch(() => '');
           return { card, labelData, subScores, grade, cardUrl, qrCodeDataUrl };
         }));
 
@@ -273,6 +281,7 @@ function BatchLabelExportInner() {
               isAlteredAuthentic: !!(labelData as any).isAlteredAuthentic,
               qrCodeDataUrl: '',
               subScores,
+              // Org batches carry the store mark (disc + front); DCM otherwise.
               logoDataUrl,
               whiteLogoDataUrl,
               showFounderEmblem,
@@ -280,6 +289,7 @@ function BatchLabelExportInner() {
               showCardLoversEmblem,
             } as any,
             bandColors: (heritageSel.active ? heritageSel.bandColors : null) ?? resolveHeritageBandColors(card.card_colors),
+            logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
           }));
           const pattern = sp.get('heritagePattern')
             ? gen.resolveHeritagePattern(sp.get('heritagePattern'))
@@ -688,6 +698,10 @@ function BatchLabelExportInner() {
               showFounderEmblem,
               showVipEmblem,
               showCardLoversEmblem,
+              // Per-card store branding (helper caches per session)
+              logoOverrides: await loadLogosForCard(card.id)
+                .then(l => (l.branding ? { color: l.color, white: l.white, black: l.black } : undefined))
+                .catch(() => undefined),
             };
             const { front, back } = await generateCardImages(imageData);
             blobs.push({ name: `DCM-CardImage-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });

@@ -16,6 +16,7 @@ import {
   getUserCredits,
   findUserIdByStripeCustomer,
 } from '@/lib/credits';
+import { depositOrgCredits, resetOrgMonthlyCredits, getOrgById } from '@/lib/organizations';
 import {
   getAffiliateByCode,
   getAffiliateByPromotionCode,
@@ -24,6 +25,10 @@ import {
 } from '@/lib/affiliates';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dcmgrading.com';
 
 /**
  * Safely convert a Stripe Unix timestamp to a Date.
@@ -168,7 +173,18 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // Check if this is a subscription checkout
   if (session.mode === 'subscription') {
+    if (session.metadata?.dcm_type === 'org_plan') {
+      await handleOrgSubscriptionCheckout(session);
+      return;
+    }
     await handleSubscriptionCheckout(session);
+    return;
+  }
+
+  // Enterprise overage top-up: one-time purchase depositing into an org's
+  // rolling grade-credit pool (checkout link generated from the admin console).
+  if (session.metadata?.dcm_type === 'org_topup') {
+    await handleOrgTopup(session);
     return;
   }
 
@@ -409,6 +425,13 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // Get the subscription to check if it's Card Lovers
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+  // Enterprise org plan: renewals DEPOSIT the monthly allotment into the org's
+  // rolling pool (identified by orgId metadata stamped at checkout).
+  if (subscription.metadata?.orgId && subscription.metadata?.dcm_type === 'org_plan') {
+    await handleOrgInvoicePaid(invoice, subscription);
+    return;
+  }
+
   // Check if this is a Card Lovers subscription by checking price ID
   const priceId = subscription.items.data[0]?.price.id;
   const isCardLoversMonthly = priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId;
@@ -537,6 +560,16 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   // Confirm this is a Card Lovers subscription before flipping any flags
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+  // Enterprise org plan: observability only in v1 — Stripe dunning retries,
+  // and suspending an org stays a manual admin action.
+  if (subscription.metadata?.dcm_type === 'org_plan') {
+    console.warn('[handleInvoicePaymentFailed] Org plan payment failed:', {
+      orgId: subscription.metadata?.orgId, invoiceId: invoice.id, subscriptionId,
+    });
+    return;
+  }
+
   const priceId = subscription.items.data[0]?.price.id;
   const isCardLovers =
     priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId ||
@@ -612,6 +645,12 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('Processing subscription.updated:', subscription.id);
+
+  // Enterprise org subscriptions are admin-managed; nothing to sync here.
+  if (subscription.metadata?.dcm_type === 'org_plan') {
+    console.log('[handleSubscriptionUpdated] Org plan subscription — no action');
+    return;
+  }
 
   // Get user ID from metadata, with same stripe_customer_id fallback used by
   // handleInvoicePaid — see comment there.
@@ -713,6 +752,47 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('Processing subscription.deleted:', subscription.id);
+
+  // Enterprise org plan ended: zero the monthly bucket (unpaid forward
+  // capacity) and stop future resets, but leave the org active — overage
+  // packs were paid one-time and stay spendable, and branding stays on
+  // already-graded cards.
+  if (subscription.metadata?.dcm_type === 'org_plan' && subscription.metadata?.orgId) {
+    const orgId = subscription.metadata.orgId;
+    const supabase = getServiceClient();
+    const org = await getOrgById(orgId);
+    const { error } = await supabase
+      .from('organizations')
+      .update({
+        monthly_credits: 0,
+        monthly_allotment: 0,
+        stripe_subscription_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orgId)
+      .eq('stripe_subscription_id', subscription.id);
+    if (error) {
+      console.error('[handleSubscriptionDeleted] Failed to detach org subscription:', error.message);
+    } else {
+      console.log('[handleSubscriptionDeleted] Org plan ended, monthly bucket cleared:', orgId);
+      // Audit trail for the forfeited monthly credits (overage untouched).
+      if (org && org.stripe_subscription_id === subscription.id && org.monthly_credits > 0) {
+        const { error: txError } = await supabase.from('credit_transactions').insert({
+          user_id: org.owner_user_id,
+          org_id: orgId,
+          type: 'admin_adjustment',
+          amount: -org.monthly_credits,
+          balance_after: org.overage_credits,
+          description: `${org.name} — plan cancelled (${org.monthly_credits} unused monthly grades expired)`,
+          metadata: { org_credit: true, org_bucket: 'monthly', reason: 'subscription_deleted' },
+        });
+        if (txError) {
+          console.error('[handleSubscriptionDeleted] Failed to record expiry transaction:', txError.message);
+        }
+      }
+    }
+    return;
+  }
 
   // Get user ID from metadata, with stripe_customer_id fallback (same as
   // handleInvoicePaid / handleSubscriptionUpdated).
@@ -854,4 +934,228 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     // Don't fail the webhook if affiliate reversal fails
     console.error('[Affiliate] Error reversing commission on refund:', error);
   }
+}
+
+// ============================================
+// ENTERPRISE ORGANIZATION HANDLERS
+// ============================================
+
+/**
+ * Initial org plan subscription checkout. The checkout link is generated from
+ * the admin console with metadata { dcm_type: 'org_plan', orgId, plan, grades }.
+ * Attaches Stripe ids to the org, sets the plan + monthly allotment, and fills
+ * the first monthly cycle (idempotent on the session id).
+ */
+async function handleOrgSubscriptionCheckout(session: Stripe.Checkout.Session) {
+  const orgId = session.metadata?.orgId;
+  const plan = session.metadata?.plan;
+  const grades = parseInt(session.metadata?.grades || '0', 10);
+
+  if (!orgId || !grades) {
+    console.error('[handleOrgSubscriptionCheckout] Missing org metadata:', { orgId, plan, grades });
+    return;
+  }
+
+  const org = await getOrgById(orgId);
+  if (!org) {
+    console.error('[handleOrgSubscriptionCheckout] Unknown org:', orgId);
+    return;
+  }
+
+  const subscriptionId = typeof session.subscription === 'string'
+    ? session.subscription
+    : session.subscription?.id;
+  const customerId = typeof session.customer === 'string'
+    ? session.customer
+    : session.customer?.id;
+
+  const supabase = getServiceClient();
+  const { error: attachError } = await supabase
+    .from('organizations')
+    .update({
+      stripe_customer_id: customerId || org.stripe_customer_id,
+      stripe_subscription_id: subscriptionId || org.stripe_subscription_id,
+      plan: plan || org.plan,
+      monthly_allotment: grades,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orgId);
+  if (attachError) {
+    console.error('[handleOrgSubscriptionCheckout] Failed to attach subscription to org:', attachError.message);
+  }
+
+  // Stamp org metadata onto the subscription so renewal invoices route here
+  // without guessing (same self-heal pattern as Card Lovers).
+  if (subscriptionId) {
+    try {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: { dcm_type: 'org_plan', orgId, plan: plan || '', grades: String(grades) },
+      });
+    } catch (err) {
+      console.warn('[handleOrgSubscriptionCheckout] Failed to stamp subscription metadata (non-fatal):', err);
+    }
+  }
+
+  const deposit = await resetOrgMonthlyCredits(orgId, grades, {
+    dedupeKey: session.id,
+    description: `${org.name} — ${plan || 'enterprise'} plan started (${grades} grades/month)`,
+  });
+  console.log('[handleOrgSubscriptionCheckout] Initial monthly fill:', {
+    orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
+  });
+
+  // Activation email to the owner: what they have, how billing recurs, and
+  // where to manage it. Fire-and-forget; skipped on webhook replays (the
+  // deposit dedupe already fired the first time).
+  if (!deposit.alreadyProcessed) {
+    await sendOrgActivationEmail(org, session, subscriptionId, plan || org.plan, grades);
+  }
+}
+
+/**
+ * "Your Enterprise Account is active" email. Reiterates the recurring billing
+ * terms plainly (monthly charge until cancelled, allotment resets, packs roll
+ * over) and links the billing page for self-service management.
+ */
+async function sendOrgActivationEmail(
+  org: { id: string; name: string; owner_user_id: string },
+  session: Stripe.Checkout.Session,
+  subscriptionId: string | undefined,
+  plan: string | null,
+  grades: number
+) {
+  try {
+    const supabase = getServiceClient();
+    const { data: owner } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', org.owner_user_id)
+      .maybeSingle();
+    if (!owner?.email) {
+      console.warn('[sendOrgActivationEmail] No owner email for org', org.id);
+      return;
+    }
+
+    // Actual amount charged (covers custom pilot deals, not just published
+    // tiers) and the real renewal date from the subscription.
+    const amountUsd = typeof session.amount_total === 'number' ? (session.amount_total / 100).toFixed(2) : null;
+    let renewalDate: string | null = null;
+    if (subscriptionId) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        renewalDate = getSubscriptionPeriodEnd(sub).toLocaleDateString('en-US', {
+          month: 'long', day: 'numeric', year: 'numeric',
+        });
+      } catch { /* non-fatal */ }
+    }
+    const planLabel = plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Enterprise';
+
+    await resend.emails.send({
+      from: 'DCM Grading <noreply@dcmgrading.com>',
+      to: [owner.email],
+      replyTo: 'admin@dcmgrading.com',
+      subject: `${org.name} is live on DCM Enterprise`,
+      html: `
+        <h2>Your Enterprise Account is active</h2>
+        <p><strong>${org.name}</strong> is now live on the <strong>${planLabel}</strong> plan with
+        <strong>${grades.toLocaleString()} grades per month</strong>. Your team can start grading under
+        your brand right away.</p>
+        <h3>How billing works</h3>
+        <ul>
+          <li>${amountUsd ? `Your card is charged <strong>$${amountUsd} (USD) each month</strong>` : 'Your card is charged monthly'}${renewalDate ? `, next on <strong>${renewalDate}</strong>` : ''}, automatically, <strong>until you cancel</strong>.</li>
+          <li>Each billing cycle your monthly allotment refreshes to ${grades.toLocaleString()} grades. Unused monthly grades do not carry over.</li>
+          <li>Overage packs are separate one-time purchases, and those credits never expire.</li>
+          <li>Cancel anytime from your billing page. You keep your monthly grades through the period you paid for, and there are no further charges after it ends.</li>
+        </ul>
+        <p><a href="${SITE_URL}/store/billing">Manage your account, plan, and payment method →</a></p>
+        <p>Ready to launch? Grab your <a href="${SITE_URL}/enterprise/launch-kit">Launch Kit</a> for
+        printable signage and announcement templates.</p>
+        <p>Questions? Just reply to this email.</p>
+      `,
+    });
+    console.log('[sendOrgActivationEmail] Sent to owner of org', org.id);
+  } catch (err) {
+    console.error('[sendOrgActivationEmail] Failed (non-fatal):', err);
+  }
+}
+
+/**
+ * Org plan renewal: SET the monthly bucket to monthly_allotment (the allotment
+ * resets each cycle — it does not roll over; overage packs live in their own
+ * bucket and are untouched). Idempotent on the invoice id.
+ */
+async function handleOrgInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
+  const orgId = subscription.metadata.orgId!;
+
+  // Initial invoice is handled by checkout.session.completed.
+  if (invoice.billing_reason === 'subscription_create') {
+    console.log('[handleOrgInvoicePaid] Initial invoice, skipping (handled by checkout)');
+    return;
+  }
+  // Mid-cycle plan upgrades invoice a proration; the upgrade API grants the
+  // allotment difference itself. Resetting here would over-grant (forgive
+  // every grade already used this cycle).
+  if (invoice.billing_reason === 'subscription_update') {
+    console.log('[handleOrgInvoicePaid] Proration invoice from plan change, skipping (handled by upgrade API)');
+    return;
+  }
+  if (subscription.cancel_at_period_end || subscription.status === 'canceled') {
+    console.log('[handleOrgInvoicePaid] Subscription cancelled/pending cancel — skipping deposit:', subscription.id);
+    return;
+  }
+
+  const org = await getOrgById(orgId);
+  if (!org) {
+    console.error('[handleOrgInvoicePaid] Unknown org:', orgId);
+    return;
+  }
+  if (org.status !== 'active') {
+    console.log('[handleOrgInvoicePaid] Org not active — skipping deposit:', orgId, org.status);
+    return;
+  }
+
+  const grades = org.monthly_allotment || parseInt(subscription.metadata.grades || '0', 10);
+  if (!grades) {
+    console.error('[handleOrgInvoicePaid] No allotment configured for org:', orgId);
+    return;
+  }
+
+  const deposit = await resetOrgMonthlyCredits(orgId, grades, {
+    dedupeKey: invoice.id ?? subscription.id,
+    description: `${org.name} — monthly renewal (monthly grades reset to ${grades})`,
+  });
+  console.log('[handleOrgInvoicePaid] Monthly reset:', {
+    orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
+  });
+}
+
+/**
+ * Enterprise overage pack (one-time payment): deposit the purchased grades
+ * into the org's OVERAGE bucket — packs roll over and survive the monthly
+ * reset. Idempotent on session id.
+ */
+async function handleOrgTopup(session: Stripe.Checkout.Session) {
+  const orgId = session.metadata?.orgId;
+  const grades = parseInt(session.metadata?.grades || '0', 10);
+
+  if (!orgId || !grades) {
+    console.error('[handleOrgTopup] Missing top-up metadata:', { orgId, grades });
+    return;
+  }
+
+  const org = await getOrgById(orgId);
+  if (!org) {
+    console.error('[handleOrgTopup] Unknown org:', orgId);
+    return;
+  }
+
+  const deposit = await depositOrgCredits(orgId, grades, {
+    dedupeKey: session.id,
+    description: `${org.name} — overage pack (${grades} grades, rolls over)`,
+    source: 'topup',
+    stripeSessionId: session.id,
+  });
+  console.log('[handleOrgTopup] Top-up deposit:', {
+    orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
+  });
 }

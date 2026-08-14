@@ -68,6 +68,10 @@ export interface CardSlabProps {
 
   /** Heritage label channel — when set, the label renders the Heritage design. */
   heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null
+
+  /** Enterprise org logos — color for light labels (traditional/heritage), white for the dark modern label. Omit for DCM branding. */
+  orgLogoColor?: string | null
+  orgLogoWhite?: string | null
 }
 
 // Helper: Format grade for display - v6.0: Always whole numbers
@@ -103,6 +107,8 @@ export function CardSlab({
   showFounderEmblem = false,
   showCardLoversEmblem = false,
   heritage = null,
+  orgLogoColor = null,
+  orgLogoWhite = null,
 }: CardSlabProps) {
   const isModern = labelStyle !== 'traditional'
   // Size configurations - heights match between front/back labels for consistency
@@ -190,7 +196,7 @@ export function CardSlab({
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
           <img
-            src="/DCM-logo.png"
+            src={orgLogoColor ?? '/DCM-logo.png'}
             alt="DCM"
             className={`${config.logoHeight} w-auto`}
           />
@@ -445,6 +451,8 @@ export function CardSlab({
                 side="front"
                 pattern={heritage.pattern as any}
                 bandColors={heritage.bandColors}
+                blackLogoHref={orgLogoColor ?? undefined}
+                colorLogoHref={orgLogoColor ?? undefined}
               />
             ) : isModern ? (
               <ModernFrontLabel
@@ -456,6 +464,8 @@ export function CardSlab({
                 condition={condition}
                 isAlteredAuthentic={isAlteredAuthentic}
                 size={size}
+                logoColorSrc={orgLogoColor}
+                logoWhiteSrc={orgLogoWhite}
               />
             ) : (
               <FrontLabel />
@@ -497,6 +507,8 @@ export function CardSlab({
                   side="back"
                   pattern={heritage.pattern as any}
                   bandColors={heritage.bandColors}
+                  blackLogoHref={orgLogoColor ?? undefined}
+                  colorLogoHref={orgLogoColor ?? undefined}
                 />
               ) : isModern ? (
                 <ModernBackLabel
@@ -550,6 +562,9 @@ export interface CardSlabGridProps {
   colorOverrides?: LabelColorOverrides
   /** Heritage label channel — when set, the label renders the Heritage design. */
   heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null
+  /** Enterprise org logos — color for light labels (traditional/heritage), white for the dark modern label. Omit for DCM branding. */
+  orgLogoColor?: string | null
+  orgLogoWhite?: string | null
 }
 
 export function CardSlabGrid({
@@ -566,6 +581,8 @@ export function CardSlabGrid({
   labelStyle = 'modern',
   colorOverrides,
   heritage = null,
+  orgLogoColor = null,
+  orgLogoWhite = null,
 }: CardSlabGridProps) {
   const isModern = labelStyle !== 'traditional'
 
@@ -626,7 +643,7 @@ export function CardSlabGrid({
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0 -ml-1">
           <img
-            src="/DCM-logo.png"
+            src={orgLogoColor ?? '/DCM-logo.png'}
             alt="DCM"
             className="h-9 w-auto"
           />
@@ -716,6 +733,8 @@ export function CardSlabGrid({
             side="front"
             pattern={heritage.pattern as any}
             bandColors={heritage.bandColors}
+            blackLogoHref={orgLogoColor ?? undefined}
+            colorLogoHref={orgLogoColor ?? undefined}
           />
         ) : isModern ? (
           <ModernFrontLabel
@@ -728,6 +747,8 @@ export function CardSlabGrid({
             isAlteredAuthentic={isAlteredAuthentic}
             size="md"
             colorOverrides={colorOverrides}
+            logoColorSrc={orgLogoColor}
+            logoWhiteSrc={orgLogoWhite}
           />
         ) : (
           <TraditionalLabel />

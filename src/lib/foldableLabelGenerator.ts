@@ -98,6 +98,7 @@ export interface FoldableLabelData {
 
   // Logo
   logoDataUrl?: string;         // Base64 DCM logo (right-side up)
+  accentColor?: string;         // Org brand primary — replaces DCM purple accents when set
   rotatedLogoDataUrl?: string;  // Base64 DCM logo (rotated 180° for fold-over labels)
 }
 
@@ -105,7 +106,13 @@ export interface FoldableLabelData {
  * Generate QR code with DCM logo overlay
  * Must be called from browser context
  */
-export async function generateQRCodeWithLogo(url: string): Promise<string> {
+/**
+ * @param logoSrc centre-mark image (path or data URL). Defaults to the DCM
+ * mark; enterprise callers pass the org's colour logo so store-graded cards
+ * carry the store mark in the QR. Either way the QR resolves to the DCM
+ * verify page, which is where the verification trust actually lives.
+ */
+export async function generateQRCodeWithLogo(url: string, logoSrc?: string): Promise<string> {
   // Dynamic import to avoid SSR issues
   const QRCode = (await import('qrcode')).default;
 
@@ -155,7 +162,7 @@ export async function generateQRCodeWithLogo(url: string): Promise<string> {
       resolve(canvas.toDataURL('image/png'));
     };
 
-    logo.src = '/DCM-logo.png';
+    logo.src = logoSrc || '/DCM-logo.png';
   });
 }
 
@@ -322,7 +329,20 @@ function wrapText(doc: jsPDF, text: string, maxWidth: number, fontSize: number):
 /**
  * Generate the foldable label PDF
  */
+/** Lighten (pct > 0) or darken (pct < 0) a #rrggbb color. */
+export function shadeHex(hex: string, pct: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(pct < 0 ? v * (1 + pct) : v + (255 - v) * pct)));
+  const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+  return '#' + (((r << 16) | (g << 8) | b).toString(16).padStart(6, '0'));
+}
+
 export async function generateFoldableLabel(data: FoldableLabelData): Promise<Blob> {
+  // Org-branded labels swap the DCM purple accents for the brand primary.
+  const accentPrimary = data.accentColor || COLORS.purplePrimary;
+  const accentDark = data.accentColor ? shadeHex(data.accentColor, -0.2) : COLORS.purpleDark;
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'pt',
@@ -431,7 +451,7 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
 
   // White background for label area
   doc.setFillColor(COLORS.white);
-  doc.setDrawColor(COLORS.purplePrimary);
+  doc.setDrawColor(accentPrimary);
   doc.setLineWidth(2);
   doc.rect(LABEL_X, LABEL_Y, LABEL_WIDTH, LABEL_HEIGHT, 'FD');
 
@@ -444,7 +464,7 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
 
   // Header with white background and purple border (matching card detail page style)
   doc.setFillColor(COLORS.white);
-  doc.setDrawColor(COLORS.purplePrimary);
+  doc.setDrawColor(accentPrimary);
   doc.setLineWidth(1.5);
   doc.rect(LABEL_X + 1, headerY + 1, LABEL_WIDTH - 2, headerHeight, 'FD');
 
@@ -458,14 +478,14 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
       doc.addImage(data.logoDataUrl, 'PNG', logoX, logoY, logoSize, logoSize);
     } catch (e) {
       // Draw fallback text if logo fails
-      doc.setTextColor(COLORS.purplePrimary);
+      doc.setTextColor(accentPrimary);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('DCM', logoX + 8, logoY + 25);
     }
   } else {
     // Draw fallback text
-    doc.setTextColor(COLORS.purplePrimary);
+    doc.setTextColor(accentPrimary);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('DCM', logoX + 8, logoY + 25);
@@ -544,18 +564,18 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   const gradeText = formatGradeDisplay(data.grade);
   const hasDecimal = gradeText.includes('.');
 
-  doc.setTextColor(COLORS.purplePrimary);
+  doc.setTextColor(accentPrimary);
   doc.setFontSize(hasDecimal ? 16 : 20);
   doc.setFont('helvetica', 'bold');
   doc.text(gradeText, gradeX, headerY + 26, { align: 'center' });
 
   // Divider line under grade (purple)
-  doc.setDrawColor(COLORS.purplePrimary);
+  doc.setDrawColor(accentPrimary);
   doc.setLineWidth(1);
   doc.line(gradeX - 14, headerY + 32, gradeX + 14, headerY + 32);
 
   // Condition label (purple)
-  doc.setTextColor(COLORS.purplePrimary);
+  doc.setTextColor(accentPrimary);
   doc.setFontSize(5);
   doc.setFont('helvetica', 'bold');
   doc.text(data.conditionLabel.toUpperCase(), gradeX, headerY + 42, { align: 'center' });
@@ -610,7 +630,7 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   drawRoundedRect(doc, LABEL_X + 4, summaryY, LABEL_WIDTH - 8, summaryHeight, 3, { fill: true });
 
   // Summary title
-  doc.setTextColor(COLORS.purpleDark);
+  doc.setTextColor(accentDark);
   doc.setFontSize(5.5);
   doc.setFont('helvetica', 'bold');
   doc.text('OVERALL CARD CONDITION SUMMARY', LABEL_X + 4 + summaryPadding, summaryY + 9);

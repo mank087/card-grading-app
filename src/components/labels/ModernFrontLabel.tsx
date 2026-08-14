@@ -14,6 +14,9 @@ interface ModernFrontLabelProps {
   isAlteredAuthentic?: boolean
   size?: 'sm' | 'md' | 'lg'
   colorOverrides?: LabelColorOverrides
+  /** Enterprise org logo overrides — color shown on light labels, white on dark. Omit for DCM. */
+  logoColorSrc?: string | null
+  logoWhiteSrc?: string | null
 }
 
 // Helper: Format grade for display
@@ -21,7 +24,10 @@ const formatGrade = (grade: number): string => {
   return Math.round(grade).toString()
 }
 
-// Size configurations for modern label - heights match ModernBackLabel for consistency
+// Size configurations for modern label - heights match ModernBackLabel for consistency.
+// Heights are MINIMUMS and font sizes are container-query clamps: on narrow
+// mobile containers the text scales down with the label width (like the
+// heritage SVG does) instead of wrapping past a fixed height and clipping.
 const sizeConfig = {
   sm: {
     logoHeight: 'h-6',
@@ -78,6 +84,8 @@ export function ModernFrontLabel({
   isAlteredAuthentic = false,
   size = 'md',
   colorOverrides,
+  logoColorSrc = null,
+  logoWhiteSrc = null,
 }: ModernFrontLabelProps) {
   const config = sizeConfig[size]
 
@@ -152,7 +160,7 @@ export function ModernFrontLabel({
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
           <img
-            src={tx.logo}
+            src={(darkText ? logoColorSrc : logoWhiteSrc) ?? tx.logo}
             alt="DCM"
             className={`${config.logoHeight} w-auto`}
           />

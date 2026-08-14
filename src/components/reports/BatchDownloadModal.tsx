@@ -11,6 +11,7 @@ import {
 } from '../../lib/foldableLabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
+import { loadLogosForCard, cardQrUrl, type OrgLogoSet } from '../../lib/orgBranding';
 import { getAuthenticatedClient } from '../../lib/directAuth';
 import { estimateProfessionalGrades, DcmGradingInput } from '../../lib/professionalGradeMapper';
 import QRCode from 'qrcode';
@@ -19,6 +20,7 @@ interface CardData {
   id: string;
   card_name?: string;
   serial?: string;
+  org_id?: string | null;
   front_url?: string | null;
   back_url?: string | null;
   front_path?: string;
@@ -90,8 +92,8 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     });
   };
 
-  // Generate QR code with logo
-  const generateQRCode = async (url: string): Promise<string> => {
+  // Generate QR code with logo (org batches pass the store mark)
+  const generateQRCode = async (url: string, logoSrc?: string): Promise<string> => {
     try {
       const canvas = document.createElement('canvas');
       await QRCode.toCanvas(canvas, url, {
@@ -119,7 +121,7 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
           resolve(canvas.toDataURL('image/png'));
         };
         logo.onerror = () => resolve(canvas.toDataURL('image/png'));
-        logo.src = '/DCM-logo.png';
+        logo.src = logoSrc || '/DCM-logo.png';
       });
     } catch {
       return '';
@@ -226,18 +228,29 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     return { front: frontUrl || '', back: backUrl || '' };
   };
 
+  // Org branding for the batch: same rule as BatchSlabLabelModal — when every
+  // selected card belongs to the same org, its logo brands the whole batch;
+  // any mix (or personal cards) falls back to DCM.
+  const resolveBatchOrgLogos = async (): Promise<OrgLogoSet | null> => {
+    const allSameOrg = selectedCards.length > 0 &&
+      selectedCards.every(c => c.org_id && c.org_id === selectedCards[0].org_id);
+    if (!allSameOrg) return null;
+    const logos = await loadLogosForCard(selectedCards[0].id).catch(() => null);
+    return logos?.branding ? logos : null;
+  };
+
   // Build foldable label data for a card
-  const buildLabelData = async (card: CardData): Promise<FoldableLabelData> => {
+  const buildLabelData = async (card: CardData, orgLogos: OrgLogoSet | null): Promise<FoldableLabelData> => {
     const cleanLabelData = getCardLabelData(card as Parameters<typeof getCardLabelData>[0]);
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    const cardUrl = cleanLabelData.serial
-      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cardQrUrl(card.id, cleanLabelData.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`);
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-      generateQRCodeWithLogo(cardUrl),
-      loadLogoAsBase64().catch(() => undefined)
+      generateQRCodeWithLogo(cardUrl, orgLogos?.branding ? orgLogos.color : undefined),
+      orgLogos?.branding
+        ? Promise.resolve(orgLogos.color)
+        : loadLogoAsBase64().catch(() => undefined)
     ]);
 
     const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
@@ -262,11 +275,12 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       qrCodeDataUrl,
       cardUrl,
       logoDataUrl,
+      accentColor: orgLogos?.branding?.brandColor || undefined,
     };
   };
 
   // Build full report data for a card
-  const buildReportData = async (card: CardData): Promise<ReportCardData> => {
+  const buildReportData = async (card: CardData, orgLogos: OrgLogoSet | null): Promise<ReportCardData> => {
     const cleanLabelData = getCardLabelData(card as Parameters<typeof getCardLabelData>[0]);
     const cardInfo = (card.conversational_card_info || {}) as Record<string, unknown>;
 
@@ -276,10 +290,8 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       imageToBase64(urls.back)
     ]);
 
-    const cardUrl = cleanLabelData.serial
-      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
-    const qrCodeDataUrl = await generateQRCode(cardUrl);
+    const cardUrl = cardQrUrl(card.id, cleanLabelData.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`);
+    const qrCodeDataUrl = await generateQRCode(cardUrl, orgLogos?.branding ? orgLogos.color : undefined);
 
     const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
     const safePrimaryName = extractAsciiSafe(cleanLabelData.primaryName, 'Card', englishName);
@@ -412,6 +424,9 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
         day: 'numeric'
       }),
       reportId: card.id.substring(0, 8).toUpperCase(),
+      ...(orgLogos?.branding
+        ? { org: { name: orgLogos.branding.name, slug: orgLogos.branding.slug, logoDataUrl: orgLogos.color, brandColor: orgLogos.branding.brandColor || null } }
+        : {}),
     };
   };
 
@@ -423,11 +438,12 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     setProgress({ current: 0, total: selectedCards.length });
 
     try {
+      const orgLogos = await resolveBatchOrgLogos();
       const labelDataArray: FoldableLabelData[] = [];
 
       for (let i = 0; i < selectedCards.length; i++) {
         setProgress({ current: i + 1, total: selectedCards.length });
-        const labelData = await buildLabelData(selectedCards[i]);
+        const labelData = await buildLabelData(selectedCards[i], orgLogos);
         labelDataArray.push(labelData);
       }
 
@@ -438,7 +454,10 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       const link = document.createElement('a');
       link.href = url;
       const timestamp = new Date().toISOString().slice(0, 10);
-      link.download = `DCM-Mini-Reports-${selectedCards.length}-${timestamp}.pdf`;
+      const brandSlug = orgLogos?.branding
+        ? orgLogos.branding.name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'DCM'
+        : 'DCM';
+      link.download = `${brandSlug}-Mini-Reports-${selectedCards.length}-${timestamp}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -462,11 +481,12 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     setProgress({ current: 0, total: selectedCards.length });
 
     try {
+      const orgLogos = await resolveBatchOrgLogos();
       const reportDataArray: ReportCardData[] = [];
 
       for (let i = 0; i < selectedCards.length; i++) {
         setProgress({ current: i + 1, total: selectedCards.length });
-        const reportData = await buildReportData(selectedCards[i]);
+        const reportData = await buildReportData(selectedCards[i], orgLogos);
         reportDataArray.push(reportData);
       }
 
@@ -478,7 +498,10 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       const link = document.createElement('a');
       link.href = url;
       const timestamp = new Date().toISOString().slice(0, 10);
-      link.download = `DCM-Full-Reports-${selectedCards.length}-${timestamp}.pdf`;
+      const brandSlug = orgLogos?.branding
+        ? orgLogos.branding.name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'DCM'
+        : 'DCM';
+      link.download = `${brandSlug}-Full-Reports-${selectedCards.length}-${timestamp}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

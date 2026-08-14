@@ -279,6 +279,8 @@ export interface CardForLabel {
   category?: string | null;
   sub_category?: string | null;
   serial?: string | null;
+  /** Formatted per-org serial (e.g. MFG-000042) — takes display precedence over serial. */
+  org_serial_display?: string | null;
 
   // Grade fields
   conversational_decimal_grade?: number | null;
@@ -1249,7 +1251,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // ========================================
   // LINE 4: Serial
   // ========================================
-  const serial = card.serial || `DCM-${card.id?.slice(0, 8) || 'UNKNOWN'}`;
+  // Org-graded cards display their per-org serial (e.g. MFG-000042); the DCM
+  // serial stays the QR/backend cross-reference.
+  const serial = card.org_serial_display || card.serial || `DCM-${card.id?.slice(0, 8) || 'UNKNOWN'}`;
 
   // ========================================
   // GRADE INFO (right side)
@@ -1283,12 +1287,13 @@ export function generateLabelData(card: CardForLabel): LabelData {
  * Falls back to generating if not present
  */
 export function getLabelData(card: CardForLabel & { label_data?: LabelData | null }): LabelData {
-  // If label_data is already stored, use it. Cached blobs predate
-  // title-casing, so the display transform applies over the stored value.
+  // If label_data is already stored, use it. Cached blobs predate org serials
+  // and title-casing, so both display transforms apply over the stored value.
   if (card.label_data) {
     return {
       ...card.label_data,
       primaryName: titleCaseShoutyWords(card.label_data.primaryName || 'Card'),
+      ...(card.org_serial_display ? { serial: card.org_serial_display } : {}),
     };
   }
 

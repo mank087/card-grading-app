@@ -11,7 +11,41 @@ import { StyleSheet, Font } from '@react-pdf/renderer';
 // renders (Font is a react-pdf singleton).
 Font.registerHyphenationCallback((word) => [word]);
 
-export const reportStyles = StyleSheet.create({
+const DCM_PURPLE = '#7c3aed';
+
+/** Lighten (pct > 0) or darken (pct < 0) a #rrggbb color. */
+function shade(hex: string, pct: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(pct < 0 ? v * (1 + pct) : v + (255 - v) * pct)));
+  const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+  return '#' + (((r << 16) | (g << 8) | b).toString(16).padStart(6, '0'));
+}
+
+const styleCache = new Map<string, ReturnType<typeof buildReportStyles>>();
+
+/**
+ * Report styles themed by an accent color. DCM purple by default; org-branded
+ * reports pass the org's primary brand color and every purple accent
+ * (headers, separators, slab borders, callouts) follows it.
+ */
+export function makeReportStyles(accentInput: string = DCM_PURPLE) {
+  const accent = /^#[0-9a-f]{6}$/i.test(accentInput) ? accentInput : DCM_PURPLE;
+  const cached = styleCache.get(accent);
+  if (cached) return cached;
+  const built = buildReportStyles(accent);
+  styleCache.set(accent, built);
+  return built;
+}
+
+function buildReportStyles(accent: string) {
+  const isDcm = accent.toLowerCase() === DCM_PURPLE;
+  const dark = isDcm ? '#6b46c1' : shade(accent, -0.15);   // Purple-700 analogue
+  const sep = isDcm ? '#9333ea' : shade(accent, 0.08);     // separator analogue
+  const tint = isDcm ? '#e9d5ff' : shade(accent, 0.78);    // light tint analogue
+
+  return StyleSheet.create({
   // Page layout - compact for single page fit
   // IMPORTANT: overflow: 'hidden' ensures content never spills to a second page
   page: {
@@ -30,7 +64,7 @@ export const reportStyles = StyleSheet.create({
     marginBottom: 5,  // Reduced from 6 to compensate
     paddingBottom: 3,  // Reduced from 4 to compensate
     borderBottomWidth: 2,
-    borderBottomColor: '#6b46c1',
+    borderBottomColor: dark,
     borderBottomStyle: 'solid',
   },
 
@@ -51,7 +85,7 @@ export const reportStyles = StyleSheet.create({
   companyName: {
     fontSize: 18,  // Increased from 16
     fontWeight: 'bold',
-    color: '#6b46c1',
+    color: dark,
     marginBottom: 2,
   },
 
@@ -64,7 +98,7 @@ export const reportStyles = StyleSheet.create({
   // Slab outer container - simulates metallic purple gradient border
   // Centered with max width to maintain card-like proportions
   slabOuterContainer: {
-    backgroundColor: '#7c3aed', // Purple-600 base (simulates metallic gradient)
+    backgroundColor: accent, // accent base (simulates metallic gradient)
     borderRadius: 6,
     padding: 2, // This creates the "border" effect
     marginBottom: 4,
@@ -89,7 +123,7 @@ export const reportStyles = StyleSheet.create({
   // Purple separator between label and card image
   slabSeparator: {
     height: 3,
-    backgroundColor: '#9333ea', // Purple-600 (matches web separator)
+    backgroundColor: sep, // (matches web separator)
   },
 
   cardLabelRow: {
@@ -153,20 +187,20 @@ export const reportStyles = StyleSheet.create({
   cardLabelGrade: {
     fontSize: 14,  // Balanced size - fits within label
     fontWeight: 'bold',
-    color: '#7c3aed',
+    color: accent,
   },
 
   cardLabelDivider: {
     width: 20,
     height: 1,
-    backgroundColor: '#7c3aed',
+    backgroundColor: accent,
     marginVertical: 2,
   },
 
   cardLabelConfidence: {
     fontSize: 5,  // Small enough to fit "Gem Mint" on one line
     fontWeight: 'bold',
-    color: '#7c3aed',
+    color: accent,
   },
 
   // QR Code for back label
@@ -253,7 +287,7 @@ export const reportStyles = StyleSheet.create({
 
   professionalGradeLabel: {
     fontSize: 6,  // Increased from 5
-    color: '#e9d5ff',
+    color: tint,
     marginBottom: 1,
   },
 
@@ -305,7 +339,7 @@ export const reportStyles = StyleSheet.create({
     padding: 3,
     backgroundColor: '#f7fafc',
     borderLeftWidth: 2,
-    borderLeftColor: '#6b46c1',
+    borderLeftColor: dark,
     borderLeftStyle: 'solid',
     minHeight: 24,
   },
@@ -326,7 +360,7 @@ export const reportStyles = StyleSheet.create({
   subgradeScore: {
     fontSize: 10,  // Increased from 9
     fontWeight: 'bold',
-    color: '#6b46c1',
+    color: dark,
   },
 
   subgradeSummary: {
@@ -444,7 +478,7 @@ export const reportStyles = StyleSheet.create({
   callToAction: {
     fontSize: 7,  // Increased from 6
     fontWeight: 'bold',
-    color: '#6b46c1',  // Purple to match brand
+    color: dark,  // Accent to match brand
     textAlign: 'center',
     marginTop: 3,  // Reduced from 4 to compensate
   },
@@ -459,4 +493,8 @@ export const reportStyles = StyleSheet.create({
   column: {
     width: '48%',
   },
-});
+  });
+}
+
+/** Default DCM-purple styles (back-compat for existing imports). */
+export const reportStyles = makeReportStyles();

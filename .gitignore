@@ -88,3 +88,4 @@ slabby/public/lab-assets/
 # MB — they live in the slabby-drafts bucket, not git. The examples are tracked.
 slabby/scenes/*.json
 !slabby/scenes/example-*.json
+marketing-audience-*.csv

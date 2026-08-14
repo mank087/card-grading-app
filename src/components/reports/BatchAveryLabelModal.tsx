@@ -5,6 +5,7 @@ import { getAveryConfig, CalibrationOffsets, generateAveryLabelSheet, generateAv
 import { generateQRCodePlain, loadLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { FoldableLabelData } from '../../lib/foldableLabelGenerator';
+import { loadLogosForCard, cardQrUrl, type OrgLogoSet } from '../../lib/orgBranding';
 import LabelPositionGrid from './LabelPositionGrid';
 import UnassignedCardsList from './UnassignedCardsList';
 
@@ -283,22 +284,32 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     return dataUrl;
   };
 
+  // Org branding for the batch: all-same-org brands the sheet, else DCM
+  // (same rule as BatchSlabLabelModal).
+  const resolveBatchOrgLogos = async (): Promise<OrgLogoSet | null> => {
+    const allSameOrg = selectedCards.length > 0 &&
+      selectedCards.every(c => (c as any).org_id && (c as any).org_id === (selectedCards[0] as any).org_id);
+    if (!allSameOrg) return null;
+    const logos = await loadLogosForCard(selectedCards[0].id).catch(() => null);
+    return logos?.branding ? logos : null;
+  };
+
   // Build label data for a card
-  const buildLabelData = async (card: CardData): Promise<FoldableLabelData> => {
+  const buildLabelData = async (card: CardData, orgLogos: OrgLogoSet | null): Promise<FoldableLabelData> => {
     const cleanLabelData = getCardLabelData(card);
 
     // Get subgrades
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    // Generate QR code and load logo
-    const cardUrl = cleanLabelData.serial
-      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
+    // Generate QR code and load logo (org batches: branded card page)
+    const cardUrl = cardQrUrl(card.id, cleanLabelData.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`);
 
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
       generateQRCodePlain(cardUrl),
-      loadLogoAsBase64().catch(() => undefined)
+      orgLogos?.branding
+        ? Promise.resolve(orgLogos.color)
+        : loadLogoAsBase64().catch(() => undefined)
     ]);
 
     // Rotate QR code and logo 180 degrees for folding
@@ -353,10 +364,11 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     const entries = Array.from(positionMap.entries()).sort((a, b) => a[1] - b[1]);
 
     // Build label data for each card
+    const orgLogos = await resolveBatchOrgLogos();
     const labelDataPromises = entries.map(async ([cardId]) => {
       const card = selectedCards.find(c => c.id === cardId);
       if (!card) throw new Error(`Card not found: ${cardId}`);
-      return buildLabelData(card);
+      return buildLabelData(card, orgLogos);
     });
 
     const labelDataArray = await Promise.all(labelDataPromises);

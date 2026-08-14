@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     // this endpoint never reads. Split so the migration-window fallback can
     // drop the ownership columns without falling back to SELECT *.
     const BASE_COLUMNS = `
-        id, serial, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
+        id, serial, org_id, org_serial, org_serial_display, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
         manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
         dcm_grade_whole, dvg_image_quality, created_at, visibility,
         conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,

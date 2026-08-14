@@ -1012,7 +1012,7 @@ async function drawHeritageLabel(
     showFounderEmblem: data.showFounderEmblem,
     showVipEmblem: data.showVipEmblem,
     showCardLoversEmblem: data.showCardLoversEmblem,
-    logoDataUrl: dcmQrMark ?? logoDataUrl,
+    logoDataUrl: data.logoOverrides?.color || dcmQrMark || logoDataUrl,
   };
   const labelCanvas = await renderHeritageLabelCanvas({
     data: slabData as any,
@@ -1021,7 +1021,7 @@ async function drawHeritageLabel(
     bandColors: data.heritage?.bandColors?.length ? data.heritage.bandColors : ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'],
     widthPx: width * 2,
     gradeColors: data.heritage?.gradeColors ?? null,
-    logoBlack: data.logoOverrides?.black,
+    logoBlack: data.logoOverrides?.color,
   });
   ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
 }
@@ -1171,7 +1171,7 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
     // downloaded card images match the printed labels.
     qrCodeDataUrl = data.heritage
       ? await generateQRCodePlain(data.cardUrl)
-      : await generateQRCodeWithLogo(data.cardUrl);
+      : await generateQRCodeWithLogo(data.cardUrl, data.logoOverrides?.color);
     console.log('[CARD IMAGE GEN] QR code generated successfully');
   } catch (err) {
     console.error('[CARD IMAGE GEN] QR code generation failed:', err);

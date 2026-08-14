@@ -46,6 +46,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Card does not belong to this user' }, { status: 403 });
     }
 
+    // Active workspace context: web clients send the dcm-org-scope cookie
+    // (same-origin fetch), so a member grading in "personal" context never
+    // touches the store pool. No cookie (mobile app, direct API calls) leaves
+    // payerScope undefined → org-first default inside deductCredit.
+    const rawScope = request.cookies.get('dcm-org-scope')?.value;
+    const payerScope = rawScope === 'personal' || rawScope === 'org' ? rawScope : undefined;
+
     // Deduct credit. No separate hasCredits pre-check: deductCredit resolves
     // the duplicate-charge case first (a card already charged returns success
     // without deducting, even at zero balance) and reports insufficiency
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
       cardId,
       isRegrade: isRegrade || false,
       description: isRegrade ? 'Re-grade card' : 'Grade card',
+      payerScope,
     });
 
     if (!result.success) {
@@ -99,6 +107,9 @@ export async function POST(request: NextRequest) {
       totalUsed: result.totalUsed,
       totalPurchased: result.totalPurchased,
       alreadyCharged: result.alreadyCharged || false,
+      orgFunded: result.orgFunded || false,
+      orgName: result.orgName,
+      orgBalance: result.orgBalance,
     });
   } catch (error) {
     console.error('Credit deduction error:', error);

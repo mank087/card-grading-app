@@ -10,7 +10,7 @@
  * Japanese/Chinese/Korean characters are converted to ASCII-safe equivalents.
  */
 
-import { FoldableLabelData } from './foldableLabelGenerator';
+import { FoldableLabelData, shadeHex } from './foldableLabelGenerator';
 import { extractAsciiSafe } from './labelDataGenerator';
 
 // Canvas dimensions (300 DPI equivalent)
@@ -161,15 +161,16 @@ function drawMetallicSlabBorder(
   width: number,
   height: number,
   borderWidth: number,
-  cornerRadius: number
+  cornerRadius: number,
+  stops: string[] = [COLORS.slabGradient1, COLORS.slabGradient2, COLORS.slabGradient3, COLORS.slabGradient4, COLORS.slabGradient5]
 ) {
   // Create gradient for metallic effect
   const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
-  gradient.addColorStop(0, COLORS.slabGradient1);
-  gradient.addColorStop(0.25, COLORS.slabGradient2);
-  gradient.addColorStop(0.5, COLORS.slabGradient3);
-  gradient.addColorStop(0.75, COLORS.slabGradient4);
-  gradient.addColorStop(1, COLORS.slabGradient5);
+  gradient.addColorStop(0, stops[0]);
+  gradient.addColorStop(0.25, stops[1]);
+  gradient.addColorStop(0.5, stops[2]);
+  gradient.addColorStop(0.75, stops[3]);
+  gradient.addColorStop(1, stops[4]);
 
   ctx.fillStyle = gradient;
 
@@ -215,12 +216,13 @@ function drawPurpleSeparator(
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  stops: string[] = [COLORS.slabGradient1, COLORS.slabGradient3]
 ) {
   const gradient = ctx.createLinearGradient(x, y, x + width, y);
-  gradient.addColorStop(0, COLORS.slabGradient1);
-  gradient.addColorStop(0.5, COLORS.slabGradient3);
-  gradient.addColorStop(1, COLORS.slabGradient1);
+  gradient.addColorStop(0, stops[0]);
+  gradient.addColorStop(0.5, stops[1]);
+  gradient.addColorStop(1, stops[0]);
 
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, width, height);
@@ -256,6 +258,17 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
+  // Org-branded images swap the DCM purple accents for the brand primary.
+  const accent = data.accentColor;
+  const accentPrimary = accent || COLORS.purplePrimary;
+  const accentDark = accent ? shadeHex(accent, -0.2) : COLORS.purpleDark;
+  const slabStops = accent
+    ? [shadeHex(accent, 0.08), shadeHex(accent, -0.3), shadeHex(accent, 0.2), accent, shadeHex(accent, -0.5)]
+    : [COLORS.slabGradient1, COLORS.slabGradient2, COLORS.slabGradient3, COLORS.slabGradient4, COLORS.slabGradient5];
+  const separatorStops = accent
+    ? [shadeHex(accent, -0.15), shadeHex(accent, 0.2)]
+    : [COLORS.slabGradient1, COLORS.slabGradient3];
+
   // ============================================
   // BACKGROUND AND METALLIC SLAB BORDER
   // ============================================
@@ -267,7 +280,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   // Outer metallic purple slab border
   const outerBorderWidth = 8;
   const outerCornerRadius = 16;
-  drawMetallicSlabBorder(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, outerBorderWidth, outerCornerRadius);
+  drawMetallicSlabBorder(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, outerBorderWidth, outerCornerRadius, slabStops);
 
   // ============================================
   // HEADER SECTION (no inner border - just outer slab border + separator)
@@ -293,7 +306,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
       ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
     } catch {
       // Fallback text
-      ctx.fillStyle = COLORS.purplePrimary;
+      ctx.fillStyle = accentPrimary;
       ctx.font = 'bold 42px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
@@ -301,7 +314,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
     }
   } else {
     // Fallback text
-    ctx.fillStyle = COLORS.purplePrimary;
+    ctx.fillStyle = accentPrimary;
     ctx.font = 'bold 42px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -377,14 +390,14 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   const gradeText = formatGradeDisplay(data.grade);
   const hasDecimal = gradeText.includes('.');
 
-  ctx.fillStyle = COLORS.purplePrimary;
+  ctx.fillStyle = accentPrimary;
   ctx.font = `bold ${hasDecimal ? 56 : 72}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(gradeText, gradeX, innerHeaderY + 30);
 
   // Divider line under grade
-  ctx.strokeStyle = COLORS.purplePrimary;
+  ctx.strokeStyle = accentPrimary;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(gradeX - 50, innerHeaderY + 105);
@@ -392,7 +405,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   ctx.stroke();
 
   // Condition label
-  ctx.fillStyle = COLORS.purplePrimary;
+  ctx.fillStyle = accentPrimary;
   ctx.font = 'bold 16px "Helvetica Neue", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -402,7 +415,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   // PURPLE SEPARATOR BETWEEN HEADER AND SUBGRADES
   // ============================================
   const separatorY = innerHeaderY + headerHeight;
-  drawPurpleSeparator(ctx, outerBorderWidth, separatorY, CANVAS_WIDTH - outerBorderWidth * 2, 6);
+  drawPurpleSeparator(ctx, outerBorderWidth, separatorY, CANVAS_WIDTH - outerBorderWidth * 2, 6, separatorStops);
 
   // ============================================
   // SUBGRADES SECTION (2x2 grid with QR in center)
@@ -455,7 +468,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   drawRoundedRect(ctx, 16, summaryY, CANVAS_WIDTH - 32, summaryHeight, 12, { fill: true });
 
   // Summary title
-  ctx.fillStyle = COLORS.purpleDark;
+  ctx.fillStyle = accentDark;
   ctx.font = `bold ${22}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';

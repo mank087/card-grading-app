@@ -33,6 +33,8 @@ import { LorcanaPriceLookup } from '@/components/pricing/LorcanaPriceLookup';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { SoldBanner } from '@/components/cards/SoldBanner';
+import OrgBrandingBadge from '@/components/org/OrgBrandingBadge';
+import { fetchBrandingForCard } from '@/lib/orgBranding';
 import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
@@ -55,7 +57,7 @@ import { DefectLegend } from '@/components/grading/DefectLegend';
 import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
-import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
+import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { ScaleToFit } from '@/components/labels/ScaleToFit'
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
@@ -1564,7 +1566,9 @@ export function MTGCardDetails() {
   // ❤️ Card Lovers emblem state (for back label)
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
-  const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyle();
+  // Org-graded cards render the org house label design (Brand Setup),
+  // overriding the viewer's personal Label Studio style.
+  const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyleWithOrg((card as any)?.org_id);
   // Heritage label selection — built-in 'heritage' id or a saved custom config
   // whose style is 'heritage'. Renders through the shared SVG preview.
   const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
@@ -1728,6 +1732,18 @@ export function MTGCardDetails() {
       setOrigin(window.location.origin);
     }
   }, []);
+
+  // Enterprise org branding — org-graded cards show the store's logo on the
+  // on-screen labels (color logo on light labels, white on the dark modern one).
+  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null } | null>(null);
+  useEffect(() => {
+    if (!(card as any)?.org_id || !card?.id) { setOrgLogos(null); return; }
+    let cancelled = false;
+    fetchBrandingForCard(card.id).then((b) => {
+      if (!cancelled) setOrgLogos(b ? { color: b.logoUrl, white: b.logoWhiteUrl } : null);
+    });
+    return () => { cancelled = true; };
+  }, [card]);
 
   // ⭐ Show emblems based on card OWNER's settings and preference
   // New format: comma-separated list of selected emblems (e.g., "founder,vip" or "card_lover")
@@ -2840,6 +2856,7 @@ export function MTGCardDetails() {
 
       {/* Main Layout */}
       <div className="space-y-8">
+        {(card as any)?.org_id && <OrgBrandingBadge cardId={card.id} />}
         {/* Card Images with Professional-Style Labels in Metallic Slab */}
         {/* Sold: the record is locked and stays online for the buyer */}
         {card?.ownership_status === 'sold' && (
@@ -2870,6 +2887,8 @@ export function MTGCardDetails() {
                   data={heritageData as any}
                   side="front"
                   pattern={heritageSel.pattern}
+                  blackLogoHref={orgLogos?.color ?? undefined}
+                  colorLogoHref={orgLogos?.color ?? undefined}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />
@@ -2882,6 +2901,8 @@ export function MTGCardDetails() {
                   grade={labelData.grade}
                   condition={labelData.condition}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
+                  logoColorSrc={orgLogos?.color}
+                  logoWhiteSrc={orgLogos?.white}
                   size="lg"
                   colorOverrides={colorOverrides}
                 />
@@ -2891,7 +2912,7 @@ export function MTGCardDetails() {
                     {/* Left: DCM Logo */}
                     <div className="flex-shrink-0">
                       <img
-                        src="/DCM-logo.png"
+                        src={orgLogos?.color ?? "/DCM-logo.png"}
                         alt="DCM"
                         className="h-14 w-auto"
                       />
@@ -3022,6 +3043,8 @@ export function MTGCardDetails() {
                   data={heritageData as any}
                   side="back"
                   pattern={heritageSel.pattern}
+                  blackLogoHref={orgLogos?.color ?? undefined}
+                  colorLogoHref={orgLogos?.color ?? undefined}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />

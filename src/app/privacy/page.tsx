@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
       <FloatingCardsBackground />
       <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-600 mb-8">Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
 
         <div className="prose prose-lg max-w-none space-y-6 text-gray-700">
           <section>
@@ -187,14 +187,25 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
               <li><strong>Account Information:</strong> Retained as long as your account remains active</li>
-              <li><strong>Card Images:</strong> Retained as long as your account remains active or until you request deletion</li>
+              <li><strong>Card Images:</strong> Retained as long as your account remains active or until you request deletion; images that are part of a graded card&apos;s certificate record are retained in the verification registry as described below</li>
               <li><strong>Payment Records:</strong> Retained as required by law for tax and accounting purposes</li>
               <li><strong>Usage Data:</strong> Aggregated and anonymized data may be retained indefinitely for analytics</li>
+              <li><strong>Certificate (registry) records:</strong> Retained permanently — see below</li>
             </ul>
             <p className="mt-4">
               When you delete your account or request data deletion, we will permanently delete your personal information within 30 days,
               except where we are required to retain it by law (for example, anonymized transaction records retained for tax and
-              accounting purposes).
+              accounting purposes) and except for certificate records as described below.
+            </p>
+            <p className="mt-4">
+              <strong>Verification registry records are permanent.</strong> When a card is graded, its certificate record — the
+              Cert ID, the card photographs captured at grading, the grade and sub-grades, and card metadata — becomes part of
+              DCM&apos;s public verification registry. These records exist to protect subsequent owners of graded cards and to
+              prevent fraud: anyone scanning a slab&apos;s QR code must be able to verify what was graded, indefinitely. When you
+              delete your account, certificate records are <strong>disassociated from your identity</strong> (your name, email,
+              and account identifiers are removed from them) but the card record itself remains in the registry. Card
+              photographs depict collectible cards, not people; do not include personal information in the photographs you
+              submit for grading.
             </p>
           </section>
 
@@ -207,9 +218,52 @@ export default function PrivacyPolicyPage() {
               <li><strong>By email:</strong> Send a deletion request to admin@dcmgrading.com from the email address associated with your account.</li>
             </ul>
             <p className="mt-4">
-              Account deletion is permanent. We delete your cards, card images, account information, and unused credits. Transaction
-              records may be retained in anonymized form to comply with tax and financial recordkeeping requirements.
+              Account deletion is permanent. We delete your account information, personal information, private cards and their
+              images, and unused credits. Transaction records may be retained in anonymized form to comply with tax and
+              financial recordkeeping requirements, and certificate records for graded cards remain in the public verification
+              registry, disassociated from your identity, as described in Section 7.
             </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">8a. Enterprise Program (Store) Data</h2>
+            <p>
+              This section applies to businesses participating in the DCM Enterprise Program and to DCM accounts that are
+              members of an Enterprise store.
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>
+                <strong>Business information:</strong> When a business applies to the Enterprise Program, we collect business
+                details (store name, desired store URL, contact phone, website, estimated volume), the applicant&apos;s account
+                email, branding assets (logo, colors), and storefront content. We use this information to review the
+                application, operate store branding, and communicate about the program.
+              </li>
+              <li>
+                <strong>Public storefront and branding:</strong> An approved store&apos;s name, logo, colors, storefront
+                content, and store-attributed graded cards appear on public pages of the Service, including the store&apos;s
+                storefront page, card detail pages, verification pages, and printed labels and reports.
+              </li>
+              <li>
+                <strong>Visibility between store members:</strong> Within a store, members can see store-scoped information
+                about each other — for example, which member account graded a given store card and member email addresses in
+                store views. The store&apos;s owner controls membership; if you leave a store or are removed, this visibility
+                ends, but records of cards you graded for the store remain attributed to the store.
+              </li>
+              <li>
+                <strong>Workspace preference:</strong> We store your personal/store workspace choice in your browser (local
+                storage and a functional cookie) so grading and billing apply to the workspace you selected. This is a
+                functional preference, not advertising tracking.
+              </li>
+              <li>
+                <strong>Store billing:</strong> Enterprise subscriptions and overage purchases are processed through Stripe
+                under the store&apos;s billing profile, as described in Section 5.1.
+              </li>
+              <li>
+                <strong>Store customer data:</strong> If a store records information about its own customers in the Service,
+                the store is responsible for that data and for its customers&apos; privacy requests; DCM processes it solely to
+                provide the Service to the store (see the Enterprise Program Terms).
+              </li>
+            </ul>
           </section>
 
           <section>
@@ -276,8 +330,9 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Children&apos;s Privacy</h2>
             <p>
-              Our Service is not intended for children under the age of 13. We do not knowingly collect personal information from
-              children under 13. If you become aware that a child has provided us with personal information, please contact us at
+              Our Service requires users to be at least 18 years old (see our Terms and Conditions) and is not intended for
+              children. We do not knowingly collect personal information from anyone under 18, and in no event from children
+              under 13. If you become aware that a minor has provided us with personal information, please contact us at
               admin@dcmgrading.com, and we will take steps to delete such information.
             </p>
           </section>

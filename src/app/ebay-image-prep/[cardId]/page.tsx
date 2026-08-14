@@ -27,7 +27,9 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { generateCardImages, generateRawCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
-import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
+import { generateQRCodeWithLogo, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
+import { generateHtmlDescription } from '@/lib/ebay/listingDescription';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
@@ -105,73 +107,6 @@ async function imageToJpegBase64(imageUrl: string): Promise<string> {
   });
 }
 
-// Mirrors generateHtmlDescription in EbayListingModal.tsx so mobile listings
-// match web parity for the eBay description body.
-function generateHtmlDescription(data: {
-  primaryName: string; setName: string; cardNumber: string;
-  grade: number; conditionLabel: string; overview: string;
-  subgrades: { centering: number; corners: number; edges: number; surface: number };
-  serial: string;
-}): string {
-  const { primaryName, setName, cardNumber, grade, conditionLabel, overview, subgrades, serial } = data;
-  const gradeColor = getGradeColor(grade);
-  const dcmPurple = '#7C3AED';
-  const dcmPurpleLight = '#A78BFA';
-  const dcmGray = '#4B5563';
-  return `
-<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-  <div style="background: linear-gradient(135deg, ${dcmPurple} 0%, #5B21B6 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-    <h2 style="margin: 0 0 8px 0; font-size: 24px;">DCM Graded Card</h2>
-    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Professional AI-Powered Card Grading</p>
-  </div>
-  <div style="background: #F9FAFB; border: 2px solid ${gradeColor}; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center;">
-    <div style="font-size: 48px; font-weight: bold; color: ${gradeColor};">${grade}</div>
-    <div style="font-size: 18px; color: ${dcmGray}; font-weight: 600;">${conditionLabel}</div>
-    <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">DCM Serial: <strong>${serial}</strong></div>
-  </div>
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">Card Details</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-      ${primaryName ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Character/Player:</td><td style="padding: 8px 0; text-align: right;">${primaryName}</td></tr>` : ''}
-      ${setName ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Set:</td><td style="padding: 8px 0; text-align: right;">${setName}</td></tr>` : ''}
-      ${cardNumber ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Card Number:</td><td style="padding: 8px 0; text-align: right;">#${cardNumber}</td></tr>` : ''}
-    </table>
-  </div>
-  ${overview ? `
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">Condition Overview</h3>
-    <p style="color: ${dcmGray}; line-height: 1.6; margin: 0;">${overview}</p>
-  </div>` : ''}
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">DCM Sub-Grades</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-      <tr>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB; border-radius: 8px 0 0 8px;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.centering)};">${subgrades.centering}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Centering</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.corners)};">${subgrades.corners}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Corners</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.edges)};">${subgrades.edges}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Edges</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB; border-radius: 0 8px 8px 0;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.surface)};">${subgrades.surface}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Surface</div>
-        </td>
-      </tr>
-    </table>
-  </div>
-  <div style="background: linear-gradient(135deg, ${dcmPurple} 0%, #5B21B6 100%); color: white; padding: 16px 20px; border-radius: 8px; text-align: center;">
-    <div style="font-size: 18px; font-weight: bold;">Graded by DCM</div>
-    <p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.9;">Professional AI-Powered Card Authentication & Grading</p>
-    <p style="margin: 4px 0 0 0; font-size: 11px; opacity: 0.7;">Verify this card at dcmgrading.com</p>
-  </div>
-</div>`.trim();
-}
 
 export default function EbayImagePrepPage() {
   const { cardId } = useParams<{ cardId: string }>();
@@ -245,6 +180,9 @@ export default function EbayImagePrepPage() {
         const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
         setStatus('Generating slab images…');
+        // Org branding once: logos for label art, slug for QR targets (org
+        // cards' QRs land on the branded storefront card page).
+        const orgLogoSet = await loadLogosForCard(cardId).catch(() => null);
         const cardImageData: CardImageData = {
           cardName: labelData.primaryName,
           contextLine: labelData.contextLine,
@@ -253,7 +191,7 @@ export default function EbayImagePrepPage() {
           englishName,
           grade: labelData.grade ?? 0,
           conditionLabel: labelData.condition,
-          cardUrl: `${window.location.origin}/${categoryToRouteSlug(card.category)}/${card.id}`,
+          cardUrl: cardQrUrl(cardId, card.serial, orgLogoSet?.branding, `${window.location.origin}/${categoryToRouteSlug(card.category)}/${card.id}`),
           frontImageUrl,
           backImageUrl,
           showFounderEmblem: emblemFlags.showFounderEmblem,
@@ -268,6 +206,9 @@ export default function EbayImagePrepPage() {
               }
             : undefined,
           subScores,
+          logoOverrides: orgLogoSet?.branding
+            ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black }
+            : undefined,
         };
 
         const [{ front, back }, rawImages] = await Promise.all([
@@ -277,10 +218,10 @@ export default function EbayImagePrepPage() {
 
         setStatus('Generating mini report…');
         const cardUrl = cardImageData.cardUrl;
-        const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-          generateQRCodeWithLogo(cardUrl),
-          loadLogoAsBase64().catch(() => undefined),
-        ]);
+        // Org-graded cards carry the store's logo; DCM otherwise.
+        const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
+          .catch(() => generateQRCodeWithLogo(cardUrl));
+        const logoDataUrl = orgLogoSet?.color || undefined;
 
         const miniReportData: FoldableLabelData = {
           cardName: labelData.primaryName,
@@ -315,19 +256,38 @@ export default function EbayImagePrepPage() {
         // eBay HTML description + pre-filled item specifics for web parity
         setStatus('Generating description and specifics…');
         const cardCategoryRaw = (card.category || 'other').toString().toLowerCase().replace(/\s+/g, '');
-        const cardTypeForSpecifics = ['pokemon','sports','mtg','lorcana','onepiece','other'].includes(cardCategoryRaw)
+        // Fold sports sub-categories (Football, Baseball, ...) into 'sports'
+        // and recognize every supported card type — previously yugioh/
+        // starwars/sport-subcategory cards fell to 'other' and shipped
+        // Non-Sport item specifics on a Sports/CCG-category listing.
+        const SPORT_CATEGORIES = ['football', 'baseball', 'basketball', 'hockey', 'soccer', 'golf', 'tennis', 'wrestling', 'boxing', 'racing', 'ufc', 'mma'];
+        const cardTypeForSpecifics = ['pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other'].includes(cardCategoryRaw)
           ? cardCategoryRaw
-          : 'other';
-        const description = generateHtmlDescription({
-          primaryName: labelData.primaryName || '',
-          setName: labelData.setName || '',
-          cardNumber: labelData.cardNumber || '',
-          grade: Math.round(labelData.grade ?? 0),
-          conditionLabel: labelData.condition || '',
-          overview: card.conversational_final_grade_summary || card.conversational_summary || '',
-          subgrades: subScores,
-          serial: card.serial || 'N/A',
-        });
+          : SPORT_CATEGORIES.includes(cardCategoryRaw)
+            ? 'sports'
+            : 'other';
+        const description = generateHtmlDescription(
+          {
+            primaryName: labelData.primaryName || '',
+            setName: labelData.setName || '',
+            cardNumber: labelData.cardNumber || '',
+            grade: Math.round(labelData.grade ?? 0),
+            conditionLabel: labelData.condition || '',
+            overview: card.conversational_final_grade_summary || card.conversational_summary || '',
+            // Whole numbers, matching the web modal (raw weighted scores can
+            // carry decimals).
+            subgrades: {
+              centering: Math.round(subScores.centering),
+              corners: Math.round(subScores.corners),
+              edges: Math.round(subScores.edges),
+              surface: Math.round(subScores.surface),
+            },
+            serial: card.org_serial_display || card.serial || 'N/A',
+          },
+          orgLogoSet?.branding
+            ? { name: orgLogoSet.branding.name, brandColor: orgLogoSet.branding.brandColor || null }
+            : null
+        );
         const itemSpecifics = mapCardToItemSpecifics(card, cardTypeForSpecifics);
         const categoryId = getCategoryForCardType(cardTypeForSpecifics);
 
@@ -381,6 +341,9 @@ export default function EbayImagePrepPage() {
             gradeRange: card.conversational_grade_uncertainty || '±0.5',
             heritage: heritageSel.active
               ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: heritageSel.gradeColors }
+              : undefined,
+            org: orgLogoSet?.branding
+              ? { name: orgLogoSet.branding.name, slug: orgLogoSet.branding.slug, logoDataUrl: orgLogoSet.color || null, brandColor: orgLogoSet.branding.brandColor || null }
               : undefined,
             professionalGrades: {
               psa: card.estimated_professional_grades?.psa?.grade || '-',

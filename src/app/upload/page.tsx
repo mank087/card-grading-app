@@ -22,11 +22,13 @@ import { useDeviceDetection } from '@/hooks/useDeviceDetection'
 import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
 import MobileCamera from '@/components/camera/MobileCamera'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
+import { useOrgContext } from '@/contexts/OrgContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPopup'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
 import UserConditionReport from '@/components/UserConditionReport'
+import OrgScopeBadge from '@/components/OrgScopeBadge'
 import WizardProgressIndicator from '@/components/WizardProgressIndicator'
 import { UserConditionReportInput, EMPTY_CONDITION_REPORT, hasAnyConditionData, countDefects } from '@/types/conditionReport'
 import { processConditionReport } from '@/lib/conditionReportProcessor'
@@ -209,6 +211,7 @@ function UniversalUploadPageContent() {
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
   const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits } = useCredits();
+  const { refreshOrg, isOrgScope, membership: orgMembership } = useOrgContext();
   const toast = useToast();
 
   // 🔒 Authentication state
@@ -864,12 +867,28 @@ function UniversalUploadPageContent() {
         })
 
         if (creditResponse.ok) {
-          deductLocalCredit() // Update local state optimistically
           console.log('[Upload] Credit deducted successfully')
 
           // Track free credit usage and first grade events
           try {
             const creditData = await creditResponse.json()
+            if (creditData.orgFunded) {
+              // Store pool paid — refresh the workspace badge; the personal
+              // balance was never touched, so no optimistic decrement.
+              refreshOrg()
+            } else {
+              deductLocalCredit() // Update local state optimistically
+              // Grading in org context but the store pool didn't pay: the
+              // pool is empty and this grade used personal credits. Say so —
+              // silent fallback reads as "store paid" and surprises staff.
+              if (isOrgScope && orgMembership && !creditData.alreadyCharged) {
+                toast.warning(
+                  `${orgMembership.name}'s store grades are used up — this grade used your personal credits. ` +
+                  `The store owner can buy more on the store billing page.`
+                )
+                refreshOrg()
+              }
+            }
             const isFirstGrade = creditData.totalUsed === 1
             const isFreeUser = creditData.totalPurchased === 0
 
@@ -2066,6 +2085,9 @@ function UniversalUploadPageContent() {
 
             {wizardStep === 3 && (
               <>
+                <div className="flex justify-center">
+                  <OrgScopeBadge />
+                </div>
                 <button
                   onClick={handleUpload}
                   disabled={!frontCompressed || !backCompressed || isCompressing || isUploading || (!noDefectsConfirmed && !hasConditionData)}

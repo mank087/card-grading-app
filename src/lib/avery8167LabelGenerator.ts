@@ -548,7 +548,8 @@ export async function generateToploaderLabelPair(
   data: ToploaderLabelData,
   frontPositionIndex: number,
   backPositionIndex: number,
-  offsets?: CalibrationOffsets
+  offsets?: CalibrationOffsets,
+  logoDataUrl?: string
 ): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -556,12 +557,15 @@ export async function generateToploaderLabelPair(
     format: 'letter',
   });
 
-  // Load color logo (used for both front labels and back watermarks)
-  let colorLogoBase64: string = '';
-  try {
-    colorLogoBase64 = await loadLogoAsBase64();
-  } catch (e) {
-    // Continue without logo
+  // Color logo (front labels + back watermarks): caller override (org
+  // branding) wins, else the DCM asset.
+  let colorLogoBase64: string = logoDataUrl || '';
+  if (!colorLogoBase64) {
+    try {
+      colorLogoBase64 = await loadLogoAsBase64();
+    } catch (e) {
+      // Continue without logo
+    }
   }
 
   // Generate QR code for back label
@@ -590,7 +594,8 @@ export async function generateToploaderLabelPair(
 export async function generateToploaderLabelSheet(
   cardsData: ToploaderLabelData[],
   cardPositionIndices: number[],
-  offsets?: CalibrationOffsets
+  offsets?: CalibrationOffsets,
+  logoDataUrl?: string
 ): Promise<Blob> {
   // Validate inputs
   if (cardsData.length !== cardPositionIndices.length) {
@@ -625,12 +630,14 @@ export async function generateToploaderLabelSheet(
     format: 'letter',
   });
 
-  // Load color logo (used for both front labels and back watermarks)
-  let colorLogoBase64: string = '';
-  try {
-    colorLogoBase64 = await loadLogoAsBase64();
-  } catch (e) {
-    // Continue without logo
+  // Color logo: caller override (org branding) wins, else the DCM asset.
+  let colorLogoBase64: string = logoDataUrl || '';
+  if (!colorLogoBase64) {
+    try {
+      colorLogoBase64 = await loadLogoAsBase64();
+    } catch (e) {
+      // Continue without logo
+    }
   }
 
   // Draw each card at its specified position
@@ -680,7 +687,8 @@ export async function generateToploaderLabelSheet(
 export async function generateToploaderLabelSheetMultiPage(
   cardsData: ToploaderLabelData[],
   offsets?: CalibrationOffsets,
-  globalPositions?: number[]
+  globalPositions?: number[],
+  logoDataUrl?: string
 ): Promise<Blob> {
   if (cardsData.length === 0) {
     throw new Error('No cards to generate labels for');
@@ -692,12 +700,14 @@ export async function generateToploaderLabelSheetMultiPage(
     format: 'letter',
   });
 
-  // Load color logo (used for both front labels and back watermarks)
-  let colorLogoBase64: string = '';
-  try {
-    colorLogoBase64 = await loadLogoAsBase64();
-  } catch (e) {
-    // Continue without logo
+  // Color logo: caller override (org branding) wins, else the DCM asset.
+  let colorLogoBase64: string = logoDataUrl || '';
+  if (!colorLogoBase64) {
+    try {
+      colorLogoBase64 = await loadLogoAsBase64();
+    } catch (e) {
+      // Continue without logo
+    }
   }
 
   const cardsPerPage = 40;

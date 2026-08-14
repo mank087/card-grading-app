@@ -35,7 +35,8 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenerator';
-import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '@/lib/foldableLabelGenerator';
+import { generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard } from '@/lib/orgBranding';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
@@ -122,6 +123,9 @@ export default function LabelPreviewPage() {
   const slabDataRef = useRef<SlabLabelData | null>(null);
   const cardColorsRef = useRef<any>(null);
   const renderIdRef = useRef(0);
+  // Heritage branding: the QR-centre disc must stay the DCM mark (verification
+  // anchor), so heritage renders swap only the front-label mark for org cards.
+  const heritageLogosRef = useRef<{ dcmColor: string; logoBlack?: string } | null>(null);
 
   // Decode initial config from URL if provided
   function decodeCustom(raw: string | null): CustomLabelConfig | null {
@@ -201,15 +205,19 @@ export default function LabelPreviewPage() {
           surface: extractScore('surface'),
         };
         const cardUrl = `${window.location.origin}/verify/${card.serial}`;
-        // Load BOTH the dark and white logos — the renderer picks logoDataUrl
+        // BOTH the dark and white logos — the renderer picks logoDataUrl
         // for light/traditional themes, whiteLogoDataUrl for dark/modern/custom
-        // themes (customSlabLabelGenerator.ts:611). Without the white one,
-        // modern + custom slabs fall back to the "DCM" text logo.
-        const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
-          generateQRCodeWithLogo(cardUrl).catch(() => ''),
-          loadLogoAsBase64().catch(() => ''),
-          loadWhiteLogoAsBase64().catch(() => ''),
-        ]);
+        // themes (customSlabLabelGenerator.ts:611). Org-graded cards get the
+        // store's logos; DCM otherwise (loadLogosForCard falls back per asset).
+        const logos = await loadLogosForCard(cardId).catch(() => ({ color: '', white: '', black: '', branding: null as any }));
+        const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
+        const logoDataUrl = logos.color;
+        const whiteLogoDataUrl = logos.white;
+        // Org cards carry the store mark on BOTH the front and the QR disc.
+        heritageLogosRef.current = {
+          dcmColor: logos.color,
+          logoBlack: logos.branding ? logos.color : undefined,
+        };
 
         if (cancelled) return;
         slabDataRef.current = {
@@ -265,8 +273,11 @@ export default function LabelPreviewPage() {
           import('@/lib/labelLab/heritageLayout'),
         ]);
         const sel = resolveHeritageSelection('heritage', config);
+        const hb = heritageLogosRef.current;
         const url = await renderHeritageLabelPng({
-          data: data as any,
+          // Heritage QR disc reads data.logoDataUrl (org colour for org cards).
+          data: (hb ? { ...(data as any), logoDataUrl: hb.dcmColor || (data as any).logoDataUrl } : data) as any,
+          logoBlack: hb?.logoBlack,
           side,
           pattern: sel.pattern,
           bandColors: sel.bandColors ?? resolveHeritageBandColors(cardColorsRef.current),

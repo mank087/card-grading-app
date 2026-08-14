@@ -10,6 +10,7 @@ import {
   getAvery8167CardsPerPage
 } from '../../lib/avery8167LabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
+import { loadLogosForCard, cardQrUrl } from '../../lib/orgBranding';
 import LabelPositionGrid8167 from './LabelPositionGrid8167';
 import UnassignedCardsList from './UnassignedCardsList';
 
@@ -265,12 +266,10 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     });
   }, [currentPage]);
 
-  // Build label data for a card
-  const buildLabelData = (card: CardData): ToploaderLabelData => {
+  // Build label data for a card (org batches: QR points at the branded page)
+  const buildLabelData = (card: CardData, branding: { slug: string } | null): ToploaderLabelData => {
     const cleanLabelData = getCardLabelData(card);
-    const cardUrl = cleanLabelData.serial
-      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cardQrUrl(card.id, cleanLabelData.serial, branding, `${window.location.origin}/${cardType}/${card.id}`);
 
     // Use primaryName from getCardLabelData - this uses intelligent category-specific logic + custom overrides
     // (e.g., player_or_character for Sports, pokemon name with variant for Pokemon, etc.)
@@ -282,16 +281,29 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     };
   };
 
+  // Org branding for the batch: all-same-org brands the sheet, else DCM
+  // (same rule as BatchSlabLabelModal).
+  const resolveBatchOrgBranding = async (): Promise<{ logo: string | undefined; branding: { slug: string } | null }> => {
+    const allSameOrg = selectedCards.length > 0 &&
+      selectedCards.every(c => (c as any).org_id && (c as any).org_id === (selectedCards[0] as any).org_id);
+    if (!allSameOrg) return { logo: undefined, branding: null };
+    const logos = await loadLogosForCard(selectedCards[0].id).catch(() => null);
+    return logos?.branding
+      ? { logo: logos.color, branding: { slug: logos.branding.slug } }
+      : { logo: undefined, branding: null };
+  };
+
   // Generate the PDF
   const generatePDF = async (): Promise<Blob> => {
     // Get all assigned cards sorted by global position
     const entries = Array.from(positionMap.entries()).sort((a, b) => a[1] - b[1]);
+    const { logo: orgLogo, branding } = await resolveBatchOrgBranding();
 
     // Build label data for each card in position order
     const labelDataArray: ToploaderLabelData[] = entries.map(([cardId]) => {
       const card = selectedCards.find(c => c.id === cardId);
       if (!card) throw new Error(`Card not found: ${cardId}`);
-      return buildLabelData(card);
+      return buildLabelData(card, branding);
     });
 
     // Save calibration
@@ -306,11 +318,11 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     if (pagesNeeded > 1) {
       // Multi-page: need to generate with specific positions across pages
       const globalPositions = entries.map(([_, pos]) => pos);
-      return generateToploaderLabelSheetMultiPageWithPositions(labelDataArray, globalPositions, offsets);
+      return generateToploaderLabelSheetMultiPageWithPositions(labelDataArray, globalPositions, offsets, orgLogo);
     } else {
       // Single page: use specific position indices
       const positionIndices = entries.map(([_, position]) => position);
-      return generateToploaderLabelSheet(labelDataArray, positionIndices, offsets);
+      return generateToploaderLabelSheet(labelDataArray, positionIndices, offsets, orgLogo);
     }
   };
 
@@ -318,7 +330,8 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
   const generateToploaderLabelSheetMultiPageWithPositions = async (
     labelDataArray: ToploaderLabelData[],
     globalPositions: number[],
-    offsets: CalibrationOffsets
+    offsets: CalibrationOffsets,
+    orgLogo?: string
   ): Promise<Blob> => {
     // Group labels by page
     const labelsByPage = new Map<number, { data: ToploaderLabelData; positionOnPage: number }[]>();
@@ -350,7 +363,7 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     });
 
     // Use multi-page generator with positions
-    return generateToploaderLabelSheetMultiPage(reorderedLabels, offsets, reorderedPositions);
+    return generateToploaderLabelSheetMultiPage(reorderedLabels, offsets, reorderedPositions, orgLogo);
   };
 
   // Handle preview

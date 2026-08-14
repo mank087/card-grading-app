@@ -1,0 +1,253 @@
+import { Metadata } from 'next';
+import Link from 'next/link';
+import FloatingCardsBackground from '../../ui/FloatingCardsBackground';
+
+export const metadata: Metadata = {
+  title: 'Enterprise Program Terms',
+  description: 'Supplemental terms for the DCM Enterprise program for card stores, dealers, and grading businesses.',
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export default function EnterpriseTermsPage() {
+  return (
+    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <FloatingCardsBackground />
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">DCM Enterprise Program Terms</h1>
+        <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
+
+        <div className="prose prose-lg max-w-none space-y-6 text-gray-700">
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. These Terms Supplement the General Terms</h2>
+            <p>
+              These Enterprise Program Terms (&quot;Enterprise Terms&quot;) are a binding agreement between the business you
+              represent (the &quot;Organization&quot;) and Dynamic Collectibles Management LLC (&quot;DCM,&quot; &quot;we,&quot;
+              &quot;our,&quot; or &quot;us&quot;). They supplement, and apply in addition to, the DCM{' '}
+              <Link href="/terms" className="text-blue-600 hover:underline">Terms and Conditions</Link> (the &quot;General
+              Terms&quot;) and the DCM <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>.
+              Where these Enterprise Terms conflict with the General Terms with respect to Enterprise Program activity, these
+              Enterprise Terms control.
+            </p>
+            <p className="mt-4">
+              By submitting an Enterprise application, accepting these Enterprise Terms during onboarding, or using any
+              Enterprise Program feature, you represent and warrant that: (a) you are authorized to bind the Organization to
+              these Enterprise Terms; (b) the Organization is a lawfully operating business; and (c) all information provided
+              in your application is accurate. If you do not have that authority, or do not agree to these Enterprise Terms,
+              do not use the Enterprise Program.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">2. The Enterprise Program</h2>
+            <p>The Enterprise Program provides an Organization with:</p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Store Branding</strong> — the Organization&apos;s name, logo, and colors rendered on slab labels, grading reports, card detail pages, listing imagery, and an optional public storefront page, in each case alongside DCM attribution (such as &quot;Powered by DCM Optic™&quot;), DCM serial numbers, and DCM verification QR codes.</li>
+              <li><strong>Enterprise Credits</strong> — a shared pool of grading credits: a monthly allotment that resets each billing cycle, plus optional overage packs that carry over (Section 6).</li>
+              <li><strong>Staff access</strong> — additional DCM accounts (&quot;Staff Members&quot;) linked to the Organization that may grade using the Organization&apos;s credit pool.</li>
+              <li><strong>Store serials and inventory tools</strong> — store-prefixed serial numbers, a store-scoped collection view, and related features we may add or modify from time to time.</li>
+            </ul>
+            <p className="mt-4">
+              The account that creates the Organization is its &quot;Owner.&quot; The Owner is responsible for the Organization&apos;s
+              use of the Services, including all activity by Staff Members.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">3. Commercial Use License</h2>
+            <p>
+              The General Terms restrict commercial use of the Services and of DCM grading outputs. For an Organization in
+              good standing, DCM grants a limited, non-exclusive, non-transferable, revocable license to use the Services and
+              DCM grading outputs commercially in connection with the Organization&apos;s own business, including:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Charging the Organization&apos;s customers for grading performed through the Services;</li>
+              <li>Selling, listing, and marketing cards graded through the Services, under the Organization&apos;s brand;</li>
+              <li>Displaying and distributing branded labels, reports, and card pages generated by the Services.</li>
+            </ul>
+            <p className="mt-4">This license is conditioned on the Organization at all times:</p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Preserving DCM attribution and verification.</strong> The Organization may not remove, obscure, or alter DCM serial numbers, Cert IDs, verification QR codes, or &quot;Powered by DCM Optic™&quot; (or similar) attribution where the Services include them.</li>
+              <li><strong>Not altering grading outputs.</strong> The Organization may not modify grades, sub-grades, confidence scores, condition text, or certificate records, and may not present an altered output as having been produced by the Services.</li>
+              <li><strong>Describing grades accurately.</strong> The Organization must describe grades as AI-assisted visual condition assessments produced through the DCM Optic™ system (or substantially similar language) and must not represent them as physical inspection, authentication, or the output of any other grading company.</li>
+              <li><strong>Complying with law.</strong> The Organization&apos;s sales and marketing must comply with all applicable consumer protection, advertising, and other laws in the jurisdictions where it operates.</li>
+            </ul>
+            <p className="mt-4">
+              This license ends automatically when the Organization&apos;s Enterprise participation ends, except that cards
+              already graded and distributed may continue to bear the labels and records generated while the license was active.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">4. Your Business, Your Customers, Your Responsibility</h2>
+            <p>
+              <strong>The Organization is an independent business.</strong> Cards graded, labeled, listed, sold, transferred, or
+              otherwise distributed by or through the Organization — including through DCM Enterprise features such as branded
+              labels, reports, storefront pages, and marketplace tools — are the property and sole responsibility of the
+              Organization and its customers. DCM&apos;s role is limited to providing the software-based grading and branding
+              tools described in these Enterprise Terms.
+            </p>
+            <p className="mt-4">
+              <strong>DCM IS NOT A PARTY TO, AND HAS NO RESPONSIBILITY FOR, ANY TRANSACTION OR RELATIONSHIP BETWEEN THE
+              ORGANIZATION AND ITS CUSTOMERS.</strong> Without limiting the General Terms, the Organization acknowledges and
+              agrees that DCM has no responsibility or liability for:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Grading accuracy claims by the Organization&apos;s customers.</strong> Grades are AI-assisted visual assessments as described in the General Terms. Any claim by the Organization&apos;s customer regarding a grade&apos;s accuracy, consistency, or value is a matter between the Organization and its customer.</li>
+              <li><strong>Card condition.</strong> The physical condition of any card before, during, or after grading, including changes caused by handling, storage, display, shipping, or environmental factors.</li>
+              <li><strong>Holders, slabbing, and sealing.</strong> All holders are supplied, assembled, and sealed by the Organization or its customers. DCM does not manufacture, supply, or certify holders and cannot certify that any holder contains the card associated with a given Cert ID. The integrity of every slab the Organization produces or sells is the Organization&apos;s responsibility.</li>
+              <li><strong>Prices, promises, and warranties.</strong> Any price the Organization charges, any value it quotes, and any promise, guarantee, or warranty it makes to its customers — none of which DCM authorizes it to make on DCM&apos;s behalf.</li>
+              <li><strong>Sales, returns, and disputes.</strong> All sales, refunds, returns, chargebacks, shipping issues, and disputes between the Organization and its customers, on any channel (in store, online, or via marketplace integrations).</li>
+              <li><strong>The Organization&apos;s conduct.</strong> Any act or omission of the Organization or its Staff Members, including misuse of grading records, misrepresentation of cards or grades, or any fraudulent, deceptive, or unlawful practice.</li>
+            </ul>
+            <p className="mt-4">
+              The Organization must not state or imply to any customer or third party that DCM inspects cards physically,
+              authenticates cards, certifies holders, guarantees grades or values, insures transactions, or is otherwise a party
+              to or guarantor of the Organization&apos;s business. The Organization is solely responsible for handling its
+              customers&apos; complaints and for its own customer service.
+            </p>
+            <p className="mt-4">
+              <strong>Customer data.</strong> If the Organization records information about its own customers in or through the
+              Services (for example, customer names or references attached to graded cards), the Organization is the party
+              responsible for that data: it must have the right to record it, must comply with all privacy and data protection
+              laws that apply to its business, and must handle its customers&apos; privacy requests. DCM processes such
+              information solely to provide the Services to the Organization.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">5. Branding: Cross-Licenses</h2>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.1 Your Marks</h3>
+            <p>
+              The Organization grants DCM a worldwide, non-exclusive, royalty-free license to host, reproduce, resize, recolor
+              (for example, deriving light and dark label variants), and display the Organization&apos;s name, logo, colors, and
+              storefront content for the purpose of operating the Enterprise Program — rendering labels, reports, card pages,
+              storefront pages, and previews. The Organization represents and warrants that it owns or has the right to license
+              these materials and that they do not infringe any third party&apos;s rights. DCM may decline, remove, or require
+              changes to any uploaded branding or storefront content at its discretion, including branding it reasonably
+              believes is infringing, misleading, or offensive.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.2 DCM Marks</h3>
+            <p>
+              DCM grants the Organization a limited right to display DCM attribution as rendered by the Services (labels,
+              reports, card pages) and to state factually that its grading is &quot;powered by DCM Optic™.&quot; The Organization
+              may not otherwise use DCM&apos;s names, logos, or marks — including in its own branding, domain names, or
+              advertising — without DCM&apos;s prior written permission, and may not state or imply that DCM endorses,
+              certifies, or operates the Organization&apos;s business.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.3 Marketing References</h3>
+            <p>
+              DCM may identify the Organization by name and logo as an Enterprise customer (for example, in a customer list or
+              case study). The Organization may opt out of this use at any time by emailing admin@dcmgrading.com. Section 6.5
+              of the General Terms (marketing use of public cards) continues to apply to cards graded under the Organization.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">6. Enterprise Billing</h2>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Plans.</strong> Enterprise plans are monthly subscriptions that provide a set allotment of grades each billing cycle at the prices published on our <Link href="/enterprise" className="text-blue-600 hover:underline">Enterprise page</Link> or otherwise agreed with DCM in writing.</li>
+              <li><strong>Monthly allotments reset.</strong> The monthly allotment is refreshed to its full amount each billing cycle. <strong>Unused monthly grades do not roll over</strong> and have no cash value.</li>
+              <li><strong>Overage packs roll over.</strong> Separately purchased overage packs carry over from month to month and are consumed only after the monthly allotment is exhausted in a given cycle.</li>
+              <li><strong>Credits are the Organization&apos;s.</strong> Enterprise credits belong to the Organization, may be used by any Staff Member grading in the Organization&apos;s workspace, are non-transferable, and may not be sold, exchanged, or redeemed for cash.</li>
+              <li><strong>Payment and non-refundability.</strong> Fees are billed in advance through Stripe and are nonrefundable except where required by law, consistent with Section 7 of the General Terms. This includes unused monthly allotments, unused overage packs on account closure, and partial billing periods.</li>
+              <li><strong>Cancellation.</strong> The Owner may cancel the plan at any time, effective at the end of the current billing period. The Organization keeps its monthly grades through the paid period; remaining monthly grades expire when the plan ends. Overage pack credits remain usable while the Organization&apos;s account remains active. A cancelled plan may be resumed before the period ends, or a new plan started afterward; starting a new plan begins a new billing cycle with a fresh allotment.</li>
+              <li><strong>Failed payments.</strong> If a renewal payment fails, Stripe will retry per its dunning schedule. Monthly grades are not deposited for unpaid cycles, and DCM may suspend the Organization for continued non-payment.</li>
+              <li><strong>Price changes.</strong> Prices may change with reasonable advance notice; changes take effect at the next renewal.</li>
+              <li><strong>Taxes.</strong> Enterprise fees are exclusive of taxes; DCM may collect applicable sales or similar taxes on its fees where required. The Organization is solely responsible for all taxes, duties, and regulatory obligations arising from its own sales to its customers, including sales tax collection and remittance on grading services and card sales.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">7. Staff Members</h2>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Staff Members access the Organization through their own DCM accounts and remain bound by the General Terms individually.</li>
+              <li>The Owner is responsible for who is added to the Organization, for removing departed staff promptly, and for all Organization activity by Staff Members, including their consumption of Enterprise credits and their conduct toward the Organization&apos;s customers.</li>
+              <li>Cards a Staff Member grades in the Organization&apos;s workspace are stamped with the Organization&apos;s branding and serials; cards graded in a personal workspace with personal credits are not Organization activity.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">8. Applications, Approval, Suspension, and Termination</h2>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Approval.</strong> Enterprise participation requires DCM approval. DCM may approve, decline, or condition any application at its sole discretion, including based on branding review, store URL selection, or business verification.</li>
+              <li><strong>Suspension and termination by DCM.</strong> DCM may suspend or terminate an Organization&apos;s Enterprise participation consistent with Section 10 of the General Terms, including for violation of these Enterprise Terms, misrepresentation of grades or cards, infringing branding, or activity that poses legal, security, or reputational risk.</li>
+              <li><strong>Effect of ending participation.</strong> When Enterprise participation ends: remaining monthly grades expire; the commercial use license in Section 3 ends for new activity; storefront pages may be unpublished; and Staff Members lose Organization access. Already-graded cards keep their certificate records, serials, and labels.</li>
+              <li><strong>The registry survives.</strong> Grading records (Cert IDs, photographs, grades, and verification pages) are part of DCM&apos;s permanent public registry, exist for the protection of buyers, and survive any termination. DCM may annotate or correct registry records at its discretion.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">9. Independent Businesses; No Agency or Franchise</h2>
+            <p>
+              The Organization and DCM are independent contracting parties. Nothing in these Enterprise Terms creates an
+              employment, agency, partnership, joint venture, fiduciary, or franchise relationship. The Organization has no
+              authority to act for or bind DCM. The Organization operates its business under its own name, at its own risk,
+              sets its own prices, and does not pay DCM any fee for the use of DCM&apos;s trademarks or any right to a business
+              format — Enterprise fees are solely for software services and grading capacity as described in Section 6.
+            </p>
+            <p className="mt-4">
+              <strong>Non-exclusivity.</strong> The Enterprise Program is non-exclusive. DCM may provide the Services, the
+              Enterprise Program, and any similar or competing offering to any other business anywhere, including businesses
+              that compete with the Organization or operate in the same geographic area. The Organization receives no
+              territory, market, or category exclusivity of any kind.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">10. Indemnification</h2>
+            <p>
+              In addition to Section 9 of the General Terms, the Organization agrees to indemnify, defend, and hold harmless
+              DCM, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses,
+              and expenses (including reasonable attorneys&apos; fees) arising out of or connected with:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>The Organization&apos;s sale, distribution, or marketing of graded cards or grading services, including claims brought by the Organization&apos;s customers;</li>
+              <li>Holders, slabs, or labels assembled, sealed, sold, or reused by the Organization or its customers;</li>
+              <li>The Organization&apos;s branding, logos, storefront content, and any associated intellectual property claims;</li>
+              <li>Acts or omissions of Staff Members;</li>
+              <li>The Organization&apos;s violation of these Enterprise Terms, the General Terms, or applicable law.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">11. Disclaimers and Limitation of Liability</h2>
+            <p>
+              Sections 8 (Disclaimers and Limitations of Liability) and 15 (Third-Party Marketplace Integrations) of the
+              General Terms apply in full to Enterprise use, including use on behalf of the Organization&apos;s customers. The
+              Organization uses grading outputs in its business at its own risk and is responsible for communicating the nature
+              and limitations of AI-assisted grading to its customers.
+            </p>
+            <p className="mt-4">
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, DCM&apos;S TOTAL AGGREGATE LIABILITY TO THE ORGANIZATION ARISING OUT OF
+              OR RELATING TO THE ENTERPRISE PROGRAM SHALL NOT EXCEED THE AMOUNTS PAID BY THE ORGANIZATION TO DCM FOR THE
+              ENTERPRISE PROGRAM IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. General</h2>
+            <p>
+              Sections 11 (Privacy), 12 (Dispute Resolution, including Georgia governing law, arbitration, and the class action
+              waiver), 13 (Miscellaneous), and 14 (Updates to Service) of the General Terms apply to these Enterprise Terms.
+              DCM may update these Enterprise Terms as described in Section 1 of the General Terms; continued use of the
+              Enterprise Program after an update constitutes acceptance. Provisions that by their nature should survive —
+              including Sections 4, 5.1, 8 (registry survival), 9, 10, and 11 — survive termination.
+            </p>
+            <p className="mt-4">For questions about these Enterprise Terms, contact:</p>
+            <ul className="list-none ml-4 mt-4 space-y-2">
+              <li>Dynamic Collectibles Management LLC</li>
+              <li>Email: admin@dcmgrading.com</li>
+              <li>Website: https://dcmgrading.com</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
+  )
+}

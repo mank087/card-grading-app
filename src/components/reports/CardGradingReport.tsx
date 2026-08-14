@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, Image } from '@react-pdf/renderer';
-import { reportStyles } from './ReportStyles';
+import { reportStyles as defaultReportStyles, makeReportStyles } from './ReportStyles';
 import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS } from '@/lib/labelPresets';
 
 /**
@@ -65,6 +65,9 @@ export interface ReportCardData {
    * black grade chip) so the report matches the user's selected label style.
    */
   heritage?: { pattern: string; bandColors: string[]; gradeColors?: Record<string, string> | null } | null;
+  // Enterprise store branding: set when the card was graded under an org.
+  // logoDataUrl must be a data URL (react-pdf can't fetch signed URLs reliably).
+  org?: { name: string; logoDataUrl: string | null; brandColor?: string | null; slug?: string | null } | null;
 
   // Legacy fields (kept for backward compatibility with other report sections)
   cardName: string;
@@ -153,6 +156,36 @@ interface BatchCardGradingReportProps {
 /**
  * Format grade score - v6.0: Always whole numbers, no decimals
  */
+/**
+ * Report footer. Org-branded reports mirror the storefront footer: the store
+ * owns the report (copyright + independence line) with DCM as the technology
+ * provider; consumer reports keep the classic DCM footer unchanged.
+ */
+const ReportFooter: React.FC<{ cardData: ReportCardData; styles: ReturnType<typeof makeReportStyles> }> = ({ cardData, styles }) => {
+  const org = cardData.org;
+  return (
+    <View style={styles.footer}>
+      <Text style={styles.reportMeta}>
+        Generated: {cardData.generatedDate} | Report ID: {cardData.reportId}
+      </Text>
+      <Text style={styles.disclaimer}>
+        {org ? `${org.name} Grading Report · Powered by DCM Optic™` : 'DCM Optic™ Report'}{'\n'}
+        Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company. Estimated equivalency to PSA, BGS, SGC, or CGC standards is for reference only. Official grading can only be guaranteed through direct submission to those respective companies.
+      </Text>
+      {org ? (
+        <Text style={styles.disclaimer}>
+          © {new Date().getFullYear()} {org.name}. All rights reserved. {org.name} is an independently owned and operated business. Grading technology provided by Dynamic Collectibles Management LLC, which is not affiliated with, and does not endorse or operate, {org.name}.
+        </Text>
+      ) : null}
+      <Text style={styles.callToAction}>
+        {org
+          ? `Verify this card anytime at dcmgrading.com/enterprise/${org.slug || ''}`.replace(/\/$/, '')
+          : 'Grade your card collection at DCMGrading.com'}
+      </Text>
+    </View>
+  );
+};
+
 const formatScore = (score: number): string => {
   // v6.0: Always return whole number (no .5 scores)
   return Math.round(score).toString();
@@ -220,6 +253,8 @@ const getSafeSubgrades = (cardData: ReportCardData) => {
 export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }) => {
   // Get safe subgrades with defaults
   const subgrades = getSafeSubgrades(cardData);
+  // Org-branded reports theme every purple accent with the brand primary.
+  const reportStyles = cardData.org?.brandColor ? makeReportStyles(cardData.org.brandColor) : defaultReportStyles;
 
   return (
   <Document>
@@ -227,11 +262,16 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
       {/* Header with Logo on Right */}
       <View style={reportStyles.headerContainer}>
         <View style={reportStyles.headerLeft}>
-          <Text style={reportStyles.companyName}>Dynamic Collectibles Management</Text>
+          <Text style={reportStyles.companyName}>{cardData.org?.name || 'Dynamic Collectibles Management'}</Text>
           <Text style={reportStyles.reportTitle}>Grading Report</Text>
+          {cardData.org ? (
+            <Text style={{ fontSize: 7, color: '#6B7280', marginTop: 2 }}>
+              Powered by DCM Optic{'™'} — Dynamic Collectibles Management
+            </Text>
+          ) : null}
         </View>
         <View style={reportStyles.headerRight}>
-          <Image src="/DCM-logo.png" style={reportStyles.logo} />
+          <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.logo} />
         </View>
       </View>
 
@@ -249,7 +289,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
                 <View style={[reportStyles.cardLabelRow, cardData.heritage ? { paddingLeft: 10 } : {}]}>
                   <View style={reportStyles.cardLabelLeft}>
-                    <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                    <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.cardLabelLogo} />
                   </View>
                   <View style={reportStyles.cardLabelCenter}>
                     {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
@@ -372,7 +412,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 ) : (
                   <View style={reportStyles.cardLabelRow}>
                     <View style={reportStyles.cardLabelLeft}>
-                      <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                      <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.cardLabelLogo} />
                     </View>
                     <View style={reportStyles.cardLabelCenter}>
                       {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
@@ -551,18 +591,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
       </View>
 
       {/* Footer */}
-      <View style={reportStyles.footer}>
-        <Text style={reportStyles.reportMeta}>
-          Generated: {cardData.generatedDate} | Report ID: {cardData.reportId}
-        </Text>
-        <Text style={reportStyles.disclaimer}>
-          DCM Optic™ Report{'\n'}
-          Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company. Estimated equivalency to PSA, BGS, SGC, or CGC standards is for reference only. Official grading can only be guaranteed through direct submission to those respective companies.
-        </Text>
-        <Text style={reportStyles.callToAction}>
-          Grade your card collection at DCMGrading.com
-        </Text>
-      </View>
+      <ReportFooter cardData={cardData} styles={reportStyles} />
     </Page>
   </Document>
   );
@@ -575,17 +604,24 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
 const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardData }) => {
   // Get safe subgrades with defaults
   const subgrades = getSafeSubgrades(cardData);
+  // Org-branded reports theme every purple accent with the brand primary.
+  const reportStyles = cardData.org?.brandColor ? makeReportStyles(cardData.org.brandColor) : defaultReportStyles;
 
   return (
     <Page size="A4" style={reportStyles.page}>
       {/* Header with Logo on Right */}
       <View style={reportStyles.headerContainer}>
         <View style={reportStyles.headerLeft}>
-          <Text style={reportStyles.companyName}>Dynamic Collectibles Management</Text>
+          <Text style={reportStyles.companyName}>{cardData.org?.name || 'Dynamic Collectibles Management'}</Text>
           <Text style={reportStyles.reportTitle}>Grading Report</Text>
+          {cardData.org ? (
+            <Text style={{ fontSize: 7, color: '#6B7280', marginTop: 2 }}>
+              Powered by DCM Optic{'™'} — Dynamic Collectibles Management
+            </Text>
+          ) : null}
         </View>
         <View style={reportStyles.headerRight}>
-          <Image src="/DCM-logo.png" style={reportStyles.logo} />
+          <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.logo} />
         </View>
       </View>
 
@@ -603,7 +639,7 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                 {cardData.heritage ? <HeritageStripe colors={cardData.heritage.bandColors} /> : null}
                 <View style={[reportStyles.cardLabelRow, cardData.heritage ? { paddingLeft: 10 } : {}]}>
                   <View style={reportStyles.cardLabelLeft}>
-                    <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                    <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.cardLabelLogo} />
                   </View>
                   <View style={reportStyles.cardLabelCenter}>
                     <Text style={reportStyles.cardLabelPlayerName}>
@@ -709,7 +745,7 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
                 ) : (
                   <View style={reportStyles.cardLabelRow}>
                     <View style={reportStyles.cardLabelLeft}>
-                      <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                      <Image src={cardData.org?.logoDataUrl || '/DCM-logo.png'} style={reportStyles.cardLabelLogo} />
                     </View>
                     <View style={reportStyles.cardLabelCenter}>
                       <Text style={reportStyles.cardLabelPlayerName}>
@@ -866,18 +902,7 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
       </View>
 
       {/* Footer */}
-      <View style={reportStyles.footer}>
-        <Text style={reportStyles.reportMeta}>
-          Generated: {cardData.generatedDate} | Report ID: {cardData.reportId}
-        </Text>
-        <Text style={reportStyles.disclaimer}>
-          DCM Optic™ Report{'\n'}
-          Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company. Estimated equivalency to PSA, BGS, SGC, or CGC standards is for reference only. Official grading can only be guaranteed through direct submission to those respective companies.
-        </Text>
-        <Text style={reportStyles.callToAction}>
-          Grade your card collection at DCMGrading.com
-        </Text>
-      </View>
+      <ReportFooter cardData={cardData} styles={reportStyles} />
     </Page>
   );
 };

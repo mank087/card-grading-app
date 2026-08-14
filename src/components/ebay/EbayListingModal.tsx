@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { generateCardImages, generateRawCardImages, CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
-import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
+import { FoldableLabelData, generateQRCodeWithLogo } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
@@ -17,6 +18,14 @@ import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
+import {
+  generateHtmlDescription,
+  renderDescriptionTemplate,
+  DESCRIPTION_MERGE_FIELDS,
+  type ListingDescriptionFields,
+  type ListingBranding,
+} from '@/lib/ebay/listingDescription';
+import { generateTrustSlide } from '@/lib/ebay/trustSlide';
 
 // Helper: Get condition label from grade
 function getConditionLabel(grade: number): string {
@@ -33,106 +42,12 @@ function getConditionLabel(grade: number): string {
   return 'Poor';
 }
 
-// Helper: Get grade color for HTML styling
-function getGradeColor(grade: number): string {
-  if (grade >= 9) return '#10B981'; // Green
-  if (grade >= 7) return '#3B82F6'; // Blue
-  if (grade >= 5) return '#F59E0B'; // Amber
-  return '#EF4444'; // Red
-}
-
-// Generate rich HTML description for eBay listing
-function generateHtmlDescription(data: {
-  primaryName: string;
-  setName: string;
-  cardNumber: string;
-  grade: number;
-  conditionLabel: string;
-  overview: string;
-  subgrades: { centering: number; corners: number; edges: number; surface: number };
-  serial: string;
-}): string {
-  const { primaryName, setName, cardNumber, grade, conditionLabel, overview, subgrades, serial } = data;
-  const gradeColor = getGradeColor(grade);
-
-  // DCM brand colors
-  const dcmPurple = '#7C3AED';
-  const dcmPurpleLight = '#A78BFA';
-  const dcmGray = '#4B5563';
-
-  return `
-<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-  <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, ${dcmPurple} 0%, #5B21B6 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-    <h2 style="margin: 0 0 8px 0; font-size: 24px;">DCM Graded Card</h2>
-    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Professional AI-Powered Card Grading</p>
-  </div>
-
-  <!-- Grade Display -->
-  <div style="background: #F9FAFB; border: 2px solid ${gradeColor}; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center;">
-    <div style="font-size: 48px; font-weight: bold; color: ${gradeColor};">${grade}</div>
-    <div style="font-size: 18px; color: ${dcmGray}; font-weight: 600;">${conditionLabel}</div>
-    <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">DCM Serial: <strong>${serial}</strong></div>
-  </div>
-
-  <!-- Card Details -->
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">Card Details</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-      ${primaryName ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Character/Player:</td><td style="padding: 8px 0; text-align: right;">${primaryName}</td></tr>` : ''}
-      ${setName ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Set:</td><td style="padding: 8px 0; text-align: right;">${setName}</td></tr>` : ''}
-      ${cardNumber ? `<tr><td style="padding: 8px 0; color: ${dcmGray}; font-weight: 600;">Card Number:</td><td style="padding: 8px 0; text-align: right;">#${cardNumber}</td></tr>` : ''}
-    </table>
-  </div>
-
-  <!-- Card Overview -->
-  ${overview ? `
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">Condition Overview</h3>
-    <p style="color: ${dcmGray}; line-height: 1.6; margin: 0;">${overview}</p>
-  </div>
-  ` : ''}
-
-  <!-- Sub-Grades -->
-  <div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h3 style="color: ${dcmPurple}; margin: 0 0 16px 0; font-size: 18px; border-bottom: 2px solid ${dcmPurpleLight}; padding-bottom: 8px;">DCM Sub-Grades</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-      <tr>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB; border-radius: 8px 0 0 8px;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.centering)};">${subgrades.centering}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Centering</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.corners)};">${subgrades.corners}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Corners</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.edges)};">${subgrades.edges}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Edges</div>
-        </td>
-        <td style="padding: 12px 8px; text-align: center; background: #F9FAFB; border-radius: 0 8px 8px 0;">
-          <div style="font-size: 24px; font-weight: bold; color: ${getGradeColor(subgrades.surface)};">${subgrades.surface}</div>
-          <div style="font-size: 12px; color: ${dcmGray};">Surface</div>
-        </td>
-      </tr>
-    </table>
-  </div>
-
-  <!-- DCM Footer -->
-  <div style="background: linear-gradient(135deg, ${dcmPurple} 0%, #5B21B6 100%); color: white; padding: 16px 20px; border-radius: 8px; text-align: center;">
-    <div style="font-size: 18px; font-weight: bold;">Graded by DCM</div>
-    <p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.9;">Professional AI-Powered Card Authentication & Grading</p>
-    <p style="margin: 4px 0 0 0; font-size: 11px; opacity: 0.7;">Verify this card at dcmgrading.com</p>
-  </div>
-</div>
-`.trim();
-}
 
 interface EbayListingModalProps {
   isOpen: boolean;
   onClose: () => void;
   card: any;
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: string;
   /** Active saved style config — needed to detect a Heritage custom style. */
@@ -154,6 +69,42 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Saved listing defaults/templates + resolved branding (enterprise cards)
+  const [listingDefaults, setListingDefaults] = useState<{
+    personal: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null; includeTrustSlide: boolean } | null;
+    org: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null; includeTrustSlide: boolean } | null;
+    orgRole: 'owner' | 'member' | null;
+  } | null>(null);
+  const [listingBranding, setListingBranding] = useState<ListingBranding | null>(null);
+  const [descriptionFields, setDescriptionFields] = useState<ListingDescriptionFields | null>(null);
+  const [trustSlideEnabled, setTrustSlideEnabled] = useState(false);
+  const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
+  const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
+
+  // Which scope a save writes to: org cards owned by the org owner save the
+  // ORG defaults (shared by staff); everything else saves personal.
+  const defaultsScope: 'personal' | 'org' =
+    card?.org_id && listingDefaults?.orgRole === 'owner' ? 'org' : 'personal';
+
+  const saveListingDefaults = async (payload: Record<string, unknown>, which: 'shipping' | 'template') => {
+    const session = getStoredSession();
+    if (!session?.access_token) return;
+    setSavingDefaults(which);
+    try {
+      const res = await fetch('/api/ebay/listing-defaults', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ scope: defaultsScope, ...payload }),
+      });
+      if (res.ok) {
+        setDefaultsSavedFlash(which === 'shipping' ? 'Shipping defaults saved' : 'Template saved');
+        setTimeout(() => setDefaultsSavedFlash(null), 2500);
+      }
+    } finally {
+      setSavingDefaults(null);
+    }
+  };
+
   // Ref for scrollable content container
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -162,6 +113,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front?: string;
     back?: string;
     miniReport?: string;
+    trustSlide?: string;
     rawFront?: string;
     rawBack?: string;
   }>({});
@@ -169,6 +121,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front?: Blob;
     back?: Blob;
     miniReport?: Blob;
+    trustSlide?: Blob;
     rawFront?: Blob;
     rawBack?: Blob;
   }>({});
@@ -176,9 +129,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front: boolean;
     back: boolean;
     miniReport: boolean;
+    trustSlide: boolean;
     rawFront: boolean;
     rawBack: boolean;
-  }>({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
+  }>({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true, trustSlide: false });
 
   // User-uploaded additional photos
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
@@ -190,7 +144,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   // uploads share the same ordering — that's how the user controls which
   // image lands in position 1 vs 2 etc.
   type OrderedImageItem =
-    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' }
+    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' | 'trustSlide' }
     | { kind: 'custom'; id: string };
   const [imageOrder, setImageOrder] = useState<OrderedImageItem[]>([]);
 
@@ -287,7 +241,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setError(null);
       setImageUrls({});
       setImageBlobs({});
-      setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
+      setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true, trustSlide: false });
       setAdditionalImages([]);
       setImageOrder([]);
       setListingResult(null);
@@ -343,29 +297,66 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       });
       setTitle(defaultTitle);
 
-      // Generate HTML description with DCM branding
+      // Description: branding (org name/color for enterprise cards) + any
+      // saved template resolve asynchronously; standard DCM layout renders
+      // immediately so the field is never blank.
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScores = card.conversational_sub_scores || {};
       const overview = card.conversational_final_grade_summary || card.conversational_summary || '';
 
-      const centering = Math.round(weightedScores.centering ?? subScores.centering?.weighted ?? 0);
-      const corners = Math.round(weightedScores.corners ?? subScores.corners?.weighted ?? 0);
-      const edges = Math.round(weightedScores.edges ?? subScores.edges?.weighted ?? 0);
-      const surface = Math.round(weightedScores.surface ?? subScores.surface?.weighted ?? 0);
-
-      // Build rich HTML description
-      const htmlDescription = generateHtmlDescription({
+      const descriptionFields: ListingDescriptionFields = {
         primaryName,
-        setName,
-        cardNumber,
+        setName: setName || '',
+        cardNumber: cardNumber || '',
         grade: Math.round(grade),
         conditionLabel,
         overview,
-        subgrades: { centering, corners, edges, surface },
-        serial: card.serial || 'N/A',
-      });
+        subgrades: {
+          centering: Math.round(weightedScores.centering ?? subScores.centering?.weighted ?? 0),
+          corners: Math.round(weightedScores.corners ?? subScores.corners?.weighted ?? 0),
+          edges: Math.round(weightedScores.edges ?? subScores.edges?.weighted ?? 0),
+          surface: Math.round(weightedScores.surface ?? subScores.surface?.weighted ?? 0),
+        },
+        serial: card.org_serial_display || card.serial || 'N/A',
+      };
+      setDescriptionFields(descriptionFields);
+      setDescription(generateHtmlDescription(descriptionFields, null));
 
-      setDescription(htmlDescription);
+      let cancelled = false;
+      (async () => {
+        const session = getStoredSession();
+        const [logos, defaultsRes] = await Promise.all([
+          card.org_id ? loadLogosForCard(card.id).catch(() => null) : Promise.resolve(null),
+          session?.access_token
+            ? fetch('/api/ebay/listing-defaults', { headers: { Authorization: `Bearer ${session.access_token}` } })
+                .then(r => (r.ok ? r.json() : null))
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+
+        const branding: ListingBranding | null = logos?.branding
+          ? { name: logos.branding.name, brandColor: logos.branding.brandColor || null }
+          : null;
+        setListingBranding(branding);
+        if (defaultsRes) setListingDefaults(defaultsRes);
+
+        // Template resolution: org template for org cards, else personal.
+        const activeDefaults = card.org_id && defaultsRes?.org ? defaultsRes.org : defaultsRes?.personal;
+        const template = activeDefaults?.descriptionTemplate || null;
+        setDescription(
+          template
+            ? renderDescriptionTemplate(template, descriptionFields, branding)
+            : generateHtmlDescription(descriptionFields, branding)
+        );
+        setTrustSlideEnabled(Boolean(activeDefaults?.includeTrustSlide));
+        if (activeDefaults?.shippingDefaults && typeof activeDefaults.shippingDefaults === 'object') {
+          const saved = activeDefaults.shippingDefaults as Record<string, unknown>;
+          const { bestOfferEnabled: savedBestOffer, ...savedShipping } = saved;
+          setShippingForm(prev => ({ ...prev, ...savedShipping }));
+          if (typeof savedBestOffer === 'boolean') setBestOfferEnabled(savedBestOffer);
+        }
+      })();
 
       // Initialize item specifics based on card type
       const ebayCategory = getCategoryForCardType(cardType);
@@ -374,6 +365,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // Pre-fill item specifics from card data
       const defaultSpecifics = mapCardToItemSpecifics(card, cardType);
       setItemSpecifics(defaultSpecifics);
+
+      return () => { cancelled = true; };
     }
   }, [isOpen, card, cardType]);
 
@@ -750,6 +743,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         if (creditsRow) emblemFlags = resolveEmblemVisibility(creditsRow);
       } catch { /* keep prop fallback */ }
 
+      // Org branding: loaded once — logos for the label art, slug for QR
+      // targets (org cards point at their branded card page).
+      const orgLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const qrTargetUrl = cardQrUrl(card.id, card.serial, orgLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
+
       // Generate card images (front & back with labels)
       const cardImageData: CardImageData = {
         cardName: labelData.primaryName,
@@ -759,7 +757,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         englishName,
         grade: labelData.grade ?? 0,
         conditionLabel: labelData.condition,
-        cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
+        cardUrl: qrTargetUrl,
         frontImageUrl,
         backImageUrl,
         showFounderEmblem: emblemFlags.showFounderEmblem,
@@ -778,6 +776,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
           surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
         },
+        logoOverrides: orgLogoSet?.branding
+          ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black }
+          : undefined,
       };
 
       const [{ front, back }, rawImages] = await Promise.all([
@@ -785,12 +786,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         generateRawCardImages(frontImageUrl, backImageUrl),
       ]);
 
-      // Generate mini-report
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
-      const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-        generateQRCodeWithLogo(cardUrl),
-        loadLogoAsBase64().catch(() => undefined),
-      ]);
+      // Generate mini-report — org-graded cards carry the store's logo and
+      // the QR lands on the org's branded card page.
+      const cardUrl = qrTargetUrl;
+      const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
+        .catch(() => generateQRCodeWithLogo(cardUrl));
+      const logoDataUrl = orgLogoSet?.color || undefined;
 
       const miniReportData: FoldableLabelData = {
         cardName: labelData.primaryName,
@@ -816,21 +817,50 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       const miniReport = await generateMiniReportJpg(miniReportData);
 
+      // Branded "why buy" trust slide (customer-requested). Generated for
+      // every card (org branding when present, DCM otherwise); whether it's
+      // SELECTED for upload follows the saved default / the user's toggle.
+      let trustSlide: Blob | undefined;
+      try {
+        trustSlide = await generateTrustSlide({
+          brandName: orgLogoSet?.branding?.name || 'DCM',
+          brandColor: orgLogoSet?.branding?.brandColor || null,
+          logoDataUrl: orgLogoSet?.color || undefined,
+          grade: Math.round(labelData.grade ?? 0),
+          conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+          serial: card.org_serial_display || card.serial || '',
+          qrUrl: qrTargetUrl,
+          subgrades: {
+            centering: Math.round(weightedScores.centering ?? subScoresData.centering?.weighted ?? 0),
+            corners: Math.round(weightedScores.corners ?? subScoresData.corners?.weighted ?? 0),
+            edges: Math.round(weightedScores.edges ?? subScoresData.edges?.weighted ?? 0),
+            surface: Math.round(weightedScores.surface ?? subScoresData.surface?.weighted ?? 0),
+          },
+        });
+      } catch (err) {
+        console.warn('[eBay Listing] Trust slide generation failed (non-fatal):', err);
+      }
+
       // Create preview URLs
-      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back });
+      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back, trustSlide });
       setImageUrls({
         front: URL.createObjectURL(front),
         back: URL.createObjectURL(back),
         miniReport: URL.createObjectURL(miniReport),
         rawFront: URL.createObjectURL(rawImages.front),
         rawBack: URL.createObjectURL(rawImages.back),
+        trustSlide: trustSlide ? URL.createObjectURL(trustSlide) : undefined,
       });
+      if (trustSlide) {
+        setSelectedImages(s => ({ ...s, trustSlide: trustSlideEnabled }));
+      }
       // Seed the ordered list once the system images are ready. Subsequent
       // user uploads append themselves via the additionalImages-sync effect.
       setImageOrder(prev => prev.length > 0 ? prev : [
         { kind: 'system', key: 'front' },
         { kind: 'system', key: 'back' },
         { kind: 'system', key: 'miniReport' },
+        ...(trustSlide ? [{ kind: 'system', key: 'trustSlide' } as const] : []),
         { kind: 'system', key: 'rawFront' },
         { kind: 'system', key: 'rawBack' },
       ]);
@@ -1040,11 +1070,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         }
       }
 
-      // Generate QR code
-      const qrCodeDataUrl = await (generateQRCodeWithLogo as (url: string, logo?: string) => Promise<string>)(
-        `https://dcmgrading.com/verify/${card.serial}`,
-        await loadLogoAsBase64()
-      );
+      // QR centre mark stays DCM (verification anchor); store branding goes on
+      // the report header instead.
+      const reportLogos = await loadLogosForCard(card.id).catch(() => null);
+      const qrCodeDataUrl = await generateQRCodeWithLogo(`https://dcmgrading.com/verify/${card.serial}`, reportLogos?.branding ? reportLogos.color : undefined);
 
       // Extract sub-scores for the report
       const centeringScore = weightedScores.centering ?? subScores.centering?.weighted ?? grade;
@@ -1082,6 +1111,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
             : undefined;
         })(),
+        org: reportLogos?.branding
+          ? { name: reportLogos.branding.name, logoDataUrl: reportLogos.color || null }
+          : undefined,
         professionalGrades: {
           psa: card.estimated_professional_grades?.psa?.grade || '-',
           bgs: card.estimated_professional_grades?.bgs?.grade || '-',
@@ -1858,12 +1890,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       drag any image into position 1 (main) regardless of
                       which "bucket" it came from. */}
                   {(() => {
-                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack', string> = {
+                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' | 'trustSlide', string> = {
                       front: 'Front',
                       back: 'Back',
                       miniReport: 'Report',
                       rawFront: 'Front (Raw)',
                       rawBack: 'Back (Raw)',
+                      trustSlide: 'Trust Slide',
                     };
                     const isItemSelected = (item: OrderedImageItem): boolean => {
                       if (item.kind === 'system') return !!selectedImages[item.key];
@@ -2111,6 +2144,41 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     <p className="mt-1 text-xs text-gray-500">
                       Edit the HTML code directly. Click "Show Preview" to see how it looks.
                     </p>
+                    <div className="mt-2 flex items-start justify-between gap-3 flex-wrap">
+                      <details className="text-xs text-gray-500">
+                        <summary className="cursor-pointer text-purple-600 hover:text-purple-800 font-medium">
+                          Merge fields for templates
+                        </summary>
+                        <div className="mt-1 grid grid-cols-2 gap-x-4">
+                          {DESCRIPTION_MERGE_FIELDS.map(f => (
+                            <div key={f.token}><code className="text-purple-700">{f.token}</code> {f.label}</div>
+                          ))}
+                        </div>
+                      </details>
+                      <div className="flex items-center gap-2">
+                        {defaultsSavedFlash === 'Template saved' && <span className="text-xs text-green-600">Saved ✓</span>}
+                        <button
+                          type="button"
+                          disabled={savingDefaults !== null}
+                          onClick={() => saveListingDefaults({ descriptionTemplate: description }, 'template')}
+                          className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
+                          title={defaultsScope === 'org' ? 'Saved for your whole store' : 'Saved to your account'}
+                        >
+                          {savingDefaults === 'template' ? 'Saving...' : `Save as ${defaultsScope === 'org' ? 'store' : 'my'} template`}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingDefaults !== null}
+                          onClick={() => {
+                            saveListingDefaults({ descriptionTemplate: null }, 'template');
+                            if (descriptionFields) setDescription(generateHtmlDescription(descriptionFields, listingBranding));
+                          }}
+                          className="text-xs px-2 py-1.5 text-gray-500 hover:text-purple-600"
+                        >
+                          Reset to standard
+                        </button>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -2789,6 +2857,19 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
                 <strong>No account changes:</strong> These shipping and return options apply only to this listing and won&apos;t modify your eBay account settings.
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                {defaultsSavedFlash === 'Shipping defaults saved' && <span className="text-xs text-green-600">Saved ✓</span>}
+                <button
+                  type="button"
+                  disabled={savingDefaults !== null}
+                  onClick={() => saveListingDefaults({ shippingDefaults: { ...shippingForm, bestOfferEnabled }, includeTrustSlide: !!selectedImages.trustSlide }, 'shipping')}
+                  className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
+                  title={defaultsScope === 'org' ? 'Applied to every listing your store creates' : 'Applied to every listing you create'}
+                >
+                  {savingDefaults === 'shipping' ? 'Saving...' : `Save as ${defaultsScope === 'org' ? 'store' : 'my'} shipping defaults`}
+                </button>
               </div>
             </div>
           )}

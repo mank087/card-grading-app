@@ -30,6 +30,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { isStorefrontHost, isOrgPublicPath } from '@/lib/storefrontHost'
 
 const STORAGE_KEY = 'dcm_consent_v1'
 const COOKIE_NAME = 'dcm_consent'
@@ -137,7 +138,12 @@ function loadMarketingScripts() {
 
 export default function ConsentManager() {
   const pathname = usePathname()
-  const suppressed = !!pathname && FULLSCREEN_ROUTES.some(p => pathname.startsWith(p))
+  // Tenant subdomains rewrite to /enterprise/{slug}/* with a '/' browser
+  // pathname (see src/middleware.ts) — org pages carry no DCM chrome and load
+  // no trackers, so the host is checked alongside the path.
+  const [tenantHost, setTenantHost] = useState(false)
+  useEffect(() => { setTenantHost(isStorefrontHost(window.location.hostname)) }, [])
+  const suppressed = tenantHost || (!!pathname && (FULLSCREEN_ROUTES.some(p => pathname.startsWith(p)) || isOrgPublicPath(pathname)))
   const [consent, setConsent] = useState<ConsentState>(null)
   const [bannerOpen, setBannerOpen] = useState(false)
   const [loadedForThisPage, setLoadedForThisPage] = useState(false)

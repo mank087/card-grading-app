@@ -3,7 +3,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { generateBatchSlabLabels, generateBatchFoldOverSlabLabels, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
 import { generateBatchCustomSlabLabels, generateBatchFoldOverCustomLabels } from '../../lib/customSlabLabelGenerator';
-import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
+import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
+import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
@@ -41,6 +42,8 @@ interface CardData {
     primary?: string; secondary?: string;
     palette?: string[]; topEdgeColors?: string[];
   } | null;
+  // Enterprise org the card was graded under, when applicable
+  org_id?: string | null;
 }
 
 interface BatchSlabLabelModalProps {
@@ -103,12 +106,18 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const buildSlabLabelData = useCallback(async (
     card: CardData,
     logoDataUrl: string | undefined,
-    whiteLogoDataUrl: string | undefined
+    whiteLogoDataUrl: string | undefined,
+    qrLogoSrc?: string,
+    orgSlug?: string
   ): Promise<SlabLabelData> => {
     const labelData = getCardLabelData(card);
-    const verifyUrl = `https://dcmgrading.com/verify/${card.serial || ''}`;
+    // Org batches: QR lands on the org's branded card page with the store
+    // mark baked in; DCM batches keep the plain verify QR.
+    const verifyUrl = cardQrUrl(card.id, card.serial, orgSlug ? { slug: orgSlug } : null);
 
-    const qrCodeDataUrl = await generateQRCodePlain(verifyUrl).catch(() => '');
+    const qrCodeDataUrl = qrLogoSrc
+      ? await generateQRCodeWithLogo(verifyUrl, qrLogoSrc).catch(() => '')
+      : await generateQRCodePlain(verifyUrl).catch(() => '');
 
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
@@ -145,18 +154,26 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     setProgress(0);
 
     try {
-      // Pre-load logos once
-      const [logoDataUrl, whiteLogoDataUrl] = await Promise.all([
+      // Pre-load logos once. A batch only carries a store's logos when EVERY
+      // card was graded under the SAME org; mixed or DCM batches keep DCM.
+      const [dcmLogoDataUrl, dcmWhiteLogoDataUrl] = await Promise.all([
         loadLogoAsBase64().catch(() => undefined),
         loadWhiteLogoAsBase64().catch(() => undefined),
       ]);
+      const allSameOrg = selectedCards.length > 0 &&
+        selectedCards.every(c => (c as any).org_id && (c as any).org_id === (selectedCards[0] as any).org_id);
+      const orgLogos = allSameOrg ? await loadLogosForCard(selectedCards[0].id).catch(() => null) : null;
+      const logoDataUrl = orgLogos?.branding ? orgLogos.color : dcmLogoDataUrl;
+      const whiteLogoDataUrl = orgLogos?.branding ? orgLogos.white : dcmWhiteLogoDataUrl;
 
       // Build label data for all selected cards
       const labelDataArray: SlabLabelData[] = [];
 
       for (let i = 0; i < selectedCards.length; i++) {
         const card = selectedCards[i];
-        const labelData = await buildSlabLabelData(card, logoDataUrl, whiteLogoDataUrl);
+        const labelData = await buildSlabLabelData(card, logoDataUrl, whiteLogoDataUrl,
+          orgLogos?.branding ? orgLogos.color : undefined,
+          orgLogos?.branding?.slug);
         labelDataArray.push(labelData);
         setProgress(Math.round(((i + 1) / selectedCards.length) * 80));
       }
@@ -172,8 +189,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         const gen = await import('@/lib/labels/heritageSlabGenerator');
         const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
         const items = labelDataArray.map((data, i) => ({
+          // Org batches carry the store mark on the QR disc AND the front;
+          // DCM batches unchanged.
           data,
           bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(selectedCards[i]?.card_colors),
+          logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
         }));
         blob = printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors)

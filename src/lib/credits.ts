@@ -4,6 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { CARD_LOVERS_LOYALTY_BONUSES } from './subscriptionConstants';
+import { getOrgForUser, takeOrgCredit, returnOrgCredits, assignOrgSerial } from './organizations';
 
 // Create a Supabase client with service role for server-side operations
 function getServiceClient() {
@@ -246,8 +247,17 @@ export async function deductCredit(
     cardId?: string;
     isRegrade?: boolean;
     description?: string;
+    /**
+     * Active workspace context (from the dcm-org-scope cookie). 'personal'
+     * skips the org pool entirely; 'org' or undefined takes the org-first
+     * path. Undefined (no cookie — mobile app, direct API calls) defaults to
+     * org-first: mobile has no workspace switcher yet, and staff grading on
+     * mobile are working for the store — flipping the default would silently
+     * burn their personal credits instead.
+     */
+    payerScope?: 'personal' | 'org';
   } = {}
-): Promise<{ success: boolean; newBalance: number; error?: string; totalUsed?: number; totalPurchased?: number; alreadyCharged?: boolean }> {
+): Promise<{ success: boolean; newBalance: number; error?: string; totalUsed?: number; totalPurchased?: number; alreadyCharged?: boolean; orgFunded?: boolean; orgBalance?: number; orgName?: string }> {
   const supabase = getServiceClient();
 
   // Get current credits
@@ -279,6 +289,77 @@ export async function deductCredit(
         alreadyCharged: true,
       };
     }
+  }
+
+  // Enterprise: a grade submitted in org context draws the store's credit pool
+  // (monthly bucket first, then rollover overage packs) before touching
+  // personal credits. payerScope 'personal' (the user's workspace switcher)
+  // skips this entirely. The pool decrement is an atomic RPC with guarded
+  // UPDATEs, so a drained pool returns null and we fall through to the
+  // personal path unchanged.
+  const membership = options.payerScope === 'personal' ? null : await getOrgForUser(userId);
+  if (membership && membership.org.status === 'active') {
+    const orgId = membership.org.id;
+    const orgDraw = await takeOrgCredit(orgId);
+    if (orgDraw !== null) {
+      const orgTxType = options.isRegrade ? 'regrade' : 'grade';
+      const { error: orgTxError } = await supabase.from('credit_transactions').insert({
+        user_id: userId,
+        org_id: orgId,
+        type: orgTxType,
+        amount: -1,
+        balance_after: orgDraw.total,
+        description: `${options.isRegrade ? 'Re-grade card' : options.description || 'Grade card'} (${membership.org.name} store credits)`,
+        card_id: options.cardId,
+        metadata: { org_credit: true, org_bucket: orgDraw.bucket },
+      });
+      if (orgTxError) {
+        // Same partial unique index on (card_id) WHERE type='grade' guards
+        // org-funded charges: a concurrent duplicate loses the insert race —
+        // put the credit back in the bucket it came from (unwind, not refund)
+        // and report the prior charge as success.
+        if (orgTxError.code === '23505' && !options.isRegrade) {
+          console.warn(`[deductCredit] Concurrent duplicate org charge for card ${options.cardId} — restoring pool`);
+          await returnOrgCredits(orgId, 1, orgDraw.bucket);
+          return {
+            success: true,
+            newBalance: credits.balance,
+            totalUsed: credits.total_used,
+            totalPurchased: credits.total_purchased,
+            alreadyCharged: true,
+            orgFunded: true,
+            orgName: membership.org.name,
+          };
+        }
+        console.error('Failed to record org grade transaction:', orgTxError);
+        // Don't fail — pool was drawn; audit log incomplete
+      }
+      // Stamp the card as org-graded: branding (labels, report, detail page,
+      // verify) keys off cards.org_id from this moment forward. The org serial
+      // is assigned in the same breath — once, never on regrades (the guard is
+      // the .is('org_serial', null) filter, so a re-run can't renumber).
+      if (options.cardId) {
+        const { error: stampError } = await supabase
+          .from('cards')
+          .update({ org_id: orgId })
+          .eq('id', options.cardId);
+        if (stampError) {
+          console.error('[deductCredit] Failed to stamp card org_id:', stampError.message);
+        } else {
+          await assignOrgSerial(options.cardId, membership.org);
+        }
+      }
+      return {
+        success: true,
+        newBalance: credits.balance, // personal balance untouched
+        totalUsed: credits.total_used,
+        totalPurchased: credits.total_purchased,
+        orgFunded: true,
+        orgBalance: orgDraw.total,
+        orgName: membership.org.name,
+      };
+    }
+    // Pool empty → fall through to personal credits.
   }
 
   if (credits.balance < 1) {
@@ -371,7 +452,7 @@ export async function refundGradeCredit(
   // Must have been charged for this card
   const { data: charge } = await supabase
     .from('credit_transactions')
-    .select('id')
+    .select('id, org_id')
     .eq('card_id', cardId)
     .eq('type', 'grade')
     .limit(1)
@@ -392,6 +473,33 @@ export async function refundGradeCredit(
   if (priorRefund) {
     console.log(`[refundGradeCredit] Card ${cardId} already refunded (tx ${priorRefund.id}) — skipping`);
     return { refunded: false, newBalance: credits.balance };
+  }
+
+  // Org-funded charge → the refund goes back to the store pool, not the
+  // grader's personal balance.
+  if (charge.org_id) {
+    // Policy: refunds always land in the OVERAGE bucket regardless of which
+    // bucket paid — the refunded credit is durable (never wiped by the monthly
+    // reset) and this avoids monthly_credits exceeding the allotment mid-cycle.
+    const orgBalance = await returnOrgCredits(charge.org_id, 1, 'overage');
+    if (orgBalance === null) {
+      return { refunded: false, newBalance: credits.balance, error: 'Org pool restore failed' };
+    }
+    const { error: orgRefundTxError } = await supabase.from('credit_transactions').insert({
+      user_id: userId,
+      org_id: charge.org_id,
+      type: 'refund',
+      amount: 1,
+      balance_after: orgBalance,
+      description: `Grading failed — store credit refunded (${reason})`.slice(0, 250),
+      card_id: cardId,
+      metadata: { org_credit: true, org_bucket: 'overage' },
+    });
+    if (orgRefundTxError) {
+      console.error('[refundGradeCredit] Failed to record org refund transaction:', orgRefundTxError);
+    }
+    console.log(`[refundGradeCredit] ✅ Refunded 1 store credit to org ${charge.org_id} for card ${cardId}`);
+    return { refunded: true, newBalance: credits.balance };
   }
 
   const newBalance = credits.balance + 1;

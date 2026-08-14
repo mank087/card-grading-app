@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe, CARD_LOVERS_SUBSCRIPTION, CardLoversPlan } from '@/lib/stripe';
 import { getAffiliateByCode } from '@/lib/affiliates';
+import { taxParams } from '@/lib/stripeTax';
 import Stripe from 'stripe';
 
 // Create Supabase client for auth
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
       subscription_data: {
         metadata: sessionMetadata,
       },
+      ...taxParams(Boolean(stripeCustomerId)),
     };
 
     // Create checkout session

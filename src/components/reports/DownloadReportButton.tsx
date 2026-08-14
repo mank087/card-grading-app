@@ -10,8 +10,7 @@ import {
   FoldableLabelData,
   generateFoldableLabel,
   generateQRCodeWithLogo,
-  generateQRCodePlain,
-  loadLogoAsBase64
+  generateQRCodePlain
 } from '../../lib/foldableLabelGenerator';
 import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
@@ -20,7 +19,6 @@ import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator'
 import { downloadSlabLabel, SlabLabelData } from '../../lib/slabLabelGenerator';
 import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '../../lib/customSlabLabelGenerator';
 import { downloadFoldOverSlabLabelStandard } from '../../lib/slabLabelGenerator';
-import { loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
 import { FoldOverLabelModal } from './FoldOverLabelModal';
@@ -28,6 +26,8 @@ import { getCardLabelData } from '../../lib/useLabelData';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
+import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
+import { useOrgContext } from '@/contexts/OrgContext';
 
 /**
  * Download Report Button Component
@@ -44,6 +44,12 @@ interface DownloadReportButtonProps {
   showCardLoversEmblem?: boolean; // Show Card Lovers emblem on back label of card images
   labelStyle?: string; // Label style preference for card images (modern, traditional, custom-1..4)
   customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null; // Custom label config when using custom style
+  /**
+   * Public-page menu: only card images + reports. Hides the printable label
+   * options and the Label Studio link (used on logged-out org storefront card
+   * pages, where slab printing belongs to the store, not the visitor).
+   */
+  publicMenu?: boolean;
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
@@ -55,6 +61,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   showCardLoversEmblem = false,
   labelStyle = 'modern',
   customLabelConfig = null,
+  publicMenu = false,
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
@@ -172,7 +179,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   /**
    * Generate QR code with DCM logo in center as base64 data URL
    */
-  const generateQRCode = async (url: string): Promise<string> => {
+  const generateQRCode = async (url: string, logoSrc?: string): Promise<string> => {
     try {
       // Generate QR code to canvas
       const canvas = document.createElement('canvas');
@@ -222,7 +229,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           resolve(canvas.toDataURL('image/png'));
         };
 
-        logo.src = '/DCM-logo.png';
+        // Org-graded cards carry the store mark; consumers keep the DCM mark.
+        logo.src = logoSrc || '/DCM-logo.png';
       });
     } catch (error) {
       console.error('[DOWNLOAD REPORT] Failed to generate QR code:', error);
@@ -341,12 +349,32 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[DOWNLOAD REPORT] All images converted successfully');
 
-      // Generate QR code for the card URL
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      // Enterprise store branding: org-graded cards carry the store name/logo
+      // in the report header and label mocks (data URL — react-pdf can't
+      // fetch the signed storage URL itself). Loaded FIRST because the QR
+      // target and mark depend on it.
+      let orgReportBranding: { name: string; slug: string; logoDataUrl: string | null; brandColor: string | null } | null = null;
+      if ((card as any)?.org_id) {
+        try {
+          const logos = await loadLogosForCard(card.id);
+          if (logos.branding) {
+            orgReportBranding = {
+              name: logos.branding.name,
+              slug: logos.branding.slug,
+              logoDataUrl: logos.color || null,
+              brandColor: logos.branding.brandColor || null,
+            };
+          }
+        } catch (err) {
+          console.warn('[DOWNLOAD REPORT] Org branding unavailable, using DCM:', err);
+        }
+      }
+
+      // QR: org cards point at the org's branded card page with the store
+      // mark in the centre; consumer cards keep the DCM verify page + mark.
+      const cardUrl = cardQrUrl(card.id, card.serial, orgReportBranding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[DOWNLOAD REPORT] Generating QR code for URL:', cardUrl);
-      const qrCodeDataUrl = await generateQRCode(cardUrl);
+      const qrCodeDataUrl = await generateQRCode(cardUrl, orgReportBranding?.logoDataUrl || undefined);
       console.log('[DOWNLOAD REPORT] QR code generated');
 
       // Use unified label data generator (filters out "Unknown...", cleans values)
@@ -410,6 +438,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
             ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
             : undefined;
         })(),
+        org: orgReportBranding,
         professionalGrades: {
           psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
           bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
@@ -496,9 +525,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const serialClean = sanitize(cleanLabelData.serial);
       const reportIdClean = reportData.reportId;
 
-      // Combine: DCM Report - PrimaryName - Serial - ReportID
+      // Combine: {Brand} Report - PrimaryName - Serial - ReportID
       const filenameParts = [primaryNameClean, serialClean, reportIdClean].filter(p => p);
-      const filename = `DCM-Report-${filenameParts.join('-')}.pdf`;
+      const brandPrefix = orgReportBranding ? sanitize(orgReportBranding.name) || 'DCM' : 'DCM';
+      const filename = `${brandPrefix}-Report-${filenameParts.join('-')}.pdf`;
 
       link.download = filename;
 
@@ -539,15 +569,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScores = card.conversational_sub_scores || {};
 
-      // Generate QR code and load logo
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      // Generate QR code and load logo. Org cards: branded card page + mark.
+      const orgLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const cardUrl = cardQrUrl(card.id, card.serial, orgLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[FOLDABLE LABEL] Generating QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-        generateQRCodeWithLogo(cardUrl),
-        loadLogoAsBase64().catch(() => undefined)
+        generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined).catch(() => generateQRCodeWithLogo(cardUrl)),
+        Promise.resolve(orgLogoSet?.color ?? undefined),
       ]);
 
       console.log('[FOLDABLE LABEL] QR code and logo loaded');
@@ -577,6 +606,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         qrCodeDataUrl,
         cardUrl,
         logoDataUrl,
+        accentColor: orgLogoSet?.branding?.brandColor || undefined,
       };
 
       console.log('[FOLDABLE LABEL] Generating PDF with data:', {
@@ -597,7 +627,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
       const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(labelData.serial);
-      const filename = `DCM-Label-${cardNameClean}-${serialClean}.pdf`;
+      const labelBrand = orgLogoSet?.branding ? sanitize(orgLogoSet.branding.name) || 'DCM' : 'DCM';
+      const filename = `${labelBrand}-Label-${cardNameClean}-${serialClean}.pdf`;
 
       link.download = filename;
 
@@ -651,15 +682,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScores = card.conversational_sub_scores || {};
 
-      // Generate QR code and load logo
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      // Generate QR code and load logo. Org cards: branded card page + mark.
+      const orgLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const cardUrl = cardQrUrl(card.id, card.serial, orgLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[MINI-REPORT JPG] Generating QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-        generateQRCodeWithLogo(cardUrl),
-        loadLogoAsBase64().catch(() => undefined)
+        generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined).catch(() => generateQRCodeWithLogo(cardUrl)),
+        Promise.resolve(orgLogoSet?.color ?? undefined),
       ]);
 
       console.log('[MINI-REPORT JPG] QR code and logo loaded');
@@ -689,6 +719,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         qrCodeDataUrl,
         cardUrl,
         logoDataUrl,
+        accentColor: orgLogoSet?.branding?.brandColor || undefined,
       };
 
       console.log('[MINI-REPORT JPG] Generating JPG with data:', {
@@ -709,7 +740,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
       const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(labelData.serial);
-      const filename = `DCM-MiniReport-${cardNameClean}-${serialClean}.jpg`;
+      const jpgBrand = orgLogoSet?.branding ? sanitize(orgLogoSet.branding.name) || 'DCM' : 'DCM';
+      const filename = `${jpgBrand}-MiniReport-${cardNameClean}-${serialClean}.jpg`;
 
       link.download = filename;
 
@@ -792,6 +824,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScoresData = card.conversational_sub_scores || {};
 
+      // Org branding: store logo on the label art, QR pointed at the org's
+      // branded card page.
+      const orgLogoSetImages = await loadLogosForCard(card.id).catch(() => null);
+
       const cardImageData: CardImageData = {
         cardName: cleanLabelData.primaryName,
         contextLine: cleanLabelData.contextLine, // Pre-formatted: "Set • Subset • #123 • 2023"
@@ -800,9 +836,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
-        cardUrl: card.serial
-          ? `https://dcmgrading.com/verify/${card.serial}`
-          : `${window.location.origin}/${cardType}/${card.id}`,
+        cardUrl: cardQrUrl(card.id, card.serial, orgLogoSetImages?.branding, `${window.location.origin}/${cardType}/${card.id}`),
         frontImageUrl,
         backImageUrl,
         showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
@@ -821,6 +855,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
           surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
         },
+        // Enterprise: org-graded cards carry the store logo on the label art
+        logoOverrides: orgLogoSetImages?.branding
+          ? { color: orgLogoSetImages.color, white: orgLogoSetImages.white, black: orgLogoSetImages.black }
+          : undefined,
       };
 
       console.log('[CARD IMAGES] Generating images with data:', {
@@ -867,14 +905,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const subScores = card.conversational_sub_scores || {};
 
       // Generate plain QR code (no logo) for better scannability and load logo separately
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      const averyLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const cardUrl = cardQrUrl(card.id, card.serial, averyLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[AVERY LABEL] Generating plain QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
         generateQRCodePlain(cardUrl),  // Plain QR for better scanning on small labels
-        loadLogoAsBase64().catch(() => undefined)
+        Promise.resolve(averyLogoSet?.color ?? undefined),
       ]);
 
       // Helper function to rotate an image 180 degrees
@@ -1012,10 +1049,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // Use unified label data generator
       const cleanLabelData = getCardLabelData(card);
 
-      // Generate QR code URL for the card
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      // Generate QR code URL for the card (org cards: branded card page)
+      const toploaderLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const cardUrl = cardQrUrl(card.id, card.serial, toploaderLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[AVERY 8167] Card URL for QR:', cardUrl);
 
       // Generate combined PDF with both front and back labels
@@ -1075,9 +1111,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       setGeneratingType('foldover');
 
       const cleanLabelData = getCardLabelData(card);
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
+      const foldOverLogoSet = await loadLogosForCard(card.id).catch(() => null);
+      const cardUrl = cardQrUrl(card.id, card.serial, foldOverLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
 
       const blob = await generateFoldOverLabel8167(
         {
@@ -1121,16 +1156,17 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     const cleanLabelData = getCardLabelData(card);
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
-    const cardUrl = card.serial
-      ? `https://dcmgrading.com/verify/${card.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
     const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
-    const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
-      generateQRCodePlain(cardUrl),
-      loadLogoAsBase64().catch(() => undefined),
-      loadWhiteLogoAsBase64().catch(() => undefined),
-    ]);
+    // Org cards: store mark baked into the QR centre and the scan lands on
+    // the org's branded card page. Non-org: plain QR to the DCM verify page.
+    const orgLogos = await loadLogosForCard(card.id).catch(() => null);
+    const cardUrl = cardQrUrl(card.id, card.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`);
+    const qrCodeDataUrl = orgLogos?.branding
+      ? await generateQRCodeWithLogo(cardUrl, orgLogos.color)
+      : await generateQRCodePlain(cardUrl);
+    const logoDataUrl = orgLogos?.color;
+    const whiteLogoDataUrl = orgLogos?.white;
 
     return {
       primaryName: cleanLabelData.primaryName,
@@ -1178,7 +1214,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const heritageSel = resolveHeritageSelection(labelStyle, customLabelConfig);
       if (heritageSel.active) {
         const gen = await import('@/lib/labels/heritageSlabGenerator');
-        const opts = { bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card?.card_colors), pattern: heritageSel.pattern, gradeColors: heritageSel.gradeColors };
+        const orgLogos = await loadLogosForCard(card.id).catch(() => null);
+        const opts = {
+          bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card?.card_colors),
+          pattern: heritageSel.pattern,
+          gradeColors: heritageSel.gradeColors,
+          // Org front mark (black variant); the QR disc follows slabData.logoDataUrl
+          logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
+        };
         if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(slabData, opts);
         else await gen.downloadHeritageSlabLabel(slabData, opts);
       } else if (format === 'foldover') {
@@ -1205,7 +1248,11 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
-  // Label Studio URL with card pre-selected
+  // Label Studio URL with card pre-selected. Hidden for enterprise members —
+  // their label design is locked to the Brand Setup house style — and on
+  // public pages (publicMenu already suppresses it).
+  const { membership: orgMembership } = useOrgContext();
+  const showLabelStudioLink = !publicMenu && !orgMembership;
   const labelStudioUrl = card?.serial ? `/labels?card=${card.serial}` : '/labels';
 
   // Labels dropdown menu items (card images and printable labels for slabs/toploaders)
@@ -1241,6 +1288,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       onClick: handleDownloadCardImages,
     },
   ];
+
+  // Public pages: card images only in the first dropdown — printable label
+  // stock belongs to the store, not the visitor.
+  const visibleLabelsMenuItems = publicMenu
+    ? labelsMenuItems.filter(item => item.id === 'card-images')
+    : labelsMenuItems;
 
   // Reports dropdown menu items (all report formats)
   const reportsMenuItems = [
@@ -1283,7 +1336,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                <span>Labels</span>
+                <span>{publicMenu ? 'Card Images' : 'Labels'}</span>
                 <svg className={`w-4 h-4 transition-transform ${isLabelsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -1294,16 +1347,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           {/* Labels Dropdown Menu */}
           {isLabelsDropdownOpen && !isGenerating && (
             <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-              <a
-                href={labelStudioUrl}
-                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
-              >
-                <div>
-                  <div className="font-medium text-purple-700 text-sm">Open Label Studio</div>
-                  <div className="text-xs text-purple-500">Design custom labels for any case type</div>
-                </div>
-              </a>
-              {labelsMenuItems.map((item) => (
+              {showLabelStudioLink && (
+                <a
+                  href={labelStudioUrl}
+                  className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
+                >
+                  <div>
+                    <div className="font-medium text-purple-700 text-sm">Open Label Studio</div>
+                    <div className="text-xs text-purple-500">Design custom labels for any case type</div>
+                  </div>
+                </a>
+              )}
+              {visibleLabelsMenuItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={item.onClick}
@@ -1406,7 +1461,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              <span>Labels</span>
+              <span>{publicMenu ? 'Card Images' : 'Labels'}</span>
               <svg className={`w-5 h-5 transition-transform ${isLabelsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -1417,16 +1472,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         {/* Labels Dropdown Menu */}
         {isLabelsDropdownOpen && !isGenerating && (
           <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-            <a
-              href={labelStudioUrl}
-              className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
-            >
-              <div>
-                <div className="font-semibold text-purple-700">Open Label Studio</div>
-                <div className="text-sm text-purple-500">Design custom labels for any case type</div>
-              </div>
-            </a>
-            {labelsMenuItems.map((item) => (
+            {showLabelStudioLink && (
+              <a
+                href={labelStudioUrl}
+                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
+              >
+                <div>
+                  <div className="font-semibold text-purple-700">Open Label Studio</div>
+                  <div className="text-sm text-purple-500">Design custom labels for any case type</div>
+                </div>
+              </a>
+            )}
+            {visibleLabelsMenuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={item.onClick}

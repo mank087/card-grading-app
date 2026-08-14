@@ -46,6 +46,13 @@ export interface HeritageRenderOptions {
   pattern: BandPattern
   /** Per-grade chip colour overrides ('1'..'10'), or null for defaults. */
   gradeColors?: Record<string, string> | null
+  /**
+   * Org-branding override for the FRONT-label mark (black-variant data URL).
+   * The QR-centre disc follows data.logoDataUrl, which enterprise callers
+   * also set to the org's colour logo — the scan still resolves to the DCM
+   * verify page, which carries the verification trust. Absent = DCM mark.
+   */
+  logoBlack?: string
 }
 
 /** 'diamond' unless the config carries a valid pattern id. */
@@ -76,9 +83,11 @@ async function buildHeritageInputs(
         return data.qrCodeDataUrl || null
       }
     })(),
-    preloadedBlackLogo !== undefined
-      ? Promise.resolve(preloadedBlackLogo)
-      : loadBlackLogoAsBase64().catch(() => null),
+    opts.logoBlack
+      ? Promise.resolve(opts.logoBlack)
+      : preloadedBlackLogo !== undefined
+        ? Promise.resolve(preloadedBlackLogo)
+        : loadBlackLogoAsBase64().catch(() => null),
   ])
 
   const grade = data.grade !== null && data.grade !== undefined
@@ -309,12 +318,14 @@ export interface HeritageBatchItem {
   data: SlabLabelData
   /** Per-card band palette (resolveHeritageBandColors(card.card_colors)). */
   bandColors: string[]
+  /** Per-card org front mark (black-variant data URL); DCM when absent. */
+  logoBlack?: string
 }
 
 async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern, gradeColors?: Record<string, string> | null): Promise<HeritageInputs[]> {
-  const blackLogo = await loadBlackLogoAsBase64().catch(() => null)
+  const dcmBlack = await loadBlackLogoAsBase64().catch(() => null)
   return Promise.all(
-    items.map(it => buildHeritageInputs(it.data, { bandColors: it.bandColors, pattern, gradeColors }, blackLogo)),
+    items.map(it => buildHeritageInputs(it.data, { bandColors: it.bandColors, pattern, gradeColors }, it.logoBlack ?? dcmBlack)),
   )
 }
 

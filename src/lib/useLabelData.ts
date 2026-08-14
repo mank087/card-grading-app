@@ -70,6 +70,7 @@ export function getCardLabelData(card: any, options?: { ignoreCustomOverrides?: 
     category: card.category,
     sub_category: card.sub_category,
     serial: card.serial,
+    org_serial_display: card.org_serial_display,
     conversational_decimal_grade: card.conversational_decimal_grade,
     conversational_whole_grade: card.conversational_whole_grade,
     conversational_condition_label: card.conversational_condition_label,

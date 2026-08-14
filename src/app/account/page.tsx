@@ -7,6 +7,7 @@ import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 type AccountStats = {
   totalCards: number
@@ -44,6 +45,10 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Enterprise store membership (org branding)
+  const [orgBranding, setOrgBranding] = useState<{ name: string; brandColor: string; logoUrl: string | null } | null>(null)
+  const [orgMembership, setOrgMembership] = useState<{ gradeCredits: number } | null>(null)
 
   // Founder state
   const [isFounder, setIsFounder] = useState(false)
@@ -215,6 +220,24 @@ export default function AccountPage() {
           recentUploads
         })
 
+        // Fetch enterprise store membership + branding
+        try {
+          const orgRes = await fetch('/api/org/branding', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          if (orgRes.ok) {
+            const orgData = await orgRes.json()
+            if (orgData.membership && orgData.branding) {
+              setOrgBranding(orgData.branding)
+              setOrgMembership(orgData.membership)
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching org branding:', err)
+        }
+
         // Fetch founder status
         try {
           const founderRes = await fetch('/api/founders/status', {
@@ -300,19 +323,8 @@ export default function AccountPage() {
   }, [])
 
   // Helper function to get card link based on category
-  const getCardLink = (cardId: string, category: string | null) => {
-    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-
-    if (category && sportCategories.includes(category)) {
-      return `/sports/${cardId}`
-    }
-    if (category === 'Pokemon') return `/pokemon/${cardId}`
-    if (category === 'MTG') return `/mtg/${cardId}`
-    if (category === 'Lorcana') return `/lorcana/${cardId}`
-    if (category === 'Other') return `/other/${cardId}`
-
-    return `/card/${cardId}`
-  }
+  const getCardLink = (cardId: string, category: string | null) =>
+    `/${categoryToRouteSlug(category)}/${cardId}`
 
   // Handle password change
   const handleChangePassword = async () => {
@@ -616,6 +628,34 @@ export default function AccountPage() {
           <h1 className="text-4xl font-bold text-gray-900">My Account</h1>
           <p className="text-gray-600 mt-2">Manage your account settings and view your collection statistics</p>
         </div>
+
+        {/* Enterprise Store Membership Banner */}
+        {orgBranding && orgMembership && (
+          <div
+            className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4"
+            style={{ borderLeftColor: orgBranding.brandColor }}
+          >
+            <div className="flex items-center gap-4">
+              {orgBranding.logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={orgBranding.logoUrl} alt={`${orgBranding.name} logo`} className="h-10 w-auto object-contain" />
+              )}
+              <div className="flex-1">
+                <p className="text-lg font-semibold text-gray-900">
+                  {orgBranding.name}: {orgMembership.gradeCredits} grades available
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  These grades are shared by your team and used when you grade in the {orgBranding.name} workspace.
+                  Monthly grades refresh each billing cycle, and overage pack credits roll over.
+                </p>
+              </div>
+              <Link href="/store/billing"
+                className="shrink-0 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700">
+                Billing &amp; grades
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Account Information Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">

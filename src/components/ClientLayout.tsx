@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
+import { OrgProvider } from '@/contexts/OrgContext'
 import PersistentStatusBar from '@/components/PersistentStatusBar'
 import HelpBot from '@/components/helpbot/HelpBot'
 import ReferralTracker from '@/components/ReferralTracker'
@@ -104,6 +105,7 @@ function SessionRefreshMonitor() {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
+    <OrgProvider>
     <CreditsProvider>
       <GradingQueueProvider>
         <ScrollToTop />
@@ -135,5 +137,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         {children}
       </GradingQueueProvider>
     </CreditsProvider>
+    </OrgProvider>
   )
 }

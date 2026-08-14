@@ -21,14 +21,20 @@ import { SortableGrid, SortableCell, CollectionDnd } from '@/components/binders/
 import { useBinders } from '@/components/binders/useBinders'
 import CardActionSheet from '@/components/binders/CardActionSheet'
 import { useLongPress } from '@/components/binders/useLongPress'
-import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
+import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
+import { useOrgContext } from '@/contexts/OrgContext'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 
 type Card = {
   id: string
   serial: string
+  user_id?: string
+  org_id?: string | null
+  conversational_sub_scores?: any
+  conversational_weighted_sub_scores?: any
   front_path: string
   back_path: string
   front_url?: string | null  // 🎯 Signed URL from API
@@ -357,46 +363,9 @@ const getImageQualityGrade = (card: Card) => {
 
 
 const getCardLink = (card: Card) => {
-  // Route to category-specific pages
-  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
-
-  // Sports cards → /sports/[id]
-  if (card.category && sportCategories.includes(card.category)) {
-    return `/sports/${card.id}`;
-  }
-
-  // Pokemon cards → /pokemon/[id] (uses conversational grading v4.2)
-  if (card.category === 'Pokemon') {
-    return `/pokemon/${card.id}`;
-  }
-
-  // MTG cards → /mtg/[id]
-  if (card.category === 'MTG') {
-    return `/mtg/${card.id}`;
-  }
-
-  // Lorcana cards → /lorcana/[id]
-  if (card.category === 'Lorcana') {
-    return `/lorcana/${card.id}`;
-  }
-
-  // One Piece cards → /onepiece/[id]
-  if (card.category === 'One Piece') {
-    return `/onepiece/${card.id}`;
-  }
-
-  // Yu-Gi-Oh cards → /yugioh/[id]
-  if (card.category === 'Yu-Gi-Oh') {
-    return `/yugioh/${card.id}`;
-  }
-
-  // Other cards → /other/[id]
-  if (card.category === 'Other') {
-    return `/other/${card.id}`;
-  }
-
-  // Default to general card page for other types
-  return `/card/${card.id}`;
+  // categoryToRouteSlug is the single source of truth for category → route
+  // (handles 'One Piece', 'Yu-Gi-Oh', 'Star Wars' and every sports sub-category).
+  return `/${categoryToRouteSlug(card.category)}/${card.id}`;
 };
 
 function CollectionPageContent() {
@@ -463,7 +432,10 @@ function CollectionPageContent() {
   const [showLabelTypeSelector, setShowLabelTypeSelector] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const { labelStyle, customStyles, activeConfig, colorOverrides, switchStyle } = useCustomLabelStyle()
+  // Store scope shows only org-graded cards — render them in the org's house
+  // label design (Brand Setup) instead of the viewer's personal style.
+  const { isOrgScope: labelScopeIsOrg } = useOrgContext()
+  const { labelStyle, customStyles, activeConfig, colorOverrides, switchStyle } = useCustomLabelStyleWithOrg(labelScopeIsOrg ? 'org' : null)
   const heritageSel = resolveHeritageSelection(labelStyle, activeConfig)
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
@@ -473,6 +445,23 @@ function CollectionPageContent() {
   const [shareSetupUsername, setShareSetupUsername] = useState('')
   const [shareSetupError, setShareSetupError] = useState<string | null>(null)
   const [shareSetupSaving, setShareSetupSaving] = useState(false)
+  // Enterprise store scope now follows the GLOBAL workspace context (nav
+  // switcher) instead of a page-local toggle: in org context this page shows
+  // ONLY the store inventory; in personal context, only the user's own cards.
+  // orgMembership stays null for non-members, so the page renders exactly as
+  // before for regular users.
+  const { membership: orgMembership, isOrgScope } = useOrgContext()
+  const orgInfo = orgMembership ? { name: orgMembership.name, gradeCredits: orgMembership.gradeCredits } : null
+  // The member's own org logo URLs — applied to slab labels of org-graded cards.
+  // (v1: any org card on this page belongs to the member's own org.)
+  const orgLogos = orgMembership ? { color: orgMembership.logos.color, white: orgMembership.logos.white } : null
+  const scope: 'mine' | 'store' = isOrgScope ? 'store' : 'mine'
+  const [storeCards, setStoreCards] = useState<Card[]>([])
+  const [storeGraders, setStoreGraders] = useState<Record<string, string>>({})
+  const [storeUserId, setStoreUserId] = useState<string | null>(null)
+  const [storeSlug, setStoreSlug] = useState<string | null>(null)
+  const [storeLoading, setStoreLoading] = useState(false)
+  const [graderFilter, setGraderFilter] = useState<string>('all')
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
@@ -525,6 +514,35 @@ function CollectionPageContent() {
       })
   }, [])
 
+  // Entering store scope (via the nav workspace switcher) resets the
+  // personal-only view state the old page-local toggle used to clear.
+  useEffect(() => {
+    if (scope === 'store') {
+      setSelectedBinderId(null)
+      setOwnershipView('owned')
+    }
+  }, [scope])
+
+  // Store scope: fetch the org's full inventory (all members' cards).
+  useEffect(() => {
+    if (scope !== 'store') return
+    const session = getStoredSession()
+    if (!session?.access_token) return
+    setStoreLoading(true)
+    fetch('/api/org/cards', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load store cards')))
+      .then(data => {
+        setStoreCards(data.cards || [])
+        setStoreGraders(data.graders || {})
+        setStoreUserId(data.currentUserId || null)
+        setStoreSlug(data.org?.slug || null)
+      })
+      .catch(() => toast.error('Failed to load store inventory'))
+      .finally(() => setStoreLoading(false))
+  }, [scope, refreshKey])
+
   // Multi-select handlers
   const toggleCardSelection = (cardId: string) => {
     setSelectedCardIds(prev => {
@@ -551,7 +569,7 @@ function CollectionPageContent() {
   useEffect(() => {
     setSelectedCardIds(new Set())
     setDisplayLimit(20) // Reset display limit when filtering
-  }, [selectedCategory, searchTerm])
+  }, [selectedCategory, searchTerm, scope, graderFilter])
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -1488,9 +1506,23 @@ function CollectionPageContent() {
   // returns every card in the binder regardless of owned/sold, and switching
   // tabs only refetches the main `cards` list — so inside a binder the Sold
   // tab did nothing at all.
-  const baseCards = selectedBinderId
-    ? (binderCards ?? []).filter(c => (c.ownership_status ?? 'owned') === ownershipView)
-    : cards
+  // Workspace separation: an org member's personal scope hides org-stamped
+  // cards — those live in the store workspace (they're on the store's quota
+  // and branding). Non-members have no org cards, so nothing changes for them.
+  const personalCards = orgMembership ? cards.filter(c => !c.org_id) : cards
+  const baseCards = scope === 'store'
+    ? storeCards.filter(c => graderFilter === 'all' || c.user_id === graderFilter)
+    : selectedBinderId
+    ? (binderCards ?? []).filter(c => (c.ownership_status ?? 'owned') === ownershipView && !(orgMembership && c.org_id))
+    : personalCards
+
+  // In store scope, only the member who graded a card may edit/sell/delete it.
+  const canEditCard = (card: Card) => scope !== 'store' || card.user_id === storeUserId
+
+  // Store scope opens the white-labeled storefront detail page (the same one
+  // {slug}.dcmgrading.com serves); personal scope keeps the DCM detail pages.
+  const cardHref = (card: Card) =>
+    scope === 'store' && storeSlug ? `/enterprise/${storeSlug}/card/${card.id}` : getCardLink(card)
 
   // Custom order IS "no sort column". Picking a sort overrides the binder's
   // arrangement (and disables dragging, below) — the Notion/Airtable rule that
@@ -1591,6 +1623,44 @@ function CollectionPageContent() {
   const displayedCards = filteredCards.slice(0, displayLimit)
   const hasMore = filteredCards.length > displayLimit
 
+  // Store scope: client-side CSV of the currently filtered set.
+  const exportStoreCsv = () => {
+    const csvEscape = (v: unknown) => {
+      const s = v === null || v === undefined ? '' : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const header = 'serial,dcm_serial,card_name,set,category,grade,centering,corners,edges,surface,graded_by,created_at,ownership_status'
+    const rows = filteredCards.map(card => {
+      const info = getCardInfo(card)
+      const weighted = card.conversational_weighted_sub_scores || {}
+      const sub = card.conversational_sub_scores || {}
+      return [
+        // Branded org serial leads (e.g. APX442921); the DCM registry serial
+        // rides alongside for cross-reference.
+        (card as any).org_serial_display || card.serial,
+        card.serial,
+        getPlayerName(card),
+        info.set_name,
+        card.category,
+        getCardGrade(card),
+        weighted.centering ?? sub.centering?.weighted ?? '',
+        weighted.corners ?? sub.corners?.weighted ?? '',
+        weighted.edges ?? sub.edges?.weighted ?? '',
+        weighted.surface ?? sub.surface?.weighted ?? '',
+        (card.user_id && storeGraders[card.user_id]) || '',
+        card.created_at,
+        card.ownership_status ?? '',
+      ].map(csvEscape).join(',')
+    })
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' })
+    const slug = (orgInfo?.name || 'store').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${slug}-inventory-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   // Reordering requires a manual binder AND no active sort — otherwise the sort
   // would immediately re-order whatever the user just arranged.
   const canReorder = Boolean(selectedBinderId) && binderReorderable && !sortColumn
@@ -1619,7 +1689,7 @@ function CollectionPageContent() {
   const selectedBinder = binderApi.binders.find(b => b.id === selectedBinderId) || null
   // Dragging is available whenever there's somewhere to drop — you can drag a
   // card onto a binder chip from any view, including All Cards.
-  const canDragCards = binderApi.available && binderApi.binders.some(b => !b.smart_filter)
+  const canDragCards = scope === 'mine' && binderApi.available && binderApi.binders.some(b => !b.smart_filter)
 
   /** Card dragged onto a binder chip. `__new__` is the "+ New binder" chip. */
   const fileCardToBinder = async (cardId: string, binderId: string) => {
@@ -1960,7 +2030,7 @@ function CollectionPageContent() {
   // other control with it — leaving no way back to Owned.
   const totalAcrossViews =
     ownershipCounts.owned + ownershipCounts.sold
-  if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId) {
+  if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId && !orgInfo) {
     return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
   }
 
@@ -2104,10 +2174,44 @@ function CollectionPageContent() {
               compact
             />
             <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-              {cards.length} card{cards.length !== 1 ? 's' : ''}
+              {(scope === 'store' ? storeCards : personalCards).length} card{(scope === 'store' ? storeCards : personalCards).length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
+
+        {/* Enterprise store scope — active workspace is chosen in the nav
+            switcher; this row only shows the store toolbar while in it. */}
+        {orgInfo && scope === 'store' && (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold whitespace-nowrap">
+              🏪 {orgInfo.name}
+            </span>
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              {orgInfo.gradeCredits} store grade{orgInfo.gradeCredits !== 1 ? 's' : ''} available
+            </span>
+                <select
+                  value={graderFilter}
+                  onChange={(e) => setGraderFilter(e.target.value)}
+                  className="text-sm border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+                  title="Filter by who graded the card"
+                >
+                  <option value="all">All members</option>
+                  {Object.entries(storeGraders).map(([id, email]) => (
+                    <option key={id} value={id}>{email}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={exportStoreCsv}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg text-xs font-medium text-gray-700 transition-colors"
+                  title="Download the filtered store inventory as CSV"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export CSV
+                </button>
+          </div>
+        )}
 
         {/* One drag context spans the strip AND the grid, so a card can be
             dragged out of the grid and dropped onto a binder chip. */}
@@ -2135,7 +2239,7 @@ function CollectionPageContent() {
 
         {/* Binder strip — scopes everything below it. Hidden entirely until the
             binders migration lands, so the page behaves exactly as before. */}
-        {binderApi.available && (
+        {binderApi.available && scope === 'mine' && (
           <BinderStrip
             binders={binderApi.binders}
             selectedId={selectedBinderId}
@@ -2467,7 +2571,7 @@ function CollectionPageContent() {
                   </div>
                 )}
                 {/* Add to binder — the primary way cards get filed */}
-                {selectedCardIds.size > 0 && binderApi.available && (
+                {selectedCardIds.size > 0 && binderApi.available && scope === 'mine' && (
                   <button
                     onClick={() => setAddToBinderOpen(true)}
                     disabled={isDeleting}
@@ -2515,6 +2619,7 @@ function CollectionPageContent() {
                     <span className="hidden md:inline">Download ({selectedCardIds.size})</span>
                   </button>
                 )}
+                {scope === 'mine' && (
                 <button
                   onClick={handleBulkDelete}
                   disabled={isDeleting}
@@ -2530,6 +2635,7 @@ function CollectionPageContent() {
                   )}
                   <span className="hidden md:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
                 </button>
+                )}
               </div>
             </div>
           </div>
@@ -2538,6 +2644,11 @@ function CollectionPageContent() {
         {viewMode === 'grid' && (
           <>
             {filteredCards.length === 0 ? (
+              scope === 'store' ? (
+                <p className="p-10 text-center text-gray-500">
+                  {storeLoading ? 'Loading store inventory…' : 'No cards in the store inventory yet.'}
+                </p>
+              ) : (
               <EmptyView
                 ownershipView={ownershipView}
                 binderName={selectedBinder?.name || null}
@@ -2549,6 +2660,7 @@ function CollectionPageContent() {
                   else { setOwnershipView('owned'); setSelectedBinderId(null) }
                 }}
               />
+              )
             ) : (
               <>
               <SortableGrid
@@ -2567,7 +2679,7 @@ function CollectionPageContent() {
                     drags instead. */}
                 <CardTileWrapper
                   selected={selectedCardIds.has(card.id)}
-                  onLongPress={() => openSheet(card)}
+                  onLongPress={() => { if (scope === 'mine') openSheet(card) }}
                 >
                 <button
                   type="button"
@@ -2591,7 +2703,7 @@ function CollectionPageContent() {
 
                 {/* Touch discoverability: long-press is invisible, so give the
                     same sheet a visible button. Hidden on desktop, which drags. */}
-                {binderApi.available && (
+                {binderApi.available && scope === 'mine' && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); openSheet(card) }}
@@ -2640,6 +2752,8 @@ function CollectionPageContent() {
                   labelStyle={labelStyle}
                   colorOverrides={colorOverrides}
                   heritage={heritageSel.active ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors((card as any).card_colors), gradeColors: heritageSel.gradeColors } : null}
+                  orgLogoColor={card.org_id ? orgLogos?.color ?? null : null}
+                  orgLogoWhite={card.org_id ? orgLogos?.white ?? null : null}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility & Price Badges */}
@@ -2706,13 +2820,13 @@ function CollectionPageContent() {
 
                     <div className="flex items-center gap-2">
                       <Link
-                        href={getCardLink(card)}
+                        href={cardHref(card)}
                         className="flex-1 text-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
                       >
                         View Details
                       </Link>
 
-                      {card.ownership_status === 'sold' ? (
+                      {canEditCard(card) && (card.ownership_status === 'sold' ? (
                         <button
                           onClick={() => updateOwnership(card.id, 'owned')}
                           disabled={updatingOwnershipId === card.id}
@@ -2730,7 +2844,7 @@ function CollectionPageContent() {
                         >
                           Sold
                         </button>
-                      )}
+                      ))}
                     </div>
                   </div>
                 </CardSlabGrid>
@@ -2760,6 +2874,11 @@ function CollectionPageContent() {
         {viewMode === 'list' && (
           <>
             {filteredCards.length === 0 ? (
+              scope === 'store' ? (
+                <p className="p-10 text-center text-gray-500">
+                  {storeLoading ? 'Loading store inventory…' : 'No cards in the store inventory yet.'}
+                </p>
+              ) : (
               <EmptyView
                 ownershipView={ownershipView}
                 binderName={selectedBinder?.name || null}
@@ -2771,6 +2890,7 @@ function CollectionPageContent() {
                   else { setOwnershipView('owned'); setSelectedBinderId(null) }
                 }}
               />
+              )
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 {/* Mobile Card Layout */}
@@ -2841,7 +2961,8 @@ function CollectionPageContent() {
 
                             {/* Card Info */}
                             <div className="flex-1 min-w-0">
-                              {/* Name - Primary */}
+                              {/* Name - Primary (wraps: ellipsizing the card
+                                  name on narrow screens hid what card it was) */}
                               <div className="font-medium text-gray-900 break-words">
                                 {getPlayerName(card)}
                               </div>
@@ -2850,6 +2971,13 @@ function CollectionPageContent() {
                               <div className="text-sm text-gray-500 break-words mt-0.5">
                                 {getCardSet(card)} {getYear(card) ? `• ${getYear(card)}` : ''}
                               </div>
+
+                              {/* Graded by — store scope only */}
+                              {scope === 'store' && card.user_id && storeGraders[card.user_id] && (
+                                <div className="text-xs text-gray-400 truncate mt-0.5">
+                                  by {storeGraders[card.user_id].split('@')[0]}
+                                </div>
+                              )}
 
                               {/* Grade & Price Row */}
                               <div className="flex items-center gap-3 mt-2">
@@ -2923,7 +3051,7 @@ function CollectionPageContent() {
                               {/* Actions Row */}
                               <div className="flex items-center justify-end gap-2 mt-2">
                                   <Link
-                                    href={getCardLink(card)}
+                                    href={cardHref(card)}
                                     className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
                                     title="View Details"
                                   >
@@ -2932,7 +3060,7 @@ function CollectionPageContent() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                   </Link>
-                                  {card.ownership_status !== 'sold' ? (
+                                  {canEditCard(card) && (card.ownership_status !== 'sold' ? (
                                     <button
                                       onClick={() => setSellCard(card)}
                                       disabled={updatingOwnershipId === card.id}
@@ -2950,7 +3078,8 @@ function CollectionPageContent() {
                                     >
                                       {updatingOwnershipId === card.id ? '…' : 'Still mine'}
                                     </button>
-                                  )}
+                                  ))}
+                                  {canEditCard(card) && (
                                   <button
                                     onClick={() => setDeleteCard(card)}
                                     disabled={deletingCardId === card.id}
@@ -2965,6 +3094,7 @@ function CollectionPageContent() {
                                       </svg>
                                     )}
                                   </button>
+                                  )}
                               </div>
                             </div>
                           </div>
@@ -3110,6 +3240,11 @@ function CollectionPageContent() {
                             <div className="text-sm font-medium text-gray-900 truncate" title={getPlayerName(card)}>
                               {getPlayerName(card)}
                             </div>
+                            {scope === 'store' && card.user_id && storeGraders[card.user_id] && (
+                              <div className="text-xs text-gray-400 truncate" title={storeGraders[card.user_id]}>
+                                by {storeGraders[card.user_id].split('@')[0]}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-3">
                             <div className="text-sm text-gray-900 truncate" title={getCardSet(card)}>
@@ -3182,12 +3317,12 @@ function CollectionPageContent() {
                           <td className="px-3 py-3 text-sm">
                             <div className="flex items-center gap-2">
                               <Link
-                                href={getCardLink(card)}
+                                href={cardHref(card)}
                                 className="text-purple-600 hover:text-purple-800 font-medium"
                               >
                                 View
                               </Link>
-                              {card.ownership_status !== 'sold' ? (
+                              {canEditCard(card) && (card.ownership_status !== 'sold' ? (
                                 <button
                                   onClick={() => setSellCard(card)}
                                   disabled={updatingOwnershipId === card.id}
@@ -3205,7 +3340,8 @@ function CollectionPageContent() {
                                 >
                                   {updatingOwnershipId === card.id ? '...' : 'Still mine'}
                                 </button>
-                              )}
+                              ))}
+                              {canEditCard(card) && (
                               <button
                                 onClick={() => setDeleteCard(card)}
                                 disabled={deletingCardId === card.id}
@@ -3214,6 +3350,7 @@ function CollectionPageContent() {
                               >
                                 {deletingCardId === card.id ? '...' : '✕'}
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -3244,7 +3381,7 @@ function CollectionPageContent() {
       <BatchAveryLabelModal
         isOpen={isBatchLabelModalOpen}
         onClose={() => setIsBatchLabelModalOpen(false)}
-        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
           ...c,
           front_image_url: c.front_url || undefined
         }))}
@@ -3255,7 +3392,7 @@ function CollectionPageContent() {
       <BatchAvery8167LabelModal
         isOpen={isBatch8167ModalOpen}
         onClose={() => setIsBatch8167ModalOpen(false)}
-        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
           ...c,
           front_image_url: c.front_url || undefined
         }))}
@@ -3266,7 +3403,7 @@ function CollectionPageContent() {
       <BatchSlabLabelModal
         isOpen={isBatchSlabLabelModalOpen}
         onClose={() => setIsBatchSlabLabelModalOpen(false)}
-        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
           ...c,
           front_image_url: c.front_url || undefined
         }))}
@@ -3281,7 +3418,7 @@ function CollectionPageContent() {
       <BatchDownloadModal
         isOpen={isBatchDownloadModalOpen}
         onClose={() => setIsBatchDownloadModalOpen(false)}
-        selectedCards={cards.filter(c => selectedCardIds.has(c.id)) as any}
+        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)) as any}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
 

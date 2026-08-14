@@ -10,6 +10,7 @@ import { getUserCredits, isFirstPurchase, isActiveCardLover, hasFounderDiscount 
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 import { getAffiliateByCode } from '@/lib/affiliates';
+import { taxParams, priceDataTaxBehavior } from '@/lib/stripeTax';
 
 export async function POST(request: NextRequest) {
   try {
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
       payment_intent_data: {
         metadata: sessionMetadata,
       },
+      ...taxParams(Boolean(stripeCustomerId)),
     };
 
     // Apply 20% discount using custom pricing (for Card Lovers or Founders), or use standard price
@@ -184,6 +186,7 @@ export async function POST(request: NextRequest) {
               description: priceConfig.description,
             },
             unit_amount: discountedPriceCents,
+            ...priceDataTaxBehavior(),
           },
           quantity: 1,
         },

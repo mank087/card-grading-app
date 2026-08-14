@@ -23,6 +23,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard, type OrgLogoSet } from '@/lib/orgBranding';
 import { generateAveryLabel } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelPair, generateFoldOverLabel8167 } from '@/lib/avery8167LabelGenerator';
 import { generateSlabLabel, generateFoldOverSlabLabel } from '@/lib/slabLabelGenerator';
@@ -190,6 +191,11 @@ export default function LabelExportPage() {
           console.warn('[label-export] user_credits lookup failed (non-fatal):', e);
         }
 
+        // Org branding: store logos when the card was graded under an
+        // enterprise org, DCM logos otherwise (per-asset fallback inside).
+        const logos: OrgLogoSet = await loadLogosForCard(cardId)
+          .catch(() => ({ color: '', white: '', black: '', branding: null }));
+
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
         const s = card.conversational_sub_scores || {};
@@ -241,6 +247,7 @@ export default function LabelExportPage() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
+            logoOverrides: logos.branding ? { color: logos.color, white: logos.white, black: logos.black } : undefined,
           };
           const { front, back } = await generateCardImages(imageData);
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
@@ -286,7 +293,7 @@ export default function LabelExportPage() {
           const uncertaintyMatch = (card.conversational_grade_uncertainty || '±0.25').match(/±\s*([\d.]+)/);
           const gradeRange = `${labelData.grade ?? 0} ± ${uncertaintyMatch ? uncertaintyMatch[1] : '0.25'}`;
 
-          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl).catch(() => '');
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
           const safePrimary = labelData.primaryName || 'Card';
           const safeContext = labelData.contextLine || '';
           const safeFeatures = labelData.featuresLine || null;
@@ -322,6 +329,7 @@ export default function LabelExportPage() {
                 ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors }
                 : undefined;
             })(),
+            org: logos.branding ? { name: logos.branding.name, logoDataUrl: logos.color || null } : undefined,
             professionalGrades: {
               psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
               bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
@@ -384,10 +392,8 @@ export default function LabelExportPage() {
         } else if (type === 'mini-report-pdf') {
           // Mini-report PDF — same generator the web's "Mini-Report (PDF)" uses.
           postStatus('Generating mini-report PDF…');
-          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-            generateQRCodeWithLogo(cardUrl).catch(() => ''),
-            loadLogoAsBase64().catch(() => undefined),
-          ]);
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
+          const logoDataUrl = logos.color || undefined;
           const fold: FoldableLabelData = {
             cardName: labelData.primaryName,
             setName: labelData.setName || '',
@@ -408,10 +414,8 @@ export default function LabelExportPage() {
           blobs.push({ name: `DCM-MiniReport-${namePrefix}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(blob) });
         } else if (type === 'mini-report') {
           postStatus('Generating mini grade report…');
-          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-            generateQRCodeWithLogo(cardUrl).catch(() => ''),
-            loadLogoAsBase64().catch(() => undefined),
-          ]);
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
+          const logoDataUrl = logos.color || undefined;
           const fold: FoldableLabelData = {
             cardName: labelData.primaryName,
             setName: labelData.setName || '',
@@ -432,10 +436,8 @@ export default function LabelExportPage() {
           blobs.push({ name: `DCM-${namePrefix}-mini-report.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(blob) });
         } else if (type === 'onetouch') {
           postStatus('Generating Avery 6871 one-touch label…');
-          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-            generateQRCodeWithLogo(cardUrl).catch(() => ''),
-            loadLogoAsBase64().catch(() => ''),
-          ]);
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
+          const logoDataUrl = logos.color;
           // Top half of the 6871 label prints upside-down so it reads
           // right-side-up after the user folds the label over the case.
           // averyLabelGenerator.ts:195 expects pre-rotated images per its
@@ -509,11 +511,7 @@ export default function LabelExportPage() {
           // whiteLogoDataUrl based on whether the user's design is light or
           // dark. Previously only logoDataUrl was loaded, so dark-themed
           // custom labels generated through the mobile path had no logo.
-          const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
-            generateQRCodeWithLogo(cardUrl).catch(() => ''),
-            loadLogoAsBase64().catch(() => ''),
-            loadWhiteLogoAsBase64().catch(() => ''),
-          ]);
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
           const slabPayload: any = {
             primaryName: labelData.primaryName,
             contextLine: labelData.contextLine || '',
@@ -527,8 +525,8 @@ export default function LabelExportPage() {
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
-            logoDataUrl,
-            whiteLogoDataUrl,
+            logoDataUrl: logos.color,
+            whiteLogoDataUrl: logos.white,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
@@ -557,6 +555,9 @@ export default function LabelExportPage() {
             isAlteredAuthentic: labelData.isAlteredAuthentic,
             qrCodeDataUrl: '',
             subScores,
+            // DCM logos on purpose: heritage's QR-centre disc renders
+            // colorLogoDataUrl and must stay the DCM verification mark.
+            // Org cards get their mark via opts.logoBlack (front label only).
             logoDataUrl: await loadLogoAsBase64().catch(() => ''),
             whiteLogoDataUrl: await loadWhiteLogoAsBase64().catch(() => ''),
             showFounderEmblem,
@@ -583,6 +584,7 @@ export default function LabelExportPage() {
             bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors),
             pattern: heritageCfg?.heritagePattern ? sel.pattern : gen.resolveHeritagePattern(sp.get('heritagePattern')),
             gradeColors: sel.gradeColors,
+            logoBlack: logos.branding ? logos.color : undefined,
           };
           const blob = format === 'foldover'
             ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)
@@ -595,15 +597,12 @@ export default function LabelExportPage() {
         } else if (type === 'slab-modern' || type === 'slab-traditional') {
           postStatus('Generating slab label PDF…');
           const slabStyle: 'modern' | 'traditional' = type === 'slab-traditional' ? 'traditional' : 'modern';
-          // Load BOTH logos — slabLabelGenerator picks whiteLogoDataUrl for
+          // BOTH logos — slabLabelGenerator picks whiteLogoDataUrl for
           // modern style (dark gradient bg) and logoDataUrl for traditional
-          // (light bg). Previously only color was loaded; modern slabs
-          // generated through the mobile path had no logo as a result.
-          const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
-            generateQRCodeWithLogo(cardUrl).catch(() => ''),
-            loadLogoAsBase64().catch(() => ''),
-            loadWhiteLogoAsBase64().catch(() => ''),
-          ]);
+          // (light bg).
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
+          const logoDataUrl = logos.color;
+          const whiteLogoDataUrl = logos.white;
           // SlabLabelData shape per src/lib/slabLabelGenerator.ts
           const slabPayload: any = {
             primaryName: labelData.primaryName,

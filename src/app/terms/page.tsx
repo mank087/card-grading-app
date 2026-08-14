@@ -16,7 +16,7 @@ export default function TermsPage() {
       <FloatingCardsBackground />
       <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Terms and Conditions</h1>
-        <p className="text-sm text-gray-600 mb-8">Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
 
         <div className="prose prose-lg max-w-none space-y-6 text-gray-700">
           <section>
@@ -50,7 +50,7 @@ export default function TermsPage() {
               <li><strong>DCM does not authenticate cards.</strong> The Services evaluate visible condition only. We do not verify whether a card is genuine, counterfeit, altered, reprinted, restored, or otherwise tampered with. You should not rely on the Services to determine authenticity.</li>
               <li><strong>Market value estimates are informational.</strong> Where shown, estimated values are derived from third-party sales data and reflect general market signals at the time of lookup. They are not appraisals and do not guarantee resale price.</li>
               <li><strong>Grading methodologies vary across providers.</strong> Because every grading service uses its own methodology and standards, a DCM grade may differ from a grade you would receive from another provider. This is true of any independent grading evaluation.</li>
-              <li><strong>Describe DCM grades accurately when sharing them.</strong> When you share or list a card with a DCM grade — for example in a marketplace listing or social post — you agree to describe it accurately as a &quot;DCM Optic™ AI grade&quot; (or substantially similar language) so others understand which service produced the evaluation.</li>
+              <li><strong>Describe DCM grades accurately when sharing them.</strong> When you share or list a card with a DCM grade — for example in a marketplace listing or social post — you agree to describe it accurately as a &quot;DCM Optic™ AI grade&quot; (or substantially similar language) so others understand which service produced the evaluation. Cards graded through a DCM Enterprise store carry the store&apos;s branding alongside DCM attribution and verification; those co-branded grades are governed by the <a href="/enterprise/terms" className="text-blue-600 hover:underline">Enterprise Program Terms</a>.</li>
             </ul>
           </section>
 
@@ -77,6 +77,7 @@ export default function TermsPage() {
               <li><strong>The physical holder is user-supplied and user-sealed.</strong> DCM cannot certify that a specific physical holder, at a specific point in time after grading, contains the same card that received the original DCM grade. Responsibility for the integrity of the holder rests with the user.</li>
               <li><strong>Buyers should verify before transacting.</strong> When considering the purchase of a DCM-graded card, you should scan the QR code on the label or search the Cert ID at <strong>dcmgrading.com/search</strong> and compare the photographs on file to the physical card in the holder. Differences in appearance, serial numbering, foil pattern, surface defects, or back image may indicate the card in the holder is not the one DCM graded.</li>
               <li><strong>You assume the risk of customization, modification, and reuse.</strong> Users who customize, modify, reuse, transfer, or share holders bearing DCM labels acknowledge this risk and assume full responsibility for any misrepresentation, fraud, or loss arising from doing so. DCM is not a party to such transactions and is not liable for any loss resulting from the substitution of cards within user-supplied holders or from any user&apos;s misrepresentation of a card&apos;s grading status.</li>
+              <li><strong>Grading records are permanent.</strong> The verification registry exists to protect anyone who later buys or receives a DCM-graded card. Certificate records — the Cert ID, the photographs taken at grading, the grade and sub-grades, and related metadata — are retained in the registry permanently, including after the grading account is closed or deleted (see Section 4.4). Deleting your account removes your personal information from the record; it does not remove the card&apos;s certificate from the registry.</li>
               <li><strong>Fraudulent representation is misuse of the Services.</strong> Knowingly misrepresenting a card as having been graded by DCM (when it has not been), knowingly presenting a card in a DCM-labeled holder as the card associated with a Cert ID (when it is not), or otherwise misusing DCM grading records to deceive third parties is a violation of these Terms and may also violate consumer protection, fraud, and intellectual property laws. We may cooperate with law enforcement, affected parties, and platform operators (such as marketplaces) in investigating and responding to misuse.</li>
             </ul>
           </section>
@@ -114,8 +115,17 @@ export default function TermsPage() {
               <li><strong>By email:</strong> Send a deletion request to admin@dcmgrading.com from the email address associated with your account.</li>
             </ul>
             <p className="mt-4">
-              Account deletion is permanent. We delete your cards, card images, account information, and unused credits.
-              Transaction records may be retained in anonymized form to comply with tax and financial recordkeeping requirements.
+              Account deletion is permanent. We delete your account information, personal information, private cards and
+              their images, and unused credits. Transaction records may be retained in anonymized form to comply with tax and
+              financial recordkeeping requirements.
+            </p>
+            <p className="mt-4">
+              <strong>Registry records survive account deletion.</strong> Certificate records for graded cards — the Cert ID,
+              the card photographs captured at grading, the grade and sub-grades, and related card metadata — remain in the
+              public verification registry after account deletion, disassociated from your name, email, and other personal
+              identifiers. These records exist to protect subsequent owners of graded cards and to prevent fraud: a buyer
+              scanning a slab&apos;s QR code must always be able to verify what was graded, regardless of whether the original
+              submitter still has an account.
             </p>
           </section>
 
@@ -140,7 +150,7 @@ export default function TermsPage() {
               <li>Interfere with or disrupt the Service or servers</li>
               <li>Use automated scripts, bots, or scrapers without permission</li>
               <li>Reverse engineer, decompile, or disassemble any part of the Service</li>
-              <li>Resell or commercialize the Service without authorization</li>
+              <li>Resell or commercialize the Service without authorization, except as expressly permitted by features of the Service (such as marketplace listing tools) or by a separate agreement with DCM (such as the <a href="/enterprise/terms" className="text-blue-600 hover:underline">Enterprise Program Terms</a>)</li>
               <li>Impersonate any person or entity</li>
               <li>Attempt to manipulate or game the grading system through misleading photographs, false condition reports, or repeated re-submissions</li>
             </ul>
@@ -213,8 +223,11 @@ export default function TermsPage() {
             <p className="mt-4">
               While you may view and share your grading results for personal, non-commercial purposes, you may not reproduce,
               distribute, modify, or create derivative works from DCM outputs without our express written permission.
-              The methodologies, algorithms, and processes used to generate grading results are proprietary trade secrets of
-              DCM.
+              This restriction does not apply to uses expressly permitted by features of the Service (such as listing your own
+              graded cards through our marketplace tools) or by a separate agreement with DCM, including the{' '}
+              <a href="/enterprise/terms" className="text-blue-600 hover:underline">Enterprise Program Terms</a>, which grant
+              participating businesses a commercial use license subject to their conditions. The methodologies, algorithms, and
+              processes used to generate grading results are proprietary trade secrets of DCM.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6.5 Use in Marketing and Promotional Materials</h3>
@@ -280,6 +293,20 @@ export default function TermsPage() {
               Payments are processed through Stripe, our secure third-party payment processor. We do not store your complete credit
               card information on our servers.
             </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.4 Chargebacks and Credit Adjustments</h3>
+            <p>
+              If you believe a charge is incorrect, contact us at admin@dcmgrading.com before disputing it with your payment
+              provider — most billing issues can be resolved quickly. Initiating a chargeback or payment dispute for services
+              you have already received (for example, credits that have been consumed by completed grades) is a violation of
+              these Terms, and we may suspend or terminate your account and revoke any remaining credits while the dispute is
+              pending or after it resolves against you.
+            </p>
+            <p className="mt-4">
+              We may also reverse or adjust credits that were granted in error, duplicated by a technical fault, obtained
+              through misuse of promotional, referral, or free-credit programs, or associated with a refunded or disputed
+              payment. Credits have no cash value, are not transferable between accounts, and may not be sold or exchanged.
+            </p>
           </section>
 
           <section>
@@ -330,6 +357,14 @@ export default function TermsPage() {
               <li>Unauthorized access to your account or data</li>
               <li>Any third-party content or conduct on the Service</li>
             </ul>
+            <p className="mt-4">
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, DCM&apos;S TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF
+              OR RELATING TO THE SERVICE OR THESE TERMS SHALL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNTS YOU PAID TO DCM
+              FOR THE SERVICE IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM, OR (B) ONE HUNDRED U.S.
+              DOLLARS ($100). SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS OF LIABILITY, SO SOME OF THE ABOVE
+              LIMITATIONS MAY NOT APPLY TO YOU. (For businesses in the DCM Enterprise Program, the liability cap in the
+              Enterprise Program Terms applies to Enterprise Program claims.)
+            </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">8.4 Service Availability</h3>
             <p>
@@ -423,7 +458,11 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">13. Miscellaneous</h2>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.1 Entire Agreement</h3>
-            <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and DCM.</p>
+            <p>
+              These Terms, together with our Privacy Policy — and, for businesses participating in the DCM Enterprise
+              Program, the <a href="/enterprise/terms" className="text-blue-600 hover:underline">Enterprise Program Terms</a> —
+              constitute the entire agreement between you and DCM.
+            </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.2 Severability</h3>
             <p>
@@ -441,7 +480,30 @@ export default function TermsPage() {
               without restriction.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.5 Contact Information</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.5 Force Majeure</h3>
+            <p>
+              DCM shall not be liable for any delay or failure to perform resulting from causes outside our reasonable
+              control, including acts of God, natural disasters, epidemics, war, terrorism, civil unrest, labor disputes,
+              government actions, power or internet failures, or failures of third-party services (including cloud hosting,
+              AI processing, and payment providers).
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.6 Notices</h3>
+            <p>
+              We may provide notices to you by email to the address associated with your account, by posting within the
+              Service, or by posting on this page. You are responsible for keeping your account email address current.
+              Notices to DCM must be sent to admin@dcmgrading.com.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.7 Beta and Experimental Features</h3>
+            <p>
+              We may offer features identified as beta, preview, lab, or experimental. These features are provided for
+              evaluation, may be modified or discontinued at any time without notice, may produce less reliable results than
+              generally available features, and are provided &quot;AS IS&quot; without any warranty of any kind. Grading or
+              analysis produced by beta features should not be relied upon for financial decisions.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">13.8 Contact Information</h3>
             <p>For questions about these Terms, please contact us at:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
               <li>Dynamic Collectibles Management LLC</li>
@@ -552,6 +614,38 @@ export default function TermsPage() {
               It is your responsibility to review and comply with all applicable third-party terms. In the event of any conflict between
               these Terms and third-party marketplace terms, the more restrictive provision shall apply to your use of DCM&apos;s
               integration features.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">16. Copyright Complaints (DMCA)</h2>
+            <p>
+              DCM respects the intellectual property rights of others and expects users to do the same. If you believe that
+              content hosted on the Service infringes your copyright, you may submit a notification under the Digital
+              Millennium Copyright Act (&quot;DMCA&quot;) to our designated agent:
+            </p>
+            <ul className="list-none ml-4 mt-4 space-y-2">
+              <li>DMCA Agent — Dynamic Collectibles Management LLC</li>
+              <li>Email: admin@dcmgrading.com (subject line: &quot;DMCA Notice&quot;)</li>
+            </ul>
+            <p className="mt-4">Your notice must include:</p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Identification of the copyrighted work you claim has been infringed</li>
+              <li>Identification of the material claimed to be infringing and its location on the Service (for example, a card page URL or Cert ID)</li>
+              <li>Your name, address, telephone number, and email address</li>
+              <li>A statement that you have a good-faith belief that the use is not authorized by the copyright owner, its agent, or the law</li>
+              <li>A statement, under penalty of perjury, that the information in your notice is accurate and that you are the copyright owner or authorized to act on the owner&apos;s behalf</li>
+              <li>Your physical or electronic signature</li>
+            </ul>
+            <p className="mt-4">
+              Upon receipt of a valid notice, we will remove or disable access to the identified material and notify the user
+              who posted it. The affected user may submit a counter-notification meeting the requirements of 17 U.S.C. § 512(g);
+              if we receive a valid counter-notification, we may restore the material unless the complaining party notifies us
+              that it has filed a court action within the statutory period.
+            </p>
+            <p className="mt-4">
+              <strong>Repeat infringer policy:</strong> We will terminate the accounts of users determined to be repeat
+              infringers in appropriate circumstances.
             </p>
           </section>
 
