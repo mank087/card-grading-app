@@ -26,7 +26,11 @@ interface OrgLabelPreviewProps {
   bandColors: string[]
   /** Primary brand color — reserved for future accents (modern labels use the standard DCM formatting). */
   brandColor?: string
-  logos: { color: string | null; white: string | null }
+  logos: { color: string | null; white: string | null; black?: string | null }
+  /** Which uploaded variant prints on the mark. */
+  logoVariant?: 'color' | 'black' | 'white'
+  /** Mark size multiplier (heritage front; modern logo slot). */
+  logoScale?: number
   /** Serial prefix for the sample serial (e.g. APX → APX442921). */
   serialPrefix: string
   className?: string
@@ -35,7 +39,7 @@ interface OrgLabelPreviewProps {
 const SAMPLE_SUBS = { centering: 9.5, corners: 9, edges: 9.5, surface: 9 }
 
 export default function OrgLabelPreview({
-  orgName, labelStyle, pattern, bandColors, logos, serialPrefix, className = '',
+  orgName, labelStyle, pattern, bandColors, logos, serialPrefix, className = '', logoVariant = 'color', logoScale = 1,
 }: OrgLabelPreviewProps) {
   const serial = `${serialPrefix || 'ORG'}442921`
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
@@ -67,6 +71,11 @@ export default function OrgLabelPreview({
     subScores: SAMPLE_SUBS,
   }) as unknown as SlabLabelData, [serial, qrDataUrl])
 
+  // The variant the store chose for its mark, falling back to the color logo
+  // when that variant hasn't been generated (older uploads predate the
+  // knockout step).
+  const mark = (logoVariant === 'white' ? logos.white : logoVariant === 'black' ? logos.black : logos.color) || logos.color
+
   const safeBand = bandColors.length >= 2 ? bandColors : bandColors.length === 1 ? [bandColors[0], bandColors[0]] : ['#7C3AED', '#4C1D95']
 
   return (
@@ -79,9 +88,10 @@ export default function OrgLabelPreview({
               side="front"
               pattern={pattern as BandPattern}
               bandColors={safeBand}
-              blackLogoHref={logos.color ?? undefined}
-              colorLogoHref={logos.color ?? undefined}
-              suppressImages={!logos.color}
+              blackLogoHref={mark ?? undefined}
+              colorLogoHref={mark ?? undefined}
+              suppressImages={!mark}
+              logoScale={logoScale}
             />
           </div>
           <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">
@@ -90,9 +100,9 @@ export default function OrgLabelPreview({
               side="back"
               pattern={pattern as BandPattern}
               bandColors={safeBand}
-              blackLogoHref={logos.color ?? undefined}
-              colorLogoHref={logos.color ?? undefined}
-              suppressImages={!logos.color}
+              blackLogoHref={mark ?? undefined}
+              colorLogoHref={mark ?? undefined}
+              suppressImages={!mark}
             />
           </div>
         </>
@@ -109,8 +119,9 @@ export default function OrgLabelPreview({
               grade={9}
               condition="Mint"
               size="lg"
-              logoColorSrc={logos.color}
-              logoWhiteSrc={logos.white ?? logos.color}
+              logoColorSrc={mark}
+              logoWhiteSrc={mark}
+              logoScale={logoScale}
             />
           </div>
           <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">

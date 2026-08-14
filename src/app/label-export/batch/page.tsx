@@ -219,7 +219,7 @@ function BatchLabelExportInner() {
         const allSameOrg = orderedCards.length > 0 &&
           orderedCards.every(c => (c as any).org_id && (c as any).org_id === (orderedCards[0] as any).org_id);
         const orgLogos = allSameOrg ? await loadLogosForCard(orderedCards[0].id).catch(() => null) : null;
-        const logoDataUrl = orgLogos?.branding ? orgLogos.color : dcmLogoDataUrl;
+        const logoDataUrl = orgLogos?.branding ? orgLogos.mark : dcmLogoDataUrl;
         const whiteLogoDataUrl = orgLogos?.branding ? orgLogos.white : dcmWhiteLogoDataUrl;
 
         const blobs: { name: string; mime: string; dataUrl: string }[] = [];
@@ -284,12 +284,14 @@ function BatchLabelExportInner() {
               // Org batches carry the store mark (disc + front); DCM otherwise.
               logoDataUrl,
               whiteLogoDataUrl,
+              logoScale: orgLogos?.logoScale ?? 1,
               showFounderEmblem,
               showVipEmblem,
               showCardLoversEmblem,
             } as any,
             bandColors: (heritageSel.active ? heritageSel.bandColors : null) ?? resolveHeritageBandColors(card.card_colors),
-            logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
+            logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
+            logoScale: orgLogos?.logoScale ?? 1,
           }));
           const pattern = sp.get('heritagePattern')
             ? gen.resolveHeritagePattern(sp.get('heritagePattern'))
@@ -326,6 +328,7 @@ function BatchLabelExportInner() {
             subScores,
             logoDataUrl,
             whiteLogoDataUrl,
+            logoScale: orgLogos?.logoScale ?? 1,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
@@ -371,6 +374,7 @@ function BatchLabelExportInner() {
             subScores,
             logoDataUrl,
             whiteLogoDataUrl,
+            logoScale: orgLogos?.logoScale ?? 1,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
@@ -700,7 +704,7 @@ function BatchLabelExportInner() {
               showCardLoversEmblem,
               // Per-card store branding (helper caches per session)
               logoOverrides: await loadLogosForCard(card.id)
-                .then(l => (l.branding ? { color: l.color, white: l.white, black: l.black } : undefined))
+                .then(l => (l.branding ? { color: l.color, white: l.white, black: l.black, mark: l.mark, scale: l.logoScale } : undefined))
                 .catch(() => undefined),
             };
             const { front, back } = await generateCardImages(imageData);

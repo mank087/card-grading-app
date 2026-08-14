@@ -3029,7 +3029,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
   // Enterprise org members preview labels with their store's logos (as data
   // URLs — the currency the canvas/SVG renderers already consume). Non-members
   // and guests never set this, so behavior is unchanged for them.
-  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null } | null>(null)
+  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null; mark: string | null } | null>(null)
   useEffect(() => {
     if (!isAuthenticated) return
     const sess = getStoredSession()
@@ -3058,8 +3058,10 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
       .then(async (data) => {
         const b = data?.branding
         if (!b) return
-        const [color, white] = await Promise.all([toDataUrl(b.logoUrl), toDataUrl(b.logoWhiteUrl)])
-        if (!cancelled && (color || white)) setOrgLogos({ color, white })
+        const [color, white, black] = await Promise.all([toDataUrl(b.logoUrl), toDataUrl(b.logoWhiteUrl), toDataUrl(b.logoBlackUrl)])
+        // Brand Setup decides which variant is the label mark.
+        const mark = (b.logoVariant === 'white' ? white : b.logoVariant === 'black' ? black : color) ?? color
+        if (!cancelled && (color || white)) setOrgLogos({ color, white, mark })
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -3194,7 +3196,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         showFounderEmblem,
         showVipEmblem,
         showCardLoversEmblem,
-        logoDataUrl: orgLogos?.color || logoDataUrl,
+        logoDataUrl: orgLogos?.mark || logoDataUrl,
         whiteLogoDataUrl: orgLogos?.white || whiteLogoDataUrl,
       }
 

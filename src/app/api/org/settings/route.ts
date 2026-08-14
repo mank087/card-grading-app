@@ -21,11 +21,26 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getOrgForUser, getOrgBranding, orgSerialPrefix } from '@/lib/organizations'
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
+import { HERITAGE_LOGO_SCALE } from '@/lib/labelLab/heritageLayout'
 import sharp from 'sharp'
 
 export const runtime = 'nodejs'
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
+/** Which uploaded logo variant prints on the label mark. */
+const LOGO_VARIANTS = ['color', 'black', 'white'] as const
+
+/**
+ * Logo size is a bounded multiplier, never a free number: the renderer clamps
+ * again per card against the fitted text, but bounding it here keeps stored
+ * settings sane and the slider honest.
+ */
+function clampLogoScale(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return HERITAGE_LOGO_SCALE.default
+  return Math.min(HERITAGE_LOGO_SCALE.max, Math.max(HERITAGE_LOGO_SCALE.min, Math.round(n * 100) / 100))
+}
 const URL_RE = /^https?:\/\//
 const SOCIAL_KEYS = ['instagram', 'facebook', 'tiktok', 'youtube', 'x'] as const
 const PHOTO_MAX_BYTES = 8 * 1024 * 1024
@@ -86,6 +101,8 @@ export async function GET(request: NextRequest) {
         pattern: storefront.slab?.pattern || 'diamond',
         colors: Array.isArray(storefront.slab?.colors) ? storefront.slab.colors : [],
         colorSource: storefront.slab?.color_source === 'card' ? 'card' : 'brand',
+        logoVariant: LOGO_VARIANTS.includes(storefront.slab?.logo_variant) ? storefront.slab.logo_variant : 'color',
+        logoScale: clampLogoScale(storefront.slab?.logo_scale),
       },
       storefrontEnabled: Boolean((org as any).storefront_enabled),
       // null = section uses the shared defaults; [] = hidden; else custom.
@@ -222,7 +239,15 @@ export async function PATCH(request: NextRequest) {
       ? slab.colors.filter((c: unknown) => typeof c === 'string' && HEX_RE.test(c)).slice(0, 5)
       : []
     const colorSource = slab.colorSource === 'card' ? 'card' : 'brand'
-    storefrontPatch.slab = { label_style: labelStyle, pattern, colors, color_source: colorSource }
+    const logoVariant = LOGO_VARIANTS.includes(slab.logoVariant) ? slab.logoVariant : 'color'
+    storefrontPatch.slab = {
+      label_style: labelStyle,
+      pattern,
+      colors,
+      color_source: colorSource,
+      logo_variant: logoVariant,
+      logo_scale: clampLogoScale(slab.logoScale),
+    }
   }
 
   // ---- How it works / FAQ (null = defaults, [] = hidden) ----

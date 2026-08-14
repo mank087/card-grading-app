@@ -194,7 +194,7 @@ export default function LabelExportPage() {
         // Org branding: store logos when the card was graded under an
         // enterprise org, DCM logos otherwise (per-asset fallback inside).
         const logos: OrgLogoSet = await loadLogosForCard(cardId)
-          .catch(() => ({ color: '', white: '', black: '', branding: null }));
+          .catch(() => ({ color: '', white: '', black: '', mark: '', logoScale: 1, branding: null }));
 
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
@@ -247,7 +247,7 @@ export default function LabelExportPage() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-            logoOverrides: logos.branding ? { color: logos.color, white: logos.white, black: logos.black } : undefined,
+            logoOverrides: logos.branding ? { color: logos.color, white: logos.white, black: logos.black, mark: logos.mark, scale: logos.logoScale } : undefined,
           };
           const { front, back } = await generateCardImages(imageData);
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
@@ -329,7 +329,7 @@ export default function LabelExportPage() {
                 ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors }
                 : undefined;
             })(),
-            org: logos.branding ? { name: logos.branding.name, logoDataUrl: logos.color || null } : undefined,
+            org: logos.branding ? { name: logos.branding.name, logoDataUrl: logos.mark || null } : undefined,
             professionalGrades: {
               psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
               bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
@@ -393,7 +393,7 @@ export default function LabelExportPage() {
           // Mini-report PDF — same generator the web's "Mini-Report (PDF)" uses.
           postStatus('Generating mini-report PDF…');
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
-          const logoDataUrl = logos.color || undefined;
+          const logoDataUrl = logos.mark || undefined;
           const fold: FoldableLabelData = {
             cardName: labelData.primaryName,
             setName: labelData.setName || '',
@@ -415,7 +415,7 @@ export default function LabelExportPage() {
         } else if (type === 'mini-report') {
           postStatus('Generating mini grade report…');
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
-          const logoDataUrl = logos.color || undefined;
+          const logoDataUrl = logos.mark || undefined;
           const fold: FoldableLabelData = {
             cardName: labelData.primaryName,
             setName: labelData.setName || '',
@@ -437,7 +437,7 @@ export default function LabelExportPage() {
         } else if (type === 'onetouch') {
           postStatus('Generating Avery 6871 one-touch label…');
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
-          const logoDataUrl = logos.color;
+          const logoDataUrl = logos.mark;
           // Top half of the 6871 label prints upside-down so it reads
           // right-side-up after the user folds the label over the case.
           // averyLabelGenerator.ts:195 expects pre-rotated images per its
@@ -525,7 +525,7 @@ export default function LabelExportPage() {
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
-            logoDataUrl: logos.color,
+            logoDataUrl: logos.mark,
             whiteLogoDataUrl: logos.white,
             showFounderEmblem,
             showVipEmblem,
@@ -584,7 +584,8 @@ export default function LabelExportPage() {
             bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors),
             pattern: heritageCfg?.heritagePattern ? sel.pattern : gen.resolveHeritagePattern(sp.get('heritagePattern')),
             gradeColors: sel.gradeColors,
-            logoBlack: logos.branding ? logos.color : undefined,
+            logoBlack: logos.branding ? logos.mark : undefined,
+            logoScale: logos.logoScale,
           };
           const blob = format === 'foldover'
             ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)
@@ -601,7 +602,7 @@ export default function LabelExportPage() {
           // modern style (dark gradient bg) and logoDataUrl for traditional
           // (light bg).
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
-          const logoDataUrl = logos.color;
+          const logoDataUrl = logos.mark;
           const whiteLogoDataUrl = logos.white;
           // SlabLabelData shape per src/lib/slabLabelGenerator.ts
           const slabPayload: any = {
@@ -619,6 +620,7 @@ export default function LabelExportPage() {
             subScores,
             logoDataUrl,
             whiteLogoDataUrl,
+            logoScale: logos.logoScale,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,

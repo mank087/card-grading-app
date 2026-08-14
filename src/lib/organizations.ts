@@ -351,6 +351,24 @@ export interface OrgBranding {
   logoUrl: string | null;
   logoWhiteUrl: string | null;
   logoBlackUrl: string | null;
+  /** Label mark settings from Brand Setup — which variant, and how big. */
+  logoVariant: 'color' | 'black' | 'white';
+  logoScale: number;
+}
+
+/**
+ * Label mark settings live in the storefront JSON (Brand Setup writes them).
+ * Read through helpers so every branding consumer — labels, reports, card
+ * images, the public org page — gets the same resolved values.
+ */
+function slabLogoVariant(org: Organization): 'color' | 'black' | 'white' {
+  const v = ((org as any).storefront?.slab?.logo_variant) as string | undefined;
+  return v === 'black' || v === 'white' ? v : 'color';
+}
+
+function slabLogoScale(org: Organization): number {
+  const n = Number((org as any).storefront?.slab?.logo_scale);
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour — surfaces convert to data URLs immediately
@@ -381,6 +399,8 @@ export async function getOrgBranding(org: Organization): Promise<OrgBranding> {
     logoUrl,
     logoWhiteUrl,
     logoBlackUrl,
+    logoVariant: slabLogoVariant(org),
+    logoScale: slabLogoScale(org),
   };
 }
 

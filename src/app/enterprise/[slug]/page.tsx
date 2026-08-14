@@ -83,7 +83,8 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
         </div>
         <StorefrontSlabMock
           orgName={sf.org.name}
-          logoHref={sf.logos.color}
+          logoHref={sf.logos.mark}
+          logoScale={c.slab?.logo_scale || 1}
           pattern={c.slab?.pattern || 'diamond'}
           bandColors={slabColors}
           labelStyle={c.slab?.label_style || 'heritage'}

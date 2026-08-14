@@ -22,6 +22,8 @@ import {
   HERITAGE_PX as PX,
   heritageTheme,
   fitHeritageFront,
+  heritageRulesFit,
+  heritageMarkBox,
   heritageCtxTracking,
   heritageBackLayout,
 } from '@/lib/labelLab/heritageLayout'
@@ -51,6 +53,13 @@ interface Props {
   suppressImages?: boolean
   /** Per-grade chip colour overrides ('1'..'10'); 10 replaces the foil with a solid. */
   gradeColors?: Record<string, string> | null
+  /**
+   * Front-mark scale, 1 = the historic size. Enterprise stores set this in
+   * Brand Setup so a square or stacked logo isn't dwarfed by the wordmark-shaped
+   * slot. Growth is clamped per card against the fitted text — see
+   * heritageMarkBox — so an oversized value can never print over the serial.
+   */
+  logoScale?: number
 }
 
 function gradeString(data: SlabLabelData): string {
@@ -156,9 +165,10 @@ function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; 
   )
 }
 
-function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors, suppressImages }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string; gradeColors?: Record<string, string> | null; suppressImages?: boolean }) {
+function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors, suppressImages, logoScale }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string; gradeColors?: Record<string, string> | null; suppressImages?: boolean; logoScale: number }) {
   const T = heritageTheme(true)
-  const { name, ctx, rulesOk } = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial)
+  const fit = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial)
+  const { name, ctx } = fit
 
   // Text stack — same arithmetic as the PDF's flow layout, made explicit.
   const nameYs = name.rows.map((_, i) => PX.TEXT_Y + i * name.size * 1.06)
@@ -168,11 +178,11 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
   const serialY = dividerY + 6 + 18
 
   // Bottom-centre mark ('rules' treatment, black mark — the Studio defaults).
-  const markLeft = (PX.W - PX.MARK_W) / 2
-  const markTop = PX.H - PX.MARK_H - PX.MARK_BOTTOM
-  const markW = PX.MARK_W * PX.MARK_SCALE
-  const markH = PX.MARK_H * PX.MARK_SCALE
-  const ruleY = markTop + PX.MARK_H / 2 - 3
+  // Enterprise stores can scale their mark; heritageMarkBox clamps the growth
+  // against THIS card's fitted text so a big logo can never reach the serial.
+  const mark = heritageMarkBox(logoScale, fit)
+  // Bars grow outward with the mark, so re-check them against the serial.
+  const rulesOk = heritageRulesFit(fit, mark)
 
   return (
     <>
@@ -201,16 +211,16 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
 
       {rulesOk && (
         <>
-          <rect x={markLeft - PX.RULE_GAP - PX.RULE_LEN} y={ruleY} width={PX.RULE_LEN} height={6} fill="#101014" />
-          <rect x={markLeft + PX.MARK_W + PX.RULE_GAP} y={ruleY} width={PX.RULE_LEN} height={6} fill="#101014" />
+          <rect x={mark.ruleLeft} y={mark.ruleY} width={mark.ruleLen} height={6} fill="#101014" />
+          <rect x={mark.ruleRight} y={mark.ruleY} width={mark.ruleLen} height={6} fill="#101014" />
         </>
       )}
       {!suppressImages && <image
         href={blackLogoHref}
-        x={markLeft + (PX.MARK_W - markW) / 2}
-        y={markTop + (PX.MARK_H - markH) / 2}
-        width={markW}
-        height={markH}
+        x={mark.x}
+        y={mark.y}
+        width={mark.w}
+        height={mark.h}
         preserveAspectRatio="xMidYMid meet"
       />}
     </>
@@ -316,7 +326,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
   )
 }
 
-export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false }: Props) {
+export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false, logoScale = 1 }: Props) {
   // Unique per instance: several previews render on one page (desktop slab,
   // hidden mobile block, gallery tile), and duplicated gradient/clip ids make
   // url(#...) resolve to the FIRST one in the document — if that copy sits in
@@ -334,7 +344,7 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
     >
       <rect x={0} y={0} width={PX.W} height={PX.H} fill={T.field} stroke={T.edge} strokeWidth={T.edgeWidth * 7} />
       {side === 'front'
-        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} suppressImages={suppressImages} />
+        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} suppressImages={suppressImages} logoScale={logoScale} />
         : <BackSide data={data} pattern={pattern} bandColors={bandColors} colorLogoHref={colorLogoHref} uid={uid} suppressImages={suppressImages} />}
     </svg>
   )

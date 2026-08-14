@@ -95,6 +95,8 @@ function mapFrontInputs(data: SlabLabelData): Omit<SlabLabelInputs, 'theme'> {
     condition,
     whiteLogoDataUrl: data.whiteLogoDataUrl || null,
     colorLogoDataUrl: data.logoDataUrl || null,
+    // Enterprise mark size (Brand Setup); the PDF caps it against the label.
+    logoScale: data.logoScale,
   }
 }
 

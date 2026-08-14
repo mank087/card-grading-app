@@ -289,7 +289,7 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     if (!allSameOrg) return { logo: undefined, branding: null };
     const logos = await loadLogosForCard(selectedCards[0].id).catch(() => null);
     return logos?.branding
-      ? { logo: logos.color, branding: { slug: logos.branding.slug } }
+      ? { logo: logos.mark, branding: { slug: logos.branding.slug } }
       : { logo: undefined, branding: null };
   };
 

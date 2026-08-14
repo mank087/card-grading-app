@@ -361,7 +361,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
             orgReportBranding = {
               name: logos.branding.name,
               slug: logos.branding.slug,
-              logoDataUrl: logos.color || null,
+              logoDataUrl: logos.mark || null,
               brandColor: logos.branding.brandColor || null,
             };
           }
@@ -857,7 +857,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         },
         // Enterprise: org-graded cards carry the store logo on the label art
         logoOverrides: orgLogoSetImages?.branding
-          ? { color: orgLogoSetImages.color, white: orgLogoSetImages.white, black: orgLogoSetImages.black }
+          ? { color: orgLogoSetImages.color, white: orgLogoSetImages.white, black: orgLogoSetImages.black, mark: orgLogoSetImages.mark, scale: orgLogoSetImages.logoScale }
           : undefined,
       };
 
@@ -1165,7 +1165,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     const qrCodeDataUrl = orgLogos?.branding
       ? await generateQRCodeWithLogo(cardUrl, orgLogos.color)
       : await generateQRCodePlain(cardUrl);
-    const logoDataUrl = orgLogos?.color;
+    const logoDataUrl = orgLogos?.mark;
     const whiteLogoDataUrl = orgLogos?.white;
 
     return {
@@ -1191,6 +1191,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       showCardLoversEmblem,
       logoDataUrl,
       whiteLogoDataUrl,
+      logoScale: orgLogos?.logoScale ?? 1,
     };
   };
 
@@ -1220,7 +1221,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           pattern: heritageSel.pattern,
           gradeColors: heritageSel.gradeColors,
           // Org front mark (black variant); the QR disc follows slabData.logoDataUrl
-          logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
+          logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
+          logoScale: orgLogos?.logoScale ?? 1,
         };
         if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(slabData, opts);
         else await gen.downloadHeritageSlabLabel(slabData, opts);

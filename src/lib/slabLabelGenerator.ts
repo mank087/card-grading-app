@@ -122,6 +122,8 @@ export interface SlabLabelData {
 
   // Pre-loaded logo data URLs
   logoDataUrl?: string;
+  /** Enterprise mark size multiplier from Brand Setup; 1 = stock DCM slot. */
+  logoScale?: number;
   whiteLogoDataUrl?: string;
 }
 

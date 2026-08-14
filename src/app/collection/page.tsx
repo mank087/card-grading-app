@@ -454,7 +454,19 @@ function CollectionPageContent() {
   const orgInfo = orgMembership ? { name: orgMembership.name, gradeCredits: orgMembership.gradeCredits } : null
   // The member's own org logo URLs — applied to slab labels of org-graded cards.
   // (v1: any org card on this page belongs to the member's own org.)
-  const orgLogos = orgMembership ? { color: orgMembership.logos.color, white: orgMembership.logos.white } : null
+  const orgLogos = orgMembership
+    ? {
+        color: orgMembership.logos.color,
+        white: orgMembership.logos.white,
+        // Brand Setup chooses which variant prints and at what size.
+        mark: (orgMembership.slab?.logoVariant === 'white'
+          ? orgMembership.logos.white
+          : orgMembership.slab?.logoVariant === 'black'
+            ? orgMembership.logos.black
+            : orgMembership.logos.color) ?? orgMembership.logos.color,
+        scale: orgMembership.slab?.logoScale || 1,
+      }
+    : null
   const scope: 'mine' | 'store' = isOrgScope ? 'store' : 'mine'
   const [storeCards, setStoreCards] = useState<Card[]>([])
   const [storeGraders, setStoreGraders] = useState<Record<string, string>>({})
@@ -2752,8 +2764,9 @@ function CollectionPageContent() {
                   labelStyle={labelStyle}
                   colorOverrides={colorOverrides}
                   heritage={heritageSel.active ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors((card as any).card_colors), gradeColors: heritageSel.gradeColors } : null}
-                  orgLogoColor={card.org_id ? orgLogos?.color ?? null : null}
-                  orgLogoWhite={card.org_id ? orgLogos?.white ?? null : null}
+                  orgLogoColor={card.org_id ? orgLogos?.mark ?? null : null}
+                  orgLogoWhite={card.org_id ? orgLogos?.mark ?? null : null}
+                  orgLogoScale={card.org_id ? orgLogos?.scale ?? 1 : 1}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility & Price Badges */}

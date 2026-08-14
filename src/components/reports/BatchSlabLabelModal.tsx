@@ -108,7 +108,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     logoDataUrl: string | undefined,
     whiteLogoDataUrl: string | undefined,
     qrLogoSrc?: string,
-    orgSlug?: string
+    orgSlug?: string,
+    logoScale = 1
   ): Promise<SlabLabelData> => {
     const labelData = getCardLabelData(card);
     // Org batches: QR lands on the org's branded card page with the store
@@ -145,6 +146,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       showCardLoversEmblem,
       logoDataUrl,
       whiteLogoDataUrl,
+      logoScale,
     };
   }, [showFounderEmblem, showVipEmblem, showCardLoversEmblem]);
 
@@ -163,7 +165,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       const allSameOrg = selectedCards.length > 0 &&
         selectedCards.every(c => (c as any).org_id && (c as any).org_id === (selectedCards[0] as any).org_id);
       const orgLogos = allSameOrg ? await loadLogosForCard(selectedCards[0].id).catch(() => null) : null;
-      const logoDataUrl = orgLogos?.branding ? orgLogos.color : dcmLogoDataUrl;
+      const logoDataUrl = orgLogos?.branding ? orgLogos.mark : dcmLogoDataUrl;
       const whiteLogoDataUrl = orgLogos?.branding ? orgLogos.white : dcmWhiteLogoDataUrl;
 
       // Build label data for all selected cards
@@ -173,7 +175,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         const card = selectedCards[i];
         const labelData = await buildSlabLabelData(card, logoDataUrl, whiteLogoDataUrl,
           orgLogos?.branding ? orgLogos.color : undefined,
-          orgLogos?.branding?.slug);
+          orgLogos?.branding?.slug,
+          orgLogos?.logoScale ?? 1);
         labelDataArray.push(labelData);
         setProgress(Math.round(((i + 1) / selectedCards.length) * 80));
       }
@@ -193,7 +196,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           // DCM batches unchanged.
           data,
           bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(selectedCards[i]?.card_colors),
-          logoBlack: orgLogos?.branding ? orgLogos.color : undefined,
+          logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
+          logoScale: orgLogos?.logoScale ?? 1,
         }));
         blob = printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors)

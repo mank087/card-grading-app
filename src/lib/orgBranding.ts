@@ -19,6 +19,9 @@ export interface OrgBrandingClient {
   logoUrl: string | null;
   logoWhiteUrl: string | null;
   logoBlackUrl: string | null;
+  /** Brand Setup label-mark settings. */
+  logoVariant?: 'color' | 'black' | 'white';
+  logoScale?: number;
 }
 
 /**
@@ -43,6 +46,14 @@ export interface OrgLogoSet {
   white: string;
   /** Black-ink variant for light/Heritage labels. */
   black: string;
+  /**
+   * The variant the store chose for its label mark, already a data URL —
+   * use this wherever a single org mark is drawn, so Brand Setup drives it.
+   * Falls back to the color logo (and to DCM when there is no org).
+   */
+  mark: string;
+  /** Mark size multiplier from Brand Setup; 1 for DCM and unset orgs. */
+  logoScale: number;
   /** Present when the logos are a store's, not DCM's. */
   branding: OrgBrandingClient | null;
 }
@@ -101,7 +112,7 @@ export async function loadLogosForCard(cardId?: string | null): Promise<OrgLogoS
   ]);
 
   if (!branding) {
-    return { color: dcmColor, white: dcmWhite, black: dcmBlack, branding: null };
+    return { color: dcmColor, white: dcmWhite, black: dcmBlack, mark: dcmColor, logoScale: 1, branding: null };
   }
 
   const [orgColor, orgWhite, orgBlack] = await Promise.all([
@@ -110,10 +121,15 @@ export async function loadLogosForCard(cardId?: string | null): Promise<OrgLogoS
     branding.logoBlackUrl ? urlToDataUrl(branding.logoBlackUrl) : Promise.resolve(null),
   ]);
 
+  const color = orgColor ?? dcmColor;
+  const variant = branding.logoVariant || 'color';
+  const mark = (variant === 'white' ? orgWhite : variant === 'black' ? orgBlack : orgColor) ?? color;
   return {
-    color: orgColor ?? dcmColor,
+    color,
     white: orgWhite ?? dcmWhite,
     black: orgBlack ?? dcmBlack,
+    mark,
+    logoScale: branding.logoScale && branding.logoScale > 0 ? branding.logoScale : 1,
     branding,
   };
 }

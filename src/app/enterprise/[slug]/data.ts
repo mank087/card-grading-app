@@ -36,13 +36,17 @@ export interface StorefrontContent {
    * is the org's house style: it drives the storefront mockup AND which label
    * the public card report renders (heritage uses pattern + colors).
    */
-  slab?: { pattern?: string; colors?: string[]; label_style?: 'modern' | 'heritage'; color_source?: 'brand' | 'card' };
+  slab?: {
+    pattern?: string; colors?: string[]; label_style?: 'modern' | 'heritage'; color_source?: 'brand' | 'card'
+    /** Brand Setup label-mark settings. */
+    logo_variant?: 'color' | 'black' | 'white'; logo_scale?: number
+  };
 }
 
 export interface StorefrontData {
   org: Organization;
   content: StorefrontContent;
-  logos: { color: string | null; white: string | null };
+  logos: { color: string | null; white: string | null; black: string | null; mark: string | null };
   photoUrls: string[];
   /** 10 most recent public org-graded cards, only when show_recent_cards. */
   recentCards: { card: Record<string, unknown>; frontUrl: string | null }[];
@@ -86,9 +90,10 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
     return data?.signedUrl ?? null;
   };
 
-  const [color, white, ...photos] = await Promise.all([
+  const [color, white, black, ...photos] = await Promise.all([
     sign(org.logo_path),
     sign(org.logo_white_path),
+    sign(org.logo_black_path),
     ...(content.photos || []).slice(0, 8).map(p => sign(p)),
   ]);
 
@@ -121,7 +126,9 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
   return {
     org: org as Organization,
     content,
-    logos: { color, white },
+    // mark = the variant Brand Setup chose for the label; the raw variants
+    // stay available for the hero and QR disc.
+    logos: { color, white, black, mark: (content.slab?.logo_variant === 'white' ? white : content.slab?.logo_variant === 'black' ? black : color) ?? color },
     photoUrls: photos.filter(Boolean) as string[],
     recentCards,
   };

@@ -308,7 +308,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
       generateQRCodePlain(cardUrl),
       orgLogos?.branding
-        ? Promise.resolve(orgLogos.color)
+        ? Promise.resolve(orgLogos.mark)
         : loadLogoAsBase64().catch(() => undefined)
     ]);
 

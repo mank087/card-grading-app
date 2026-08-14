@@ -115,7 +115,12 @@ export interface CardImageData {
    * Org-branding logo overrides (data URLs). When present, used instead of
    * the DCM asset loads — enterprise store cards print with the store's mark.
    */
-  logoOverrides?: { color?: string; white?: string; black?: string } | null;
+  /**
+   * Enterprise logos. color/white/black are the raw variants; mark is the one
+   * Brand Setup chose for the label, and scale its size multiplier. The QR
+   * disc deliberately stays on color — a white mark would vanish on it.
+   */
+  logoOverrides?: { color?: string; white?: string; black?: string; mark?: string; scale?: number } | null;
 }
 
 /**
@@ -1021,7 +1026,8 @@ async function drawHeritageLabel(
     bandColors: data.heritage?.bandColors?.length ? data.heritage.bandColors : ['#7c3aed', '#4c1d95', '#a855f7', '#2e1065', '#c4b5fd'],
     widthPx: width * 2,
     gradeColors: data.heritage?.gradeColors ?? null,
-    logoBlack: data.logoOverrides?.color,
+    logoBlack: data.logoOverrides?.mark || data.logoOverrides?.color,
+    logoScale: data.logoOverrides?.scale ?? 1,
   });
   ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
 }
@@ -1181,8 +1187,8 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
   try {
     console.log('[CARD IMAGE GEN] Loading logo, isModern:', isModern);
     logoDataUrl = isModern
-      ? (data.logoOverrides?.white || await loadWhiteLogoAsBase64().catch(() => undefined))
-      : (data.logoOverrides?.color || await loadLogoAsBase64().catch(() => undefined));
+      ? (data.logoOverrides?.mark || data.logoOverrides?.white || await loadWhiteLogoAsBase64().catch(() => undefined))
+      : (data.logoOverrides?.mark || data.logoOverrides?.color || await loadLogoAsBase64().catch(() => undefined));
     console.log('[CARD IMAGE GEN] Logo loaded:', logoDataUrl ? 'success' : 'failed (using fallback)');
   } catch (err) {
     console.error('[CARD IMAGE GEN] Logo loading failed:', err);

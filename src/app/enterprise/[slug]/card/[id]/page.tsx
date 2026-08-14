@@ -203,6 +203,7 @@ export default async function StorefrontCardPage({
       orgName={sf.org.name}
       brand={brand}
       logos={sf.logos}
+      logoScale={sf.content.slab?.logo_scale || 1}
       frontUrl={frontUrl}
       backUrl={backUrl}
       label={label}

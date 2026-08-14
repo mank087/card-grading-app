@@ -249,7 +249,7 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
       generateQRCodeWithLogo(cardUrl, orgLogos?.branding ? orgLogos.color : undefined),
       orgLogos?.branding
-        ? Promise.resolve(orgLogos.color)
+        ? Promise.resolve(orgLogos.mark)
         : loadLogoAsBase64().catch(() => undefined)
     ]);
 
@@ -425,7 +425,7 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       }),
       reportId: card.id.substring(0, 8).toUpperCase(),
       ...(orgLogos?.branding
-        ? { org: { name: orgLogos.branding.name, slug: orgLogos.branding.slug, logoDataUrl: orgLogos.color, brandColor: orgLogos.branding.brandColor || null } }
+        ? { org: { name: orgLogos.branding.name, slug: orgLogos.branding.slug, logoDataUrl: orgLogos.mark, brandColor: orgLogos.branding.brandColor || null } }
         : {}),
     };
   };

@@ -1,6 +1,7 @@
 'use client'
 
 import type { LabelColorOverrides } from '@/lib/labelPresets'
+import { modernLogoScale } from '@/lib/labels/logoScale'
 import { RAINBOW_GRADIENT } from '@/lib/labelPresets'
 import { ScaleToFit } from './ScaleToFit'
 
@@ -17,7 +18,13 @@ interface ModernFrontLabelProps {
   /** Enterprise org logo overrides — color shown on light labels, white on dark. Omit for DCM. */
   logoColorSrc?: string | null
   logoWhiteSrc?: string | null
+  /** Mark size multiplier from Brand Setup; 1 keeps the stock DCM sizing. */
+  logoScale?: number
 }
+
+/** Tailwind logoHeight classes (h-6/h-8/h-10) expressed in rem, so a scaled
+ * mark can be sized inline while the default keeps its utility class. */
+const LOGO_BASE_REM: Record<'sm' | 'md' | 'lg', number> = { sm: 1.5, md: 2, lg: 2.5 }
 
 // Helper: Format grade for display
 const formatGrade = (grade: number): string => {
@@ -86,8 +93,12 @@ export function ModernFrontLabel({
   colorOverrides,
   logoColorSrc = null,
   logoWhiteSrc = null,
+  logoScale = 1,
 }: ModernFrontLabelProps) {
   const config = sizeConfig[size]
+  // Clamp to what the single-row layout can hold — same ceiling the print
+  // generators apply, so the preview matches the printed label.
+  const appliedScale = modernLogoScale(logoScale)
 
   // Calculate dynamic font size for name (shrink to fit instead of scaleX)
   const nameFontSize = displayName.length <= config.maxNameChars
@@ -162,7 +173,18 @@ export function ModernFrontLabel({
           <img
             src={(darkText ? logoColorSrc : logoWhiteSrc) ?? tx.logo}
             alt="DCM"
-            className={`${config.logoHeight} w-auto`}
+            className={`${appliedScale === 1 ? config.logoHeight : ''} w-auto`}
+            // Enterprise logo sizing. The height class stays at scale 1 so
+            // nothing shifts for consumers. A scaled mark switches to an
+            // explicit rem height: ABSOLUTE units only — a percentage here
+            // resolves against an auto-height flex parent, which drops the
+            // declaration and lets the image render at natural size. maxWidth
+            // keeps a wide wordmark from crowding out the card name.
+            style={appliedScale === 1 ? undefined : {
+              height: `${LOGO_BASE_REM[size] * appliedScale}rem`,
+              maxWidth: '40%',
+              objectFit: 'contain',
+            }}
           />
         </div>
 

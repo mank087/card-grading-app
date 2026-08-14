@@ -38,7 +38,11 @@ export interface OrgMembership {
   /** Full brand palette ([0] = primary). */
   brandColors: string[]
   /** House label design from Brand Setup — applied to org-graded cards. */
-  slab: { labelStyle: 'heritage' | 'modern'; pattern: string; colors: string[]; colorSource: 'brand' | 'card' } | null
+  slab: {
+    labelStyle: 'heritage' | 'modern'; pattern: string; colors: string[]; colorSource: 'brand' | 'card'
+    /** Which uploaded logo variant prints on the mark, and how big. */
+    logoVariant: 'color' | 'black' | 'white'; logoScale: number
+  } | null
   logos: { color: string | null; white: string | null; black: string | null }
 }
 

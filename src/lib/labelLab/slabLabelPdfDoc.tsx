@@ -61,6 +61,7 @@ import {
 import { printColorTweaksHex } from './contrastWCAG'
 import { textWidthEm } from './textFit'
 import { boldFitFactor } from './heritageLayout'
+import { modernLogoSize } from '@/lib/labels/logoScale'
 
 // ------- Geometry -------
 
@@ -172,6 +173,8 @@ export interface SlabLabelInputs {
   // Logos as data URLs (fetch + toBase64 before rendering — see LabelLabClient)
   whiteLogoDataUrl?: string | null
   colorLogoDataUrl?: string | null
+  /** Enterprise mark size multiplier from Brand Setup; 1 = stock DCM slot. */
+  logoScale?: number
   // QR data URL (back; optional placeholder for now)
   qrCodeDataUrl?: string | null
   // Card images (used by some downstream formats; slab labels don't show them)
@@ -285,7 +288,11 @@ export function SlabFrontContentRow({
   // Auto-fit the whole text block (production fitCardInfoFonts): width-fit
   // name/features/serial, cap context at 2 lines, shrink until the stack
   // fits the label height.
-  const textRegionWidth = LABEL_WIDTH - PADDING - LOGO_SIZE - TEXT_LOGO_GAP - GRADE_AREA_WIDTH - GRADE_RIGHT_PADDING
+  // Enterprise stores can enlarge the mark; the slot grows and the text
+  // region shrinks to match, which fitFrontTextBlock absorbs by shrinking
+  // fonts rather than overflowing.
+  const logoSize = modernLogoSize(LOGO_SIZE, LABEL_HEIGHT, inputs.logoScale)
+  const textRegionWidth = LABEL_WIDTH - PADDING - logoSize - TEXT_LOGO_GAP - GRADE_AREA_WIDTH - GRADE_RIGHT_PADDING
   const fitted = fitFrontTextBlock(
     inputs.primaryName || 'Card',
     inputs.contextLine || '',
@@ -304,11 +311,11 @@ export function SlabFrontContentRow({
   return (
     <View style={styles.contentRow}>
       {/* Left: logo */}
-      <View style={styles.logoSlot}>
+      <View style={[styles.logoSlot, { width: logoSize }]}>
         {logoSrc ? (
-          <Image src={logoSrc} style={{ width: LOGO_SIZE, height: LOGO_SIZE }} />
+          <Image src={logoSrc} style={{ width: logoSize, height: logoSize, objectFit: 'contain' }} />
         ) : (
-          <View style={{ width: LOGO_SIZE, height: LOGO_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: logoSize, height: logoSize, alignItems: 'center', justifyContent: 'center' }}>
             <Text
               style={{
                 fontFamily: 'Helvetica-Bold',

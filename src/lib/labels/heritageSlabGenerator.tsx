@@ -53,6 +53,12 @@ export interface HeritageRenderOptions {
    * verify page, which carries the verification trust. Absent = DCM mark.
    */
   logoBlack?: string
+  /**
+   * Mark size multiplier from the org's Brand Setup. The PDF clamps it per
+   * card against the fitted text (heritageMarkBox), so a large store logo
+   * can never print over the serial.
+   */
+  logoScale?: number
 }
 
 /** 'diamond' unless the config carries a valid pattern id. */
@@ -114,6 +120,7 @@ async function buildHeritageInputs(
     blackLogoDataUrl,
     logoTreatment: 'rules',
     logoColor: 'black',
+    logoScale: opts.logoScale ?? 1,
     qrDataUrl,
     printHardened: true,
     showFounder: data.showFounderEmblem,

@@ -39,7 +39,9 @@ export interface OrgCardReportProps {
   slug: string;
   orgName: string;
   brand: string;
-  logos: { color: string | null; white: string | null };
+  logos: { color: string | null; white: string | null; mark: string | null };
+  /** Mark size multiplier from Brand Setup; clamped per card by the renderer. */
+  logoScale?: number;
   frontUrl: string | null;
   backUrl: string | null;
   label: LabelData;
@@ -260,7 +262,7 @@ function isNoiseValue(v: string): boolean {
 // ---------------------------------------------------------------------------
 
 export default function OrgCardReport({
-  slug, orgName, brand, logos, frontUrl, backUrl, label, displaySerial, gradedOn, card,
+  slug, orgName, brand, logos, logoScale = 1, frontUrl, backUrl, label, displaySerial, gradedOn, card,
   labelStyle = 'modern', heritagePattern = 'diamond', heritageBandColors,
 }: OrgCardReportProps) {
   // QR code target — this page's own URL (set client-side to avoid hydration mismatch)
@@ -335,9 +337,10 @@ export default function OrgCardReport({
   // the front mark and the QR disc; no logo -> suppress the marks entirely
   // (never fall back to a DCM asset).
   const heritageLogoProps = {
-    blackLogoHref: logos.color ?? undefined,
-    colorLogoHref: logos.color ?? undefined,
-    suppressImages: !logos.color,
+    blackLogoHref: logos.mark ?? undefined,
+    colorLogoHref: logos.mark ?? undefined,
+    suppressImages: !logos.mark,
+    logoScale,
   };
 
   // ---- Card Information rows -------------------------------------------------
@@ -467,8 +470,9 @@ export default function OrgCardReport({
                     grade={label.grade}
                     condition={label.condition}
                     isAlteredAuthentic={label.isAlteredAuthentic}
-                    logoColorSrc={logos.color}
-                    logoWhiteSrc={logos.white ?? logos.color}
+                    logoColorSrc={logos.mark}
+                    logoWhiteSrc={logos.mark}
+                    logoScale={logoScale}
                     size="lg"
                   />
                 )}

@@ -101,6 +101,12 @@ export interface HeritageFrontFit {
    * accent bars would underline the serial — the bars yield, the mark stays.
    */
   rulesOk: boolean
+  /** Bottom of the fitted text stack, in label px — the mark's growth ceiling. */
+  textBottom: number
+  /** Right edge of the serial line — the accent bars must stay clear of it. */
+  serialRight: number
+  /** Top of the serial row: a mark clear of the serial horizontally may rise this high. */
+  serialTop: number
 }
 
 // ---------------------------------------------------------------------------
@@ -189,5 +195,96 @@ export function fitHeritageFront(primaryName: string, contextLine: string, seria
   const serialRight = HERITAGE_PX.TEXT_X + widthOf(`Serial: ${serial ?? ''}`, 34, 2)
   const vClear = textBottom + 6 <= BAR_TOP
   const hClear = serial != null && serialRight + 16 <= BAR_LEFT
-  return { name, ctx, rulesOk: vClear || hClear }
+  // The serial row is the only text the mark can sit BESIDE (it is short and
+  // left-aligned); everything above it spans the full text box.
+  const serialTop = textBottom - (18 + 34 * 1.2)
+  return { name, ctx, rulesOk: vClear || hClear, textBottom, serialRight, serialTop }
+}
+
+// ---------------------------------------------------------------------------
+// Logo mark sizing
+// ---------------------------------------------------------------------------
+/**
+ * Enterprise logo scale bounds. 1 is the historic mark size (0.85 of the
+ * 260x96 slot). Stores with a square or stacked logo need more than that —
+ * 'meet' fitting caps a square mark at the slot's 96px height, which is what
+ * made it read as tiny — so the range runs up to 2x. The floor exists for
+ * wide wordmarks that look better understated.
+ */
+export const HERITAGE_LOGO_SCALE = { min: 0.7, max: 2, step: 0.05, default: 1 } as const
+
+export interface HeritageMarkBox {
+  /** Image rect, already centred inside the slot. */
+  x: number; y: number; w: number; h: number
+  /** Y of the accent bars' top edge, and their inner x bounds. */
+  ruleY: number; ruleLeft: number; ruleRight: number; ruleLen: number
+  /** True when the requested scale had to be reduced to clear the text. */
+  clamped: boolean
+}
+
+/**
+ * Geometry for the bottom-centre mark at a requested scale.
+ *
+ * The mark grows from a FIXED BASELINE (the bottom of the historic slot), not
+ * from its centre: growing symmetrically would push it off the bottom edge,
+ * since the slot already sits 8px from it. Growth therefore goes upward, and
+ * upward is where the text stack lives — so the height is clamped to keep a
+ * gap below `textBottom` for the card actually being rendered. A store can ask
+ * for 2x and get it on a short name, and quietly get less on a long one,
+ * rather than shipping a label with the mark printed over the serial.
+ *
+ * Shared by the on-screen SVG preview and the print PDF so the two cannot
+ * drift. Callers in PDF space multiply the returned numbers by their own unit
+ * scale.
+ */
+/**
+ * Whether the accent bars still fit beside a (possibly enlarged) mark. The
+ * bars grow outward with the mark, so a big logo can push the left bar into
+ * the serial even when fitHeritageFront judged the fixed-size bars clear.
+ */
+export function heritageRulesFit(fit: HeritageFrontFit, box: HeritageMarkBox): boolean {
+  return fit.rulesOk && box.ruleLeft >= fit.serialRight + 16
+}
+
+export function heritageMarkBox(scale: number, fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'> | number): HeritageMarkBox {
+  // Number form kept for callers that only know the text bottom.
+  const f = typeof fit === 'number'
+    ? { textBottom: fit, serialRight: Number.POSITIVE_INFINITY, serialTop: fit }
+    : fit
+  const PX = HERITAGE_PX
+  const requested = Math.min(
+    HERITAGE_LOGO_SCALE.max,
+    Math.max(HERITAGE_LOGO_SCALE.min, Number.isFinite(scale) ? scale : 1)
+  )
+  const baseW = PX.MARK_W * PX.MARK_SCALE
+  const baseH = PX.MARK_H * PX.MARK_SCALE
+  // Baseline the mark sits on: bottom of the historic slot.
+  const bottom = PX.H - PX.MARK_BOTTOM - (PX.MARK_H - baseH) / 2
+  // Ceiling: 10px of air under the text stack, never above y=232 (the mark
+  // must stay a bottom-strip element even when the card has a one-line name).
+  // Two ceilings. STRICT keeps the mark under the whole text stack. RELAXED
+  // lets it rise alongside the serial — legal only when the mark is clear of
+  // the serial horizontally, which depends on the mark's own width, so solve
+  // with the relaxed ceiling first and fall back if the result overlaps.
+  const strict = Math.max(232, f.textBottom + 10)
+  const relaxed = Math.max(232, f.serialTop + 4)
+  const wantH = baseH * requested
+  const solve = (ceiling: number) => {
+    const maxH = Math.max(baseH * HERITAGE_LOGO_SCALE.min, bottom - ceiling)
+    const hh = Math.min(wantH, maxH)
+    const ww = baseW * (hh / baseH)
+    return { hh, ww, xx: (PX.W - ww) / 2 }
+  }
+  let { hh: h, ww: w, xx: x } = solve(relaxed)
+  if (x < f.serialRight + 16) ({ hh: h, ww: w, xx: x } = solve(strict))
+  const y = bottom - h
+  const ruleY = y + h / 2 - 3
+  return {
+    x, y, w, h,
+    ruleY,
+    ruleLeft: x - PX.RULE_GAP - PX.RULE_LEN,
+    ruleRight: x + w + PX.RULE_GAP,
+    ruleLen: PX.RULE_LEN,
+    clamped: h < wantH - 0.5,
+  }
 }

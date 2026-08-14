@@ -777,7 +777,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
         },
         logoOverrides: orgLogoSet?.branding
-          ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black }
+          ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
           : undefined,
       };
 
@@ -791,7 +791,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const cardUrl = qrTargetUrl;
       const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
         .catch(() => generateQRCodeWithLogo(cardUrl));
-      const logoDataUrl = orgLogoSet?.color || undefined;
+      const logoDataUrl = orgLogoSet?.mark || undefined;
 
       const miniReportData: FoldableLabelData = {
         cardName: labelData.primaryName,
@@ -825,7 +825,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         trustSlide = await generateTrustSlide({
           brandName: orgLogoSet?.branding?.name || 'DCM',
           brandColor: orgLogoSet?.branding?.brandColor || null,
-          logoDataUrl: orgLogoSet?.color || undefined,
+          logoDataUrl: orgLogoSet?.mark || undefined,
           grade: Math.round(labelData.grade ?? 0),
           conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
           serial: card.org_serial_display || card.serial || '',
@@ -1112,7 +1112,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             : undefined;
         })(),
         org: reportLogos?.branding
-          ? { name: reportLogos.branding.name, logoDataUrl: reportLogos.color || null }
+          ? { name: reportLogos.branding.name, logoDataUrl: reportLogos.mark || null }
           : undefined,
         professionalGrades: {
           psa: card.estimated_professional_grades?.psa?.grade || '-',

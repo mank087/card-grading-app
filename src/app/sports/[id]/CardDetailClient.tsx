@@ -1854,12 +1854,18 @@ export function SportsCardDetails() {
 
   // Enterprise org branding — org-graded cards show the store's logo on the
   // on-screen labels (color logo on light labels, white on the dark modern one).
-  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null } | null>(null);
+  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null; mark: string | null; scale: number } | null>(null);
   useEffect(() => {
     if (!(card as any)?.org_id || !card?.id) { setOrgLogos(null); return; }
     let cancelled = false;
     fetchBrandingForCard(card.id).then((b) => {
-      if (!cancelled) setOrgLogos(b ? { color: b.logoUrl, white: b.logoWhiteUrl } : null);
+      if (!cancelled) setOrgLogos(b ? {
+        color: b.logoUrl,
+        white: b.logoWhiteUrl,
+        // Brand Setup picks WHICH variant prints on the mark and how big.
+        mark: (b.logoVariant === 'white' ? b.logoWhiteUrl : b.logoVariant === 'black' ? b.logoBlackUrl : b.logoUrl) ?? b.logoUrl,
+        scale: b.logoScale && b.logoScale > 0 ? b.logoScale : 1,
+      } : null);
     });
     return () => { cancelled = true; };
   }, [card]);
@@ -2809,8 +2815,9 @@ export function SportsCardDetails() {
                   data={heritageData as any}
                   side="front"
                   pattern={heritageSel.pattern}
-                  blackLogoHref={orgLogos?.color ?? undefined}
-                  colorLogoHref={orgLogos?.color ?? undefined}
+                  blackLogoHref={orgLogos?.mark ?? undefined}
+                  colorLogoHref={orgLogos?.mark ?? undefined}
+                  logoScale={orgLogos?.scale ?? 1}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />
@@ -2823,8 +2830,9 @@ export function SportsCardDetails() {
                   grade={labelData.grade}
                   condition={labelData.condition}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
-                  logoColorSrc={orgLogos?.color}
-                  logoWhiteSrc={orgLogos?.white}
+                  logoColorSrc={orgLogos?.mark}
+                  logoWhiteSrc={orgLogos?.mark}
+                  logoScale={orgLogos?.scale ?? 1}
                   size="lg"
                   colorOverrides={colorOverrides}
                 />
@@ -2834,7 +2842,7 @@ export function SportsCardDetails() {
                     {/* Left: DCM Logo */}
                     <div className="flex-shrink-0">
                       <img
-                        src={orgLogos?.color ?? "/DCM-logo.png"}
+                        src={orgLogos?.mark ?? "/DCM-logo.png"}
                         alt="DCM"
                         className="h-14 w-auto"
                       />
@@ -2958,8 +2966,9 @@ export function SportsCardDetails() {
                   data={heritageData as any}
                   side="back"
                   pattern={heritageSel.pattern}
-                  blackLogoHref={orgLogos?.color ?? undefined}
-                  colorLogoHref={orgLogos?.color ?? undefined}
+                  blackLogoHref={orgLogos?.mark ?? undefined}
+                  colorLogoHref={orgLogos?.mark ?? undefined}
+                  logoScale={orgLogos?.scale ?? 1}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />

@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
   const branding = await getOrgBranding(membership.org)
   const slab = ((membership.org as any).storefront?.slab || {}) as {
     label_style?: string; pattern?: string; colors?: string[]; color_source?: string
+    logo_variant?: string; logo_scale?: number
   }
   const brandColors = membership.org.brand_colors?.length
     ? membership.org.brand_colors
@@ -61,6 +62,8 @@ export async function GET(request: NextRequest) {
         pattern: slab.pattern || 'diamond',
         colors: Array.isArray(slab.colors) ? slab.colors : [],
         colorSource: slab.color_source === 'card' ? 'card' : 'brand',
+        logoVariant: slab.logo_variant === 'black' || slab.logo_variant === 'white' ? slab.logo_variant : 'color',
+        logoScale: typeof slab.logo_scale === 'number' ? slab.logo_scale : 1,
       },
     },
   })

@@ -14,6 +14,7 @@
 import { jsPDF } from 'jspdf';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 import type { SlabLabelData } from './slabLabelGenerator';
+import { modernLogoSize } from './labels/logoScale';
 import { resolveConfigTextPolarity, resolveGradeColor, resolveFontScale, type CustomLabelConfig } from './labelPresets';
 
 // ============================================================================
@@ -626,7 +627,9 @@ export async function renderFrontCanvas(
   const padding = Math.round(18 * scale);
 
   // Left: DCM Logo
-  const logoSize = ECH * 0.55;
+  // Enterprise stores can enlarge the mark; capped against the label height
+  // so it stays inside the content area (shared with the print PDF).
+  const logoSize = modernLogoSize(ECH * 0.55, ECH, data.logoScale);
   const logoX = EB + padding;
   const logoY = EB + (ECH - logoSize) / 2;
   const logoSrc = light ? data.logoDataUrl : data.whiteLogoDataUrl;

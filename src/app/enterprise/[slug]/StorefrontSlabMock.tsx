@@ -13,6 +13,7 @@ import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 export default function StorefrontSlabMock({
   orgName,
   logoHref,
+  logoScale = 1,
   pattern,
   bandColors,
   labelStyle = 'heritage',
@@ -20,6 +21,8 @@ export default function StorefrontSlabMock({
 }: {
   orgName: string;
   logoHref: string | null;
+  /** Mark size multiplier from Brand Setup. */
+  logoScale?: number;
   pattern: string;
   bandColors: string[];
   labelStyle?: 'modern' | 'heritage';
@@ -55,6 +58,7 @@ export default function StorefrontSlabMock({
             bandColors={bandColors}
             blackLogoHref={logoHref ?? undefined}
             colorLogoHref={logoHref ?? undefined}
+            logoScale={logoScale}
             suppressImages={!logoHref}
           />
         ) : (
@@ -71,6 +75,7 @@ export default function StorefrontSlabMock({
             } as any}
             logoWhiteSrc={logoHref}
             logoColorSrc={logoHref}
+            logoScale={logoScale}
           />
         )}
       </div>

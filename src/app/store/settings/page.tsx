@@ -22,6 +22,7 @@ import { useOrgContext } from '@/contexts/OrgContext'
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS, HowItWorksStep, FaqEntry } from '@/lib/storefrontDefaults'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import OrgLabelPreview from '@/components/labels/OrgLabelPreview'
+import { HERITAGE_LOGO_SCALE as LOGO_SCALE } from '@/lib/labelLab/heritageLayout'
 
 const SOCIAL_KEYS = ['instagram', 'facebook', 'tiktok', 'youtube', 'x'] as const
 
@@ -46,7 +47,16 @@ interface Settings {
   showRecentCards: boolean
   socials: Record<string, string>
   photos: { path: string; url: string | null }[]
-  slab: { labelStyle: 'heritage' | 'modern'; pattern: string; colors: string[]; colorSource: 'brand' | 'card' }
+  slab: {
+    labelStyle: 'heritage' | 'modern'
+    pattern: string
+    colors: string[]
+    colorSource: 'brand' | 'card'
+    /** Which uploaded logo variant prints on the label mark. */
+    logoVariant: 'color' | 'black' | 'white'
+    /** Mark size multiplier; the renderer clamps it per card so it can't clip. */
+    logoScale: number
+  }
   storefrontEnabled: boolean
   howItWorks: HowItWorksStep[] | null
   faqs: FaqEntry[] | null
@@ -436,6 +446,62 @@ function StoreSettingsContent() {
                   Modern labels derive their gradient from your primary brand color.
                 </p>
               )}
+
+              {/* Logo treatment — applies to both label styles. */}
+              <div>
+                <label className={labelCls}>Logo version on the label</label>
+                <select
+                  value={settings.slab.logoVariant}
+                  className={inputCls}
+                  onChange={(e) => {
+                    const slab = { ...settings.slab, logoVariant: e.target.value as 'color' | 'black' | 'white' }
+                    saveAnd({ slab }, { slab }, 'Logo version saved')
+                  }}
+                >
+                  <option value="color">Full color (as uploaded)</option>
+                  <option value="black">Black</option>
+                  <option value="white">White</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {settings.slab.logoVariant === 'white' && settings.slab.labelStyle === 'heritage'
+                    ? 'Heads up: Heritage labels print on a light field, so a white logo will be hard to see. Check the preview.'
+                    : 'Black usually reads cleanest on Heritage labels. White is made for the dark Modern label.'}
+                </p>
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Logo size
+                  <span className="ml-2 font-normal text-gray-400">
+                    {Math.round(settings.slab.logoScale * 100)}%
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min={LOGO_SCALE.min}
+                  max={LOGO_SCALE.max}
+                  step={LOGO_SCALE.step}
+                  value={settings.slab.logoScale}
+                  className="w-full accent-purple-600"
+                  // Drag updates the preview live; the save fires on release so
+                  // a drag isn't 20 PATCHes.
+                  onChange={(e) => {
+                    const slab = { ...settings.slab, logoScale: Number(e.target.value) }
+                    setSettings(s => (s ? { ...s, slab } : s))
+                  }}
+                  onMouseUp={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
+                  onTouchEnd={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
+                  onKeyUp={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Square and stacked logos usually need a larger size than a wide wordmark. The label
+                  keeps your logo clear of the card name and serial automatically, so on a long card
+                  name it may render slightly smaller than set here.
+                  {settings.slab.labelStyle === 'modern'
+                    ? ' Modern labels have a fixed single-row layout, so they top out near 150%.'
+                    : ''}
+                </p>
+              </div>
             </div>
             <OrgLabelPreview
               orgName={settings.name}
@@ -443,7 +509,9 @@ function StoreSettingsContent() {
               pattern={settings.slab.pattern}
               bandColors={slabColors}
               brandColor={brandPrimary}
-              logos={{ color: settings.logos.color, white: settings.logos.white }}
+              logos={settings.logos}
+              logoVariant={settings.slab.logoVariant}
+              logoScale={settings.slab.logoScale}
               serialPrefix={settings.serialPrefix || settings.derivedPrefix}
             />
           </div>

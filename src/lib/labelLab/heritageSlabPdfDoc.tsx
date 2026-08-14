@@ -28,7 +28,7 @@ import { Document, Page, View, Text, Text as SvgText, Image, Svg, Path, Rect, G,
 import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS, type GradeChip } from '@/lib/labelPresets'
 import { bandGeometry, BAND_STROKE_HEX, BAND_STROKE_OPACITY, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
-import { heritageTheme, fitHeritageFront, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE } from './heritageLayout'
+import { heritageTheme, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE } from './heritageLayout'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -99,6 +99,12 @@ export interface HeritageInputs {
    * whereas black belongs to no palette and so cannot clash with one.
    */
   logoColor?: LogoColor
+  /**
+   * Mark scale, 1 = the historic size. Enterprise stores set this in Brand
+   * Setup; growth is clamped against the fitted text stack by heritageMarkBox,
+   * the same helper the on-screen preview uses, so print and screen agree.
+   */
+  logoScale?: number
   /** Black mark, generated from the white one (negate RGB, keep alpha). */
   blackLogoDataUrl?: string | null
   /** QR with the mark knocked into the centre, built by the caller. */
@@ -329,13 +335,16 @@ function GradeChipBlock({ chip, size, inkOverride }: { chip: GradeChip; size: nu
  * Everything is sized off one box so the treatments are directly comparable —
  * only the backing changes, never the mark's size or position.
  */
-function LogoBlock({ i, showRules = true }: { i: HeritageInputs; showRules?: boolean }) {
+function LogoBlock({ i, showRules = true, fit }: { i: HeritageInputs; showRules?: boolean; fit: ReturnType<typeof fitHeritageFront> }) {
   const t = i.logoTreatment ?? 'rules'
   const c = i.logoColor ?? 'black'
   // 260x96 with the mark at 0.85 of the box (was 238x88 at 0.78) — about 20%
   // more visible mark. The box top moves up only 16 mockup-px, which the
   // densest fitted text stack still clears.
   const MARK_W = u(260), MARK_H = u(96)
+  // Scaled geometry in mockup-px, converted to PDF units by u(). Shared with
+  // the SVG preview so a store's chosen size prints exactly as previewed.
+  const box = heritageMarkBox(i.logoScale ?? 1, fit)
 
   const src =
     c === 'white' ? (i.whiteLogoDataUrl ?? i.colorLogoDataUrl)
@@ -343,27 +352,20 @@ function LogoBlock({ i, showRules = true }: { i: HeritageInputs; showRules?: boo
     : (i.blackLogoDataUrl ?? i.colorLogoDataUrl)
 
   if (t === 'plain' || t === 'rules') {
-    const left = (LABEL_W - MARK_W) / 2
-    const top = LABEL_H - MARK_H - u(8)
     // Accent lines in the same ink as the mark so the group reads as one
     // object. Short on purpose — a full-width rule becomes a second divider and
     // argues with the one above the serial.
-    const ruleLen = u(112)
-    const gap = u(20)
-    // Bar height is u(6), so back the top off by half of it — otherwise the
-    // bars hang below the mark's centreline instead of sitting on it.
-    const ruleY = top + MARK_H / 2 - u(3)
     const ink = c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
     return (
       <>
         {t === 'rules' && showRules ? (
           <>
-            <View style={{ position: 'absolute', left: left - gap - ruleLen, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
-            <View style={{ position: 'absolute', left: left + MARK_W + gap, top: ruleY, width: ruleLen, height: u(6), backgroundColor: ink }} />
+            <View style={{ position: 'absolute', left: u(box.ruleLeft), top: u(box.ruleY), width: u(box.ruleLen), height: u(6), backgroundColor: ink }} />
+            <View style={{ position: 'absolute', left: u(box.ruleRight), top: u(box.ruleY), width: u(box.ruleLen), height: u(6), backgroundColor: ink }} />
           </>
         ) : null}
-        <View style={{ position: 'absolute', left, top, width: MARK_W, height: MARK_H, alignItems: 'center', justifyContent: 'center' }}>
-          {src ? <Image src={src} style={{ width: MARK_W * 0.85, height: MARK_H * 0.85, objectFit: 'contain' }} /> : null}
+        <View style={{ position: 'absolute', left: u(box.x), top: u(box.y), width: u(box.w), height: u(box.h), alignItems: 'center', justifyContent: 'center' }}>
+          {src ? <Image src={src} style={{ width: u(box.w), height: u(box.h), objectFit: 'contain' }} /> : null}
         </View>
       </>
     )
@@ -390,7 +392,9 @@ function LogoBlock({ i, showRules = true }: { i: HeritageInputs; showRules?: boo
  */
 export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   const T = heritageTheme(!!i.printHardened)
-  const { name, ctx, rulesOk } = fitHeritageFront(i.primaryName, i.contextLine, i.serial)
+  const fit = fitHeritageFront(i.primaryName, i.contextLine, i.serial)
+  const { name, ctx } = fit
+  const rulesOk = heritageRulesFit(fit, heritageMarkBox(i.logoScale ?? 1, fit))
   return (
     <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
@@ -430,7 +434,7 @@ export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip 
       </View>
 
       {/* Mark, bottom-centre, hugging the edge */}
-      <LogoBlock i={i} showRules={rulesOk} />
+      <LogoBlock i={i} showRules={rulesOk} fit={fit} />
     </View>
   )
 }

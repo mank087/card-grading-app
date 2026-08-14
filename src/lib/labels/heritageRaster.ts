@@ -22,7 +22,7 @@ import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import type { BandPattern } from '@/lib/labelLab/bandGeometry'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
-import { HERITAGE_PX } from '@/lib/labelLab/heritageLayout'
+import { HERITAGE_PX, heritageMarkBox, fitHeritageFront } from '@/lib/labelLab/heritageLayout'
 
 export interface HeritageRasterOptions {
   data: SlabLabelData
@@ -38,6 +38,8 @@ export interface HeritageRasterOptions {
    * anchor). Absent = DCM mark, loaded internally, as before.
    */
   logoBlack?: string
+  /** Mark size multiplier from Brand Setup; clamped per card by heritageMarkBox. */
+  logoScale?: number
 }
 
 function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): string {
@@ -54,6 +56,7 @@ function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): strin
     // canvas (QR + logos silently vanished from rasterized labels) — omit
     // them here; renderHeritageLabelPng composites the bitmaps natively.
     suppressImages: true,
+    logoScale: opts.logoScale ?? 1,
   })
   const host = document.createElement('div')
   const root = createRoot(host)
@@ -132,11 +135,11 @@ async function compositeBitmaps(
   if (opts.side === 'front') {
     const mark = await loadBitmap(blackLogo || opts.data.logoDataUrl || '')
     if (mark) {
-      const markW = PX.MARK_W * PX.MARK_SCALE
-      const markH = PX.MARK_H * PX.MARK_SCALE
-      const left = (PX.W - PX.MARK_W) / 2 + (PX.MARK_W - markW) / 2
-      const top = PX.H - PX.MARK_H - PX.MARK_BOTTOM + (PX.MARK_H - markH) / 2
-      drawContain(ctx, mark, left * k, top * k, markW * k, markH * k)
+      // Same geometry helper the SVG and the PDF use, so the rasterized
+      // label matches what Brand Setup previewed.
+      const fit = fitHeritageFront(opts.data.primaryName || 'Card', opts.data.contextLine || '', opts.data.serial)
+      const box = heritageMarkBox(opts.logoScale ?? 1, fit)
+      drawContain(ctx, mark, box.x * k, box.y * k, box.w * k, box.h * k)
     }
     return
   }

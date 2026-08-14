@@ -207,7 +207,7 @@ export default function EbayImagePrepPage() {
             : undefined,
           subScores,
           logoOverrides: orgLogoSet?.branding
-            ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black }
+            ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
             : undefined,
         };
 
@@ -221,7 +221,7 @@ export default function EbayImagePrepPage() {
         // Org-graded cards carry the store's logo; DCM otherwise.
         const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
           .catch(() => generateQRCodeWithLogo(cardUrl));
-        const logoDataUrl = orgLogoSet?.color || undefined;
+        const logoDataUrl = orgLogoSet?.mark || undefined;
 
         const miniReportData: FoldableLabelData = {
           cardName: labelData.primaryName,
@@ -343,7 +343,7 @@ export default function EbayImagePrepPage() {
               ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: heritageSel.gradeColors }
               : undefined,
             org: orgLogoSet?.branding
-              ? { name: orgLogoSet.branding.name, slug: orgLogoSet.branding.slug, logoDataUrl: orgLogoSet.color || null, brandColor: orgLogoSet.branding.brandColor || null }
+              ? { name: orgLogoSet.branding.name, slug: orgLogoSet.branding.slug, logoDataUrl: orgLogoSet.mark || null, brandColor: orgLogoSet.branding.brandColor || null }
               : undefined,
             professionalGrades: {
               psa: card.estimated_professional_grades?.psa?.grade || '-',
