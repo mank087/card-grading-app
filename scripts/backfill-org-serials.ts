@@ -29,23 +29,41 @@ async function main() {
   if (orgErr || !org) { console.error('Org not found:', orgErr?.message ?? slug); process.exit(1); }
   console.log(`Org: ${org.name} (${org.id}) — prefix ${orgSerialPrefix(org)}`);
 
-  const { data: cards, error: cardsErr } = await s.from('cards')
-    .select('id, serial, org_serial, created_at')
-    .eq('org_id', org.id)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true })
-    .limit(500);
-  if (cardsErr) { console.error('Cards query failed:', cardsErr.message); process.exit(1); }
+  // Page through ALL of the org's cards in small batches (light columns only;
+  // small batches are required — see feedback_production_db_safety). Range
+  // pagination is stable here: assigning serials never changes created_at
+  // ordering, so pages don't shift under us.
+  const BATCH = 500;
+  let offset = 0;
+  let total = 0;
+  let missing = 0;
+  for (;;) {
+    const { data: cards, error: cardsErr } = await s.from('cards')
+      .select('id, serial, org_serial, created_at')
+      .eq('org_id', org.id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }) // tiebreak so equal timestamps page deterministically
+      .range(offset, offset + BATCH - 1);
+    if (cardsErr) { console.error('Cards query failed:', cardsErr.message); process.exit(1); }
+    const page = cards ?? [];
+    if (page.length === 0) break;
 
-  const todo = (cards ?? []).filter(c => c.org_serial === null);
-  console.log(`${cards?.length ?? 0} org cards, ${todo.length} missing an org serial.`);
+    total += page.length;
+    const todo = page.filter(c => c.org_serial === null);
+    missing += todo.length;
 
-  for (const c of todo) {
-    if (!apply) { console.log(`[dry] would assign a random serial to ${c.id} (DCM ${c.serial})`); continue; }
-    const display = await assignOrgSerial(c.id, org);
-    if (!display) { console.error(`Assignment failed for ${c.id} — stopping.`); process.exit(1); }
-    console.log(`${c.id}: ${display} (DCM ${c.serial})`);
+    for (const c of todo) {
+      if (!apply) { console.log(`[dry] would assign a random serial to ${c.id} (DCM ${c.serial})`); continue; }
+      const display = await assignOrgSerial(c.id, org);
+      if (!display) { console.error(`Assignment failed for ${c.id} — stopping.`); process.exit(1); }
+      console.log(`${c.id}: ${display} (DCM ${c.serial})`);
+    }
+
+    if (page.length < BATCH) break;
+    offset += BATCH;
   }
+  console.log(`${total} org cards, ${missing} missing an org serial.`);
   console.log(apply ? 'Done.' : 'Dry run complete — re-run with --apply to write.');
 }
 main();

@@ -11,23 +11,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/serverAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
+import { SLUG_RE, RESERVED_SLUGS, escapeHtml } from '@/lib/orgSlugs'
 import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/
-
-// Slugs that would collide with app routes, DCM itself, or invite
-// impersonation of major graders. Everything else gets human review anyway.
-const RESERVED_SLUGS = new Set([
-  'dcm', 'dcmgrading', 'admin', 'api', 'app', 'www', 'store', 'storefront',
-  'verify', 'pop', 'enterprise', 'account', 'collection', 'credits', 'labels',
-  'support', 'help', 'mail', 'blog', 'shop', 'grading', 'official',
-  'psa', 'bgs', 'cgc', 'sgc', 'beckett', 'tag', 'ace', 'hga',
-  // /enterprise/* static children — org pages live at /enterprise/{slug}
-  'apply', 'terms', 'launch-kit', 'welcome', 'billing', 'settings',
-])
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32)
@@ -100,7 +89,7 @@ export async function POST(request: NextRequest) {
   const slug = rawSlug || slugify(storeName)
   if (!SLUG_RE.test(slug)) {
     return NextResponse.json(
-      { error: 'Branded URL must be 3 to 32 lowercase letters, numbers, and hyphens' },
+      { error: 'Branded URL must be up to 32 lowercase letters, numbers, and hyphens' },
       { status: 400 }
     )
   }
@@ -165,7 +154,7 @@ export async function POST(request: NextRequest) {
         subject: `We received your DCM Enterprise application for ${storeName}`,
         html: `
           <h2>Application received</h2>
-          <p>Thanks for applying to DCM Enterprise with <strong>${storeName}</strong>.</p>
+          <p>Thanks for applying to DCM Enterprise with <strong>${escapeHtml(storeName)}</strong>.</p>
           <p>Our team reviews every application, and we&#39;ll reach out to finalize the
           process &mdash; usually within one business day. There&#39;s nothing you need to do
           in the meantime, and no payment is due until your account is approved and you
@@ -189,12 +178,12 @@ export async function POST(request: NextRequest) {
       subject: `Enterprise application: ${storeName}`,
       html: `
         <h2>New enterprise application (pending approval)</h2>
-        <p><strong>Store:</strong> ${storeName} (/${slug})</p>
-        <p><strong>Applicant:</strong> ${authResult.user.email || userId}</p>
-        <p><strong>Volume estimate:</strong> ${monthlyVolume || '—'}</p>
-        <p><strong>Tier interest:</strong> ${tierIntent || '—'}</p>
-        <p><strong>Website:</strong> ${website || '—'}</p>
-        <p><strong>Logo uploaded:</strong> ${logo instanceof File && logo.size > 0 ? (logoWarning ? `failed (${logoWarning})` : 'yes') : 'no'}</p>
+        <p><strong>Store:</strong> ${escapeHtml(storeName)} (/${escapeHtml(slug)})</p>
+        <p><strong>Applicant:</strong> ${escapeHtml(authResult.user.email || userId)}</p>
+        <p><strong>Volume estimate:</strong> ${escapeHtml(monthlyVolume) || '—'}</p>
+        <p><strong>Tier interest:</strong> ${escapeHtml(tierIntent) || '—'}</p>
+        <p><strong>Website:</strong> ${escapeHtml(website) || '—'}</p>
+        <p><strong>Logo uploaded:</strong> ${logo instanceof File && logo.size > 0 ? (logoWarning ? `failed (${escapeHtml(logoWarning)})` : 'yes') : 'no'}</p>
         <p>Review and approve in the admin panel → Organizations.</p>
       `,
     })

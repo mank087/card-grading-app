@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { SLUG_RE, RESERVED_SLUGS, escapeIlike } from '@/lib/orgSlugs'
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get('admin_token')?.value
   if (!token) return null
   return await verifyAdminSession(token)
 }
-
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdmin(request)
@@ -63,7 +62,12 @@ export async function POST(request: NextRequest) {
 
   if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
   if (!SLUG_RE.test(slug)) {
-    return NextResponse.json({ error: 'Slug must be lowercase letters, numbers, and hyphens (2-32 chars)' }, { status: 400 })
+    return NextResponse.json({ error: 'Slug must be lowercase letters, numbers, and hyphens (up to 32 chars)' }, { status: 400 })
+  }
+  // Same reserved list as self-serve — an admin-created org colliding with an
+  // app route or grader brand is a footgun, not a feature.
+  if (RESERVED_SLUGS.has(slug)) {
+    return NextResponse.json({ error: 'That slug is reserved (app route, subdomain, or grader brand)' }, { status: 400 })
   }
   if (!ownerEmail) return NextResponse.json({ error: 'Owner email is required' }, { status: 400 })
   if (!/^#[0-9a-fA-F]{6}$/.test(brandColor)) {
@@ -74,7 +78,7 @@ export async function POST(request: NextRequest) {
   const { data: owner } = await supabaseAdmin
     .from('users')
     .select('id, email')
-    .ilike('email', ownerEmail)
+    .ilike('email', escapeIlike(ownerEmail))
     .maybeSingle()
   if (!owner) {
     return NextResponse.json({ error: `No user found with email ${ownerEmail} — they must sign up first` }, { status: 404 })

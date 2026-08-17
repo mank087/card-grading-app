@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
+import { escapeIlike } from '@/lib/orgSlugs'
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get('admin_token')?.value
@@ -25,7 +26,7 @@ export async function POST(
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('id, email')
-    .ilike('email', email)
+    .ilike('email', escapeIlike(email))
     .maybeSingle()
   if (!user) {
     return NextResponse.json({ error: `No user found with email ${email} — they must sign up first` }, { status: 404 })

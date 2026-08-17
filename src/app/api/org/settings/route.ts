@@ -22,10 +22,13 @@ import { getOrgForUser, getOrgBranding, orgSerialPrefix } from '@/lib/organizati
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import { HERITAGE_LOGO_SCALE } from '@/lib/labelLab/heritageLayout'
+import { findGraderBrandToken, escapeHtml } from '@/lib/orgSlugs'
+import { Resend } from 'resend'
 import sharp from 'sharp'
 
 export const runtime = 'nodejs'
 
+const resend = new Resend(process.env.RESEND_API_KEY)
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
 /** Which uploaded logo variant prints on the label mark. */
@@ -130,6 +133,15 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.name === 'string') {
     const name = body.name.trim().slice(0, 120)
     if (name.length < 2) return NextResponse.json({ error: 'Brand or business name is too short' }, { status: 400 })
+    // Impersonation guard: an approved org must not rename itself into a
+    // grading-company brand (e.g. "PSA Grading") without human review.
+    const brandToken = findGraderBrandToken(name)
+    if (brandToken && name !== org.name) {
+      return NextResponse.json(
+        { error: `Brand names can't include grading-company names ("${brandToken}"). Contact support if this is your registered business name.` },
+        { status: 400 }
+      )
+    }
     updates.name = name
   }
 
@@ -312,6 +324,29 @@ export async function PATCH(request: NextRequest) {
     console.error('[org/settings] update error:', error)
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
+
+  // Any rename gets human eyes: the change is immediate, but admin is told
+  // old + new so an impersonation-adjacent rename can't slip by silently.
+  // Fire-and-forget — the row update is the source of truth.
+  if (typeof updates.name === 'string' && updates.name !== org.name) {
+    try {
+      await resend.emails.send({
+        from: 'DCM Grading <noreply@dcmgrading.com>',
+        to: ['admin@dcmgrading.com'],
+        subject: `Enterprise org renamed: ${org.slug}`,
+        html: `
+          <h2>Organization renamed by its owner</h2>
+          <p><strong>Slug:</strong> /${escapeHtml(org.slug)}</p>
+          <p><strong>Old name:</strong> ${escapeHtml(org.name)}</p>
+          <p><strong>New name:</strong> ${escapeHtml(updates.name)}</p>
+          <p>The change is already live. Review in the admin panel &rarr; Organizations.</p>
+        `,
+      })
+    } catch (emailErr) {
+      console.error('[org/settings] rename notification email failed (rename saved):', emailErr)
+    }
+  }
+
   return NextResponse.json({ success: true })
 }
 

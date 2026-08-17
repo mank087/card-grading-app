@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+// Edge runtime: orgSlugs is dependency-free pure constants, safe to import here.
+import { RESERVED_SLUGS, SLUG_RE } from '@/lib/orgSlugs';
 
 /**
  * Tenant subdomain routing (Enterprise Pages, Phase 2A).
@@ -13,11 +15,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * without any hosts-file changes.
  */
 
-// Subdomains that must never resolve to a storefront
-const RESERVED = new Set(['www', 'api', 'app', 'admin', 'mail', 'staging', 'dev', 'cdn', 'assets']);
-
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
-
+// Subdomains that must never resolve to a storefront: the shared canonical
+// reserved-slug list (src/lib/orgSlugs.ts) — same set slug creation enforces.
 function storefrontSlug(hostHeader: string | null): string | null {
   if (!hostHeader) return null;
   const host = hostHeader.toLowerCase().split(':')[0];
@@ -28,7 +27,7 @@ function storefrontSlug(hostHeader: string | null): string | null {
     sub = host.slice(0, -'.localhost'.length);
   }
   if (!sub || sub.includes('.')) return null; // no nested subdomains
-  if (RESERVED.has(sub) || !SLUG_RE.test(sub)) return null;
+  if (RESERVED_SLUGS.has(sub) || !SLUG_RE.test(sub)) return null;
   return sub;
 }
 
