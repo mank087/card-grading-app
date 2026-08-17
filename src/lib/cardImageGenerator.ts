@@ -1001,9 +1001,10 @@ async function drawHeritageLabel(
   const { renderHeritageLabelCanvas } = await import('@/lib/labels/heritageRaster');
   const { BAND_PATTERNS } = await import('@/lib/labelLab/bandGeometry');
   const pattern = (BAND_PATTERNS.some(p => p.id === data.heritage?.pattern) ? data.heritage!.pattern : 'diamond') as import('@/lib/labelLab/bandGeometry').BandPattern;
-  // The QR-centre disc must ALWAYS carry the DCM mark (verification anchor) —
-  // never a store logo, even when logoOverrides is set. Store identity on
-  // heritage goes through logoBlack (the front-label mark) only.
+  // QR-centre disc policy (Aug 2026): org cards carry the org COLOR logo
+  // (their QR resolves to the org's branded card page); consumer cards keep
+  // the DCM mark. Always the COLOR variant — a white Brand Setup mark would
+  // vanish on the white QR plate. The front-label mark rides logoBlack.
   const dcmQrMark = await loadLogoAsBase64().catch(() => undefined);
   const slabData = {
     primaryName: data.cardName,

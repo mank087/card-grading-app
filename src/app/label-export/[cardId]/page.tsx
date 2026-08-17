@@ -23,7 +23,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
-import { loadLogosForCard, type OrgLogoSet } from '@/lib/orgBranding';
+import { loadLogosForCard, cardQrUrl, type OrgLogoSet } from '@/lib/orgBranding';
 import { generateAveryLabel } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelPair, generateFoldOverLabel8167 } from '@/lib/avery8167LabelGenerator';
 import { generateSlabLabel, generateFoldOverSlabLabel } from '@/lib/slabLabelGenerator';
@@ -474,9 +474,11 @@ export default function LabelExportPage() {
             qrCodeUrl: cardUrl,
             cardName: labelData.primaryName,
           };
+          // Org cards: store mark on the label + watermark; DCM otherwise.
+          const orgToploaderLogo = logos.branding ? logos.mark : undefined;
           const blob = type === 'foldover'
-            ? await generateFoldOverLabel8167(toploaderData, position)
-            : await generateToploaderLabelPair(toploaderData, position, secondPosition);
+            ? await generateFoldOverLabel8167(toploaderData, position, undefined, orgToploaderLogo)
+            : await generateToploaderLabelPair(toploaderData, position, secondPosition, undefined, orgToploaderLogo);
           blobs.push({
             name: `DCM-Toploader-${type === 'foldover' ? 'Foldover-' : ''}${namePrefix}.pdf`,
             mime: 'application/pdf',
@@ -555,10 +557,11 @@ export default function LabelExportPage() {
             isAlteredAuthentic: labelData.isAlteredAuthentic,
             qrCodeDataUrl: '',
             subScores,
-            // DCM logos on purpose: heritage's QR-centre disc renders
-            // colorLogoDataUrl and must stay the DCM verification mark.
-            // Org cards get their mark via opts.logoBlack (front label only).
-            logoDataUrl: await loadLogoAsBase64().catch(() => ''),
+            // QR-centre disc (colorLogoDataUrl): org cards carry the org
+            // COLOR mark — never the Brand Setup mark, which may be white and
+            // vanish on the white QR plate. Consumer cards keep DCM. The
+            // front-label mark still comes from opts.logoBlack.
+            logoDataUrl: logos.branding ? logos.color : await loadLogoAsBase64().catch(() => ''),
             whiteLogoDataUrl: await loadWhiteLogoAsBase64().catch(() => ''),
             showFounderEmblem,
             showVipEmblem,
@@ -586,6 +589,9 @@ export default function LabelExportPage() {
             gradeColors: sel.gradeColors,
             logoBlack: logos.branding ? logos.mark : undefined,
             logoScale: logos.logoScale,
+            // Org cards carry an ORG serial that /verify/[serial] doesn't
+            // match — the printed QR must target the branded card page.
+            qrUrl: cardQrUrl(cardId, card.serial, logos.branding),
           };
           const blob = format === 'foldover'
             ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)
@@ -603,7 +609,9 @@ export default function LabelExportPage() {
           // (light bg).
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
           const logoDataUrl = logos.mark;
-          const whiteLogoDataUrl = logos.white;
+          // Modern renders the whiteLogoDataUrl slot; screens show the Brand
+          // Setup mark there for org cards, so print matches the preview.
+          const whiteLogoDataUrl = logos.branding ? logos.mark : logos.white;
           // SlabLabelData shape per src/lib/slabLabelGenerator.ts
           const slabPayload: any = {
             primaryName: labelData.primaryName,

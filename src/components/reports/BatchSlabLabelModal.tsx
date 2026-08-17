@@ -192,31 +192,45 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         const gen = await import('@/lib/labels/heritageSlabGenerator');
         const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
         const items = labelDataArray.map((data, i) => ({
-          // Org batches carry the store mark on the QR disc AND the front;
-          // DCM batches unchanged.
-          data,
+          // Org batches: front mark from Brand Setup (logoBlack), QR-centre
+          // disc always the org COLOR mark (a white mark would vanish on the
+          // white QR plate). DCM batches unchanged.
+          data: orgLogos?.branding ? { ...data, logoDataUrl: orgLogos.color } : data,
           bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(selectedCards[i]?.card_colors),
           logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
           logoScale: orgLogos?.logoScale ?? 1,
+          // Org serials don't resolve at /verify — point the printed QR at the
+          // same branded URL the composited QR image already encodes.
+          qrUrl: cardQrUrl(selectedCards[i].id, selectedCards[i].serial,
+            orgLogos?.branding ? { slug: orgLogos.branding.slug } : null),
         }));
         blob = printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors)
           : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors);
-      } else if (printFormat === 'foldover') {
-        // Fold-over batch: multiple fold-over labels per page in a single PDF
-        if (localActiveConfig) {
-          blob = await generateBatchFoldOverCustomLabels(labelDataArray, localActiveConfig);
-        } else {
-          const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
-          blob = await generateBatchFoldOverSlabLabels(labelDataArray, builtInStyle);
-        }
-      } else if (localActiveConfig) {
-        // Custom style — use batch generator with same multi-up grid layout as standard
-        blob = await generateBatchCustomSlabLabels(labelDataArray, localActiveConfig);
       } else {
-        // Built-in style — use standard batch generator
-        const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
-        blob = await generateBatchSlabLabels(labelDataArray, builtInStyle);
+        // Modern/custom dark labels render the whiteLogoDataUrl slot; the
+        // on-screen previews show the Brand Setup mark there for org cards,
+        // so the batch print must match. Consumer batches unchanged.
+        const orgMark = orgLogos?.branding ? orgLogos.mark : null;
+        const printArray = orgMark
+          ? labelDataArray.map(d => ({ ...d, whiteLogoDataUrl: orgMark }))
+          : labelDataArray;
+        if (printFormat === 'foldover') {
+          // Fold-over batch: multiple fold-over labels per page in a single PDF
+          if (localActiveConfig) {
+            blob = await generateBatchFoldOverCustomLabels(printArray, localActiveConfig);
+          } else {
+            const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+            blob = await generateBatchFoldOverSlabLabels(printArray, builtInStyle);
+          }
+        } else if (localActiveConfig) {
+          // Custom style — use batch generator with same multi-up grid layout as standard
+          blob = await generateBatchCustomSlabLabels(printArray, localActiveConfig);
+        } else {
+          // Built-in style — use standard batch generator
+          const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+          blob = await generateBatchSlabLabels(printArray, builtInStyle);
+        }
       }
 
       setProgress(95);

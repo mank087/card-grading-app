@@ -1071,16 +1071,18 @@ async function drawFoldOverLabel(
 export async function generateFoldOverLabel8167(
   data: ToploaderLabelData,
   positionIndex: number,
-  offsets?: CalibrationOffsets
+  offsets?: CalibrationOffsets,
+  logoDataUrl?: string
 ): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
   const position = indexToPosition8167(positionIndex);
   const { x, y } = getLabelPosition(position, offsets);
 
+  // Watermark logo: caller override (org branding) wins, else the DCM asset.
   const [qrCodeBase64, logoBase64] = await Promise.all([
     generateQRCodeBase64(data.qrCodeUrl, 200),
-    loadLogoAsBase64().catch(() => ''),
+    logoDataUrl ? Promise.resolve(logoDataUrl) : loadLogoAsBase64().catch(() => ''),
   ]);
 
   await drawFoldOverLabel(doc, x, y, data, qrCodeBase64, logoBase64);
@@ -1094,13 +1096,15 @@ export async function generateFoldOverLabel8167(
 export async function generateFoldOverLabelSheet(
   cardsData: ToploaderLabelData[],
   offsets?: CalibrationOffsets,
-  startPosition: number = 0
+  startPosition: number = 0,
+  logoDataUrl?: string
 ): Promise<Blob> {
   if (cardsData.length === 0) throw new Error('No cards to generate labels for');
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  const logoBase64 = await loadLogoAsBase64().catch(() => '');
+  // Watermark logo: caller override (org branding) wins, else the DCM asset.
+  const logoBase64 = logoDataUrl || (await loadLogoAsBase64().catch(() => ''));
 
   for (let i = 0; i < cardsData.length; i++) {
     const globalIndex = startPosition + i;

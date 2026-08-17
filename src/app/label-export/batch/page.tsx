@@ -49,7 +49,7 @@ import {
 import { generateAveryLabelSheetMultiPage } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelSheetMultiPage, generateFoldOverLabelSheet, type ToploaderLabelData } from '@/lib/avery8167LabelGenerator';
 import { generateBatchFoldableLabels, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
-import { loadLogosForCard } from '@/lib/orgBranding';
+import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { pdf } from '@react-pdf/renderer';
@@ -281,8 +281,10 @@ function BatchLabelExportInner() {
               isAlteredAuthentic: !!(labelData as any).isAlteredAuthentic,
               qrCodeDataUrl: '',
               subScores,
-              // Org batches carry the store mark (disc + front); DCM otherwise.
-              logoDataUrl,
+              // QR-centre disc: org batches carry the org COLOR mark (a white
+              // Brand Setup mark would vanish on the white QR plate); DCM
+              // batches unchanged. Front mark rides logoBlack below.
+              logoDataUrl: orgLogos?.branding ? orgLogos.color : logoDataUrl,
               whiteLogoDataUrl,
               logoScale: orgLogos?.logoScale ?? 1,
               showFounderEmblem,
@@ -292,6 +294,8 @@ function BatchLabelExportInner() {
             bandColors: (heritageSel.active ? heritageSel.bandColors : null) ?? resolveHeritageBandColors(card.card_colors),
             logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
             logoScale: orgLogos?.logoScale ?? 1,
+            // Org serials don't resolve at /verify — target the branded page.
+            qrUrl: cardQrUrl(card.id, card.serial, orgLogos?.branding),
           }));
           const pattern = sp.get('heritagePattern')
             ? gen.resolveHeritagePattern(sp.get('heritagePattern'))
@@ -327,7 +331,9 @@ function BatchLabelExportInner() {
             qrCodeDataUrl,
             subScores,
             logoDataUrl,
-            whiteLogoDataUrl,
+            // Modern renders the whiteLogoDataUrl slot; screens show the
+            // Brand Setup mark there for org cards, so print matches.
+            whiteLogoDataUrl: orgLogos?.branding ? orgLogos.mark : whiteLogoDataUrl,
             logoScale: orgLogos?.logoScale ?? 1,
             showFounderEmblem,
             showVipEmblem,
@@ -373,7 +379,9 @@ function BatchLabelExportInner() {
             qrCodeDataUrl,
             subScores,
             logoDataUrl,
-            whiteLogoDataUrl,
+            // Dark custom designs render the whiteLogoDataUrl slot; screens
+            // show the Brand Setup mark there for org cards, so print matches.
+            whiteLogoDataUrl: orgLogos?.branding ? orgLogos.mark : whiteLogoDataUrl,
             logoScale: orgLogos?.logoScale ?? 1,
             showFounderEmblem,
             showVipEmblem,
@@ -445,7 +453,9 @@ function BatchLabelExportInner() {
             qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
           }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
-          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray, calibrationOffsets, globalPositions);
+          // Org batches (all-same-org): store mark on labels + watermark.
+          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray, calibrationOffsets, globalPositions,
+            orgLogos?.branding ? orgLogos.mark : undefined);
           blobs.push({
             name: `DCM-Toploader-Avery8167-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -472,7 +482,9 @@ function BatchLabelExportInner() {
           // auto-fills the rest sequentially. Use the first position from the
           // array if provided, otherwise start at 0.
           const startPosition = positions.length > 0 ? positions[0] : 0;
-          const blob = await generateFoldOverLabelSheet(labelDataArray, undefined, startPosition);
+          // Org batches (all-same-org): store mark in the fold-over watermark.
+          const blob = await generateFoldOverLabelSheet(labelDataArray, undefined, startPosition,
+            orgLogos?.branding ? orgLogos.mark : undefined);
           blobs.push({
             name: `DCM-FoldOver-Avery8167-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',

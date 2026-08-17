@@ -354,6 +354,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // fetch the signed storage URL itself). Loaded FIRST because the QR
       // target and mark depend on it.
       let orgReportBranding: { name: string; slug: string; logoDataUrl: string | null; brandColor: string | null } | null = null;
+      // QR-disc policy: the centre disc always carries the COLOR logo — a
+      // white Brand Setup mark would vanish on the white disc.
+      let orgQrDiscLogo: string | undefined;
       if ((card as any)?.org_id) {
         try {
           const logos = await loadLogosForCard(card.id);
@@ -364,6 +367,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
               logoDataUrl: logos.mark || null,
               brandColor: logos.branding.brandColor || null,
             };
+            orgQrDiscLogo = logos.color || undefined;
           }
         } catch (err) {
           console.warn('[DOWNLOAD REPORT] Org branding unavailable, using DCM:', err);
@@ -374,7 +378,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // mark in the centre; consumer cards keep the DCM verify page + mark.
       const cardUrl = cardQrUrl(card.id, card.serial, orgReportBranding, `${window.location.origin}/${cardType}/${card.id}`);
       console.log('[DOWNLOAD REPORT] Generating QR code for URL:', cardUrl);
-      const qrCodeDataUrl = await generateQRCode(cardUrl, orgReportBranding?.logoDataUrl || undefined);
+      const qrCodeDataUrl = await generateQRCode(cardUrl, orgQrDiscLogo);
       console.log('[DOWNLOAD REPORT] QR code generated');
 
       // Use unified label data generator (filters out "Unknown...", cleans values)
@@ -1064,7 +1068,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         },
         frontPositionIndex,
         backPositionIndex,
-        offsets
+        offsets,
+        // Org cards: store mark on the front label + watermark; DCM otherwise.
+        toploaderLogoSet?.branding ? toploaderLogoSet.mark : undefined
       );
 
       // Download the PDF
@@ -1122,7 +1128,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           cardName: cleanLabelData.primaryName,
         },
         positionIndex,
-        offsets
+        offsets,
+        // Org cards: store mark in the fold-over watermark; DCM otherwise.
+        foldOverLogoSet?.branding ? foldOverLogoSet.mark : undefined
       );
 
       const url = URL.createObjectURL(blob);
@@ -1210,12 +1218,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       setGeneratingType('label');
 
       const slabData = await buildSlabData();
+      // Cached per session — same set buildSlabData already resolved.
+      const orgLogos = await loadLogosForCard(card.id).catch(() => null);
 
       // Heritage — built-in id or a saved custom config with style 'heritage'
       const heritageSel = resolveHeritageSelection(labelStyle, customLabelConfig);
       if (heritageSel.active) {
         const gen = await import('@/lib/labels/heritageSlabGenerator');
-        const orgLogos = await loadLogosForCard(card.id).catch(() => null);
         const opts = {
           bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card?.card_colors),
           pattern: heritageSel.pattern,
@@ -1223,20 +1232,36 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           // Org front mark (black variant); the QR disc follows slabData.logoDataUrl
           logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
           logoScale: orgLogos?.logoScale ?? 1,
+          // Org cards carry an ORG serial — /verify/[serial] wouldn't resolve,
+          // so hand the generator the same URL the QR image already encodes.
+          qrUrl: cardQrUrl(card.id, card.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`),
         };
-        if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(slabData, opts);
-        else await gen.downloadHeritageSlabLabel(slabData, opts);
-      } else if (format === 'foldover') {
-        if (customLabelConfig) {
-          await downloadFoldOverSlabLabel(slabData, customLabelConfig);
-        } else {
-          await downloadFoldOverSlabLabelStandard(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
-        }
+        // QR-centre disc policy: org cards get the org COLOR mark (a white
+        // Brand Setup mark would vanish on the white QR plate); consumer DCM.
+        const heritageData = orgLogos?.branding
+          ? { ...slabData, logoDataUrl: orgLogos.color }
+          : slabData;
+        if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(heritageData, opts);
+        else await gen.downloadHeritageSlabLabel(heritageData, opts);
       } else {
-        if (customLabelConfig) {
-          await downloadCustomSlabLabel(slabData, customLabelConfig);
+        // Modern/custom dark labels render the whiteLogoDataUrl slot; screens
+        // show the Brand Setup mark there for org cards, so print must match.
+        // (Heritage above keeps the true white variant for its dark back plate.)
+        const printData = orgLogos?.branding
+          ? { ...slabData, whiteLogoDataUrl: orgLogos.mark }
+          : slabData;
+        if (format === 'foldover') {
+          if (customLabelConfig) {
+            await downloadFoldOverSlabLabel(printData, customLabelConfig);
+          } else {
+            await downloadFoldOverSlabLabelStandard(printData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+          }
         } else {
-          await downloadSlabLabel(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+          if (customLabelConfig) {
+            await downloadCustomSlabLabel(printData, customLabelConfig);
+          } else {
+            await downloadSlabLabel(printData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+          }
         }
       }
 

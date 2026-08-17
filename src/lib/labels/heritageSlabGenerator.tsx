@@ -59,6 +59,12 @@ export interface HeritageRenderOptions {
    * can never print over the serial.
    */
   logoScale?: number
+  /**
+   * Target URL for the printed QR code. Enterprise callers pass the org's
+   * branded card page (cardQrUrl) — the ORG serial on those labels doesn't
+   * resolve at /verify/[serial]. Absent = DCM verify page for the serial.
+   */
+  qrUrl?: string
 }
 
 /** 'diamond' unless the config carries a valid pattern id. */
@@ -81,7 +87,7 @@ async function buildHeritageInputs(
     (async () => {
       try {
         const QRCode = (await import('qrcode')).default
-        return await QRCode.toDataURL(`https://dcmgrading.com/verify/${data.serial}`, {
+        return await QRCode.toDataURL(opts.qrUrl || `https://dcmgrading.com/verify/${data.serial}`, {
           errorCorrectionLevel: 'H', margin: 1, width: 560,
           color: { dark: '#141414', light: '#ffffff' },
         })
@@ -327,12 +333,20 @@ export interface HeritageBatchItem {
   bandColors: string[]
   /** Per-card org front mark (black-variant data URL); DCM when absent. */
   logoBlack?: string
+  /** Brand Setup mark size multiplier; 1 (DCM sizing) when absent. */
+  logoScale?: number
+  /** Per-card QR target URL (cardQrUrl); verify/serial when absent. */
+  qrUrl?: string
 }
 
 async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern, gradeColors?: Record<string, string> | null): Promise<HeritageInputs[]> {
   const dcmBlack = await loadBlackLogoAsBase64().catch(() => null)
   return Promise.all(
-    items.map(it => buildHeritageInputs(it.data, { bandColors: it.bandColors, pattern, gradeColors }, it.logoBlack ?? dcmBlack)),
+    items.map(it => buildHeritageInputs(
+      it.data,
+      { bandColors: it.bandColors, pattern, gradeColors, logoScale: it.logoScale, qrUrl: it.qrUrl },
+      it.logoBlack ?? dcmBlack,
+    )),
   )
 }
 

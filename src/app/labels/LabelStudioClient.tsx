@@ -1549,7 +1549,14 @@ function CustomDesigner({
         // Heritage has its own vector documents. Dynamic import keeps
         // @react-pdf out of the initial bundle.
         const gen = await import('@/lib/labels/heritageSlabGenerator')
-        const opts = { bandColors: heritageBandColors, pattern: heritagePattern, gradeColors: config.heritageGradeColors ?? null }
+        // Match the on-screen HeritageLabelPreview, which renders the org
+        // color logo (orgLogoColor) as the front mark at default scale.
+        const opts = {
+          bandColors: heritageBandColors,
+          pattern: heritagePattern,
+          gradeColors: config.heritageGradeColors ?? null,
+          logoBlack: orgLogoColor ?? undefined,
+        }
         if (format === 'foldover') await gen.downloadHeritageFoldOverLabel(previewData, opts)
         else await gen.downloadHeritageSlabLabel(previewData, opts)
       } else if (format === 'foldover') {
@@ -3028,8 +3035,10 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
   // Enterprise org members preview labels with their store's logos (as data
   // URLs — the currency the canvas/SVG renderers already consume). Non-members
-  // and guests never set this, so behavior is unchanged for them.
-  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null; mark: string | null } | null>(null)
+  // and guests never set this, so behavior is unchanged for them. orgId is
+  // kept so the logos only apply to cards graded under THIS org — a member's
+  // personal (or other-store) cards keep DCM assets.
+  const [orgLogos, setOrgLogos] = useState<{ orgId: string | null; color: string | null; white: string | null; mark: string | null } | null>(null)
   useEffect(() => {
     if (!isAuthenticated) return
     const sess = getStoredSession()
@@ -3061,7 +3070,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         const [color, white, black] = await Promise.all([toDataUrl(b.logoUrl), toDataUrl(b.logoWhiteUrl), toDataUrl(b.logoBlackUrl)])
         // Brand Setup decides which variant is the label mark.
         const mark = (b.logoVariant === 'white' ? white : b.logoVariant === 'black' ? black : color) ?? color
-        if (!cancelled && (color || white)) setOrgLogos({ color, white, mark })
+        if (!cancelled && (color || white)) setOrgLogos({ orgId: typeof b.orgId === 'string' ? b.orgId : null, color, white, mark })
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -3139,6 +3148,15 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
     [cards, batchSelectedIds]
   )
 
+  // Store logos apply ONLY when the selected card was graded under the
+  // member's own org. Personal cards (org_id null) and cards from any other
+  // org keep DCM assets — previously the store logo was baked into whatever
+  // card was selected.
+  const cardOrgLogos = useMemo(
+    () => (orgLogos && selectedCard?.org_id && selectedCard.org_id === orgLogos.orgId ? orgLogos : null),
+    [orgLogos, selectedCard]
+  )
+
   // Generate SlabLabelData whenever selectedCard changes
   // Note: slabData/customPreviewData are already cleared synchronously in setSelectedCard
   useEffect(() => {
@@ -3196,8 +3214,8 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         showFounderEmblem,
         showVipEmblem,
         showCardLoversEmblem,
-        logoDataUrl: orgLogos?.mark || logoDataUrl,
-        whiteLogoDataUrl: orgLogos?.white || whiteLogoDataUrl,
+        logoDataUrl: cardOrgLogos?.mark || logoDataUrl,
+        whiteLogoDataUrl: cardOrgLogos?.white || whiteLogoDataUrl,
       }
 
       setSlabData(data)
@@ -3205,7 +3223,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
     buildSlabData()
     return () => { cancelled = true }
-  }, [selectedCard, showFounderEmblem, showVipEmblem, showCardLoversEmblem, orgLogos])
+  }, [selectedCard, showFounderEmblem, showVipEmblem, showCardLoversEmblem, cardOrgLogos])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -3449,7 +3467,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         {/* Section 2: Slab Label Designer — the main event: most users are
             here to customize their graded slab label, so it leads the page.
             Other formats (Avery, card images) live in "More Label Formats". */}
-        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} isAuthenticated={isAuthenticated} orgLogoColor={orgLogos?.color ?? null} />
+        <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} isAuthenticated={isAuthenticated} orgLogoColor={cardOrgLogos?.color ?? null} />
 
         {/* Section 4: Save & Manage Custom Styles */}
         {isAuthenticated && (
@@ -3483,7 +3501,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
           </button>
           {showMoreFormats && (
             <div className="px-0 pb-2">
-              <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} orgLogoColor={orgLogos?.color ?? null} />
+              <LabelGallery selectedCard={selectedCard} slabData={slabData} customConfig={customConfig} customPreviewData={customPreviewData ?? slabData} showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} orgLogoColor={cardOrgLogos?.color ?? null} />
             </div>
           )}
         </section>

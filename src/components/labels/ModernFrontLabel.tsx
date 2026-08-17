@@ -32,9 +32,10 @@ const formatGrade = (grade: number): string => {
 }
 
 // Size configurations for modern label - heights match ModernBackLabel for consistency.
-// Heights are MINIMUMS and font sizes are container-query clamps: on narrow
-// mobile containers the text scales down with the label width (like the
-// heritage SVG does) instead of wrapping past a fixed height and clipping.
+// Heights are MINIMUMS. Below DESIGN_WIDTH the whole label transform-scales
+// down as one unit via ScaleToFit (like the heritage SVG) instead of
+// reflowing; the name additionally shrinks with length (nameMaxFontSize down
+// to nameMinFontSize) so long names fit without clipping.
 const sizeConfig = {
   sm: {
     logoHeight: 'h-6',
