@@ -13,12 +13,17 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// GPT-5.1 pricing per million tokens (matches scripts/audit-prompt-cache.ts).
-const RATES = {
-  inputUncached: 1.25,
-  inputCached: 0.125,
-  output: 10.0,
+// Pricing per million tokens, per model. cacheWrite applies only to models
+// with extended prompt-cache retention (gpt-5.6 bills writes at 1.25x input).
+// Unknown models fall back to gpt-5.1 rates — the pre-Aug-17 behavior, which
+// silently overstated luna's cost ~4x; keep this table in sync with
+// scripts/canary-report.ts when models change.
+const MODEL_RATES: Record<string, { inputUncached: number; inputCached: number; output: number; cacheWrite?: number }> = {
+  'gpt-5.1': { inputUncached: 1.25, inputCached: 0.125, output: 10.0 },
+  'gpt-5.6-luna': { inputUncached: 0.20, inputCached: 0.02, output: 1.20, cacheWrite: 0.25 },
+  'gpt-5.6-terra': { inputUncached: 2.00, inputCached: 0.20, output: 12.0, cacheWrite: 2.50 },
 };
+const DEFAULT_RATES = MODEL_RATES['gpt-5.1'];
 
 export interface OpenAIUsageEntry {
   /** e.g. 'grade_ensemble', 'zoom_batch', 'zoom_geometry_gate', 'zoom_structural_verify' */
@@ -29,7 +34,7 @@ export interface OpenAIUsageEntry {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
-    prompt_tokens_details?: { cached_tokens?: number };
+    prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
   } | null;
   durationMs?: number;
   status?: 'success' | 'error';
@@ -52,14 +57,19 @@ export function logOpenAIUsage(entry: OpenAIUsageEntry): void {
       const prompt = entry.usage?.prompt_tokens ?? null;
       const completion = entry.usage?.completion_tokens ?? null;
       const cached = entry.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+      const cacheWrites = entry.usage?.prompt_tokens_details?.cache_write_tokens ?? 0;
 
+      const rates = MODEL_RATES[entry.model] ?? DEFAULT_RATES;
       let costUsd: number | null = null;
       if (typeof prompt === 'number' && typeof completion === 'number') {
-        const uncached = Math.max(0, prompt - cached);
+        // Cache-write tokens are prompt tokens billed at the write rate (models
+        // without extended retention report 0, so this is a no-op for them).
+        const uncached = Math.max(0, prompt - cached - cacheWrites);
         costUsd =
-          (uncached / 1e6) * RATES.inputUncached +
-          (cached / 1e6) * RATES.inputCached +
-          (completion / 1e6) * RATES.output;
+          (uncached / 1e6) * rates.inputUncached +
+          (cached / 1e6) * rates.inputCached +
+          (cacheWrites / 1e6) * (rates.cacheWrite ?? rates.inputUncached) +
+          (completion / 1e6) * rates.output;
       }
 
       await supabase.from('api_usage_log').insert({
@@ -77,6 +87,7 @@ export function logOpenAIUsage(entry: OpenAIUsageEntry): void {
         error_message: entry.errorMessage ?? null,
         request_metadata: {
           cached_input_tokens: cached,
+          cache_write_tokens: cacheWrites,
           ...(entry.metadata ?? {}),
         },
       });

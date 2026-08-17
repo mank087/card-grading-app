@@ -112,6 +112,15 @@ export function applyModelCompat<T extends Record<string, any>>(
   const effort = process.env.GRADING_CANARY_REASONING_EFFORT || 'low';
   if (effort !== 'default') next.reasoning_effort = effort;
 
+  // Aug 17: production evicts the low-traffic model's cache entries within
+  // minutes (0% hit across ALL luna ops at 40% share, while identical probes
+  // hit at +5min off-peak — load-dependent eviction on OpenAI's side).
+  // Extended retention persists the entry 24h. Writes bill at 1.25x input
+  // (~$0.02 for the whole rubric on luna); reads then actually hit.
+  // 'off' disables without a code change.
+  const retention = process.env.GRADING_CANARY_CACHE_RETENTION || '24h';
+  if (retention !== 'off') next.prompt_cache_retention = retention;
+
   return { config: next as T, stripped, reasoningEffort: effort };
 }
 
