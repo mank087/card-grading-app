@@ -106,6 +106,17 @@ export default function EnterpriseApplyPage() {
       }
       setDone(true)
       refreshOrg()
+      // Ads conversion: application actually accepted by the API, not just the
+      // button click. gtag routes to both the GA4 and AW tags; pre-consent it
+      // hits the ConsentManager no-op stub, so nothing fires without consent.
+      // The Google Ads conversion action must use this exact event name —
+      // 'signup_click' is already taken by consumer CTAs.
+      if (typeof window !== 'undefined' && (window as any).gtag) {
+        (window as any).gtag('event', 'enterprise_apply', {
+          event_category: 'conversion',
+          event_label: 'enterprise_application_submitted',
+        })
+      }
     } catch {
       setError('Network error. Please try again.')
     } finally {
