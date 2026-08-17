@@ -397,7 +397,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Machine Learning</h3>
-              <p className="text-gray-600 text-sm">Advanced AI technology delivers consistent, detailed, and reliable condition assessments.</p>
+              <p className="text-gray-600 text-sm">DCM Optic™, our grading engine, delivers consistent, detailed, and reliable condition assessments.</p>
             </div>
 
             {/* 2. Detailed Card Condition */}

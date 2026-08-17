@@ -79,7 +79,7 @@ export default function GradeScreen() {
         <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.headerTitle}>Grade Your Card</Text>
         <Text style={styles.headerSubtitle}>
-          Upload photos of your card for professional AI grading
+          Upload photos of your card for professional DCM Optic™ grading
         </Text>
         <View style={styles.creditBadge}>
           <Ionicons name="diamond" size={14} color={Colors.purple[600]} />

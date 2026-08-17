@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   ...homeMetadata,
   // Default metadata that can be overridden by child pages
   title: {
-    default: 'DCM Grading - AI-Powered Trading Card Grading',
+    default: 'DCM Grading - Card Grading Powered by DCM Optic™',
     template: '%s | DCM Grading',
   },
 };

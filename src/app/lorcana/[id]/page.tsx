@@ -195,7 +195,7 @@ function buildDescription(card: any): string {
   if (grade !== null && grade !== undefined) {
     desc = `${cardId} graded DCM ${grade}/10.`;
     if (gradeDesc) desc += ` ${gradeDesc} condition.`;
-    desc += ' Professional Disney Lorcana card grading with AI analysis.';
+    desc += ' Professional Disney Lorcana card grading with a full DCM Optic™ condition report.';
   } else {
     desc = `${cardId} - Professional Lorcana card authentication and grading by DCM.`;
   }

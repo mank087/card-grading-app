@@ -289,7 +289,7 @@ function buildDescription(card: any): string {
 
   // Add call to action
   if (grade !== null && grade !== undefined) {
-    desc += ' Professional Pokemon card grading with AI analysis.';
+    desc += ' Professional Pokemon card grading with a full DCM Optic™ condition report.';
   } else {
     desc += ' Professional Pokemon card authentication.';
   }

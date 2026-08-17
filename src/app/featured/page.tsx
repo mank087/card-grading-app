@@ -3,10 +3,10 @@ import FeaturedPageClient from './FeaturedPageClient'
 
 export const metadata: Metadata = {
   title: 'Featured Cards',
-  description: 'Browse our curated showcase of AI-graded trading cards. See detailed grade reports with centering, corners, edges, and surface sub-scores, market pricing estimates, and front & back slab images for Pokemon, Sports, MTG, Lorcana, and One Piece cards.',
+  description: 'Browse our curated showcase of cards graded by DCM Optic™. See detailed grade reports with centering, corners, edges, and surface sub-scores, market pricing estimates, and front & back slab images for Pokemon, Sports, MTG, Lorcana, and One Piece cards.',
   keywords: [
     'featured graded cards',
-    'AI graded trading cards',
+    'DCM Optic graded trading cards',
     'graded card showcase',
     'pokemon graded cards',
     'sports card grades',
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   ].join(', '),
   openGraph: {
     title: 'Featured Cards | DCM Grading',
-    description: 'Explore our curated gallery of AI-graded trading cards with detailed condition analysis, sub-scores, and market pricing estimates. Pokemon, Sports, MTG, Lorcana & One Piece.',
+    description: 'Explore our curated gallery of DCM Optic™ graded trading cards with detailed condition analysis, sub-scores, and market pricing estimates. Pokemon, Sports, MTG, Lorcana & One Piece.',
     type: 'website',
     siteName: 'DCM Grading',
     locale: 'en_US',
@@ -30,14 +30,14 @@ export const metadata: Metadata = {
         url: '/DCM-logo.png',
         width: 512,
         height: 512,
-        alt: 'DCM Grading - Featured AI-Graded Trading Cards',
+        alt: 'DCM Grading - Featured Cards Graded by DCM Optic™',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Featured Cards | DCM Grading',
-    description: 'Browse our curated showcase of AI-graded trading cards with detailed grades, sub-scores, and market pricing.',
+    description: 'Browse our curated showcase of DCM Optic™ graded trading cards with detailed grades, sub-scores, and market pricing.',
     creator: '@DCM_Grading',
     images: ['/DCM-logo.png'],
   },

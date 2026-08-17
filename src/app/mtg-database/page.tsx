@@ -370,7 +370,7 @@ export default function MtgDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-indigo-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM's AI cross-references the official Scryfall database using set code, collector number, and card name to ensure
+                DCM Optic™ cross-references the official Scryfall database using set code, collector number, and card name to ensure
                 accurate identification. This database contains all Magic: The Gathering cards with verified details
                 including mana cost, type line, keywords, and TCGPlayer pricing.
               </p>

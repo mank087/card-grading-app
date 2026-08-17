@@ -324,7 +324,7 @@ export default function OnePieceDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-red-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM's AI cross-references the official One Piece TCG database using card ID (e.g., OP01-001), card name, and set information to ensure
+                DCM Optic™ cross-references the official One Piece TCG database using card ID (e.g., OP01-001), card name, and set information to ensure
                 accurate identification. This database contains all English One Piece TCG cards with verified details
                 including rarity, power, cost, and TCGPlayer pricing.
               </p>

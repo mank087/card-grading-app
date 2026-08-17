@@ -758,7 +758,7 @@ export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDi
         {/* AI Response Section */}
         {aiResponse && (
           <div className="mt-4 pt-3 border-t border-amber-200">
-            <p className="font-medium text-amber-700 mb-2">AI Verification:</p>
+            <p className="font-medium text-amber-700 mb-2">DCM Optic™ Verification:</p>
             {aiResponse.hints_confirmed.length > 0 && (
               <div className="flex items-start gap-2 mb-1">
                 <span className="text-green-600">✓</span>

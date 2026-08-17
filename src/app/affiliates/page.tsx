@@ -77,7 +77,7 @@ export default function AffiliatesPage() {
               { title: '30-Day Cookie Window', desc: 'Your referrals are tracked for 30 days, so you get credit even if they buy later.' },
               { title: 'Dual Attribution', desc: 'Referral links AND promo codes — your audience can use whichever is easier.' },
               { title: 'Real-Time Dashboard', desc: 'Track clicks, conversions, and earnings in your affiliate dashboard.' },
-              { title: 'Growing Product', desc: 'DCM Grading is used by thousands of collectors for AI-powered card grading.' },
+              { title: 'Growing Product', desc: 'DCM Grading is used by thousands of collectors for card grading powered by DCM Optic™.' },
               { title: 'Flexible Payouts', desc: 'Get paid via PayPal, Venmo, or your preferred method.' },
             ].map((benefit) => (
               <div key={benefit.title} className="flex gap-3 p-4 bg-white rounded-xl border border-gray-100">

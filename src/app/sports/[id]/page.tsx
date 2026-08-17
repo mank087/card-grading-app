@@ -399,7 +399,7 @@ function buildDescription(card: any, dvgGrading: any): string {
 
   // Add call to action
   if (grade !== null && grade !== undefined) {
-    desc += ' Professional grading with AI analysis.';
+    desc += ' Professional grading with a full DCM Optic™ condition report.';
   } else {
     desc += ' Professional authentication service.';
   }

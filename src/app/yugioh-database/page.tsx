@@ -318,7 +318,7 @@ export default function YuGiOhDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-indigo-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM&apos;s AI cross-references the official Yu-Gi-Oh! database using card name, set information, and rarity to ensure
+                DCM Optic™ cross-references the official Yu-Gi-Oh! database using card name, set information, and rarity to ensure
                 accurate identification. This database contains all Yu-Gi-Oh! TCG cards with verified details
                 including stats, effects, and TCGPlayer/Cardmarket pricing.
               </p>

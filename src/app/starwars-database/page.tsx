@@ -227,7 +227,7 @@ export default function StarWarsDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-yellow-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM&apos;s AI cross-references our Star Wars card database using set name, card number, and card name to ensure
+                DCM Optic™ cross-references our Star Wars card database using set name, card number, and card name to ensure
                 accurate identification. This database contains Star Wars trading cards with verified details
                 and PriceCharting market pricing.
               </p>

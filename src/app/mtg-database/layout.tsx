@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'MTG Card Database - Browse & Grade Magic Cards',
-  description: 'Browse the complete Magic: The Gathering card database. Find cards by set, name, or type. View card details and get instant AI grades for any MTG card.',
+  description: 'Browse the complete Magic: The Gathering card database. Find cards by set, name, or type. View card details and get instant DCM Optic™ grades for any MTG card.',
   keywords: 'MTG card database, magic the gathering cards, MTG card search, magic card database, find MTG cards, magic card sets',
   openGraph: {
     title: 'MTG Card Database | DCM Grading',

@@ -29,7 +29,7 @@ export default function GetStartedPage() {
               Get Started with DCM Grading
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Dynamic Collectibles Management (DCM) brings AI-powered card grading to collectors worldwide.
+              Dynamic Collectibles Management (DCM) brings card grading powered by DCM Optic™ to collectors worldwide.
               Get professional-grade analysis in under 60 seconds — no shipping, no waiting.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -58,9 +58,9 @@ export default function GetStartedPage() {
               What is DCM Grading?
             </h2>
             <p className="text-lg text-gray-600 text-center mb-12 max-w-3xl mx-auto">
-              DCM (Dynamic Collectibles Management) is an AI-powered card grading service that provides instant,
-              professional-grade analysis of your trading cards. Using advanced computer vision technology called
-              DCM Optic™, we evaluate the same factors traditional grading companies assess — but deliver results
+              DCM (Dynamic Collectibles Management) is a card grading service that provides instant,
+              professional-grade analysis of your trading cards. Using DCM Optic™, our proprietary grading
+              engine, we evaluate the same factors traditional grading companies assess — but deliver results
               in seconds, not months.
             </p>
 
@@ -153,9 +153,9 @@ export default function GetStartedPage() {
                         <span className="text-sm text-purple-600 font-medium">DCM Optic™ Analysis</span>
                       </div>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-3">AI-Powered Analysis</h3>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">DCM Optic™ Analysis</h3>
                     <p className="text-gray-600">
-                      Our DCM Optic™ AI examines 30+ condition factors in under 60 seconds.
+                      Our DCM Optic™ engine examines 30+ condition factors in under 60 seconds.
                       It evaluates centering, corners, edges, and surface quality with precision accuracy.
                     </p>
                   </div>
@@ -583,8 +583,8 @@ export default function GetStartedPage() {
                 a: "DCM applies the same evaluation criteria as PSA, BGS, and SGC, but does it from your photos in seconds instead of taking weeks via mail. The grade you get is independent and not officially recognized by those companies, but the methodology is the same and many collectors use DCM grades alongside or in place of mail-away grading."
               },
               {
-                q: "How accurate is DCM's AI grading?",
-                a: "DCM Optic™ analyzes 30+ condition factors using computer vision, then averages three independent passes to keep the grade stable. Accuracy is bounded by your photo quality — clear, well-lit photos produce grades that align closely with what professional services would assign."
+                q: "How accurate is DCM Optic™ grading?",
+                a: "DCM Optic™ analyzes 30+ condition factors, then averages three independent passes to keep the grade stable. Accuracy is bounded by your photo quality — clear, well-lit photos produce grades that align closely with what professional services would assign."
               },
               {
                 q: "Do I need to ship my cards?",

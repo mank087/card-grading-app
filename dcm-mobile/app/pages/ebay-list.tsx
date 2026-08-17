@@ -47,7 +47,7 @@ const STEP_LABELS: Record<Step, string> = {
 const DISCLAIMER_SECTIONS: { heading: string; body: string }[] = [
   {
     heading: '1. DCM is Not a Party to Your eBay Transactions',
-    body: 'DCM (Digital Card Marketplace) provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.',
+    body: 'DCM Grading provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.',
   },
   {
     heading: '2. No Liability for eBay Transactions',

@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 
 // Homepage metadata - exported and used in layout.tsx
 export const homeMetadata: Metadata = {
-  title: 'DCM Grading - AI Card Grading for Pokemon, Sports, MTG & More',
-  description: 'Professional AI card grading powered by DCM Optic™. Get instant, accurate grades for Pokemon, Sports Cards, Magic: The Gathering, Lorcana & One Piece. 30-point inspection starting at $0.50/grade with downloadable labels.',
+  title: 'DCM Grading - Instant Card Grading for Pokemon, Sports, MTG & More',
+  description: 'Professional card grading powered by DCM Optic™. Get instant, accurate grades for Pokemon, Sports Cards, Magic: The Gathering, Lorcana & One Piece. 30-point inspection starting at $0.50/grade with downloadable labels.',
   // Icons for Google Search, browsers, and mobile devices
   icons: {
     icon: [
@@ -20,7 +20,7 @@ export const homeMetadata: Metadata = {
   keywords: [
     'card grading',
     'trading card grading',
-    'AI card grading',
+    'DCM Optic card grading',
     'sports card grading',
     'pokemon card grading',
     'MTG card grading',
@@ -35,8 +35,8 @@ export const homeMetadata: Metadata = {
     'online card grading',
   ].join(', '),
   openGraph: {
-    title: 'DCM Grading - AI Card Grading for Pokemon, Sports, MTG & More',
-    description: 'Professional AI card grading powered by DCM Optic™. Instant grades for Pokemon, Sports Cards, MTG, Lorcana & One Piece. Starting at $0.50/grade.',
+    title: 'DCM Grading - Instant Card Grading for Pokemon, Sports, MTG & More',
+    description: 'Professional card grading powered by DCM Optic™. Instant grades for Pokemon, Sports Cards, MTG, Lorcana & One Piece. Starting at $0.50/grade.',
     type: 'website',
     siteName: 'DCM Grading',
     locale: 'en_US',
@@ -51,8 +51,8 @@ export const homeMetadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DCM Grading - AI Card Grading',
-    description: 'Instant AI grades for Pokemon, Sports, MTG & more. Starting at $0.50/grade with DCM Optic™.',
+    title: 'DCM Grading - Instant Card Grading',
+    description: 'Instant DCM Optic™ grades for Pokemon, Sports, MTG & more. Starting at $0.50/grade.',
     creator: '@DCM_Grading',
     images: ['/DCM-logo.png'],
   },

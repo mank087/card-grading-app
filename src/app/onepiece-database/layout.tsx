@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'One Piece Card Database - Browse & Grade Cards',
-  description: 'Browse the complete One Piece card game database. Find cards by set, character, or type. View card details and get instant AI grades for any One Piece card.',
+  description: 'Browse the complete One Piece card game database. Find cards by set, character, or type. View card details and get instant DCM Optic™ grades for any One Piece card.',
   keywords: 'one piece card database, one piece TCG cards, one piece card search, one piece card game database, find one piece cards',
   openGraph: {
     title: 'One Piece Card Database | DCM Grading',

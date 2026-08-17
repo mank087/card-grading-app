@@ -927,7 +927,7 @@ export default function LabelStudioScreen() {
       const hadOverrides = !!selectedCard.custom_label_data && Object.keys(selectedCard.custom_label_data).length > 0
       const hasPayload = Object.keys(payload).length > 0
       if (!hasPayload && !hadOverrides) {
-        Alert.alert('Nothing to save', 'All fields match the AI-generated label.')
+        Alert.alert('Nothing to save', 'All fields match the DCM Optic™ label.')
         return
       }
       const res = await fetch(`${API_BASE}/api/cards/${selectedCard.id}/custom-label`, {
@@ -946,7 +946,7 @@ export default function LabelStudioScreen() {
       setSelectedCard((prev: any) => prev ? { ...prev, custom_label_data: hasPayload ? payload : null } : prev)
       Alert.alert('Saved', hasPayload
         ? 'Custom label text saved to this card. It will show up on slabs, collection thumbnails, and downloadable labels everywhere.'
-        : 'All fields match the AI-generated label — custom overrides removed.')
+        : 'All fields match the DCM Optic™ label — custom overrides removed.')
     } catch (err: any) {
       Alert.alert('Save failed', err?.message || 'Could not save custom label text.')
     } finally {
@@ -2010,7 +2010,7 @@ export default function LabelStudioScreen() {
                       <Text style={{ fontSize: 10, color: Colors.gray[500], borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.gray[300], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>Reset all ⟲</Text>
                     </TouchableOpacity>
                   ) : (
-                    <Text style={{ fontSize: 10, color: Colors.gray[400] }}>Edits override AI values</Text>
+                    <Text style={{ fontSize: 10, color: Colors.gray[400] }}>Edits override DCM Optic™ values</Text>
                   )
                 })()}
               </View>

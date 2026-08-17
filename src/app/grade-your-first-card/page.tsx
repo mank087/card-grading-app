@@ -347,7 +347,7 @@ export default function GradeYourFirstCardPage() {
 
           <p className="text-gray-600 mb-8 text-lg">
             Before grading, you&apos;ll have a chance to report any defects you know about.
-            This helps our AI focus on potential issues and provide more accurate grades.
+            This helps DCM Optic™, our grading engine, focus on potential issues and provide more accurate grades.
           </p>
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -363,7 +363,7 @@ export default function GradeYourFirstCardPage() {
               </div>
               <p className="text-gray-600 mb-4">
                 Select this if you believe your card is in excellent condition with no visible issues.
-                Our AI will still perform a thorough analysis.
+                DCM Optic™ will still perform a thorough analysis.
               </p>
               <div className="bg-white/70 rounded-lg p-4">
                 <p className="text-sm text-gray-500">
@@ -410,7 +410,7 @@ export default function GradeYourFirstCardPage() {
               <div>
                 <h4 className="font-bold text-gray-900 mb-1">Why Report Defects?</h4>
                 <p className="text-gray-600">
-                  Self-reporting helps calibrate our AI analysis. If you mention a scratch and we detect it,
+                  Self-reporting helps calibrate the DCM Optic™ analysis. If you mention a scratch and we detect it,
                   that confirms the accuracy. If you report a clean card but we find issues, we&apos;ll highlight
                   them in detail so you know exactly what affects your grade.
                 </p>

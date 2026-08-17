@@ -324,7 +324,7 @@ export default async function CardShowsPage() {
                 </svg>
               </div>
               <h3 className="text-white font-semibold mb-2">Verify Seller Claims</h3>
-              <p className="text-gray-400 text-sm">Confirm condition claims from vendors with instant AI analysis</p>
+              <p className="text-gray-400 text-sm">Confirm condition claims from vendors with instant DCM Optic™ analysis</p>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700 text-center">
               <div className="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">

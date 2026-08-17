@@ -306,7 +306,7 @@ export default function LorcanaDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-purple-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM's AI cross-references the official Lorcana database using set code, collector number, and card name to ensure
+                DCM Optic™ cross-references the official Lorcana database using set code, collector number, and card name to ensure
                 accurate identification. This database contains all Disney Lorcana TCG cards with verified details
                 including ink color, stats, keywords, and TCGPlayer pricing.
               </p>

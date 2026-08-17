@@ -23,7 +23,7 @@ export default function LaunchKitPage() {
   const [copied, setCopied] = useState<number | null>(null)
 
   const captions = [
-    `🔥 BIG NEWS: ${storeName} now grades cards IN STORE. Bring your cards in and walk out with a graded slab the same visit. No shipping, no months of waiting. Powered by DCM Optic™ AI grading with a scannable verification QR on every label.`,
+    `🔥 BIG NEWS: ${storeName} now grades cards IN STORE. Bring your cards in and walk out with a graded slab the same visit. No shipping, no months of waiting. Powered by DCM Optic™ grading with a scannable verification QR on every label.`,
     `Thinking about grading but not sure what's worth submitting? Bring your stack to ${storeName} and we'll grade them on the spot for a fraction of traditional grading costs, so you only send your true bangers off for expensive slabs. Work smarter. 📈`,
     `Every card we grade at ${storeName} gets a serial number and QR code backed by the DCM verification registry. Scan any of our slabs and see exactly what was graded, when, and the full condition report. Real transparency. 🔍`,
     `Grading day at ${storeName}! 🃏 Bring your Pokémon, sports cards, MTG, One Piece, Lorcana and more. We grade them all, in minutes, while you shop. Ask at the counter.`,
@@ -87,7 +87,7 @@ export default function LaunchKitPage() {
             Ask at the counter <span className="text-gray-400 font-normal">·</span>{' '}
             <span style={{ color: brandColor }}>$____ per card</span>
           </div>
-          <p className="text-xs text-gray-400 mt-6">Powered by DCM Optic™ AI grading · verify any slab at dcmgrading.com</p>
+          <p className="text-xs text-gray-400 mt-6">Powered by DCM Optic™ grading · verify any slab at dcmgrading.com</p>
         </div>
 
         {/* ===== Staff pitch sheet ===== */}

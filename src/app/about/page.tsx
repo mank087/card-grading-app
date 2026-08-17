@@ -3,18 +3,18 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
   title: 'About Us - Our Story & Mission',
-  description: 'DCM Grading is built by collectors, for collectors. Learn about our AI-powered card grading service using DCM Optic™ technology for fast, accurate, and affordable trading card assessments.',
-  keywords: 'about DCM, card grading company, AI grading, DCM Optic, card collectors, trading card grading service, who is DCM',
+  description: 'DCM Grading is built by collectors, for collectors. Learn about our card grading service powered by DCM Optic™ technology for fast, accurate, and affordable trading card assessments.',
+  keywords: 'about DCM, card grading company, DCM Optic grading, DCM Optic, card collectors, trading card grading service, who is DCM',
   openGraph: {
     title: 'About DCM Grading - Our Story & Mission',
-    description: 'Built by collectors, for collectors. Fast, accurate AI card grading with DCM Optic™ technology.',
+    description: 'Built by collectors, for collectors. Fast, accurate card grading with DCM Optic™ technology.',
     type: 'website',
     siteName: 'DCM Grading',
   },
   twitter: {
     card: 'summary',
     title: 'About DCM Grading',
-    description: 'Built by collectors, for collectors. AI-powered card grading with DCM Optic™.',
+    description: 'Built by collectors, for collectors. Card grading powered by DCM Optic™.',
   },
 };
 
@@ -73,7 +73,7 @@ export default function AboutPage() {
               We built DCM for ourselves first. If you're cracking packs at your local card shop on the weekend, or you've got thousands of cards from the last 30 years stacked in binders, or you just dug out your childhood collection and want to know what's actually in there, DCM works the same way for all of it.
             </p>
             <p className="text-gray-700 mb-4">
-              Our grading runs on DCM Optic™, our own AI built specifically for trading cards. Use it to manage a collection, price out a sale, or just answer the question that started this whole thing for us: what would this grade?
+              Our grading runs on DCM Optic™, our own grading engine built specifically for trading cards. Use it to manage a collection, price out a sale, or just answer the question that started this whole thing for us: what would this grade?
             </p>
           </div>
 

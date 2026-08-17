@@ -895,7 +895,7 @@ export default function AccountPage() {
               <div>
                 <p className="text-lg font-semibold text-gray-900 mb-2">Need More Credits?</p>
                 <p className="text-sm text-gray-600 mb-4">
-                  Purchase credits to grade more cards with our AI-powered system.
+                  Purchase credits to grade more cards with DCM Optic™, our grading engine.
                 </p>
                 {isFirstPurchase && (
                   <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full mb-4">

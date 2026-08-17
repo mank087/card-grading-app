@@ -342,7 +342,7 @@ export default function SportsDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-emerald-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a
-                sports card for grading, DCM&apos;s AI cross-references this database using set, player name, card number,
+                sports card for grading, DCM Optic™ cross-references this database using set, player name, card number,
                 and parallel details to ensure accurate identification. Every parallel and serial-numbered variant is
                 tracked with SportsCardsPro market pricing.
               </p>

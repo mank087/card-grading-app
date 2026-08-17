@@ -212,7 +212,7 @@ function LoginPageContent() {
                 </svg>
               </div>
               <div>
-                <p className="text-white font-semibold">Three-Pass AI Consensus</p>
+                <p className="text-white font-semibold">Triple-Pass DCM Optic™ Consensus</p>
                 <p className="text-purple-200 text-sm">Every card graded 3 times independently for maximum accuracy</p>
               </div>
             </div>
@@ -486,7 +486,7 @@ function LoginPageContent() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-gray-900 font-semibold">Three-Pass AI Consensus</p>
+                  <p className="text-gray-900 font-semibold">Triple-Pass DCM Optic™ Consensus</p>
                   <p className="text-gray-600 text-sm">Every card graded 3 times independently for maximum accuracy</p>
                 </div>
               </div>

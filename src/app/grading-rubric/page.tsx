@@ -328,7 +328,7 @@ export default function GradingRubricPage() {
 
           <div className="bg-white rounded-xl shadow-md p-8">
             <p className="text-gray-700 mb-6">
-              DCM uses a 10-point whole-number scale, aligned with industry grading criteria from PSA, BGS, and CGC. Every deduction we make is documented and justified, so you can always see what the AI saw.
+              DCM uses a 10-point whole-number scale, aligned with industry grading criteria from PSA, BGS, and CGC. Every deduction we make is documented and justified, so you can always see what DCM Optic™ saw.
             </p>
 
             <div className="space-y-3">

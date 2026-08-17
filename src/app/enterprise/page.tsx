@@ -6,7 +6,7 @@ import { ORG_PLANS, ORG_OVERAGE_PACK } from '@/lib/orgPlans';
 
 export const metadata: Metadata = {
   title: 'Enterprise Card Grading for Stores, Breakers & Creators',
-  description: 'Launch your own card grading brand. Branded slab labels, grading reports, card pages, and a hosted storefront, powered by DCM Optic AI grading. Wholesale grading from $0.40/card for card shops, case breakers, streamers, and high-volume collectors.',
+  description: 'Launch your own card grading brand. Branded slab labels, grading reports, card pages, and a hosted storefront, powered by DCM Optic™ grading. Wholesale grading from $0.40/card for card shops, case breakers, streamers, and high-volume collectors.',
   keywords: 'card store grading, dealer card grading, case breaker grading, streamer card grading, white label card grading, branded slab labels, LCS grading service, enterprise card grading, card shop grading program',
   openGraph: {
     title: 'DCM Enterprise: Launch Your Own Card Grading Brand',
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
     title: 'DCM Enterprise: Launch Your Own Card Grading Brand',
-    description: 'Your own card grading brand, powered by DCM Optic AI grading.',
+    description: 'Your own card grading brand, powered by DCM Optic™ grading.',
   },
 };
 
@@ -45,7 +45,7 @@ const BENEFITS = [
   {
     icon: '⚡',
     title: 'Grades in minutes, not months',
-    body: 'DCM Optic™ AI grading returns sub-grades for centering, corners, edges, and surface in minutes. Grade at the counter, on stream, or at a show while they watch.',
+    body: 'DCM Optic™ grading returns sub-grades for centering, corners, edges, and surface in minutes. Grade at the counter, on stream, or at a show while they watch.',
   },
   {
     icon: '🏬',
@@ -135,7 +135,7 @@ export default function EnterprisePage() {
             Launch your own card grading brand
           </h1>
           <p className="text-lg sm:text-xl text-purple-100 max-w-2xl mx-auto mb-6">
-            For card shops, case breakers, streamers, and serious collectors. Professional AI grading
+            For card shops, case breakers, streamers, and serious collectors. Professional grading
             under your brand: your logo on the slab, the report, and the card page, powered by
             DCM Optic™ and backed by the DCM verification registry.
           </p>

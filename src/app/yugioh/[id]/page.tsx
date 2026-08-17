@@ -268,7 +268,7 @@ function buildDescription(card: any): string {
     if (isValidValue(attribute)) details.push(`${attribute} attribute`);
     if (details.length > 0) desc += ` ${details.join(', ')}.`;
 
-    desc += ' Professional Yu-Gi-Oh TCG card grading with AI analysis.';
+    desc += ' Professional Yu-Gi-Oh TCG card grading with a full DCM Optic™ condition report.';
   } else {
     desc = `${cardId} - Professional Yu-Gi-Oh TCG card authentication and grading by DCM.`;
   }

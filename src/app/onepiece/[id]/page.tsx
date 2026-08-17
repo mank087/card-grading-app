@@ -276,7 +276,7 @@ function buildDescription(card: any): string {
     if (isValidValue(variantType)) details.push(`${variantType.replace(/_/g, ' ')} variant`);
     if (details.length > 0) desc += ` ${details.join(', ')}.`;
 
-    desc += ' Professional One Piece TCG card grading with AI analysis.';
+    desc += ' Professional One Piece TCG card grading with a full DCM Optic™ condition report.';
   } else {
     desc = `${cardId} - Professional One Piece TCG card authentication and grading by DCM.`;
   }

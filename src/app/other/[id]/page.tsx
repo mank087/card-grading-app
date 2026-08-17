@@ -179,7 +179,7 @@ function buildDescription(card: any): string {
   if (grade !== null && grade !== undefined) {
     desc = `${cardId} graded DCM ${grade}/10.`;
     if (gradeDesc) desc += ` ${gradeDesc} condition.`;
-    desc += ' Professional collectible card grading with AI analysis.';
+    desc += ' Professional collectible card grading with a full DCM Optic™ condition report.';
   } else {
     desc = `${cardId} - Professional card authentication and grading by DCM.`;
   }

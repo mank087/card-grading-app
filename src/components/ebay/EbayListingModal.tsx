@@ -1733,7 +1733,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <div className="space-y-3">
                   <div>
                     <h4 className="font-semibold text-gray-900">1. DCM is Not a Party to Your eBay Transactions</h4>
-                    <p>DCM (Digital Card Marketplace) provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.</p>
+                    <p>DCM Grading provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.</p>
                   </div>
 
                   <div>

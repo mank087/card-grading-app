@@ -80,7 +80,7 @@ export default function ImagePreview({
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Score: {qualityValidation.overallScore}/100 • AI Grade Uncertainty: {qualityValidation.gradeUncertainty}
+                  Score: {qualityValidation.overallScore}/100 • Grade Uncertainty: {qualityValidation.gradeUncertainty}
                 </p>
               </div>
             </div>
@@ -106,13 +106,13 @@ export default function ImagePreview({
               <p className="text-gray-400 text-xs">
                 <span className="font-semibold">Grade {qualityValidation.confidenceLetter}:</span>{' '}
                 {qualityValidation.confidenceLetter === 'A' &&
-                  'Exceptional quality - sharp, well-lit, no glare. AI grading highly accurate (±0.25 grades).'}
+                  'Exceptional quality - sharp, well-lit, no glare. DCM Optic™ grading highly accurate (±0.25 grades).'}
                 {qualityValidation.confidenceLetter === 'B' &&
-                  'Good quality - clear focus and lighting. AI grading accuracy is good (±0.5 grades).'}
+                  'Good quality - clear focus and lighting. DCM Optic™ grading accuracy is good (±0.5 grades).'}
                 {qualityValidation.confidenceLetter === 'C' &&
-                  'Acceptable quality but may have blur, shadows, or glare. AI grading may vary (±1.0 grade).'}
+                  'Acceptable quality but may have blur, shadows, or glare. DCM Optic™ grading may vary (±1.0 grade).'}
                 {qualityValidation.confidenceLetter === 'D' &&
-                  'Poor quality - significant blur or lighting issues. AI grading accuracy reduced (±1.5 grades).'}
+                  'Poor quality - significant blur or lighting issues. DCM Optic™ grading accuracy reduced (±1.5 grades).'}
               </p>
             </div>
 

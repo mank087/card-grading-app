@@ -352,7 +352,7 @@ export default function ReviewScreen() {
       {step === 3 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Report Card Condition</Text>
-          <Text style={styles.stepSubtitle}>Optional — helps the AI grade more accurately</Text>
+          <Text style={styles.stepSubtitle}>Optional — helps DCM Optic™ grade more accurately</Text>
 
           <View style={styles.noDefectsRow}>
             <Switch value={noDefects} onValueChange={(v) => { setNoDefects(v); if (v) setConditionReport(EMPTY_REPORT) }}
@@ -363,7 +363,7 @@ export default function ReviewScreen() {
           {/* Optional description — always shown (even with no defects) */}
           {noDefects && (
             <View style={styles.defectSide}>
-              <Text style={styles.defectGroupTitle}>Card Details for AI Guidance (Optional)</Text>
+              <Text style={styles.defectGroupTitle}>Card Details for Grading Guidance (Optional)</Text>
               <TextInput
                 style={styles.notesInput}
                 placeholder="E.g., 'This card has a textured holofoil surface', 'Vintage card from 1997'..."

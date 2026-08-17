@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Sports Card Grading — Instant AI Grades, Verified Against 2,900+ Sets',
+  title: 'Sports Card Grading — Instant DCM Optic™ Grades, Verified Against 2,900+ Sets',
   description:
     'Grade sports cards instantly with DCM Optic™. Every card is matched against a catalog of 2,951 sets spanning 1901 to 2026, so parallels, serial numbering and rookie status are verified — not guessed. Baseball, basketball, football, hockey and more. From $0.50 a card.',
   keywords:
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     canonical: 'https://dcmgrading.com/sports-grading',
   },
   openGraph: {
-    title: 'Sports Card Grading — Instant AI Results | DCM Grading',
+    title: 'Sports Card Grading — Instant DCM Optic™ Results | DCM Grading',
     description:
       'Instant sports grades with verified set and parallel identification across 2,951 sets, 1901 to 2026. Chrome surface, thick-stock corners and vintage centering inspected at magnification.',
     url: 'https://dcmgrading.com/sports-grading',
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Sports Card Grading — Instant AI Results',
+    title: 'Sports Card Grading — Instant DCM Optic™ Results',
     description:
       'Instant sports grades with verified set and parallel ID across 2,951 sets. Chrome, corners and centering inspected at magnification.',
     images: ['/Sports/DCM-Card-LeBron-James-547249-front.jpg'],
@@ -48,7 +48,7 @@ const serviceJsonLd = {
   },
   areaServed: 'Worldwide',
   description:
-    'AI-powered sports card grading with four sub-grades, magnified defect inspection, and set/parallel identification verified against a catalog of 2,951 sports sets from 1901 to 2026.',
+    'Sports card grading powered by DCM Optic™ with four sub-grades, magnified defect inspection, and set/parallel identification verified against a catalog of 2,951 sports sets from 1901 to 2026.',
   offers: {
     '@type': 'Offer',
     price: '0.50',

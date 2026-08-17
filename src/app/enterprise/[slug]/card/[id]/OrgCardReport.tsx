@@ -916,7 +916,7 @@ export default function OrgCardReport({
                   })()}
 
                   <p className="text-xs text-gray-500 mt-4 text-center">
-                    AI grading confidence based on image clarity, protective case impact, defect detection certainty, and grade uncertainty.
+                    Grading confidence based on image clarity, protective case impact, defect detection certainty, and grade uncertainty.
                   </p>
                 </div>
               );

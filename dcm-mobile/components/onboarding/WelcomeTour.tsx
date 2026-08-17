@@ -30,7 +30,7 @@ import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { TOUR_STEPS, TOUR_SCREEN_ORDER, type TourScreenId } from './welcomeTourContent'
 
 const WELCOME_BENEFITS = [
-  { icon: '🔬', title: 'Triple-pass AI grading', body: 'Every card is analyzed 3 independent times and averaged for maximum accuracy. PSA-aligned scoring.' },
+  { icon: '🔬', title: 'Triple-pass DCM Optic™ grading', body: 'Every card is analyzed 3 independent times and averaged for maximum accuracy. PSA-aligned scoring.' },
   { icon: '💰', title: 'Real market pricing', body: "See what your card is worth based on its grade — pulled from live eBay sales + PriceCharting data." },
   { icon: '🏷️', title: 'Custom slab labels', body: 'Design and print labels for your slabs, magnetic one-touch holders, and toploaders.' },
   { icon: '🛒', title: 'List to eBay from the InstaList tab', body: 'Publish graded cards to your eBay store in seconds with auto-generated labels and your full grading report attached. Track active and sold listings without leaving DCM.' },

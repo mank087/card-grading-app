@@ -1907,7 +1907,7 @@ function UniversalUploadPageContent() {
                         </span>
                       </div>
                       <p className="text-sm text-indigo-700 leading-relaxed">
-                        Photos can miss subtle defects. If you notice any issues with your card, report them below to guide our AI inspection.
+                        Photos can miss subtle defects. If you notice any issues with your card, report them below to guide the DCM Optic™ inspection.
                       </p>
                       <p className="text-xs text-indigo-500 mt-2 italic">
                         Your input helps guide inspection but cannot raise grades above what photos show.
@@ -1949,7 +1949,7 @@ function UniversalUploadPageContent() {
                   {noDefectsConfirmed && (
                     <div className="mt-3 pt-3 border-t border-green-200">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-green-800">Card details for AI guidance</span>
+                        <span className="text-sm font-medium text-green-800">Card details for grading guidance</span>
                         <span className="px-1.5 py-0.5 bg-green-200 text-green-700 text-[10px] font-semibold rounded-full uppercase">Optional</span>
                       </div>
                       <p className="text-xs text-green-600 mb-2">

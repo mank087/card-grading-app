@@ -93,7 +93,7 @@ export async function generateMetadata({
           url: 'https://dcmgrading.com/og-image.png',
           width: 1200,
           height: 630,
-          alt: 'DCM Grading - AI Card Grading',
+          alt: 'DCM Grading - Card Grading Powered by DCM Optic™',
         }
       ],
     },

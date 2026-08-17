@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Pokemon Card Database - Browse & Grade Cards',
-  description: 'Browse the complete Pokemon card database. Find cards by set, name, or type. View card details and get instant AI grades for any Pokemon card.',
+  description: 'Browse the complete Pokemon card database. Find cards by set, name, or type. View card details and get instant DCM Optic™ grades for any Pokemon card.',
   keywords: 'pokemon card database, pokemon cards list, pokemon card search, pokemon TCG database, find pokemon cards, pokemon card sets',
   openGraph: {
     title: 'Pokemon Card Database | DCM Grading',

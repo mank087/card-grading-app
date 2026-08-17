@@ -295,7 +295,7 @@ export default function PokemonDatabasePage() {
             <div className="border-t border-gray-700 pt-4">
               <p className="text-gray-300 text-sm text-center leading-relaxed">
                 <span className="text-purple-400 font-semibold">How DCM Identifies Your Cards:</span> When you upload a card for grading,
-                DCM's AI cross-references the official Pokemon TCG database using card name, card number, and set information to ensure
+                DCM Optic™ cross-references the official Pokemon TCG database using card name, card number, and set information to ensure
                 accurate identification. This database contains English and Japanese Pokemon TCG cards with verified details
                 including rarity, artist, HP, and market pricing links.
               </p>

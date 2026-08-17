@@ -1,16 +1,16 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Pokémon Card Grading — Instant AI Grades, Verified Against 26,000+ Cards',
+  title: 'Pokémon Card Grading — Instant DCM Optic™ Grades, Verified Against 26,000+ Cards',
   description:
     'Grade Pokémon cards instantly with DCM Optic™. Every card is matched against our own database of 20,933 English and 5,548 Japanese cards across 322 sets, so the set, number and rarity on your label are verified. Base Set Charizard to Prismatic Evolutions. From $0.50 a card.',
   keywords:
-    'pokemon card grading, grade pokemon cards, pokemon PSA, charizard grading, pikachu card grade, vintage pokemon grading, WOTC card grading, base set charizard grade, japanese pokemon card grading, holo scratch grading, modern pokemon grading, AI pokemon grading, instant pokemon grades',
+    'pokemon card grading, grade pokemon cards, pokemon PSA, charizard grading, pikachu card grade, vintage pokemon grading, WOTC card grading, base set charizard grade, japanese pokemon card grading, holo scratch grading, modern pokemon grading, instant pokemon grades',
   alternates: {
     canonical: 'https://dcmgrading.com/pokemon-grading',
   },
   openGraph: {
-    title: 'Pokémon Card Grading — Instant AI Results | DCM Grading',
+    title: 'Pokémon Card Grading — Instant DCM Optic™ Results | DCM Grading',
     description:
       'Instant Pokémon grades with verified card identification across 322 English and Japanese sets. Holo surface, edge whitening and vintage centering inspected at magnification.',
     url: 'https://dcmgrading.com/pokemon-grading',
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Pokémon Card Grading — Instant AI Results',
+    title: 'Pokémon Card Grading — Instant DCM Optic™ Results',
     description:
       'Instant Pokémon grades with verified card ID across 322 sets. Holo, edge and centering inspected at magnification.',
     images: ['/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg'],
@@ -48,7 +48,7 @@ const serviceJsonLd = {
   },
   areaServed: 'Worldwide',
   description:
-    'AI-powered Pokémon card grading with four sub-grades, magnified defect inspection, and card identification verified against a database of 26,481 English and Japanese Pokémon cards.',
+    'Pokémon card grading powered by DCM Optic™ with four sub-grades, magnified defect inspection, and card identification verified against a database of 26,481 English and Japanese Pokémon cards.',
   offers: {
     '@type': 'Offer',
     price: '0.50',

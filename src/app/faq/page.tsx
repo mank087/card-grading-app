@@ -5,7 +5,7 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 export const metadata: Metadata = {
   title: 'FAQ - Frequently Asked Questions',
   description: 'Find answers to common questions about DCM card grading services, our three-pass consensus technology, pricing, supported card types, and more.',
-  keywords: 'DCM grading FAQ, card grading questions, AI card grading, three-pass grading, card authentication, grading accuracy, how does card grading work',
+  keywords: 'DCM grading FAQ, card grading questions, DCM Optic card grading, three-pass grading, card authentication, grading accuracy, how does card grading work',
   openGraph: {
     title: 'FAQ - Frequently Asked Questions | DCM Grading',
     description: 'Find answers to common questions about DCM card grading services, pricing, and supported card types.',
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
     title: 'FAQ - DCM Grading',
-    description: 'Answers to common questions about AI-powered card grading.',
+    description: 'Answers to common questions about card grading powered by DCM Optic™.',
   },
 };
 
@@ -34,7 +34,7 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         <p className="mb-3">
-          DCM Grading is an AI-powered card grading service that provides professional-quality condition assessments for trading cards. Using our proprietary DCM Optic™ technology, we analyze your card images and deliver accurate grades in under 60 seconds.
+          DCM Grading is a card grading service powered by DCM Optic™, our proprietary grading engine, that provides professional-quality condition assessments for trading cards. DCM Optic™ analyzes your card images and delivers accurate grades in under 60 seconds.
         </p>
         <p>
           Unlike traditional grading services that can take weeks or months, DCM provides instant results while maintaining the same rigorous standards used by professional grading companies.

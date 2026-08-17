@@ -181,7 +181,7 @@ function buildDescription(card: any): string {
   if (grade !== null && grade !== undefined) {
     desc = `${cardId} graded DCM ${grade}/10.`;
     if (gradeDesc) desc += ` ${gradeDesc} condition.`;
-    desc += ' Professional Magic: The Gathering card grading with AI analysis.';
+    desc += ' Professional Magic: The Gathering card grading with a full DCM Optic™ condition report.';
   } else {
     desc = `${cardId} - Professional MTG card authentication and grading by DCM.`;
   }

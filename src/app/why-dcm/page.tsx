@@ -467,7 +467,7 @@ export default function WhyDcmPage() {
               </h2>
               <p className="text-base sm:text-lg text-gray-200 mb-6">
                 Grade your collection from anywhere. The DCM Grading app brings full
-                DCM Optic™ AI grading to your iPhone or iPad — same accurate grades,
+                DCM Optic™ grading to your iPhone or iPad — same accurate grades,
                 same instant reports, now in your pocket.
               </p>
               <ul className="space-y-2 mb-6 text-sm sm:text-base text-gray-200">
@@ -1194,7 +1194,7 @@ export default function WhyDcmPage() {
           <SectionHeading title="Fair Questions" subtitle="The things collectors ask before their first grade" />
           <div className="space-y-8">
             <div>
-              <h3 className="font-bold text-gray-900 text-lg mb-2">How accurate is AI grading?</h3>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">How accurate is DCM Optic™ grading?</h3>
               <p className="text-gray-600 leading-relaxed">
                 Every card is evaluated by three independent grading passes plus a magnified inspection of
                 each corner, edge, and surface region, and the consensus becomes your grade. The engine is

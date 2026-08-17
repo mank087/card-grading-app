@@ -1561,7 +1561,7 @@ export default function CardDetailScreen() {
             {/* AI Verification — what the model could / couldn't see */}
             {aiResp && (Array.isArray(aiResp.hints_confirmed) || Array.isArray(aiResp.hints_not_visible)) && (
               <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.amber[100] }}>
-                <Text style={[s.userReportSectionLabel, { marginBottom: 4 }]}>AI Verification:</Text>
+                <Text style={[s.userReportSectionLabel, { marginBottom: 4 }]}>DCM Optic™ Verification:</Text>
                 {Array.isArray(aiResp.hints_confirmed) && aiResp.hints_confirmed.length > 0 && (
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
                     <Text style={{ color: Colors.green[600], fontSize: 12 }}>✓</Text>
@@ -2454,7 +2454,7 @@ export default function CardDetailScreen() {
                 </View>
               )
             })}
-            <Text style={s.disclaimer}>These are estimated projections based on DCM's AI grading analysis. They are not official grades from PSA, BGS, SGC, or CGC. Actual grades may vary.</Text>
+            <Text style={s.disclaimer}>These are estimated projections based on DCM Optic™ grading analysis. They are not official grades from PSA, BGS, SGC, or CGC. Actual grades may vary.</Text>
           </CollapsibleSection>
           </View>
         )}

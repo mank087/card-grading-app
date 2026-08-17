@@ -41,7 +41,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'what-is-dcm',
     question: 'What is DCM Grading?',
     answer:
-      'DCM Grading is an AI-powered card grading service that uses DCM Optic\u2122 technology to evaluate your trading cards in under 60 seconds. Upload front and back photos, and our three-pass consensus system delivers a professional-quality grade instantly.',
+      'DCM Grading is a card grading service powered by DCM Optic\u2122, our grading engine, which evaluates your trading cards in under 60 seconds. Upload front and back photos, and our three-pass consensus system delivers a professional-quality grade instantly.',
     keywords: ['what', 'dcm', 'grading', 'about', 'service', 'ai', 'optic'],
     category: 'getting-started',
     links: [{ label: 'Learn more', href: '/faq' }],
@@ -103,7 +103,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'three-pass',
     question: 'What is three-pass consensus grading?',
     answer:
-      'Three independent AI evaluations analyze your card separately. A defect must be confirmed by at least 2 of 3 passes to count. This eliminates false positives, reduces variance, and produces more reliable grades than a single evaluation.',
+      'DCM Optic™ runs three independent evaluations that analyze your card separately. A defect must be confirmed by at least 2 of 3 passes to count. This eliminates false positives, reduces variance, and produces more reliable grades than a single evaluation.',
     keywords: ['three-pass', 'consensus', 'passes', 'independent', 'evaluation', 'accuracy', 'reliable'],
     category: 'grading-scores',
     links: [{ label: 'Learn more', href: '/faq#three-pass' }],
@@ -289,7 +289,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'dcm-vs-mailaway',
     question: 'How does DCM compare to mail-away grading companies?',
     answer:
-      'DCM provides instant AI-powered grades aligned with professional industry standards, but at a fraction of the cost and time. Use DCM for pre-screening before submitting to a mail-away grading company, or as an independent assessment for personal collecting and trading.',
+      'DCM provides instant grades powered by DCM Optic™, aligned with professional industry standards, but at a fraction of the cost and time. Use DCM for pre-screening before submitting to a mail-away grading company, or as an independent assessment for personal collecting and trading.',
     keywords: ['compare', 'difference', 'vs', 'versus', 'better', 'professional', 'mail-away', 'mail away', 'traditional'],
     category: 'dcm-vs-mailaway',
     links: [{ label: 'Full comparison', href: '/faq#accuracy' }],

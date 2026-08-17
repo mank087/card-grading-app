@@ -19,8 +19,8 @@ const CATEGORIES = [
 ]
 
 const KB: KBEntry[] = [
-  { id: '1', q: 'What is DCM Grading?', a: 'DCM Grading is an AI-powered card grading service. Upload front and back photos, and our DCM Optic™ system delivers a professional grade in under 60 seconds.', keywords: ['what', 'dcm', 'about'], cat: 'getting-started' },
-  { id: '2', q: 'How does grading work?', a: 'Upload front and back photos → our 3-pass AI consensus system evaluates centering, corners, edges, and surface → you get a grade 1-10 with detailed subgrades.', keywords: ['how', 'work', 'process'], cat: 'getting-started' },
+  { id: '1', q: 'What is DCM Grading?', a: 'DCM Grading is a card grading service powered by DCM Optic™. Upload front and back photos and get a professional grade in under 60 seconds.', keywords: ['what', 'dcm', 'about'], cat: 'getting-started' },
+  { id: '2', q: 'How does grading work?', a: 'Upload front and back photos → our triple-pass DCM Optic™ consensus evaluates centering, corners, edges, and surface → you get a grade 1-10 with detailed subgrades.', keywords: ['how', 'work', 'process'], cat: 'getting-started' },
   { id: '3', q: 'What card types are supported?', a: 'Pokemon, Sports (Baseball, Football, Basketball, Hockey, Soccer), Magic: The Gathering, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, Marvel, and more under "Other".', keywords: ['cards', 'types', 'supported', 'pokemon', 'sports'], cat: 'getting-started' },
   { id: '4', q: 'How much does grading cost?', a: Platform.OS === 'ios'
       ? 'Grading is credit-based — each card uses one credit. Open the Account tab to see your balance and add credits.'
