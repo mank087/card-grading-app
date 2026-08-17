@@ -458,7 +458,23 @@ export async function refundGradeCredit(
     .limit(1)
     .maybeSingle();
   if (!charge) {
-    console.log(`[refundGradeCredit] Card ${cardId} was never charged — nothing to refund`);
+    // If the card belongs to an org, "no charge tx" likely means the org pool
+    // WAS debited (org_deduct_credit RPC) but the grade transaction row was
+    // never recorded — in that case skipping here silently strands the org's
+    // credit. Log loudly with both ids so it can be restored manually.
+    const { data: cardRow } = await supabase
+      .from('cards')
+      .select('org_id')
+      .eq('id', cardId)
+      .maybeSingle();
+    if (cardRow?.org_id) {
+      console.error(
+        `[refundGradeCredit] CRITICAL: card ${cardId} belongs to org ${cardRow.org_id} but no 'grade' transaction was found — ` +
+        `the org pool credit (if one was deducted) was NOT restored. Verify org_deduct_credit usage for this card and restore manually.`
+      );
+    } else {
+      console.log(`[refundGradeCredit] Card ${cardId} was never charged — nothing to refund`);
+    }
     return { refunded: false, newBalance: credits.balance };
   }
 

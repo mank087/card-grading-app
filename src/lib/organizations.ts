@@ -221,51 +221,128 @@ export async function depositOrgCredits(
     source: 'subscription' | 'topup' | 'admin';
     stripeSessionId?: string;
   }
-): Promise<{ success: boolean; newBalance: number; alreadyProcessed?: boolean }> {
+): Promise<{ success: boolean; newBalance: number; alreadyProcessed?: boolean; error?: string }> {
   const supabase = getServiceClient();
+
+  const org = await getOrgById(orgId);
+  if (!org) {
+    return { success: false, newBalance: 0, error: `Organization ${orgId} not found` };
+  }
 
   if (options.dedupeKey) {
     const { data: prior, error: dedupeError } = await supabase
       .from('credit_transactions')
-      .select('id')
+      .select('id, metadata')
       .eq('org_id', orgId)
       .eq('metadata->>org_dedupe_key', options.dedupeKey)
       .limit(1);
     if (dedupeError) {
-      // Fail open, same policy as the purchase webhook: better to risk a
-      // duplicate than to drop a paid deposit.
-      console.error('[depositOrgCredits] dedupe check failed (continuing):', dedupeError.message);
-    } else if (prior && prior.length > 0) {
-      console.log(`[depositOrgCredits] Deposit ${options.dedupeKey} already processed — skipping`);
-      const org = await getOrgById(orgId);
-      return { success: true, newBalance: org?.grade_credits ?? 0, alreadyProcessed: true };
+      // FAIL CLOSED: if we can't verify the dedupe key, do NOT grant. A missed
+      // grant surfaces on the next Stripe retry (or manually); a double grant
+      // is unrecoverable silent revenue loss (see the July 2026 duplicate-
+      // charge incident). Return an error so the webhook 500s and Stripe
+      // retries the delivery.
+      console.error('[depositOrgCredits] CRITICAL: dedupe check failed — refusing to deposit', {
+        orgId, dedupeKey: options.dedupeKey, error: dedupeError.message,
+      });
+      return { success: false, newBalance: 0, error: `Dedupe check failed: ${dedupeError.message}` };
     }
+    if (prior && prior.length > 0) {
+      if (!(prior[0].metadata as Record<string, unknown> | null)?.org_grant_completed) {
+        // The claim exists but was never marked completed: either a concurrent
+        // delivery is mid-flight (benign), or a crash landed between the claim
+        // and the increment and this deposit was LOST. Can't safely re-credit
+        // (the increment may have run without the marker), so surface it.
+        console.error('[depositOrgCredits] CRITICAL: prior claim has no completion marker — verify this deposit actually landed:', {
+          orgId, dedupeKey: options.dedupeKey, txId: prior[0].id,
+        });
+      } else {
+        console.log(`[depositOrgCredits] Deposit ${options.dedupeKey} already processed — skipping`);
+      }
+      return { success: true, newBalance: org.grade_credits ?? 0, alreadyProcessed: true };
+    }
+  }
+
+  // ORDERING (do not reorder): insert the transaction row FIRST — it is the
+  // atomic idempotency claim via the partial unique index on
+  // (metadata->>'org_dedupe_key') — and increment the balance only after the
+  // claim succeeds. Under concurrent webhook redelivery exactly one insert
+  // wins; the loser gets 23505 and never touches the balance, so a double
+  // credit is impossible. The reverse order (increment first, unwind on
+  // conflict) lets both deliveries increment before one detects the conflict,
+  // and a failed unwind leaves a permanent double credit. The failure mode of
+  // claim-first (crash between claim and increment) is a MISSED increment
+  // with an audit row pointing at it — loud, and recoverable by hand.
+  const expectedBalance = (org.monthly_credits || 0) + (org.overage_credits || 0) + amount;
+  const { data: txRow, error: txError } = await supabase
+    .from('credit_transactions')
+    .insert({
+      user_id: org.owner_user_id,
+      org_id: orgId,
+      type: 'purchase',
+      amount,
+      // Expected post-increment total (the increment hasn't run yet).
+      balance_after: expectedBalance,
+      description: options.description,
+      stripe_session_id: options.stripeSessionId,
+      metadata: {
+        org_credit: true,
+        org_dedupe_key: options.dedupeKey,
+        source: options.source,
+        org_bucket: 'overage',
+      },
+    })
+    .select('id')
+    .single();
+  if (txError) {
+    if (txError.code === '23505') {
+      // Concurrent delivery won the claim — already processed, not an error.
+      console.log(`[depositOrgCredits] Deposit ${options.dedupeKey} claimed concurrently — skipping`);
+      return { success: true, newBalance: org.grade_credits ?? 0, alreadyProcessed: true };
+    }
+    console.error('[depositOrgCredits] Failed to claim deposit transaction — nothing credited:', txError.message);
+    return { success: false, newBalance: 0, error: txError.message };
   }
 
   const newBalance = await returnOrgCredits(orgId, amount);
   if (newBalance === null) {
-    return { success: false, newBalance: 0 };
+    // Increment failed after the claim: unwind the claim so a Stripe retry can
+    // re-attempt cleanly. If the unwind also fails, the audit row exists with
+    // no matching credit — log CRITICAL for manual recovery.
+    const { error: unwindError } = await supabase
+      .from('credit_transactions')
+      .delete()
+      .eq('id', txRow.id);
+    if (unwindError) {
+      console.error('[depositOrgCredits] CRITICAL: increment failed AND claim unwind failed — org has an audit row but NO credit. Manual fix needed:', {
+        orgId, dedupeKey: options.dedupeKey, amount, txId: txRow.id, unwindError: unwindError.message,
+      });
+    } else {
+      console.error('[depositOrgCredits] Increment failed after claim; claim unwound — deposit will retry:', {
+        orgId, dedupeKey: options.dedupeKey, amount,
+      });
+    }
+    return { success: false, newBalance: 0, error: 'Balance increment failed' };
   }
 
-  const org = await getOrgById(orgId);
-  const { error: txError } = await supabase.from('credit_transactions').insert({
-    user_id: org?.owner_user_id,
-    org_id: orgId,
-    type: 'purchase',
-    amount,
-    balance_after: newBalance,
-    description: options.description,
-    stripe_session_id: options.stripeSessionId,
-    metadata: {
-      org_credit: true,
-      org_dedupe_key: options.dedupeKey,
-      source: options.source,
-      org_bucket: 'overage',
-    },
-  });
-  if (txError) {
-    console.error('[depositOrgCredits] Failed to record deposit transaction:', txError.message);
-    // Pool was credited; audit log incomplete. Do not retry (would double-deposit).
+  // Mark the claim completed so a later replay can tell "already credited"
+  // from "claimed but crashed before the increment". Best-effort — a missing
+  // marker on a completed grant only produces a false-alarm CRITICAL log.
+  const { error: markError } = await supabase
+    .from('credit_transactions')
+    .update({
+      balance_after: newBalance,
+      metadata: {
+        org_credit: true,
+        org_dedupe_key: options.dedupeKey,
+        source: options.source,
+        org_bucket: 'overage',
+        org_grant_completed: true,
+      },
+    })
+    .eq('id', txRow.id);
+  if (markError) {
+    console.warn('[depositOrgCredits] Failed to mark claim completed (deposit itself succeeded):', markError.message);
   }
 
   return { success: true, newBalance };
@@ -281,62 +358,146 @@ export async function resetOrgMonthlyCredits(
   orgId: string,
   amount: number,
   options: { dedupeKey: string; description: string }
-): Promise<{ success: boolean; newBalance: number; alreadyProcessed?: boolean }> {
+): Promise<{ success: boolean; newBalance: number; alreadyProcessed?: boolean; error?: string }> {
   const supabase = getServiceClient();
+
+  const org = await getOrgById(orgId);
+  if (!org) {
+    return { success: false, newBalance: 0, error: `Organization ${orgId} not found` };
+  }
 
   if (options.dedupeKey) {
     const { data: prior, error: dedupeError } = await supabase
       .from('credit_transactions')
-      .select('id')
+      .select('id, metadata')
       .eq('org_id', orgId)
       .eq('metadata->>org_dedupe_key', options.dedupeKey)
       .limit(1);
     if (dedupeError) {
-      // Fail open, same policy as depositOrgCredits: a duplicate reset is
-      // harmless-ish (SET, not increment) but a dropped one loses a paid cycle.
-      console.error('[resetOrgMonthlyCredits] dedupe check failed (continuing):', dedupeError.message);
-    } else if (prior && prior.length > 0) {
-      console.log(`[resetOrgMonthlyCredits] Cycle ${options.dedupeKey} already processed — skipping`);
-      const org = await getOrgById(orgId);
-      return { success: true, newBalance: org?.grade_credits ?? 0, alreadyProcessed: true };
+      // FAIL CLOSED (same policy as depositOrgCredits): a replayed reset would
+      // re-fill a partially-used cycle. Error out so the webhook 500s and
+      // Stripe retries the delivery instead of guessing.
+      console.error('[resetOrgMonthlyCredits] CRITICAL: dedupe check failed — refusing to reset', {
+        orgId, dedupeKey: options.dedupeKey, error: dedupeError.message,
+      });
+      return { success: false, newBalance: 0, error: `Dedupe check failed: ${dedupeError.message}` };
     }
+    if (prior && prior.length > 0) {
+      if (!(prior[0].metadata as Record<string, unknown> | null)?.org_grant_completed) {
+        // Claim exists without a completion marker: a crash may have landed
+        // between the claim and the SET. Unlike the deposit increment, the
+        // reset RPC is an idempotent SET, so re-running it is always safe —
+        // recover instead of just logging.
+        console.warn('[resetOrgMonthlyCredits] Prior claim has no completion marker — re-running the idempotent reset:', {
+          orgId, dedupeKey: options.dedupeKey, txId: prior[0].id,
+        });
+        const { data: redo, error: redoError } = await supabase.rpc('org_reset_monthly_credits', {
+          p_org_id: orgId,
+          p_amount: amount,
+        });
+        const redoBalance = Array.isArray(redo) ? Number(redo?.[0]) : Number(redo);
+        if (!redoError && Number.isFinite(redoBalance)) {
+          await markOrgClaimCompleted(supabase, prior[0].id, prior[0].metadata, redoBalance);
+          return { success: true, newBalance: redoBalance, alreadyProcessed: true };
+        }
+        console.error('[resetOrgMonthlyCredits] CRITICAL: recovery reset failed — verify this cycle was filled:', {
+          orgId, dedupeKey: options.dedupeKey, error: redoError?.message,
+        });
+      } else {
+        console.log(`[resetOrgMonthlyCredits] Cycle ${options.dedupeKey} already processed — skipping`);
+      }
+      return { success: true, newBalance: org.grade_credits ?? 0, alreadyProcessed: true };
+    }
+  }
+
+  // Same claim-first ordering as depositOrgCredits: the tx insert is the
+  // atomic idempotency claim (unique index on metadata->>'org_dedupe_key');
+  // the SET runs only after the claim succeeds, so concurrent redeliveries
+  // cannot both re-fill a partially-used cycle.
+  const expectedBalance = amount + (org.overage_credits || 0);
+  const { data: txRow, error: txError } = await supabase
+    .from('credit_transactions')
+    .insert({
+      user_id: org.owner_user_id,
+      org_id: orgId,
+      type: 'purchase',
+      amount,
+      // Expected post-reset total (monthly set to `amount` + untouched overage).
+      balance_after: expectedBalance,
+      description: options.description,
+      metadata: {
+        org_credit: true,
+        org_dedupe_key: options.dedupeKey,
+        source: 'subscription',
+        org_bucket: 'monthly',
+        monthly_reset: true,
+      },
+    })
+    .select('id')
+    .single();
+  if (txError) {
+    if (txError.code === '23505') {
+      console.log(`[resetOrgMonthlyCredits] Cycle ${options.dedupeKey} claimed concurrently — skipping`);
+      return { success: true, newBalance: org.grade_credits ?? 0, alreadyProcessed: true };
+    }
+    console.error('[resetOrgMonthlyCredits] Failed to claim cycle transaction — nothing reset:', txError.message);
+    return { success: false, newBalance: 0, error: txError.message };
   }
 
   const { data, error } = await supabase.rpc('org_reset_monthly_credits', {
     p_org_id: orgId,
     p_amount: amount,
   });
-  if (error) {
-    console.error('[resetOrgMonthlyCredits] rpc error:', error.message);
-    return { success: false, newBalance: 0 };
-  }
-  const newBalance = Array.isArray(data) ? Number(data[0]) : Number(data);
-  if (!Number.isFinite(newBalance)) {
-    console.error('[resetOrgMonthlyCredits] no row updated for org', orgId);
-    return { success: false, newBalance: 0 };
+  const newBalance = Array.isArray(data) ? Number(data?.[0]) : Number(data);
+  if (error || !Number.isFinite(newBalance)) {
+    const reason = error ? error.message : `no row updated for org ${orgId}`;
+    // Reset failed after the claim: unwind the claim so a Stripe retry can
+    // re-attempt cleanly.
+    const { error: unwindError } = await supabase
+      .from('credit_transactions')
+      .delete()
+      .eq('id', txRow.id);
+    if (unwindError) {
+      console.error('[resetOrgMonthlyCredits] CRITICAL: reset failed AND claim unwind failed — audit row exists with no reset. Manual fix needed:', {
+        orgId, dedupeKey: options.dedupeKey, amount, txId: txRow.id, reason, unwindError: unwindError.message,
+      });
+    } else {
+      console.error('[resetOrgMonthlyCredits] Reset failed after claim; claim unwound — will retry:', {
+        orgId, dedupeKey: options.dedupeKey, amount, reason,
+      });
+    }
+    return { success: false, newBalance: 0, error: reason };
   }
 
-  const org = await getOrgById(orgId);
-  const { error: txError } = await supabase.from('credit_transactions').insert({
-    user_id: org?.owner_user_id,
-    org_id: orgId,
-    type: 'purchase',
-    amount,
-    balance_after: newBalance,
-    description: options.description,
-    metadata: {
-      org_credit: true,
-      org_dedupe_key: options.dedupeKey,
-      source: 'subscription',
-      org_bucket: 'monthly',
-      monthly_reset: true,
-    },
-  });
-  if (txError) {
-    console.error('[resetOrgMonthlyCredits] Failed to record cycle transaction:', txError.message);
-  }
+  // Mark the claim completed (see depositOrgCredits) — best-effort.
+  await markOrgClaimCompleted(supabase, txRow.id, {
+    org_credit: true,
+    org_dedupe_key: options.dedupeKey,
+    source: 'subscription',
+    org_bucket: 'monthly',
+    monthly_reset: true,
+  }, newBalance);
 
   return { success: true, newBalance };
+}
+
+/** Stamp org_grant_completed on a claim row after its balance change landed. */
+async function markOrgClaimCompleted(
+  supabase: ReturnType<typeof getServiceClient>,
+  txId: string,
+  metadata: unknown,
+  balanceAfter: number
+) {
+  const { error } = await supabase
+    .from('credit_transactions')
+    .update({
+      balance_after: balanceAfter,
+      metadata: { ...(metadata as Record<string, unknown> | null ?? {}), org_grant_completed: true },
+    })
+    .eq('id', txId);
+  if (error) {
+    console.warn('[markOrgClaimCompleted] Failed to mark claim completed (the balance change itself succeeded):', error.message);
+  }
 }
 
 /**

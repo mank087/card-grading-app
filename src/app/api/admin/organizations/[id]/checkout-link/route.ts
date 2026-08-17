@@ -38,7 +38,7 @@ export async function POST(
 
   const { data: org } = await supabaseAdmin
     .from('organizations')
-    .select('id, name, plan, stripe_customer_id')
+    .select('id, name, plan, stripe_customer_id, stripe_subscription_id')
     .eq('id', params.id)
     .maybeSingle()
   if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
@@ -61,6 +61,31 @@ export async function POST(
   const amountCents = Math.round(amountUsd * 100)
 
   try {
+    // One subscription per org: gate plan-type links the same way the
+    // self-serve checkout does (topup links stay ungated — they're one-time
+    // payments, not subscriptions). Check both our DB pointer and Stripe
+    // directly, since stripe_subscription_id is only set post-webhook.
+    if (kind === 'plan') {
+      if (org.stripe_subscription_id) {
+        return NextResponse.json({ error: 'Organization already has an active plan subscription' }, { status: 409 })
+      }
+      if (org.stripe_customer_id) {
+        const existing = await stripe.subscriptions.list({
+          customer: org.stripe_customer_id,
+          status: 'all',
+          limit: 20,
+        })
+        const LIVE_STATUSES = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete']
+        const live = existing.data.find((s) => LIVE_STATUSES.includes(s.status))
+        if (live) {
+          console.warn('[org checkout-link] Blocked duplicate plan link — live subscription exists:', {
+            orgId: org.id, subscriptionId: live.id, status: live.status,
+          })
+          return NextResponse.json({ error: 'Organization already has an active plan subscription' }, { status: 409 })
+        }
+      }
+    }
+
     const common = {
       success_url: `${SITE_URL}/account?enterprise=success`,
       cancel_url: `${SITE_URL}/account?enterprise=cancelled`,

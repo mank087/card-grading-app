@@ -82,6 +82,25 @@ export async function POST(request: NextRequest) {
         // or an admin-managed proration — not a second subscription.
         return NextResponse.json({ error: 'Store already has an active plan' }, { status: 409 })
       }
+      // org.stripe_subscription_id is only set by the webhook AFTER checkout
+      // completes, so two open checkout tabs could both pass the check above
+      // and create two live subscriptions. Ask Stripe directly for any live
+      // subscription on the org's customer before creating another session.
+      if (org.stripe_customer_id) {
+        const existing = await stripe.subscriptions.list({
+          customer: org.stripe_customer_id,
+          status: 'all',
+          limit: 20,
+        })
+        const LIVE_STATUSES = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete']
+        const live = existing.data.find((s) => LIVE_STATUSES.includes(s.status))
+        if (live) {
+          console.warn('[org/billing/checkout] Blocked duplicate plan checkout — live subscription exists:', {
+            orgId: org.id, subscriptionId: live.id, status: live.status,
+          })
+          return NextResponse.json({ error: 'Store already has an active plan' }, { status: 409 })
+        }
+      }
       const metadata = {
         dcm_type: 'org_plan',
         orgId: org.id,

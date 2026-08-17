@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { returnOrgCredits, getOrgBranding } from '@/lib/organizations'
+import { stripe } from '@/lib/stripe'
 import { isUuid } from '@/lib/uuid'
+import { escapeHtml } from '@/lib/orgSlugs'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -30,7 +32,7 @@ async function sendApprovalEmail(orgId: string, orgName: string, ownerUserId: st
       subject: `${orgName} is approved on DCM Enterprise 🎉`,
       html: `
         <h2>Your store is live</h2>
-        <p>${orgName} has been approved for DCM Enterprise.</p>
+        <p>${escapeHtml(orgName)} has been approved for DCM Enterprise.</p>
         <p>Next step: pick your plan and activate your monthly grades.</p>
         <p><a href="${SITE_URL}/store/billing">Choose your plan →</a></p>
         <p>Your branding is already set up — the moment your plan is active, every
@@ -225,6 +227,30 @@ export async function PATCH(
 
     if (approving) {
       await sendApprovalEmail(params.id, approving.name, approving.owner_user_id)
+    }
+
+    // A custom allotment must also be stamped onto the Stripe subscription
+    // metadata: handleOrgInvoicePaid treats metadata.grades as the source of
+    // truth and would otherwise revert this edit at the next renewal.
+    if (updates.monthly_allotment !== undefined) {
+      const { data: subOrg } = await supabaseAdmin
+        .from('organizations')
+        .select('stripe_subscription_id')
+        .eq('id', params.id)
+        .maybeSingle()
+      if (subOrg?.stripe_subscription_id) {
+        try {
+          await stripe.subscriptions.update(subOrg.stripe_subscription_id, {
+            metadata: { grades: String(updates.monthly_allotment) },
+          })
+        } catch (err) {
+          console.error('[admin/organizations] CRITICAL: failed to stamp custom allotment on subscription metadata — the next renewal will revert it:', err)
+          return NextResponse.json(
+            { error: 'Allotment saved, but stamping it on the Stripe subscription failed — the next renewal would revert it. Retry the save.' },
+            { status: 500 }
+          )
+        }
+      }
     }
   }
 

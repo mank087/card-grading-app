@@ -20,8 +20,26 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { stripe } from '@/lib/stripe'
 import { ORG_PLANS } from '@/lib/orgPlans'
 import { priceDataTaxBehavior } from '@/lib/stripeTax'
+import { escapeHtml } from '@/lib/orgSlugs'
+import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+/** Admin alert (fire-and-forget) — same Resend pattern as the enterprise lead route. */
+async function sendAdminAlert(subject: string, html: string) {
+  try {
+    await resend.emails.send({
+      from: 'DCM Grading <noreply@dcmgrading.com>',
+      to: ['admin@dcmgrading.com'],
+      subject,
+      html,
+    })
+  } catch (emailErr) {
+    console.error('[org/billing/manage] admin alert email failed:', emailErr)
+  }
+}
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dcmgrading.com'
 
@@ -114,43 +132,127 @@ export async function POST(request: NextRequest) {
       })
 
       // Bump the org: new plan + allotment; renewals now reset to the new
-      // amount via the normal invoice.paid path.
-      const { error: orgError } = await supabaseAdmin
-        .from('organizations')
-        .update({
-          plan: target.key,
-          monthly_allotment: target.gradesPerMonth,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', org.id)
-      if (orgError) {
-        console.error('[org/billing/manage] upgrade org update failed:', orgError.message)
+      // amount via the normal invoice.paid path. Stripe has already charged
+      // the prorated Enterprise price above, so a failed write here would
+      // leave the customer paying $399 on a 400-grade allotment — retry, and
+      // if it still fails, alert + 500 (never silent). The subscription
+      // metadata written above carries the new grades value, and
+      // handleOrgInvoicePaid now self-heals monthly_allotment from that
+      // metadata on the next renewal, so even a missed alert can't leave the
+      // org stale forever.
+      let orgUpdated = false
+      let lastOrgError = ''
+      for (let attempt = 1; attempt <= 3 && !orgUpdated; attempt++) {
+        const { error: orgError } = await supabaseAdmin
+          .from('organizations')
+          .update({
+            plan: target.key,
+            monthly_allotment: target.gradesPerMonth,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', org.id)
+        if (!orgError) {
+          orgUpdated = true
+        } else {
+          lastOrgError = orgError.message
+          console.error(`[org/billing/manage] upgrade org update failed (attempt ${attempt}/3):`, orgError.message)
+        }
       }
 
       // Grant the difference into the monthly bucket — usage stays counted.
+      // Idempotent on org_dedupe_key: the tx insert is the claim (backed by
+      // the partial unique index on metadata->>'org_dedupe_key'), and the
+      // balance increment runs only after the claim succeeds — same
+      // claim-first ordering as depositOrgCredits, so a double-submitted
+      // upgrade can never double-grant.
       const diff = target.gradesPerMonth - ORG_PLANS.dealer.gradesPerMonth
-      const newBalance = await returnOrgCredits(org.id, diff, 'monthly')
-      const { error: txError } = await supabaseAdmin.from('credit_transactions').insert({
-        user_id: org.owner_user_id,
-        org_id: org.id,
-        type: 'purchase',
-        amount: diff,
-        balance_after: newBalance ?? 0,
-        description: `${org.name} — upgraded to ${target.name} (${diff} additional monthly grades this cycle)`,
-        metadata: {
-          org_credit: true,
-          org_bucket: 'monthly',
-          org_dedupe_key: `upgrade-${org.stripe_subscription_id}-${sub.items.data[0].price.id}`,
-          source: 'subscription',
-          plan_upgrade: true,
-        },
-      })
-      if (txError) {
-        console.error('[org/billing/manage] upgrade tx record failed:', txError.message)
+      // Key is deliberately price-independent: the Stripe update mints a new
+      // inline price id, so a key embedding the price would differ between a
+      // first attempt and a staggered double-submit or post-failure retry,
+      // defeating the dedupe. One dealer→enterprise upgrade per subscription.
+      const dedupeKey = `upgrade-${org.stripe_subscription_id}-dealer-to-enterprise`
+      let newBalance: number | null = null
+      let alreadyGranted = false
+
+      const { data: priorGrant, error: dedupeError } = await supabaseAdmin
+        .from('credit_transactions')
+        .select('id')
+        .eq('org_id', org.id)
+        .eq('metadata->>org_dedupe_key', dedupeKey)
+        .limit(1)
+      if (dedupeError) {
+        // Fail closed: without a verified dedupe check, don't grant.
+        console.error('[org/billing/manage] CRITICAL: upgrade grant dedupe check failed — grant skipped:', dedupeError.message)
+        await sendAdminAlert(
+          `Org upgrade grant NOT applied — ${org.name}`,
+          `<p>Upgrade to ${target.name} for org <strong>${escapeHtml(org.name)}</strong> (${org.id}) charged on Stripe, but the +${diff} monthly-grade grant was skipped because the dedupe check errored: ${escapeHtml(dedupeError.message)}</p><p>Verify and grant manually (dedupe key: ${dedupeKey}).</p>`
+        )
+      } else if (priorGrant && priorGrant.length > 0) {
+        alreadyGranted = true
+      } else {
+        const { data: txRow, error: txError } = await supabaseAdmin
+          .from('credit_transactions')
+          .insert({
+            user_id: org.owner_user_id,
+            org_id: org.id,
+            type: 'purchase',
+            amount: diff,
+            // Expected post-grant total; the increment runs next.
+            balance_after: (org.grade_credits ?? 0) + diff,
+            description: `${org.name} — upgraded to ${target.name} (${diff} additional monthly grades this cycle)`,
+            metadata: {
+              org_credit: true,
+              org_bucket: 'monthly',
+              org_dedupe_key: dedupeKey,
+              source: 'subscription',
+              plan_upgrade: true,
+            },
+          })
+          .select('id')
+          .single()
+        if (txError) {
+          if (txError.code === '23505') {
+            // Unique-index backstop fired: a concurrent request already
+            // granted. Treat as already-granted, not an error.
+            alreadyGranted = true
+          } else {
+            console.error('[org/billing/manage] upgrade grant claim failed — nothing granted:', txError.message)
+            await sendAdminAlert(
+              `Org upgrade grant NOT applied — ${org.name}`,
+              `<p>Upgrade to ${target.name} for org <strong>${escapeHtml(org.name)}</strong> (${org.id}) charged on Stripe, but the +${diff} monthly-grade grant transaction failed to insert: ${escapeHtml(txError.message)}</p><p>Grant manually (dedupe key: ${dedupeKey}).</p>`
+            )
+          }
+        } else {
+          newBalance = await returnOrgCredits(org.id, diff, 'monthly')
+          if (newBalance === null) {
+            // Increment failed after the claim — unwind the claim so a retry
+            // can re-attempt cleanly (same recovery as depositOrgCredits).
+            await supabaseAdmin.from('credit_transactions').delete().eq('id', txRow.id)
+            console.error('[org/billing/manage] CRITICAL: upgrade grant increment failed after claim (claim unwound):', { orgId: org.id, dedupeKey })
+            await sendAdminAlert(
+              `Org upgrade grant NOT applied — ${org.name}`,
+              `<p>Upgrade to ${target.name} for org <strong>${escapeHtml(org.name)}</strong> (${org.id}) charged on Stripe, but the +${diff} monthly-grade balance increment failed. Grant manually (dedupe key: ${dedupeKey}).</p>`
+            )
+          }
+        }
+      }
+
+      if (!orgUpdated) {
+        // Customer is now paying Enterprise on a Dealer allotment. Alert a
+        // human and surface the failure to the caller — the charge went
+        // through, so this must not look like success.
+        await sendAdminAlert(
+          `URGENT: org upgrade DB update failed — ${org.name}`,
+          `<p>Org <strong>${escapeHtml(org.name)}</strong> (${org.id}) was charged for the ${target.name} upgrade on Stripe (subscription ${org.stripe_subscription_id}), but updating the org row (plan/monthly_allotment) failed after 3 attempts: ${escapeHtml(String(lastOrgError))}</p><p>Set plan='${target.key}' and monthly_allotment=${target.gradesPerMonth} manually. Credit grant status: ${alreadyGranted ? 'already granted' : newBalance !== null ? 'granted' : 'NOT granted — check preceding alert'}.</p>`
+        )
+        return NextResponse.json(
+          { error: 'Your payment went through, but we hit an error finishing the upgrade. Our team has been alerted and will complete it shortly — no need to retry or pay again.' },
+          { status: 500 }
+        )
       }
 
       console.log('[org/billing/manage] Upgraded org to enterprise:', {
-        orgId: org.id, diff, newBalance,
+        orgId: org.id, diff, newBalance, alreadyGranted,
       })
       return NextResponse.json({ success: true, plan: target.key, added: diff, newBalance })
     }

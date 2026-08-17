@@ -31,6 +31,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dcmgrading.com';
 
 /**
+ * Admin alert email (fire-and-forget) for org billing conditions that need a
+ * human — same Resend pattern as the enterprise lead route. Never throws.
+ */
+async function sendOrgAdminAlert(subject: string, html: string) {
+  try {
+    await resend.emails.send({
+      from: 'DCM Grading <noreply@dcmgrading.com>',
+      to: ['admin@dcmgrading.com'],
+      subject,
+      html,
+    });
+  } catch (emailErr) {
+    console.error('[sendOrgAdminAlert] alert email failed:', emailErr);
+  }
+}
+
+/**
  * Safely convert a Stripe Unix timestamp to a Date.
  * Returns a fallback date (30 days from now) if the timestamp is invalid.
  */
@@ -561,12 +578,24 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // Confirm this is a Card Lovers subscription before flipping any flags
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-  // Enterprise org plan: observability only in v1 — Stripe dunning retries,
-  // and suspending an org stays a manual admin action.
+  // Enterprise org plan: Stripe dunning retries, and suspending an org stays
+  // a manual admin action — but a human has to actually hear about it, so
+  // alert admin@ with enough detail to act. No auto-suspend.
   if (subscription.metadata?.dcm_type === 'org_plan') {
+    const orgId = subscription.metadata?.orgId;
     console.warn('[handleInvoicePaymentFailed] Org plan payment failed:', {
-      orgId: subscription.metadata?.orgId, invoiceId: invoice.id, subscriptionId,
+      orgId, invoiceId: invoice.id, subscriptionId,
     });
+    const org = orgId ? await getOrgById(orgId) : null;
+    const amountUsd = typeof invoice.amount_due === 'number' ? (invoice.amount_due / 100).toFixed(2) : '?';
+    await sendOrgAdminAlert(
+      `Org plan payment FAILED — ${org?.name || orgId || 'unknown org'}`,
+      `<h2>Enterprise plan payment failed</h2>
+       <p><strong>Org:</strong> ${org?.name || 'unknown'} (${orgId || 'no orgId in metadata'})</p>
+       <p><strong>Invoice:</strong> ${invoice.id} — $${amountUsd} USD (attempt ${invoice.attempt_count ?? '?'})</p>
+       <p><strong>Subscription:</strong> ${subscriptionId}</p>
+       <p>Stripe will keep retrying (Smart Retries). If it keeps failing, suspend the org manually from the admin console.</p>`
+    );
     return;
   }
 
@@ -1003,6 +1032,10 @@ async function handleOrgSubscriptionCheckout(session: Stripe.Checkout.Session) {
   console.log('[handleOrgSubscriptionCheckout] Initial monthly fill:', {
     orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
   });
+  if (!deposit.success) {
+    // 500 so Stripe redelivers — the paid first cycle must not be dropped.
+    throw new Error(`[handleOrgSubscriptionCheckout] Initial fill failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
+  }
 
   // Activation email to the owner: what they have, how billing recurs, and
   // where to manage it. Fire-and-forget; skipped on webhook replays (the
@@ -1099,8 +1132,12 @@ async function handleOrgInvoicePaid(invoice: Stripe.Invoice, subscription: Strip
     console.log('[handleOrgInvoicePaid] Proration invoice from plan change, skipping (handled by upgrade API)');
     return;
   }
-  if (subscription.cancel_at_period_end || subscription.status === 'canceled') {
-    console.log('[handleOrgInvoicePaid] Subscription cancelled/pending cancel — skipping deposit:', subscription.id);
+  // cancel_at_period_end does NOT skip the deposit: a paid invoice means the
+  // customer paid for this period and gets its grades — the cancellation only
+  // stops FUTURE invoices. Only a fully-canceled subscription (stale replay)
+  // is skipped.
+  if (subscription.status === 'canceled') {
+    console.log('[handleOrgInvoicePaid] Subscription fully canceled — skipping deposit:', subscription.id);
     return;
   }
 
@@ -1110,23 +1147,71 @@ async function handleOrgInvoicePaid(invoice: Stripe.Invoice, subscription: Strip
     return;
   }
   if (org.status !== 'active') {
-    console.log('[handleOrgInvoicePaid] Org not active — skipping deposit:', orgId, org.status);
+    // Suspended/cancelled org paid an invoice: don't deposit, but a human
+    // needs to reconcile (refund the invoice or reactivate the org).
+    console.warn('[handleOrgInvoicePaid] Org not active — skipping deposit, alerting admin:', orgId, org.status);
+    const amountUsd = typeof invoice.amount_due === 'number' ? (invoice.amount_due / 100).toFixed(2) : '?';
+    await sendOrgAdminAlert(
+      `Org paid an invoice while ${org.status} — ${org.name}`,
+      `<h2>Paid invoice on a non-active org</h2>
+       <p><strong>Org:</strong> ${org.name} (${orgId}) — status <strong>${org.status}</strong></p>
+       <p><strong>Invoice:</strong> ${invoice.id} — $${amountUsd} USD</p>
+       <p>The monthly credit deposit was skipped. Either refund the invoice or reactivate the org and grant the cycle manually.</p>`
+    );
     return;
   }
 
-  const grades = org.monthly_allotment || parseInt(subscription.metadata.grades || '0', 10);
+  // The subscription metadata `grades` is stamped at checkout and re-stamped
+  // on every plan change (upgrade API), so it reflects what the customer is
+  // actually paying for. The org row can be stale if a plan-change DB write
+  // failed — when they disagree, trust the metadata and self-heal the org row.
+  const metaGrades = parseInt(subscription.metadata.grades || '0', 10);
+  let grades = org.monthly_allotment || 0;
+  if (metaGrades > 0 && metaGrades !== grades) {
+    console.warn('[handleOrgInvoicePaid] Allotment mismatch — self-healing org row from subscription metadata:', {
+      orgId, orgAllotment: grades, metadataGrades: metaGrades,
+    });
+    grades = metaGrades;
+    const supabase = getServiceClient();
+    const { error: healError } = await supabase
+      .from('organizations')
+      .update({
+        monthly_allotment: metaGrades,
+        ...(subscription.metadata.plan ? { plan: subscription.metadata.plan } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orgId);
+    if (healError) {
+      console.error('[handleOrgInvoicePaid] Self-heal update failed (deposit still uses metadata value):', healError.message);
+    }
+  }
   if (!grades) {
     console.error('[handleOrgInvoicePaid] No allotment configured for org:', orgId);
     return;
   }
 
+  // A missing invoice id must not fall back to the subscription id: a
+  // subscription-id dedupe key would be claimed once and then block EVERY
+  // future renewal for this org. Fail closed and let Stripe retry.
+  if (!invoice.id) {
+    console.error('[handleOrgInvoicePaid] Invoice has no id — skipping deposit (cannot dedupe safely):', {
+      orgId, subscriptionId: subscription.id,
+    });
+    return;
+  }
+
   const deposit = await resetOrgMonthlyCredits(orgId, grades, {
-    dedupeKey: invoice.id ?? subscription.id,
+    dedupeKey: invoice.id,
     description: `${org.name} — monthly renewal (monthly grades reset to ${grades})`,
   });
   console.log('[handleOrgInvoicePaid] Monthly reset:', {
     orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
   });
+  if (!deposit.success) {
+    // Propagate so the webhook returns 500 and Stripe redelivers — the
+    // paid cycle must not be silently dropped.
+    throw new Error(`[handleOrgInvoicePaid] Monthly reset failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
+  }
 }
 
 /**
@@ -1158,4 +1243,8 @@ async function handleOrgTopup(session: Stripe.Checkout.Session) {
   console.log('[handleOrgTopup] Top-up deposit:', {
     orgId, grades, success: deposit.success, newBalance: deposit.newBalance, alreadyProcessed: deposit.alreadyProcessed,
   });
+  if (!deposit.success) {
+    // 500 so Stripe redelivers — the paid pack must not be dropped.
+    throw new Error(`[handleOrgTopup] Top-up deposit failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
+  }
 }
