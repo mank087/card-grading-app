@@ -22,7 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     .select('*')
     .eq('id', id)
     .eq('org_id', sf.org.id)
-    .eq('is_public', true)
+    // Live privacy field is cards.visibility (null = public on old rows);
+    // is_public is dead — stuck at true since the Oct 2025 migration.
+    .or('visibility.is.null,visibility.neq.private')
     .is('deleted_at', null)
     .maybeSingle();
   if (!card) return { title: 'Not found', robots: { index: false, follow: false } };
@@ -87,7 +89,8 @@ export default async function StorefrontCardPage({
     .select('*')
     .eq('id', id)
     .eq('org_id', sf.org.id)
-    .eq('is_public', true)
+    // visibility, not the dead is_public column; only explicit 'private' hides
+    .or('visibility.is.null,visibility.neq.private')
     .is('deleted_at', null)
     .maybeSingle();
   if (!cardRow) notFound();

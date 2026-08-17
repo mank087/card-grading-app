@@ -36,7 +36,7 @@ export default async function VerifyPage({ params }: PageProps) {
   const { data: card } = await withColumnFallback(
     () => supabase
       .from('cards')
-      .select('id, category, org_id')
+      .select('id, category, org_id, visibility')
       .eq('serial', serial)
       .is('deleted_at', null)
       .maybeSingle(),
@@ -54,8 +54,12 @@ export default async function VerifyPage({ params }: PageProps) {
 
   // Org-graded cards land on the org's branded storefront page when one is
   // live — this retroactively brands every QR already printed on their slabs.
+  // Private cards skip the org redirect (the public enterprise card page would
+  // 404 them) and fall through to the consumer route, which handles privacy
+  // itself — same behavior consumer cards always had here.
   const orgId = (card as { org_id?: string | null }).org_id;
-  if (orgId) {
+  const isPrivate = (card as { visibility?: string | null }).visibility === 'private';
+  if (orgId && !isPrivate) {
     const { data: org } = await supabase
       .from('organizations')
       .select('slug, status, storefront_enabled')

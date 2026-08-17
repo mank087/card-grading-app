@@ -108,7 +108,10 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
         'conversational_condition_label, label_data, custom_label_data, card_colors, ' +
         'card_name, card_set, card_number, featured, pokemon_featured')
       .eq('org_id', org.id)
-      .eq('is_public', true)
+      // Live privacy field is cards.visibility ('public'/'private', null on old
+      // rows) — is_public is a dead column stuck at true since Oct 2025. Only an
+      // explicit 'private' hides a card (consumer-page convention).
+      .or('visibility.is.null,visibility.neq.private')
       .is('deleted_at', null)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
@@ -151,7 +154,8 @@ export async function lookupOrgSerial(slug: string, serial: string): Promise<{ i
   const find = async (column: 'org_serial' | 'serial', value: number | string) => {
     const { data } = await s.from('cards').select('id')
       .eq('org_id', org.id)
-      .eq('is_public', true)
+      // visibility, not the dead is_public column; null = public (old rows)
+      .or('visibility.is.null,visibility.neq.private')
       .is('deleted_at', null)
       .eq(column, value)
       .maybeSingle();
