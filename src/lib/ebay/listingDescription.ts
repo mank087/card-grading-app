@@ -51,12 +51,26 @@ function darken(hex: string, pct: number): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
   if (!m) return hex;
   const n = parseInt(m[1], 16);
-  const f = (v: number) => Math.max(0, Math.round(v * (1 - pct)));
+  const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * (1 - pct))));
+  return '#' + ((f((n >> 16) & 255) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255)).toString(16).padStart(6, '0');
+}
+
+/** Mix a hex color toward white by pct (0-1). lighten(#7C3AED, 0.4) ≈ #A78BFA-ish. */
+function lighten(hex: string, pct: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const f = (v: number) => Math.max(0, Math.min(255, Math.round(v + (255 - v) * pct)));
   return '#' + ((f((n >> 16) & 255) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255)).toString(16).padStart(6, '0');
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -117,7 +131,7 @@ export function generateHtmlDescription(
   const brandName = branding?.name || 'DCM';
   const accent = branding?.brandColor && /^#[0-9a-f]{6}$/i.test(branding.brandColor) ? branding.brandColor : '#7C3AED';
   const accentDark = branding ? darken(accent, 0.35) : '#5B21B6';
-  const accentLight = branding ? darken(accent, -0.0) : '#A78BFA';
+  const accentLight = branding ? lighten(accent, 0.4) : '#A78BFA';
   const gray = '#4B5563';
 
   const headerSub = branding
@@ -196,4 +210,98 @@ export function generateHtmlDescription(
   </div>
 </div>
 `.trim();
+}
+
+/* ------------------------------------------------------------------ */
+/* Preview sanitizer                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tags the standard generated description (and reasonable templates) use.
+ * Anything else — script/style/iframe/object/embed/form/svg/etc. — is
+ * removed entirely (content of script/style/iframe-likes dropped too).
+ */
+const SANITIZE_ALLOWED_TAGS = new Set([
+  'div', 'table', 'tbody', 'thead', 'tr', 'td', 'th',
+  'h1', 'h2', 'h3', 'h4', 'p', 'span', 'strong', 'b', 'em', 'i', 'u', 's',
+  'ul', 'ol', 'li', 'img', 'br', 'hr', 'blockquote', 'small', 'sup', 'sub',
+  'center', 'font',
+]);
+
+const SANITIZE_ALLOWED_ATTRS = new Set([
+  'style', 'align', 'valign', 'width', 'height', 'colspan', 'rowspan',
+  'cellpadding', 'cellspacing', 'border', 'alt', 'title', 'color', 'size', 'face',
+]);
+
+/** Attribute values / style values that could execute or load active content. */
+function isDangerousValue(value: string): boolean {
+  const v = value.replace(/[\s -]+/g, '').toLowerCase();
+  return v.includes('javascript:') || v.includes('vbscript:') || v.includes('expression(') || v.includes('url(');
+}
+
+function isSafeImgSrc(value: string): boolean {
+  const v = value.trim();
+  return /^https?:\/\//i.test(v) || /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(v);
+}
+
+/**
+ * Sanitize listing-description HTML for in-app preview rendering
+ * (dangerouslySetInnerHTML). Allowlist-based: keeps the tags/attrs the
+ * standard generated layout uses, drops scripts, event handlers,
+ * javascript: URLs, and embedded frames/objects.
+ *
+ * IMPORTANT: sanitize at RENDER time only. The stored template and the HTML
+ * submitted to eBay stay untouched (eBay strips active content itself); the
+ * browser preview is the attack surface this defends.
+ *
+ * Uses the real DOM parser when available (client components); falls back to
+ * a conservative regex strip during SSR so previews never render raw markup.
+ */
+export function sanitizeListingHtml(html: string): string {
+  if (!html) return '';
+
+  if (typeof document !== 'undefined') {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+
+    const walk = (node: Element) => {
+      // Snapshot children first — we mutate while iterating.
+      for (const child of Array.from(node.children)) {
+        const tag = child.tagName.toLowerCase();
+        if (!SANITIZE_ALLOWED_TAGS.has(tag)) {
+          // Remove tag AND contents for active-content containers; unwrap
+          // (keep text/children) for unknown-but-inert wrappers like <a>/<section>.
+          if (['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'form', 'input', 'button', 'textarea', 'select', 'svg', 'math', 'template', 'noscript'].includes(tag)) {
+            child.remove();
+          } else {
+            walk(child);
+            child.replaceWith(...Array.from(child.childNodes));
+          }
+          continue;
+        }
+        // Scrub attributes on kept elements.
+        for (const attr of Array.from(child.attributes)) {
+          const name = attr.name.toLowerCase();
+          const value = attr.value;
+          if (name === 'src' && tag === 'img') {
+            if (!isSafeImgSrc(value)) child.removeAttribute(attr.name);
+            continue;
+          }
+          if (!SANITIZE_ALLOWED_ATTRS.has(name) || name.startsWith('on') || isDangerousValue(value)) {
+            child.removeAttribute(attr.name);
+          }
+        }
+        walk(child);
+      }
+    };
+    walk(tpl.content as unknown as Element);
+    return tpl.innerHTML;
+  }
+
+  // SSR fallback: strip active-content blocks, event handlers, and js: URLs.
+  return html
+    .replace(/<(script|style|iframe|object|embed|noscript|template|svg|math)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<\/?(script|style|iframe|object|embed|link|meta|base|form|input|button|textarea|select|noscript|template|svg|math)\b[^>]*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src|xlink:href|formaction|action)\s*=\s*("[^"]*javascript:[^"]*"|'[^']*javascript:[^']*'|javascript:[^\s>]+)/gi, '');
 }

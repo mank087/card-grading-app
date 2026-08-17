@@ -5,31 +5,65 @@
  *        org's row. The client uses the org row when listing an org-graded
  *        card, else personal.
  * PUT  — upsert. Body: { scope: 'personal' | 'org', descriptionTemplate?,
- *        shippingDefaults?, includeTrustSlide? }. A null descriptionTemplate
- *        clears back to the standard generated layout. Org scope requires
- *        the org owner.
+ *        shippingDefaults? }. A null descriptionTemplate clears back to the
+ *        standard generated layout. Org scope requires the org owner.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/serverAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getOrgForUser } from '@/lib/organizations'
+import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi'
 
 export const runtime = 'nodejs'
 
 const TEMPLATE_MAX = 20000
+
 // Mirrors EbayListingModal's shippingForm shape (+ bestOfferEnabled).
-const SHIPPING_KEYS = new Set([
-  'shippingType', 'domesticShippingService', 'flatRateAmount', 'handlingDays', 'postalCode',
-  'packageWeightOz', 'packageLengthIn', 'packageWidthIn', 'packageDepthIn',
-  'offerInternational', 'internationalShippingType', 'internationalShippingService',
-  'internationalFlatRateCost', 'internationalShipToLocations',
-  'domesticReturnsAccepted', 'domesticReturnPeriodDays', 'domesticReturnShippingPaidBy',
-  'internationalReturnsAccepted', 'internationalReturnPeriodDays', 'internationalReturnShippingPaidBy',
-  'bestOfferEnabled',
-])
+// Per-key validators: return the cleaned value, or undefined to DROP the key
+// (invalid values are dropped, never 400'd — the client merges over its own
+// defaults so a dropped key just falls back).
+type ShippingValidator = (v: unknown) => unknown | undefined
+
+const enumOf = (values: readonly string[]): ShippingValidator => v =>
+  typeof v === 'string' && values.includes(v) ? v : undefined
+const boolVal: ShippingValidator = v => (typeof v === 'boolean' ? v : undefined)
+const numMin = (min: number, max = 1_000_000): ShippingValidator => v =>
+  typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
+const shortString = (maxLen: number): ShippingValidator => v =>
+  typeof v === 'string' ? v.slice(0, maxLen) : undefined
+
+const DOMESTIC_SERVICE_VALUES = DOMESTIC_SHIPPING_SERVICES.map(s => s.value)
+const INTERNATIONAL_SERVICE_VALUES = INTERNATIONAL_SHIPPING_SERVICES.map(s => s.value)
+
+const SHIPPING_VALIDATORS: Record<string, ShippingValidator> = {
+  shippingType: enumOf(['FREE', 'FLAT_RATE', 'CALCULATED']),
+  domesticShippingService: enumOf(DOMESTIC_SERVICE_VALUES),
+  flatRateAmount: numMin(0),
+  handlingDays: numMin(0, 30),
+  postalCode: shortString(20),
+  packageWeightOz: numMin(0),
+  packageLengthIn: numMin(0),
+  packageWidthIn: numMin(0),
+  packageDepthIn: numMin(0),
+  offerInternational: boolVal,
+  internationalShippingType: enumOf(['FLAT_RATE', 'CALCULATED']),
+  internationalShippingService: enumOf(INTERNATIONAL_SERVICE_VALUES),
+  internationalFlatRateCost: numMin(0),
+  internationalShipToLocations: v =>
+    Array.isArray(v) && v.every(x => typeof x === 'string')
+      ? v.slice(0, 40).map(x => x.slice(0, 100))
+      : undefined,
+  domesticReturnsAccepted: boolVal,
+  domesticReturnPeriodDays: numMin(0, 365),
+  domesticReturnShippingPaidBy: enumOf(['BUYER', 'SELLER']),
+  internationalReturnsAccepted: boolVal,
+  internationalReturnPeriodDays: numMin(0, 365),
+  internationalReturnShippingPaidBy: enumOf(['BUYER', 'SELLER']),
+  bestOfferEnabled: boolVal,
+}
 
 async function rowFor(filter: { user_id?: string; org_id?: string }) {
-  let q = supabaseAdmin.from('listing_templates').select('description_template, shipping_defaults, include_trust_slide')
+  let q = supabaseAdmin.from('listing_templates').select('description_template, shipping_defaults')
   if (filter.org_id) q = q.eq('org_id', filter.org_id)
   else q = q.eq('user_id', filter.user_id!).is('org_id', null)
   const { data } = await q.maybeSingle()
@@ -37,7 +71,6 @@ async function rowFor(filter: { user_id?: string; org_id?: string }) {
     ? {
         descriptionTemplate: data.description_template,
         shippingDefaults: data.shipping_defaults,
-        includeTrustSlide: Boolean(data.include_trust_slide),
       }
     : null
 }
@@ -52,7 +85,9 @@ export async function GET(request: NextRequest) {
     rowFor({ user_id: auth.user.id }),
     membership ? rowFor({ org_id: membership.org.id }) : Promise.resolve(null),
   ])
-  return NextResponse.json({ personal, org, orgRole: membership?.role ?? null })
+  // orgId lets the client verify the caller's org matches the CARD's org
+  // before applying the org template (cross-org guard).
+  return NextResponse.json({ personal, org, orgRole: membership?.role ?? null, orgId: membership?.org.id ?? null })
 }
 
 export async function PUT(request: NextRequest) {
@@ -89,22 +124,16 @@ export async function PUT(request: NextRequest) {
     } else if (typeof body.shippingDefaults === 'object' && !Array.isArray(body.shippingDefaults)) {
       const clean: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(body.shippingDefaults)) {
-        if (!SHIPPING_KEYS.has(k)) continue
-        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-          clean[k] = typeof v === 'string' ? v.slice(0, 200) : v
-        } else if (Array.isArray(v) && v.every(x => typeof x === 'string')) {
-          clean[k] = v.slice(0, 40).map(x => x.slice(0, 100))
-        }
+        const validate = SHIPPING_VALIDATORS[k]
+        if (!validate) continue // unknown key: drop
+        const cleaned = validate(v)
+        if (cleaned !== undefined) clean[k] = cleaned // invalid value: drop
       }
       updates.shipping_defaults = clean
     } else {
       return NextResponse.json({ error: 'shippingDefaults must be an object' }, { status: 400 })
     }
   }
-  if (body.includeTrustSlide !== undefined) {
-    updates.include_trust_slide = Boolean(body.includeTrustSlide)
-  }
-
   const key = scope === 'org' ? { org_id: orgId } : { user_id: auth.user.id, org_id: null }
   const { data: existing } = await supabaseAdmin
     .from('listing_templates')

@@ -130,10 +130,34 @@ export async function POST(request: NextRequest) {
     const body: ImageUploadRequest = await request.json();
     const { cardId, images, additionalImages } = body;
 
-    if (!cardId) {
+    // cardId becomes part of the storage key — require a well-formed UUID so
+    // it can't inject path segments (e.g. "../other-user") into the key.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!cardId || !UUID_RE.test(cardId)) {
       return NextResponse.json(
-        { error: 'Card ID is required' },
+        { error: 'A valid card ID is required' },
         { status: 400 }
+      );
+    }
+
+    // Ownership check: the card must belong to the authenticated user.
+    const { data: ownedCard, error: cardLookupError } = await supabase
+      .from('cards')
+      .select('id')
+      .eq('id', cardId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (cardLookupError) {
+      console.error('[eBay Images] Card ownership lookup failed:', cardLookupError);
+      return NextResponse.json(
+        { error: 'Failed to verify card ownership' },
+        { status: 500 }
+      );
+    }
+    if (!ownedCard) {
+      return NextResponse.json(
+        { error: 'Card not found' },
+        { status: 404 }
       );
     }
 

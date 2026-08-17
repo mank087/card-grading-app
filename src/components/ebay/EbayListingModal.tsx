@@ -21,6 +21,7 @@ import { CardGradingReport, type ReportCardData } from '@/components/reports/Car
 import {
   generateHtmlDescription,
   renderDescriptionTemplate,
+  sanitizeListingHtml,
   DESCRIPTION_MERGE_FIELDS,
   type ListingDescriptionFields,
   type ListingBranding,
@@ -73,16 +74,24 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     personal: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
     org: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
     orgRole: 'owner' | 'member' | null;
+    orgId: string | null;
   } | null>(null);
   const [listingBranding, setListingBranding] = useState<ListingBranding | null>(null);
   const [descriptionFields, setDescriptionFields] = useState<ListingDescriptionFields | null>(null);
   const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
   const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
 
-  // Which scope a save writes to: org cards owned by the org owner save the
-  // ORG defaults (shared by staff); everything else saves personal.
+  // Cross-org guard: org templates/branding only apply when the CALLER's org
+  // is the same org that graded the card. A member of org A opening a card
+  // graded by org B gets personal defaults, not A's template on B's card.
+  const callerOrgMatchesCard: boolean =
+    Boolean(card?.org_id) && Boolean(listingDefaults?.orgId) && listingDefaults?.orgId === card?.org_id;
+
+  // Which scope a save writes to: org cards owned by the org owner (of the
+  // SAME org that graded the card) save the ORG defaults (shared by staff);
+  // everything else saves personal.
   const defaultsScope: 'personal' | 'org' =
-    card?.org_id && listingDefaults?.orgRole === 'owner' ? 'org' : 'personal';
+    callerOrgMatchesCard && listingDefaults?.orgRole === 'owner' ? 'org' : 'personal';
 
   const saveListingDefaults = async (payload: Record<string, unknown>, which: 'shipping' | 'template') => {
     const session = getStoredSession();
@@ -315,7 +324,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         serial: card.org_serial_display || card.serial || 'N/A',
       };
       setDescriptionFields(descriptionFields);
-      setDescription(generateHtmlDescription(descriptionFields, null));
+      const seededDescription = generateHtmlDescription(descriptionFields, null);
+      setDescription(seededDescription);
 
       let cancelled = false;
       (async () => {
@@ -336,13 +346,21 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         setListingBranding(branding);
         if (defaultsRes) setListingDefaults(defaultsRes);
 
-        // Template resolution: org template for org cards, else personal.
-        const activeDefaults = card.org_id && defaultsRes?.org ? defaultsRes.org : defaultsRes?.personal;
+        // Template resolution: org template only when the caller's org IS the
+        // card's org; else personal.
+        const activeDefaults =
+          card.org_id && defaultsRes?.orgId === card.org_id && defaultsRes?.org
+            ? defaultsRes.org
+            : defaultsRes?.personal;
         const template = activeDefaults?.descriptionTemplate || null;
-        setDescription(
-          template
-            ? renderDescriptionTemplate(template, descriptionFields, branding)
-            : generateHtmlDescription(descriptionFields, branding)
+        // Only apply the resolved template/branding if the user hasn't edited
+        // the description since it was seeded — never clobber user edits.
+        setDescription(prev =>
+          prev === seededDescription
+            ? template
+              ? renderDescriptionTemplate(template, descriptionFields, branding)
+              : generateHtmlDescription(descriptionFields, branding)
+            : prev
         );
         if (activeDefaults?.shippingDefaults && typeof activeDefaults.shippingDefaults === 'object') {
           const saved = activeDefaults.shippingDefaults as Record<string, unknown>;
@@ -2010,10 +2028,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                         {/* Add Photo Button (kept at the end of the unified grid) */}
                     {(() => {
-                      const totalSelected = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length
-                        + additionalImages.filter(i => i.selected).length;
-                      const maxAdditional = 12 - [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length;
-                      const canAddMore = additionalImages.length < maxAdditional && totalSelected < 12;
+                      // 12-slot math: count SELECTED system tiles + SELECTED
+                      // additional photos (deselected tiles don't occupy slots).
+                      const selectedSystemCount = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length;
+                      const totalSelected = selectedSystemCount + additionalImages.filter(i => i.selected).length;
+                      const canAddMore = totalSelected < 12;
                       return canAddMore ? (
                         <div
                           className="border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all"
@@ -2039,8 +2058,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
+                      // Same slot math as the Add Photo tile: selected system
+                      // tiles + selected additional photos occupy slots.
                       const systemImageCount = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length;
-                      const remaining = Math.max(0, 12 - systemImageCount - additionalImages.length);
+                      const selectedAdditionalCount = additionalImages.filter(i => i.selected).length;
+                      const remaining = Math.max(0, 12 - systemImageCount - selectedAdditionalCount);
                       const filesToAdd = files.slice(0, remaining);
                       const newImages = filesToAdd.map(f => ({
                         id: crypto.randomUUID(),
@@ -2165,7 +2187,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     >
                       <div
                         className="p-3 text-sm"
-                        dangerouslySetInnerHTML={{ __html: description }}
+                        // Sanitized at render only — the stored template and the
+                        // HTML submitted to eBay are untouched. Org templates are
+                        // author-controlled, so the in-app preview must not
+                        // execute scripts/handlers from them.
+                        dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(description) }}
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
@@ -3188,7 +3214,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             );
             const isDisabled =
               isLoading ||
-              (step === 'images' && !Object.values(selectedImages).some(Boolean)) ||
+              // Images step: proceed if ANY image is selected — system tiles
+              // OR user-uploaded additional photos.
+              (step === 'images' &&
+                !Object.values(selectedImages).some(Boolean) &&
+                !additionalImages.some(i => i.selected)) ||
               ((step === 'specifics' || step === 'review') && hasEmptyRequired);
 
             return (
