@@ -59,10 +59,12 @@ export interface OrganizationMember {
 /**
  * The organization a user belongs to (v1: at most one), or null.
  *
- * PENDING orgs are invisible by default: an applicant sees no org UI anywhere
- * (no workspace switcher, badges, billing, or settings) until DCM approves —
- * they get a confirmation screen + email instead, and DCM reaches out.
- * Pass includePending only for surfaces that explicitly handle applications.
+ * PENDING and CANCELLED orgs are invisible by default: an applicant sees no
+ * org UI anywhere (no workspace switcher, badges, billing, or settings) until
+ * DCM approves, and a rejected/cancelled org drops the member back to the
+ * plain consumer experience. SUSPENDED stays visible on purpose — the owner
+ * needs to reach billing to fix it. Pass includePending only for surfaces
+ * that explicitly handle applications.
  */
 export async function getOrgForUser(
   userId: string,
@@ -84,6 +86,7 @@ export async function getOrgForUser(
   const org = (data?.organizations ?? null) as Organization | null;
   if (!org) return null;
   if (org.status === 'pending' && !options.includePending) return null;
+  if (org.status === 'cancelled') return null;
   return { org, role: (data!.role as 'owner' | 'member') || 'member' };
 }
 

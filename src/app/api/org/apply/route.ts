@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
       {
         error: status === 'pending'
           ? 'Your application is already in review. We will reach out to finalize the process.'
-          : 'This account already has an enterprise account.',
+          : status === 'cancelled'
+            ? 'A previous enterprise account on this login was closed. Contact admin@dcmgrading.com and we will get you set up again.'
+            : 'This account already has an enterprise account.',
       },
       { status: 409 }
     )
