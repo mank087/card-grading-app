@@ -203,7 +203,7 @@ export default function EnterprisePage() {
       </section>
 
       {/* Tiers */}
-      <section className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <section id="pricing" className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
           <div className="w-[36rem] h-72 rounded-full bg-purple-200/40 blur-3xl" />
         </div>
@@ -261,7 +261,7 @@ export default function EnterprisePage() {
       </section>
 
       {/* How it works */}
-      <section className="relative bg-white py-16 border-t border-gray-100 overflow-hidden">
+      <section id="how-it-works" className="relative bg-white py-16 border-t border-gray-100 overflow-hidden scroll-mt-24">
         <SectionDeco variant="right" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-10">How it works</h2>
