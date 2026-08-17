@@ -13,7 +13,7 @@
 
 import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { logEmailSend } from '@/lib/emailScheduler'
+import { logEmailSend, getUnsubscribeToken } from '@/lib/emailScheduler'
 import { getWelcomeEmailHtml } from '@/lib/welcomeEmailTemplate'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -78,11 +78,35 @@ export async function sendWelcomeEmail(params: {
   }
 
   try {
+    // CAN-SPAM: the welcome email is promotional in substance, so it gets the
+    // same unsubscribe link + one-click headers as the drip emails. The token
+    // lives on the profile row; if it isn't there yet (webhook can race the
+    // profile trigger at signup), send without the link rather than fail —
+    // the welcome must never block on it.
+    let unsubscribeUrl: string | null = null
+    if (userId) {
+      const token = await getUnsubscribeToken(userId)
+      if (token) {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://dcmgrading.com'
+        unsubscribeUrl = `${baseUrl}/api/unsubscribe/${token}`
+      } else {
+        console.warn('[WelcomeEmail] No unsubscribe token yet for', email, '— sending without unsubscribe link')
+      }
+    }
+
     const { data, error } = await resend.emails.send({
       from: 'DCM Grading <admin@dcmgrading.com>',
       to: [email],
       subject: WELCOME_SUBJECT,
-      html: getWelcomeEmailHtml({ name }),
+      html: getWelcomeEmailHtml({ name, unsubscribeUrl }),
+      ...(unsubscribeUrl
+        ? {
+            headers: {
+              'List-Unsubscribe': `<${unsubscribeUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
+          }
+        : {}),
     })
 
     if (error) {

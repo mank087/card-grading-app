@@ -9,7 +9,16 @@
  * bgcolor attributes for Outlook compatibility.
  */
 
-export function getWelcomeEmailHtml(_params?: { name?: string | null }): string {
+export function getWelcomeEmailHtml(_params?: { name?: string | null; unsubscribeUrl?: string | null }): string {
+  // CAN-SPAM footer: the welcome email's content is promotional (promo code,
+  // pricing, Card Lovers pitch), so it carries the same unsubscribe link +
+  // postal address as the drip emails. The link is omitted only when the
+  // profile's token isn't available yet (send must never block signup).
+  const unsubscribeLine = _params?.unsubscribeUrl
+    ? `<p style="color: #9ca3af; font-size: 11px; margin: 0 0 8px 0;">
+                      <a href="${_params.unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a> from marketing emails
+                    </p>`
+    : ''
   // Reserved: _params.name for future personalization. Current template
   // is static across all recipients to keep the layout simple and the
   // greeting universal ("Welcome to DCM Grading!").
@@ -599,6 +608,8 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #059669; text-decoration: none;">admin@dcmgrading.com</a></p>
                     <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px 0; line-height: 1.5;">If you grade a card, we&rsquo;ll send a few short follow-ups over the next two weeks, then stop.</p>
                     <p style="color: #9ca3af; font-size: 11px; margin: 0 0 10px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
+                    ${unsubscribeLine}
+                    <p style="color: #9ca3af; font-size: 10px; margin: 0;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
                   </td>
                 </tr>
               </table>
