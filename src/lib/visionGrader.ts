@@ -38,7 +38,11 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.15';
+// v9.16: sports delta adds card_info.last_stat_year (final stat-table season)
+// so yearGuard can cross-check tiny vintage © digits against the much larger
+// stat table — © misreads like "1986" on a card with stats through '87 are
+// corrected or dropped server-side (customer report, Aug 2026).
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.16';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and

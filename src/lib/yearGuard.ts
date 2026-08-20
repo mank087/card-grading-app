@@ -40,17 +40,48 @@ export type YearGuardOutcome =
   | 'dropped_not_visible'
   | 'dropped_no_evidence'
   | 'dropped_mismatch'
-  | 'dropped_implausible';
+  | 'dropped_implausible'
+  | 'corrected_stat_mismatch'  // © digits contradicted the stat table; year replaced
+  | 'dropped_stat_mismatch';   // © digits contradicted the stat table beyond repair
+
+/**
+ * Stat-table cross-check result (v9.16). Vintage sports backs print the ©
+ * year in ~6pt type that the model misreads with confidence ("© 1986" on a
+ * card that says "© 1988" — customer report, Aug 2026), while the year-by-year
+ * stat table beside it is printed far larger. A card cannot be printed BEFORE
+ * its own final stat season, so:
+ *
+ *   year >= last_stat_year      → consistent (retro/archive sets legitimately
+ *                                 show stats that end long before the © year,
+ *                                 and update sets show the partial current
+ *                                 season, so no upper-bound check)
+ *   year <  last_stat_year      → impossible; a small gap is a digit misread
+ *                                 (8→6, 2→0) and is corrected to
+ *                                 last_stat_year + 1; a large gap means
+ *                                 something is badly misread and blank is the
+ *                                 only honest answer.
+ */
+export interface StatCrossCheck {
+  lastStatYear: number;
+  /** Flagship-set expectation: printed the year after the final stat season. */
+  expectedYear: number;
+  relation: 'match' | 'later_than_stats' | 'corrected' | 'dropped';
+}
+
+/** Largest impossible-gap (expected − reported) we repair instead of blank. */
+const STAT_CORRECTION_MAX_GAP = 4;
 
 export interface YearGuardResult {
   outcome: YearGuardOutcome;
-  /** The year after enforcement (null when dropped). */
+  /** The year after enforcement (null when dropped, replaced when corrected). */
   year: string | null;
   /** The year the model originally proposed, for audit/telemetry. */
   originalYear: string | null;
   source: string | null;
   textSeen: string | null;
   reason: string | null;
+  /** Present when a last_stat_year was available to cross-check against. */
+  statCheck?: StatCrossCheck;
 }
 
 /**
@@ -66,6 +97,66 @@ function strictMode(): boolean {
 function firstFourDigitYear(text: string): string | null {
   const m = String(text).match(/\b((?:1[89]|20)\d{2})\b/);
   return m ? m[1] : null;
+}
+
+/** Parse card_info.last_stat_year into a plausible 4-digit year, else null. */
+function statTableYear(cardInfo: any): number | null {
+  const raw = cardInfo?.last_stat_year;
+  if (raw == null || raw === '') return null;
+  const parsed = firstFourDigitYear(String(raw));
+  if (!parsed) return null;
+  const n = Number(parsed);
+  const maxPlausible = new Date().getUTCFullYear() + 1;
+  return n >= MIN_PLAUSIBLE_YEAR && n <= maxPlausible ? n : null;
+}
+
+/**
+ * Cross-check a kept year against the stat table (see StatCrossCheck docs).
+ * Returns the (possibly rewritten) result; a no-op when no stat year exists.
+ */
+function applyStatCrossCheck(result: YearGuardResult, cardInfo: any): YearGuardResult {
+  if (!result.year) return result;
+  const lastStatYear = statTableYear(cardInfo);
+  if (lastStatYear === null) return result;
+
+  const reported = Number(firstFourDigitYear(result.year));
+  if (!Number.isFinite(reported)) return result;
+  const expectedYear = lastStatYear + 1;
+  const maxPlausible = new Date().getUTCFullYear() + 1;
+
+  if (reported >= lastStatYear) {
+    return {
+      ...result,
+      statCheck: {
+        lastStatYear,
+        expectedYear,
+        relation: reported <= expectedYear ? 'match' : 'later_than_stats',
+      },
+    };
+  }
+
+  // Reported year predates the card's own final stat season — impossible.
+  const gap = expectedYear - reported;
+  if (gap <= STAT_CORRECTION_MAX_GAP && expectedYear <= maxPlausible) {
+    return {
+      ...result,
+      outcome: 'corrected_stat_mismatch',
+      year: String(expectedYear),
+      reason:
+        `year "${reported}" predates the stat table ending ${lastStatYear}; ` +
+        `corrected to ${expectedYear} (stats print through the season before issue)`,
+      statCheck: { lastStatYear, expectedYear, relation: 'corrected' },
+    };
+  }
+  return {
+    ...result,
+    outcome: 'dropped_stat_mismatch',
+    year: null,
+    reason:
+      `year "${reported}" predates the stat table ending ${lastStatYear} by too much ` +
+      `to repair — © line or stat table badly misread`,
+    statCheck: { lastStatYear, expectedYear, relation: 'dropped' },
+  };
 }
 
 /**
@@ -125,7 +216,10 @@ export function checkYearEvidence(cardInfo: any): YearGuardResult {
         reason: 'no year_source/year_text_seen supplied (YEAR_EVIDENCE_REQUIRED=1)',
       };
     }
-    return { ...base, outcome: 'kept_unverified', year: originalYear, reason: null };
+    return applyStatCrossCheck(
+      { ...base, outcome: 'kept_unverified', year: originalYear, reason: null },
+      cardInfo,
+    );
   }
 
   // A source we don't recognise is not a source.
@@ -160,7 +254,10 @@ export function checkYearEvidence(cardInfo: any): YearGuardResult {
     };
   }
 
-  return { ...base, outcome: 'kept', year: originalYear, reason: null };
+  return applyStatCrossCheck(
+    { ...base, outcome: 'kept', year: originalYear, reason: null },
+    cardInfo,
+  );
 }
 
 /**
@@ -192,6 +289,12 @@ export function applyYearGuard(cardInfo: any, label = 'card'): YearGuardResult {
       `(source=${result.source ?? 'none'}, seen=${JSON.stringify(result.textSeen)})`
     );
     cardInfo.year = null;
+  } else if (result.outcome === 'corrected_stat_mismatch') {
+    console.warn(
+      `[YearGuard] ${label}: CORRECTED year "${result.originalYear}" -> "${result.year}" — ${result.reason} ` +
+      `(source=${result.source ?? 'none'}, seen=${JSON.stringify(result.textSeen)})`
+    );
+    cardInfo.year = result.year;
   } else if (result.outcome === 'kept_unverified') {
     console.warn(
       `[YearGuard] ${label}: year "${result.originalYear}" kept UNVERIFIED — model did not ` +
@@ -210,6 +313,13 @@ export function applyYearGuard(cardInfo: any, label = 'card'): YearGuardResult {
     source: result.source,
     text_seen: result.textSeen,
     reason: result.reason,
+    ...(result.statCheck
+      ? {
+          last_stat_year: result.statCheck.lastStatYear,
+          expected_from_stats: result.statCheck.expectedYear,
+          stat_cross_check: result.statCheck.relation,
+        }
+      : {}),
   };
 
   return result;

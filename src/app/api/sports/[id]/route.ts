@@ -916,24 +916,26 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       aiYearHint = guard.originalYear;
       yearGuardOutcome = guard.outcome;
 
-      if (guard.outcome.startsWith('dropped_')) {
+      if (guard.outcome.startsWith('dropped_') || guard.outcome === 'corrected_stat_mismatch') {
         // conversationalGradingData.card_info is a live reference into the
         // parsed report, but the RAW report string and the legacy
         // gradingResult["Card Information"] block were parsed separately —
         // the full-report tab renders straight off the raw string, so both
-        // need the same correction or the dropped year reappears there.
+        // need the same correction or the dropped/corrected year reappears
+        // there. guard.year is null for drops, the stat-table-corrected
+        // year for corrections (v9.16 vintage © misread repair).
         if (conversationalGradingResult) {
           try {
             const raw = JSON.parse(conversationalGradingResult);
             if (raw?.card_info) {
-              raw.card_info.year = null;
+              raw.card_info.year = guard.year;
               raw.card_info._year_guard = conversationalGradingData.card_info._year_guard;
               conversationalGradingResult = JSON.stringify(raw);
             }
           } catch { /* markdown-format report: nothing to patch */ }
         }
         if (gradingResult && (gradingResult as any)["Card Information"]) {
-          (gradingResult as any)["Card Information"].year = null;
+          (gradingResult as any)["Card Information"].year = guard.year;
         }
       }
     }
