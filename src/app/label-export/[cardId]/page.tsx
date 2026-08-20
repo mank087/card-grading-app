@@ -115,7 +115,17 @@ export default function LabelExportPage() {
   const { cardId } = useParams<{ cardId: string }>();
   const sp = useSearchParams();
   const token = sp.get('token') || '';
-  const type = sp.get('type') || 'slab-modern';
+  const rawType = sp.get('type') || 'slab-modern';
+  // Heritage Compact on the small holders — see the batch route for the full
+  // note. Accepted as a `-heritage` type suffix or &style=heritage; never
+  // implied, so a bare `onetouch`/`toploader` keeps printing Modern.
+  const styleParam = (sp.get('style') || '').toLowerCase();
+  const COMPACT_HOLDERS = ['onetouch', 'toploader', 'foldover'];
+  const suffixHeritage = rawType.endsWith('-heritage')
+    && COMPACT_HOLDERS.includes(rawType.slice(0, -'-heritage'.length));
+  const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
+  const wantsCompactHeritage = (suffixHeritage || styleParam === 'heritage')
+    && COMPACT_HOLDERS.includes(type);
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   // Any style id: 'modern' | 'traditional' | 'heritage' | 'custom-N'.
   const labelStyleParam = sp.get('labelStyle') || 'modern';
@@ -434,6 +444,38 @@ export default function LabelExportPage() {
           };
           const blob = await generateMiniReportJpg(fold);
           blobs.push({ name: `DCM-${namePrefix}-mini-report.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(blob) });
+        } else if (wantsCompactHeritage) {
+          postStatus('Generating Heritage label…');
+          const [{ buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl }, sheets] = await Promise.all([
+            import('@/lib/labels/heritageCompactInputs'),
+            import('@/lib/labels/heritageCompactSheets'),
+          ]);
+          // Same precedence as the slab heritage path: inline config first,
+          // then the slot named by ?labelStyle.
+          let inlineCfg: any = null;
+          if (inlineCustomConfigRaw) {
+            try { inlineCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall through */ }
+          }
+          const cfg = inlineCfg
+            ? { ...inlineCfg, style: 'heritage' }
+            : savedCustomStyles.find(st => st.id === labelStyleParam)?.config || null;
+          const sel = resolveHeritageSelection(labelStyleParam, cfg);
+          const items = [buildHeritageCompactInputs(card, {
+            qrDataUrl: await compactQrDataUrl(cardUrl),
+            bandColors: (sel.active ? sel.bandColors : null) ?? null,
+            pattern: (sp.get('heritagePattern') || (sel.active ? sel.pattern : null) || 'diamond') as any,
+            wordmarkDataUrl: await loadWordmarkDataUrl(),
+          })];
+          const blob =
+            type === 'onetouch' ? await sheets.generateHeritageOneTouchSheet(items, undefined, [position])
+            : type === 'foldover' ? await sheets.generateHeritageFoldOverSheet(items, undefined, position)
+            : await sheets.generateHeritageToploaderSheet(items, undefined, [position]);
+          const holderName = type === 'onetouch' ? 'OneTouch' : type === 'foldover' ? 'FoldOver' : 'Toploader';
+          blobs.push({
+            name: `DCM-${holderName}-Heritage-${namePrefix}.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
         } else if (type === 'onetouch') {
           postStatus('Generating Avery 6871 one-touch label…');
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');

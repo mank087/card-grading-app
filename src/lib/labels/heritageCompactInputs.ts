@@ -75,3 +75,44 @@ export function buildHeritageCompactInputs(
     showCardLoversEmblem: opts.showCardLoversEmblem,
   }
 }
+
+/**
+ * The DCM wordmark as a data URL, for embedding in a generated sheet.
+ *
+ * Cached after the first fetch: a 20-card batch would otherwise re-read and
+ * re-encode the same PNG once per label.
+ */
+let wordmarkCache: string | null | undefined
+export async function loadWordmarkDataUrl(): Promise<string | null> {
+  if (wordmarkCache !== undefined) return wordmarkCache
+  try {
+    const res = await fetch('/DCM-wordmark-black.png')
+    if (!res.ok) { wordmarkCache = null; return null }
+    const blob = await res.blob()
+    wordmarkCache = await new Promise<string | null>((resolve) => {
+      const r = new FileReader()
+      r.onloadend = () => resolve(typeof r.result === 'string' ? r.result : null)
+      r.onerror = () => resolve(null)
+      r.readAsDataURL(blob)
+    })
+  } catch {
+    wordmarkCache = null
+  }
+  return wordmarkCache
+}
+
+/**
+ * QR for a compact Heritage label. Error-correction H because the code is
+ * printed small (0.4" or less) and may carry an org mark in its centre.
+ */
+export async function compactQrDataUrl(url: string): Promise<string | null> {
+  try {
+    const QR = await import('qrcode')
+    return await QR.default.toDataURL(url, {
+      errorCorrectionLevel: 'H', margin: 1, width: 480,
+      color: { dark: '#141414', light: '#ffffff' },
+    })
+  } catch {
+    return null
+  }
+}

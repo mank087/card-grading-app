@@ -12,6 +12,17 @@
  *         onetouch|toploader|toploader-foldover|
  *         card-image-modern|card-image-traditional|
  *         mini-report|mini-report-pdf|full-report
+ *   &style=heritage                              — Heritage Compact on the
+ *                                                   onetouch/toploader/
+ *                                                   toploader-foldover types.
+ *                                                   `onetouch-heritage` etc.
+ *                                                   work as equivalent type
+ *                                                   suffixes. Omitted = the
+ *                                                   Modern layout those types
+ *                                                   have always produced, so
+ *                                                   existing callers are
+ *                                                   unaffected.
+ *   &heritagePattern=<id>                        — band pattern override
  *   &format=duplex|foldover                      — slab labels only
  *   &positions=0,1,2,3                           — Avery sheet positions for
  *                                                   onetouch (6871) and
@@ -119,7 +130,19 @@ function BatchLabelExportInner() {
   const token = sp.get('token') || '';
   const cardIdsParam = sp.get('cardIds') || '';
   const cardIds = cardIdsParam.split(',').map(s => s.trim()).filter(Boolean);
-  const type = sp.get('type') || 'slab-modern';
+  const rawType = sp.get('type') || 'slab-modern';
+  // Heritage Compact on the small holders. Accepted two ways so callers can
+  // use whichever fits: an explicit `-heritage` type suffix (matching how the
+  // slab types name their style) or a separate &style=heritage. Neither is
+  // implied — a bare `onetouch` still prints Modern, so every existing caller
+  // keeps its current output.
+  const styleParam = (sp.get('style') || '').toLowerCase();
+  const COMPACT_HOLDERS = ['onetouch', 'toploader', 'toploader-foldover', 'foldover'];
+  const suffixHeritage = rawType.endsWith('-heritage')
+    && COMPACT_HOLDERS.includes(rawType.slice(0, -'-heritage'.length));
+  const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
+  const wantsCompactHeritage = (suffixHeritage || styleParam === 'heritage')
+    && COMPACT_HOLDERS.includes(type);
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
@@ -241,6 +264,50 @@ function BatchLabelExportInner() {
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, orgLogos?.branding ? orgLogos.color : undefined).catch(() => '');
           return { card, labelData, subScores, grade, cardUrl, qrCodeDataUrl };
         }));
+
+        /**
+         * Heritage settings for the compact (One-Touch / Toploader) sheets.
+         *
+         * Same precedence the slab-heritage branch uses — inline ?customConfig,
+         * then the slot named by ?labelStyle, then the account's saved style —
+         * so a design saved in the wizard prints the same from either path.
+         * Band colours stay null when the design does not pin a palette, which
+         * lets each card sample its own artwork.
+         */
+        const resolveCompactHeritage = () => {
+          let inlineCfg: any = null;
+          if (inlineCustomConfigRaw) {
+            try { inlineCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall through */ }
+          }
+          const savedCfg =
+            savedCustomStyles.find(st => st.id === labelStyleParam)?.config
+            || savedCustomStyles.find(st => st.id === userLabelStyle)?.config
+            || null;
+          const sel = inlineCfg
+            ? resolveHeritageSelection(labelStyleParam || userLabelStyle, { ...inlineCfg, style: 'heritage' })
+            : resolveHeritageSelection(userLabelStyle, savedCfg);
+          const patternParam = sp.get('heritagePattern');
+          return {
+            pattern: (patternParam || (sel.active ? sel.pattern : null) || 'diamond') as any,
+            bandColors: (sel.active ? sel.bandColors : null) ?? null,
+          };
+        };
+
+        /** Per-card HeritageCompactInputs, with a high-EC QR and the wordmark. */
+        const buildCompactItems = async () => {
+          const { buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl } =
+            await import('@/lib/labels/heritageCompactInputs');
+          const { pattern, bandColors } = resolveCompactHeritage();
+          const wordmark = await loadWordmarkDataUrl();
+          return Promise.all(perCard.map(async ({ card }) => {
+            const qrDataUrl = await compactQrDataUrl(
+              cardQrUrl(card.id, card.serial, orgLogos?.branding),
+            );
+            return buildHeritageCompactInputs(card, {
+              qrDataUrl, bandColors, pattern, wordmarkDataUrl: wordmark,
+            });
+          }));
+        };
 
         // ------------------------------------------------------------
         // SLAB LABELS — HERITAGE (vector, per-card band colours)
@@ -400,6 +467,19 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         // ONE-TOUCH (Avery 6871) — 18 per page, 3-col × 6-row
         // ------------------------------------------------------------
+        else if (type === 'onetouch' && wantsCompactHeritage) {
+          setStatus(`Generating ${cardIds.length} Heritage one-touch labels…`);
+          const sheets = await import('@/lib/labels/heritageCompactSheets');
+          const items = await buildCompactItems();
+          const globalPositions = positions.length === items.length ? positions : undefined;
+          const blob = await sheets.generateHeritageOneTouchSheet(items, calibrationOffsets, globalPositions);
+          blobs.push({
+            name: `DCM-OneTouch-Heritage-Avery6871-${cardIds.length}cards.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        }
+
         else if (type === 'onetouch') {
           setStatus(`Generating ${cardIds.length} one-touch labels…`);
           // Build a real FoldableLabelData. The previous version
@@ -438,6 +518,19 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         // TOPLOADER (Avery 8167 standard front+back) — 80 labels/page
         // ------------------------------------------------------------
+        else if (type === 'toploader' && wantsCompactHeritage) {
+          setStatus(`Generating ${cardIds.length} Heritage toploader label pairs…`);
+          const sheets = await import('@/lib/labels/heritageCompactSheets');
+          const items = await buildCompactItems();
+          const globalPositions = positions.length === items.length ? positions : undefined;
+          const blob = await sheets.generateHeritageToploaderSheet(items, calibrationOffsets, globalPositions);
+          blobs.push({
+            name: `DCM-Toploader-Heritage-Avery8167-${cardIds.length}cards.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        }
+
         else if (type === 'toploader') {
           setStatus(`Generating ${cardIds.length} toploader label pairs…`);
           // ToploaderLabelData has 4 fields: grade, conditionLabel,
@@ -466,6 +559,21 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         // FOLD-OVER TOPLOADER (Avery 8167 foldover) — 80 per page
         // ------------------------------------------------------------
+        else if ((type === 'foldover' || type === 'toploader-foldover') && wantsCompactHeritage) {
+          setStatus(`Generating ${cardIds.length} Heritage fold-over toploader labels…`);
+          const sheets = await import('@/lib/labels/heritageCompactSheets');
+          const items = await buildCompactItems();
+          // Fold-over prints sequentially — the generator owns its layout, so
+          // only the starting slot is honoured (same as the Modern path).
+          const startPosition = positions.length > 0 ? positions[0] : 0;
+          const blob = await sheets.generateHeritageFoldOverSheet(items, calibrationOffsets, startPosition);
+          blobs.push({
+            name: `DCM-FoldOver-Heritage-Avery8167-${cardIds.length}cards.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        }
+
         else if (type === 'foldover' || type === 'toploader-foldover') {
           setStatus(`Generating ${cardIds.length} fold-over toploader labels…`);
           // Same shape fix as 'toploader' above: ToploaderLabelData

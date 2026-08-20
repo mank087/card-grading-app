@@ -305,23 +305,6 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     };
   };
 
-  /** DCM wordmark (letterforms only) as a data URL, for Heritage panels. */
-  const loadWordmarkDataUrl = async (): Promise<string | null> => {
-    try {
-      const res = await fetch('/DCM-wordmark-black.png');
-      if (!res.ok) return null;
-      const blob = await res.blob();
-      return await new Promise<string | null>((resolve) => {
-        const r = new FileReader();
-        r.onloadend = () => resolve(typeof r.result === 'string' ? r.result : null);
-        r.onerror = () => resolve(null);
-        r.readAsDataURL(blob);
-      });
-    } catch {
-      return null;
-    }
-  };
-
   // Org branding for the batch: all-same-org brands the sheet, else DCM
   // (same rule as BatchSlabLabelModal).
   const resolveBatchOrgBranding = async (): Promise<{ logo: string | undefined; branding: { slug: string } | null }> => {
@@ -354,23 +337,17 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
 
     // Heritage Compact: same grid/positions, Heritage panels instead of Modern.
     if (heritage) {
-      const [{ buildHeritageCompactInputs }, sheets, QR] = await Promise.all([
+      const [{ buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl }, sheets] = await Promise.all([
         import('@/lib/labels/heritageCompactInputs'),
         import('@/lib/labels/heritageCompactSheets'),
-        import('qrcode'),
       ]);
       const wordmark = await loadWordmarkDataUrl();
       const inputs = await Promise.all(entries.map(async ([cardId]) => {
         const card = selectedCards.find(c => c.id === cardId)!;
         const url = cardQrUrl(card.id, getCardLabelData(card).serial, branding,
           `${window.location.origin}/${cardType}/${card.id}`);
-        // Error-correction H: the Heritage QR is small and may carry a centre mark.
-        const qrDataUrl = await QR.default.toDataURL(url, {
-          errorCorrectionLevel: 'H', margin: 1, width: 480,
-          color: { dark: '#141414', light: '#ffffff' },
-        }).catch(() => null);
         return buildHeritageCompactInputs(card, {
-          qrDataUrl,
+          qrDataUrl: await compactQrDataUrl(url),
           bandColors: heritage.bandColors ?? null,
           pattern: heritage.pattern as any,
           wordmarkDataUrl: wordmark,
