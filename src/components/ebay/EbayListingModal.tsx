@@ -1327,6 +1327,15 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     }
   };
 
+  // Validation errors render at the TOP of the scroll container — on long
+  // steps (Shipping especially) the user is scrolled to the bottom when they
+  // hit Next, so without this scroll the message is invisible and the button
+  // just looks dead. (Customer report, Aug 2026.)
+  const showValidationError = (msg: string) => {
+    setError(msg);
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleNext = () => {
     switch (step) {
       case 'images':
@@ -1334,11 +1343,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         break;
       case 'details':
         if (!title.trim()) {
-          setError('Title is required');
+          showValidationError('Title is required');
           return;
         }
         if (!price || parseFloat(price) <= 0) {
-          setError('Valid price is required');
+          showValidationError('Valid price is required');
           return;
         }
         setError(null);
@@ -1352,7 +1361,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         break;
       case 'shipping':
         if (!shippingForm.postalCode || shippingForm.postalCode.length < 5) {
-          setError('Please enter your ZIP code for shipping');
+          showValidationError('Please enter your ship-from ZIP code (in the Shipping section above) to continue');
           return;
         }
         setError(null);
@@ -1388,6 +1397,17 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   if (!isOpen) return null;
 
   const labelData = getCardLabelData(card);
+
+  // Required item specifics that are still empty. Computed here (not in the
+  // footer IIFE) so both the footer's disable logic AND the visible Review
+  // banner share one definition. These can appear AFTER the user passes the
+  // Specifics step: the eBay aspects fetch starts on entering that step and
+  // used to append required rows behind a fast user's back — which left them
+  // on Review with a dead Publish button and only a hover tooltip (invisible
+  // on touch) to explain why.
+  const missingRequired = itemSpecifics.filter(s =>
+    s.required && (!s.value || (Array.isArray(s.value) ? s.value.length === 0 : !s.value.trim()))
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -2882,6 +2902,25 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Listing</h3>
 
+              {/* Missing required specifics — say it out loud. The disabled
+                  Publish button's tooltip never shows on touch devices. */}
+              {missingRequired.length > 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-amber-900 mb-1">
+                    eBay requires {missingRequired.length === 1 ? 'one more field' : `${missingRequired.length} more fields`} before this can be published:
+                  </p>
+                  <p className="text-sm text-amber-800 mb-3">
+                    {missingRequired.map(s => s.name).join(', ')}
+                  </p>
+                  <button
+                    onClick={() => { setError(null); setStep('specifics'); }}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                  >
+                    Go back and fill {missingRequired.length === 1 ? 'it' : 'them'} in
+                  </button>
+                </div>
+              )}
+
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <span className="text-gray-600">Title:</span>
@@ -3208,12 +3247,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               Try Again
             </button>
           ) : step !== 'publishing' && (() => {
-            // Check if any required item specifics are empty
-            const hasEmptyRequired = itemSpecifics.some(s =>
-              s.required && (!s.value || (Array.isArray(s.value) ? s.value.length === 0 : !s.value.trim()))
-            );
+            const hasEmptyRequired = missingRequired.length > 0;
+            // Hold the Specifics step until eBay's aspect list arrives —
+            // otherwise a fast user advances before the required rows exist,
+            // they get appended behind their back, and Review dead-ends.
+            // Mirrors the fetch's own guard (needs a categoryId) so a card
+            // with no category can never deadlock here.
+            const aspectsPending = step === 'specifics' && !aspectsLoaded && Boolean(categoryId);
             const isDisabled =
               isLoading ||
+              aspectsPending ||
               // Images step: proceed if ANY image is selected — system tiles
               // OR user-uploaded additional photos.
               (step === 'images' &&
@@ -3222,14 +3265,26 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               ((step === 'specifics' || step === 'review') && hasEmptyRequired);
 
             return (
-              <button
-                onClick={handleNext}
-                disabled={isDisabled}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                title={hasEmptyRequired && (step === 'specifics' || step === 'review') ? 'Please fill in all required fields' : undefined}
-              >
-                {step === 'review' ? 'Publish Listing' : 'Next'}
-              </button>
+              <div className="flex items-center gap-3 min-w-0">
+                {/* Visible reason the button is disabled — tooltips don't
+                    exist on touch devices. */}
+                {hasEmptyRequired && (step === 'specifics' || step === 'review') && !aspectsPending && (
+                  <span className="text-xs text-amber-600 truncate max-w-[200px] sm:max-w-none">
+                    {missingRequired.length} required field{missingRequired.length === 1 ? '' : 's'} to fill
+                  </span>
+                )}
+                <button
+                  onClick={handleNext}
+                  disabled={isDisabled}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shrink-0"
+                >
+                  {aspectsPending
+                    ? 'Checking eBay requirements…'
+                    : step === 'review'
+                      ? 'Publish Listing'
+                      : 'Next'}
+                </button>
+              </div>
             );
           })()}
           </div>

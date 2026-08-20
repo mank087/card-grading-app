@@ -1305,7 +1305,19 @@ export default function EbayListScreen() {
         )}
       </ScrollView>
 
-      {/* Bottom navigation bar — pad for device home indicator / nav bar */}
+      {/* Bottom navigation bar — pad for device home indicator / nav bar.
+          When Next is greyed out, a hint strip above the bar says WHY — a
+          silent disabled button reads as a broken app (customer report,
+          Aug 2026: stuck on Shipping with no ZIP and no explanation). */}
+      {!['publishing', 'success', 'error'].includes(step) && !canGoNext && (step === 'shipping' || step === 'details') && (
+        <View style={st.navHintStrip}>
+          <Text style={st.navHintText}>
+            {step === 'shipping'
+              ? 'Enter your ship-from ZIP code above to continue'
+              : 'Enter a title and price to continue'}
+          </Text>
+        </View>
+      )}
       {!['publishing', 'success', 'error'].includes(step) && (
         <View style={[st.navBar, { paddingBottom: 12 + Math.max(insets.bottom, 4) }]}>
           {step !== 'connect' ? (
@@ -1421,6 +1433,8 @@ const st = StyleSheet.create({
 
   // Navigation
   navBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.gray[200], backgroundColor: '#fff' },
+  navHintStrip: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#FFFBEB', borderTopWidth: 1, borderTopColor: '#FDE68A' },
+  navHintText: { fontSize: 12, color: '#92400E', textAlign: 'center', fontWeight: '500' },
   navBtnBack: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: Colors.gray[300] },
   navBtnBackText: { fontSize: 14, fontWeight: '600', color: Colors.gray[600] },
   navBtnNext: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: Colors.purple[600] },
