@@ -44,6 +44,13 @@ interface LabelMockupProps {
     showVipEmblem?: boolean
     showCardLoversEmblem?: boolean
   }
+  /**
+   * Pre-rendered label artwork (data URLs) to drop into the holder slot instead
+   * of the DOM label this file builds. Heritage Compact supplies the very
+   * canvases its print sheets use, so the mockup cannot drift from the paper.
+   * Only honoured by the One-Touch and Toploader mockups.
+   */
+  labelImages?: { front?: string | null; back?: string | null } | null
 }
 
 function gradeStr(grade: number | null, alt?: boolean): string {
@@ -431,14 +438,18 @@ function GradedSlabMockup({ card, labelProps, backLabelProps, style }: {
 //    Label sits at the very top edge, centered
 // ============================================================================
 
-function ToploaderMockup({ card, labelProps, variant }: {
+function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
   variant: 'front-back' | 'foldover'
+  /** Real QR data URL — falls back to the placeholder glyph when absent. */
+  qrCodeUrl?: string
+  labelImages?: LabelMockupProps['labelImages']
 }) {
   const [side, setSide] = useState<'front' | 'back'>('front')
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const grade = gradeStr(labelProps.grade, labelProps.isAlteredAuthentic)
+  const supplied = labelImages ? (side === 'front' ? labelImages.front : labelImages.back) : null
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -462,20 +473,35 @@ function ToploaderMockup({ card, labelProps, variant }: {
         </div>
 
         {/* Label overlaid at the top edge */}
-        {variant === 'foldover' ? (
+        {supplied ? (
+          variant === 'foldover' ? (
+            /* Fold-over, as it actually sits on the card: the 1.75" long axis
+               runs VERTICALLY over the top edge, so each visible half is a
+               0.5" x 0.875" portrait — which is why the print sheet rotates the
+               artwork 90 degrees. 0.5" / 3.0" holder width = 16.7%. */
+            <div className="absolute" style={{ top: '0%', left: '41.65%', width: '16.7%' }}>
+              <img src={supplied} alt="Label" className="w-full block rounded-b-[2px]"
+                style={{ boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }} />
+            </div>
+          ) : (
+            /* Front + back pair: 1.75" / 3.0" holder width = 58%. */
+            <div className="absolute" style={{ top: '0%', left: '21%', width: '58%' }}>
+              <img src={supplied} alt="Label" className="w-full block rounded-b-[2px]"
+                style={{ boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }} />
+            </div>
+          )
+        ) : variant === 'foldover' ? (
           /* FOLD-OVER LABEL (8167 fold-over variant):
-             The physical label is 1.75" × 0.5", folded along the CENTER VERTICAL line.
-             Each folded half is 0.875" × 0.5" (aspect ~1.75:1).
-             Left half = front (grade rotated 90° CW → right-side up when folded)
-             Right half = back (QR rotated 90° CCW → right-side up when folded)
-             Purple fold line sits on the toploader edge.
-             Folded half width relative to toploader: 0.875" / 3.0" ≈ 29% */
-          <div className="absolute" style={{ top: '0%', left: '35.5%', width: '29%' }}>
-            {/* Thin purple fold crease at top — sits on the toploader edge */}
-            <div className="rounded-t-[1px]" style={{ height: '3px', background: '#7c3aed' }} />
+             The physical label is 1.75" × 0.5", folded along the CENTER VERTICAL
+             line and wrapped over the TOP edge — so the 1.75" axis runs
+             vertically on the card and each visible half is a 0.5" × 0.875"
+             PORTRAIT. That is why drawFoldOverLabel rotates its content 90°:
+             left half CW (front), right half CCW (back), both landing upright
+             once folded. Half width vs. the 3.0" holder: 0.5" / 3.0" ≈ 16.7%. */
+          <div className="absolute" style={{ top: '0%', left: '41.65%', width: '16.7%' }}>
             {/* Visible folded half */}
             <div className="w-full rounded-b-[2px] overflow-hidden"
-              style={{ aspectRatio: '1.75 / 1', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>
+              style={{ aspectRatio: '0.5 / 0.875', boxShadow: '0 2px 5px rgba(0,0,0,0.15)' }}>
               {side === 'front' ? (
                 /* FRONT: grade + condition, right-side up (after folding) */
                 <div className="w-full h-full relative flex items-center justify-center"
@@ -494,7 +520,11 @@ function ToploaderMockup({ card, labelProps, variant }: {
                 /* BACK: QR code, right-side up (after folding) */
                 <div className="w-full h-full relative flex items-center justify-center" style={{ background: '#ffffff' }}>
                   <WatermarkPattern />
-                  <div className="relative z-10"><QRPlaceholder size={18} /></div>
+                  <div className="relative z-10">
+                    {qrCodeUrl
+                      ? <img src={qrCodeUrl} alt="QR code" style={{ width: 18, height: 18 }} />
+                      : <QRPlaceholder size={18} />}
+                  </div>
                 </div>
               )}
             </div>
@@ -530,7 +560,9 @@ function ToploaderMockup({ card, labelProps, variant }: {
                 style={{ aspectRatio: '3.5 / 1', background: '#ffffff', boxShadow: '0 2px 5px rgba(0,0,0,0.15)', border: '0.5px solid #e5e7eb' }}>
                 <DenseLogoGrid />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <QRPlaceholder size={14} />
+                  {qrCodeUrl
+                    ? <img src={qrCodeUrl} alt="QR code" style={{ width: 14, height: 14 }} />
+                    : <QRPlaceholder size={14} />}
                 </div>
               </div>
             )}
@@ -552,13 +584,17 @@ function ToploaderMockup({ card, labelProps, variant }: {
 //    Label width relative to case: ~79% (2.375 / 3.0)
 // ============================================================================
 
-function OneTouchMockup({ card, labelProps }: {
+function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
+  /** Real QR data URL — falls back to the placeholder glyph when absent. */
+  qrCodeUrl?: string
+  labelImages?: LabelMockupProps['labelImages']
 }) {
   const [side, setSide] = useState<'front' | 'back'>('front')
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const grade = gradeStr(labelProps.grade, labelProps.isAlteredAuthentic)
+  const supplied = labelImages ? (side === 'front' ? labelImages.front : labelImages.back) : null
 
   /* Avery 6871: 2.375" × 1.25" folds over the top edge.
      Visible half on each side: 2.375" × 0.625" (ratio ~3.8:1).
@@ -585,15 +621,15 @@ function OneTouchMockup({ card, labelProps }: {
           )}
         </div>
 
-        {/* Label folded over the top edge of the case */}
+        {/* Label folded over the top edge of the case. No fold-crease marker:
+            nothing prints there, so drawing one misrepresents the output. */}
         <div className="absolute" style={{ top: '0%', left: '17.5%', width: '65%' }}>
-          {/* Thin purple fold crease — sits on the case edge, no text */}
-          <div className="rounded-t-[1px]" style={{ height: '3px', background: '#7c3aed' }} />
-
           {/* Visible label half — 2.375" × 0.625" (ratio ~3.8:1) */}
           <div className="w-full overflow-hidden rounded-b-[2px]"
             style={{ boxShadow: '0 3px 8px rgba(0,0,0,0.2)' }}>
-            {side === 'front' ? (
+            {supplied ? (
+              <img src={supplied} alt="Label" className="w-full block" />
+            ) : side === 'front' ? (
               /* FRONT: logo + card info + grade (bottom half of unfolded 6871) */
               <div className="w-full flex items-center gap-[3px] px-[4px]"
                 style={{ aspectRatio: '3.8 / 1', background: '#ffffff' }}>
@@ -622,7 +658,9 @@ function OneTouchMockup({ card, labelProps }: {
               /* BACK: QR code centered + rotated DCM logo (top half of unfolded 6871) */
               <div className="w-full flex items-center justify-center gap-1"
                 style={{ aspectRatio: '3.8 / 1', background: '#ffffff' }}>
-                <QRPlaceholder size={16} />
+                {qrCodeUrl
+                  ? <img src={qrCodeUrl} alt="QR code" style={{ width: 16, height: 16 }} />
+                  : <QRPlaceholder size={16} />}
                 <img src="/DCM-logo.png" alt="" className="h-[10px] w-auto opacity-25" />
               </div>
             )}
@@ -718,15 +756,15 @@ function SideToggle({ side, onToggle }: { side: 'front' | 'back'; onToggle: (s: 
 // MAIN EXPORT
 // ============================================================================
 
-export function LabelMockup({ card, labelType, labelProps, backLabelProps }: LabelMockupProps) {
+export function LabelMockup({ card, labelType, labelProps, backLabelProps, labelImages }: LabelMockupProps) {
   const style = labelType.style || 'modern'
   switch (labelType.category) {
     case 'slab':
       return <GradedSlabMockup card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} />
     case 'onetouch':
-      return <OneTouchMockup card={card} labelProps={labelProps} />
+      return <OneTouchMockup card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} />
     case 'toploader':
-      return <ToploaderMockup card={card} labelProps={labelProps} variant={labelType.downloadType === 'foldover' ? 'foldover' : 'front-back'} />
+      return <ToploaderMockup card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} variant={labelType.downloadType === 'foldover' ? 'foldover' : 'front-back'} />
     case 'digital':
       return <CardImageMockup card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} />
     default:

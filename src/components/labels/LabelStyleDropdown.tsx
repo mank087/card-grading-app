@@ -78,7 +78,9 @@ export function LabelStyleDropdown({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+        // max-h + scroll: with 12 saved-design slots the list can hit 15
+        // entries, which would overflow past a modal's bottom edge.
+        <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-80 overflow-y-auto">
           {/* Built-in styles */}
           <button
             onClick={() => { onSwitch('modern'); setOpen(false); }}

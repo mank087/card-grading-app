@@ -37,6 +37,12 @@ interface BatchAveryLabelModalProps {
   onClose: () => void;
   selectedCards: CardData[];
   cardType?: string;
+  /**
+   * Heritage Compact styling. When supplied the sheet renders the Heritage
+   * One-Touch layout instead of the Modern one; grid, calibration and the
+   * position picker are unchanged.
+   */
+  heritage?: { pattern: string; bandColors?: string[] | null } | null;
 }
 
 const CALIBRATION_STORAGE_KEY = 'dcm_avery_calibration';
@@ -46,7 +52,8 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
   isOpen,
   onClose,
   selectedCards,
-  cardType = 'card'
+  cardType = 'card',
+  heritage = null
 }) => {
   const config = getAveryConfig();
 
@@ -286,6 +293,23 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
 
   // Org branding for the batch: all-same-org brands the sheet, else DCM
   // (same rule as BatchSlabLabelModal).
+  /** DCM wordmark (letterforms only) as a data URL, for Heritage panels. */
+  const loadWordmarkDataUrl = async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/DCM-wordmark-black.png');
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string | null>((resolve) => {
+        const r = new FileReader();
+        r.onloadend = () => resolve(typeof r.result === 'string' ? r.result : null);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const resolveBatchOrgLogos = async (): Promise<OrgLogoSet | null> => {
     const allSameOrg = selectedCards.length > 0 &&
       selectedCards.every(c => (c as any).org_id && (c as any).org_id === (selectedCards[0] as any).org_id);
@@ -377,6 +401,33 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify({ x: offsetX, y: offsetY }));
 
     const offsets: CalibrationOffsets = { x: offsetX, y: offsetY };
+
+    // Heritage Compact: same grid/positions, Heritage panels instead of Modern.
+    if (heritage) {
+      const [{ buildHeritageCompactInputs }, sheets, QR] = await Promise.all([
+        import('@/lib/labels/heritageCompactInputs'),
+        import('@/lib/labels/heritageCompactSheets'),
+        import('qrcode'),
+      ]);
+      const wordmark = await loadWordmarkDataUrl();
+      const inputs = await Promise.all(entries.map(async ([cardId]) => {
+        const card = selectedCards.find(c => c.id === cardId)!;
+        const url = cardQrUrl(card.id, getCardLabelData(card).serial,
+          orgLogos?.branding ?? null,
+          `${window.location.origin}/${cardType}/${card.id}`);
+        const qrDataUrl = await QR.default.toDataURL(url, {
+          errorCorrectionLevel: 'H', margin: 1, width: 480,
+          color: { dark: '#141414', light: '#ffffff' },
+        }).catch(() => null);
+        return buildHeritageCompactInputs(card, {
+          qrDataUrl,
+          bandColors: heritage.bandColors ?? null,
+          pattern: heritage.pattern as any,
+          wordmarkDataUrl: wordmark,
+        });
+      }));
+      return sheets.generateHeritageOneTouchSheet(inputs, offsets, entries.map(([, pos]) => pos));
+    }
 
     // Check if we need multi-page
     const maxPosition = Math.max(...entries.map(([_, pos]) => pos));

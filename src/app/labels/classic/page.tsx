@@ -1,24 +1,26 @@
 'use client'
 
 /**
- * /labels — the Label Wizard (five-step flow).
+ * Label Studio — Classic design mode.
  *
- * The original single-page studio is preserved unchanged at /labels/classic.
- * Data loading and the org-workspace gate are identical to the classic page:
- * signed-in users get their collection, guests get sample cards, and org-scope
- * members are pointed at Brand Setup (org labels are a locked house style).
+ * The original single-page studio, preserved as-is while /labels becomes the
+ * step-by-step wizard. This wrapper is a copy of the pre-wizard /labels page
+ * (same data loading, same org gate) plus a slim banner linking back to the
+ * wizard. LabelStudioClient itself is untouched.
  */
 
-import { Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
-import LabelWizard from '@/components/labelWizard/LabelWizard'
+import LabelStudioClient from '../LabelStudioClient'
 
-function LabelsPageInner() {
+export default function ClassicLabelsPage() {
   const [cards, setCards] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // Org workspace: label design is locked to the house style chosen in Brand
+  // Setup. Members keep Label Studio for their PERSONAL workspace/cards.
   const { membership, membershipLoaded, isOrgScope } = useOrgContext()
 
   useEffect(() => {
@@ -93,13 +95,17 @@ function LabelsPageInner() {
     )
   }
 
-  return <LabelWizard cards={cards} isAuthenticated={isAuthenticated} />
-}
-
-export default function LabelsPage() {
   return (
-    <Suspense fallback={null}>
-      <LabelsPageInner />
-    </Suspense>
+    <div>
+      <div className="bg-purple-50 border-b border-purple-100">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-purple-900 font-medium">Classic design mode</span>
+          <Link href="/labels" className="text-purple-700 font-semibold hover:text-purple-900 underline underline-offset-2">
+            Try the new step-by-step Label Wizard →
+          </Link>
+        </div>
+      </div>
+      <LabelStudioClient cards={cards} isAuthenticated={isAuthenticated} />
+    </div>
   )
 }

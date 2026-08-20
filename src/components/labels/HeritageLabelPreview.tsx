@@ -60,6 +60,13 @@ interface Props {
    * heritageMarkBox — so an oversized value can never print over the serial.
    */
   logoScale?: number
+  /**
+   * Physical aspect ratio (width/height) to stretch the preview to. The design
+   * canvas is 3.5:1 (2.8" × 0.8"); non-standard slots like Zion Mag Pro
+   * (2.51" × 0.76" = 3.30:1) mirror the print pipeline's mild anisotropic
+   * scale by stretching the SVG. Absent = natural 3.5:1.
+   */
+  stretchAspect?: number
 }
 
 function gradeString(data: SlabLabelData): string {
@@ -326,7 +333,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
   )
 }
 
-export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false, logoScale = 1 }: Props) {
+export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false, logoScale = 1, stretchAspect }: Props) {
   // Unique per instance: several previews render on one page (desktop slab,
   // hidden mobile block, gallery tile), and duplicated gradient/clip ids make
   // url(#...) resolve to the FIRST one in the document — if that copy sits in
@@ -338,7 +345,12 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
     <svg
       viewBox={`0 0 ${PX.W} ${PX.H}`}
       className={className}
-      style={{ display: 'block', width: '100%', height: 'auto' }}
+      preserveAspectRatio={stretchAspect ? 'none' : undefined}
+      style={
+        stretchAspect
+          ? { display: 'block', width: '100%', height: 'auto', aspectRatio: String(stretchAspect) }
+          : { display: 'block', width: '100%', height: 'auto' }
+      }
       role="img"
       aria-label={`Heritage label preview — ${side}`}
     >

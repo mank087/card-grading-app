@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine, formatCardNumberForContext } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops, GRADE_CHIPS_PRINT, GRADE_CHIP_BLACK, GRADE_10_FOIL_CSS } from '@/lib/labelPresets'
+import { DIMENSION_PRESETS, COLOR_PRESETS, MAX_SAVED_LABEL_STYLES, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops, GRADE_CHIPS_PRINT, GRADE_CHIP_BLACK, GRADE_10_FOIL_CSS } from '@/lib/labelPresets'
 import { contrastRatioHex } from '@/lib/contrastWCAG'
 import { getStoredSession } from '@/lib/directAuth'
 import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
@@ -2793,8 +2793,8 @@ function SavedStylesManager({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const handleSaveNew = async () => {
-    if (customStyles.length >= 4) {
-      alert('Maximum 4 custom styles. Delete one first.')
+    if (customStyles.length >= MAX_SAVED_LABEL_STYLES) {
+      alert(`Maximum ${MAX_SAVED_LABEL_STYLES} custom styles. Delete one first.`)
       return
     }
     setIsSaving(true)

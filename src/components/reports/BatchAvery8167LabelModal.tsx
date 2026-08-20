@@ -7,6 +7,7 @@ import {
   ToploaderLabelData,
   generateToploaderLabelSheet,
   generateToploaderLabelSheetMultiPage,
+  generateFoldOverLabelSheet,
   getAvery8167CardsPerPage
 } from '../../lib/avery8167LabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
@@ -42,6 +43,19 @@ interface BatchAvery8167LabelModalProps {
   onClose: () => void;
   selectedCards: CardData[];
   cardType?: string;
+  /**
+   * 'front-back' (default): the classic pair layout with the drag-drop
+   * position picker. 'foldover': one fold-over label per card, printed
+   * sequentially from the first 8167 slot — the fold-over generator lays out
+   * its own positions, so the picker is hidden and cards auto-assign in order.
+   */
+  variant?: 'front-back' | 'foldover';
+  /**
+   * Heritage Compact styling. When supplied, the sheet renders the Heritage
+   * layouts for this format instead of the Modern ones; the grid, calibration
+   * and position picker are unchanged.
+   */
+  heritage?: { pattern: string; bandColors?: string[] | null } | null;
 }
 
 const CALIBRATION_STORAGE_KEY = 'dcm_avery8167_calibration';
@@ -51,9 +65,13 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
   isOpen,
   onClose,
   selectedCards,
-  cardType = 'card'
+  cardType = 'card',
+  variant = 'front-back',
+  heritage = null
 }) => {
   const config = getAvery8167Config();
+  const isFoldOver = variant === 'foldover';
+  const isHeritage = Boolean(heritage);
 
   // Card-to-position mapping (cardId -> global position: page * CARDS_PER_PAGE + positionOnPage)
   const [positionMap, setPositionMap] = useState<Map<string, number>>(new Map());
@@ -131,13 +149,19 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     }
   }, [isOpen]);
 
-  // Reset state when modal opens with new cards
+  // Reset state when modal opens with new cards. Fold-over has no position
+  // picker: every card auto-assigns sequentially so the assignedCount-gated
+  // preview/download buttons work unchanged.
   useEffect(() => {
     if (isOpen) {
-      setPositionMap(new Map());
+      setPositionMap(
+        isFoldOver
+          ? new Map(selectedCards.map((c, i) => [c.id, i]))
+          : new Map()
+      );
       setCurrentPage(0);
     }
-  }, [isOpen, selectedCards]);
+  }, [isOpen, selectedCards, isFoldOver]);
 
   // Clean up preview URL on unmount
   useEffect(() => {
@@ -281,6 +305,23 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     };
   };
 
+  /** DCM wordmark (letterforms only) as a data URL, for Heritage panels. */
+  const loadWordmarkDataUrl = async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/DCM-wordmark-black.png');
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string | null>((resolve) => {
+        const r = new FileReader();
+        r.onloadend = () => resolve(typeof r.result === 'string' ? r.result : null);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   // Org branding for the batch: all-same-org brands the sheet, else DCM
   // (same rule as BatchSlabLabelModal).
   const resolveBatchOrgBranding = async (): Promise<{ logo: string | undefined; branding: { slug: string } | null }> => {
@@ -310,6 +351,42 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify({ x: offsetX, y: offsetY }));
 
     const offsets: CalibrationOffsets = { x: offsetX, y: offsetY };
+
+    // Heritage Compact: same grid/positions, Heritage panels instead of Modern.
+    if (heritage) {
+      const [{ buildHeritageCompactInputs }, sheets, QR] = await Promise.all([
+        import('@/lib/labels/heritageCompactInputs'),
+        import('@/lib/labels/heritageCompactSheets'),
+        import('qrcode'),
+      ]);
+      const wordmark = await loadWordmarkDataUrl();
+      const inputs = await Promise.all(entries.map(async ([cardId]) => {
+        const card = selectedCards.find(c => c.id === cardId)!;
+        const url = cardQrUrl(card.id, getCardLabelData(card).serial, branding,
+          `${window.location.origin}/${cardType}/${card.id}`);
+        // Error-correction H: the Heritage QR is small and may carry a centre mark.
+        const qrDataUrl = await QR.default.toDataURL(url, {
+          errorCorrectionLevel: 'H', margin: 1, width: 480,
+          color: { dark: '#141414', light: '#ffffff' },
+        }).catch(() => null);
+        return buildHeritageCompactInputs(card, {
+          qrDataUrl,
+          bandColors: heritage.bandColors ?? null,
+          pattern: heritage.pattern as any,
+          wordmarkDataUrl: wordmark,
+        });
+      }));
+      const positions = entries.map(([, pos]) => pos);
+      return isFoldOver
+        ? sheets.generateHeritageFoldOverSheet(inputs, offsets, 0)
+        : sheets.generateHeritageToploaderSheet(inputs, offsets, positions);
+    }
+
+    // Fold-over: one label per card, sequential from slot 0 — the generator
+    // handles its own layout and page breaks.
+    if (isFoldOver) {
+      return generateFoldOverLabelSheet(labelDataArray, offsets, 0, orgLogo);
+    }
 
     // Check if we need multi-page
     const maxPosition = entries.length > 0 ? Math.max(...entries.map(([_, pos]) => pos)) : 0;
@@ -466,7 +543,10 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-white">Print Toploader Labels</h2>
+              <h2 className="text-xl font-bold text-white">
+                {isFoldOver ? 'Print Fold-Over Toploader Labels' : 'Print Toploader Labels'}
+                {isHeritage && <span className="ml-2 text-xs font-medium text-purple-200">Heritage</span>}
+              </h2>
               <p className="text-purple-100 text-sm mt-1">
                 {selectedCards.length} cards selected • {assignedCount} assigned
                 {isMultiPageMode && <> • {totalPages} pages</>}
@@ -513,8 +593,17 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
                 </div>
               )}
 
+              {/* Fold-over: no position picker — labels print sequentially. */}
+              {isFoldOver && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+                  {selectedCards.length} fold-over label{selectedCards.length === 1 ? '' : 's'} will print in
+                  order, starting from the first slot on the Avery 8167 sheet. Each label folds over the
+                  toploader&apos;s top edge — grade on the front, QR on the back.
+                </div>
+              )}
+
               {/* Page Navigation (for multi-page) */}
-              {isMultiPageMode && (
+              {!isFoldOver && isMultiPageMode && (
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">
@@ -568,6 +657,7 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
               )}
 
               {/* Main drag-drop layout */}
+              {!isFoldOver && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Unassigned Cards */}
                 <div>
@@ -664,6 +754,7 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
                   pageNumber={isMultiPageMode ? currentPage + 1 : undefined}
                 />
               </div>
+              )}
 
               {/* Calibration Section */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -759,9 +850,15 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-amber-800 text-xs">
                   <strong>Tip:</strong> Print at 100% scale (no scaling) for proper alignment.
-                  Drag cards to positions, or click a card in the grid to remove it.
-                  {isMultiPageMode && ' Use page navigation to assign cards across multiple pages.'}
-                  {' '}Apply front labels to toploader front, back labels to toploader back.
+                  {isFoldOver ? (
+                    <> Apply each label to the toploader&apos;s top edge and fold over to seal — grade shows on the front, QR on the back.</>
+                  ) : (
+                    <>
+                      {' '}Drag cards to positions, or click a card in the grid to remove it.
+                      {isMultiPageMode && ' Use page navigation to assign cards across multiple pages.'}
+                      {' '}Apply front labels to toploader front, back labels to toploader back.
+                    </>
+                  )}
                 </p>
               </div>
             </div>

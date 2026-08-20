@@ -65,6 +65,21 @@ export interface HeritageRenderOptions {
    * resolve at /verify/[serial]. Absent = DCM verify page for the serial.
    */
   qrUrl?: string
+  /**
+   * Physical label size. Absent = the standard 2.8" × 0.8" slot. Non-standard
+   * sizes (Zion Mag Pro 2.51" × 0.76") render the SAME standard-authored
+   * Heritage blocks through a scale transform — every element (text, band,
+   * QR, badges, chip) keeps its exact layout, just smaller. Zion's aspect is
+   * 3.30:1 vs the design's 3.5:1, so the scale is mildly anisotropic
+   * (×0.896 w, ×0.95 h ⇒ ~6% relative vertical stretch) — imperceptible at
+   * label sizes and well inside QR tolerance.
+   */
+  dims?: HeritageDims
+}
+
+export interface HeritageDims {
+  widthIn: number
+  heightIn: number
 }
 
 /** 'diamond' unless the config carries a valid pattern id. */
@@ -138,35 +153,41 @@ async function buildHeritageInputs(
 /** Heritage is a light label — guides print black, like Traditional. */
 const GUIDE_COLOR = '#000000'
 
-function HeritageProductionDoc({ inputs }: { inputs: HeritageInputs }) {
+function HeritageProductionDoc({ inputs, d }: { inputs: HeritageInputs; d: HeritageDims }) {
   const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+  const std = isStdDims(d)
+  // Centre the (possibly non-standard) label on the page; at standard size
+  // this equals SINGLE_X/SINGLE_Y. Centring keeps duplex mirroring exact.
+  const x = std ? SINGLE_X : (PAGE_W - d.widthIn * INCH) / 2
+  const y = std ? SINGLE_Y : (PAGE_H - d.heightIn * INCH) / 2
+  const header = `${dimsLabel(d)} — Heritage`
   return (
     <Document>
       <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 0.8" — Heritage'} />
+        <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={header} />
         {/* Duplex instruction — matches the standard vector sheet's PageHeader wording. */}
         <View style={{ position: 'absolute', top: 33, left: 50, right: 50, alignItems: 'center' }}>
           <Text style={{ fontSize: 7, color: '#9ca3af' }}>Print duplex (flip on long edge) • Cut along dotted lines</Text>
         </View>
-        <PanelBleed x={SINGLE_X} y={SINGLE_Y} inputs={inputs} />
-        <LabelAt x={SINGLE_X} y={SINGLE_Y}>
+        <PanelBleed x={x} y={y} inputs={inputs} d={d} />
+        <HeritageLabelAt x={x} y={y} d={d}>
           <HeritageFront i={inputs} chip={chip} />
-        </LabelAt>
+        </HeritageLabelAt>
         <GuidesLayer>
-          <FrontCutGuides x={SINGLE_X} y={SINGLE_Y} color={GUIDE_COLOR} />
+          {std ? <FrontCutGuides x={x} y={y} color={GUIDE_COLOR} /> : <DimsGuides x={x} y={y} d={d} />}
         </GuidesLayer>
       </Page>
       <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="back" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 0.8" — Heritage'} />
+        <PageHeader pageType="back" pageNum={1} totalPages={1} variant="custom" dims={header} />
         <View style={{ position: 'absolute', top: 33, left: 50, right: 50, alignItems: 'center' }}>
           <Text style={{ fontSize: 7, color: '#9ca3af' }}>BACK SIDE • Print duplex (flip on long edge)</Text>
         </View>
-        <PanelBleed x={SINGLE_X} y={SINGLE_Y} inputs={inputs} />
-        <LabelAt x={SINGLE_X} y={SINGLE_Y}>
+        <PanelBleed x={x} y={y} inputs={inputs} d={d} />
+        <HeritageLabelAt x={x} y={y} d={d}>
           <HeritageBack i={inputs} chip={chip} />
-        </LabelAt>
+        </HeritageLabelAt>
         <GuidesLayer>
-          <CornerMarks x={SINGLE_X} y={SINGLE_Y} color={GUIDE_COLOR} />
+          {std ? <CornerMarks x={x} y={y} color={GUIDE_COLOR} /> : <DimsGuides x={x} y={y} d={d} cornersOnly />}
         </GuidesLayer>
       </Page>
     </Document>
@@ -179,7 +200,7 @@ export async function generateHeritageSlabLabelVector(
   opts: HeritageRenderOptions,
 ): Promise<Blob> {
   const inputs = await buildHeritageInputs(data, opts)
-  return pdf(<HeritageProductionDoc inputs={inputs} /> as any).toBlob()
+  return pdf(<HeritageProductionDoc inputs={inputs} d={resolveDims(opts.dims)} /> as any).toBlob()
 }
 
 export async function downloadHeritageSlabLabel(
@@ -217,6 +238,63 @@ const PAGE_W = 8.5 * INCH
 const PAGE_H = 11 * INCH
 const FOLD_H = LABEL_H * 2
 
+// ---------------------------------------------------------------------------
+// Non-standard sizes (Zion Mag Pro). The Heritage blocks are authored at the
+// standard 2.8" × 0.8"; other sizes render them through a scale transform so
+// nothing re-flows — see HeritageRenderOptions.dims.
+// ---------------------------------------------------------------------------
+const STD_DIMS: HeritageDims = { widthIn: 2.8, heightIn: 0.8 }
+const isStdDims = (d: HeritageDims) =>
+  Math.abs(d.widthIn - STD_DIMS.widthIn) < 0.001 && Math.abs(d.heightIn - STD_DIMS.heightIn) < 0.001
+const resolveDims = (d?: HeritageDims): HeritageDims =>
+  d && d.widthIn > 0 && d.heightIn > 0 ? d : STD_DIMS
+const dimsLabel = (d: HeritageDims) => `${d.widthIn}" × ${d.heightIn}"`
+
+/** A standard-authored Heritage panel scaled to the target physical size. */
+function ScaledPanel({ d, children }: { d: HeritageDims; children: React.ReactNode }) {
+  if (isStdDims(d)) return <>{children}</>
+  const sx = d.widthIn / STD_DIMS.widthIn
+  const sy = d.heightIn / STD_DIMS.heightIn
+  return (
+    <View style={{ width: d.widthIn * INCH, height: d.heightIn * INCH, overflow: 'hidden' }}>
+      <View style={{ width: LABEL_W, height: LABEL_H, transform: `scale(${sx}, ${sy})`, transformOrigin: '0 0' }}>
+        {children}
+      </View>
+    </View>
+  )
+}
+
+/** Absolutely-positioned, size-aware label slot. */
+function HeritageLabelAt({ x, y, d, children }: { x: number; y: number; d: HeritageDims; children: React.ReactNode }) {
+  return (
+    <View style={{ position: 'absolute', left: x, top: y, width: d.widthIn * INCH, height: d.heightIn * INCH }}>
+      <ScaledPanel d={d}>{children}</ScaledPanel>
+    </View>
+  )
+}
+
+/** Size-aware cut guides: dashed rect (front) or corner ticks (back). */
+function DimsGuides({ x, y, d, cornersOnly }: { x: number; y: number; d: HeritageDims; cornersOnly?: boolean }) {
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const m = 8
+  if (!cornersOnly) {
+    return <Rect x={x} y={y} width={w} height={h} fill="none" stroke={GUIDE_COLOR} strokeWidth={0.5} strokeDasharray="3 3" />
+  }
+  return (
+    <>
+      <Line x1={x - m} y1={y} x2={x} y2={y} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x} y1={y - m} x2={x} y2={y} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y} x2={x + w + m} y2={y} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y - m} x2={x + w} y2={y} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x - m} y1={y + h} x2={x} y2={y + h} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x} y1={y + h} x2={x} y2={y + h + m} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y + h} x2={x + w + m} y2={y + h} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y + h} x2={x + w} y2={y + h + m} stroke={GUIDE_COLOR} strokeWidth={0.5} />
+    </>
+  )
+}
+
 // Print bleed matching the modern fold-over (slabLabelGenerator BLEED_IN
 // 0.08"): the heritage panels draw their field flush at the cut line, so a
 // slightly wide cut used to leave unprinted paper — and the ink block itself
@@ -231,72 +309,87 @@ const BAND_W_PT = (90 / 1400) * LABEL_W // heritageSlabPdfDoc BAND_W = u(90)
  *  band sits on the panel's left in both front and back blocks. Used by the
  *  single and batch-duplex docs; FoldPair composes its own pair-shaped bleed
  *  because the rotated back panel moves its band to the pair's other edge. */
-function PanelBleed({ x, y, inputs }: { x: number; y: number; inputs: HeritageInputs }) {
+function PanelBleed({ x, y, inputs, d = STD_DIMS }: { x: number; y: number; inputs: HeritageInputs; d?: HeritageDims }) {
   const B = FOLD_BLEED
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const bandW = BAND_W_PT * (d.widthIn / STD_DIMS.widthIn)
   const field = heritageTheme(!!inputs.printHardened).field
   const band = inputs.bandColors?.[0] || '#101014'
   return (
     <>
-      <View style={{ position: 'absolute', left: x - B, top: y - B, width: LABEL_W + B * 2, height: LABEL_H + B * 2, backgroundColor: field }} />
-      <View style={{ position: 'absolute', left: x - B, top: y - B, width: B, height: LABEL_H + B * 2, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x, top: y - B, width: BAND_W_PT, height: B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x, top: y + LABEL_H, width: BAND_W_PT, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: w + B * 2, height: h + B * 2, backgroundColor: field }} />
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: B, height: h + B * 2, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x, top: y - B, width: bandW, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x, top: y + h, width: bandW, height: B, backgroundColor: band }} />
     </>
   )
 }
 
 /** One fold pair: rotated back over front, at (x, y) = top-left of the pair. */
-function FoldPair({ inputs, x, y }: { inputs: HeritageInputs; x: number; y: number }) {
+function FoldPair({ inputs, x, y, d = STD_DIMS }: { inputs: HeritageInputs; x: number; y: number; d?: HeritageDims }) {
   const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
   const B = FOLD_BLEED
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const pairH = h * 2
+  const bandW = BAND_W_PT * (d.widthIn / STD_DIMS.widthIn)
   const field = heritageTheme(!!inputs.printHardened).field
   const band = inputs.bandColors?.[0] || '#101014'
   return (
     <>
       {/* field bleed under the whole pair (left/right/top/bottom overhang) */}
-      <View style={{ position: 'absolute', left: x - B, top: y - B, width: LABEL_W + B * 2, height: FOLD_H + B * 2, backgroundColor: field }} />
+      <View style={{ position: 'absolute', left: x - B, top: y - B, width: w + B * 2, height: pairH + B * 2, backgroundColor: field }} />
       {/* band-colour bleed: front band sits on the pair's bottom-left edge;
           the 180°-rotated back puts its band on the top-right edge */}
-      <View style={{ position: 'absolute', left: x - B, top: y + LABEL_H, width: B, height: LABEL_H + B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x - B, top: y + FOLD_H, width: B + BAND_W_PT, height: B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x + LABEL_W, top: y - B, width: B, height: LABEL_H + B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x + LABEL_W - BAND_W_PT, top: y - B, width: B + BAND_W_PT, height: B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x, top: y, width: LABEL_W, height: LABEL_H, transform: 'rotate(180deg)' }}>
-        <HeritageBack i={inputs} chip={chip} />
+      <View style={{ position: 'absolute', left: x - B, top: y + h, width: B, height: h + B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x - B, top: y + pairH, width: B + bandW, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x + w, top: y - B, width: B, height: h + B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x + w - bandW, top: y - B, width: B + bandW, height: B, backgroundColor: band }} />
+      <View style={{ position: 'absolute', left: x, top: y, width: w, height: h, transform: 'rotate(180deg)' }}>
+        <ScaledPanel d={d}>
+          <HeritageBack i={inputs} chip={chip} />
+        </ScaledPanel>
       </View>
-      <View style={{ position: 'absolute', left: x, top: y + LABEL_H, width: LABEL_W, height: LABEL_H }}>
-        <HeritageFront i={inputs} chip={chip} />
+      <View style={{ position: 'absolute', left: x, top: y + h, width: w, height: h }}>
+        <ScaledPanel d={d}>
+          <HeritageFront i={inputs} chip={chip} />
+        </ScaledPanel>
       </View>
     </>
   )
 }
 
 /** Dashed cut outline around the pair + fold ticks at the seam (outside). */
-function FoldGuides({ x, y }: { x: number; y: number }) {
-  const foldY = y + LABEL_H
+function FoldGuides({ x, y, d = STD_DIMS }: { x: number; y: number; d?: HeritageDims }) {
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const foldY = y + h
   return (
     <>
-      <Rect x={x} y={y} width={LABEL_W} height={FOLD_H} fill="none"
+      <Rect x={x} y={y} width={w} height={h * 2} fill="none"
         stroke={GUIDE_COLOR} strokeWidth={0.5} strokeDasharray="3 3" />
       <Line x1={x - 16} y1={foldY} x2={x - 4} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
-      <Line x1={x + LABEL_W + 4} y1={foldY} x2={x + LABEL_W + 16} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
+      <Line x1={x + w + 4} y1={foldY} x2={x + w + 16} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
     </>
   )
 }
 
-function HeritageFoldOverDoc({ inputs }: { inputs: HeritageInputs }) {
-  const x = (PAGE_W - LABEL_W) / 2
-  const y = (PAGE_H - FOLD_H) / 2
+function HeritageFoldOverDoc({ inputs, d }: { inputs: HeritageInputs; d: HeritageDims }) {
+  const w = d.widthIn * INCH
+  const pairH = d.heightIn * INCH * 2
+  const x = (PAGE_W - w) / 2
+  const y = (PAGE_H - pairH) / 2
   return (
     <Document>
       <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={'2.8" × 1.6" — Heritage fold-over'} />
-        <FoldPair inputs={inputs} x={x} y={y} />
+        <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={`${d.widthIn}" × ${(d.heightIn * 2).toFixed(2).replace(/0$/, '')}" — Heritage fold-over`} />
+        <FoldPair inputs={inputs} x={x} y={y} d={d} />
         <GuidesLayer>
-          <FoldGuides x={x} y={y} />
+          <FoldGuides x={x} y={y} d={d} />
         </GuidesLayer>
-        <Text style={{ position: 'absolute', left: x, top: y + FOLD_H + 8, fontSize: 7, color: '#9ca3af' }}>
-          2.8&quot; × 1.6&quot; total — fold top panel behind front
+        <Text style={{ position: 'absolute', left: x, top: y + pairH + 8, fontSize: 7, color: '#9ca3af' }}>
+          {d.widthIn}&quot; × {(d.heightIn * 2).toFixed(2)}&quot; total — fold top panel behind front
         </Text>
       </Page>
     </Document>
@@ -309,7 +402,7 @@ export async function generateHeritageFoldOverLabelVector(
   opts: HeritageRenderOptions,
 ): Promise<Blob> {
   const inputs = await buildHeritageInputs(data, opts)
-  return pdf(<HeritageFoldOverDoc inputs={inputs} /> as any).toBlob()
+  return pdf(<HeritageFoldOverDoc inputs={inputs} d={resolveDims(opts.dims)} /> as any).toBlob()
 }
 
 export async function downloadHeritageFoldOverLabel(
@@ -350,53 +443,66 @@ async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern
   )
 }
 
-function HeritageBatchDuplexDoc({ entries }: { entries: HeritageInputs[] }) {
+function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: HeritageDims }) {
+  const std = isStdDims(d)
+  // Non-standard labels centre inside the standard grid cell — the cells are
+  // page-symmetric, so long-edge-flip duplex mirroring stays exact.
+  const offX = std ? 0 : (LABEL_W - d.widthIn * INCH) / 2
+  const offY = std ? 0 : (LABEL_H - d.heightIn * INCH) / 2
   const totalSheets = Math.ceil(entries.length / LABELS_PER_PAGE)
   const pages: React.ReactElement[] = []
   for (let sheet = 0; sheet < totalSheets; sheet++) {
     const slice = entries.slice(sheet * LABELS_PER_PAGE, (sheet + 1) * LABELS_PER_PAGE)
     pages.push(
       <Page key={`f-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
+        {std
+          ? <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
+          : <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
         {slice.map((inputs, i) => {
           const { x, y } = gridPos(i, false)
           const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
           return (
             <React.Fragment key={i}>
-              <PanelBleed x={x} y={y} inputs={inputs} />
-              <LabelAt x={x} y={y}>
+              <PanelBleed x={x + offX} y={y + offY} inputs={inputs} d={d} />
+              <HeritageLabelAt x={x + offX} y={y + offY} d={d}>
                 <HeritageFront i={inputs} chip={chip} />
-              </LabelAt>
+              </HeritageLabelAt>
             </React.Fragment>
           )
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
             const { x, y } = gridPos(i, false)
-            return <FrontCutGuides key={i} x={x} y={y} color={GUIDE_COLOR} />
+            return std
+              ? <FrontCutGuides key={i} x={x} y={y} color={GUIDE_COLOR} />
+              : <DimsGuides key={i} x={x + offX} y={y + offY} d={d} />
           })}
         </GuidesLayer>
       </Page>,
     )
     pages.push(
       <Page key={`b-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
+        {std
+          ? <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
+          : <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
         {slice.map((inputs, i) => {
           const { x, y } = gridPos(i, true)
           const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
           return (
             <React.Fragment key={i}>
-              <PanelBleed x={x} y={y} inputs={inputs} />
-              <LabelAt x={x} y={y}>
+              <PanelBleed x={x + offX} y={y + offY} inputs={inputs} d={d} />
+              <HeritageLabelAt x={x + offX} y={y + offY} d={d}>
                 <HeritageBack i={inputs} chip={chip} />
-              </LabelAt>
+              </HeritageLabelAt>
             </React.Fragment>
           )
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
             const { x, y } = gridPos(i, true)
-            return <CornerMarks key={i} x={x} y={y} color={GUIDE_COLOR} />
+            return std
+              ? <CornerMarks key={i} x={x} y={y} color={GUIDE_COLOR} />
+              : <DimsGuides key={i} x={x + offX} y={y + offY} d={d} cornersOnly />
           })}
         </GuidesLayer>
       </Page>,
@@ -416,24 +522,31 @@ const FOLD_PER_PAGE = FOLD_COLS * FOLD_ROWS
 const FOLD_GRID_X = (PAGE_W - FOLD_COLS * FOLD_CELL_W + FOLD_COL_MARGIN) / 2
 const FOLD_GRID_Y = (PAGE_H - FOLD_ROWS * FOLD_CELL_H + FOLD_ROW_MARGIN) / 2
 
-function HeritageBatchFoldOverDoc({ entries }: { entries: HeritageInputs[] }) {
+function HeritageBatchFoldOverDoc({ entries, d }: { entries: HeritageInputs[]; d: HeritageDims }) {
+  const std = isStdDims(d)
+  // Non-standard pairs centre inside the standard fold cell.
+  const offX = std ? 0 : (LABEL_W - d.widthIn * INCH) / 2
+  const offY = std ? 0 : (FOLD_H - d.heightIn * INCH * 2) / 2
+  const header = std
+    ? '2.8" × 1.6" fold-over — Heritage'
+    : `${d.widthIn}" × ${(d.heightIn * 2).toFixed(2)}" fold-over — Heritage`
   const totalSheets = Math.ceil(entries.length / FOLD_PER_PAGE)
   const pages: React.ReactElement[] = []
   for (let sheet = 0; sheet < totalSheets; sheet++) {
     const slice = entries.slice(sheet * FOLD_PER_PAGE, (sheet + 1) * FOLD_PER_PAGE)
     pages.push(
       <Page key={sheet} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={'2.8" × 1.6" fold-over — Heritage'} />
+        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={header} />
         {slice.map((inputs, i) => {
-          const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W
-          const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H
-          return <FoldPair key={i} inputs={inputs} x={x} y={y} />
+          const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W + offX
+          const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H + offY
+          return <FoldPair key={i} inputs={inputs} x={x} y={y} d={d} />
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
-            const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W
-            const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H
-            return <FoldGuides key={i} x={x} y={y} />
+            const x = FOLD_GRID_X + (i % FOLD_COLS) * FOLD_CELL_W + offX
+            const y = FOLD_GRID_Y + Math.floor(i / FOLD_COLS) * FOLD_CELL_H + offY
+            return <FoldGuides key={i} x={x} y={y} d={d} />
           })}
         </GuidesLayer>
       </Page>,
@@ -447,9 +560,10 @@ export async function generateBatchHeritageSlabLabelsVector(
   items: HeritageBatchItem[],
   pattern: BandPattern,
   gradeColors?: Record<string, string> | null,
+  dims?: HeritageDims,
 ): Promise<Blob> {
   const entries = await buildBatchInputs(items, pattern, gradeColors)
-  return pdf(<HeritageBatchDuplexDoc entries={entries} /> as any).toBlob()
+  return pdf(<HeritageBatchDuplexDoc entries={entries} d={resolveDims(dims)} /> as any).toBlob()
 }
 
 /** Batch fold-over sheets (single-sided). */
@@ -457,7 +571,8 @@ export async function generateBatchHeritageFoldOverLabelsVector(
   items: HeritageBatchItem[],
   pattern: BandPattern,
   gradeColors?: Record<string, string> | null,
+  dims?: HeritageDims,
 ): Promise<Blob> {
   const entries = await buildBatchInputs(items, pattern, gradeColors)
-  return pdf(<HeritageBatchFoldOverDoc entries={entries} /> as any).toBlob()
+  return pdf(<HeritageBatchFoldOverDoc entries={entries} d={resolveDims(dims)} /> as any).toBlob()
 }

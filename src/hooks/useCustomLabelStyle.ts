@@ -5,7 +5,10 @@ import { getStoredSession } from '@/lib/directAuth';
 import type { SavedCustomStyle, LabelColorOverrides, CustomLabelConfig } from '@/lib/labelPresets';
 import { extractColorOverrides } from '@/lib/labelPresets';
 
-export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
+// Custom slots run 'custom-1'..`custom-${MAX_SAVED_LABEL_STYLES}` (12 as of
+// Aug 2026) — the template type accepts any slot number; the API validates
+// the actual range.
+export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | `custom-${number}`;
 
 interface UseCustomLabelStyleReturn {
   labelStyle: LabelStyleId;

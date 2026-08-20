@@ -57,7 +57,7 @@ import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { ScaleToFit } from '@/components/labels/ScaleToFit'
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageSelection, isTraditionalSelection } from '@/lib/labels/labelStyleResolution'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
@@ -1581,6 +1581,7 @@ export function YugiohCardDetails() {
   // Heritage label selection — built-in 'heritage' id or a saved custom config
   // whose style is 'heritage'. Renders through the shared SVG preview.
   const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
+  const isTraditionalLabel = isTraditionalSelection(labelStyle, activeConfig);
   const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
   // currentUrl is declared after this component's early returns, so mirror its
   // value here — hooks must stay unconditional and in a stable order.
@@ -2890,12 +2891,12 @@ export function YugiohCardDetails() {
             {/* Front Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={labelStyle !== 'traditional' ? getSlabWrapperStyle(colorOverrides) : {
+              style={!isTraditionalLabel ? getSlabWrapperStyle(colorOverrides) : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              <div className={`${!isTraditionalLabel ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Front Label */}
               {heritageSel.active && heritageData ? (
                 <HeritageLabelPreview
@@ -2908,7 +2909,7 @@ export function YugiohCardDetails() {
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />
-              ) : labelStyle !== 'traditional' ? (
+              ) : !isTraditionalLabel ? (
                 <ModernFrontLabel
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine || 'Card Details'}
@@ -3003,7 +3004,7 @@ export function YugiohCardDetails() {
               {/* Separator */}
               <div
                 className="h-1"
-                style={labelStyle !== 'traditional' ? {
+                style={!isTraditionalLabel ? {
                   background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
                 } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
@@ -3048,12 +3049,12 @@ export function YugiohCardDetails() {
             {/* Back Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={labelStyle !== 'traditional' ? getSlabWrapperStyle(colorOverrides) : {
+              style={!isTraditionalLabel ? getSlabWrapperStyle(colorOverrides) : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              <div className={`${!isTraditionalLabel ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Back Label */}
               {heritageSel.active && heritageData ? (
                 <HeritageLabelPreview
@@ -3066,7 +3067,7 @@ export function YugiohCardDetails() {
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />
-              ) : labelStyle !== 'traditional' ? (
+              ) : !isTraditionalLabel ? (
                 <ModernBackLabel
                   serial={labelData.serial}
                   grade={labelData.grade}
@@ -3204,7 +3205,7 @@ export function YugiohCardDetails() {
               {/* Separator */}
               <div
                 className="h-1"
-                style={labelStyle !== 'traditional' ? {
+                style={!isTraditionalLabel ? {
                   background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
                 } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',

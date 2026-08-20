@@ -9,8 +9,10 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const VALID_BUILT_IN = ['modern', 'traditional', 'heritage'];
-const VALID_CUSTOM_IDS = ['custom-1', 'custom-2', 'custom-3', 'custom-4'];
-const MAX_CUSTOM_STYLES = 4;
+import { MAX_SAVED_LABEL_STYLES } from '@/lib/labelPresets';
+
+const MAX_CUSTOM_STYLES = MAX_SAVED_LABEL_STYLES;
+const VALID_CUSTOM_IDS = Array.from({ length: MAX_CUSTOM_STYLES }, (_, i) => `custom-${i + 1}`);
 
 function isValidStyleId(id: string): boolean {
   return VALID_BUILT_IN.includes(id) || VALID_CUSTOM_IDS.includes(id);
@@ -130,7 +132,7 @@ export async function POST(request: NextRequest) {
         } else {
           // ID specified but doesn't exist yet - create with that ID
           if (updatedStyles.length >= MAX_CUSTOM_STYLES) {
-            return NextResponse.json({ error: 'Maximum 4 custom styles. Delete one first.' }, { status: 400 });
+            return NextResponse.json({ error: 'Maximum ' + MAX_CUSTOM_STYLES + ' custom styles. Delete one first.' }, { status: 400 });
           }
           savedStyle = { id: style.id, name: style.name || `Custom Label ${style.id.split('-')[1]}`, config: style.config };
           updatedStyles.push(savedStyle);
@@ -138,7 +140,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Assign next available slot
         if (updatedStyles.length >= MAX_CUSTOM_STYLES) {
-          return NextResponse.json({ error: 'Maximum 4 custom styles. Delete one first.' }, { status: 400 });
+          return NextResponse.json({ error: 'Maximum ' + MAX_CUSTOM_STYLES + ' custom styles. Delete one first.' }, { status: 400 });
         }
 
         const usedIds = new Set(updatedStyles.map((s: any) => s.id));
@@ -178,12 +180,15 @@ export async function POST(request: NextRequest) {
 
       const updatedStyles = currentCustomStyles.filter((s: any) => s.id !== styleId);
 
-      // If deleted style was active, revert to modern
+      // If deleted style was active, revert to the product default. Heritage
+      // has been the unset-user default since Aug 2026 — falling back to
+      // 'modern' here silently flipped a user's slabs to a style they never
+      // chose.
       const updateData: any = { custom_label_styles: updatedStyles };
       let newLabelStyle = currentLabelStyle;
       if (currentLabelStyle === styleId) {
-        updateData.label_style = 'modern';
-        newLabelStyle = 'modern';
+        updateData.label_style = 'heritage';
+        newLabelStyle = 'heritage';
       }
 
       const { error } = await supabaseAdmin

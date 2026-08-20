@@ -31,6 +31,26 @@ export interface HeritageSelection {
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
+/**
+ * Is the ACTIVE selection the traditional (light) label design?
+ *
+ * The old `labelStyle !== 'traditional'` binary on card pages got this wrong
+ * for saved custom slots: a custom-N config with style 'traditional' rendered
+ * the Modern label and slab chrome. The rule is: heritage wins outright, then
+ * a config-backed selection is whatever its config says, then the built-in id.
+ */
+export function isTraditionalSelection(
+  labelStyle: string | null | undefined,
+  activeConfig?: Pick<
+    CustomLabelConfig,
+    'style' | 'heritagePattern' | 'heritageColorSource' | 'heritageBandColors' | 'heritageGradeColors'
+  > | null,
+): boolean {
+  if (resolveHeritageSelection(labelStyle, activeConfig).active) return false
+  if (activeConfig) return activeConfig.style === 'traditional'
+  return labelStyle === 'traditional'
+}
+
 export function resolveHeritageSelection(
   labelStyle: string | null | undefined,
   activeConfig?: Pick<

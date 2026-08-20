@@ -606,8 +606,17 @@ export function resolveFontScale(
 // SAVED CUSTOM STYLES (persisted to DB)
 // ============================================================================
 
+/**
+ * Saved-design slot cap. Raised 4 → 12 (Aug 2026): the Label Wizard made
+ * saving designs a first-class flow and users hit 4 immediately. Storage is a
+ * JSONB array on user_credits — no schema change. The API, both studios, and
+ * the wizard all read this one constant (mobile mirrors it in its own
+ * lib/labelPresets and needs an OTA to lift its local check).
+ */
+export const MAX_SAVED_LABEL_STYLES = 12;
+
 export interface SavedCustomStyle {
-  id: string;           // 'custom-1' through 'custom-4'
+  id: string;           // 'custom-1' through `custom-${MAX_SAVED_LABEL_STYLES}`
   name: string;         // Default "Custom Label 1", user-editable
   config: CustomLabelConfig;
 }

@@ -1430,17 +1430,24 @@ function batchGetMirroredLabelPosition(index: number) {
   return { labelX: cellX + BATCH_CUT_MARGIN, labelY: cellY + BATCH_CUT_MARGIN };
 }
 
-function batchPlaceLabelImage(doc: jsPDF, imgDataUrl: string, labelX: number, labelY: number) {
+function batchPlaceLabelImage(
+  doc: jsPDF,
+  imgDataUrl: string,
+  labelX: number,
+  labelY: number,
+  labelWPt: number = BATCH_LABEL_WIDTH,
+  labelHPt: number = BATCH_LABEL_HEIGHT,
+) {
   doc.addImage(
     imgDataUrl, 'JPEG',
     labelX - BATCH_BLEED_PT,
     labelY - BATCH_BLEED_PT,
-    BATCH_LABEL_WIDTH + BATCH_BLEED_PT * 2,
-    BATCH_LABEL_HEIGHT + BATCH_BLEED_PT * 2
+    labelWPt + BATCH_BLEED_PT * 2,
+    labelHPt + BATCH_BLEED_PT * 2
   );
 }
 
-function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number) {
+function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number, dims = '2.8" × 0.8"') {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#9ca3af');
@@ -1450,7 +1457,7 @@ function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: nu
     ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
     : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
   doc.text(instructions, BATCH_PAGE_WIDTH / 2, headerY, { align: 'center' });
-  doc.text('Label: 2.8" \u00D7 0.8"', BATCH_PAGE_WIDTH - BATCH_GRID_START_X, headerY, { align: 'right' });
+  doc.text(`Label: ${dims}`, BATCH_PAGE_WIDTH - BATCH_GRID_START_X, headerY, { align: 'right' });
 }
 
 /** Guide color from the config's resolved lightness — dark guides on light labels, white on dark (matches slabLabelGenerator). */
@@ -1458,39 +1465,57 @@ function batchGuideColor(config: CustomLabelConfig): string {
   return isLightTheme(config) ? '#000000' : '#ffffff';
 }
 
-function batchDrawCornerMarks(doc: jsPDF, labelX: number, labelY: number, config: CustomLabelConfig) {
+function batchDrawCornerMarks(
+  doc: jsPDF,
+  labelX: number,
+  labelY: number,
+  config: CustomLabelConfig,
+  labelWPt: number = BATCH_LABEL_WIDTH,
+  labelHPt: number = BATCH_LABEL_HEIGHT,
+) {
   const cutX = labelX + BATCH_TRIM_INSET_PT;
   const cutY = labelY + BATCH_TRIM_INSET_PT;
+  const cutW = labelWPt - BATCH_TRIM_INSET_PT * 2;
+  const cutH = labelHPt - BATCH_TRIM_INSET_PT * 2;
   const markLen = 8;
   doc.setDrawColor(batchGuideColor(config));
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([], 0);
   doc.line(cutX - markLen, cutY, cutX, cutY);
   doc.line(cutX, cutY - markLen, cutX, cutY);
-  doc.line(cutX + BATCH_CUT_WIDTH, cutY, cutX + BATCH_CUT_WIDTH + markLen, cutY);
-  doc.line(cutX + BATCH_CUT_WIDTH, cutY - markLen, cutX + BATCH_CUT_WIDTH, cutY);
-  doc.line(cutX - markLen, cutY + BATCH_CUT_HEIGHT, cutX, cutY + BATCH_CUT_HEIGHT);
-  doc.line(cutX, cutY + BATCH_CUT_HEIGHT, cutX, cutY + BATCH_CUT_HEIGHT + markLen);
-  doc.line(cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT, cutX + BATCH_CUT_WIDTH + markLen, cutY + BATCH_CUT_HEIGHT);
-  doc.line(cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT, cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT + markLen);
+  doc.line(cutX + cutW, cutY, cutX + cutW + markLen, cutY);
+  doc.line(cutX + cutW, cutY - markLen, cutX + cutW, cutY);
+  doc.line(cutX - markLen, cutY + cutH, cutX, cutY + cutH);
+  doc.line(cutX, cutY + cutH, cutX, cutY + cutH + markLen);
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW + markLen, cutY + cutH);
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW, cutY + cutH + markLen);
 }
 
-function batchDrawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number, config: CustomLabelConfig) {
+function batchDrawFrontCutGuides(
+  doc: jsPDF,
+  labelX: number,
+  labelY: number,
+  config: CustomLabelConfig,
+  labelWPt: number = BATCH_LABEL_WIDTH,
+  labelHPt: number = BATCH_LABEL_HEIGHT,
+) {
   const cutX = labelX + BATCH_TRIM_INSET_PT;
   const cutY = labelY + BATCH_TRIM_INSET_PT;
+  const cutW = labelWPt - BATCH_TRIM_INSET_PT * 2;
+  const cutH = labelHPt - BATCH_TRIM_INSET_PT * 2;
   const guideColor = batchGuideColor(config);
   doc.setDrawColor(guideColor);
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([3, 3], 0);
-  doc.rect(cutX, cutY, BATCH_CUT_WIDTH, BATCH_CUT_HEIGHT, 'S');
+  doc.rect(cutX, cutY, cutW, cutH, 'S');
   doc.setLineDashPattern([], 0);
   doc.setFontSize(7);
   doc.setTextColor(guideColor);
   doc.text('\u2702', cutX - 7, cutY + 3);
-  doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + 3);
-  doc.text('\u2702', cutX - 7, cutY + BATCH_CUT_HEIGHT + 3);
-  doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + BATCH_CUT_HEIGHT + 3);
-  batchDrawCornerMarks(doc, labelX, labelY, config);
+  doc.text('\u2702', cutX + cutW + 1, cutY + 3);
+  doc.text('\u2702', cutX - 7, cutY + cutH + 3);
+  doc.text('\u2702', cutX + cutW + 1, cutY + cutH + 3);
+  batchDrawCornerMarks(doc, labelX, labelY, config, labelWPt, labelHPt);
 }
 
 /**
@@ -1503,21 +1528,30 @@ export async function generateBatchCustomSlabLabels(
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
-  // June 2026: vector first (batch always renders at standard slab
-  // dimensions), raster fallback on any failure.
-  try {
-    const vector = await import('./labels/vectorSlabGenerator');
-    // Halo gate: react-pdf can't stroke text, so styles whose text needs
-    // the raster halo (worst-case WCAG contrast < 4.5:1 on the real
-    // background stops) fall through to the legible raster path.
-    if (vector.customConfigNeedsTextHalo(config)) {
-      console.log('[customSlabLabel] style needs text halo — using raster batch path');
-    } else {
-      console.log('[customSlabLabel] using vector batch path');
-      return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+  // June 2026: vector first, raster fallback on any failure. The vector
+  // batch document is built around the standard 2.8" × 0.8" slot, so
+  // non-standard dimensions (Zion Mag Pro 2.51" × 0.76") MUST take the
+  // raster path, which renders at the config's true size — routing them
+  // through vector silently printed standard-size labels (customer report,
+  // Aug 2026).
+  const isStdDims = Math.abs(config.width - 2.8) < 0.001 && Math.abs(config.height - 0.8) < 0.001;
+  if (isStdDims) {
+    try {
+      const vector = await import('./labels/vectorSlabGenerator');
+      // Halo gate: react-pdf can't stroke text, so styles whose text needs
+      // the raster halo (worst-case WCAG contrast < 4.5:1 on the real
+      // background stops) fall through to the legible raster path.
+      if (vector.customConfigNeedsTextHalo(config)) {
+        console.log('[customSlabLabel] style needs text halo — using raster batch path');
+      } else {
+        console.log('[customSlabLabel] using vector batch path');
+        return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+      }
+    } catch (err) {
+      console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
     }
-  } catch (err) {
-    console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
+  } else {
+    console.log(`[customSlabLabel] non-standard dims ${config.width}"×${config.height}" — using raster batch path`);
   }
   return generateBatchCustomSlabLabelsRaster(dataArray, config);
 }
@@ -1534,12 +1568,17 @@ export async function generateBatchCustomSlabLabelsRaster(
     return generateCustomSlabLabel(dataArray[0], config);
   }
 
-  // Force config to standard slab dimensions for batch grid layout
-  const batchConfig: CustomLabelConfig = {
-    ...config,
-    width: BATCH_LABEL_WIDTH_IN,
-    height: BATCH_LABEL_HEIGHT_IN,
-  };
+  // Labels render at the CONFIG's true dimensions, centered inside the
+  // standard grid cell. Smaller sizes (Zion Mag Pro 2.51" × 0.76") keep the
+  // same 2×5 sheet and duplex mirroring — centering within symmetric cells
+  // preserves long-edge-flip alignment — they just get a little more air
+  // between cut lines. (Previously the config was forced back to 2.8" × 0.8"
+  // here, which printed Zion designs at standard size.)
+  const labelWPt = config.width * BATCH_INCH;
+  const labelHPt = config.height * BATCH_INCH;
+  const offX = (BATCH_LABEL_WIDTH - labelWPt) / 2;
+  const offY = (BATCH_LABEL_HEIGHT - labelHPt) / 2;
+  const dims = `${config.width}" × ${config.height}"`;
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
   const totalSheets = Math.ceil(dataArray.length / BATCH_LABELS_PER_PAGE);
@@ -1551,26 +1590,26 @@ export async function generateBatchCustomSlabLabelsRaster(
     if (sheet > 0) doc.addPage('letter', 'portrait');
 
     // Front side
-    batchDrawPageHeader(doc, 'front', sheet + 1, totalSheets);
+    batchDrawPageHeader(doc, 'front', sheet + 1, totalSheets, dims);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = batchGetLabelPosition(gridIdx);
-      const frontCanvas = await renderFrontCanvas(dataArray[i], batchConfig, BATCH_DPI);
+      const frontCanvas = await renderFrontCanvas(dataArray[i], config, BATCH_DPI);
       const frontImg = frontCanvas.toDataURL('image/jpeg', 0.92);
-      batchPlaceLabelImage(doc, frontImg, labelX, labelY);
-      batchDrawFrontCutGuides(doc, labelX, labelY, batchConfig);
+      batchPlaceLabelImage(doc, frontImg, labelX + offX, labelY + offY, labelWPt, labelHPt);
+      batchDrawFrontCutGuides(doc, labelX + offX, labelY + offY, config, labelWPt, labelHPt);
     }
 
     // Back side (mirrored X for duplex)
     doc.addPage('letter', 'portrait');
-    batchDrawPageHeader(doc, 'back', sheet + 1, totalSheets);
+    batchDrawPageHeader(doc, 'back', sheet + 1, totalSheets, dims);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = batchGetMirroredLabelPosition(gridIdx);
-      const backCanvas = await renderBackCanvas(dataArray[i], batchConfig, BATCH_DPI);
+      const backCanvas = await renderBackCanvas(dataArray[i], config, BATCH_DPI);
       const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
-      batchPlaceLabelImage(doc, backImg, labelX, labelY);
-      batchDrawCornerMarks(doc, labelX, labelY, batchConfig);
+      batchPlaceLabelImage(doc, backImg, labelX + offX, labelY + offY, labelWPt, labelHPt);
+      batchDrawCornerMarks(doc, labelX + offX, labelY + offY, config, labelWPt, labelHPt);
     }
   }
 

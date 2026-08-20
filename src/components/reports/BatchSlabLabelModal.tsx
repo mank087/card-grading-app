@@ -56,6 +56,13 @@ interface BatchSlabLabelModalProps {
   showFounderEmblem?: boolean;
   showVipEmblem?: boolean;
   showCardLoversEmblem?: boolean;
+  /**
+   * A complete working design (Label Wizard). When present it wins over the
+   * saved-style resolution AND hides the style dropdown — the design was
+   * already chosen upstream. `style: 'heritage'` configs route through the
+   * heritage vector batch exactly like a saved heritage slot would.
+   */
+  configOverride?: import('@/lib/labelPresets').CustomLabelConfig | null;
 }
 
 const LABELS_PER_PAGE = getSlabLabelConfig().labelsPerPage;
@@ -69,6 +76,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   showFounderEmblem = false,
   showVipEmblem = false,
   showCardLoversEmblem = false,
+  configOverride = null,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -92,11 +100,13 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     }
   }, [isOpen, labelStyleProp, hookLabelStyle]);
 
-  // Resolve the active custom config for the local style
+  // Resolve the active custom config for the local style. A wizard
+  // configOverride short-circuits the saved-slot lookup entirely.
   const localActiveConfig = useMemo(() => {
+    if (configOverride) return configOverride;
     if (localStyle === 'modern' || localStyle === 'traditional' || localStyle === 'heritage') return null;
     return customStyles.find(s => s.id === localStyle)?.config || null;
-  }, [localStyle, customStyles]);
+  }, [configOverride, localStyle, customStyles]);
 
   const handleStyleSwitch = (id: LabelStyleId) => {
     setLocalStyle(id);
@@ -187,7 +197,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
       // Heritage — built-in id or a saved custom config with style 'heritage'.
       // Its band palette is per-card, so it can't ride the config generators.
-      const heritageSel = resolveHeritageSelection(localStyle, localActiveConfig);
+      // With a wizard configOverride, the CONFIG alone decides: the user's
+      // stored default style must not leak into an explicit design.
+      const heritageSel = resolveHeritageSelection(configOverride ? '' : localStyle, localActiveConfig);
       if (heritageSel.active) {
         const gen = await import('@/lib/labels/heritageSlabGenerator');
         const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
@@ -204,9 +216,14 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           qrUrl: cardQrUrl(selectedCards[i].id, selectedCards[i].serial,
             orgLogos?.branding ? { slug: orgLogos.branding.slug } : null),
         }));
+        // Non-standard sizes (Zion Mag Pro) flow from the active config; the
+        // generator scales the standard-authored Heritage blocks to fit.
+        const heritageDims = localActiveConfig
+          ? { widthIn: localActiveConfig.width, heightIn: localActiveConfig.height }
+          : undefined;
         blob = printFormat === 'foldover'
-          ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors)
-          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors);
+          ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims)
+          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims);
       } else {
         // Modern/custom dark labels render the whiteLogoDataUrl slot; the
         // on-screen previews show the Brand Setup mark there for org cards,
@@ -257,7 +274,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, localStyle, localActiveConfig, printFormat, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, buildSlabLabelData, onClose]);
 
   // Fold-over: ~10 labels per page (single-sided), Duplex: LABELS_PER_PAGE per sheet (front+back)
   const FOLDOVER_ROWS_PER_PAGE = 10;
@@ -322,15 +339,18 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             </div>
           </div>
 
-          {/* Label Style Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Label Style</label>
-            <LabelStyleDropdown
-              labelStyle={localStyle}
-              customStyles={customStyles}
-              onSwitch={handleStyleSwitch}
-            />
-          </div>
+          {/* Label Style Dropdown — hidden when the design arrives from the
+              Label Wizard (configOverride), where style was already chosen. */}
+          {!configOverride && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Label Style</label>
+              <LabelStyleDropdown
+                labelStyle={localStyle}
+                customStyles={customStyles}
+                onSwitch={handleStyleSwitch}
+              />
+            </div>
+          )}
 
           {/* Print Instructions */}
           <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
