@@ -2,49 +2,20 @@ import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+import { PRODUCTS, productUrl, type Product } from '@/lib/shopProducts';
 
 export const metadata: Metadata = {
   title: 'Recommended Products | DCM Grading',
-  description: 'Recommended card grading accessories and supplies. Card scanner stands, graded card slabs, and more to enhance your DCM grading experience.',
-  keywords: 'card grading supplies, graded card slab, card scanner stand, trading card accessories, card protection',
+  description: 'Recommended card grading accessories and supplies. Card scanner stands, graded card slabs, magnetic holders, paper trimmers, and more to enhance your DCM grading experience.',
+  keywords: 'card grading supplies, graded card slab, card scanner stand, magnetic card holder, zion magpro, paper cutter, trading card accessories, card protection',
 };
 
-interface Product {
-  name: string;
-  description: string;
-  image: string;
-  link: string;
-  badge?: string;
-}
-
-const products: Product[] = [
-  {
-    name: 'Card Scanner Stand',
-    description: 'Hands-free phone stand designed for photographing trading cards. Provides consistent overhead positioning and stable framing for the sharpest, most accurate grading photos. Adjustable height and angle for any card size.',
-    image: '/shop/card-scanner-stand.jpg',
-    link: 'https://www.amazon.com/dp/B0G4D5J8GG?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=fe14feb53605799758759b454abbe0df&language=en_US&ref_=as_li_ss_tl',
-    badge: 'Best for Photos',
-  },
-  {
-    name: 'Magnetic Graded Slabs',
-    description: 'Premium magnetic closure graded card slabs. Showcase your DCM-graded cards with a professional display-quality case. Easy open/close design with crystal-clear viewing on both sides. Perfect for high-value cards.',
-    image: '/shop/magnetic-graded-slabs.jpg',
-    link: 'https://www.amazon.com/dp/B0GK6PSGKQ?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=cda52cb06ef2d75f7bdc4dd4e477ad42&language=en_US&ref_=as_li_ss_tl',
-    badge: 'Premium Display',
-  },
-  {
-    name: 'Traditional Graded Slabs',
-    description: 'Classic snap-fit graded card slabs in bulk. The standard case for displaying DCM-graded cards with custom labels. Fits standard trading cards with room for front and back labels. Great value at 100 per pack.',
-    image: '/shop/traditional-graded-slab.jpg',
-    link: 'https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl',
-    badge: 'Best Value',
-  },
-];
+const products = PRODUCTS;
 
 function ProductCard({ product }: { product: Product }) {
   return (
     <a
-      href={product.link}
+      href={productUrl(product)}
       target="_blank"
       rel="noopener noreferrer sponsored"
       className="group bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-purple-300 transition-all duration-300 flex flex-col"
@@ -120,11 +91,18 @@ export default function ShopPage() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
           {products.map((product) => (
-            <ProductCard key={product.name} product={product} />
+            <ProductCard key={product.id} product={product} />
           ))}
         </div>
+
+        {/* Affiliate disclosure — required by the Amazon Associates
+            Operating Agreement wherever affiliate links appear. */}
+        <p className="text-center text-xs text-gray-400 mb-12 max-w-2xl mx-auto">
+          As an Amazon Associate, DCM Grading earns from qualifying purchases. Product links on this page are
+          affiliate links — they cost you nothing extra and help support the platform.
+        </p>
 
         {/* Labels CTA */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center">
