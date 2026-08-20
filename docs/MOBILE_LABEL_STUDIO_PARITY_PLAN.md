@@ -112,11 +112,16 @@ Pattern and band colours resolve with the same precedence the slab Heritage path
 
 *Risk:* low, as expected. Additive branches; the generators were already proven by the wizard.
 
-### Phase 2 — Ship what is already written
+### Phase 2 — Ship what is already written ✅ CODE DONE, OTA PENDING
 **Mobile OTA at runtime 1.0.2 (plus the 1.0.1 / 1.0.0 legacy lanes; never omit `--platform`).**
 
-- The 12-slot `MAX_SAVED_LABEL_STYLES` is sitting in the source unshipped. Web already allows 12 and the API cap now derives from `MAX_SAVED_LABEL_STYLES`, so a user who saves 12 designs on web currently sees a mobile client that disagrees. Ship it.
-- Correct the fold-over geometry in `dcm-mobile/components/labels/LabelMockup.tsx` to the portrait 0.5 × 0.875 half, matching the web fix, and drop the purple fold-crease bar that does not print.
+- **12 saved slots** — `MAX_SAVED_LABEL_STYLES = 12` was already in `hooks/useLabelStyle.ts`; nothing else in the app still caps at 4 (checked). It only needs the OTA to reach devices.
+- **Fold-over geometry corrected** in `dcm-mobile/components/labels/LabelMockup.tsx`: the visible half is now the portrait 0.5 × 0.875 (16.7% of holder width, centred at 41.65%) instead of the landscape 0.875 × 0.5, matching the web fix and the 90° rotation the print sheet applies. Grade and QR rescaled for the taller half. Both purple fold-crease bars removed — One-Touch and Toploader — since nothing prints on the fold. Unused `foldCrease` style deleted.
+- **Zion `dims` gap closed** (carried over from Phase 1): both `/label-export/batch` and `/label-export/[cardId]` now pass `dims` into the Heritage slab and fold-over vector generators, derived from the design's own width/height and omitted when it is the standard 2.8 × 0.8. Previously a Zion Heritage design printed at full slab size from these routes.
+
+Web typecheck, mobile typecheck, and a clean production build all pass.
+
+*Still to do:* the OTA publish itself, and a look at the mobile fold-over preview on a real device — the geometry change is unverified on hardware.
 
 *Why second:* smallest possible change, removes an active web/mobile disagreement.
 

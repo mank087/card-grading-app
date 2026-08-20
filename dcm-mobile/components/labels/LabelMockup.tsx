@@ -748,8 +748,8 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUr
           : <View style={{ width: cardW, height: cardH, backgroundColor: Colors.gray[100] }} />}
       </View>
 
+      {/* No fold-crease marker — nothing prints on the fold. */}
       <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
-        <View style={s.foldCrease} />
         {side === 'front'
           ? <OneTouchFrontInline width={labelWidth} labelProps={labelProps} />
           : <OneTouchBackInline width={labelWidth} labelProps={labelProps} />}
@@ -804,15 +804,18 @@ function OneTouchBackInline({ width, labelProps }: { width: number; labelProps?:
 // Toploader — photo 451×588
 // Front+back variant: Avery 8167 (1.75" × 0.5", aspect 3.5:1) — compact
 // strip with [accent | logo | name | divider | grade], NOT the slab label.
-// Foldover variant: same physical 1.75" × 0.5" but folded vertically →
-// visible half is 0.875" × 0.5" (aspect 1.75:1) with just grade or QR.
-// Mirrors web LabelMockup.tsx:434-543.
+// Foldover variant: the same physical 1.75" × 0.5" label, folded on its centre
+// vertical and wrapped over the TOP edge — so the 1.75" axis runs vertically on
+// the card and each visible half is a 0.5" × 0.875" PORTRAIT. That is why
+// drawFoldOverLabel rotates its artwork 90° (left half CW, right half CCW):
+// both land upright once folded. Half width vs. the 3.0" holder: 0.5/3.0 ≈ 16.7%.
+// Mirrors the corrected web LabelMockup.
 // ============================================================================
 function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
   const height = (width * 588) / 451
-  const labelWidth = width * (variant === 'foldover' ? 0.29 : 0.58)
+  const labelWidth = width * (variant === 'foldover' ? 0.167 : 0.58)
   const cardTop = height * 0.045, cardLeft = width * 0.07, cardW = width * 0.86, cardH = height * 0.90
-  const labelLeft = width * (variant === 'foldover' ? 0.355 : 0.21)
+  const labelLeft = width * (variant === 'foldover' ? 0.4165 : 0.21)
   return (
     <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/top-loader-dcm.png')} style={{ width, height }} resizeMode="contain" />
@@ -824,8 +827,9 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { c
       </View>
 
       {variant === 'foldover' ? (
+        // No fold-crease marker: nothing prints there, so drawing one
+        // misrepresents the output.
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
-          <View style={s.foldCrease} />
           {side === 'front'
             ? <FoldoverFrontInline width={labelWidth} labelProps={labelProps} />
             : <FoldoverBackInline width={labelWidth} labelProps={labelProps} />}
@@ -887,11 +891,13 @@ function ToploaderBackInline({ width, labelProps }: { width: number; labelProps?
   )
 }
 
-/** Foldover FRONT: just grade + condition centered. Aspect 1.75:1, light bg.
- *  Web LabelMockup.tsx:481-491. */
+/** The visible folded half is 0.5" wide × 0.875" tall — portrait, not landscape. */
+const FOLD_HALF_ASPECT = 0.5 / 0.875
+
+/** Foldover FRONT: grade + condition centered on the portrait half. */
 function FoldoverFrontInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
   const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
-  const height = width / 1.75
+  const height = width / FOLD_HALF_ASPECT
   const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
     ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
   return (
@@ -902,17 +908,16 @@ function FoldoverFrontInline({ width, labelProps }: { width: number; labelProps?
       style={{ width, height, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
     >
       <DCMLogoTile width={width} height={height} opacity={0.06} />
-      <Text style={{ fontSize: width * 0.32, fontWeight: 'bold', lineHeight: width * 0.32, color: '#7c3aed' }}>{grade}</Text>
-      {!!condition && <Text numberOfLines={1} style={{ fontSize: width * 0.07, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b46c1', marginTop: width * 0.02 }}>{condition}</Text>}
+      <Text style={{ fontSize: width * 0.5, fontWeight: 'bold', lineHeight: width * 0.55, color: '#7c3aed' }}>{grade}</Text>
+      {!!condition && <Text numberOfLines={1} style={{ fontSize: width * 0.11, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b46c1', marginTop: width * 0.03 }}>{condition}</Text>}
     </LinearGradient>
   )
 }
 
-/** Foldover BACK: just QR centered. Aspect 1.75:1, white bg.
- *  Web LabelMockup.tsx:494-498. */
+/** Foldover BACK: QR centered on the portrait half. */
 function FoldoverBackInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
-  const height = width / 1.75
-  const qrSize = Math.min(width, height) * 0.7
+  const height = width / FOLD_HALF_ASPECT
+  const qrSize = Math.min(width, height) * 0.78
   return (
     <View style={{ width, height, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <DCMLogoTile width={width} height={height} opacity={0.06} />
@@ -1007,5 +1012,4 @@ const s = StyleSheet.create({
   holder: { alignSelf: 'center', position: 'relative', overflow: 'hidden' },
   slot: { position: 'absolute', overflow: 'hidden' },
   fill: { width: '100%', height: '100%' },
-  foldCrease: { height: 3, backgroundColor: '#7c3aed', borderTopLeftRadius: 1, borderTopRightRadius: 1 },
 })

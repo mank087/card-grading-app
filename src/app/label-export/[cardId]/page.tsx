@@ -634,6 +634,15 @@ export default function LabelExportPage() {
             // Org cards carry an ORG serial that /verify/[serial] doesn't
             // match — the printed QR must target the branded card page.
             qrUrl: cardQrUrl(cardId, card.serial, logos.branding),
+            // Non-standard slot sizes (Zion Mag Pro 2.51 x 0.76) come in on the
+            // design's own width/height; without them the Heritage docs are
+            // fixed at 2.8 x 0.8 and a Zion design prints at full slab size.
+            dims: (() => {
+              const w = Number(heritageCfg?.width), h = Number(heritageCfg?.height);
+              if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) return undefined;
+              if (Math.abs(w - 2.8) < 0.001 && Math.abs(h - 0.8) < 0.001) return undefined;
+              return { widthIn: w, heightIn: h };
+            })(),
           };
           const blob = format === 'foldover'
             ? await gen.generateHeritageFoldOverLabelVector(slabPayload, opts)

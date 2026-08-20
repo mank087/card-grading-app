@@ -368,9 +368,19 @@ function BatchLabelExportInner() {
             ? gen.resolveHeritagePattern(sp.get('heritagePattern'))
             : heritageSel.active ? heritageSel.pattern : gen.resolveHeritagePattern(null);
           const gradeColors = heritageSel.active ? heritageSel.gradeColors : null;
+          // Non-standard slot sizes (Zion Mag Pro 2.51 x 0.76) ride in on the
+          // design's own width/height. Without this the Heritage docs are fixed
+          // at 2.8 x 0.8 and a Zion design printed at full slab size.
+          const heritageDims = (() => {
+            const cfg = inlineHeritageCfg || savedCfg;
+            const w = Number(cfg?.width), h = Number(cfg?.height);
+            if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) return undefined;
+            if (Math.abs(w - 2.8) < 0.001 && Math.abs(h - 0.8) < 0.001) return undefined;
+            return { widthIn: w, heightIn: h };
+          })();
           const blob = format === 'foldover'
-            ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern, gradeColors)
-            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors);
+            ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern, gradeColors, heritageDims)
+            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors, heritageDims);
           blobs.push({
             name: `DCM-Slab-heritage-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
