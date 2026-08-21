@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform, ScrollView, useWindowDimensions } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Image, Alert, Platform, ScrollView, useWindowDimensions } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -34,6 +34,36 @@ export default function CaptureScreen() {
   // the camera initializes with its safe default; flips to the max once
   // onCameraReady fires.
   const [pictureSize, setPictureSize] = useState<string | undefined>(undefined)
+
+  /**
+   * Tap-to-refocus.
+   *
+   * expo-camera exposes no focus method and no metering point, so true
+   * tap-to-point focus is not available. What IS available: flipping the
+   * autofocus prop off -> on -> off makes the native side run
+   * startFocusMetering() and then cancelFocusAndMetering(), and that cancel
+   * hands control back to continuous AF, which re-converges. So a tap is a
+   * "refocus now" kick rather than "focus here" — which is the useful half
+   * anyway when the lens has settled on the wrong thing.
+   */
+  const [autofocusMode, setAutofocusMode] = useState<'on' | 'off'>('off')
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
+  const focusTimers = useRef<Array<ReturnType<typeof setTimeout>>>([])
+
+  const handleTapFocus = useCallback((e: { nativeEvent: { locationX: number; locationY: number } }) => {
+    const { locationX, locationY } = e.nativeEvent
+    focusTimers.current.forEach(clearTimeout)
+    focusTimers.current = []
+    setFocusPoint({ x: locationX, y: locationY })
+    setAutofocusMode('on')
+    Haptics.selectionAsync().catch(() => { /* haptics are optional */ })
+    // Back to 'off' = cancelFocusAndMetering() = resume continuous AF.
+    focusTimers.current.push(setTimeout(() => setAutofocusMode('off'), 150))
+    focusTimers.current.push(setTimeout(() => setFocusPoint(null), 900))
+  }, [])
+
+  // Timers outlive the screen if the user backs out mid-focus.
+  useEffect(() => () => { focusTimers.current.forEach(clearTimeout) }, [])
 
   // Measured size of the camera preview container. Feeds the geometry-aware
   // capture crop (lib/imageUtils computeGuideCrop) so the crop matches the
@@ -567,11 +597,31 @@ export default function CaptureScreen() {
                * call cancelFocusAndMetering(), handing focus back to CameraX's
                * continuous AF, which is what a card in a guide box needs.
                */
-              autofocus="off"
-              zoom={0}
+              autofocus={autofocusMode}
+              /**
+               * NO zoom prop. Passing zoom={0} looks like "no zoom", but
+               * setCameraZoom() computes max(1f, 0 * maxZoomRatio) and issues an
+               * explicit setZoomRatio(1f) on every bind. That pins the main wide
+               * sensor at exactly 1x and suppresses the automatic lens switching
+               * phones use for close subjects — and a main sensor typically
+               * cannot focus closer than ~10-15cm, which is inside the distance
+               * a card fills the guide box at. Omitting the prop leaves the
+               * device free to choose, the way getUserMedia does on mobile web.
+               */
               pictureSize={pictureSize}
               onCameraReady={handleCameraReady}
             />
+            {/* Tap to refocus. expo-camera accepts no metering point, so this
+                cannot focus on the tapped SPOT — it kicks AF and hands control
+                back to continuous focus, which re-converges on the scene. The
+                reticle is placed at the tap purely as feedback. */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleTapFocus} />
+            {focusPoint && (
+              <View
+                pointerEvents="none"
+                style={[styles.focusRing, { left: focusPoint.x - 36, top: focusPoint.y - 36 }]}
+              />
+            )}
             <View style={styles.guideContainer} pointerEvents="none">
               <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
                 <View style={[styles.corner, styles.cornerTL]} />
@@ -750,6 +800,8 @@ const styles = StyleSheet.create({
   cameraContainer: { flex: 1, width: '100%' },
   cameraContainerTablet: { width: '100%', maxWidth: 520 },
   camera: { flex: 1 },
+  // Tap-to-refocus feedback ring.
+  focusRing: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'transparent' },
 
   // Guide (absolute overlay on camera)
   guideContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
