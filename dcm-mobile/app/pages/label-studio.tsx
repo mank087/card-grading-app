@@ -1593,7 +1593,11 @@ export default function LabelStudioScreen() {
         {selectedCard && (
           <>
             {/* ============ Label Badges ============ */}
-            {step === 4 && <LabelBadgesPicker />}
+            {/* Founder / VIP / Card Lover emblems only render on the slab
+                label. The compact one-touch and toploader panels have no room
+                for them, so offering the toggles there sets something the
+                user will never see. */}
+            {step === 4 && activeHolder === 'slab' && <LabelBadgesPicker />}
 
             {/* ============ Step 6: Supplies ============
                 Keyed to the holder, so the label stock a sheet is actually
@@ -1892,7 +1896,11 @@ export default function LabelStudioScreen() {
                 showsHorizontalScrollIndicator={false}
                 data={effectiveRunIds}
                 keyExtractor={id => id}
-                extraData={activeGalleryIdx}
+                // Every value the rows read must be in here. With a saved run
+                // the data array keeps its identity, so FlatList skips
+                // re-rendering rows — the Heritage panel and the card image
+                // would arrive and never be drawn.
+                extraData={`${activeGalleryIdx}|${selectedCard?.id}|${side}|${frontUrl}|${backUrl}|${labelPreviewUrl}|${labelPreviewType}`}
                 snapToInterval={SCREEN_W - 24}
                 onScrollToIndexFailed={() => { /* run shorter than the target index */ }}
                 decelerationRate="fast"
