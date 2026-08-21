@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { Colors } from '@/lib/constants'
 import type { LabelStyleId, SavedCustomStyle } from '@/hooks/useLabelStyle'
+import { MAX_SAVED_LABEL_STYLES } from '@/hooks/useLabelStyle'
 
 interface Props {
   labelStyle: LabelStyleId
@@ -87,7 +88,7 @@ export default function LabelStylePicker({ labelStyle, customStyles, onSwitch, c
               {customStyles.map(s => (
                 <StyleRow key={s.id} id={s.id as LabelStyleId} name={s.name} dot={<ColorDot config={s.config} />} />
               ))}
-              {customStyles.length < 4 && (
+              {customStyles.length < MAX_SAVED_LABEL_STYLES && (
                 <>
                   <View style={styles.divider} />
                   <TouchableOpacity

@@ -5,7 +5,12 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { HERITAGE_BRAND_COLORS } from '@/lib/heritage'
 
-export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4'
+// Custom slots run 'custom-1'..`custom-${MAX_SAVED_LABEL_STYLES}` — the
+// template type accepts any slot number; the server validates the range.
+export type LabelStyleId = 'modern' | 'traditional' | 'heritage' | `custom-${number}`
+
+/** Saved-design slot cap — mirrors web src/lib/labelPresets.ts (Aug 2026: 4 → 12). */
+export const MAX_SAVED_LABEL_STYLES = 12
 
 export interface CustomLabelConfig {
   colorPreset?: string

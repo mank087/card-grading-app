@@ -1,48 +1,28 @@
 import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { Colors } from '@/lib/constants'
+import { PRODUCTS, productUrl } from '@/lib/shopProducts'
 
-const products = [
-  {
-    name: 'Card Scanner Stand',
-    description: 'Hands-free phone stand for consistent overhead card photography.',
-    image: require('@/assets/images/shop-scanner-stand.jpg'),
-    link: 'https://www.amazon.com/dp/B0G4D5J8GG?th=1&linkCode=ll2&tag=dcmgrading03-20',
-    badge: 'Best for Photos',
-  },
-  {
-    name: 'Magnetic Graded Slabs',
-    description: 'Premium magnetic closure cases for displaying DCM-graded cards.',
-    image: require('@/assets/images/shop-magnetic-slabs.jpg'),
-    link: 'https://www.amazon.com/dp/B0GK6PSGKQ?th=1&linkCode=ll2&tag=dcmgrading03-20',
-    badge: 'Premium Display',
-  },
-  {
-    name: 'Traditional Graded Slabs',
-    description: 'Classic snap-fit graded card slabs. 100 per pack — great value.',
-    image: require('@/assets/images/shop-traditional-slabs.jpg'),
-    link: 'https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl',
-    badge: 'Best Value',
-  },
-]
 
 export default function ShopScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.subtitle}>Enhance your card grading experience</Text>
 
-      {products.map((product) => (
+      {PRODUCTS.map((product) => (
         <TouchableOpacity
           key={product.name}
           style={styles.productCard}
-          onPress={() => WebBrowser.openBrowserAsync(product.link)}
+          onPress={() => WebBrowser.openBrowserAsync(productUrl(product))}
           activeOpacity={0.7}
           accessibilityLabel={`${product.name} on Amazon`}
           accessibilityHint={product.description}
           accessibilityRole="link"
         >
           <View style={styles.imageContainer}>
-            <Image source={product.image} style={styles.productImage} resizeMode="contain" />
+            {product.image
+              ? <Image source={product.image} style={styles.productImage} resizeMode="contain" />
+              : <View style={styles.imagePlaceholder}><Text style={styles.imagePlaceholderText}>{product.name}</Text></View>}
             {product.badge && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{product.badge}</Text>
@@ -78,6 +58,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   productImage: { width: 160, height: 160 },
+  imagePlaceholder: { width: 160, height: 160, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  imagePlaceholderText: { fontSize: 13, fontWeight: '600', color: Colors.gray[500], textAlign: 'center' },
   badge: {
     position: 'absolute',
     top: 12,

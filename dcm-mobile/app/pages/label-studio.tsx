@@ -47,6 +47,8 @@ import { saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
 import { useSegments } from 'expo-router'
 import { useLabelStyle, MAX_SAVED_LABEL_STYLES } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
+import * as WebBrowser from 'expo-web-browser'
+import { productsForHolder, productUrl } from '@/lib/shopProducts'
 
 // SCREEN_W is now read per-render via useWindowDimensions() inside the
 // component so the FlatList snap interval tracks iPad rotation +
@@ -1504,6 +1506,39 @@ export default function LabelStudioScreen() {
             {/* ============ Label Badges ============ */}
             <LabelBadgesPicker />
 
+            {/* ============ Supplies ============
+                Keyed to the holder, so the label stock a sheet is actually
+                laid out for leads. Affiliate links, same tag as the Shop tab. */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>What you&apos;ll need</Text>
+              {productsForHolder(activeHolder, Math.abs((config.width ?? 2.8) - 2.51) < 0.01)
+                .slice(0, 3)
+                .map(product => (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={s.supplyRow}
+                    activeOpacity={0.7}
+                    onPress={() => WebBrowser.openBrowserAsync(productUrl(product))}
+                    accessibilityRole="link"
+                    accessibilityLabel={`${product.name} on Amazon`}
+                  >
+                    <View style={s.supplyThumb}>
+                      {product.image
+                        ? <Image source={product.image} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                        : <Text style={{ fontSize: 20 }}>🏷️</Text>}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.supplyName} numberOfLines={1}>{product.name}</Text>
+                      <Text style={s.supplyDesc} numberOfLines={2}>{product.shortDescription}</Text>
+                    </View>
+                    <Text style={s.supplyChevron}>›</Text>
+                  </TouchableOpacity>
+                ))}
+              <Text style={s.supplyDisclosure}>
+                These are Amazon affiliate links — DCM earns a small commission at no cost to you.
+              </Text>
+            </View>
+
             {/* ============ Print run ============
                 One design, many cards. The preview and text editor stay on the
                 card you tapped; everything in the run prints with the same
@@ -2645,6 +2680,12 @@ const s = StyleSheet.create({
   runChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 190, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50] },
   runChipText: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: Colors.purple[800] },
   runChipX: { fontSize: 15, lineHeight: 15, fontWeight: '700', color: Colors.purple[500] },
+  supplyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.gray[200] },
+  supplyThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: Colors.gray[50], alignItems: 'center', justifyContent: 'center' },
+  supplyName: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
+  supplyDesc: { fontSize: 11, color: Colors.gray[500], marginTop: 2, lineHeight: 15 },
+  supplyChevron: { fontSize: 22, color: Colors.gray[300], fontWeight: '300' },
+  supplyDisclosure: { fontSize: 10, color: Colors.gray[400], marginTop: 10, lineHeight: 14 },
   subLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginBottom: 6 },
 
   // Card selector

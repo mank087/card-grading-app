@@ -160,10 +160,16 @@ Steps map cleanly to a native stack: a card picker, a holder picker, a style pic
 
 *Risk:* highest of the set, but mostly mechanical once Phases 3 and 4 have already split holder from style and taught the screen to hold multiple cards. Consider keeping today's screen reachable as mobile's own "classic mode", mirroring what web did.
 
-### Phase 6 — Supplies step
+### Phase 6 — Supplies ✅ DONE
 **Mobile OTA.**
 
-`src/lib/shopProducts.ts` (shipped in `8b52721`) already holds the catalogue, the affiliate tag, and `productsForHolder()`. Mobile has a Shop tab that can share the same data. Small once Phase 5 exists.
+`dcm-mobile/lib/shopProducts.ts` mirrors the web catalogue — same ASINs, link ids, categories, and `productsForHolder()`. A deliberate copy, since the two projects share no code today (see §6 open decisions).
+
+The mobile Shop tab was **stale**: three products, hardcoded URLs, missing Zion, the trimmer, and both Avery label packs. It now renders from the shared catalogue, so the two surfaces cannot drift again.
+
+Label Studio gained a "What you'll need" section keyed to the chosen holder, showing the top three with an affiliate disclosure. Product images are optional here too — Zion, the trimmer, and both Avery packs have no bundled mobile asset yet and render a placeholder.
+
+*Note:* this is a section in the existing screen rather than a discrete step, because mobile has no wizard yet. It folds into step 6 naturally if Phase 5 lands.
 
 ---
 
