@@ -135,8 +135,12 @@ export default function LabelWebRenderer({
     } catch { return '' }
   })()
 
+  // NOTE: current `side`, not the captured initial one. Changing `type` (a style
+  // switch) rebuilds this URL and reloads the WebView — with the initial side
+  // baked in, the label came back showing the FRONT while the card image stayed
+  // on the back.
   const url = cardId && token && initialRef.current
-    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
+    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
     : ''
 
   // Send config updates to the page (re-renders canvas without reload).

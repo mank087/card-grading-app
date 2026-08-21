@@ -70,11 +70,11 @@ export type HolderId = 'slab' | 'onetouch' | 'toploader' | 'digital'
 export type StyleId = 'heritage' | 'modern' | 'traditional' | 'custom'
 export type ToploaderFormat = 'front-back' | 'foldover'
 
-const HOLDER_OPTIONS: Array<{ id: HolderId; name: string; blurb: string }> = [
-  { id: 'slab',      name: 'Graded Slab',  blurb: '2.8" × 0.8" label, cut and insert' },
-  { id: 'onetouch',  name: 'One-Touch',    blurb: 'Avery 6871 sheets' },
-  { id: 'toploader', name: 'Toploader',    blurb: 'Avery 8167 sheets' },
-  { id: 'digital',   name: 'Card Image',   blurb: 'For eBay and social' },
+const HOLDER_OPTIONS: Array<{ id: HolderId; name: string; blurb: string; image?: any }> = [
+  { id: 'slab',      name: 'Graded Slab',  blurb: '2.8" × 0.8" label · cut and insert', image: require('@/assets/images/graded-card-slab.png') },
+  { id: 'onetouch',  name: 'One-Touch',    blurb: '2.375" × 0.625" · Avery 6871', image: require('@/assets/images/mag-one-touch-DCM.png') },
+  { id: 'toploader', name: 'Toploader',    blurb: '1.75" × 0.5" · Avery 8167', image: require('@/assets/images/top-loader-dcm.png') },
+  { id: 'digital',   name: 'Card Image',   blurb: '800 × 1120 px · eBay and social' },
 ]
 
 /**
@@ -374,7 +374,9 @@ export default function LabelStudioScreen() {
   const [savingStyle, setSavingStyle] = useState(false)
   const [renamingStyleId, setRenamingStyleId] = useState<string | null>(null)
   const [renamingValue, setRenamingValue] = useState('')
-  const [activeGalleryIdx, setActiveGalleryIdx] = useState(0)
+  const [activeGalleryIdx, setActiveGalleryIdx] = useState(
+    Math.max(0, LABEL_GALLERY.findIndex(t => t.id === 'slab-heritage')),
+  )
   const galleryListRef = useRef<FlatList<any>>(null)
   // Jump the swipe gallery to a tile programmatically (e.g. tapping the
   // "DCM Heritage" dimension preset) — the preview and per-tile option
@@ -1498,6 +1500,9 @@ export default function LabelStudioScreen() {
         {step === 1 && (<>
         <View style={s.section}>
           <Text style={s.sectionTitle}>Select a Card</Text>
+          <Text style={s.sectionHint}>
+            Tap a card to design its label. Press and hold to add cards to a print run and do up to {MAX_PRINT_RUN} at once.
+          </Text>
           <TextInput
             style={s.searchInput}
             placeholder="Search by name or serial..."
@@ -1571,37 +1576,71 @@ export default function LabelStudioScreen() {
             {/* ============ Step 6: Supplies ============
                 Keyed to the holder, so the label stock a sheet is actually
                 laid out for leads. Affiliate links, same tag as the Shop tab. */}
-            {step === 6 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>What you&apos;ll need</Text>
-              {productsForHolder(activeHolder, Math.abs((config.width ?? 2.8) - 2.51) < 0.01)
-                .slice(0, 3)
-                .map(product => (
-                  <TouchableOpacity
-                    key={product.id}
-                    style={s.supplyRow}
-                    activeOpacity={0.7}
-                    onPress={() => WebBrowser.openBrowserAsync(productUrl(product))}
-                    accessibilityRole="link"
-                    accessibilityLabel={`${product.name} on Amazon`}
-                  >
-                    <View style={s.supplyThumb}>
-                      {product.image
-                        ? <Image source={product.image} style={{ width: 44, height: 44 }} resizeMode="contain" />
-                        : <Text style={{ fontSize: 20 }}>🏷️</Text>}
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
+            {step === 6 && (() => {
+              const isZion = Math.abs((config.width ?? 2.8) - 2.51) < 0.01
+              const products = productsForHolder(activeHolder, isZion)
+              const cutter = products.find(pr => pr.id === 'paper-cutter')
+              const cases = products.filter(pr => pr.id !== 'paper-cutter')
+              const Row = ({ product, featured }: { product: any; featured?: boolean }) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={[s.supplyRow, featured && s.supplyRowFeatured]}
+                  activeOpacity={0.7}
+                  onPress={() => WebBrowser.openBrowserAsync(productUrl(product))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${product.name} on Amazon`}
+                >
+                  <View style={s.supplyThumb}>
+                    {product.image
+                      ? <Image source={product.image} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                      : <Text style={{ fontSize: 20 }}>🏷️</Text>}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={s.supplyName} numberOfLines={1}>{product.name}</Text>
-                      <Text style={s.supplyDesc} numberOfLines={2}>{product.shortDescription}</Text>
+                      {!!product.badge && (
+                        <View style={s.supplyBadge}><Text style={s.supplyBadgeText}>{product.badge}</Text></View>
+                      )}
                     </View>
-                    <Text style={s.supplyChevron}>›</Text>
+                    <Text style={s.supplyDesc} numberOfLines={2}>{product.shortDescription}</Text>
+                  </View>
+                  <Text style={s.supplyChevron}>›</Text>
+                </TouchableOpacity>
+              )
+              return (
+                <View style={s.section}>
+                  <Text style={s.sectionTitle}>Everything else you&apos;ll need</Text>
+                  <Text style={s.sectionHint}>
+                    Optional — the cases and tools that pair with the labels you just designed.
+                  </Text>
+
+                  {isZion && activeHolder === 'slab' && (
+                    <View style={s.zionNote}>
+                      <Text style={s.zionNoteText}>
+                        You designed at Zion Mag Pro size — the Zion MagPro case below is the holder those labels are cut for.
+                      </Text>
+                    </View>
+                  )}
+
+                  {cases.map((pr, i) => <Row key={pr.id} product={pr} featured={i === 0} />)}
+
+                  {!!cutter && (
+                    <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.gray[200] }}>
+                      <Text style={s.pickerLabel}>Cut your labels cleanly</Text>
+                      <Row product={cutter} />
+                    </View>
+                  )}
+
+                  <Text style={s.supplyDisclosure}>
+                    As an Amazon Associate, DCM Grading earns from qualifying purchases. These are affiliate
+                    links — they cost you nothing extra and help support the platform.
+                  </Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/shop')} style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>See all recommended products →</Text>
                   </TouchableOpacity>
-                ))}
-              <Text style={s.supplyDisclosure}>
-                These are Amazon affiliate links — DCM earns a small commission at no cost to you.
-              </Text>
-            </View>
-            )}
+                </View>
+              )
+            })()}
 
             {/* ============ Print run ============
                 One design, many cards. The preview and text editor stay on the
@@ -1654,19 +1693,27 @@ export default function LabelStudioScreen() {
                 them back, so both ways of choosing stay in sync. */}
             {step === 2 && (
             <View style={s.section}>
-              <Text style={s.pickerLabel}>Holder</Text>
-              <View style={s.pickerRow}>
+              <Text style={s.sectionTitle}>What are these cards going into?</Text>
+              <Text style={s.sectionHint}>The holder decides the label size and the sheet it prints on.</Text>
+              <View style={s.holderGrid}>
                 {HOLDER_OPTIONS.map(h => {
                   const on = activeHolder === h.id
                   return (
                     <TouchableOpacity
                       key={h.id}
                       onPress={() => selectHolder(h.id)}
-                      style={[s.pickerChip, on && s.pickerChipOn]}
+                      style={[s.holderCard, on && s.holderCardOn]}
+                      activeOpacity={0.8}
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
                     >
-                      <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>{h.name}</Text>
+                      <View style={s.holderThumb}>
+                        {h.image
+                          ? <Image source={h.image} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                          : <Ionicons name="image-outline" size={30} color={Colors.gray[300]} />}
+                      </View>
+                      <Text style={[s.holderName, on && { color: Colors.purple[700] }]}>{h.name}</Text>
+                      <Text style={s.holderBlurb}>{h.blurb}</Text>
                     </TouchableOpacity>
                   )
                 })}
@@ -1752,6 +1799,37 @@ export default function LabelStudioScreen() {
                 </>
               )}
             </View>
+            )}
+
+            {/* Card pager — check the style on every card in the run. */}
+            {step === 3 && effectiveRunIds.length > 1 && (
+              <View style={s.cardPager}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const i = effectiveRunIds.indexOf(selectedCard?.id)
+                    const prev = effectiveRunIds[(i - 1 + effectiveRunIds.length) % effectiveRunIds.length]
+                    const c = runCardById(prev); if (c) setSelectedCard(c)
+                  }}
+                  style={s.cardPagerBtn}
+                  accessibilityLabel="Previous card"
+                >
+                  <Ionicons name="chevron-back" size={18} color={Colors.purple[700]} />
+                </TouchableOpacity>
+                <Text style={s.cardPagerText} numberOfLines={1}>
+                  {Math.max(1, effectiveRunIds.indexOf(selectedCard?.id) + 1)} of {effectiveRunIds.length} · {selectedCard?.featured || selectedCard?.card_name || 'Card'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const i = effectiveRunIds.indexOf(selectedCard?.id)
+                    const next = effectiveRunIds[(i + 1) % effectiveRunIds.length]
+                    const c = runCardById(next); if (c) setSelectedCard(c)
+                  }}
+                  style={s.cardPagerBtn}
+                  accessibilityLabel="Next card"
+                >
+                  <Ionicons name="chevron-forward" size={18} color={Colors.purple[700]} />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* ============ Label Gallery (Swipeable) ============ */}
@@ -1973,55 +2051,6 @@ export default function LabelStudioScreen() {
                 </Text>
               </View>
             )}
-
-            {/* ============ Dimensions ============ */}
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Dimensions</Text>
-              <View style={s.dimGrid}>
-                {DIMENSION_PRESETS.map(p => {
-                  const isActive = (config.preset ?? 'dcm') === p.id
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[s.dimTile, isActive && s.dimTileActive]}
-                      onPress={() => handleDimensionPreset(p)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[s.dimTileName, isActive && s.dimTileNameActive]}>{p.name}</Text>
-                      <Text style={s.dimTileSize}>
-                        {p.id === 'custom' ? 'Adjust width & height' : `${p.width}" × ${p.height}"`}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-              {(config.preset === 'custom') && (
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.fieldLabel}>Width (in)</Text>
-                    <DimensionInput
-                      value={config.width ?? 2.8}
-                      min={0.5}
-                      max={4}
-                      fallback={2.8}
-                      styleField={s.fieldInput}
-                      onCommit={(w) => updateConfig({ width: w })}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.fieldLabel}>Height (in)</Text>
-                    <DimensionInput
-                      value={config.height ?? 0.8}
-                      min={0.3}
-                      max={4}
-                      fallback={0.8}
-                      styleField={s.fieldInput}
-                      onCommit={(h) => updateConfig({ height: h })}
-                    />
-                  </View>
-                </View>
-              )}
-            </View>
 
             {/* ============ Color Theme ============ */}
             <View style={s.section}>
@@ -2396,38 +2425,10 @@ export default function LabelStudioScreen() {
               </Text>
             </View>
 
-            {/* ============ Custom Slab Preview (duplicate) ============ */}
-            {/* Second preview below border so users can edit colors/border and
-                see the result without scrolling back to the top. */}
-            <View style={s.section}>
-              <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Live Preview</Text>
-              <LabelMockup
-                labelType="custom"
-                cardImageUrl={frontUrl}
-                cardBackImageUrl={backUrl}
-                width={260}
-                labelProps={inlineLabelProps}
-                side={side}
-                emblems={galleryEmblems}
-                customOverrides={customOverrides}
-                labelImageUrl={labelPreviewUrl}
-              />
-              <View style={s.sideToggle}>
-                <TouchableOpacity
-                  style={[s.sideBtn, side === 'front' && s.sideBtnActive]}
-                  onPress={() => setSide('front')}
-                >
-                  <Text style={[s.sideBtnText, side === 'front' && s.sideBtnTextActive]}>Front</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.sideBtn, side === 'back' && s.sideBtnActive]}
-                  onPress={() => setSide('back')}
-                >
-                  <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            </>)}
 
+            {/* ============ Step 5: Finish ============ */}
+            {step === 5 && (<>
             {/* ============ Label Text ============ */}
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -2517,10 +2518,6 @@ export default function LabelStudioScreen() {
               </Text>
             </View>
 
-            </>)}
-
-            {/* ============ Step 5: Finish ============ */}
-            {step === 5 && (<>
             {/* ============ Download Custom Label ============ */}
             <View style={s.section}>
               <TouchableOpacity
@@ -2807,7 +2804,22 @@ const s = StyleSheet.create({
   supplyName: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
   supplyDesc: { fontSize: 11, color: Colors.gray[500], marginTop: 2, lineHeight: 15 },
   supplyChevron: { fontSize: 22, color: Colors.gray[300], fontWeight: '300' },
+  supplyRowFeatured: { borderRadius: 10, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50], paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: Colors.purple[200] },
+  supplyBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: Colors.purple[600] },
+  supplyBadgeText: { fontSize: 8, fontWeight: '700', color: '#fff' },
+  zionNote: { padding: 10, borderRadius: 10, backgroundColor: Colors.purple[50], borderWidth: 1, borderColor: Colors.purple[100], marginBottom: 12 },
+  zionNoteText: { fontSize: 11, color: Colors.purple[800], lineHeight: 16 },
   supplyDisclosure: { fontSize: 10, color: Colors.gray[400], marginTop: 10, lineHeight: 14 },
+  cardPager: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingHorizontal: 4 },
+  cardPagerBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50], alignItems: 'center', justifyContent: 'center' },
+  cardPagerText: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: Colors.gray[700] },
+  sectionHint: { fontSize: 12, color: Colors.gray[500], marginTop: -4, marginBottom: 10, lineHeight: 17 },
+  holderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  holderCard: { width: '47.5%', borderRadius: 12, borderWidth: 2, borderColor: Colors.gray[200], backgroundColor: '#fff', padding: 10 },
+  holderCardOn: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
+  holderThumb: { height: 92, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  holderName: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
+  holderBlurb: { fontSize: 10, color: Colors.gray[500], marginTop: 2, lineHeight: 14 },
   stepper: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 14 },
   stepperItem: { flex: 1, alignItems: 'center', gap: 4 },
   stepperDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
