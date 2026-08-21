@@ -39,12 +39,16 @@ function ProductCard({ product, featured }: { product: Product; featured?: boole
       <div className="w-20 h-20 shrink-0 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
         {/* Plain <img>: these are self-hosted product shots at small sizes,
             and next/image's optimizer adds nothing at 80px. */}
-        <img
-          src={product.image}
-          alt={product.name}
-          className="max-h-[72px] w-auto object-contain group-hover:scale-105 transition-transform"
-          loading="lazy"
-        />
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            className="max-h-[72px] w-auto object-contain group-hover:scale-105 transition-transform"
+            loading="lazy"
+          />
+        ) : (
+          <span className="text-2xl" aria-hidden="true">🏷️</span>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">

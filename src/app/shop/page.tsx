@@ -22,13 +22,21 @@ function ProductCard({ product }: { product: Product }) {
     >
       {/* Image */}
       <div className="relative bg-gray-50 p-6 flex items-center justify-center" style={{ minHeight: '280px' }}>
-        <Image
-          src={product.image}
-          alt={product.name}
-          width={300}
-          height={300}
-          className="object-contain max-h-[260px] w-auto group-hover:scale-105 transition-transform duration-300"
-        />
+        {product.image ? (
+          <Image
+            src={product.image}
+            alt={product.name}
+            width={300}
+            height={300}
+            className="object-contain max-h-[260px] w-auto group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          /* No product shot yet — a titled tile beats a broken image icon. */
+          <div className="flex flex-col items-center justify-center text-center px-6">
+            <span className="text-4xl mb-3" aria-hidden="true">🏷️</span>
+            <span className="text-sm font-semibold text-gray-500">{product.name}</span>
+          </div>
+        )}
         {product.badge && (
           <span className="absolute top-4 left-4 px-3 py-1 bg-purple-600 text-white text-xs font-semibold rounded-full shadow-sm">
             {product.badge}

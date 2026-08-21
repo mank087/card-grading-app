@@ -40,8 +40,9 @@ export function amazonAffiliateUrl(asin: string, linkId?: string, tag: string = 
  *  - 'magnetic'  : magnetic one-touch style cases
  *  - 'zion'      : Zion MagPro — the case behind the wizard's Zion size option
  *  - 'tool'      : everything that helps you produce the labels themselves
+ *  - 'labels'    : the Avery label stock a holder's sheets are laid out for
  */
-export type ProductCategory = 'slab' | 'magnetic' | 'zion' | 'tool';
+export type ProductCategory = 'slab' | 'magnetic' | 'zion' | 'tool' | 'labels';
 
 export interface Product {
   /** Stable key — also the anchor/analytics id. */
@@ -50,7 +51,8 @@ export interface Product {
   description: string;
   /** Short line used in the compact wizard cards. */
   shortDescription: string;
-  image: string;
+  /** Optional — a product with no photo yet renders a titled placeholder. */
+  image?: string;
   asin: string;
   /** SiteStripe per-placement id, when one has been generated. */
   linkId?: string;
@@ -115,6 +117,28 @@ export const PRODUCTS: Product[] = [
     categories: ['magnetic', 'zion'],
   },
   {
+    id: 'avery-6871',
+    name: 'Avery 6871 Labels (2.375" × 1.25")',
+    description:
+      'The label stock the One-Touch sheets are laid out for. Label Studio prints 18 per page on this size, with the back panel inverted on the top half so the label reads upright once folded over the case edge. Print at 100% scale — any fit-to-page scaling will pull the artwork off the die-cuts.',
+    shortDescription: 'One-Touch label stock — 18 per page, printed to the die-cuts.',
+    asin: 'B00007M4HJ',
+    linkId: '1e69599b7a1a8a38139531e917282a1d',
+    badge: 'One-Touch Sheets',
+    categories: ['labels'],
+  },
+  {
+    id: 'avery-8167',
+    name: 'Avery 8167 Labels (1.75" × 0.5")',
+    description:
+      'The label stock both Toploader formats are laid out for. Front-and-back pairs fit 40 cards per page; the fold-over format fits 80, printed rotated so each half reads upright once folded over the top edge. Print at 100% scale — any fit-to-page scaling will pull the artwork off the die-cuts.',
+    shortDescription: 'Toploader label stock — 40 cards per page, or 80 folded.',
+    asin: 'B00004Z5QO',
+    linkId: 'a044b1dc8e00e40e60d13214dfdf102e',
+    badge: 'Toploader Sheets',
+    categories: ['labels'],
+  },
+  {
     id: 'paper-cutter',
     name: 'A4 Paper Cutter & Trimmer',
     description:
@@ -140,14 +164,22 @@ export function productsForHolder(
 ): Product[] {
   const byId = (id: string) => PRODUCTS.find(p => p.id === id)!;
   const cutter = byId('paper-cutter');
+  const avery6871 = byId('avery-6871');
+  const avery8167 = byId('avery-8167');
 
-  if (holder === 'onetouch' || slabSize === 'zion') {
-    // Zion sizing implies a Zion case; one-touch users want magnetic cases.
+  if (holder === 'onetouch') {
+    // The 6871 stock first: the sheet is laid out for it and nothing else fits.
+    return [avery6871, byId('zion-magpro'), byId('magnetic-graded-slabs'), cutter];
+  }
+  if (slabSize === 'zion') {
     return [byId('zion-magpro'), byId('magnetic-graded-slabs'), byId('traditional-graded-slabs'), cutter];
   }
   if (holder === 'slab') {
     return [byId('traditional-graded-slabs'), byId('magnetic-graded-slabs'), byId('zion-magpro'), cutter];
   }
-  // Toploader (or nothing chosen): cases are less relevant, tools still are.
+  if (holder === 'toploader') {
+    return [avery8167, byId('card-scanner-stand'), byId('traditional-graded-slabs'), cutter];
+  }
+  // Nothing chosen: cases are less relevant, tools still are.
   return [byId('card-scanner-stand'), byId('traditional-graded-slabs'), byId('magnetic-graded-slabs'), cutter];
 }
