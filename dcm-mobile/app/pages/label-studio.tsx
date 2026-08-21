@@ -1807,8 +1807,9 @@ export default function LabelStudioScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     const i = effectiveRunIds.indexOf(selectedCard?.id)
-                    const prev = effectiveRunIds[(i - 1 + effectiveRunIds.length) % effectiveRunIds.length]
-                    const c = runCardById(prev); if (c) setSelectedCard(c)
+                    const j = (i - 1 + effectiveRunIds.length) % effectiveRunIds.length
+                    const c = runCardById(effectiveRunIds[j]); if (c) setSelectedCard(c)
+                    try { galleryListRef.current?.scrollToIndex({ index: j, animated: true }) } catch { /* not mounted */ }
                   }}
                   style={s.cardPagerBtn}
                   accessibilityLabel="Previous card"
@@ -1821,8 +1822,9 @@ export default function LabelStudioScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     const i = effectiveRunIds.indexOf(selectedCard?.id)
-                    const next = effectiveRunIds[(i + 1) % effectiveRunIds.length]
-                    const c = runCardById(next); if (c) setSelectedCard(c)
+                    const j = (i + 1) % effectiveRunIds.length
+                    const c = runCardById(effectiveRunIds[j]); if (c) setSelectedCard(c)
+                    try { galleryListRef.current?.scrollToIndex({ index: j, animated: true }) } catch { /* not mounted */ }
                   }}
                   style={s.cardPagerBtn}
                   accessibilityLabel="Next card"
@@ -1832,98 +1834,78 @@ export default function LabelStudioScreen() {
               </View>
             )}
 
-            {/* ============ Label Gallery (Swipeable) ============ */}
+            {/* ============ Style preview ============
+                Swipes through the CARDS in the run, not the styles — the style
+                is chosen by the chips above, and paging styles here meant you
+                could never compare one style across several cards. No download
+                button: printing belongs on Finish, once the design is settled. */}
             {step === 3 && (
             <View style={s.section}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={s.sectionTitle}>Label Gallery</Text>
-                <Text style={{ fontSize: 11, color: Colors.gray[400] }}>{LABEL_GALLERY.length} label types</Text>
-              </View>
               <FlatList
                 ref={galleryListRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                data={LABEL_GALLERY}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ gap: 0 }}
-                snapToAlignment="center"
-                decelerationRate="fast"
+                data={effectiveRunIds}
+                keyExtractor={id => id}
+                extraData={activeGalleryIdx}
                 snapToInterval={SCREEN_W - 24}
-                // Negate the section's horizontal padding (16px each side) so
-                // the FlatList viewport equals the panel width (SCREEN_W-24).
-                // Without this, panels are wider than the viewport and the
-                // holder PNG bleeds into the neighboring slide.
-                style={{ marginHorizontal: -16 }}
-                // Momentum-end does not fire on slow drags (long-standing RN
-                // quirk), which left activeGalleryIdx stale — the tile LOOKED
-                // selected but preview + option sections tracked the old one.
-                onScrollEndDrag={(e) => {
+                decelerationRate="fast"
+                onMomentumScrollEnd={e => {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
-                  setActiveGalleryIdx(idx)
+                  const c = runCardById(effectiveRunIds[idx])
+                  if (c && c.id !== selectedCard?.id) setSelectedCard(c)
                 }}
-                onMomentumScrollEnd={(e) => {
-                  const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
-                  // Only track the visible tile — do NOT mutate config here.
-                  // Forced-style tiles get their display style derived at
-                  // render time in the labelConfig memo, so swiping past
-                  // slab-modern/traditional no longer permanently overwrites
-                  // the user's chosen config.style.
-                  setActiveGalleryIdx(idx)
-                }}
-                renderItem={({ item: labelType, index }) => (
-                  <View style={{ width: SCREEN_W - 24, paddingHorizontal: 12 }}>
-                    {/* Type label header */}
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[900], textAlign: 'center' }}>{labelType.name}</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[600], textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginBottom: 8 }}>{labelType.holderLabel}</Text>
-
-                    {/* Holder mockup */}
-                    <LabelMockup
-                      labelType={labelType.id}
-                      cardImageUrl={frontUrl}
-                      cardBackImageUrl={backUrl}
-                      width={260}
-                      labelProps={inlineLabelProps}
-                      side={side}
-                      emblems={galleryEmblems}
-                      customOverrides={customOverrides}
-                      labelImageUrl={previewUrlForTile(labelType)}
-                    />
-
-                    {/* Side toggle (front/back) — same as designer below */}
-                    <View style={[s.sideToggle, { marginTop: 8, alignSelf: 'center' }]}>
-                      <TouchableOpacity style={[s.sideBtn, side === 'front' && s.sideBtnActive]} onPress={() => setSide('front')}>
-                        <Text style={[s.sideBtnText, side === 'front' && s.sideBtnTextActive]}>Front</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.sideBtn, side === 'back' && s.sideBtnActive]} onPress={() => setSide('back')}>
-                        <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', marginTop: 8 }}>
-                      {labelType.dimensions} — {labelType.useCase}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: Colors.gray[400], textAlign: 'center', marginTop: 4 }} numberOfLines={3}>
-                      {labelType.description}
-                    </Text>
-                    <TouchableOpacity
-                      style={[s.downloadBtn, { marginTop: 12, marginHorizontal: 20 }]}
-                      onPress={() => handleGalleryDownload(labelType)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="download-outline" size={16} color="#fff" />
-                      <Text style={s.downloadBtnText}>
-                        {labelType.holderLabel === 'Digital' ? 'Download Images' : 'Download PDF'}
+                renderItem={({ item: cardId }) => {
+                  const card = runCardById(cardId)
+                  const isShown = cardId === selectedCard?.id
+                  return (
+                    <View style={{ width: SCREEN_W - 24, paddingHorizontal: 12 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[900], textAlign: 'center' }} numberOfLines={1}>
+                        {card?.featured || card?.card_name || 'Card'}
                       </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[600], textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginBottom: 8 }}>
+                        {activeTile?.name}
+                      </Text>
+
+                      {/* Only the card on screen renders through the web
+                          preview bridge; the others fall back to the native
+                          mockup rather than racing for one renderer. */}
+                      <LabelMockup
+                        labelType={(activeTile?.id ?? 'slab-heritage') as any}
+                        cardImageUrl={isShown ? frontUrl : null}
+                        cardBackImageUrl={isShown ? backUrl : null}
+                        width={260}
+                        labelProps={inlineLabelProps}
+                        side={side}
+                        emblems={galleryEmblems}
+                        customOverrides={customOverrides}
+                        labelImageUrl={isShown && activeTile ? previewUrlForTile(activeTile) : null}
+                      />
+
+                      <View style={[s.sideToggle, { marginTop: 8, alignSelf: 'center' }]}>
+                        <TouchableOpacity style={[s.sideBtn, side === 'front' && s.sideBtnActive]} onPress={() => setSide('front')}>
+                          <Text style={[s.sideBtnText, side === 'front' && s.sideBtnTextActive]}>Front</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.sideBtn, side === 'back' && s.sideBtnActive]} onPress={() => setSide('back')}>
+                          <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', marginTop: 8 }}>
+                        {activeTile?.dimensions} — {activeTile?.useCase}
+                      </Text>
+                    </View>
+                  )
+                }}
               />
-              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 4 }}>
-                {LABEL_GALLERY.map((_, i) => (
-                  <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activeGalleryIdx ? Colors.purple[600] : Colors.gray[300] }} />
-                ))}
-              </View>
+              {effectiveRunIds.length > 1 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 4 }}>
+                  {effectiveRunIds.map((id, i) => (
+                    <View key={id} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: id === selectedCard?.id ? Colors.purple[600] : Colors.gray[300] }} />
+                  ))}
+                </View>
+              )}
             </View>
             )}
 
@@ -2052,6 +2034,10 @@ export default function LabelStudioScreen() {
               </View>
             )}
 
+            {/* Heritage is a fixed ivory field with a coloured band — these
+                theme, text, grade and size controls only apply to the Modern
+                and Traditional layouts, exactly as on web. */}
+            {!isHeritageTile && (<>
             {/* ============ Color Theme ============ */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>Color Theme</Text>
@@ -2426,9 +2412,43 @@ export default function LabelStudioScreen() {
             </View>
 
             </>)}
+            </>)}
 
             {/* ============ Step 5: Finish ============ */}
             {step === 5 && (<>
+            {/* Card pager — the text fields belong to ONE card, so a run needs
+                a way to reach the others. Switching re-seeds the fields from
+                the card you land on. */}
+            {effectiveRunIds.length > 1 && (
+              <View style={[s.cardPager, { marginBottom: 0, marginTop: 4 }]}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const i = effectiveRunIds.indexOf(selectedCard?.id)
+                    const j = (i - 1 + effectiveRunIds.length) % effectiveRunIds.length
+                    const c = runCardById(effectiveRunIds[j]); if (c) setSelectedCard(c)
+                  }}
+                  style={s.cardPagerBtn}
+                  accessibilityLabel="Edit previous card"
+                >
+                  <Ionicons name="chevron-back" size={18} color={Colors.purple[700]} />
+                </TouchableOpacity>
+                <Text style={s.cardPagerText} numberOfLines={1}>
+                  Editing {Math.max(1, effectiveRunIds.indexOf(selectedCard?.id) + 1)} of {effectiveRunIds.length} · {selectedCard?.featured || selectedCard?.card_name || 'Card'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const i = effectiveRunIds.indexOf(selectedCard?.id)
+                    const j = (i + 1) % effectiveRunIds.length
+                    const c = runCardById(effectiveRunIds[j]); if (c) setSelectedCard(c)
+                  }}
+                  style={s.cardPagerBtn}
+                  accessibilityLabel="Edit next card"
+                >
+                  <Ionicons name="chevron-forward" size={18} color={Colors.purple[700]} />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* ============ Label Text ============ */}
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -2524,25 +2544,30 @@ export default function LabelStudioScreen() {
                 style={s.downloadBtn}
                 onPress={() => {
                   if (!selectedCard?.id) {
-                    Alert.alert('Select a card', 'Pick a card above to download its custom label.')
+                    Alert.alert('Select a card', 'Pick a card above to download its label.')
                     return
                   }
-                  Alert.alert(
-                    'Download Custom Label',
-                    'Choose print format:',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Duplex (front+back)', onPress: () => openWebDownload('slab-custom', { format: 'duplex' }) },
-                      { text: 'Fold-over', onPress: () => openWebDownload('slab-custom', { format: 'foldover' }) },
-                    ],
-                  )
+                  // Route through the same handler the gallery uses so the
+                  // chosen HOLDER and STYLE both apply. This used to hardcode
+                  // 'slab-custom', which ignored the holder entirely and only
+                  // became Heritage if config.style happened to be 'heritage' —
+                  // picking the Heritage tile does not set that, so a Heritage
+                  // design printed as Modern.
+                  if (activeTile) handleGalleryDownload(activeTile)
                 }}
-                disabled={!selectedCard?.id}
+                disabled={!selectedCard?.id || !activeTile}
                 activeOpacity={0.7}
               >
                 <Ionicons name="download-outline" size={20} color="#fff" />
-                <Text style={s.downloadBtnText}>Download Custom Label</Text>
+                <Text style={s.downloadBtnText}>
+                  {activeHolder === 'digital' ? 'Download Card Images' : `Download ${activeTile?.shortName ?? 'Label'} PDF`}
+                </Text>
               </TouchableOpacity>
+              <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
+                {effectiveRunIds.length > 1
+                  ? `${effectiveRunIds.length} cards · ${sheetsNeeded(effectiveRunIds.length, activeHolder, activeFormat === 'foldover')} sheet(s). Print at 100% scale.`
+                  : 'Print at 100% scale / Actual Size.'}
+              </Text>
               <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
                 Opens the DCM download page in your browser. PDF saves to your Downloads folder.
               </Text>
@@ -2605,6 +2630,19 @@ export default function LabelStudioScreen() {
                       <TouchableOpacity onPress={() => updateExistingStyle(style.id, style.name)}>
                         <Text style={{ fontSize: 12, color: Colors.blue[600], fontWeight: '700' }}>Update</Text>
                       </TouchableOpacity>
+                      {/* The account default drives SLAB labels everywhere —
+                          card details, collection, web. Nothing outside this
+                          print flow renders a one-touch or toploader label, so
+                          offering it there would promise a change you would
+                          never see. Same rule as web. */}
+                      {activeHolder === 'slab' && (
+                        <TouchableOpacity onPress={() => {
+                          switchStyle(style.id as any)
+                          Alert.alert('Default updated', `"${style.name}" is now your default label style everywhere your slabs appear.`)
+                        }}>
+                          <Text style={{ fontSize: 12, color: Colors.gray[600], fontWeight: '700' }}>Default</Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity onPress={() => deleteStyle(style.id)}>
                         <Ionicons name="trash-outline" size={16} color={Colors.red[500]} />
                       </TouchableOpacity>
