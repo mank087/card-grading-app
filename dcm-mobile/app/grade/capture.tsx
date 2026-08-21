@@ -234,15 +234,16 @@ export default function CaptureScreen() {
     setIsCapturing(true)
 
     try {
-      // Always give the lens ~200ms to settle before the shutter fires.
-      // The previous version delayed only on iPad because iPhones
-      // autofocus quickly; in practice Android phones land somewhere in
-      // between and the user can tap shutter mid-focus-sweep. A small
-      // universal delay catches all the focus-sweep blur cases without
-      // a perceptible UI hitch. shutterSound: false suppresses the
-      // system camera click (Japanese/Korean Android devices force it
-      // on by law, so the flag is ignored there).
-      await new Promise(r => setTimeout(r, isTablet ? 250 : 180))
+      // Give the lens time to settle before the shutter fires. This delay
+      // matters more now that focus is CONTINUOUS (see autofocus="off" on the
+      // CameraView): the lens may be mid-sweep when the user taps, and a
+      // continuous-AF sweep on Android typically takes 300-500ms — well past
+      // the 180ms this used to allow, which is why Android capture could still
+      // land blurry. iOS converges faster and keeps the shorter delay.
+      // shutterSound: false suppresses the system camera click (Japanese and
+      // Korean Android devices force it on by law, so the flag is ignored there).
+      const settleMs = Platform.OS === 'android' ? 450 : isTablet ? 250 : 180
+      await new Promise(r => setTimeout(r, settleMs))
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, shutterSound: false })
       if (!photo?.uri) throw new Error('Capture failed')
 
@@ -532,7 +533,22 @@ export default function CaptureScreen() {
               style={styles.camera}
               facing={facing}
               enableTorch={torchOn && facing === 'back'}
-              autofocus="on"
+              /**
+               * "off" means CONTINUOUS autofocus. The prop's semantics are the
+               * opposite of what the name suggests, per Expo's own docs:
+               *   "on"  — autofocus once and then LOCK the focus
+               *   "off" — automatically focus when needed
+               *
+               * We had "on", so the camera fired a single focus sweep at mount,
+               * before the card was in frame, and locked there. On Android it is
+               * worse than it sounds: ExpoCameraView.startFocusMetering() meters
+               * at createPoint(1f, 1f) — the BOTTOM-RIGHT CORNER of the preview,
+               * not the centre where the card guide is — so the one sweep it did
+               * get locked onto the background. Setting OFF makes the native side
+               * call cancelFocusAndMetering(), handing focus back to CameraX's
+               * continuous AF, which is what a card in a guide box needs.
+               */
+              autofocus="off"
               zoom={0}
               pictureSize={pictureSize}
               onCameraReady={handleCameraReady}
