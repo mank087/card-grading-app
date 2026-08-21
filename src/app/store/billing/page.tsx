@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { getStoredSession } from '@/lib/directAuth'
+import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 
 interface BillingState {
@@ -59,7 +59,7 @@ function StoreBillingContent() {
   const checkoutResult = searchParams.get('checkout')
 
   const load = useCallback(async () => {
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.access_token) {
       setState({ org: null })
       setLoading(false)
@@ -91,7 +91,7 @@ function StoreBillingContent() {
   }, [checkoutResult, load, refreshOrg])
 
   const post = async (path: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.access_token) return null
     setBusy(true)
     setError(null)

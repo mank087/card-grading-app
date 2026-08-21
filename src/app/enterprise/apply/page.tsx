@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { getStoredSession } from '@/lib/directAuth'
+import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { ORG_PLANS } from '@/lib/orgPlans'
 
@@ -47,16 +47,21 @@ export default function EnterpriseApplyPage() {
   const [pendingApplication, setPendingApplication] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const session = getStoredSession()
-    setSignedIn(Boolean(session?.access_token))
-    if (!session?.access_token) {
-      setPendingApplication(false)
-      return
-    }
-    fetch('/api/org/apply', { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then(res => (res.ok ? res.json() : { applied: false }))
-      .then(data => setPendingApplication(Boolean(data.applied && data.status === 'pending')))
-      .catch(() => setPendingApplication(false))
+    let cancelled = false
+    ;(async () => {
+      const session = await getValidSession()
+      if (cancelled) return
+      setSignedIn(Boolean(session?.access_token))
+      if (!session?.access_token) {
+        setPendingApplication(false)
+        return
+      }
+      fetch('/api/org/apply', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        .then(res => (res.ok ? res.json() : { applied: false }))
+        .then(data => { if (!cancelled) setPendingApplication(Boolean(data.applied && data.status === 'pending')) })
+        .catch(() => { if (!cancelled) setPendingApplication(false) })
+    })()
+    return () => { cancelled = true }
   }, [])
 
   const effectiveSlug = useMemo(
@@ -77,7 +82,7 @@ export default function EnterpriseApplyPage() {
     !submitting
 
   const submit = async () => {
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.access_token) return
     setSubmitting(true)
     setError(null)

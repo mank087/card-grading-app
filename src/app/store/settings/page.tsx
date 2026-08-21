@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getStoredSession } from '@/lib/directAuth'
+import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS, HowItWorksStep, FaqEntry } from '@/lib/storefrontDefaults'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
@@ -79,7 +79,7 @@ function StoreSettingsContent() {
   const setupMode = searchParams.get('setup') === '1' || (settings ? !settings.setupDone : false)
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.access_token) return null
     return fetch(path, {
       ...init,
@@ -117,9 +117,17 @@ function StoreSettingsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       })
-      const data = res ? await res.json() : null
-      if (!res?.ok) {
-        setError(data?.error || 'Save failed')
+      // No response at all means we could not produce a valid token — the
+      // sign-in lapsed while the form was open. Say that, rather than the
+      // generic failure that sent an owner to support with a page full of
+      // unsaved work and nothing to act on.
+      if (!res) {
+        setError('Your sign-in expired while this page was open. Open DCM in another tab to sign in again, then press Save — your changes on this page are still here.')
+        return false
+      }
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || `Save failed (${res.status}). Please try again, or contact support if it keeps happening.`)
         return false
       }
       notify(message)

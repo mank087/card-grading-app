@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getStoredSession } from '@/lib/directAuth'
+import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 
 interface BillingState {
@@ -61,7 +61,7 @@ export default function StoreWelcomePage() {
   const [attempts, setAttempts] = useState(0)
 
   const load = useCallback(async () => {
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.access_token) {
       setState({ org: null })
       return
