@@ -140,7 +140,7 @@ export default function LabelWebRenderer({
   // baked in, the label came back showing the FRONT while the card image stayed
   // on the back.
   const url = cardId && token && initialRef.current
-    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
+    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
     : ''
 
   // Send config updates to the page (re-renders canvas without reload).
@@ -181,6 +181,31 @@ export default function LabelWebRenderer({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [config, cardData, side, pageReady, emblems.showFounder, emblems.showVip, emblems.showCardLovers])
 
+  /** Send the CURRENT config/side/emblems without waiting for the debounce. */
+  const pushConfigNow = () => {
+    if (!webViewRef.current || !config || !cardData) return
+    const payload = JSON.stringify({
+      type: 'preview-config',
+      config,
+      side,
+      labelText: {
+        primaryName: cardData.primaryName,
+        contextLine: cardData.contextLine,
+        featuresLine: cardData.featuresLine,
+        condition: cardData.condition,
+      },
+      emblems: {
+        showFounderEmblem: !!emblems.showFounder,
+        showVipEmblem: !!emblems.showVip,
+        showCardLoversEmblem: !!emblems.showCardLovers,
+      },
+    })
+    const escaped = payload.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    webViewRef.current.injectJavaScript(
+      `window.dispatchEvent(new MessageEvent('message', { data: '${escaped}' })); true;`
+    )
+  }
+
   const handleMessage = (event: { nativeEvent: { data: string } }) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data)
@@ -198,6 +223,11 @@ export default function LabelWebRenderer({
     readyRef.current = true
     reloadAttemptsRef.current = 0
     setPageReady(true)
+    // Push the live config straight away. The page renders once from the URL
+    // params, and a `type` change (switching holder or style) reloads it — so
+    // without this the only thing that ever corrected the side and colours was
+    // the 250ms debounce, which never fires if nothing changes afterwards.
+    pushConfigNow()
   }
 
   // WebView-level failures (network error, crashed WKWebView content

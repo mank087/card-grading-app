@@ -354,6 +354,8 @@ export default function LabelStudioScreen() {
   const [customColorCount, setCustomColorCount] = useState(2)
   const [labelPreviewUrl, setLabelPreviewUrl] = useState<string | null>(null)
   const [labelPreviewType, setLabelPreviewType] = useState<string | null>(null)
+  /** Surfaced under the preview — a silent console.warn is invisible on a phone. */
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const [side, setSide] = useState<'front' | 'back'>('front')
 
   // Editable text fields
@@ -447,6 +449,21 @@ export default function LabelStudioScreen() {
     ? printRunIds
     : (selectedCard?.id ? [selectedCard.id] : [])
   const runCardById = useCallback((id: string) => cards.find(c => c.id === id), [cards])
+
+  /**
+   * Keep the shown card inside the run.
+   *
+   * The step 3 swiper only renders artwork for the card that matches
+   * selectedCard. Tapping a card that is NOT in the run left every slide
+   * unmatched — no card image, no Heritage panel, just the bare holder with
+   * the fallback Modern label. Snap back to the first card in the run.
+   */
+  useEffect(() => {
+    if (printRunIds.length === 0 || !selectedCard) return
+    if (printRunIds.includes(selectedCard.id)) return
+    const first = cards.find(c => c.id === printRunIds[0])
+    if (first) setSelectedCard(first)
+  }, [printRunIds, selectedCard, cards])
 
   const toggleInRun = useCallback((cardId: string) => {
     setPrintRunIds(prev => {
@@ -1419,8 +1436,8 @@ export default function LabelStudioScreen() {
         cardId={selectedCard?.id}
         type={previewType}
         side={side}
-        onRender={(url) => { setLabelPreviewUrl(url); setLabelPreviewType(previewType) }}
-        onError={(msg) => console.warn('[label-studio] label preview error:', msg)}
+        onRender={(url) => { setLabelPreviewUrl(url); setLabelPreviewType(previewType); setPreviewError(null) }}
+        onError={(msg) => { console.warn('[label-studio] label preview error:', msg); setPreviewError(msg) }}
       />
 
       {/* Color picker modal */}
@@ -1923,6 +1940,13 @@ export default function LabelStudioScreen() {
                       <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', marginTop: 8 }}>
                         {activeTile?.dimensions} — {activeTile?.useCase}
                       </Text>
+                      {activeTile?.style === 'heritage' && !previewUrlForTile(activeTile) && (
+                        <Text style={{ fontSize: 10, color: previewError ? '#b91c1c' : Colors.gray[400], textAlign: 'center', marginTop: 6 }}>
+                          {previewError
+                            ? `Heritage preview failed: ${previewError}`
+                            : 'Rendering the Heritage label…'}
+                        </Text>
+                      )}
                     </View>
                   )
                 }}
@@ -1945,8 +1969,11 @@ export default function LabelStudioScreen() {
                 pipes customOverrides through so this updates live as the user
                 edits gradient colors below. */}
             <View style={s.section}>
+              {/* Follows the chosen holder. This was hardcoded to 'custom',
+                  which maps to the slab holder — so customizing a one-touch or
+                  toploader design showed you a graded slab. */}
               <LabelMockup
-                labelType="custom"
+                labelType={(activeTile?.id ?? 'custom') as any}
                 cardImageUrl={frontUrl}
                 cardBackImageUrl={backUrl}
                 width={260}
@@ -1954,7 +1981,7 @@ export default function LabelStudioScreen() {
                 side={side}
                 emblems={galleryEmblems}
                 customOverrides={customOverrides}
-                labelImageUrl={labelPreviewUrl}
+                labelImageUrl={activeTile ? previewUrlForTile(activeTile) : null}
               />
               <View style={s.sideToggle}>
                 <TouchableOpacity
