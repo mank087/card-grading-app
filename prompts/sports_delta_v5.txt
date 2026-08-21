@@ -70,6 +70,17 @@ If `year_source` is "not_visible", `year` MUST be null. Sports-specific traps:
      NOT year evidence — a card listing stats through 2018 may well be a 2019 or later print.
   ✅ Only characters you can actually READ in these images count.
 
+🚨 **STAT-TABLE CROSS-CHECK FIELD (v9.16)** — vintage backs print the © year in tiny type
+that is easy to misread; the year-by-year stat table beside it is printed far larger and
+lets the system VERIFY your © reading. Whenever the back shows a year-by-year statistics
+table, ALSO output in card_info:
+  • `last_stat_year`: the 4-digit year of the LAST (most recent) season row in that table,
+    read from the table itself. A two-digit row like '87 in a vintage table means "1987".
+    null if there is no stat table or its final row's year is not legible.
+This does NOT change the rules above — the stat table is still not a year source and never
+goes in `year`. It is used only server-side to cross-check the © digits (flagship sets
+print stats through the season BEFORE the issue year).
+
 **manufacturer**: Card publisher
 • Official company name
 • Common manufacturers:
