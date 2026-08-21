@@ -86,6 +86,18 @@ const HOLDER_OPTIONS: Array<{ id: HolderId; name: string; blurb: string }> = [
  */
 const MAX_PRINT_RUN = 20
 
+/** Step 6 (supplies) is optional — reachable from Finish, never required. */
+export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6
+
+const WIZARD_STEPS: Array<{ n: WizardStep; name: string; optional?: boolean }> = [
+  { n: 1, name: 'Cards' },
+  { n: 2, name: 'Holder' },
+  { n: 3, name: 'Style' },
+  { n: 4, name: 'Customize' },
+  { n: 5, name: 'Finish' },
+  { n: 6, name: 'Supplies', optional: true },
+]
+
 /** Cards per printed sheet, by holder — drives the sheet-count hint. */
 function sheetsNeeded(count: number, holder: HolderId, foldover: boolean): number {
   const per = holder === 'slab' ? 10
@@ -308,6 +320,18 @@ export default function LabelStudioScreen() {
   const isTabContext = segments[0] === '(tabs)'
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  /**
+   * Wizard step. Step 6 (supplies) is OPTIONAL — reachable from Finish, never
+   * required to print. Mirrors the web wizard's shape.
+   */
+  const [step, setStep] = useState<WizardStep>(1)
+  const scrollRef = useRef<ScrollView>(null)
+  const goToStep = useCallback((next: WizardStep) => {
+    setStep(next)
+    // Steps are long; landing mid-scroll makes it look like nothing happened.
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }))
+  }, [])
+
   const [selectedCard, setSelectedCard] = useState<any | null>(null)
   /**
    * Cards in the current print run, in pick order.
@@ -430,6 +454,12 @@ export default function LabelStudioScreen() {
       return [...seed, cardId]
     })
   }, [selectedCard])
+
+  /** Why the user cannot advance yet, or null when they can. */
+  const stepBlocker: string | null =
+    step === 1 && !selectedCard ? 'Pick a card to continue.'
+    : step === 2 && !activeTile ? 'Choose a holder to continue.'
+    : null
 
   /** What /label-preview should draw: the compact panel, or the slab label. */
   const previewType = activeTile && activeTile.holder !== 'slab' && activeTile.holder !== 'digital'
@@ -1429,12 +1459,43 @@ export default function LabelStudioScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        {/* ============ Card Selector ============ */}
+        {/* ============ Stepper ============
+            Tappable, but only backwards and only as far as you have already
+            reached — jumping ahead past a required choice just lands you on an
+            empty screen. */}
+        <View style={s.stepper}>
+          {WIZARD_STEPS.map(w => {
+            const done = w.n < step
+            const current = w.n === step
+            const reachable = w.n <= step || (w.n === 6 && step >= 5)
+            return (
+              <TouchableOpacity
+                key={w.n}
+                disabled={!reachable}
+                onPress={() => goToStep(w.n)}
+                style={s.stepperItem}
+                accessibilityRole="button"
+                accessibilityState={{ selected: current, disabled: !reachable }}
+              >
+                <View style={[s.stepperDot, current && s.stepperDotOn, done && s.stepperDotDone]}>
+                  <Text style={[s.stepperDotText, (current || done) && { color: '#fff' }]}>{w.n}</Text>
+                </View>
+                <Text style={[s.stepperName, current && s.stepperNameOn, !reachable && { color: Colors.gray[300] }]} numberOfLines={1}>
+                  {w.name}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+
+        {/* ============ Step 1: Cards ============ */}
+        {step === 1 && (<>
         <View style={s.section}>
           <Text style={s.sectionTitle}>Select a Card</Text>
           <TextInput
@@ -1500,15 +1561,17 @@ export default function LabelStudioScreen() {
             <Text style={s.emptyText}>Select a card above to start designing labels</Text>
           </View>
         )}
+        </>)}
 
         {selectedCard && (
           <>
             {/* ============ Label Badges ============ */}
-            <LabelBadgesPicker />
+            {step === 4 && <LabelBadgesPicker />}
 
-            {/* ============ Supplies ============
+            {/* ============ Step 6: Supplies ============
                 Keyed to the holder, so the label stock a sheet is actually
                 laid out for leads. Affiliate links, same tag as the Shop tab. */}
+            {step === 6 && (
             <View style={s.section}>
               <Text style={s.sectionTitle}>What you&apos;ll need</Text>
               {productsForHolder(activeHolder, Math.abs((config.width ?? 2.8) - 2.51) < 0.01)
@@ -1538,11 +1601,13 @@ export default function LabelStudioScreen() {
                 These are Amazon affiliate links — DCM earns a small commission at no cost to you.
               </Text>
             </View>
+            )}
 
             {/* ============ Print run ============
                 One design, many cards. The preview and text editor stay on the
                 card you tapped; everything in the run prints with the same
                 design onto shared sheets. */}
+            {step === 1 && (
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={s.sectionTitle}>Print run</Text>
@@ -1581,11 +1646,13 @@ export default function LabelStudioScreen() {
                 </>
               )}
             </View>
+            )}
 
-            {/* ============ Holder / Style / Format ============
+            {/* ============ Step 2: Holder ============
                 Holder and style are separate decisions, as on web. These
                 pickers resolve to a gallery tile; swiping the gallery drives
                 them back, so both ways of choosing stay in sync. */}
+            {step === 2 && (
             <View style={s.section}>
               <Text style={s.pickerLabel}>Holder</Text>
               <View style={s.pickerRow}>
@@ -1605,7 +1672,13 @@ export default function LabelStudioScreen() {
                 })}
               </View>
 
-              <Text style={[s.pickerLabel, { marginTop: 14 }]}>Style</Text>
+            </View>
+            )}
+
+            {/* ============ Step 3: Style ============ */}
+            {step === 3 && (
+            <View style={s.section}>
+              <Text style={s.pickerLabel}>Style</Text>
               <View style={s.pickerRow}>
                 {stylesForHolder(activeHolder).map(st => {
                   const on = activeStyle === st
@@ -1625,9 +1698,15 @@ export default function LabelStudioScreen() {
                 })}
               </View>
 
+            </View>
+            )}
+
+            {/* Slot size and label format belong with the holder. */}
+            {step === 2 && (
+            <View style={[s.section, { marginTop: -8 }]}>
               {activeHolder === 'slab' && (
                 <>
-                  <Text style={[s.pickerLabel, { marginTop: 14 }]}>Slot size</Text>
+                  <Text style={s.pickerLabel}>Slot size</Text>
                   <View style={s.pickerRow}>
                     {SLAB_SIZES.map(sz => {
                       const on = Math.abs((config.width ?? 2.8) - sz.width) < 0.01
@@ -1653,7 +1732,7 @@ export default function LabelStudioScreen() {
 
               {activeHolder === 'toploader' && (
                 <>
-                  <Text style={[s.pickerLabel, { marginTop: 14 }]}>Label format</Text>
+                  <Text style={s.pickerLabel}>Label format</Text>
                   <View style={s.pickerRow}>
                     {([['front-back', 'Front + Back pair'], ['foldover', 'Fold-over']] as const).map(([f, name]) => {
                       const on = activeFormat === f
@@ -1673,8 +1752,10 @@ export default function LabelStudioScreen() {
                 </>
               )}
             </View>
+            )}
 
             {/* ============ Label Gallery (Swipeable) ============ */}
+            {step === 3 && (
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={s.sectionTitle}>Label Gallery</Text>
@@ -1766,7 +1847,10 @@ export default function LabelStudioScreen() {
                 ))}
               </View>
             </View>
+            )}
 
+            {/* ============ Step 4: Customize ============ */}
+            {step === 4 && (<>
             {/* ============ Custom Slab Preview ============ */}
             {/* Uses LabelMockup (native inline) so the DCM logo, colors, and
                 emblems exactly match what gets exported. The 'custom' labelType
@@ -2433,6 +2517,10 @@ export default function LabelStudioScreen() {
               </Text>
             </View>
 
+            </>)}
+
+            {/* ============ Step 5: Finish ============ */}
+            {step === 5 && (<>
             {/* ============ Download Custom Label ============ */}
             <View style={s.section}>
               <TouchableOpacity
@@ -2528,8 +2616,42 @@ export default function LabelStudioScreen() {
                 )
               })}
             </View>
+            </>)}
           </>
         )}
+
+        {/* ============ Step navigation ============
+            In the page flow, below the step content and above the tab bar —
+            a floating bar gets covered by the chat widget on small screens. */}
+        <View style={s.stepNav}>
+          <TouchableOpacity
+            onPress={() => goToStep(Math.max(1, step - 1) as WizardStep)}
+            disabled={step === 1}
+            style={[s.stepNavBack, step === 1 && { opacity: 0.4 }]}
+          >
+            <Text style={s.stepNavBackText}>Back</Text>
+          </TouchableOpacity>
+          {stepBlocker ? (
+            <Text style={s.stepNavBlocker}>{stepBlocker}</Text>
+          ) : null}
+          {step < 5 ? (
+            <TouchableOpacity
+              onPress={() => goToStep((step + 1) as WizardStep)}
+              disabled={!!stepBlocker}
+              style={[s.stepNavNext, !!stepBlocker && { opacity: 0.4 }]}
+            >
+              <Text style={s.stepNavNextText}>Continue</Text>
+            </TouchableOpacity>
+          ) : step === 5 ? (
+            <TouchableOpacity onPress={() => goToStep(6)} style={s.stepNavGhost}>
+              <Text style={s.stepNavGhostText}>Supplies</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => goToStep(5)} style={s.stepNavGhost}>
+              <Text style={s.stepNavGhostText}>Back to Finish</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
       </KeyboardAvoidingView>
       {!isTabContext && <MobileTabBar />}
@@ -2686,6 +2808,22 @@ const s = StyleSheet.create({
   supplyDesc: { fontSize: 11, color: Colors.gray[500], marginTop: 2, lineHeight: 15 },
   supplyChevron: { fontSize: 22, color: Colors.gray[300], fontWeight: '300' },
   supplyDisclosure: { fontSize: 10, color: Colors.gray[400], marginTop: 10, lineHeight: 14 },
+  stepper: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 14 },
+  stepperItem: { flex: 1, alignItems: 'center', gap: 4 },
+  stepperDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
+  stepperDotOn: { backgroundColor: Colors.purple[600] },
+  stepperDotDone: { backgroundColor: Colors.purple[300] },
+  stepperDotText: { fontSize: 11, fontWeight: '700', color: Colors.gray[500] },
+  stepperName: { fontSize: 10, fontWeight: '600', color: Colors.gray[500] },
+  stepperNameOn: { color: Colors.purple[700] },
+  stepNav: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.gray[200] },
+  stepNavBack: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[300] },
+  stepNavBackText: { fontSize: 14, fontWeight: '600', color: Colors.gray[700] },
+  stepNavBlocker: { flex: 1, fontSize: 11, color: Colors.gray[400], textAlign: 'right' },
+  stepNavNext: { marginLeft: 'auto', paddingHorizontal: 22, paddingVertical: 11, borderRadius: 10, backgroundColor: Colors.purple[600] },
+  stepNavNextText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  stepNavGhost: { marginLeft: 'auto', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10, borderWidth: 2, borderColor: Colors.purple[600] },
+  stepNavGhostText: { fontSize: 14, fontWeight: '700', color: Colors.purple[700] },
   subLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginBottom: 6 },
 
   // Card selector

@@ -151,14 +151,24 @@ Label Studio now prints up to 20 cards in one run, capped to match web (two full
 
 *Not attempted:* real-device memory at 20 cards. Previews still render one card at a time through the WebView bridge, so the exposure is the export itself, where 20 cards means 20 QR codes and 20 label renders inside the export page. Worth watching on an older phone.
 
-### Phase 5 — The wizard proper
+### Phase 5 — The wizard proper ✅ DONE
 **Mobile OTA.**
 
-Port the step structure and the single-reducer state model. `wizardTypes.ts` is deliberately platform-agnostic — the reducer, `HOLDERS`, `SLAB_SIZES`, `styleOptionsForHolder()`, `stepBlocker()`, and `sheetsNeeded()` contain no DOM or React-DOM references and can move to a shared module or be copied nearly verbatim.
+The single long scroll is now six steps: Cards, Holder, Style, Customize, Finish, and optional Supplies — the same shape as web.
 
-Steps map cleanly to a native stack: a card picker, a holder picker, a style picker with a swipeable preview, a customize screen, a finish screen, and the optional supplies step.
+Deliberately done by **gating the existing sections rather than rewriting them**. Every section's internals are untouched; each is wrapped in a `step === N` guard and the sections were regrouped into steps. A full port to a navigation stack would have meant rebuilding a 2,400-line screen with no device testing behind it, for the same user-visible result.
 
-*Risk:* highest of the set, but mostly mechanical once Phases 3 and 4 have already split holder from style and taught the screen to hold multiple cards. Consider keeping today's screen reachable as mobile's own "classic mode", mirroring what web did.
+- Tappable stepper header. Only backwards and only as far as you have already reached — jumping ahead past a required choice lands you on an empty screen.
+- Back / Continue in the page flow, below the content and above the tab bar. Not floating: on small screens a floating bar sits under the chat widget.
+- `stepBlocker` explains why Continue is disabled rather than just greying it out.
+- Every step change scrolls to top. Steps are long, and landing mid-scroll reads as nothing having happened.
+- Step 5 offers Supplies; step 6 offers a way back to Finish.
+
+Section-to-step mapping: Cards gets the card picker and print run; Holder gets holder, slot size, and label format; Style gets the style picker and the swipeable gallery; Customize gets badges, previews, Heritage options, dimensions, colour, border, text and grade controls, and label text; Finish gets download and saved styles.
+
+*Not done:* a mobile "classic mode". Web kept its old studio at `/labels/classic` as insurance. Mobile has no equivalent — the step gates are reversible in one commit, but there is no user-facing escape hatch. Worth deciding before the OTA.
+
+Verified: `npx tsc --noEmit` clean, and `npx expo export` bundles (6.3 MB, no errors).
 
 ### Phase 6 — Supplies ✅ DONE
 **Mobile OTA.**
