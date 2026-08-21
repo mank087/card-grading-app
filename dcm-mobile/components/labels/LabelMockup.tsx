@@ -27,6 +27,9 @@ export type LabelTypeId =
   | 'card-image-modern'
   | 'card-image-traditional'
   | 'custom'
+  | 'onetouch-heritage'
+  | 'toploader-heritage'
+  | 'foldover-heritage'
 
 type Holder = 'slab' | 'onetouch' | 'toploader' | 'digital'
 
@@ -40,6 +43,10 @@ const HOLDER_BY_TYPE: Record<LabelTypeId, Holder> = {
   'foldover': 'toploader',
   'card-image-modern': 'digital',
   'card-image-traditional': 'digital',
+  // Heritage Compact variants sit in the same holders as their Modern twins.
+  'onetouch-heritage': 'onetouch',
+  'toploader-heritage': 'toploader',
+  'foldover-heritage': 'toploader',
 }
 
 export interface LabelInlineProps {
@@ -133,17 +140,18 @@ export default function LabelMockup({
     )
   }
   if (holder === 'onetouch') {
-    return <OneTouchMockup cardImageUrl={cardSrc} width={width} labelProps={labelProps} side={side} emblems={emblems} />
+    return <OneTouchMockup cardImageUrl={cardSrc} width={width} labelProps={labelProps} side={side} emblems={emblems} labelImageUrl={labelImageUrl} />
   }
   if (holder === 'toploader') {
     return (
       <ToploaderMockup
         cardImageUrl={cardSrc}
         width={width}
-        variant={labelType === 'foldover' ? 'foldover' : 'front-back'}
+        variant={labelType === 'foldover' || labelType === 'foldover-heritage' ? 'foldover' : 'front-back'}
         labelProps={labelProps}
         side={side}
         emblems={emblems}
+        labelImageUrl={labelImageUrl}
       />
     )
   }
@@ -733,7 +741,7 @@ function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems,
 // 2.375" × 0.625", aspect 3.8:1). Mirrors web's OneTouchMockup
 // (src/components/labels/LabelMockup.tsx:555-635) — NOT the slab label.
 // ============================================================================
-function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
+function OneTouchMockup({ cardImageUrl, width, labelProps, side, labelImageUrl }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems; labelImageUrl?: string | null }) {
   const height = (width * 457) / 314
   const labelWidth = width * 0.65
   const cardTop = height * 0.13, cardLeft = width * 0.11, cardW = width * 0.78, cardH = height * 0.76
@@ -748,11 +756,15 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUr
           : <View style={{ width: cardW, height: cardH, backgroundColor: Colors.gray[100] }} />}
       </View>
 
-      {/* No fold-crease marker — nothing prints on the fold. */}
+      {/* No fold-crease marker — nothing prints on the fold. A supplied panel
+          (Heritage Compact, rendered by the web print path) wins over the
+          native inline label so preview and paper cannot drift. */}
       <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
-        {side === 'front'
-          ? <OneTouchFrontInline width={labelWidth} labelProps={labelProps} />
-          : <OneTouchBackInline width={labelWidth} labelProps={labelProps} />}
+        {labelImageUrl
+          ? <Image source={{ uri: labelImageUrl }} style={{ width: labelWidth, height: labelWidth / 3.8 }} resizeMode="contain" />
+          : side === 'front'
+            ? <OneTouchFrontInline width={labelWidth} labelProps={labelProps} />
+            : <OneTouchBackInline width={labelWidth} labelProps={labelProps} />}
       </View>
     </View>
   )
@@ -811,7 +823,7 @@ function OneTouchBackInline({ width, labelProps }: { width: number; labelProps?:
 // both land upright once folded. Half width vs. the 3.0" holder: 0.5/3.0 ≈ 16.7%.
 // Mirrors the corrected web LabelMockup.
 // ============================================================================
-function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
+function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side, labelImageUrl }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems; labelImageUrl?: string | null }) {
   const height = (width * 588) / 451
   const labelWidth = width * (variant === 'foldover' ? 0.167 : 0.58)
   const cardTop = height * 0.045, cardLeft = width * 0.07, cardW = width * 0.86, cardH = height * 0.90
@@ -830,15 +842,19 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { c
         // No fold-crease marker: nothing prints there, so drawing one
         // misrepresents the output.
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
-          {side === 'front'
-            ? <FoldoverFrontInline width={labelWidth} labelProps={labelProps} />
-            : <FoldoverBackInline width={labelWidth} labelProps={labelProps} />}
+          {labelImageUrl
+            ? <Image source={{ uri: labelImageUrl }} style={{ width: labelWidth, height: labelWidth / (0.5 / 0.875) }} resizeMode="contain" />
+            : side === 'front'
+              ? <FoldoverFrontInline width={labelWidth} labelProps={labelProps} />
+              : <FoldoverBackInline width={labelWidth} labelProps={labelProps} />}
         </View>
       ) : (
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
-          {side === 'front'
-            ? <ToploaderFrontInline width={labelWidth} labelProps={labelProps} />
-            : <ToploaderBackInline width={labelWidth} labelProps={labelProps} />}
+          {labelImageUrl
+            ? <Image source={{ uri: labelImageUrl }} style={{ width: labelWidth, height: labelWidth / 3.5 }} resizeMode="contain" />
+            : side === 'front'
+              ? <ToploaderFrontInline width={labelWidth} labelProps={labelProps} />
+              : <ToploaderBackInline width={labelWidth} labelProps={labelProps} />}
         </View>
       )}
     </View>

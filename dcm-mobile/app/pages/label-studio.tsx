@@ -45,7 +45,7 @@ import AppHeaderBar from '@/components/AppHeaderBar'
 import ExportRunner, { type ExportSource } from '@/components/exports/ExportRunner'
 import { saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
 import { useSegments } from 'expo-router'
-import { useLabelStyle } from '@/hooks/useLabelStyle'
+import { useLabelStyle, MAX_SAVED_LABEL_STYLES } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
 // SCREEN_W is now read per-render via useWindowDimensions() inside the
@@ -55,6 +55,41 @@ import { useUserEmblems } from '@/hooks/useUserEmblems'
 // Label gallery — matches LABEL_TYPES on web. Each item has a holder type
 // (slab / one-touch / toploader / digital) so the mockup tile renders the
 // correct frame, plus the export route ID used by the /label-export flow.
+/**
+ * Holder / style / format — the three decisions the gallery tiles fuse.
+ *
+ * Web's wizard asks them separately (holder, then style, with Toploader
+ * choosing a format). Mobile keeps the tile list as its internal source of
+ * truth so every downstream memo and handler is untouched, and the pickers
+ * above the gallery simply resolve to a tile id. Swiping the gallery still
+ * works and drives the pickers back the other way.
+ */
+export type HolderId = 'slab' | 'onetouch' | 'toploader' | 'digital'
+export type StyleId = 'heritage' | 'modern' | 'traditional' | 'custom'
+export type ToploaderFormat = 'front-back' | 'foldover'
+
+const HOLDER_OPTIONS: Array<{ id: HolderId; name: string; blurb: string }> = [
+  { id: 'slab',      name: 'Graded Slab',  blurb: '2.8" × 0.8" label, cut and insert' },
+  { id: 'onetouch',  name: 'One-Touch',    blurb: 'Avery 6871 sheets' },
+  { id: 'toploader', name: 'Toploader',    blurb: 'Avery 8167 sheets' },
+  { id: 'digital',   name: 'Card Image',   blurb: 'For eBay and social' },
+]
+
+/** Slab slot sizes. Zion Mag Pro's opening is smaller in both dimensions. */
+const SLAB_SIZES: Array<{ id: string; name: string; width: number; height: number; note?: string }> = [
+  { id: 'standard', name: 'Standard', width: 2.8, height: 0.8 },
+  { id: 'zion', name: 'Zion Mag Pro', width: 2.51, height: 0.76, note: 'Prints at 2.51" × 0.76" for the smaller Zion slot.' },
+]
+
+/** Which styles a holder can actually print. Mirrors web styleOptionsForHolder. */
+function stylesForHolder(holder: HolderId): StyleId[] {
+  if (holder === 'slab') return ['heritage', 'modern', 'traditional', 'custom']
+  if (holder === 'digital') return ['modern', 'traditional']
+  // Heritage Compact fits Heritage to the small holders; Traditional has no
+  // compact layout, so it is not offered there.
+  return ['heritage', 'modern']
+}
+
 const LABEL_GALLERY: Array<{
   id: LabelTypeId
   name: string
@@ -66,16 +101,25 @@ const LABEL_GALLERY: Array<{
   howToApply: string
   forcedStyle?: 'modern' | 'traditional' | 'heritage'
   needsFormat?: boolean
+  /** Holder + style + format this tile represents, for the pickers. */
+  holder: HolderId
+  style: StyleId
+  format?: ToploaderFormat
 }> = [
-  { id: 'slab-modern',         name: 'Graded Slab (Modern)',      holderLabel: 'Graded Card Slab', shortName: 'Modern Slab',      dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Dark gradient label matching DCM modern style. Duplex printing with front grade and back QR code.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'modern', needsFormat: true },
-  { id: 'slab-traditional',    name: 'Graded Slab (Traditional)', holderLabel: 'Graded Card Slab', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Light/white label with classic grading style. Clean, professional look for any slab.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'traditional', needsFormat: true },
-  { id: 'slab-heritage',       name: 'Graded Slab (Heritage)',    holderLabel: 'Graded Card Slab', shortName: 'Heritage Slab',    dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Ivory Round 3 design — patterned side band in the card colors, grade-colored chip, rainbow-foil Gem Mint 10.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'heritage', needsFormat: true },
-  { id: 'onetouch',            name: 'Magnetic One-Touch',        holderLabel: 'Mag One Touch',    shortName: 'One-Touch',        dimensions: '1.25" × 2.375"',  useCase: 'Avery 6871 for magnetic cases',     description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders perfectly.', howToApply: 'Print on Avery 6871 label sheets. Peel and stick to one-touch magnetic case.' },
-  { id: 'toploader',           name: 'Toploader Front+Back',      holderLabel: 'Top Loader',       shortName: 'Toploader',        dimensions: '1.75" × 0.5"',    useCase: 'Avery 8167, front grade + back QR', description: 'Two small labels per card — grade info on front, QR code on back of toploader.', howToApply: 'Print on Avery 8167 sheets. Apply front label to toploader front, back label to rear.' },
-  { id: 'foldover',            name: 'Fold-Over Toploader',       holderLabel: 'Top Loader',       shortName: 'Fold-Over',        dimensions: '1.75" × 0.5"',    useCase: 'Single label, fold over toploader tab', description: 'One label that folds over the toploader opening. Grade visible on front, QR on back.', howToApply: 'Print on Avery 8167. Apply to toploader top edge and fold over to seal.' },
-  { id: 'card-image-modern',   name: 'Card Image (Modern)',       holderLabel: 'Digital',          shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with modern dark label overlay. Perfect for online listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'modern' },
-  { id: 'card-image-traditional', name: 'Card Image (Traditional)', holderLabel: 'Digital',         shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with traditional light label overlay. Clean look for listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'traditional' },
-  { id: 'custom',              name: 'Custom Label',              holderLabel: 'Graded Card Slab', shortName: 'Custom',           dimensions: 'Any size',        useCase: 'Design your own',                   description: 'Custom dimensions, colors, borders, and editable text.', howToApply: 'Customize the colors, layout, and dimensions in the Customize section below.', needsFormat: true },
+  { id: 'slab-modern',         name: 'Graded Slab (Modern)',      holderLabel: 'Graded Card Slab', shortName: 'Modern Slab',      dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Dark gradient label matching DCM modern style. Duplex printing with front grade and back QR code.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'modern', needsFormat: true , holder: 'slab', style: 'modern' },
+  { id: 'slab-traditional',    name: 'Graded Slab (Traditional)', holderLabel: 'Graded Card Slab', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Light/white label with classic grading style. Clean, professional look for any slab.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'traditional', needsFormat: true , holder: 'slab', style: 'traditional' },
+  { id: 'slab-heritage',       name: 'Graded Slab (Heritage)',    holderLabel: 'Graded Card Slab', shortName: 'Heritage Slab',    dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Ivory Round 3 design — patterned side band in the card colors, grade-colored chip, rainbow-foil Gem Mint 10.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'heritage', needsFormat: true , holder: 'slab', style: 'heritage' },
+  { id: 'onetouch',            name: 'Magnetic One-Touch',        holderLabel: 'Mag One Touch',    shortName: 'One-Touch',        dimensions: '1.25" × 2.375"',  useCase: 'Avery 6871 for magnetic cases',     description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders perfectly.', howToApply: 'Print on Avery 6871 label sheets. Peel and stick to one-touch magnetic case.' , holder: 'onetouch', style: 'modern' },
+  { id: 'toploader',           name: 'Toploader Front+Back',      holderLabel: 'Top Loader',       shortName: 'Toploader',        dimensions: '1.75" × 0.5"',    useCase: 'Avery 8167, front grade + back QR', description: 'Two small labels per card — grade info on front, QR code on back of toploader.', howToApply: 'Print on Avery 8167 sheets. Apply front label to toploader front, back label to rear.' , holder: 'toploader', style: 'modern', format: 'front-back' },
+  { id: 'foldover',            name: 'Fold-Over Toploader',       holderLabel: 'Top Loader',       shortName: 'Fold-Over',        dimensions: '1.75" × 0.5"',    useCase: 'Single label, fold over toploader tab', description: 'One label that folds over the toploader opening. Grade visible on front, QR on back.', howToApply: 'Print on Avery 8167. Apply to toploader top edge and fold over to seal.' , holder: 'toploader', style: 'modern', format: 'foldover' },
+  // Heritage Compact (Aug 2026) — the Heritage layout fitted to the small
+  // holders. The ids double as the export route's `-heritage` type suffix.
+  { id: 'onetouch-heritage',   name: 'One-Touch (Heritage)',      holderLabel: 'Mag One Touch',    shortName: 'Heritage One-Touch', dimensions: '2.375" × 0.625"', useCase: 'Avery 6871 for magnetic cases',     description: 'The full Heritage layout — patterned band, grade chip, DCM wordmark — fitted to the one-touch panel.', howToApply: 'Print on Avery 6871 at 100% scale. Fold at the centre line and wrap over the case edge.', forcedStyle: 'heritage', holder: 'onetouch', style: 'heritage' },
+  { id: 'toploader-heritage',  name: 'Toploader (Heritage)',      holderLabel: 'Top Loader',       shortName: 'Heritage Toploader', dimensions: '1.75" × 0.5"',    useCase: 'Avery 8167, front grade + back QR', description: 'Heritage band and grade chip at toploader size — the divider and serial come off the front to keep the name readable.', howToApply: 'Print on Avery 8167 at 100% scale. Front label to the toploader front, back label to the rear.', forcedStyle: 'heritage', holder: 'toploader', style: 'heritage', format: 'front-back' },
+  { id: 'foldover-heritage',   name: 'Fold-Over (Heritage)',      holderLabel: 'Top Loader',       shortName: 'Heritage Fold-Over', dimensions: '0.5" × 0.875" half', useCase: 'Single label, folds over the top edge', description: 'Heritage band across the top, grade chip and wordmark below, on the folded portrait half.', howToApply: 'Print on Avery 8167 at 100% scale. Fold on the centre line and wrap over the toploader edge.', forcedStyle: 'heritage', holder: 'toploader', style: 'heritage', format: 'foldover' },
+  { id: 'card-image-modern',   name: 'Card Image (Modern)',       holderLabel: 'Digital',          shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with modern dark label overlay. Perfect for online listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'modern' , holder: 'digital', style: 'modern' },
+  { id: 'card-image-traditional', name: 'Card Image (Traditional)', holderLabel: 'Digital',         shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with traditional light label overlay. Clean look for listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'traditional' , holder: 'digital', style: 'traditional' },
+  { id: 'custom',              name: 'Custom Label',              holderLabel: 'Graded Card Slab', shortName: 'Custom',           dimensions: 'Any size',        useCase: 'Design your own',                   description: 'Custom dimensions, colors, borders, and editable text.', howToApply: 'Customize the colors, layout, and dimensions in the Customize section below.', needsFormat: true , holder: 'slab', style: 'custom' },
 ]
 
 // ============================================================================
@@ -287,6 +331,61 @@ export default function LabelStudioScreen() {
     setActiveGalleryIdx(idx)
     try { galleryListRef.current?.scrollToIndex({ index: idx, animated: true }) } catch { /* not mounted yet */ }
   }, [activeGalleryIdx])
+
+  // ---- Holder / style / format pickers ----
+  // Derived FROM the gallery index rather than held separately, so swiping the
+  // gallery and tapping a chip can never disagree.
+  const activeTile = LABEL_GALLERY[activeGalleryIdx]
+  const activeHolder: HolderId = activeTile?.holder ?? 'slab'
+  const activeStyle: StyleId = activeTile?.style ?? 'modern'
+  const activeFormat: ToploaderFormat = activeTile?.format ?? 'front-back'
+
+  /** Resolve a holder+style+format triple to a tile, tolerating gaps. */
+  const findTile = useCallback((holder: HolderId, style: StyleId, format: ToploaderFormat) => {
+    const inHolder = LABEL_GALLERY.filter(t => t.holder === holder)
+    const matchesFormat = (t: typeof LABEL_GALLERY[number]) =>
+      holder !== 'toploader' || (t.format ?? 'front-back') === format
+    return inHolder.find(t => t.style === style && matchesFormat(t))
+      // Style not offered for this holder (e.g. Traditional on a toploader):
+      // fall back to the holder's first tile in the requested format.
+      || inHolder.find(matchesFormat)
+      || inHolder[0]
+  }, [])
+
+  const goToTile = useCallback((holder: HolderId, style: StyleId, format: ToploaderFormat) => {
+    const tile = findTile(holder, style, format)
+    if (tile) jumpToTile(tile.id)
+  }, [findTile, jumpToTile])
+
+  const selectHolder = useCallback((h: HolderId) => {
+    // Keep the current style when the new holder supports it, else take its first.
+    const keep = stylesForHolder(h).includes(activeStyle) ? activeStyle : stylesForHolder(h)[0]
+    goToTile(h, keep, activeFormat)
+  }, [activeStyle, activeFormat, goToTile])
+
+  const selectStyle = useCallback((st: StyleId) => goToTile(activeHolder, st, activeFormat),
+    [activeHolder, activeFormat, goToTile])
+
+  const selectFormat = useCallback((f: ToploaderFormat) => goToTile(activeHolder, activeStyle, f),
+    [activeHolder, activeStyle, goToTile])
+
+  /**
+   * The web-rendered panel only belongs to the tile it was rendered for.
+   *
+   * Slab and digital tiles have always shown it. Small holders only have a
+   * rendered panel for Heritage Compact — a Modern one-touch tile must keep
+   * its native inline label, or it would display the slab artwork.
+   */
+  const previewUrlForTile = useCallback((tile: typeof LABEL_GALLERY[number]) => {
+    if (tile.holder === 'slab' || tile.holder === 'digital') return labelPreviewUrl
+    return tile.style === 'heritage' && tile.id === activeTile?.id ? labelPreviewUrl : null
+  }, [labelPreviewUrl, activeTile])
+
+  /** What /label-preview should draw: the compact panel, or the slab label. */
+  const previewType = activeTile && activeTile.holder !== 'slab' && activeTile.holder !== 'digital'
+    && activeTile.style === 'heritage'
+    ? (activeTile.id as any)
+    : (activeTile?.style === 'heritage' ? 'slab-heritage' : 'slab-custom')
 
   // Color picker modal
   const [pickerVisible, setPickerVisible] = useState(false)
@@ -574,7 +673,7 @@ export default function LabelStudioScreen() {
         borderColor: '#7c3aed',
       }
     }
-    if (activeTile?.id === 'slab-heritage') {
+    if (activeTile?.style === 'heritage') {
       return {
         ...baseDims,
         colorPreset: 'traditional',
@@ -632,7 +731,7 @@ export default function LabelStudioScreen() {
     if (config.heritageColorSource === 'brand') return HERITAGE_BRAND_COLORS
     return resolveHeritageBandColors(cardColors)
   }, [config.heritageBandColors, config.heritageColorSource, cardColors])
-  const isHeritageTile = LABEL_GALLERY[activeGalleryIdx]?.id === 'slab-heritage'
+  const isHeritageTile = LABEL_GALLERY[activeGalleryIdx]?.style === 'heritage'
 
   // ---- Handlers ----
   // Slab-modern, slab-traditional, and the matching card-image tiles render
@@ -640,7 +739,7 @@ export default function LabelStudioScreen() {
   // memo above). When the user starts customizing, hop them to the Custom
   // Label tile so their changes actually show up in the preview.
   const switchToCustomTileIfForced = useCallback(() => {
-    const FORCED_TILES = ['slab-modern', 'slab-traditional', 'slab-heritage', 'card-image-modern', 'card-image-traditional']
+    const FORCED_TILES = ['slab-modern', 'slab-traditional', 'slab-heritage', 'card-image-modern', 'card-image-traditional', 'onetouch-heritage', 'toploader-heritage', 'foldover-heritage']
     const currentTile = LABEL_GALLERY[activeGalleryIdx]
     if (!currentTile || !FORCED_TILES.includes(currentTile.id)) return
     const customIdx = LABEL_GALLERY.findIndex(t => t.id === 'custom')
@@ -840,15 +939,15 @@ export default function LabelStudioScreen() {
   // additions (e.g. gradeColor, fontScale) flowing through unchanged —
   // previously geometric/split/5-color designs corrupted on save.
   const buildSaveConfig = useCallback(() => {
-    if (LABEL_GALLERY[activeGalleryIdx]?.id === 'slab-heritage') {
+    if (LABEL_GALLERY[activeGalleryIdx]?.style === 'heritage') {
       return { ...config, style: 'heritage', preset: 'dcm-heritage', heritagePattern: config.heritagePattern || 'diamond' }
     }
     return { ...config }
   }, [config, activeGalleryIdx])
 
   const saveStyle = useCallback(async () => {
-    if (customStyles.length >= 4) {
-      Alert.alert('Limit reached', 'You can keep up to 4 saved styles. Update or delete one to save a new design.')
+    if (customStyles.length >= MAX_SAVED_LABEL_STYLES) {
+      Alert.alert('Limit reached', `You can keep up to ${MAX_SAVED_LABEL_STYLES} saved styles. Update or delete one to save a new design.`)
       return
     }
     setSavingStyle(true)
@@ -983,10 +1082,17 @@ export default function LabelStudioScreen() {
     if (opts?.format) params.set('format', opts.format)
     if (opts?.position != null) params.set('position', String(opts.position))
     if (opts?.position2 != null) params.set('position2', String(opts.position2))
-    params.set('labelStyle', config.style || 'modern')
+    // Heritage Compact types carry the style in a `-heritage` suffix that the
+    // web export route understands (onetouch-heritage, toploader-heritage,
+    // foldover-heritage). Treat them as Heritage everywhere below.
+    const isHeritageExport = exportType === 'slab-heritage'
+      || exportType === 'card-image-heritage'
+      || exportType.endsWith('-heritage')
+      || config.style === 'heritage'
+    params.set('labelStyle', isHeritageExport ? 'heritage' : (config.style || 'modern'))
     // Heritage exports read the band pattern from the URL (web bridge
     // resolveHeritagePattern); band colours resolve per card server-side.
-    if (exportType === 'slab-heritage' || exportType === 'card-image-heritage' || config.style === 'heritage') {
+    if (isHeritageExport) {
       params.set('heritagePattern', config.heritagePattern || 'diamond')
     }
     params.set('download', '1')
@@ -995,7 +1101,9 @@ export default function LabelStudioScreen() {
     // generated PDF matches exactly what the user is designing — without
     // forcing them to save it to a slot first. Web /label-export reads this
     // base64-encoded JSON via ?customConfig=...
-    if (exportType === 'slab-custom' || exportType === 'slab-heritage') {
+    // Compact Heritage sheets read the pinned band palette and per-grade chip
+    // colours out of the same inline config the slab paths use.
+    if (exportType === 'slab-custom' || isHeritageExport) {
       const inlineConfig = {
         colorPreset: config.colorPreset,
         gradientStart: config.gradientStart,
@@ -1088,16 +1196,18 @@ export default function LabelStudioScreen() {
     // toploader pair claims 2 adjacent slots per card so it uses the
     // 'avery8167-pair' picker mode (40 card cells); foldover uses 1 slot
     // per card so it uses the raw 80-slot grid.
-    if (labelType.id === 'onetouch') {
+    // The Heritage ids carry the export route's `-heritage` suffix, so they
+    // need the same sheet pickers as their Modern twins.
+    if (labelType.holder === 'onetouch') {
       setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery6871' })
       return
     }
-    if (labelType.id === 'toploader') {
-      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167-pair' })
-      return
-    }
-    if (labelType.id === 'foldover') {
-      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167-foldover' })
+    if (labelType.holder === 'toploader') {
+      setGalleryPositionPicker({
+        exportType,
+        title: labelType.name,
+        sheet: labelType.format === 'foldover' ? 'avery8167-foldover' : 'avery8167-pair',
+      })
       return
     }
 
@@ -1203,6 +1313,7 @@ export default function LabelStudioScreen() {
         config={labelConfig}
         cardData={labelCardData}
         cardId={selectedCard?.id}
+        type={previewType}
         side={side}
         onRender={setLabelPreviewUrl}
         onError={(msg) => console.warn('[label-studio] label preview error:', msg)}
@@ -1319,6 +1430,98 @@ export default function LabelStudioScreen() {
             {/* ============ Label Badges ============ */}
             <LabelBadgesPicker />
 
+            {/* ============ Holder / Style / Format ============
+                Holder and style are separate decisions, as on web. These
+                pickers resolve to a gallery tile; swiping the gallery drives
+                them back, so both ways of choosing stay in sync. */}
+            <View style={s.section}>
+              <Text style={s.pickerLabel}>Holder</Text>
+              <View style={s.pickerRow}>
+                {HOLDER_OPTIONS.map(h => {
+                  const on = activeHolder === h.id
+                  return (
+                    <TouchableOpacity
+                      key={h.id}
+                      onPress={() => selectHolder(h.id)}
+                      style={[s.pickerChip, on && s.pickerChipOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>{h.name}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              <Text style={[s.pickerLabel, { marginTop: 14 }]}>Style</Text>
+              <View style={s.pickerRow}>
+                {stylesForHolder(activeHolder).map(st => {
+                  const on = activeStyle === st
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      onPress={() => selectStyle(st)}
+                      style={[s.pickerChip, on && s.pickerChipOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>
+                        {st === 'custom' ? 'Custom' : st.charAt(0).toUpperCase() + st.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+
+              {activeHolder === 'slab' && (
+                <>
+                  <Text style={[s.pickerLabel, { marginTop: 14 }]}>Slot size</Text>
+                  <View style={s.pickerRow}>
+                    {SLAB_SIZES.map(sz => {
+                      const on = Math.abs((config.width ?? 2.8) - sz.width) < 0.01
+                        && Math.abs((config.height ?? 0.8) - sz.height) < 0.01
+                      return (
+                        <TouchableOpacity
+                          key={sz.id}
+                          onPress={() => setConfig(prev => ({ ...prev, width: sz.width, height: sz.height }))}
+                          style={[s.pickerChip, on && s.pickerChipOn]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>{sz.name}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                  <Text style={{ fontSize: 11, color: Colors.gray[400], marginTop: 6 }}>
+                    {SLAB_SIZES.find(sz => Math.abs((config.width ?? 2.8) - sz.width) < 0.01)?.note || ''}
+                  </Text>
+                </>
+              )}
+
+              {activeHolder === 'toploader' && (
+                <>
+                  <Text style={[s.pickerLabel, { marginTop: 14 }]}>Label format</Text>
+                  <View style={s.pickerRow}>
+                    {([['front-back', 'Front + Back pair'], ['foldover', 'Fold-over']] as const).map(([f, name]) => {
+                      const on = activeFormat === f
+                      return (
+                        <TouchableOpacity
+                          key={f}
+                          onPress={() => selectFormat(f)}
+                          style={[s.pickerChip, on && s.pickerChipOn]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>{name}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </>
+              )}
+            </View>
+
             {/* ============ Label Gallery (Swipeable) ============ */}
             <View style={s.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1373,7 +1576,7 @@ export default function LabelStudioScreen() {
                       side={side}
                       emblems={galleryEmblems}
                       customOverrides={customOverrides}
-                      labelImageUrl={labelPreviewUrl}
+                      labelImageUrl={previewUrlForTile(labelType)}
                     />
 
                     {/* Side toggle (front/back) — same as designer below */}
@@ -2111,11 +2314,11 @@ export default function LabelStudioScreen() {
             {/* ============ Saved Styles (server-synced custom-1..4) ============ */}
             <View style={s.section}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={s.sectionTitle}>Saved Styles {customStyles.length > 0 && <Text style={{ fontSize: 11, color: Colors.gray[400], fontWeight: '500' }}>({customStyles.length}/4)</Text>}</Text>
+                <Text style={s.sectionTitle}>Saved Styles {customStyles.length > 0 && <Text style={{ fontSize: 11, color: Colors.gray[400], fontWeight: '500' }}>({customStyles.length}/{MAX_SAVED_LABEL_STYLES})</Text>}</Text>
                 <TouchableOpacity
                   onPress={saveStyle}
-                  disabled={savingStyle || customStyles.length >= 4}
-                  style={{ backgroundColor: customStyles.length >= 4 ? Colors.gray[300] : Colors.purple[600], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                  disabled={savingStyle || customStyles.length >= MAX_SAVED_LABEL_STYLES}
+                  style={{ backgroundColor: customStyles.length >= MAX_SAVED_LABEL_STYLES ? Colors.gray[300] : Colors.purple[600], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
                 >
                   <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>{savingStyle ? 'Saving…' : 'Save Current'}</Text>
                 </TouchableOpacity>
@@ -2313,6 +2516,12 @@ const s = StyleSheet.create({
   // Sections
   section: { backgroundColor: '#fff', marginHorizontal: 12, marginTop: 12, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.gray[800], marginBottom: 10 },
+  pickerLabel: { fontSize: 11, fontWeight: '700', color: Colors.gray[400], textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pickerChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 2, borderColor: Colors.gray[300], backgroundColor: '#fff' },
+  pickerChipOn: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[600] },
+  pickerChipText: { fontSize: 13, fontWeight: '600', color: Colors.gray[700] },
+  pickerChipTextOn: { color: '#fff' },
   subLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginBottom: 6 },
 
   // Card selector

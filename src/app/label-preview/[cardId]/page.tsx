@@ -14,8 +14,9 @@
  *
  * URL params:
  *   ?token=<jwt>                    — Supabase auth token
- *   &type=slab-modern|slab-traditional|slab-custom|slab-heritage
- *   &heritagePattern=<band pattern id>  — optional, slab-heritage only
+ *   &type=slab-modern|slab-traditional|slab-custom|slab-heritage|
+ *         onetouch-heritage|toploader-heritage|foldover-heritage
+ *   &heritagePattern=<band pattern id>  — optional, heritage types only
  *   &side=front|back
  *   &customConfig=<base64-json>     — optional, used for slab-custom
  *
@@ -48,6 +49,17 @@ declare global {
 }
 
 const PREVIEW_DPI = 144;
+/** Compact panels are physically tiny — render denser so 4pt type stays legible. */
+const COMPACT_PREVIEW_DPI = 260;
+
+/** Compact Heritage formats this page can render, keyed off the ?type param. */
+type CompactFormat = 'onetouch' | 'toploader' | 'foldover';
+function compactFormatFor(type: string): CompactFormat | null {
+  if (type === 'onetouch-heritage') return 'onetouch';
+  if (type === 'toploader-heritage') return 'toploader';
+  if (type === 'foldover-heritage') return 'foldover';
+  return null;
+}
 
 function postToRN(payload: any) {
   if (typeof window !== 'undefined' && window.ReactNativeWebView) {
@@ -121,6 +133,9 @@ export default function LabelPreviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const slabDataRef = useRef<SlabLabelData | null>(null);
+  // Raw card row + verify URL, for the compact Heritage renderers.
+  const cardRef = useRef<any>(null);
+  const cardUrlRef = useRef<string>('');
   const cardColorsRef = useRef<any>(null);
   const renderIdRef = useRef(0);
   // Heritage branding: the QR-centre disc must stay the DCM mark (verification
@@ -205,6 +220,8 @@ export default function LabelPreviewPage() {
           surface: extractScore('surface'),
         };
         const cardUrl = `${window.location.origin}/verify/${card.serial}`;
+        cardRef.current = card;
+        cardUrlRef.current = cardUrl;
         // BOTH the dark and white logos — the renderer picks logoDataUrl
         // for light/traditional themes, whiteLogoDataUrl for dark/modern/custom
         // themes (customSlabLabelGenerator.ts:611). Org-graded cards get the
@@ -261,10 +278,41 @@ export default function LabelPreviewPage() {
   // ---------- Render fn ----------
   async function doRender(config: CustomLabelConfig) {
     if (!slabDataRef.current) return;
+    // The compact holders are fixed by the ?type param — a config update from
+    // the host changes colours and pattern, never which panel we are drawing.
+    const compactFormat = compactFormatFor(initialType);
     const renderId = ++renderIdRef.current;
     try {
       const data = slabDataRef.current;
       const side = (config.side as 'front' | 'back') || 'front';
+      // Heritage Compact — the One-Touch / Toploader / fold-over panels. Same
+      // canvas functions the print sheets use, so the mobile preview cannot
+      // drift from the paper (the slab rasterizer below cannot draw these).
+      if (compactFormat) {
+        const [{ buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl }, compact, { resolveHeritageSelection }] =
+          await Promise.all([
+            import('@/lib/labels/heritageCompactInputs'),
+            import('@/lib/labels/heritageCompact'),
+            import('@/lib/labels/labelStyleResolution'),
+          ]);
+        const sel = resolveHeritageSelection('heritage', config);
+        const inputs = buildHeritageCompactInputs(cardRef.current, {
+          qrDataUrl: await compactQrDataUrl(cardUrlRef.current || ''),
+          bandColors: sel.bandColors ?? null,
+          pattern: sel.pattern,
+          wordmarkDataUrl: await loadWordmarkDataUrl(),
+        });
+        const fn =
+          compactFormat === 'onetouch' ? (side === 'front' ? compact.renderOneTouchFront : compact.renderOneTouchBack)
+          : compactFormat === 'toploader' ? (side === 'front' ? compact.renderToploaderFront : compact.renderToploaderBack)
+          : (side === 'front' ? compact.renderFoldFront : compact.renderFoldBack);
+        const canvas = await fn(inputs, COMPACT_PREVIEW_DPI);
+        if (renderId !== renderIdRef.current) return;
+        const url = canvas.toDataURL('image/png');
+        setImageUrl(url);
+        postToRN({ type: 'label-preview-ready', dataUrl: url, side });
+        return;
+      }
       // Heritage renders through the shared SVG rasterizer (the canvas
       // generators only know modern/traditional layouts).
       if (config.style === 'heritage') {

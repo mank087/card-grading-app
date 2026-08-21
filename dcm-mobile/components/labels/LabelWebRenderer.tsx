@@ -84,6 +84,9 @@ export interface LabelWebRendererProps {
    *  so the customizer config flows through. Slab-modern/traditional should
    *  pass their own preset to anchor the colors. */
   type?: 'slab-modern' | 'slab-traditional' | 'slab-custom' | 'slab-bordered' | 'slab-heritage'
+    // Heritage Compact panels — the page renders these with the same canvas
+    // functions the print sheets use.
+    | 'onetouch-heritage' | 'toploader-heritage' | 'foldover-heritage'
 }
 
 // ---------------------------------------------------------------------------
