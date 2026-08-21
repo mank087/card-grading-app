@@ -17,8 +17,13 @@
  * ── Env ────────────────────────────────────────────────────────────────────
  *   GRADING_CANARY_PERCENT  0-100, default 0 (everything on baseline)
  *   GRADING_CANARY_MODEL    default 'gpt-5.6-luna'
- *   GRADING_BASELINE_MODEL  default 'gpt-5.1'
+ *   GRADING_BASELINE_MODEL  default 'gpt-5.6-luna'
  *   GRADING_CANARY_KILL     '1' forces 100% baseline, ignoring percent.
+ *
+ * NOTE: GRADING_CANARY_REASONING_EFFORT and GRADING_CANARY_CACHE_RETENTION
+ * are named "CANARY" for historical reasons but apply to ANY reasoning model,
+ * baseline included. Do not rename them — the names are load-bearing in
+ * Vercel, and a rename silently drops whatever is configured there.
  *
  * The kill switch is a separate variable rather than "set percent to 0" on
  * purpose: flipping one flag to '1' in Vercel is a smaller, less error-prone
@@ -33,7 +38,22 @@
  * survive. applyModelCompat() is the only correct way to build a request body.
  */
 
-export const BASELINE_MODEL = process.env.GRADING_BASELINE_MODEL || 'gpt-5.1';
+/**
+ * The model production actually runs. The Aug 2026 canary graduated — every
+ * card graded since has been luna — but this default stayed 'gpt-5.1', so the
+ * live model was held up entirely by GRADING_CANARY_PERCENT in Vercel. An
+ * unset or mistyped env var silently reverted the whole engine to gpt-5.1:
+ * different grades, ~6x the input cost, and nothing to alert on. The default
+ * is now the truth and env is the override, not the load-bearing part.
+ */
+export const BASELINE_MODEL = process.env.GRADING_BASELINE_MODEL || 'gpt-5.6-luna';
+/**
+ * Deliberately still luna: with the canary graduated there is nothing being
+ * trialled, so baseline and canary resolve to the same model and the percent
+ * is a no-op. Point this at a NEW model only when you intend to trial it —
+ * if GRADING_CANARY_PERCENT is non-zero, changing this default immediately
+ * routes that share of live traffic to whatever you put here.
+ */
 export const CANARY_MODEL = process.env.GRADING_CANARY_MODEL || 'gpt-5.6-luna';
 
 /** Models that reject sampling params and need reasoning-effort control. */
@@ -73,6 +93,12 @@ export interface ModelDecision {
  * BASELINE rather than routing randomly: an un-attributable canary grade is
  * worse than no canary grade, because it pollutes the comparison without
  * being identifiable afterwards.
+ *
+ * Callers that omit routingKey therefore ALWAYS get BASELINE. That is correct
+ * for a trial, but it is a trapdoor for scripts: a calibration run with no
+ * routing key silently measured the baseline while appearing to measure the
+ * canary. Any harness that grades cards should pass one and log the result of
+ * describeDecision() so a run can be attributed afterwards.
  */
 export function resolveGradingModel(routingKey?: string | null): ModelDecision {
   const percent = canaryPercent();

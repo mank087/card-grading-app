@@ -12,18 +12,22 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { BASELINE_MODEL } from './grading/modelRouter';
 
 // Pricing per million tokens, per model. cacheWrite applies only to models
 // with extended prompt-cache retention (gpt-5.6 bills writes at 1.25x input).
-// Unknown models fall back to gpt-5.1 rates — the pre-Aug-17 behavior, which
-// silently overstated luna's cost ~4x; keep this table in sync with
-// scripts/canary-report.ts when models change.
+// Keep this table in sync with scripts/canary-report.ts when models change.
+//
+// Unknown models fall back to the rates of whatever BASELINE_MODEL currently
+// is, rather than a hardcoded one. This used to pin to gpt-5.1 and overstated
+// luna's cost ~4x whenever a model string fell through; tying it to the
+// baseline means the fallback follows the engine instead of rotting behind it.
 const MODEL_RATES: Record<string, { inputUncached: number; inputCached: number; output: number; cacheWrite?: number }> = {
   'gpt-5.1': { inputUncached: 1.25, inputCached: 0.125, output: 10.0 },
   'gpt-5.6-luna': { inputUncached: 0.20, inputCached: 0.02, output: 1.20, cacheWrite: 0.25 },
   'gpt-5.6-terra': { inputUncached: 2.00, inputCached: 0.20, output: 12.0, cacheWrite: 2.50 },
 };
-const DEFAULT_RATES = MODEL_RATES['gpt-5.1'];
+const DEFAULT_RATES = MODEL_RATES[BASELINE_MODEL] ?? MODEL_RATES['gpt-5.1'];
 
 export interface OpenAIUsageEntry {
   /** e.g. 'grade_ensemble', 'zoom_batch', 'zoom_geometry_gate', 'zoom_structural_verify' */

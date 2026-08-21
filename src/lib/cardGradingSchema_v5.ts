@@ -24,7 +24,7 @@ import { z } from 'zod';
  * Meta information about the grading analysis
  */
 const MetaSchema = z.object({
-  model_name: z.string().describe('AI model used for grading (e.g., "gpt-5.1")'),
+  model_name: z.string().describe('AI model used for grading (e.g., "gpt-5.6-luna")'),
   provider: z.string().describe('AI provider (e.g., "openai")'),
   version: z.string().describe('Schema version (e.g., "v6.2")'),
   prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v6.2_THREE_PASS")'),
@@ -665,7 +665,7 @@ export type GradingPasses = z.infer<typeof GradingPassesSchema>;
  * Usage:
  * ```typescript
  * const response = await openai.chat.completions.create({
- *   model: 'gpt-5.1',
+ *   model: 'gpt-5.6-luna',
  *   messages: [...],
  *   response_format: getCardGradingResponseFormat()
  * });

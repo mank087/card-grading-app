@@ -22,6 +22,10 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
+import { imageDetail } from './grading/imageDetail';
+// Cast: the OpenAI SDK's type union predates detail:'original', which the
+// API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
+const IMAGE_DETAIL = imageDetail() as 'high';
 
 export interface ZoomDefect {
   region: string;
@@ -197,11 +201,11 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
     }
     crops.forEach((c, i) => {
       content.push({ type: 'text', text: `CLAIM — ${c.label}:` });
-      content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${c.buf.toString('base64')}`, detail: 'high' } });
+      content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${c.buf.toString('base64')}`, detail: IMAGE_DETAIL } });
       const o = oppositeCrops[i];
       if (o) {
         content.push({ type: 'text', text: o.label + ':' });
-        content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${o.buf.toString('base64')}`, detail: 'high' } });
+        content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${o.buf.toString('base64')}`, detail: IMAGE_DETAIL } });
       }
     });
 
@@ -674,9 +678,9 @@ export async function detectCardGeometry(
       {
         role: 'user', content: [
           { type: 'text', text: 'Photo 1 (front):' },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: 'high' } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: IMAGE_DETAIL } },
           { type: 'text', text: 'Photo 2 (back):' },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: 'high' } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: IMAGE_DETAIL } },
         ] as any,
       },
     ],
@@ -813,7 +817,7 @@ export async function runZoomInspection(
         content.push({ type: 'text', text: `REGION ${r.id} — ${r.label}:` });
         content.push({
           type: 'image_url',
-          image_url: { url: `data:image/jpeg;base64,${r.buf.toString('base64')}`, detail: 'high' },
+          image_url: { url: `data:image/jpeg;base64,${r.buf.toString('base64')}`, detail: IMAGE_DETAIL },
         });
       }
       content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });

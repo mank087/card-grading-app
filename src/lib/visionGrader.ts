@@ -31,6 +31,10 @@ import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
+import { imageDetail } from './grading/imageDetail';
+// Cast: the OpenAI SDK's type union predates detail:'original', which the
+// API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
+const IMAGE_DETAIL = imageDetail() as 'high';
 
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
@@ -719,6 +723,10 @@ Return your observations in the required JSON format.`;
 
     // Use Chat Completions API instead of Assistants API
     // This matches ChatGPT's implementation and provides better defect detection
+    // LEGACY PATH — not reached in production (see callers). Builds its own
+    // request instead of going through applyModelCompat, so it would 400 on a
+    // reasoning model (luna rejects temperature/top_p). Route it through
+    // applyModelCompat before reviving this.
     const response = await openai.chat.completions.create({
       model: model,
       temperature: temperature,           // 0.0 = fully deterministic
@@ -739,14 +747,14 @@ Return your observations in the required JSON format.`;
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'high' // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
+                detail: IMAGE_DETAIL // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'high' // v8.8: pinned (was 'auto')
+                detail: IMAGE_DETAIL // v8.8: pinned (was 'auto')
               }
             },
             {
@@ -998,6 +1006,10 @@ export async function estimateProfessionalGrades(
   try {
     console.log('[Professional Grading] Calling OpenAI API...');
 
+    // LEGACY PATH — not reached in production (see callers). Builds its own
+    // request instead of going through applyModelCompat, so it would 400 on a
+    // reasoning model (luna rejects temperature/top_p). Route it through
+    // applyModelCompat before reviving this.
     const response = await openai.chat.completions.create({
       model: model,
       temperature: temperature,
@@ -1337,6 +1349,10 @@ export async function performDetailedInspection(
     console.log('[Stage 2 Inspection] Calling OpenAI API with vision...');
 
     // Call Chat Completions API with detailed inspection prompt + Stage 1 data + images
+    // LEGACY PATH — not reached in production (see callers). Builds its own
+    // request instead of going through applyModelCompat, so it would 400 on a
+    // reasoning model (luna rejects temperature/top_p). Route it through
+    // applyModelCompat before reviving this.
     const response = await openai.chat.completions.create({
       model: model,
       temperature: temperature,
@@ -1357,14 +1373,14 @@ export async function performDetailedInspection(
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'high'
+                detail: IMAGE_DETAIL
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'high'
+                detail: IMAGE_DETAIL
               }
             }
           ]
@@ -1876,14 +1892,14 @@ export async function gradeCardConversational(
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'high' // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
+                detail: IMAGE_DETAIL // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'high' // v8.8: pinned (was 'auto')
+                detail: IMAGE_DETAIL // v8.8: pinned (was 'auto')
               }
             },
             {
