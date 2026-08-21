@@ -353,6 +353,7 @@ export default function LabelStudioScreen() {
   const [activeCardColorStyle, setActiveCardColorStyle] = useState<string | null>(null)
   const [customColorCount, setCustomColorCount] = useState(2)
   const [labelPreviewUrl, setLabelPreviewUrl] = useState<string | null>(null)
+  const [labelPreviewType, setLabelPreviewType] = useState<string | null>(null)
   const [side, setSide] = useState<'front' | 'back'>('front')
 
   // Editable text fields
@@ -385,7 +386,6 @@ export default function LabelStudioScreen() {
     const idx = LABEL_GALLERY.findIndex(t => t.id === tileId)
     if (idx < 0 || idx === activeGalleryIdx) return
     setActiveGalleryIdx(idx)
-    try { galleryListRef.current?.scrollToIndex({ index: idx, animated: true }) } catch { /* not mounted yet */ }
   }, [activeGalleryIdx])
 
   // ---- Holder / style / format pickers ----
@@ -433,9 +433,14 @@ export default function LabelStudioScreen() {
    * its native inline label, or it would display the slab artwork.
    */
   const previewUrlForTile = useCallback((tile: typeof LABEL_GALLERY[number]) => {
-    if (tile.holder === 'slab' || tile.holder === 'digital') return labelPreviewUrl
-    return tile.style === 'heritage' && tile.id === activeTile?.id ? labelPreviewUrl : null
-  }, [labelPreviewUrl, activeTile])
+    if (tile.holder === 'slab' || tile.holder === 'digital') {
+      return labelPreviewType && labelPreviewType.startsWith('slab-') ? labelPreviewUrl : null
+    }
+    // Compact panels only: the image must have been rendered for THIS tile,
+    // or a slab render leaks into the small holder's slot.
+    if (tile.style !== 'heritage' || tile.id !== activeTile?.id) return null
+    return labelPreviewType === tile.id ? labelPreviewUrl : null
+  }, [labelPreviewUrl, labelPreviewType, activeTile])
 
   /** The run as it will actually print: explicit picks, else the shown card. */
   const effectiveRunIds = printRunIds.length > 0
@@ -1414,7 +1419,7 @@ export default function LabelStudioScreen() {
         cardId={selectedCard?.id}
         type={previewType}
         side={side}
-        onRender={setLabelPreviewUrl}
+        onRender={(url) => { setLabelPreviewUrl(url); setLabelPreviewType(previewType) }}
         onError={(msg) => console.warn('[label-studio] label preview error:', msg)}
       />
 
@@ -1723,6 +1728,28 @@ export default function LabelStudioScreen() {
             )}
 
             {/* ============ Step 3: Style ============ */}
+            {step === 3 && activeHolder === 'toploader' && (
+            <View style={s.section}>
+              <Text style={s.pickerLabel}>Label format</Text>
+              <View style={s.pickerRow}>
+                {([['front-back', 'Front + Back pair'], ['foldover', 'Fold-over']] as const).map(([f, name]) => {
+                  const on = activeFormat === f
+                  return (
+                    <TouchableOpacity
+                      key={f}
+                      onPress={() => selectFormat(f)}
+                      style={[s.pickerChip, on && s.pickerChipOn]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                    >
+                      <Text style={[s.pickerChipText, on && s.pickerChipTextOn]}>{name}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </View>
+            )}
+
             {step === 3 && (
             <View style={s.section}>
               <Text style={s.pickerLabel}>Style</Text>
@@ -1850,6 +1877,7 @@ export default function LabelStudioScreen() {
                 keyExtractor={id => id}
                 extraData={activeGalleryIdx}
                 snapToInterval={SCREEN_W - 24}
+                onScrollToIndexFailed={() => { /* run shorter than the target index */ }}
                 decelerationRate="fast"
                 onMomentumScrollEnd={e => {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
