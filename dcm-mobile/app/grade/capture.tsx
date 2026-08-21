@@ -191,6 +191,25 @@ export default function CaptureScreen() {
   // Defined before early returns to keep hook order stable across renders.
   const handleCameraReady = useCallback(async () => {
     if (!cameraRef.current || pictureSize) return
+    /**
+     * ANDROID: do not touch pictureSize. It buys nothing and breaks focus.
+     *
+     * expo-camera's buildResolutionSelector() already falls back to
+     * ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY when pictureSize is empty,
+     * so Android is ALREADY capturing at the maximum the sensor offers. Setting
+     * it explicitly selects the same resolution — but assigning the prop sets
+     * shouldCreateCamera = true, which tears down and rebinds the whole CameraX
+     * session moments after onCameraReady.
+     *
+     * That rebind is why the preview would not focus. createCamera() restores
+     * zoom afterwards but never re-applies focus state, and the autoFocus
+     * setter is a no-op while `camera` is null (which it is when props first
+     * apply), so nothing re-establishes continuous AF after the rebind.
+     *
+     * The "expo default is 1920x1080 or lower" note below is true on iOS, which
+     * is why the 'Photo' preset is still needed there. It is not true on Android.
+     */
+    if (Platform.OS === 'android') return
     try {
       const sizes = await cameraRef.current.getAvailablePictureSizesAsync()
       if (!sizes || sizes.length === 0) return
