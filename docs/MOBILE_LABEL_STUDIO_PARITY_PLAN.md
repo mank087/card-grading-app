@@ -136,14 +136,20 @@ This can ship inside the existing single-screen layout — it does not require t
 
 *Risk:* medium. Touches the busiest part of a 2,400-line screen and changes the `type` values sent to the export route. Keep the old gallery IDs working as an alias layer so in-flight sessions and any deep links do not break.
 
-### Phase 4 — Multi-card selection in Label Studio
+### Phase 4 — Multi-card selection in Label Studio ✅ DONE
 **Mobile OTA.**
 
-Raise Label Studio from one card to the web's 20. The Collection tab already does multi-select and already calls `/label-export/batch` with a `cardIds` list, so both the selection UI pattern and the export contract exist in the app — this is largely wiring them together rather than new invention.
+Label Studio now prints up to 20 cards in one run, capped to match web (two full slab sheets).
 
-Include the web's sheet-count hint ("12 labels — 2 printed sheets") so the count means something before printing.
+`selectedCard` is referenced in 61 places — label text editing, colour extraction, signed URLs, the preview bridge. Rather than convert all of them, a **print run** sits alongside it: `selectedCard` stays the one card the preview and text editor work against, and `printRunIds` is the list that actually prints. That mirrors the web wizard, where the swiper shows one card at a time and the design applies to all of them, and it leaves the single-card path untouched until a second card is added.
 
-*Risk:* medium. Watch memory: 20 cards means 40 QR codes and 40 label renders through a WebView bridge. Consider rendering previews lazily for the visible card only, rather than all 20 up front.
+- **Tap** a card to show it (unchanged). **Press and hold** to add or remove it from the run. Tiles in the run carry their run position as a badge.
+- The first long-press also captures the card already on screen, so the run matches what the user thinks they are building rather than silently dropping the visible card.
+- A chip row lists the run in order; tapping a chip removes it. "Clear run" resets.
+- Header shows `N of 20` plus the sheet count for the chosen holder and format — 10 per sheet for slab, 18 for 6871, 40 for 8167 pairs, 80 folded.
+- Export routes to `/label-export/batch` with `cardIds` when the run has more than one card, and keeps the single-card route otherwise so its position picker still applies. When a start slot was picked, batch positions are generated from it — stepping by 2 for toploader pairs, which claim two slots per card.
+
+*Not attempted:* real-device memory at 20 cards. Previews still render one card at a time through the WebView bridge, so the exposure is the export itself, where 20 cards means 20 QR codes and 20 label renders inside the export page. Worth watching on an older phone.
 
 ### Phase 5 — The wizard proper
 **Mobile OTA.**

@@ -75,6 +75,24 @@ const HOLDER_OPTIONS: Array<{ id: HolderId; name: string; blurb: string }> = [
   { id: 'digital',   name: 'Card Image',   blurb: 'For eBay and social' },
 ]
 
+/**
+ * Print-run cap: two full slab sheets, matching web.
+ *
+ * Slab is the tightest format at 10 labels per page, so 20 is exactly two
+ * sheets there; 6871 fits 18 and 8167 fits 40 (80 folded). Every sheet builder
+ * paginates, so this is a review limit rather than a technical one.
+ */
+const MAX_PRINT_RUN = 20
+
+/** Cards per printed sheet, by holder — drives the sheet-count hint. */
+function sheetsNeeded(count: number, holder: HolderId, foldover: boolean): number {
+  const per = holder === 'slab' ? 10
+    : holder === 'onetouch' ? 18
+    : holder === 'toploader' ? (foldover ? 80 : 40)
+    : count // digital: one image per card, no sheet
+  return Math.max(1, Math.ceil(count / per))
+}
+
 /** Slab slot sizes. Zion Mag Pro's opening is smaller in both dimensions. */
 const SLAB_SIZES: Array<{ id: string; name: string; width: number; height: number; note?: string }> = [
   { id: 'standard', name: 'Standard', width: 2.8, height: 0.8 },
@@ -289,6 +307,16 @@ export default function LabelStudioScreen() {
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCard, setSelectedCard] = useState<any | null>(null)
+  /**
+   * Cards in the current print run, in pick order.
+   *
+   * Separate from `selectedCard`, which stays the one card the preview and the
+   * label-text editor work against — the design applies to every card in the
+   * run, exactly as the web wizard's swiper works. Empty means "just the
+   * selected card", so the single-card flow is untouched until you add a
+   * second.
+   */
+  const [printRunIds, setPrintRunIds] = useState<string[]>([])
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [cardColors, setCardColors] = useState<CardColors | null>(null)
@@ -380,6 +408,26 @@ export default function LabelStudioScreen() {
     if (tile.holder === 'slab' || tile.holder === 'digital') return labelPreviewUrl
     return tile.style === 'heritage' && tile.id === activeTile?.id ? labelPreviewUrl : null
   }, [labelPreviewUrl, activeTile])
+
+  /** The run as it will actually print: explicit picks, else the shown card. */
+  const effectiveRunIds = printRunIds.length > 0
+    ? printRunIds
+    : (selectedCard?.id ? [selectedCard.id] : [])
+  const runCardById = useCallback((id: string) => cards.find(c => c.id === id), [cards])
+
+  const toggleInRun = useCallback((cardId: string) => {
+    setPrintRunIds(prev => {
+      if (prev.includes(cardId)) return prev.filter(id => id !== cardId)
+      if (prev.length >= MAX_PRINT_RUN) {
+        Alert.alert('Print run full', `You can print up to ${MAX_PRINT_RUN} cards at once. Remove one to add another.`)
+        return prev
+      }
+      // First add also captures the card already on screen, so the run matches
+      // what the user thinks they are building.
+      const seed = prev.length === 0 && selectedCard?.id && selectedCard.id !== cardId ? [selectedCard.id] : prev
+      return [...seed, cardId]
+    })
+  }, [selectedCard])
 
   /** What /label-preview should draw: the compact panel, or the slab label. */
   const previewType = activeTile && activeTile.holder !== 'slab' && activeTile.holder !== 'digital'
@@ -1160,7 +1208,24 @@ export default function LabelStudioScreen() {
     // which doesn't work inside RN WebView. With it absent + the
     // ReactNativeWebView bridge present, the page postMessages back.
     params.delete('download')
-    const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
+    // A print run of more than one card goes to the batch route, which lays
+    // every card onto the same sheets and paginates. One card keeps the
+    // single-card route so its position picker still applies.
+    const runIds = printRunIds.length > 1 ? printRunIds : null
+    if (runIds) {
+      params.delete('position')
+      params.delete('position2')
+      params.set('cardIds', runIds.join(','))
+      // Batch takes GLOBAL slot indices, one per card, starting where the
+      // single-card picker left off.
+      if (opts?.position != null) {
+        const step = exportType.startsWith('toploader') || exportType === 'toploader' ? 2 : 1
+        params.set('positions', runIds.map((_, i) => opts.position! + i * step).join(','))
+      }
+    }
+    const url = runIds
+      ? `${API_BASE}/label-export/batch?${params.toString()}`
+      : `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
     const title = exportType === 'slab-heritage' ? 'Heritage Slab Label'
       : exportType === 'slab-custom' ? 'Custom Slab Label'
       : exportType === 'slab' ? 'Slab Label'
@@ -1170,7 +1235,7 @@ export default function LabelStudioScreen() {
       : exportType === 'card-image' ? 'Card Image'
       : 'Label'
     setTimeout(() => setExportSource({ url, title }), 350)
-  }, [selectedCard, session?.access_token, config])
+  }, [selectedCard, session?.access_token, config, printRunIds])
 
   // Gallery's per-tile Download button — uses the in-app web browser
   // approach so the user gets the same download UX as mobile web.
@@ -1386,12 +1451,21 @@ export default function LabelStudioScreen() {
             renderItem={({ item }) => {
               const grade = item.conversational_whole_grade
               const isSelected = selectedCard?.id === item.id
+              const inRun = printRunIds.includes(item.id)
               return (
                 <TouchableOpacity
-                  style={[s.cardTile, isSelected && s.cardTileSelected]}
+                  style={[s.cardTile, isSelected && s.cardTileSelected, inRun && s.cardTileInRun]}
                   onPress={() => setSelectedCard(item)}
+                  onLongPress={() => toggleInRun(item.id)}
+                  delayLongPress={250}
                   activeOpacity={0.7}
                 >
+                  {/* Tap shows a card; press and hold adds it to the print run. */}
+                  {inRun && (
+                    <View style={s.cardTileRunBadge}>
+                      <Text style={s.cardTileRunBadgeText}>{printRunIds.indexOf(item.id) + 1}</Text>
+                    </View>
+                  )}
                   {item.front_path ? (
                     <CardThumbnail frontPath={item.front_path} />
                   ) : (
@@ -1429,6 +1503,49 @@ export default function LabelStudioScreen() {
           <>
             {/* ============ Label Badges ============ */}
             <LabelBadgesPicker />
+
+            {/* ============ Print run ============
+                One design, many cards. The preview and text editor stay on the
+                card you tapped; everything in the run prints with the same
+                design onto shared sheets. */}
+            <View style={s.section}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={s.sectionTitle}>Print run</Text>
+                <Text style={{ fontSize: 11, color: Colors.gray[400] }}>
+                  {effectiveRunIds.length} of {MAX_PRINT_RUN}
+                  {activeHolder !== 'digital' && ` · ${sheetsNeeded(effectiveRunIds.length, activeHolder, activeFormat === 'foldover')} sheet${sheetsNeeded(effectiveRunIds.length, activeHolder, activeFormat === 'foldover') === 1 ? '' : 's'}`}
+                </Text>
+              </View>
+              {printRunIds.length === 0 ? (
+                <Text style={{ fontSize: 12, color: Colors.gray[500] }}>
+                  Printing just this card. Press and hold any card above to add it to a run and print several at once.
+                </Text>
+              ) : (
+                <>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {printRunIds.map((id, i) => {
+                      const c = runCardById(id)
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          onPress={() => toggleInRun(id)}
+                          style={s.runChip}
+                          accessibilityLabel={`Remove ${c?.card_name || 'card'} from the print run`}
+                        >
+                          <Text style={s.runChipText} numberOfLines={1}>
+                            {i + 1}. {c?.featured || c?.card_name || 'Card'}
+                          </Text>
+                          <Text style={s.runChipX}>×</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                  <TouchableOpacity onPress={() => setPrintRunIds([])} style={{ marginTop: 10 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>Clear run</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
 
             {/* ============ Holder / Style / Format ============
                 Holder and style are separate decisions, as on web. These
@@ -2522,6 +2639,12 @@ const s = StyleSheet.create({
   pickerChipOn: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[600] },
   pickerChipText: { fontSize: 13, fontWeight: '600', color: Colors.gray[700] },
   pickerChipTextOn: { color: '#fff' },
+  cardTileInRun: { borderColor: Colors.purple[400] },
+  cardTileRunBadge: { position: 'absolute', top: 4, left: 4, zIndex: 2, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: Colors.purple[600], alignItems: 'center', justifyContent: 'center' },
+  cardTileRunBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  runChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 190, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50] },
+  runChipText: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: Colors.purple[800] },
+  runChipX: { fontSize: 15, lineHeight: 15, fontWeight: '700', color: Colors.purple[500] },
   subLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[500], marginBottom: 6 },
 
   // Card selector
