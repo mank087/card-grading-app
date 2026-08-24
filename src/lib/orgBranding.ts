@@ -68,6 +68,11 @@ export interface OrgLogoSet {
 
 const brandingCache = new Map<string, OrgBrandingClient | null>();
 
+/** Drop the per-session card→branding cache (call after Brand Setup saves a design). */
+export function clearBrandingCache(): void {
+  brandingCache.clear();
+}
+
 async function urlToDataUrl(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);

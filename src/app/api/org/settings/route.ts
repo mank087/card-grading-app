@@ -17,6 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/serverAuth'
+import { revalidateOrgPages } from '@/lib/orgRevalidate'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getOrgForUser, getOrgBranding, orgSerialPrefix } from '@/lib/organizations'
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
@@ -337,6 +338,11 @@ export async function PATCH(request: NextRequest) {
     console.error('[org/settings] update error:', error)
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
+
+  // The public Enterprise Page and its card pages are ISR-cached (300s /
+  // 60s). A saved label design or storefront edit must show up on the next
+  // load, not after the cache expires.
+  revalidateOrgPages(org.slug)
 
   // Any rename gets human eyes: the change is immediate, but admin is told
   // old + new so an impersonation-adjacent rename can't slip by silently.

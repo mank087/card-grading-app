@@ -10,6 +10,7 @@ import { isUuid } from '@/lib/uuid'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import type { StorefrontContent } from '@/app/enterprise/[slug]/data'
 import { normalizeOrgLabelDesign, designToLegacySlab, type LegacySlabKeys } from '@/lib/labels/orgLabelDesign'
+import { revalidateOrgPages } from '@/lib/orgRevalidate'
 import sharp from 'sharp'
 
 export const runtime = 'nodejs'
@@ -38,10 +39,14 @@ async function loadStorefront(orgId: string): Promise<{ enabled: boolean; conten
 }
 
 async function saveStorefront(orgId: string, updates: { storefront_enabled?: boolean; storefront?: StorefrontContent }) {
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('organizations')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', orgId)
+    .select('slug')
+    .maybeSingle()
+  // Public pages are ISR-cached; show the edit on the next load.
+  if (!error) revalidateOrgPages((data as { slug?: string } | null)?.slug)
   return error
 }
 

@@ -128,7 +128,9 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               cards={sf.recentCards}
               pattern={c.slab?.pattern || 'diamond'}
               bandColors={slabColors}
-              orgLogoColor={sf.logos.color}
+              orgLogoColor={sf.logos.mark}
+              logoScale={c.slab?.logo_scale || 1}
+              design={resolveOrgLabelDesign(c)}
             />
           </div>
         </section>

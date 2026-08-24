@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CardSlabGrid } from '@/components/CardSlab';
 import { getCardLabelData } from '@/lib/useLabelData';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 /**
  * Optional "recently graded" strip on the storefront home: a horizontal
@@ -15,12 +16,17 @@ export default function StorefrontRecentCards({
   pattern,
   bandColors,
   orgLogoColor,
+  logoScale = 1,
+  design = null,
 }: {
   slug: string;
   cards: { card: Record<string, unknown>; frontUrl: string | null }[];
   pattern: string;
   bandColors: string[];
   orgLogoColor: string | null;
+  /** Brand Setup mark size + Label Designer document — the house design these cards print with. */
+  logoScale?: number;
+  design?: OrgLabelDesign | null;
 }) {
   if (!cards.length) return null;
   return (
@@ -45,6 +51,8 @@ export default function StorefrontRecentCards({
               isAlteredAuthentic={label.isAlteredAuthentic}
               heritage={{ pattern, bandColors }}
               orgLogoColor={orgLogoColor}
+              orgLogoScale={logoScale}
+              orgDesign={design}
               className="hover:shadow-xl transition-shadow duration-200"
             />
           </Link>

@@ -21,7 +21,9 @@ import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS, HowItWorksStep, FaqEntry } from '@/lib/storefrontDefaults'
 import LabelDesigner from '@/components/enterprise/LabelDesigner'
-import { designToLegacySlab, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { designToLegacySlab, designEquals, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { useUnsavedChangesGuard, UnsavedChangesDialog } from '@/hooks/useUnsavedChangesGuard'
+import { clearBrandingCache } from '@/lib/orgBranding'
 
 /** The flat Brand Setup fields a design implies (mirrors what the API stores). */
 function slabFromDesign(d: OrgLabelDesign) {
@@ -90,6 +92,10 @@ function StoreSettingsContent() {
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Label Designer edits live here until "Save design"; null = nothing pending.
+  const [draft, setDraft] = useState<OrgLabelDesign | null>(null)
+  const dirty = !!settings && !!draft && !designEquals(draft, settings.slab.design)
+  const guard = useUnsavedChangesGuard(dirty)
   const setupMode = searchParams.get('setup') === '1' || (settings ? !settings.setupDone : false)
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
@@ -195,9 +201,32 @@ function StoreSettingsContent() {
     }
   }
 
+  /** Persist the pending Label Designer draft. Returns true on success. */
+  const saveDesign = async (): Promise<boolean> => {
+    if (!settings || !draft) return true
+    const d = draft
+    const ok = await save({ slab: { design: d } }, 'Label design saved')
+    if (ok) {
+      setSettings(prev => (prev ? { ...prev, slab: { ...prev.slab, ...slabFromDesign(d), design: d } } : prev))
+      setDraft(null)
+      // Card pages cache branding per session; make them refetch the new design.
+      clearBrandingCache()
+    }
+    return ok
+  }
+
   const finishSetup = async () => {
-    if (await save({ setupDone: true }, 'Brand setup complete')) {
-      setSettings(prev => (prev ? { ...prev, setupDone: true } : prev))
+    // A pending label design rides along, so finishing setup never drops it.
+    const patch: Record<string, unknown> = { setupDone: true }
+    if (dirty && draft) patch.slab = { design: draft }
+    if (await save(patch, 'Brand setup complete')) {
+      const d = draft
+      setSettings(prev => (prev ? {
+        ...prev,
+        setupDone: true,
+        ...(dirty && d ? { slab: { ...prev.slab, ...slabFromDesign(d), design: d } } : {}),
+      } : prev))
+      setDraft(null)
       router.push('/store/billing')
     }
   }
@@ -375,22 +404,38 @@ function StoreSettingsContent() {
           <p className="text-xs text-gray-400">First color is your primary accent on card pages and labels.</p>
         </div>
 
-        {/* Slab label design — the enterprise Label Designer */}
+        {/* Slab label design — the enterprise Label Designer. Edits stay
+            local until "Save design"; leaving with unsaved edits is guarded. */}
         <div className="bg-white rounded-2xl shadow-md p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Slab label design</h2>
-          <p className="text-xs text-gray-400 mb-4">
-            The design printed on every slab label your account grades, and shown on your public card pages. Changes save as you make them.
-          </p>
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Slab label design</h2>
+              <p className="text-xs text-gray-400">
+                The design printed on every slab label your account grades, and shown on your public card pages. Nothing changes until you save.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {dirty && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">Unsaved changes</span>}
+              <button type="button" onClick={() => setDraft(null)} disabled={!dirty || busy}
+                className="px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+                Discard
+              </button>
+              <button type="button" onClick={() => { void saveDesign() }} disabled={!dirty || busy}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-40">
+                {busy ? 'Saving…' : 'Save design'}
+              </button>
+            </div>
+          </div>
           <LabelDesigner
-            design={settings.slab.design}
-            onChange={d => setSettings(s => (s ? { ...s, slab: { ...s.slab, ...slabFromDesign(d), design: d } } : s))}
-            onCommit={d => { void save({ slab: { design: d } }, 'Label design saved') }}
+            design={draft ?? settings.slab.design}
+            onChange={setDraft}
             orgName={settings.name}
             serialPrefix={settings.serialPrefix || settings.derivedPrefix}
             brandColors={settings.brandColors}
             logos={settings.logos}
           />
         </div>
+        <UnsavedChangesDialog open={guard.pending} onStay={guard.stay} onLeave={guard.leave} onSave={saveDesign} saving={busy} />
 
         {/* Storefront details */}
         <div className="bg-white rounded-2xl shadow-md p-6 space-y-4">
