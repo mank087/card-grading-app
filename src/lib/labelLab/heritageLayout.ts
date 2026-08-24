@@ -406,6 +406,25 @@ export function heritageRulesFit(fit: HeritageFrontFit, box: HeritageMarkBox): b
   return fit.rulesOk && box.ruleLeft >= fit.serialRight + 16
 }
 
+/**
+ * The largest logo scale this layout can still honour for a fitted card —
+ * past it the mark is clamped and the number changes nothing. The designer
+ * caps its slider here so the control stops where the element stops.
+ */
+export function heritageLogoScaleMax(geom: HeritageGeometry, fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'>): number {
+  if (geom.logo.column) {
+    return Math.max(HERITAGE_LOGO_SCALE.min, Math.min(1.5, (geom.content.h - 48) / 240))
+  }
+  const baseH = HERITAGE_PX.MARK_H * HERITAGE_PX.MARK_SCALE
+  const atMax = heritageMarkBox(HERITAGE_LOGO_SCALE.max, fit, geom)
+  return Math.max(HERITAGE_LOGO_SCALE.min, Math.min(HERITAGE_LOGO_SCALE.max, Math.round((atMax.h / baseH) * 100) / 100))
+}
+
+/** Largest chip scale the content rect can hold (the geometry caps past it). */
+export function heritageChipScaleMax(geom: HeritageGeometry, limit: number): number {
+  return Math.max(0.8, Math.min(limit, Math.round(((geom.content.h - 32) / HERITAGE_PX.CHIP_H) * 100) / 100))
+}
+
 export function heritageMarkBox(
   scale: number,
   fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'> | number,

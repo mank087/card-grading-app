@@ -23,8 +23,9 @@ import ModernFrontLabel from '@/components/labels/ModernFrontLabel'
 import ModernBackLabel from '@/components/labels/ModernBackLabel'
 import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/bandGeometry'
 import {
-  heritageGeometry, fitHeritageFront, heritageMarkBox, HERITAGE_PX,
+  heritageGeometry, fitHeritageFront, heritageMarkBox, heritageLogoScaleMax, heritageChipScaleMax, HERITAGE_PX,
 } from '@/lib/labelLab/heritageLayout'
+import { MODERN_LOGO_MAX_SCALE } from '@/lib/labels/logoScale'
 import {
   DESIGN_LIMITS, defaultOrgLabelDesign, designEquals, normalizeOrgLabelDesign,
   type OrgLabelDesign, type BandPosition, type LogoZone,
@@ -243,11 +244,13 @@ export default function LabelDesigner({
       }
       case 'logo-size': {
         const lim = d.start.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
-        next = patch(d.start, x => { x.logo.scale = round2(clamp(d.start.logo.scale + (dx + dy) / 260, lim.min, lim.max)) })
+        // The handle stops where the element stops, like the slider.
+        const max = Math.max(lim.min + 0.05, heritageLogoScaleMax(g, fit))
+        next = patch(d.start, x => { x.logo.scale = round2(clamp(d.start.logo.scale + (dx + dy) / 260, lim.min, max)) })
         break
       }
       case 'chip-size': {
-        next = patch(d.start, x => { x.chip.scale = round2(clamp(d.start.chip.scale + (dx + dy) / 600, DESIGN_LIMITS.chipScale.min, DESIGN_LIMITS.chipScale.max)) })
+        next = patch(d.start, x => { x.chip.scale = round2(clamp(d.start.chip.scale + (dx + dy) / 600, DESIGN_LIMITS.chipScale.min, heritageChipScaleMax(g, DESIGN_LIMITS.chipScale.max))) })
         break
       }
       case 'text-size': {
@@ -320,10 +323,16 @@ export default function LabelDesigner({
   const panelCls = 'space-y-3'
   const sectionCls = (k: Selection) => `rounded-xl border p-3 transition-colors ${sel(k) ? 'border-purple-400 bg-purple-50/40' : 'border-gray-200'}`
   // Sliders update the preview live and record/commit on press/release, so a
-  // drag is one undo step and one save.
-  const Range = (p: Omit<RangeProps, 'disabled' | 'onStart' | 'onEnd'>) => (
-    <RangeControl {...p} disabled={disabled} onStart={() => history.push(design)} onEnd={() => onCommit?.(design)} />
-  )
+  // drag is one undo step and one save. RangeControl is module-level: a
+  // wrapper component defined here would remount the <input> on every
+  // value change and kill the drag after its first tick.
+  const rangeExtras = { disabled, onStart: () => history.push(design), onEnd: () => onCommit?.(design) }
+  // Effective ceilings for THIS layout and sample: the geometry clamps the
+  // logo (text ceiling / column height) and the chip (label height), so the
+  // sliders stop exactly where the elements stop growing.
+  const logoLimit = design.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
+  const logoMax = heritage ? Math.max(logoLimit.min + 0.05, heritageLogoScaleMax(geom, fit)) : MODERN_LOGO_MAX_SCALE
+  const chipMax = heritageChipScaleMax(geom, DESIGN_LIMITS.chipScale.max)
 
   return (
     <div className={`grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] ${className}`} onKeyDown={onKeyDown} tabIndex={0}>
@@ -546,7 +555,7 @@ export default function LabelDesigner({
             )}
           </div>
           <div className="mt-2">
-            <Range label="Band width" value={design.band.width} min={DESIGN_LIMITS.bandWidth.min} max={DESIGN_LIMITS.bandWidth.max} step={DESIGN_LIMITS.bandWidth.step}
+            <RangeControl {...rangeExtras} label="Band width" value={design.band.width} min={DESIGN_LIMITS.bandWidth.min} max={DESIGN_LIMITS.bandWidth.max} step={DESIGN_LIMITS.bandWidth.step}
               onChange={v => onChange(patch(design, x => { x.band.width = v }))} />
           </div>
         </div>
@@ -580,15 +589,18 @@ export default function LabelDesigner({
             </div>
           </div>
           <div className="mt-2">
-            <Range label="Logo size" value={design.logo.scale}
-              min={design.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom.min : DESIGN_LIMITS.logoScaleSide.min}
-              max={design.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom.max : DESIGN_LIMITS.logoScaleSide.max}
+            <RangeControl {...rangeExtras} label="Logo size" value={Math.min(design.logo.scale, logoMax)}
+              min={logoLimit.min}
+              max={logoMax}
               step={DESIGN_LIMITS.logoScaleBottom.step}
               onChange={v => onChange(patch(design, x => { x.logo.scale = v }))} />
+            {logoMax < logoLimit.max - 0.01 && (
+              <p className="text-[11px] text-gray-400 mt-1">Tops out at {Math.round(logoMax * 100)}% here — that&apos;s as large as this layout can hold the logo on this card.</p>
+            )}
           </div>
           {heritage && (
             <div className="mt-2">
-              <Range label={design.logo.zone === 'bottom' ? 'Slide left / right' : 'Slide up / down'} suffix=""
+              <RangeControl {...rangeExtras} label={design.logo.zone === 'bottom' ? 'Slide left / right' : 'Slide up / down'} suffix=""
                 value={design.logo.zone === 'bottom' ? design.logo.offset.x : design.logo.offset.y}
                 min={-1} max={1} step={DESIGN_LIMITS.logoOffset.step}
                 onChange={v => onChange(patch(design, x => { if (x.logo.zone === 'bottom') x.logo.offset.x = v; else x.logo.offset.y = v }))} />
@@ -631,7 +643,7 @@ export default function LabelDesigner({
           </div>
           {heritage && (
             <div className="mt-2">
-              <Range label="Chip size" value={design.chip.scale} min={DESIGN_LIMITS.chipScale.min} max={DESIGN_LIMITS.chipScale.max} step={DESIGN_LIMITS.chipScale.step}
+              <RangeControl {...rangeExtras} label="Chip size" value={Math.min(design.chip.scale, chipMax)} min={DESIGN_LIMITS.chipScale.min} max={chipMax} step={DESIGN_LIMITS.chipScale.step}
                 onChange={v => onChange(patch(design, x => { x.chip.scale = v }))} />
             </div>
           )}
@@ -639,7 +651,7 @@ export default function LabelDesigner({
 
         <div className={`${sectionCls('text')} ${heritage ? '' : 'opacity-50 pointer-events-none'}`} onClick={() => setSelection('text')}>
           <div className="text-xs font-semibold text-gray-800 mb-2">Text</div>
-          <Range label="Text size" value={design.text.scale} min={DESIGN_LIMITS.textScale.min} max={DESIGN_LIMITS.textScale.max} step={DESIGN_LIMITS.textScale.step}
+          <RangeControl {...rangeExtras} label="Text size" value={design.text.scale} min={DESIGN_LIMITS.textScale.min} max={DESIGN_LIMITS.textScale.max} step={DESIGN_LIMITS.textScale.step}
             onChange={v => onChange(patch(design, x => { x.text.scale = v }))} />
           <p className="text-[11px] text-gray-400 mt-1">A request, not a guarantee: long names still shrink to fit.</p>
         </div>
@@ -659,9 +671,9 @@ export default function LabelDesigner({
                   onBlur={() => onCommit?.(design)}
                   className="w-9 h-8 border border-gray-300 rounded cursor-pointer" />
               </div>
-              <Range label="Thickness" suffix='"' value={design.border.width} min={DESIGN_LIMITS.borderWidth.min} max={DESIGN_LIMITS.borderWidth.max} step={DESIGN_LIMITS.borderWidth.step}
+              <RangeControl {...rangeExtras} label="Thickness" suffix='"' value={design.border.width} min={DESIGN_LIMITS.borderWidth.min} max={DESIGN_LIMITS.borderWidth.max} step={DESIGN_LIMITS.borderWidth.step}
                 onChange={v => onChange(patch(design, x => { x.border.width = v }))} />
-              <Range label="Inset from edge" suffix='"' value={design.border.inset} min={DESIGN_LIMITS.borderInset.min} max={DESIGN_LIMITS.borderInset.max} step={DESIGN_LIMITS.borderInset.step}
+              <RangeControl {...rangeExtras} label="Inset from edge" suffix='"' value={design.border.inset} min={DESIGN_LIMITS.borderInset.min} max={DESIGN_LIMITS.borderInset.max} step={DESIGN_LIMITS.borderInset.step}
                 onChange={v => onChange(patch(design, x => { x.border.inset = v }))} />
               <p className="text-[11px] text-gray-400">Label sheets cut with up to 0.5&nbsp;mm of drift — keep the inset at 0.05&quot; or more so the border prints evenly.</p>
             </div>
