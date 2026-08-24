@@ -5,6 +5,7 @@ import StorefrontRecentCards from './StorefrontRecentCards';
 import SerialLookup from './SerialLookup';
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS } from '@/lib/storefrontDefaults';
 import { orgSerialPrefix } from '@/lib/organizations';
+import { resolveOrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 export const revalidate = 300;
 
@@ -89,6 +90,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           bandColors={slabColors}
           labelStyle={c.slab?.label_style || 'heritage'}
           serialPrefix={serialPrefix}
+          design={resolveOrgLabelDesign(c)}
         />
       </section>
 

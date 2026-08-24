@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import { ORG_PLANS, ORG_OVERAGE_PACK } from '@/lib/orgPlans'
-import OrgLabelPreview from '@/components/labels/OrgLabelPreview'
+import LabelDesigner from '@/components/enterprise/LabelDesigner'
+import { resolveOrgLabelDesign, designToLegacySlab } from '@/lib/labels/orgLabelDesign'
 
 /** Mirror of orgSerialPrefix's name-derived fallback (first 3 alphanumerics). */
 const derivePrefix = (name: string) => ((name || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'ORG').slice(0, 3)
@@ -913,117 +914,17 @@ export default function OrganizationsAdminPage() {
 
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Slab design</h4>
-              <div className="mb-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500">Label style</label>
-                  <select value={sfContent.slab?.label_style || 'heritage'}
-                    onChange={e => setSfContent(prev => ({ ...prev, slab: { ...prev.slab, label_style: e.target.value as 'modern' | 'heritage' } }))}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm">
-                    <option value="heritage">Heritage (default)</option>
-                    <option value="modern">Modern</option>
-                  </select>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">The label design shown on this org&apos;s public card report pages and storefront mockup. Heritage is the default and uses the pattern and colors below.</p>
-              </div>
-              <div className="mb-3 flex items-center gap-2">
-                <label className="text-xs text-gray-500">Band color source</label>
-                <select
-                  value={(sfContent.slab?.colors?.length ?? 0) > 0 ? 'custom' : (sfContent.slab as any)?.color_source === 'card' ? 'card' : 'brand'}
-                  onChange={e => {
-                    const v = e.target.value
-                    setSfContent(prev => ({
-                      ...prev,
-                      slab: v === 'custom'
-                        ? { ...prev.slab, color_source: 'brand', colors: [...brandColors] } as any
-                        : { ...prev.slab, color_source: v as 'brand' | 'card', colors: [] } as any,
-                    }))
-                  }}
-                  className="border border-gray-300 rounded px-2 py-1 text-sm">
-                  <option value="brand">Org brand colors</option>
-                  <option value="card">Each card&apos;s own colors</option>
-                  <option value="custom">Custom colors</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className={`flex items-center gap-2 ${(sfContent.slab?.label_style || 'heritage') === 'modern' ? 'opacity-40' : ''}`}>
-                  <label className="text-xs text-gray-500">Pattern</label>
-                  <select value={sfContent.slab?.pattern || 'diamond'}
-                    onChange={e => setSfContent(prev => ({ ...prev, slab: { ...prev.slab, pattern: e.target.value } }))}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm">
-                    {BAND_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-xs text-gray-500">Colors</label>
-                  {(sfContent.slab?.colors?.length ?? 0) === 0 ? (
-                    // Empty = org brand colors; show the org palette greyed as a hint
-                    <>
-                      {brandColors.map((c, i) => (
-                        <input key={i} type="color" value={c} disabled
-                          className="w-8 h-8 border border-gray-300 rounded opacity-40 cursor-not-allowed" />
-                      ))}
-                      <span className="text-xs text-gray-400">org brand colors</span>
-                      <button
-                        onClick={() => setSfContent(prev => ({ ...prev, slab: { ...prev.slab, colors: [...brandColors] } }))}
-                        className="px-2 py-1 border border-gray-300 rounded text-xs hover:border-purple-400">
-                        Customize
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {(sfContent.slab?.colors || []).map((c, i) => (
-                        <div key={i} className="relative">
-                          <input type="color" value={c}
-                            onChange={e => setSfContent(prev => {
-                              const colors = [...(prev.slab?.colors || [])]
-                              colors[i] = e.target.value
-                              return { ...prev, slab: { ...prev.slab, colors } }
-                            })}
-                            className="w-8 h-8 border border-gray-300 rounded cursor-pointer" />
-                          <button
-                            onClick={() => setSfContent(prev => ({
-                              ...prev,
-                              slab: { ...prev.slab, colors: (prev.slab?.colors || []).filter((_, j) => j !== i) },
-                            }))}
-                            disabled={(sfContent.slab?.colors?.length ?? 0) <= 1}
-                            title="Remove color"
-                            className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-gray-600 text-white text-[10px] hover:bg-red-600 disabled:opacity-30 disabled:hover:bg-gray-600">
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {(sfContent.slab?.colors?.length ?? 0) < 5 && (
-                        <button
-                          onClick={() => setSfContent(prev => ({
-                            ...prev,
-                            slab: { ...prev.slab, colors: [...(prev.slab?.colors || []), '#7c3aed'] },
-                          }))}
-                          className="px-2 py-1 border border-gray-300 rounded text-xs hover:border-purple-400">
-                          + Add color
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setSfContent(prev => ({ ...prev, slab: { ...prev.slab, colors: [] } }))}
-                        className="text-xs text-purple-600 hover:text-purple-800 underline">
-                        Reset to default
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Live label preview — front + back, exactly what prints */}
-              <div className="mt-4 max-w-md">
-                <OrgLabelPreview
-                  orgName={selected.name}
-                  labelStyle={(sfContent.slab?.label_style || 'heritage') as 'heritage' | 'modern'}
-                  pattern={sfContent.slab?.pattern || 'diamond'}
-                  bandColors={(sfContent.slab?.colors?.length ?? 0) > 0 ? sfContent.slab!.colors! : brandColors}
-                  brandColor={brandColors[0] || '#7C3AED'}
-                  logos={{ color: logoPreviews.color ?? null, white: logoPreviews.white ?? null }}
-                  serialPrefix={selected.serial_prefix || derivePrefix(selected.name)}
-                />
-              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                The org&apos;s house label design — what prints on every slab label and shows on the public card pages and storefront mockup. Edits apply when you save the storefront.
+              </p>
+              <LabelDesigner
+                design={resolveOrgLabelDesign(sfContent)}
+                onChange={d => setSfContent(prev => ({ ...prev, slab: { ...prev.slab, ...designToLegacySlab(d), design: d } }))}
+                orgName={selected.name}
+                serialPrefix={selected.serial_prefix || derivePrefix(selected.name)}
+                brandColors={brandColors}
+                logos={{ color: logoPreviews.color ?? null, white: logoPreviews.white ?? null, black: logoPreviews.black ?? null }}
+              />
             </div>
 
             <button onClick={saveStorefront} disabled={sfSaving}

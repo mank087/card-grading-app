@@ -17,6 +17,7 @@ import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview';
 import type { BandPattern } from '@/lib/labelLab/bandGeometry';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
 import { DefectLegend } from '@/components/grading/DefectLegend';
@@ -54,6 +55,8 @@ export interface OrgCardReportProps {
   /** Heritage band design — pattern + resolved colors (>= 2 stops). */
   heritagePattern?: string;
   heritageBandColors?: string[];
+  /** Label Designer document (resolved by the page). */
+  design?: OrgLabelDesign | null;
 }
 
 /** The public slice of the cards row the report reads. Everything optional —
@@ -263,7 +266,7 @@ function isNoiseValue(v: string): boolean {
 
 export default function OrgCardReport({
   slug, orgName, brand, logos, logoScale = 1, frontUrl, backUrl, label, displaySerial, gradedOn, card,
-  labelStyle = 'modern', heritagePattern = 'diamond', heritageBandColors,
+  labelStyle = 'modern', heritagePattern = 'diamond', heritageBandColors, design = null,
 }: OrgCardReportProps) {
   // QR code target — this page's own URL (set client-side to avoid hydration mismatch)
   const [pageUrl, setPageUrl] = useState('');
@@ -341,6 +344,7 @@ export default function OrgCardReport({
     colorLogoHref: logos.mark ?? undefined,
     suppressImages: !logos.mark,
     logoScale,
+    design,
   };
 
   // ---- Card Information rows -------------------------------------------------
@@ -473,6 +477,8 @@ export default function OrgCardReport({
                     logoColorSrc={logos.mark}
                     logoWhiteSrc={logos.mark}
                     logoScale={logoScale}
+                    design={design}
+                    designBandColors={bandColors}
                     size="lg"
                   />
                 )}

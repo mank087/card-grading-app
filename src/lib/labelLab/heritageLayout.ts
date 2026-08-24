@@ -13,6 +13,7 @@
  * the px values directly inside a 1400x400 viewBox.
  */
 import { fitLines, widthOf, type FitResult } from './textFit'
+import { isStockLayout, type OrgLabelDesign, type BandPosition, type LogoZone } from '@/lib/labels/orgLabelDesign'
 
 // ---------------------------------------------------------------------------
 // Geometry (mockup px, 1400 x 400)
@@ -33,6 +34,146 @@ export const HERITAGE_PX = {
   GRADE_X: 700, GRADE_Y: 60, GRADE_W: 360,
   SUBS_RIGHT: 70, SUBS_TOP: 84, SUBS_W: 300,
 } as const
+
+// ---------------------------------------------------------------------------
+// Geometry engine (enterprise Label Designer)
+// ---------------------------------------------------------------------------
+/**
+ * Every front-label rect, derived from an org design document. With no
+ * document (consumers, orgs that never opened the designer) the output is the
+ * HERITAGE_PX constants above, number for number — the isolation gate
+ * (scripts/label-design-snapshot.ts) holds the renderers to that.
+ *
+ * The design is a set of BOUNDED choices; this function is where they become
+ * rects, and the rules that keep the label printable live here rather than in
+ * any renderer:
+ *   - the band (any edge, any width) and the optional border carve the
+ *     content rect; everything else lives inside it;
+ *   - the chip anchors to the content's right edge and caps at its height;
+ *   - a side-zone logo takes a square column and hands the text whatever
+ *     width is left — the fitter shrinks type, it never overlaps;
+ *   - the text stack gets a hard floor (maxBottom) so a short content rect
+ *     (top/bottom band) can never push the serial off the label.
+ */
+export interface Rect { x: number; y: number; w: number; h: number }
+
+export interface HeritageGeometry {
+  W: number; H: number
+  /** Inside the border stroke, or the whole label. */
+  outer: Rect
+  /** Stroke-centred rect + stroke width, mockup px. null = no border. */
+  border: (Rect & { width: number; color: string }) | null
+  band: Rect & { position: BandPosition; horizontal: boolean }
+  rule: Rect
+  /** Outer minus band + rule: where text, chip and mark live. */
+  content: Rect
+  text: { x: number; y: number; w: number; maxBottom: number; scale: number }
+  chip: { x: number; y: number; w: number; h: number; r: number; bw: number; scale: number }
+  logo: {
+    zone: LogoZone
+    /** The side column (left/right zones); null for the bottom strip. */
+    column: Rect | null
+    scale: number
+    offset: { x: number; y: number }
+    accentRules: boolean
+  }
+  /** Accent-bar anchors the fitter tests the serial against (content-relative). */
+  barTop: number
+  barLeft: number
+  /** Nothing in the document moves any stock rect. */
+  stock: boolean
+}
+
+/** Mockup px per inch (1400 px = 2.8"). */
+export const HERITAGE_PX_PER_INCH = 500
+
+export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeometry {
+  const PX = HERITAGE_PX
+  const W = PX.W, H = PX.H
+  const stock = isStockLayout(design)
+  const d = design ?? null
+
+  let outer: Rect = { x: 0, y: 0, w: W, h: H }
+  let border: HeritageGeometry['border'] = null
+  if (d?.border.enabled) {
+    const wPx = d.border.width * HERITAGE_PX_PER_INCH
+    const iPx = d.border.inset * HERITAGE_PX_PER_INCH
+    border = { x: iPx + wPx / 2, y: iPx + wPx / 2, w: W - 2 * (iPx + wPx / 2), h: H - 2 * (iPx + wPx / 2), width: wPx, color: d.border.color }
+    outer = { x: iPx + wPx, y: iPx + wPx, w: W - 2 * (iPx + wPx), h: H - 2 * (iPx + wPx) }
+  }
+
+  const bandW = PX.BAND_W * (d?.band.width ?? 1)
+  const position: BandPosition = d?.band.position ?? 'left'
+  const R = PX.RULE_W
+  let band: HeritageGeometry['band']
+  let rule: Rect
+  let content: Rect
+  switch (position) {
+    case 'right':
+      band = { x: outer.x + outer.w - bandW, y: outer.y, w: bandW, h: outer.h, position, horizontal: false }
+      rule = { x: band.x - R, y: outer.y, w: R, h: outer.h }
+      content = { x: outer.x, y: outer.y, w: outer.w - bandW - R, h: outer.h }
+      break
+    case 'top':
+      band = { x: outer.x, y: outer.y, w: outer.w, h: bandW, position, horizontal: true }
+      rule = { x: outer.x, y: outer.y + bandW, w: outer.w, h: R }
+      content = { x: outer.x, y: outer.y + bandW + R, w: outer.w, h: outer.h - bandW - R }
+      break
+    case 'bottom':
+      band = { x: outer.x, y: outer.y + outer.h - bandW, w: outer.w, h: bandW, position, horizontal: true }
+      rule = { x: outer.x, y: band.y - R, w: outer.w, h: R }
+      content = { x: outer.x, y: outer.y, w: outer.w, h: outer.h - bandW - R }
+      break
+    default:
+      band = { x: outer.x, y: outer.y, w: bandW, h: outer.h, position: 'left', horizontal: false }
+      rule = { x: outer.x + bandW, y: outer.y, w: R, h: outer.h }
+      content = { x: outer.x + bandW + R, y: outer.y, w: outer.w - bandW - R, h: outer.h }
+  }
+
+  // Chip: right-anchored, vertically centred with the stock 10px lift, capped
+  // at the content height so a top/bottom band can never clip it.
+  let cs = d?.chip.scale ?? 1
+  const chipCapH = content.h - 32
+  if (PX.CHIP_H * cs > chipCapH) cs = chipCapH / PX.CHIP_H
+  const chipW = PX.CHIP_W * cs
+  const chipH = PX.CHIP_H * cs
+  const chip = {
+    x: content.x + content.w - 30 - chipW,
+    y: content.y + (content.h - chipH) / 2 - 10 * (content.h / H),
+    w: chipW, h: chipH, r: PX.CHIP_R * cs, bw: PX.CHIP_BORDER * cs, scale: cs,
+  }
+
+  // Logo zone.
+  const zone: LogoZone = d?.logo.zone ?? 'bottom'
+  const logoScale = d?.logo.scale ?? 1
+  const offset = d?.logo.offset ?? { x: 0, y: 0 }
+  let column: Rect | null = null
+  let textX = content.x + 54
+  let textRight = chip.x - 40
+  if (zone === 'left' || zone === 'right') {
+    const side = Math.min(240 * logoScale, content.h - 48)
+    const colX = zone === 'left' ? content.x + 30 : chip.x - 30 - side
+    column = { x: colX, y: content.y + 24, w: side, h: content.h - 48 }
+    if (zone === 'left') textX = column.x + column.w + 30
+    else textRight = column.x - 30
+  }
+  const text = {
+    x: textX,
+    y: content.y + Math.min(50, content.h * 0.125),
+    w: textRight - textX,
+    maxBottom: content.y + content.h - 12,
+    scale: d?.text.scale ?? 1,
+  }
+
+  return {
+    W, H, outer, border, band, rule, content, text, chip,
+    logo: { zone, column, scale: logoScale, offset, accentRules: d?.logo.accentRules ?? true },
+    // Stock: bars at y 341 with the left bar's zone starting at x 438.
+    barTop: content.y + content.h - 59,
+    barLeft: content.x + 342,
+    stock,
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Theme
@@ -172,27 +313,46 @@ export function boldFitFactor(text: string): number {
   return 1.06 + 0.06 * (caps / letters)
 }
 
-export function fitHeritageFront(primaryName: string, contextLine: string, serial?: string): HeritageFrontFit {
-  const name = fitLines(primaryName, HERITAGE_PX.TEXT_BOX / boldFitFactor(primaryName), 84, 30, 3)
-  // Context floor is 24 (3.5pt at true size): below that an inkjet dithers the
-  // line into noise. The fitter never truncates — long lines wrap a row earlier.
-  const ctx = fitLines((contextLine || '').toUpperCase(), HERITAGE_PX.TEXT_BOX, 30, 24, 3, heritageCtxTracking)
-  // Approximate bottom of the stack: block top, name and context rows at their
-  // line heights, gap, divider (+margins), serial row.
-  const textBottom =
-    HERITAGE_PX.TEXT_Y +
+/** Bottom of a fitted stack: block top, name + context rows, gap, divider (+margins), serial row. */
+function stackBottom(top: number, name: FitResult, ctx: FitResult): number {
+  return (
+    top +
     name.rows.length * name.size * 1.06 +
     Math.max(name.size * 0.28, 18) +
     ctx.rows.length * ctx.size * 1.2 +
     (24 + 6) + (18 + 34 * 1.2)
+  )
+}
+
+export function fitHeritageFront(primaryName: string, contextLine: string, serial?: string, geom?: HeritageGeometry): HeritageFrontFit {
+  const g = geom ?? heritageGeometry(null)
+  let nameMax = Math.round(84 * g.text.scale)
+  let ctxMax = Math.round(30 * g.text.scale)
+  let name = fitLines(primaryName, g.text.w / boldFitFactor(primaryName), nameMax, 30, 3)
+  // Context floor is 24 (3.5pt at true size): below that an inkjet dithers the
+  // line into noise. The fitter never truncates — long lines wrap a row earlier.
+  let ctx = fitLines((contextLine || '').toUpperCase(), g.text.w, ctxMax, 24, 3, heritageCtxTracking)
+  // Approximate bottom of the stack: block top, name and context rows at their
+  // line heights, gap, divider (+margins), serial row.
+  let textBottom = stackBottom(g.text.y, name, ctx)
+  // Designer layouts with a short content rect (top/bottom band, border):
+  // step the maximum sizes down until the stack clears the floor. The stock
+  // stack never reaches it, so consumers never enter this loop.
+  while (textBottom > g.text.maxBottom && nameMax > 40) {
+    nameMax -= 6
+    ctxMax = Math.max(24, ctxMax - 1)
+    name = fitLines(primaryName, g.text.w / boldFitFactor(primaryName), nameMax, 30, 3)
+    ctx = fitLines((contextLine || '').toUpperCase(), g.text.w, ctxMax, 24, 3, heritageCtxTracking)
+    textBottom = stackBottom(g.text.y, name, ctx)
+  }
   // The logo accent bars only collide with the serial line if BOTH hold: the
   // stack reaches down into the bar row (bars sit at y 341-347), AND the
   // serial text extends rightward into the left bar's zone (bars start at
   // x 438). A blanket depth test hid the bars on every two-row-context label
   // even when the serial stopped 200px short of them.
-  const BAR_TOP = 341
-  const BAR_LEFT = 438
-  const serialRight = HERITAGE_PX.TEXT_X + widthOf(`Serial: ${serial ?? ''}`, 34, 2)
+  const BAR_TOP = g.barTop
+  const BAR_LEFT = g.barLeft
+  const serialRight = g.text.x + widthOf(`Serial: ${serial ?? ''}`, 34, 2)
   const vClear = textBottom + 6 <= BAR_TOP
   const hClear = serial != null && serialRight + 16 <= BAR_LEFT
   // The serial row is the only text the mark can sit BESIDE (it is short and
@@ -246,34 +406,68 @@ export function heritageRulesFit(fit: HeritageFrontFit, box: HeritageMarkBox): b
   return fit.rulesOk && box.ruleLeft >= fit.serialRight + 16
 }
 
-export function heritageMarkBox(scale: number, fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'> | number): HeritageMarkBox {
+export function heritageMarkBox(
+  scale: number,
+  fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'> | number,
+  geom?: HeritageGeometry,
+): HeritageMarkBox {
   // Number form kept for callers that only know the text bottom.
   const f = typeof fit === 'number'
     ? { textBottom: fit, serialRight: Number.POSITIVE_INFINITY, serialTop: fit }
     : fit
   const PX = HERITAGE_PX
+  const g = geom ?? heritageGeometry(null)
+
+  // Side columns (designer 'left' / 'right' zones): a square mark inside the
+  // column, slid vertically by the offset. No accent bars, no text ceiling —
+  // the column already reserved its width from the text box.
+  if (g.logo.column) {
+    const c = g.logo.column
+    const side = c.w
+    const travel = Math.max(0, (c.h - side) / 2)
+    const y = c.y + (c.h - side) / 2 + g.logo.offset.y * travel
+    return {
+      x: c.x, y, w: side, h: side,
+      ruleY: y + side / 2 - 3,
+      ruleLeft: Number.NEGATIVE_INFINITY, ruleRight: Number.POSITIVE_INFINITY, ruleLen: 0,
+      clamped: side < 240 * g.logo.scale - 0.5,
+    }
+  }
+
   const requested = Math.min(
     HERITAGE_LOGO_SCALE.max,
     Math.max(HERITAGE_LOGO_SCALE.min, Number.isFinite(scale) ? scale : 1)
   )
   const baseW = PX.MARK_W * PX.MARK_SCALE
   const baseH = PX.MARK_H * PX.MARK_SCALE
+  const content = g.content
   // Baseline the mark sits on: bottom of the historic slot.
-  const bottom = PX.H - PX.MARK_BOTTOM - (PX.MARK_H - baseH) / 2
+  const bottom = content.y + content.h - PX.MARK_BOTTOM - (PX.MARK_H - baseH) / 2
   // Ceiling: 10px of air under the text stack, never above y=232 (the mark
   // must stay a bottom-strip element even when the card has a one-line name).
   // Two ceilings. STRICT keeps the mark under the whole text stack. RELAXED
   // lets it rise alongside the serial — legal only when the mark is clear of
   // the serial horizontally, which depends on the mark's own width, so solve
   // with the relaxed ceiling first and fall back if the result overlaps.
-  const strict = Math.max(232, f.textBottom + 10)
-  const relaxed = Math.max(232, f.serialTop + 4)
+  const floor = content.y + 232 * (content.h / PX.H)
+  const strict = Math.max(floor, f.textBottom + 10)
+  const relaxed = Math.max(floor, f.serialTop + 4)
   const wantH = baseH * requested
+  // Centred on the LABEL (not the content rect): "bottom-centre" reads as the
+  // physical centre whichever edge the band sits on. The designer offset
+  // slides it toward the band-side padding or the chip, never under either.
   const solve = (ceiling: number) => {
     const maxH = Math.max(baseH * HERITAGE_LOGO_SCALE.min, bottom - ceiling)
     const hh = Math.min(wantH, maxH)
     const ww = baseW * (hh / baseH)
-    return { hh, ww, xx: (PX.W - ww) / 2 }
+    let xx = (g.outer.w - ww) / 2 + g.outer.x
+    if (g.logo.offset.x !== 0) {
+      const leftLimit = content.x + 24
+      const rightLimit = g.chip.x - 16 - ww
+      const travel = g.logo.offset.x > 0 ? Math.max(0, rightLimit - xx) : Math.max(0, xx - leftLimit)
+      xx += g.logo.offset.x * travel
+    }
+    return { hh, ww, xx }
   }
   let { hh: h, ww: w, xx: x } = solve(relaxed)
   if (x < f.serialRight + 16) ({ hh: h, ww: w, xx: x } = solve(strict))

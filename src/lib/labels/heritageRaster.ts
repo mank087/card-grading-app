@@ -22,7 +22,8 @@ import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import type { BandPattern } from '@/lib/labelLab/bandGeometry'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
-import { HERITAGE_PX, heritageMarkBox, fitHeritageFront } from '@/lib/labelLab/heritageLayout'
+import { HERITAGE_PX, heritageMarkBox, fitHeritageFront, heritageGeometry } from '@/lib/labelLab/heritageLayout'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 export interface HeritageRasterOptions {
   data: SlabLabelData
@@ -40,6 +41,8 @@ export interface HeritageRasterOptions {
   logoBlack?: string
   /** Mark size multiplier from Brand Setup; clamped per card by heritageMarkBox. */
   logoScale?: number
+  /** Enterprise Label Designer document; absent = stock layout. */
+  design?: OrgLabelDesign | null
 }
 
 function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): string {
@@ -57,6 +60,7 @@ function svgMarkup(opts: HeritageRasterOptions, blackLogo: string | null): strin
     // them here; renderHeritageLabelPng composites the bitmaps natively.
     suppressImages: true,
     logoScale: opts.logoScale ?? 1,
+    design: opts.design ?? null,
   })
   const host = document.createElement('div')
   const root = createRoot(host)
@@ -132,31 +136,40 @@ async function compositeBitmaps(
   k: number,
 ): Promise<void> {
   const PX = HERITAGE_PX
+  const geom = heritageGeometry(opts.design)
   if (opts.side === 'front') {
     const mark = await loadBitmap(blackLogo || opts.data.logoDataUrl || '')
     if (mark) {
       // Same geometry helper the SVG and the PDF use, so the rasterized
       // label matches what Brand Setup previewed.
-      const fit = fitHeritageFront(opts.data.primaryName || 'Card', opts.data.contextLine || '', opts.data.serial)
-      const box = heritageMarkBox(opts.logoScale ?? 1, fit)
+      const fit = fitHeritageFront(opts.data.primaryName || 'Card', opts.data.contextLine || '', opts.data.serial, geom)
+      const box = heritageMarkBox(geom.logo.zone === 'bottom' ? (opts.logoScale ?? 1) : geom.logo.scale, fit, geom)
       drawContain(ctx, mark, box.x * k, box.y * k, box.w * k, box.h * k)
     }
     return
   }
   if (!opts.data.qrCodeDataUrl) return
+  // The back is authored against the stock content rect; a designer layout
+  // remaps it uniformly (same transform as HeritageLabelPreview's BackSide).
+  const c = geom.content
+  const STOCK_X = PX.BAND_W + PX.RULE_W
+  const kb = Math.min(c.w / (PX.W - STOCK_X), c.h / PX.H)
+  const bx = (x: number) => (c.x + (x - STOCK_X) * kb) * k
+  const by = (y: number) => (c.y + y * kb) * k
+  const bs = (v: number) => v * kb * k
   const qr = await loadBitmap(opts.data.qrCodeDataUrl)
   if (qr) {
-    ctx.drawImage(qr, (PX.QR_X + 8) * k, (PX.QR_Y + 8) * k, PX.QR_IMG * k, PX.QR_IMG * k)
+    ctx.drawImage(qr, bx(PX.QR_X + 8), by(PX.QR_Y + 8), bs(PX.QR_IMG), bs(PX.QR_IMG))
   }
   const logo = await loadBitmap(opts.data.logoDataUrl || '')
-  const cx = (PX.QR_X + PX.QR_BOX / 2) * k
-  const cy = (PX.QR_Y + PX.QR_BOX / 2) * k
+  const cx = bx(PX.QR_X + PX.QR_BOX / 2)
+  const cy = by(PX.QR_Y + PX.QR_BOX / 2)
   ctx.fillStyle = '#FFFFFF'
   ctx.beginPath()
-  ctx.arc(cx, cy, (PX.QR_LOGO_DISC / 2) * k, 0, Math.PI * 2)
+  ctx.arc(cx, cy, bs(PX.QR_LOGO_DISC / 2), 0, Math.PI * 2)
   ctx.fill()
   if (logo) {
-    const box = PX.QR_LOGO * k
+    const box = bs(PX.QR_LOGO)
     drawContain(ctx, logo, cx - box / 2, cy - box / 2, box, box)
   }
 }

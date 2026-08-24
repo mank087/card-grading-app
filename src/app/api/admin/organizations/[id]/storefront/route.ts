@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import type { StorefrontContent } from '@/app/enterprise/[slug]/data'
+import { normalizeOrgLabelDesign, designToLegacySlab, type LegacySlabKeys } from '@/lib/labels/orgLabelDesign'
 import sharp from 'sharp'
 
 export const runtime = 'nodejs'
@@ -161,6 +162,26 @@ function validateContent(orgId: string, raw: unknown): { error: string } | { con
       }
       slab.colors = slabIn.colors as string[]
     }
+    if (slabIn.logo_variant !== undefined) {
+      if (!['color', 'black', 'white'].includes(slabIn.logo_variant as string)) {
+        return { error: 'slab.logo_variant must be one of: color, black, white' }
+      }
+      slab.logo_variant = slabIn.logo_variant as 'color' | 'black' | 'white'
+    }
+    if (slabIn.logo_scale !== undefined) {
+      const n = Number(slabIn.logo_scale)
+      if (!Number.isFinite(n) || n < 0.5 || n > 2) return { error: 'slab.logo_scale must be between 0.5 and 2' }
+      slab.logo_scale = n
+    }
+    if (slabIn.design !== undefined && slabIn.design !== null) {
+      if (typeof slabIn.design !== 'object' || Array.isArray(slabIn.design)) {
+        return { error: 'slab.design must be an object' }
+      }
+      // Bounded document: clamped + whitelisted by the shared normalizer. The
+      // legacy keys are re-derived from it below so the two never disagree.
+      const design = normalizeOrgLabelDesign(slabIn.design, slab as LegacySlabKeys)
+      Object.assign(slab, designToLegacySlab(design), { design })
+    }
     content.slab = slab
   }
 
@@ -192,8 +213,33 @@ export async function PATCH(
   if (body.storefront !== undefined) {
     const result = validateContent(params.id, body.storefront)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: 400 })
-    // Shallow-merge over the stored blob so partial saves don't wipe fields
+    // Shallow-merge over the stored blob so partial saves don't wipe fields.
+    // `slab` merges one level deeper: the admin console edits pattern /
+    // colours / style without knowing about the owner's Brand Setup mark
+    // settings or Label Designer document, which must survive the save.
     updates.storefront = { ...current.content, ...result.content }
+    if (result.content.slab) {
+      const mergedSlab = { ...(current.content.slab || {}), ...result.content.slab }
+      // Keep the document coherent with whatever flat keys the admin changed.
+      if (mergedSlab.design && !result.content.slab.design) {
+        const design = normalizeOrgLabelDesign({
+          ...mergedSlab.design,
+          base: mergedSlab.label_style ?? mergedSlab.design.base,
+          band: {
+            ...mergedSlab.design.band,
+            ...(result.content.slab.pattern ? { pattern: result.content.slab.pattern } : {}),
+            ...(result.content.slab.colors !== undefined
+              ? { colors: result.content.slab.colors, colorSource: result.content.slab.colors.length ? 'custom' : (mergedSlab.color_source === 'card' ? 'card' : 'brand') }
+              : {}),
+            ...(result.content.slab.color_source && !(result.content.slab.colors?.length)
+              ? { colorSource: result.content.slab.color_source }
+              : {}),
+          },
+        }, mergedSlab)
+        Object.assign(mergedSlab, designToLegacySlab(design), { design })
+      }
+      updates.storefront.slab = mergedSlab
+    }
   }
 
   if (Object.keys(updates).length === 0) {

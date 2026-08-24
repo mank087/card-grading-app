@@ -17,6 +17,7 @@ import ModernFrontLabel from '@/components/labels/ModernFrontLabel'
 import ModernBackLabel from '@/components/labels/ModernBackLabel'
 import type { BandPattern } from '@/lib/labelLab/bandGeometry'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 interface OrgLabelPreviewProps {
   orgName: string
@@ -34,12 +35,16 @@ interface OrgLabelPreviewProps {
   /** Serial prefix for the sample serial (e.g. APX → APX442921). */
   serialPrefix: string
   className?: string
+  /** Label Designer document; null = the stock layout the flat settings describe. */
+  design?: OrgLabelDesign | null
+  /** Override the sample card (the designer's short / typical / worst-case picks). */
+  sample?: { primaryName: string; contextLine: string; grade: number | null; condition: string }
 }
 
 const SAMPLE_SUBS = { centering: 9.5, corners: 9, edges: 9.5, surface: 9 }
 
 export default function OrgLabelPreview({
-  orgName, labelStyle, pattern, bandColors, logos, serialPrefix, className = '', logoVariant = 'color', logoScale = 1,
+  orgName, labelStyle, pattern, bandColors, logos, serialPrefix, className = '', logoVariant = 'color', logoScale = 1, design = null, sample,
 }: OrgLabelPreviewProps) {
   const serial = `${serialPrefix || 'ORG'}442921`
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
@@ -58,18 +63,20 @@ export default function OrgLabelPreview({
     return () => { cancelled = true }
   }, [labelStyle, serial])
 
+  const s = sample ?? { primaryName: 'Aaron Judge', contextLine: 'Bowman Chrome • #99 • 2023', grade: 9, condition: 'Mint' }
   const heritageData = useMemo(() => ({
-    primaryName: 'Aaron Judge',
-    contextLine: 'Bowman Chrome • #99 • 2023',
+    primaryName: s.primaryName,
+    contextLine: s.contextLine,
     features: [],
     featuresLine: null,
     serial,
-    grade: 9,
-    gradeFormatted: '9',
-    condition: 'Mint',
+    grade: s.grade,
+    gradeFormatted: s.grade == null ? 'A' : String(s.grade),
+    condition: s.condition,
+    isAlteredAuthentic: s.grade == null,
     qrCodeDataUrl: qrDataUrl,
     subScores: SAMPLE_SUBS,
-  }) as unknown as SlabLabelData, [serial, qrDataUrl])
+  }) as unknown as SlabLabelData, [serial, qrDataUrl, s.primaryName, s.contextLine, s.grade, s.condition])
 
   // The variant the store chose for its mark, falling back to the color logo
   // when that variant hasn't been generated (older uploads predate the
@@ -92,6 +99,7 @@ export default function OrgLabelPreview({
               colorLogoHref={mark ?? undefined}
               suppressImages={!mark}
               logoScale={logoScale}
+              design={design}
             />
           </div>
           <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">
@@ -103,6 +111,7 @@ export default function OrgLabelPreview({
               blackLogoHref={mark ?? undefined}
               colorLogoHref={mark ?? undefined}
               suppressImages={!mark}
+              design={design}
             />
           </div>
         </>
@@ -113,22 +122,25 @@ export default function OrgLabelPreview({
               org logo in the logo slot. */}
           <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">
             <ModernFrontLabel
-              displayName="Aaron Judge"
-              setLineText="#99 Bowman Chrome"
+              displayName={s.primaryName}
+              setLineText={s.contextLine}
               serial={serial}
-              grade={9}
-              condition="Mint"
+              grade={s.grade}
+              condition={s.condition}
+              isAlteredAuthentic={s.grade == null}
               size="lg"
               logoColorSrc={mark}
               logoWhiteSrc={mark}
               logoScale={logoScale}
+              design={design}
+              designBandColors={safeBand}
             />
           </div>
           <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">
             <ModernBackLabel
               serial={serial}
-              grade={9}
-              condition="Mint"
+              grade={s.grade}
+              condition={s.condition}
               qrCodeUrl={`https://dcmgrading.com/verify/${serial}`}
               qrLogoSrc={logos.color}
               subScores={SAMPLE_SUBS}

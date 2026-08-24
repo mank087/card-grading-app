@@ -465,6 +465,7 @@ function CollectionPageContent() {
             ? orgMembership.logos.black
             : orgMembership.logos.color) ?? orgMembership.logos.color,
         scale: orgMembership.slab?.logoScale || 1,
+        design: orgMembership.slab?.design ?? null,
       }
     : null
   const scope: 'mine' | 'store' = isOrgScope ? 'store' : 'mine'
@@ -2767,6 +2768,7 @@ function CollectionPageContent() {
                   orgLogoColor={card.org_id ? orgLogos?.mark ?? null : null}
                   orgLogoWhite={card.org_id ? orgLogos?.mark ?? null : null}
                   orgLogoScale={card.org_id ? orgLogos?.scale ?? 1 : 1}
+                  orgDesign={card.org_id ? orgLogos?.design ?? null : null}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility & Price Badges */}

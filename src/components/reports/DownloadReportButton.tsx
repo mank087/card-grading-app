@@ -27,6 +27,7 @@ import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { useOrgContext } from '@/contexts/OrgContext';
 
 /**
@@ -357,9 +358,11 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // QR-disc policy: the centre disc always carries the COLOR logo — a
       // white Brand Setup mark would vanish on the white disc.
       let orgQrDiscLogo: string | undefined;
+      let orgDesign: OrgLabelDesign | null = null;
       if ((card as any)?.org_id) {
         try {
           const logos = await loadLogosForCard(card.id);
+          orgDesign = logos.design;
           if (logos.branding) {
             orgReportBranding = {
               name: logos.branding.name,
@@ -439,7 +442,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         heritage: (() => {
           const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
           return sel.active
-            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
+            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors, chipTheme: orgDesign?.chip.theme }
             : undefined;
         })(),
         org: orgReportBranding,
@@ -863,6 +866,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         logoOverrides: orgLogoSetImages?.branding
           ? { color: orgLogoSetImages.color, white: orgLogoSetImages.white, black: orgLogoSetImages.black, mark: orgLogoSetImages.mark, scale: orgLogoSetImages.logoScale }
           : undefined,
+        orgDesign: orgLogoSetImages?.design ?? null,
       };
 
       console.log('[CARD IMAGES] Generating images with data:', {

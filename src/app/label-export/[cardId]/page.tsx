@@ -204,7 +204,7 @@ export default function LabelExportPage() {
         // Org branding: store logos when the card was graded under an
         // enterprise org, DCM logos otherwise (per-asset fallback inside).
         const logos: OrgLogoSet = await loadLogosForCard(cardId)
-          .catch(() => ({ color: '', white: '', black: '', mark: '', logoScale: 1, branding: null }));
+          .catch(() => ({ color: '', white: '', black: '', mark: '', logoScale: 1, design: null, branding: null }));
 
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
@@ -258,6 +258,7 @@ export default function LabelExportPage() {
             showVipEmblem,
             showCardLoversEmblem,
             logoOverrides: logos.branding ? { color: logos.color, white: logos.white, black: logos.black, mark: logos.mark, scale: logos.logoScale } : undefined,
+            orgDesign: logos.design,
           };
           const { front, back } = await generateCardImages(imageData);
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
@@ -336,7 +337,7 @@ export default function LabelExportPage() {
               const cfg = savedCustomStyles.find(st => st.id === labelStyleParam)?.config || null;
               const sel = resolveHeritageSelection(labelStyleParam, cfg);
               return sel.active
-                ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors }
+                ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: sel.gradeColors, chipTheme: logos.design?.chip.theme }
                 : undefined;
             })(),
             org: logos.branding ? { name: logos.branding.name, logoDataUrl: logos.mark || null } : undefined,
@@ -465,6 +466,7 @@ export default function LabelExportPage() {
             bandColors: (sel.active ? sel.bandColors : null) ?? null,
             pattern: (sp.get('heritagePattern') || (sel.active ? sel.pattern : null) || 'diamond') as any,
             wordmarkDataUrl: await loadWordmarkDataUrl(),
+            chipTheme: logos.design?.chip.theme,
           })];
           const blob =
             type === 'onetouch' ? await sheets.generateHeritageOneTouchSheet(items, undefined, [position])
@@ -631,6 +633,7 @@ export default function LabelExportPage() {
             gradeColors: sel.gradeColors,
             logoBlack: logos.branding ? logos.mark : undefined,
             logoScale: logos.logoScale,
+            design: logos.design,
             // Org cards carry an ORG serial that /verify/[serial] doesn't
             // match — the printed QR must target the branded card page.
             qrUrl: cardQrUrl(cardId, card.serial, logos.branding),

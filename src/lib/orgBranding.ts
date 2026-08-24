@@ -10,6 +10,7 @@ import {
   loadWhiteLogoAsBase64,
   loadBlackLogoAsBase64,
 } from '@/lib/foldableLabelGenerator';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 export interface OrgBrandingClient {
   orgId: string;
@@ -22,6 +23,8 @@ export interface OrgBrandingClient {
   /** Brand Setup label-mark settings. */
   logoVariant?: 'color' | 'black' | 'white';
   logoScale?: number;
+  /** Label Designer document (enterprise only); absent on older payloads. */
+  design?: OrgLabelDesign | null;
 }
 
 /**
@@ -54,6 +57,11 @@ export interface OrgLogoSet {
   mark: string;
   /** Mark size multiplier from Brand Setup; 1 for DCM and unset orgs. */
   logoScale: number;
+  /**
+   * The store's Label Designer document, or null for DCM. Pass it to every
+   * heritage renderer alongside the logos; consumers always get null.
+   */
+  design: OrgLabelDesign | null;
   /** Present when the logos are a store's, not DCM's. */
   branding: OrgBrandingClient | null;
 }
@@ -112,7 +120,7 @@ export async function loadLogosForCard(cardId?: string | null): Promise<OrgLogoS
   ]);
 
   if (!branding) {
-    return { color: dcmColor, white: dcmWhite, black: dcmBlack, mark: dcmColor, logoScale: 1, branding: null };
+    return { color: dcmColor, white: dcmWhite, black: dcmBlack, mark: dcmColor, logoScale: 1, design: null, branding: null };
   }
 
   const [orgColor, orgWhite, orgBlack] = await Promise.all([
@@ -130,6 +138,7 @@ export async function loadLogosForCard(cardId?: string | null): Promise<OrgLogoS
     black: orgBlack ?? dcmBlack,
     mark,
     logoScale: branding.logoScale && branding.logoScale > 0 ? branding.logoScale : 1,
+    design: branding.design ?? null,
     branding,
   };
 }

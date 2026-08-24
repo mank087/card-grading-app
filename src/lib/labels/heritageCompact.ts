@@ -30,7 +30,7 @@
  */
 import { bandGeometry, type BandPattern } from '@/lib/labelLab/bandGeometry'
 import { EMBLEMS, EMBLEM_ORDER } from '@/lib/labelLab/emblemShapes'
-import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS } from '@/lib/labelPresets'
+import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK, type GradeChipTheme } from '@/lib/labelPresets'
 
 /** Print-hardened Heritage theme — these labels exist to be printed. */
 const FIELD = '#FFFFFF'
@@ -65,6 +65,12 @@ export interface HeritageCompactInputs {
   showFounderEmblem?: boolean
   showVipEmblem?: boolean
   showCardLoversEmblem?: boolean
+  /**
+   * Enterprise Label Designer chip colourway. The small holders have no room
+   * for the designer's band/logo moves, so the chip theme is the one design
+   * choice they honour; absent = the stock black chip.
+   */
+  chipTheme?: GradeChipTheme
 }
 
 // ---------------------------------------------------------------------------
@@ -157,8 +163,8 @@ function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
 }
 
 /** Grade chip: black plate, grade-coloured numeral + keyline (print ramp). */
-function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, grade: string) {
-  const chipSpec = resolveGradeChip(grade, true)
+function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, grade: string, theme: GradeChipTheme = 'black') {
+  const chipSpec = resolveGradeChip(grade, true, theme)
   const numeral = chipSpec.grade === 0 ? 'A' : String(chipSpec.grade)
   const isTen = chipSpec.grade === 10
   const stroke = Math.max(w * 0.025, 1)
@@ -169,7 +175,7 @@ function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
     paint = g
   }
   roundRectPath(ctx, x + stroke / 2, y + stroke / 2, w - stroke, h - stroke, h * 0.11)
-  ctx.fillStyle = GRADE_CHIP_BLACK
+  ctx.fillStyle = chipSpec.fill
   ctx.fill()
   ctx.strokeStyle = paint as any
   ctx.lineWidth = stroke
@@ -182,7 +188,9 @@ function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 
   const labSize = Math.max(h * 0.125, 4)
   ctx.font = `700 ${labSize}px ${FONT}`
-  ctx.fillStyle = '#F4EFE4'
+  // Stock: ivory knockout on black. White theme: dark ink, the numeral's own
+  // colour for a solid grade, near-black under a foil 10.
+  ctx.fillStyle = chipSpec.keyline ? (isTen ? GRADE_CHIP_WHITE_LABEL_INK : chipSpec.ink) : '#F4EFE4'
   const label = chipSpec.label
   // Shrink the label rather than let it run outside the chip.
   let ls = labSize
@@ -256,7 +264,7 @@ export async function renderOneTouchFront(i: HeritageCompactInputs, dpi: number)
   trackedText(ctx, `Serial: ${i.serial}`, tx, H * 0.675, serSize * 0.06)
 
   const chipW = W * 0.171, chipH = H * 0.63
-  drawChip(ctx, W - chipW - W * 0.021, (H - chipH) / 2 - H * 0.03, chipW, chipH, i.grade)
+  drawChip(ctx, W - chipW - W * 0.021, (H - chipH) / 2 - H * 0.03, chipW, chipH, i.grade, i.chipTheme)
 
   const markH = H * 0.135
   const markW = markH * WORDMARK_AR
@@ -345,7 +353,7 @@ export async function renderToploaderFront(i: HeritageCompactInputs, dpi: number
   await drawWordmark(ctx, i.wordmarkDataUrl, tx, H * 0.78, H * 0.15)
 
   const chipW = W * 0.185, chipH = H * 0.68
-  drawChip(ctx, W - chipW - W * 0.022, (H - chipH) / 2, chipW, chipH, i.grade)
+  drawChip(ctx, W - chipW - W * 0.022, (H - chipH) / 2, chipW, chipH, i.grade, i.chipTheme)
 
   return c
 }
@@ -402,7 +410,7 @@ export async function renderFoldFront(i: HeritageCompactInputs, dpi: number): Pr
   ctx.fillStyle = RULE; ctx.fillRect(0, bh, W, rh)
 
   const chipW = W * 0.66, chipH = chipW * 1.05
-  drawChip(ctx, (W - chipW) / 2, H * 0.16, chipW, chipH, i.grade)
+  drawChip(ctx, (W - chipW) / 2, H * 0.16, chipW, chipH, i.grade, i.chipTheme)
 
   // Wordmark sits high enough that its box clears the serial's ascenders —
   // at 0.5" wide there is no room to recover from a collision.

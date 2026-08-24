@@ -22,6 +22,7 @@ import { getOrgForUser, getOrgBranding, orgSerialPrefix } from '@/lib/organizati
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
 import { HERITAGE_LOGO_SCALE } from '@/lib/labelLab/heritageLayout'
+import { resolveOrgLabelDesign, normalizeOrgLabelDesign, designToLegacySlab } from '@/lib/labels/orgLabelDesign'
 import { findGraderBrandToken, escapeHtml } from '@/lib/orgSlugs'
 import { Resend } from 'resend'
 import sharp from 'sharp'
@@ -106,6 +107,8 @@ export async function GET(request: NextRequest) {
         colorSource: storefront.slab?.color_source === 'card' ? 'card' : 'brand',
         logoVariant: LOGO_VARIANTS.includes(storefront.slab?.logo_variant) ? storefront.slab.logo_variant : 'color',
         logoScale: clampLogoScale(storefront.slab?.logo_scale),
+        /** Label Designer document — resolved, so the editor always gets a full shape. */
+        design: resolveOrgLabelDesign(storefront),
       },
       storefrontEnabled: Boolean((org as any).storefront_enabled),
       // null = section uses the shared defaults; [] = hidden; else custom.
@@ -243,23 +246,33 @@ export async function PATCH(request: NextRequest) {
   }
 
   // ---- Slab design (replaced wholesale, same as the admin route) ----
+  // Two writers share this block: the classic Brand Setup controls (flat
+  // keys) and the Label Designer (`slab.design`, a full document). Either way
+  // the stored shape is the legacy keys PLUS the document, kept in sync, so
+  // every older reader of the keys and every designer-aware renderer agree.
   if (body.slab !== undefined) {
     const slab = body.slab || {}
-    const labelStyle = slab.labelStyle === 'modern' ? 'modern' : 'heritage'
-    const pattern = BAND_PATTERNS.some(p => p.id === slab.pattern) ? slab.pattern : 'diamond'
-    const colors = Array.isArray(slab.colors)
-      ? slab.colors.filter((c: unknown) => typeof c === 'string' && HEX_RE.test(c)).slice(0, 5)
-      : []
-    const colorSource = slab.colorSource === 'card' ? 'card' : 'brand'
-    const logoVariant = LOGO_VARIANTS.includes(slab.logoVariant) ? slab.logoVariant : 'color'
-    storefrontPatch.slab = {
-      label_style: labelStyle,
-      pattern,
-      colors,
-      color_source: colorSource,
-      logo_variant: logoVariant,
-      logo_scale: clampLogoScale(slab.logoScale),
+    const storedSlab = (((org as any).storefront || {}) as Record<string, any>).slab || null
+    let design
+    if (slab.design !== undefined && slab.design !== null) {
+      design = normalizeOrgLabelDesign(slab.design, storedSlab)
+    } else {
+      const labelStyle = slab.labelStyle === 'modern' ? 'modern' : 'heritage'
+      const pattern = BAND_PATTERNS.some(p => p.id === slab.pattern) ? slab.pattern : 'diamond'
+      const colors = Array.isArray(slab.colors)
+        ? slab.colors.filter((c: unknown) => typeof c === 'string' && HEX_RE.test(c)).slice(0, 5)
+        : []
+      const colorSource = slab.colorSource === 'card' ? 'card' : 'brand'
+      const logoVariant = LOGO_VARIANTS.includes(slab.logoVariant) ? slab.logoVariant : 'color'
+      const current = resolveOrgLabelDesign((org as any).storefront)
+      design = normalizeOrgLabelDesign({
+        ...current,
+        base: labelStyle,
+        band: { ...current.band, pattern, colorSource: colors.length ? 'custom' : colorSource, colors },
+        logo: { ...current.logo, variant: logoVariant, scale: clampLogoScale(slab.logoScale) },
+      }, storedSlab)
     }
+    storefrontPatch.slab = { ...designToLegacySlab(design), design }
   }
 
   // ---- How it works / FAQ (null = defaults, [] = hidden) ----

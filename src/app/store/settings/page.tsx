@@ -20,9 +20,21 @@ import Link from 'next/link'
 import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS, HowItWorksStep, FaqEntry } from '@/lib/storefrontDefaults'
-import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
-import OrgLabelPreview from '@/components/labels/OrgLabelPreview'
-import { HERITAGE_LOGO_SCALE as LOGO_SCALE } from '@/lib/labelLab/heritageLayout'
+import LabelDesigner from '@/components/enterprise/LabelDesigner'
+import { designToLegacySlab, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+
+/** The flat Brand Setup fields a design implies (mirrors what the API stores). */
+function slabFromDesign(d: OrgLabelDesign) {
+  const l = designToLegacySlab(d)
+  return {
+    labelStyle: l.label_style as 'heritage' | 'modern',
+    pattern: l.pattern,
+    colors: l.colors,
+    colorSource: l.color_source as 'brand' | 'card',
+    logoVariant: l.logo_variant as 'color' | 'black' | 'white',
+    logoScale: l.logo_scale,
+  }
+}
 
 const SOCIAL_KEYS = ['instagram', 'facebook', 'tiktok', 'youtube', 'x'] as const
 
@@ -56,6 +68,8 @@ interface Settings {
     logoVariant: 'color' | 'black' | 'white'
     /** Mark size multiplier; the renderer clamps it per card so it can't clip. */
     logoScale: number
+    /** The Label Designer document (always resolved by the API). */
+    design: OrgLabelDesign
   }
   storefrontEnabled: boolean
   howItWorks: HowItWorksStep[] | null
@@ -229,8 +243,6 @@ function StoreSettingsContent() {
     )
   }
 
-  const slabColors = settings.slab.colors.length > 0 ? settings.slab.colors : settings.brandColors
-  const brandPrimary = settings.brandColors[0] || '#7C3AED'
 
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
@@ -363,166 +375,21 @@ function StoreSettingsContent() {
           <p className="text-xs text-gray-400">First color is your primary accent on card pages and labels.</p>
         </div>
 
-        {/* Slab label design + live preview */}
+        {/* Slab label design — the enterprise Label Designer */}
         <div className="bg-white rounded-2xl shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Slab label design</h2>
           <p className="text-xs text-gray-400 mb-4">
-            The design printed on every slab label your account grades, and shown on your public card pages.
+            The design printed on every slab label your account grades, and shown on your public card pages. Changes save as you make them.
           </p>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4">
-              <div>
-                <label className={labelCls}>Label style</label>
-                <select value={settings.slab.labelStyle} className={inputCls}
-                  onChange={e => {
-                    const slab = { ...settings.slab, labelStyle: e.target.value as 'heritage' | 'modern' }
-                    saveAnd({ slab }, { slab }, 'Label style saved')
-                  }}>
-                  <option value="heritage">Heritage (default)</option>
-                  <option value="modern">Modern</option>
-                </select>
-              </div>
-              {settings.slab.labelStyle === 'heritage' && (
-                <>
-                  <div>
-                    <label className={labelCls}>Band pattern</label>
-                    <select value={settings.slab.pattern} className={inputCls}
-                      onChange={e => {
-                        const slab = { ...settings.slab, pattern: e.target.value }
-                        saveAnd({ slab }, { slab }, 'Pattern saved')
-                      }}>
-                      {BAND_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Band colors</label>
-                    <select
-                      value={settings.slab.colors.length > 0 ? 'custom' : settings.slab.colorSource}
-                      className={inputCls + ' mb-2'}
-                      onChange={e => {
-                        const v = e.target.value
-                        const slab = v === 'custom'
-                          ? { ...settings.slab, colorSource: 'brand' as const, colors: settings.brandColors.slice(0, 5) }
-                          : { ...settings.slab, colorSource: v as 'brand' | 'card', colors: [] }
-                        saveAnd({ slab }, { slab }, 'Band colors saved')
-                      }}
-                    >
-                      <option value="brand">Your brand colors</option>
-                      <option value="card">Each card&apos;s own colors</option>
-                      <option value="custom">Custom colors</option>
-                    </select>
-                    {settings.slab.colors.length === 0 ? (
-                      <p className="text-xs text-gray-400">
-                        {settings.slab.colorSource === 'card'
-                          ? 'The band picks up each graded card’s artwork colors, so every slab is unique. The preview shows your brand palette as a stand-in.'
-                          : 'The band uses your brand palette on every slab for a uniform look.'}
-                      </p>
-                    ) : (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {settings.slab.colors.map((c, i) => (
-                          <input key={`${i}-${c}`} type="color" defaultValue={c}
-                            onBlur={e => {
-                              const colors = settings.slab.colors.map((p, j) => (j === i ? e.target.value : p))
-                              const slab = { ...settings.slab, colors }
-                              if (JSON.stringify(colors) !== JSON.stringify(settings.slab.colors)) {
-                                saveAnd({ slab }, { slab }, 'Band colors saved')
-                              }
-                            }}
-                            className="w-9 h-9 border border-gray-300 rounded cursor-pointer" />
-                        ))}
-                        {settings.slab.colors.length < 5 && (
-                          <button onClick={() => {
-                            const slab = { ...settings.slab, colors: [...settings.slab.colors, brandPrimary] }
-                            saveAnd({ slab }, { slab }, 'Color added')
-                          }} disabled={busy}
-                            className="w-9 h-9 border border-dashed border-gray-300 rounded text-gray-400 hover:border-purple-400">+</button>
-                        )}
-                        <button onClick={() => {
-                          const slab = { ...settings.slab, colors: [] }
-                          saveAnd({ slab }, { slab }, 'Reset to brand colors')
-                        }} disabled={busy}
-                          className="px-2 py-1 text-xs text-gray-400 hover:text-purple-600">
-                          use brand colors
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-              {settings.slab.labelStyle === 'modern' && (
-                <p className="text-xs text-gray-400">
-                  Modern labels derive their gradient from your primary brand color.
-                </p>
-              )}
-
-              {/* Logo treatment — applies to both label styles. */}
-              <div>
-                <label className={labelCls}>Logo version on the label</label>
-                <select
-                  value={settings.slab.logoVariant}
-                  className={inputCls}
-                  onChange={(e) => {
-                    const slab = { ...settings.slab, logoVariant: e.target.value as 'color' | 'black' | 'white' }
-                    saveAnd({ slab }, { slab }, 'Logo version saved')
-                  }}
-                >
-                  <option value="color">Full color (as uploaded)</option>
-                  <option value="black">Black</option>
-                  <option value="white">White</option>
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  {settings.slab.logoVariant === 'white' && settings.slab.labelStyle === 'heritage'
-                    ? 'Heads up: Heritage labels print on a light field, so a white logo will be hard to see. Check the preview.'
-                    : 'Black usually reads cleanest on Heritage labels. White is made for the dark Modern label.'}
-                </p>
-              </div>
-
-              <div>
-                <label className={labelCls}>
-                  Logo size
-                  <span className="ml-2 font-normal text-gray-400">
-                    {Math.round(settings.slab.logoScale * 100)}%
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min={LOGO_SCALE.min}
-                  max={LOGO_SCALE.max}
-                  step={LOGO_SCALE.step}
-                  value={settings.slab.logoScale}
-                  className="w-full accent-purple-600"
-                  // Drag updates the preview live; the save fires on release so
-                  // a drag isn't 20 PATCHes.
-                  onChange={(e) => {
-                    const slab = { ...settings.slab, logoScale: Number(e.target.value) }
-                    setSettings(s => (s ? { ...s, slab } : s))
-                  }}
-                  onMouseUp={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
-                  onTouchEnd={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
-                  onKeyUp={() => saveAnd({ slab: settings.slab }, {}, 'Logo size saved')}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Square and stacked logos usually need a larger size than a wide wordmark. The label
-                  keeps your logo clear of the card name and serial automatically, so on a long card
-                  name it may render slightly smaller than set here.
-                  {settings.slab.labelStyle === 'modern'
-                    ? ' Modern labels have a fixed single-row layout, so they top out near 150%.'
-                    : ''}
-                </p>
-              </div>
-            </div>
-            <OrgLabelPreview
-              orgName={settings.name}
-              labelStyle={settings.slab.labelStyle}
-              pattern={settings.slab.pattern}
-              bandColors={slabColors}
-              brandColor={brandPrimary}
-              logos={settings.logos}
-              logoVariant={settings.slab.logoVariant}
-              logoScale={settings.slab.logoScale}
-              serialPrefix={settings.serialPrefix || settings.derivedPrefix}
-            />
-          </div>
+          <LabelDesigner
+            design={settings.slab.design}
+            onChange={d => setSettings(s => (s ? { ...s, slab: { ...s.slab, ...slabFromDesign(d), design: d } } : s))}
+            onCommit={d => { void save({ slab: { design: d } }, 'Label design saved') }}
+            orgName={settings.name}
+            serialPrefix={settings.serialPrefix || settings.derivedPrefix}
+            brandColors={settings.brandColors}
+            logos={settings.logos}
+          />
         </div>
 
         {/* Storefront details */}

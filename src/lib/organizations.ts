@@ -13,6 +13,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { resolveOrgLabelDesign, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 function getServiceClient() {
   return createClient(
@@ -518,6 +519,12 @@ export interface OrgBranding {
   /** Label mark settings from Brand Setup — which variant, and how big. */
   logoVariant: 'color' | 'black' | 'white';
   logoScale: number;
+  /**
+   * The org's Label Designer document (band edge, logo zone, chip theme,
+   * border…). Always resolved — seeded from the legacy slab keys when the
+   * store has never opened the designer — so every renderer gets one shape.
+   */
+  design: OrgLabelDesign;
 }
 
 /**
@@ -565,6 +572,7 @@ export async function getOrgBranding(org: Organization): Promise<OrgBranding> {
     logoBlackUrl,
     logoVariant: slabLogoVariant(org),
     logoScale: slabLogoScale(org),
+    design: resolveOrgLabelDesign((org as any).storefront),
   };
 }
 

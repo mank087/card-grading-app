@@ -209,6 +209,7 @@ export default function EbayImagePrepPage() {
           logoOverrides: orgLogoSet?.branding
             ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
             : undefined,
+          orgDesign: orgLogoSet?.design ?? null,
         };
 
         const [{ front, back }, rawImages] = await Promise.all([

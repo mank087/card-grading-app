@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Organization } from '@/lib/organizations';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 /** Storefront content blob shape (organizations.storefront jsonb). */
 export interface StorefrontContent {
@@ -40,6 +41,8 @@ export interface StorefrontContent {
     pattern?: string; colors?: string[]; label_style?: 'modern' | 'heritage'; color_source?: 'brand' | 'card'
     /** Brand Setup label-mark settings. */
     logo_variant?: 'color' | 'black' | 'white'; logo_scale?: number
+    /** Label Designer document — read via resolveOrgLabelDesign(), never directly. */
+    design?: OrgLabelDesign
   };
 }
 

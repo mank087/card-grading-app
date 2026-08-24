@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
         colorSource: slab.color_source === 'card' ? 'card' : 'brand',
         logoVariant: slab.logo_variant === 'black' || slab.logo_variant === 'white' ? slab.logo_variant : 'color',
         logoScale: typeof slab.logo_scale === 'number' ? slab.logo_scale : 1,
+        /** Label Designer document (resolved; seeded from the keys above when unset). */
+        design: branding.design,
       },
     },
   })

@@ -12,6 +12,7 @@
 
 import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from './foldableLabelGenerator';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets } from './labelDataGenerator';
+import type { OrgLabelDesign } from './labels/orgLabelDesign';
 
 // Canvas dimensions - card ratio 2.5" x 3.5" (standard trading card)
 // Label adds ~110px height at 400px width scale
@@ -121,6 +122,8 @@ export interface CardImageData {
    * disc deliberately stays on color — a white mark would vanish on it.
    */
   logoOverrides?: { color?: string; white?: string; black?: string; mark?: string; scale?: number } | null;
+  /** Enterprise Label Designer document for org cards; absent = stock layout. */
+  orgDesign?: OrgLabelDesign | null;
 }
 
 /**
@@ -1029,6 +1032,7 @@ async function drawHeritageLabel(
     gradeColors: data.heritage?.gradeColors ?? null,
     logoBlack: data.logoOverrides?.mark || data.logoOverrides?.color,
     logoScale: data.logoOverrides?.scale ?? 1,
+    design: data.orgDesign ?? null,
   });
   ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
 }

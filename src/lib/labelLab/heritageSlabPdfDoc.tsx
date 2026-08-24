@@ -25,10 +25,11 @@ import React from 'react'
 // `Text as SvgText`: the same component renders as SVG <text> inside <Svg>,
 // where — unlike ordinary Text — its fill can reference a gradient def.
 import { Document, Page, View, Text, Text as SvgText, Image, Svg, Path, Rect, G, Defs, LinearGradient, Stop, ClipPath, Font } from '@react-pdf/renderer'
-import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS, type GradeChip } from '@/lib/labelPresets'
+import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK, type GradeChip } from '@/lib/labelPresets'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import { bandGeometry, BAND_STROKE_HEX, BAND_STROKE_OPACITY, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
-import { heritageTheme, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE } from './heritageLayout'
+import { heritageTheme, heritageGeometry, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE, HERITAGE_PX, type HeritageGeometry } from './heritageLayout'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -124,6 +125,17 @@ export interface HeritageInputs {
   showFounder?: boolean
   showCardLover?: boolean
   showVip?: boolean
+  /**
+   * Enterprise org design document (Label Designer): band edge/width, logo
+   * zone, chip theme, border. Absent for consumers and for orgs that never
+   * opened the designer — geometry then equals the stock constants exactly.
+   */
+  design?: OrgLabelDesign | null
+}
+
+/** The chip for these inputs — theme-aware; every caller resolves it here. */
+export function heritageChip(i: HeritageInputs): GradeChip {
+  return resolveGradeChip(i.grade, !!i.printHardened, i.design?.chip.theme ?? 'black')
 }
 
 /**
@@ -155,18 +167,23 @@ export const LOGO_TREATMENTS: { id: LogoTreatment; name: string; note: string }[
 // re-cut customSlabLabelGenerator's patterns for a tall narrow strip.
 // ---------------------------------------------------------------------------
 function BandArt({
-  pattern, colors, id, w, h,
-}: { pattern: BandPattern; colors: string[]; id: string; w?: number; h?: number }) {
+  pattern, colors, id, w, h, horizontal = false,
+}: { pattern: BandPattern; colors: string[]; id: string; w?: number; h?: number; horizontal?: boolean }) {
+  // The drawn box (w x h) vs the pattern's authoring box: patterns are cut
+  // for a TALL strip (thickness x length). A horizontal band (Label Designer
+  // top/bottom edge) draws the tall box rotated -90deg inside a wide Svg.
   const W = w ?? BAND_W
   const H = h ?? LABEL_H
-  const g = bandGeometry(pattern, colors, W, H)
+  const thick = horizontal ? H : W
+  const len = horizontal ? W : H
+  const g = bandGeometry(pattern, colors, thick, len)
 
   if (g.gradientStops) {
     const stops = g.gradientStops
     return (
       <Svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0 }}>
         <Defs>
-          <LinearGradient id={`bg-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <LinearGradient id={`bg-${id}`} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
             {stops.map((c, i) => (
               <Stop key={i} offset={stops.length > 1 ? i / (stops.length - 1) : 0} stopColor={c} />
             ))}
@@ -177,21 +194,48 @@ function BandArt({
     )
   }
 
+  const art = (
+    <G clipPath={`url(#clip-${id})`}>
+      <Rect x={0} y={0} width={thick} height={len} fill={g.base} />
+      {g.fills.map((f, i) => <Path key={`f${i}`} d={f.d} fill={f.fill} />)}
+      {g.strokes.map((s, i) => (
+        <Path key={`s${i}`} d={s.d} fill="none" stroke={BAND_STROKE_HEX} strokeOpacity={BAND_STROKE_OPACITY} strokeWidth={g.strokeWidth} />
+      ))}
+    </G>
+  )
   return (
     <Svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0 }}>
       <Defs>
         <ClipPath id={`clip-${id}`}>
-          <Rect x={0} y={0} width={W} height={H} />
+          <Rect x={0} y={0} width={thick} height={len} />
         </ClipPath>
       </Defs>
-      <G clipPath={`url(#clip-${id})`}>
-        <Rect x={0} y={0} width={W} height={H} fill={g.base} />
-        {g.fills.map((f, i) => <Path key={`f${i}`} d={f.d} fill={f.fill} />)}
-        {g.strokes.map((s, i) => (
-          <Path key={`s${i}`} d={s.d} fill="none" stroke={BAND_STROKE_HEX} strokeOpacity={BAND_STROKE_OPACITY} strokeWidth={g.strokeWidth} />
-        ))}
-      </G>
+      {horizontal ? <G transform={`translate(0, ${thick}) rotate(-90)`}>{art}</G> : art}
     </Svg>
+  )
+}
+
+/**
+ * Band + gold rule + optional border for one side, from the geometry. The
+ * stock layout draws the same views the label always had.
+ */
+function Frame({ geom, i, id }: { geom: HeritageGeometry; i: HeritageInputs; id: string }) {
+  const T = heritageTheme(!!i.printHardened)
+  const b = geom.band
+  return (
+    <>
+      {geom.border ? (
+        <View style={{
+          position: 'absolute', left: u(geom.border.x - geom.border.width / 2), top: u(geom.border.y - geom.border.width / 2),
+          width: u(geom.border.w + geom.border.width), height: u(geom.border.h + geom.border.width),
+          borderWidth: u(geom.border.width), borderColor: geom.border.color, borderStyle: 'solid',
+        }} />
+      ) : null}
+      <View style={{ position: 'absolute', top: u(b.y), left: u(b.x), width: u(b.w), height: u(b.h) }}>
+        <BandArt pattern={i.pattern} colors={i.bandColors} id={id} w={u(b.w)} h={u(b.h)} horizontal={b.horizontal} />
+      </View>
+      <View style={{ position: 'absolute', top: u(geom.rule.y), left: u(geom.rule.x), width: u(geom.rule.w), height: u(geom.rule.h), backgroundColor: T.rule }} />
+    </>
   )
 }
 
@@ -224,15 +268,17 @@ const foilAt = (() => {
  */
 const FOIL_STRIPS = 24
 
-function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; solid?: string | null }) {
+function FoilChipBlock({ chip, size, solid, cs = 1 }: { chip: GradeChip; size: number; solid?: string | null; cs?: number }) {
   const w = size
   const h = size * (252 / 240)
-  const bw = u(6)
-  const r = u(28)
-  const numSize = u(150)
+  const bw = u(6 * cs)
+  const r = u(28 * cs)
+  const numSize = u(150 * cs)
   const baseline = h * 0.40 + numSize * 0.36
   // Matches GradeChipBlock's knockout floor: 28/32, ~4pt at true size.
-  const labelSize = u(chip.label.length > 8 ? 28 : 32)
+  const labelSize = u((chip.label.length > 8 ? 28 : 32) * cs)
+  // White theme: the word under a foil numeral goes dark instead of ivory.
+  const labelInk = chip.keyline ? GRADE_CHIP_WHITE_LABEL_INK : '#F4EFE4'
   // Digit box for the sweep, in diagonal coordinates c = x + y.
   const numW = numSize * 1.3
   const c0 = (w - numW) / 2 + (baseline - numSize * 0.72)
@@ -243,12 +289,12 @@ function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; s
     return (
       <Svg width={w} height={h}>
         <Rect x={bw / 2} y={bw / 2} width={w - bw} height={h - bw} rx={r} ry={r}
-          fill={GRADE_CHIP_BLACK} stroke={solid} strokeWidth={bw} />
+          fill={chip.fill} stroke={solid} strokeWidth={bw} />
         <SvgText x={w / 2} y={baseline} textAnchor="middle" fill={solid}
           style={{ fontFamily: 'Helvetica-Bold', fontSize: numSize }}>
           {String(chip.grade)}
         </SvgText>
-        <SvgText x={w / 2} y={baseline + u(44)} textAnchor="middle" fill="#F4EFE4"
+        <SvgText x={w / 2} y={baseline + u(44 * cs)} textAnchor="middle" fill={labelInk}
           style={{ fontFamily: 'Helvetica-Bold', fontSize: labelSize, letterSpacing: u(4) }}>
           {chip.label}
         </SvgText>
@@ -275,7 +321,7 @@ function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; s
         ))}
       </Defs>
       <Rect x={0} y={0} width={w} height={h} rx={r} ry={r} fill="url(#foil-ring)" />
-      <Rect x={bw} y={bw} width={w - 2 * bw} height={h - 2 * bw} rx={r - bw} ry={r - bw} fill={GRADE_CHIP_BLACK} />
+      <Rect x={bw} y={bw} width={w - 2 * bw} height={h - 2 * bw} rx={r - bw} ry={r - bw} fill={chip.fill} />
       {strips.map((s, i) => (
         <G key={i} clipPath={`url(#foil-strip-${i})`}>
           <SvgText
@@ -287,8 +333,8 @@ function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; s
         </G>
       ))}
       <SvgText
-        x={w / 2} y={baseline + u(44)} textAnchor="middle"
-        fill="#F4EFE4" style={{ fontFamily: 'Helvetica-Bold', fontSize: labelSize, letterSpacing: u(4) }}
+        x={w / 2} y={baseline + u(44 * cs)} textAnchor="middle"
+        fill={labelInk} style={{ fontFamily: 'Helvetica-Bold', fontSize: labelSize, letterSpacing: u(4) }}
       >
         {chip.label}
       </SvgText>
@@ -296,22 +342,25 @@ function FoilChipBlock({ chip, size, solid }: { chip: GradeChip; size: number; s
   )
 }
 
-function GradeChipBlock({ chip, size, inkOverride }: { chip: GradeChip; size: number; inkOverride?: string | null }) {
-  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} solid={inkOverride} />
+function GradeChipBlock({ chip, size, inkOverride, cs = 1 }: { chip: GradeChip; size: number; inkOverride?: string | null; cs?: number }) {
+  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} solid={inkOverride} cs={cs} />
   const ink = inkOverride || chip.ink
   const isBig = String(chip.grade).length > 1 || chip.grade === 0
   return (
     <View
       style={{
-        width: size, height: size * (252 / 240), borderRadius: u(28),
+        width: size, height: size * (252 / 240), borderRadius: u(28 * cs),
         backgroundColor: chip.fill, alignItems: 'center', justifyContent: 'center',
-        // No border here, ever: grade 10 alone carries a keyline (the foil
-        // ring in FoilChipBlock), and it only signals Gem Mint while it is
-        // scarce. The old faint rgba() keyline also rendered with a green
-        // cast in @react-pdf, which is what finally killed it.
+        // No border on the stock chip, ever: grade 10 alone carries a keyline
+        // (the foil ring in FoilChipBlock), and it only signals Gem Mint while
+        // it is scarce. The old faint rgba() keyline also rendered with a
+        // green cast in @react-pdf, which is what finally killed it. The
+        // enterprise WHITE theme is the one exception — a white chip on the
+        // white field needs its keyline to exist at all.
+        ...(chip.keyline ? { borderWidth: u(6 * cs), borderColor: inkOverride || chip.keyline, borderStyle: 'solid' as const } : {}),
       }}
     >
-      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(isBig ? 150 : 168), color: ink, lineHeight: 1 }}>
+      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u((isBig ? 150 : 168) * cs), color: ink, lineHeight: 1 }}>
         {chip.grade === 0 ? 'A' : chip.grade}
       </Text>
       {/* 28/32 (4.0/4.6pt), up from 26/30, and no opacity: this is KNOCKOUT
@@ -319,8 +368,8 @@ function GradeChipBlock({ chip, size, inkOverride }: { chip: GradeChip; size: nu
           and dimming it to 90% only helps it disappear. */}
       <Text
         style={{
-          fontFamily: 'Helvetica-Bold', fontSize: u(chip.label.length > 8 ? 28 : 32),
-          color: ink, letterSpacing: u(4), marginTop: u(6),
+          fontFamily: 'Helvetica-Bold', fontSize: u((chip.label.length > 8 ? 28 : 32) * cs),
+          color: ink, letterSpacing: u(4), marginTop: u(6 * cs),
         }}
       >
         {chip.label}
@@ -335,16 +384,13 @@ function GradeChipBlock({ chip, size, inkOverride }: { chip: GradeChip; size: nu
  * Everything is sized off one box so the treatments are directly comparable —
  * only the backing changes, never the mark's size or position.
  */
-function LogoBlock({ i, showRules = true, fit }: { i: HeritageInputs; showRules?: boolean; fit: ReturnType<typeof fitHeritageFront> }) {
+function LogoBlock({ i, showRules = true, fit, geom }: { i: HeritageInputs; showRules?: boolean; fit: ReturnType<typeof fitHeritageFront>; geom: HeritageGeometry }) {
   const t = i.logoTreatment ?? 'rules'
   const c = i.logoColor ?? 'black'
-  // 260x96 with the mark at 0.85 of the box (was 238x88 at 0.78) — about 20%
-  // more visible mark. The box top moves up only 16 mockup-px, which the
-  // densest fitted text stack still clears.
-  const MARK_W = u(260), MARK_H = u(96)
   // Scaled geometry in mockup-px, converted to PDF units by u(). Shared with
   // the SVG preview so a store's chosen size prints exactly as previewed.
-  const box = heritageMarkBox(i.logoScale ?? 1, fit)
+  // A designer side zone ignores logoScale (the column carries its own size).
+  const box = heritageMarkBox(geom.logo.zone === 'bottom' ? (i.logoScale ?? 1) : geom.logo.scale, fit, geom)
 
   const src =
     c === 'white' ? (i.whiteLogoDataUrl ?? i.colorLogoDataUrl)
@@ -392,19 +438,19 @@ function LogoBlock({ i, showRules = true, fit }: { i: HeritageInputs; showRules?
  */
 export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   const T = heritageTheme(!!i.printHardened)
-  const fit = fitHeritageFront(i.primaryName, i.contextLine, i.serial)
+  const geom = heritageGeometry(i.design)
+  const fit = fitHeritageFront(i.primaryName, i.contextLine, i.serial, geom)
   const { name, ctx } = fit
-  const rulesOk = heritageRulesFit(fit, heritageMarkBox(i.logoScale ?? 1, fit))
+  const rulesOk = geom.logo.zone === 'bottom' && geom.logo.accentRules
+    && heritageRulesFit(fit, heritageMarkBox(i.logoScale ?? 1, fit, geom))
+  const TX = geom.text
   return (
     <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
-        <BandArt pattern={i.pattern} colors={i.bandColors} id="f" />
-      </View>
-      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
+      <Frame geom={geom} i={i} id="f" />
 
       {/* Text block — fitted, never truncated. Real card names run to 119
           characters and set lines to 128; both used to run under the chip. */}
-      <View style={{ position: 'absolute', left: u(150), top: u(50), width: u(940) }}>
+      <View style={{ position: 'absolute', left: u(TX.x), top: u(TX.y), width: u(TX.w) }}>
         {name.rows.map((r, ri) => (
           <Text key={`n${ri}`} style={{ ...faceFor(r, true), fontSize: u(name.size), color: T.ink, lineHeight: 1.06 }}>
             {r}
@@ -422,19 +468,24 @@ export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip 
             {r}
           </Text>
         ))}
-        <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(24), width: u(940) }} />
+        <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(24), width: u(TX.w) }} />
         <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(18) }}>
           Serial: {i.serial}
         </Text>
       </View>
 
       {/* Grade chip */}
-      <View style={{ position: 'absolute', left: u(1130), top: u(64) }}>
-        <GradeChipBlock chip={chip} size={u(240)} inkOverride={i.gradeColors?.[String(chip.grade)]} />
+      <View style={{ position: 'absolute', left: u(geom.chip.x), top: u(geom.chip.y) }}>
+        <GradeChipBlock
+          chip={chip}
+          size={u(geom.chip.w)}
+          cs={geom.chip.scale}
+          inkOverride={i.gradeColors?.[String(chip.grade)] ?? (chip.grade === 10 ? i.design?.chip.grade10Color ?? undefined : undefined)}
+        />
       </View>
 
       {/* Mark, bottom-centre, hugging the edge */}
-      <LogoBlock i={i} showRules={rulesOk} fit={fit} />
+      <LogoBlock i={i} showRules={rulesOk} fit={fit} geom={geom} />
     </View>
   )
 }
@@ -491,6 +542,7 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
 
 export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   const T = heritageTheme(!!i.printHardened)
+  const geom = heritageGeometry(i.design)
   const sg = i.subgrades
   const row = (label: string, v: number | null) =>
     v == null ? null : (
@@ -498,13 +550,15 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
         {label}: {v}
       </Text>
     )
-  return (
-    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: BAND_W, height: LABEL_H }}>
-        <BandArt pattern={i.pattern} colors={i.bandColors} id="b" />
-      </View>
-      <View style={{ position: 'absolute', top: 0, left: BAND_W, width: RULE_W, height: LABEL_H, backgroundColor: T.rule }} />
-
+  // The back is authored against the stock content rect (x 96..1400, full
+  // height). A designer layout that moves the band or adds a border remaps
+  // it into the new content rect uniformly; the stock layout has no wrapper.
+  const c = geom.content
+  const STOCK_X = HERITAGE_PX.BAND_W + HERITAGE_PX.RULE_W
+  const stockContent = c.x === STOCK_X && c.y === 0 && c.w === HERITAGE_PX.W - STOCK_X && c.h === HERITAGE_PX.H
+  const k = Math.min(c.w / (HERITAGE_PX.W - STOCK_X), c.h / HERITAGE_PX.H)
+  const body = (
+    <>
       {/* QR carrying the mark: the DCM logo sits on a white disc at the QR's
           centre, matching production (generateQRCodeWithLogo: logo ~20% of the
           QR, disc slightly larger). Error-correction H absorbs the occlusion.
@@ -569,13 +623,26 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
         {row('Edges', sg.edges)}
         {row('Surface', sg.surface)}
       </View>
+    </>
+  )
+  return (
+    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
+      <Frame geom={geom} i={i} id="b" />
+      {stockContent ? body : (
+        <View style={{
+          position: 'absolute', left: u(c.x) - u(STOCK_X) * k, top: u(c.y),
+          width: LABEL_W, height: LABEL_H, transform: `scale(${k})`, transformOrigin: '0 0',
+        }}>
+          {body}
+        </View>
+      )}
     </View>
   )
 }
 
 export function HeritageSlabPdfDoc(props: { inputs: HeritageInputs; note?: string }) {
   const { inputs, note } = props
-  const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+  const chip = heritageChip(inputs)
   const patternName = BAND_PATTERNS.find(p => p.id === inputs.pattern)?.name ?? inputs.pattern
 
   return (

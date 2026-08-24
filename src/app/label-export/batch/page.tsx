@@ -305,6 +305,7 @@ function BatchLabelExportInner() {
             );
             return buildHeritageCompactInputs(card, {
               qrDataUrl, bandColors, pattern, wordmarkDataUrl: wordmark,
+              chipTheme: orgLogos?.design?.chip.theme,
             });
           }));
         };
@@ -361,6 +362,7 @@ function BatchLabelExportInner() {
             bandColors: (heritageSel.active ? heritageSel.bandColors : null) ?? resolveHeritageBandColors(card.card_colors),
             logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
             logoScale: orgLogos?.logoScale ?? 1,
+            design: orgLogos?.design ?? null,
             // Org serials don't resolve at /verify — target the branded page.
             qrUrl: cardQrUrl(card.id, card.serial, orgLogos?.branding),
           }));
@@ -836,6 +838,7 @@ function BatchLabelExportInner() {
               logoOverrides: await loadLogosForCard(card.id)
                 .then(l => (l.branding ? { color: l.color, white: l.white, black: l.black, mark: l.mark, scale: l.logoScale } : undefined))
                 .catch(() => undefined),
+              orgDesign: await loadLogosForCard(card.id).then(l => l.design).catch(() => null),
             };
             const { front, back } = await generateCardImages(imageData);
             blobs.push({ name: `DCM-CardImage-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });

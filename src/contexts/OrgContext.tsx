@@ -21,6 +21,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { getStoredSession, AUTH_STATE_CHANGE_EVENT } from '@/lib/directAuth'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 export type OrgScope = 'personal' | 'org'
 
@@ -42,6 +43,8 @@ export interface OrgMembership {
     labelStyle: 'heritage' | 'modern'; pattern: string; colors: string[]; colorSource: 'brand' | 'card'
     /** Which uploaded logo variant prints on the mark, and how big. */
     logoVariant: 'color' | 'black' | 'white'; logoScale: number
+    /** Label Designer document (enterprise only). */
+    design: OrgLabelDesign | null
   } | null
   logos: { color: string | null; white: string | null; black: string | null }
 }
@@ -106,7 +109,9 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
           gradeCredits: data.membership.gradeCredits ?? 0,
           brandColor: data.branding?.brandColor ?? null,
           brandColors: Array.isArray(data.membership.brandColors) ? data.membership.brandColors : [],
-          slab: data.membership.slab ?? null,
+          slab: data.membership.slab
+            ? { ...data.membership.slab, design: data.membership.slab.design ?? null }
+            : null,
           logos: {
             color: data.branding?.logoUrl ?? null,
             white: data.branding?.logoWhiteUrl ?? null,

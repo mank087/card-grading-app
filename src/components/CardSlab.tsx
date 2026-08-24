@@ -8,6 +8,7 @@ import { ModernBackLabel } from './labels/ModernBackLabel'
 import { ScaleToFit } from './labels/ScaleToFit'
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 // Below this width labels transform-scale down as one unit (ScaleToFit)
 // instead of reflowing piecewise — same behavior as the heritage SVG.
@@ -74,6 +75,8 @@ export interface CardSlabProps {
   orgLogoWhite?: string | null
   /** Mark size multiplier from Brand Setup; 1 keeps DCM sizing. */
   orgLogoScale?: number
+  /** Enterprise Label Designer document for org cards; null/absent = stock layout. */
+  orgDesign?: OrgLabelDesign | null
 }
 
 // Helper: Format grade for display - v6.0: Always whole numbers
@@ -112,6 +115,7 @@ export function CardSlab({
   orgLogoColor = null,
   orgLogoWhite = null,
   orgLogoScale = 1,
+  orgDesign = null,
 }: CardSlabProps) {
   const isModern = labelStyle !== 'traditional'
   // Size configurations - heights match between front/back labels for consistency
@@ -457,6 +461,7 @@ export function CardSlab({
                 blackLogoHref={orgLogoColor ?? undefined}
                 colorLogoHref={orgLogoColor ?? undefined}
                 logoScale={orgLogoScale}
+                design={orgDesign}
               />
             ) : isModern ? (
               <ModernFrontLabel
@@ -514,7 +519,8 @@ export function CardSlab({
                   bandColors={heritage.bandColors}
                   blackLogoHref={orgLogoColor ?? undefined}
                   colorLogoHref={orgLogoColor ?? undefined}
-                logoScale={orgLogoScale}
+                  logoScale={orgLogoScale}
+                  design={orgDesign}
                 />
               ) : isModern ? (
                 <ModernBackLabel
@@ -573,6 +579,7 @@ export interface CardSlabGridProps {
   orgLogoWhite?: string | null
   /** Mark size multiplier from Brand Setup; 1 keeps DCM sizing. */
   orgLogoScale?: number
+  orgDesign?: OrgLabelDesign | null
 }
 
 export function CardSlabGrid({
@@ -592,6 +599,7 @@ export function CardSlabGrid({
   orgLogoColor = null,
   orgLogoWhite = null,
   orgLogoScale = 1,
+  orgDesign = null,
 }: CardSlabGridProps) {
   const isModern = labelStyle !== 'traditional'
 
@@ -744,7 +752,8 @@ export function CardSlabGrid({
             bandColors={heritage.bandColors}
             blackLogoHref={orgLogoColor ?? undefined}
             colorLogoHref={orgLogoColor ?? undefined}
-                logoScale={orgLogoScale}
+            logoScale={orgLogoScale}
+            design={orgDesign}
           />
         ) : isModern ? (
           <ModernFrontLabel

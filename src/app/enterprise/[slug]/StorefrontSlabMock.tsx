@@ -2,6 +2,7 @@
 
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 
 /**
  * Live slab mockup for the storefront: the org's label design (house style ×
@@ -18,6 +19,7 @@ export default function StorefrontSlabMock({
   bandColors,
   labelStyle = 'heritage',
   serialPrefix = 'ORG',
+  design = null,
 }: {
   orgName: string;
   logoHref: string | null;
@@ -27,6 +29,8 @@ export default function StorefrontSlabMock({
   bandColors: string[];
   labelStyle?: 'modern' | 'heritage';
   serialPrefix?: string;
+  /** Label Designer document (resolved by the page). */
+  design?: OrgLabelDesign | null;
 }) {
   const sampleSerial = `${serialPrefix}442921`;
   const data: any = {
@@ -60,6 +64,7 @@ export default function StorefrontSlabMock({
             colorLogoHref={logoHref ?? undefined}
             logoScale={logoScale}
             suppressImages={!logoHref}
+            design={design}
           />
         ) : (
           <ModernFrontLabel
@@ -76,6 +81,8 @@ export default function StorefrontSlabMock({
             logoWhiteSrc={logoHref}
             logoColorSrc={logoHref}
             logoScale={logoScale}
+            design={design}
+            designBandColors={bandColors}
           />
         )}
       </div>

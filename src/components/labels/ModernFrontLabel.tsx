@@ -1,6 +1,7 @@
 'use client'
 
 import type { LabelColorOverrides } from '@/lib/labelPresets'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import { modernLogoScale } from '@/lib/labels/logoScale'
 import { RAINBOW_GRADIENT } from '@/lib/labelPresets'
 import { ScaleToFit } from './ScaleToFit'
@@ -20,6 +21,16 @@ interface ModernFrontLabelProps {
   logoWhiteSrc?: string | null
   /** Mark size multiplier from Brand Setup; 1 keeps the stock DCM sizing. */
   logoScale?: number
+  /**
+   * Enterprise Label Designer document. RESERVED: the Modern label's print
+   * renderers (slabLabelPdfDoc, cardImageGenerator) don't read the designer's
+   * band / border / chip / text fields yet, so this component deliberately
+   * ignores them too — what a store sees on screen must be what prints.
+   * Modern org labels take only the logo version + size (above) for now.
+   */
+  design?: OrgLabelDesign | null
+  /** Reserved with `design`. */
+  designBandColors?: string[]
 }
 
 /** Tailwind logoHeight classes (h-6/h-8/h-10) expressed in rem, so a scaled

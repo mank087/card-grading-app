@@ -13,6 +13,11 @@
  * Browser SVG natively supports gradient fill on text, so the grade-10 foil
  * numeral is a one-liner here (the PDF needs strip-clipping for the same
  * effect — see FoilChipBlock in heritageSlabPdfDoc).
+ *
+ * Enterprise Label Designer (Aug 2026): an optional `design` document moves
+ * the band, the mark and the chip through heritageGeometry(). Without one the
+ * geometry IS the stock constants and this renders exactly what it always
+ * has — scripts/label-design-snapshot.ts holds it to that byte for byte.
  */
 import React, { useMemo, useId } from 'react'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
@@ -21,13 +26,16 @@ import { EMBLEMS, EMBLEM_ORDER } from '@/lib/labelLab/emblemShapes'
 import {
   HERITAGE_PX as PX,
   heritageTheme,
+  heritageGeometry,
   fitHeritageFront,
   heritageRulesFit,
   heritageMarkBox,
   heritageCtxTracking,
   heritageBackLayout,
+  type HeritageGeometry,
 } from '@/lib/labelLab/heritageLayout'
-import { resolveGradeChip, GRADE_CHIP_BLACK, GRADE_10_FOIL_STOPS } from '@/lib/labelPresets'
+import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK } from '@/lib/labelPresets'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 const FONT = 'Helvetica, Arial, "Noto Sans JP", sans-serif'
 
@@ -67,6 +75,11 @@ interface Props {
    * scale by stretching the SVG. Absent = natural 3.5:1.
    */
   stretchAspect?: number
+  /**
+   * Enterprise org design document (Label Designer). Only org-graded cards
+   * ever carry one; consumers and Label Studio never pass it.
+   */
+  design?: OrgLabelDesign | null
 }
 
 function gradeString(data: SlabLabelData): string {
@@ -74,15 +87,27 @@ function gradeString(data: SlabLabelData): string {
   return data.isAlteredAuthentic ? 'A' : '—'
 }
 
-function Band({ pattern, colors, idPrefix }: { pattern: BandPattern; colors: string[]; idPrefix: string }) {
-  const g = useMemo(() => bandGeometry(pattern, colors, PX.BAND_W, PX.H), [pattern, colors])
+/**
+ * The band, on whichever edge the geometry puts it. Patterns are authored in a
+ * TALL box (thickness × length); a horizontal band draws that same tall box
+ * rotated -90° so every pattern works on the top/bottom edge without a second
+ * set of geometry. The stock left band has no transform wrapper at all.
+ */
+function Band({ pattern, colors, idPrefix, band }: { pattern: BandPattern; colors: string[]; idPrefix: string; band: HeritageGeometry['band'] }) {
+  const thick = band.horizontal ? band.h : band.w
+  const len = band.horizontal ? band.w : band.h
+  const g = useMemo(() => bandGeometry(pattern, colors, thick, len), [pattern, colors, thick, len])
   const clipId = `${idPrefix}-band-clip`
   const gradId = `${idPrefix}-band-grad`
-  return (
+  const stockPlacement = !band.horizontal && band.x === 0 && band.y === 0
+  const transform = band.horizontal
+    ? `translate(${band.x} ${band.y + band.h}) rotate(-90)`
+    : `translate(${band.x} ${band.y})`
+  const art = (
     <>
       <defs>
         <clipPath id={clipId}>
-          <rect x={0} y={0} width={PX.BAND_W} height={PX.H} />
+          <rect x={0} y={0} width={thick} height={len} />
         </clipPath>
         {g.gradientStops && (
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -93,7 +118,7 @@ function Band({ pattern, colors, idPrefix }: { pattern: BandPattern; colors: str
         )}
       </defs>
       <g clipPath={`url(#${clipId})`}>
-        <rect x={0} y={0} width={PX.BAND_W} height={PX.H} fill={g.gradientStops ? `url(#${gradId})` : g.base} />
+        <rect x={0} y={0} width={thick} height={len} fill={g.gradientStops ? `url(#${gradId})` : g.base} />
         {g.fills.map((f, i) => <path key={`f${i}`} d={f.d} fill={f.fill} />)}
         {g.strokes.map((s, i) => (
           <path key={`s${i}`} d={s.d} fill="none" stroke={BAND_STROKE_HEX} strokeOpacity={BAND_STROKE_OPACITY} strokeWidth={g.strokeWidth} />
@@ -101,29 +126,36 @@ function Band({ pattern, colors, idPrefix }: { pattern: BandPattern; colors: str
       </g>
     </>
   )
+  return stockPlacement ? art : <g transform={transform}>{art}</g>
 }
 
-function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; hardened: boolean; idPrefix: string; gradeColors?: Record<string, string> | null }) {
-  const chip = resolveGradeChip(grade, hardened)
-  const override = gradeColors?.[String(chip.grade)]
-  const { CHIP_X: x, CHIP_Y: y, CHIP_W: w, CHIP_H: h, CHIP_R: r, CHIP_BORDER: bw } = PX
+function GradeChip({ grade, hardened, idPrefix, gradeColors, geom, design }: {
+  grade: string; hardened: boolean; idPrefix: string; gradeColors?: Record<string, string> | null
+  geom: HeritageGeometry; design?: OrgLabelDesign | null
+}) {
+  const theme = design?.chip.theme ?? 'black'
+  const chip = resolveGradeChip(grade, hardened, theme)
+  const override = gradeColors?.[String(chip.grade)] ?? (chip.grade === 10 ? design?.chip.grade10Color ?? undefined : undefined)
+  const { x, y, w, h, r, bw, scale: cs } = geom.chip
   const numeral = chip.grade === 0 ? 'A' : String(chip.grade)
-  const labelSize = chip.label.length > 8 ? 28 : 32
+  const labelSize = (chip.label.length > 8 ? 28 : 32) * cs
+  const white = theme === 'white'
+  const tenLabelInk = white ? GRADE_CHIP_WHITE_LABEL_INK : '#F4EFE4'
   if (chip.grade === 10) {
     const foilId = `${idPrefix}-foil`
-    const numSize = 150
+    const numSize = 150 * cs
     const baseline = y + h * 0.4 + numSize * 0.36
     if (override) {
       // Custom grade-10 colour: solid keyline + numeral, still on black.
       return (
         <>
           <rect x={x + bw / 2} y={y + bw / 2} width={w - bw} height={h - bw} rx={r} ry={r}
-            fill={GRADE_CHIP_BLACK} stroke={override} strokeWidth={bw} />
+            fill={chip.fill} stroke={override} strokeWidth={bw} />
           <text x={x + w / 2} y={baseline} textAnchor="middle" fill={override}
             fontFamily={FONT} fontWeight={700} fontSize={numSize}>
             {numeral}
           </text>
-          <text x={x + w / 2} y={baseline + 44} textAnchor="middle" fill="#F4EFE4"
+          <text x={x + w / 2} y={baseline + 44 * cs} textAnchor="middle" fill={tenLabelInk}
             fontFamily={FONT} fontWeight={700} fontSize={labelSize} letterSpacing={4}>
             {chip.label}
           </text>
@@ -140,12 +172,12 @@ function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; 
           </linearGradient>
         </defs>
         <rect x={x + bw / 2} y={y + bw / 2} width={w - bw} height={h - bw} rx={r} ry={r}
-          fill={GRADE_CHIP_BLACK} stroke={`url(#${foilId})`} strokeWidth={bw} />
+          fill={chip.fill} stroke={`url(#${foilId})`} strokeWidth={bw} />
         <text x={x + w / 2} y={baseline} textAnchor="middle" fill={`url(#${foilId})`}
           fontFamily={FONT} fontWeight={700} fontSize={numSize}>
           {numeral}
         </text>
-        <text x={x + w / 2} y={baseline + 44} textAnchor="middle" fill="#F4EFE4"
+        <text x={x + w / 2} y={baseline + 44 * cs} textAnchor="middle" fill={tenLabelInk}
           fontFamily={FONT} fontWeight={700} fontSize={labelSize} letterSpacing={4}>
           {chip.label}
         </text>
@@ -154,17 +186,19 @@ function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; 
   }
   const ink = override || chip.ink
   const isBig = numeral.length > 1
-  const numSize = isBig ? 150 : 168
-  const contentH = numSize + 6 + labelSize
+  const numSize = (isBig ? 150 : 168) * cs
+  const contentH = numSize + 6 * cs + labelSize
   const top = y + (h - contentH) / 2
   return (
     <>
-      <rect x={x} y={y} width={w} height={h} rx={r} ry={r} fill={chip.fill} />
+      {chip.keyline
+        ? <rect x={x + bw / 2} y={y + bw / 2} width={w - bw} height={h - bw} rx={r} ry={r} fill={chip.fill} stroke={override || chip.keyline} strokeWidth={bw} />
+        : <rect x={x} y={y} width={w} height={h} rx={r} ry={r} fill={chip.fill} />}
       <text x={x + w / 2} y={top + numSize * 0.8} textAnchor="middle" fill={ink}
         fontFamily={FONT} fontWeight={700} fontSize={numSize}>
         {numeral}
       </text>
-      <text x={x + w / 2} y={top + numSize + 6 + labelSize * 0.8} textAnchor="middle" fill={ink}
+      <text x={x + w / 2} y={top + numSize + 6 * cs + labelSize * 0.8} textAnchor="middle" fill={ink}
         fontFamily={FONT} fontWeight={700} fontSize={labelSize} letterSpacing={4}>
         {chip.label}
       </text>
@@ -172,14 +206,26 @@ function GradeChip({ grade, hardened, idPrefix, gradeColors }: { grade: string; 
   )
 }
 
-function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors, suppressImages, logoScale }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string; gradeColors?: Record<string, string> | null; suppressImages?: boolean; logoScale: number }) {
+/** Border stroke (designer only) — drawn over the field, under everything else. */
+function Border({ geom }: { geom: HeritageGeometry }) {
+  const b = geom.border
+  if (!b) return null
+  return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={b.color} strokeWidth={b.width} />
+}
+
+function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors, suppressImages, logoScale, geom, design }: {
+  data: SlabLabelData; pattern: BandPattern; bandColors: string[]; blackLogoHref: string; uid: string
+  gradeColors?: Record<string, string> | null; suppressImages?: boolean; logoScale: number
+  geom: HeritageGeometry; design?: OrgLabelDesign | null
+}) {
   const T = heritageTheme(true)
-  const fit = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial)
+  const fit = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial, geom)
   const { name, ctx } = fit
+  const TX = geom.text
 
   // Text stack — same arithmetic as the PDF's flow layout, made explicit.
-  const nameYs = name.rows.map((_, i) => PX.TEXT_Y + i * name.size * 1.06)
-  const ctxTop = PX.TEXT_Y + name.rows.length * name.size * 1.06 + Math.max(name.size * 0.28, 18)
+  const nameYs = name.rows.map((_, i) => TX.y + i * name.size * 1.06)
+  const ctxTop = TX.y + name.rows.length * name.size * 1.06 + Math.max(name.size * 0.28, 18)
   const ctxYs = ctx.rows.map((_, i) => ctxTop + i * ctx.size * 1.2)
   const dividerY = ctxTop + ctx.rows.length * ctx.size * 1.2 + 24
   const serialY = dividerY + 6 + 18
@@ -187,34 +233,35 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
   // Bottom-centre mark ('rules' treatment, black mark — the Studio defaults).
   // Enterprise stores can scale their mark; heritageMarkBox clamps the growth
   // against THIS card's fitted text so a big logo can never reach the serial.
-  const mark = heritageMarkBox(logoScale, fit)
+  const mark = heritageMarkBox(geom.logo.zone === 'bottom' ? logoScale : geom.logo.scale, fit, geom)
   // Bars grow outward with the mark, so re-check them against the serial.
-  const rulesOk = heritageRulesFit(fit, mark)
+  const rulesOk = geom.logo.zone === 'bottom' && geom.logo.accentRules && heritageRulesFit(fit, mark)
 
   return (
     <>
-      <Band pattern={pattern} colors={bandColors} idPrefix={uid + "f"} />
-      <rect x={PX.BAND_W} y={0} width={PX.RULE_W} height={PX.H} fill={T.rule} />
+      <Border geom={geom} />
+      <Band pattern={pattern} colors={bandColors} idPrefix={uid + "f"} band={geom.band} />
+      <rect x={geom.rule.x} y={geom.rule.y} width={geom.rule.w} height={geom.rule.h} fill={T.rule} />
 
       {name.rows.map((row, i) => (
-        <text key={`n${i}`} x={PX.TEXT_X} y={nameYs[i]} dominantBaseline="hanging"
+        <text key={`n${i}`} x={TX.x} y={nameYs[i]} dominantBaseline="hanging"
           fontFamily={FONT} fontWeight={700} fontSize={name.size} fill={T.ink}>
           {row}
         </text>
       ))}
       {ctx.rows.map((row, i) => (
-        <text key={`c${i}`} x={PX.TEXT_X} y={ctxYs[i]} dominantBaseline="hanging"
+        <text key={`c${i}`} x={TX.x} y={ctxYs[i]} dominantBaseline="hanging"
           fontFamily={FONT} fontSize={ctx.size} fill={T.inkSoft} letterSpacing={heritageCtxTracking(ctx.size)}>
           {row}
         </text>
       ))}
-      <rect x={PX.TEXT_X} y={dividerY} width={PX.TEXT_BOX} height={6} fill={T.divider} />
-      <text x={PX.TEXT_X} y={serialY} dominantBaseline="hanging"
+      <rect x={TX.x} y={dividerY} width={TX.w} height={6} fill={T.divider} />
+      <text x={TX.x} y={serialY} dominantBaseline="hanging"
         fontFamily={FONT} fontSize={34} fill={T.inkSoft} letterSpacing={2}>
         Serial: {data.serial}
       </text>
 
-      <GradeChip grade={gradeString(data)} hardened idPrefix={uid + "f"} gradeColors={gradeColors} />
+      <GradeChip grade={gradeString(data)} hardened idPrefix={uid + "f"} gradeColors={gradeColors} geom={geom} design={design} />
 
       {rulesOk && (
         <>
@@ -234,10 +281,13 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
   )
 }
 
-function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImages }: { data: SlabLabelData; pattern: BandPattern; bandColors: string[]; colorLogoHref: string; uid: string; suppressImages?: boolean }) {
+function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImages, geom, design }: {
+  data: SlabLabelData; pattern: BandPattern; bandColors: string[]; colorLogoHref: string; uid: string
+  suppressImages?: boolean; geom: HeritageGeometry; design?: OrgLabelDesign | null
+}) {
   const T = heritageTheme(true)
   const grade = gradeString(data)
-  const chip = resolveGradeChip(grade, true)
+  const chip = resolveGradeChip(grade, true, design?.chip.theme ?? 'black')
   const condition = ((data.isAlteredAuthentic && data.grade === null ? 'Authentic' : data.condition) || chip.label).toUpperCase()
 
   const emblemFlags: Record<(typeof EMBLEM_ORDER)[number], boolean | undefined> = {
@@ -265,11 +315,8 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
     condition,
   })
 
-  return (
+  const body = (
     <>
-      <Band pattern={pattern} colors={bandColors} idPrefix={uid + "b"} />
-      <rect x={PX.BAND_W} y={0} width={PX.RULE_W} height={PX.H} fill={T.rule} />
-
       {/* QR + DCM mark on a white disc, as printed */}
       {data.qrCodeDataUrl ? (
         <>
@@ -331,9 +378,27 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
       ))}
     </>
   )
+
+  // The back is authored against the stock content rect (x 96..1400, full
+  // height). A designer layout that moves the band or adds a border remaps
+  // it into the new content rect uniformly — no wrapper at all for stock.
+  const c = geom.content
+  const stockContent = c.x === PX.BAND_W + PX.RULE_W && c.y === 0 && c.w === PX.W - PX.BAND_W - PX.RULE_W && c.h === PX.H
+  const k = Math.min(c.w / (PX.W - PX.BAND_W - PX.RULE_W), c.h / PX.H)
+
+  return (
+    <>
+      <Border geom={geom} />
+      <Band pattern={pattern} colors={bandColors} idPrefix={uid + "b"} band={geom.band} />
+      <rect x={geom.rule.x} y={geom.rule.y} width={geom.rule.w} height={geom.rule.h} fill={T.rule} />
+      {stockContent ? body : (
+        <g transform={`translate(${c.x} ${c.y}) scale(${k}) translate(${-(PX.BAND_W + PX.RULE_W)} 0)`}>{body}</g>
+      )}
+    </>
+  )
 }
 
-export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false, logoScale = 1, stretchAspect }: Props) {
+export function HeritageLabelPreview({ data, side, pattern, bandColors, className, blackLogoHref = '/DCM-logo-black.png', colorLogoHref = '/DCM-logo.png', gradeColors = null, suppressImages = false, logoScale = 1, stretchAspect, design = null }: Props) {
   // Unique per instance: several previews render on one page (desktop slab,
   // hidden mobile block, gallery tile), and duplicated gradient/clip ids make
   // url(#...) resolve to the FIRST one in the document — if that copy sits in
@@ -341,6 +406,7 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
   // grade-10 foil numeral and ring disappeared.
   const uid = 'h' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const T = heritageTheme(true)
+  const geom = useMemo(() => heritageGeometry(design), [design])
   return (
     <svg
       viewBox={`0 0 ${PX.W} ${PX.H}`}
@@ -356,8 +422,8 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
     >
       <rect x={0} y={0} width={PX.W} height={PX.H} fill={T.field} stroke={T.edge} strokeWidth={T.edgeWidth * 7} />
       {side === 'front'
-        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} suppressImages={suppressImages} logoScale={logoScale} />
-        : <BackSide data={data} pattern={pattern} bandColors={bandColors} colorLogoHref={colorLogoHref} uid={uid} suppressImages={suppressImages} />}
+        ? <FrontSide data={data} pattern={pattern} bandColors={bandColors} blackLogoHref={blackLogoHref} uid={uid} gradeColors={gradeColors} suppressImages={suppressImages} logoScale={logoScale} geom={geom} design={design} />
+        : <BackSide data={data} pattern={pattern} bandColors={bandColors} colorLogoHref={colorLogoHref} uid={uid} suppressImages={suppressImages} geom={geom} design={design} />}
     </svg>
   )
 }

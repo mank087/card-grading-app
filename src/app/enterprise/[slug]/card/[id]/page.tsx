@@ -4,6 +4,7 @@ import { getStorefront } from '../../data';
 import { getLabelData } from '@/lib/labelDataGenerator';
 import { orgBrandPalette } from '../../data';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
+import { resolveOrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import OrgCardReport, { type OrgReportCard } from './OrgCardReport';
 
 export const revalidate = 60;
@@ -216,6 +217,7 @@ export default async function StorefrontCardPage({
       labelStyle={labelStyle}
       heritagePattern={heritagePattern}
       heritageBandColors={heritageBandColors}
+      design={resolveOrgLabelDesign(sf.content)}
     />
   );
 }

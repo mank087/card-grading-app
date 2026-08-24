@@ -799,6 +799,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         logoOverrides: orgLogoSet?.branding
           ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
           : undefined,
+        orgDesign: orgLogoSet?.design ?? null,
       };
 
       // The QR only needs the card URL, so it does not have to wait behind the

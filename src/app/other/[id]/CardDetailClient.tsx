@@ -32,6 +32,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { SoldBanner } from '@/components/cards/SoldBanner';
 import OrgBrandingBadge from '@/components/org/OrgBrandingBadge';
 import { fetchBrandingForCard } from '@/lib/orgBranding';
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
@@ -1703,7 +1704,7 @@ export function OtherCardDetails() {
 
   // Enterprise org branding — org-graded cards show the store's logo on the
   // on-screen labels (color logo on light labels, white on the dark modern one).
-  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null; mark: string | null; scale: number } | null>(null);
+  const [orgLogos, setOrgLogos] = useState<{ color: string | null; white: string | null; mark: string | null; scale: number; design: OrgLabelDesign | null } | null>(null);
   useEffect(() => {
     if (!(card as any)?.org_id || !card?.id) { setOrgLogos(null); return; }
     let cancelled = false;
@@ -1714,6 +1715,7 @@ export function OtherCardDetails() {
         // Brand Setup picks WHICH variant prints on the mark and how big.
         mark: (b.logoVariant === 'white' ? b.logoWhiteUrl : b.logoVariant === 'black' ? b.logoBlackUrl : b.logoUrl) ?? b.logoUrl,
         scale: b.logoScale && b.logoScale > 0 ? b.logoScale : 1,
+        design: b.design ?? null,
       } : null);
     });
     return () => { cancelled = true; };
@@ -2846,6 +2848,7 @@ export function OtherCardDetails() {
                   blackLogoHref={orgLogos?.mark ?? undefined}
                   colorLogoHref={orgLogos?.mark ?? undefined}
                   logoScale={orgLogos?.scale ?? 1}
+                  design={orgLogos?.design ?? null}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />
@@ -2861,6 +2864,7 @@ export function OtherCardDetails() {
                   logoColorSrc={orgLogos?.mark}
                   logoWhiteSrc={orgLogos?.mark}
                   logoScale={orgLogos?.scale ?? 1}
+                  design={orgLogos?.design ?? null}
                   size="lg"
                   colorOverrides={colorOverrides}
                 />
@@ -3004,6 +3008,7 @@ export function OtherCardDetails() {
                   blackLogoHref={orgLogos?.mark ?? undefined}
                   colorLogoHref={orgLogos?.mark ?? undefined}
                   logoScale={orgLogos?.scale ?? 1}
+                  design={orgLogos?.design ?? null}
                   bandColors={heritageBandColors}
                     gradeColors={heritageSel.gradeColors}
                 />

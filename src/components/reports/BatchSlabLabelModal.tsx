@@ -211,6 +211,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(selectedCards[i]?.card_colors),
           logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
           logoScale: orgLogos?.logoScale ?? 1,
+          design: orgLogos?.design ?? null,
           // Org serials don't resolve at /verify — point the printed QR at the
           // same branded URL the composited QR image already encodes.
           qrUrl: cardQrUrl(selectedCards[i].id, selectedCards[i].serial,

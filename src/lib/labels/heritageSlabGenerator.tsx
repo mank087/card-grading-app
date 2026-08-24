@@ -20,12 +20,13 @@ import { Document, Page, View, Text, Svg, Rect, Line, pdf } from '@react-pdf/ren
 import {
   HeritageFront,
   HeritageBack,
+  heritageChip,
   type HeritageInputs,
   type BandPattern,
   BAND_PATTERNS,
 } from '@/lib/labelLab/heritageSlabPdfDoc'
-import { resolveGradeChip } from '@/lib/labelPresets'
-import { heritageTheme } from '@/lib/labelLab/heritageLayout'
+import { heritageTheme, heritageGeometry, HERITAGE_PX } from '@/lib/labelLab/heritageLayout'
+import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import {
   PageHeader,
   CornerMarks,
@@ -65,6 +66,11 @@ export interface HeritageRenderOptions {
    * resolve at /verify/[serial]. Absent = DCM verify page for the serial.
    */
   qrUrl?: string
+  /**
+   * Enterprise org design document (Label Designer). Only org-graded cards
+   * carry one; absent = the stock Heritage layout, unchanged.
+   */
+  design?: OrgLabelDesign | null
   /**
    * Physical label size. Absent = the standard 2.8" × 0.8" slot. Non-standard
    * sizes (Zion Mag Pro 2.51" × 0.76") render the SAME standard-authored
@@ -142,6 +148,7 @@ async function buildHeritageInputs(
     logoTreatment: 'rules',
     logoColor: 'black',
     logoScale: opts.logoScale ?? 1,
+    design: opts.design ?? null,
     qrDataUrl,
     printHardened: true,
     showFounder: data.showFounderEmblem,
@@ -154,7 +161,7 @@ async function buildHeritageInputs(
 const GUIDE_COLOR = '#000000'
 
 function HeritageProductionDoc({ inputs, d }: { inputs: HeritageInputs; d: HeritageDims }) {
-  const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+  const chip = heritageChip(inputs)
   const std = isStdDims(d)
   // Centre the (possibly non-standard) label on the page; at standard size
   // this equals SINGLE_X/SINGLE_Y. Centring keeps duplex mirroring exact.
@@ -303,49 +310,72 @@ function DimsGuides({ x, y, d, cornersOnly }: { x: number; y: number; d: Heritag
 // the field — and the band colour along the band edge — past the cut on the
 // pair's outer edges only; the fold seam stays flush.
 const FOLD_BLEED = 0.08 * INCH
-const BAND_W_PT = (90 / 1400) * LABEL_W // heritageSlabPdfDoc BAND_W = u(90)
 
-/** Field + band-edge bleed underlay for ONE heritage panel at (x, y) — the
- *  band sits on the panel's left in both front and back blocks. Used by the
- *  single and batch-duplex docs; FoldPair composes its own pair-shaped bleed
- *  because the rotated back panel moves its band to the pair's other edge. */
+/**
+ * Band-colour bleed strips for one panel drawn at (x, y, w, h): wherever the
+ * band touches a label edge, its colour extends B past the cut on that edge
+ * (a border-inset band touches nothing, so only the field bleeds). `rotated`
+ * mirrors the edges for the fold-over's 180deg back panel; `seam` names the
+ * pair edge that must stay flush.
+ */
+function bandBleeds(
+  inputs: HeritageInputs, x: number, y: number, w: number, h: number, B: number,
+  rotated: boolean, seam: 'top' | 'bottom' | null,
+): React.ReactElement[] {
+  const g = heritageGeometry(inputs.design)
+  const band = inputs.bandColors?.[0] || '#101014'
+  const sx = w / HERITAGE_PX.W
+  const sy = h / HERITAGE_PX.H
+  // Band rect in panel points, mirrored through the panel centre when rotated.
+  const bx = rotated ? w - (g.band.x + g.band.w) * sx : g.band.x * sx
+  const by = rotated ? h - (g.band.y + g.band.h) * sy : g.band.y * sy
+  const bw = g.band.w * sx
+  const bh = g.band.h * sy
+  const eps = 0.01
+  const left = bx <= eps, right = bx + bw >= w - eps
+  const top = by <= eps && seam !== 'top', bottom = by + bh >= h - eps && seam !== 'bottom'
+  const out: React.ReactElement[] = []
+  if (left) out.push(<View key="l" style={{ position: 'absolute', left: x - B, top: y + by - (top ? B : 0), width: B, height: bh + (top ? B : 0) + (bottom ? B : 0), backgroundColor: band }} />)
+  if (right) out.push(<View key="r" style={{ position: 'absolute', left: x + w, top: y + by - (top ? B : 0), width: B, height: bh + (top ? B : 0) + (bottom ? B : 0), backgroundColor: band }} />)
+  if (top) out.push(<View key="t" style={{ position: 'absolute', left: x + bx, top: y - B, width: bw, height: B, backgroundColor: band }} />)
+  if (bottom) out.push(<View key="b" style={{ position: 'absolute', left: x + bx, top: y + h, width: bw, height: B, backgroundColor: band }} />)
+  return out
+}
+
+/** Field + band-edge bleed underlay for ONE heritage panel at (x, y). Used by
+ *  the single and batch-duplex docs; FoldPair composes its own pair-shaped
+ *  bleed because the rotated back panel mirrors its band to the pair's other
+ *  edge. */
 function PanelBleed({ x, y, inputs, d = STD_DIMS }: { x: number; y: number; inputs: HeritageInputs; d?: HeritageDims }) {
   const B = FOLD_BLEED
   const w = d.widthIn * INCH
   const h = d.heightIn * INCH
-  const bandW = BAND_W_PT * (d.widthIn / STD_DIMS.widthIn)
   const field = heritageTheme(!!inputs.printHardened).field
-  const band = inputs.bandColors?.[0] || '#101014'
   return (
     <>
       <View style={{ position: 'absolute', left: x - B, top: y - B, width: w + B * 2, height: h + B * 2, backgroundColor: field }} />
-      <View style={{ position: 'absolute', left: x - B, top: y - B, width: B, height: h + B * 2, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x, top: y - B, width: bandW, height: B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x, top: y + h, width: bandW, height: B, backgroundColor: band }} />
+      {bandBleeds(inputs, x, y, w, h, B, false, null)}
     </>
   )
 }
 
 /** One fold pair: rotated back over front, at (x, y) = top-left of the pair. */
 function FoldPair({ inputs, x, y, d = STD_DIMS }: { inputs: HeritageInputs; x: number; y: number; d?: HeritageDims }) {
-  const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+  const chip = heritageChip(inputs)
   const B = FOLD_BLEED
   const w = d.widthIn * INCH
   const h = d.heightIn * INCH
   const pairH = h * 2
-  const bandW = BAND_W_PT * (d.widthIn / STD_DIMS.widthIn)
   const field = heritageTheme(!!inputs.printHardened).field
-  const band = inputs.bandColors?.[0] || '#101014'
   return (
     <>
       {/* field bleed under the whole pair (left/right/top/bottom overhang) */}
       <View style={{ position: 'absolute', left: x - B, top: y - B, width: w + B * 2, height: pairH + B * 2, backgroundColor: field }} />
-      {/* band-colour bleed: front band sits on the pair's bottom-left edge;
-          the 180°-rotated back puts its band on the top-right edge */}
-      <View style={{ position: 'absolute', left: x - B, top: y + h, width: B, height: h + B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x - B, top: y + pairH, width: B + bandW, height: B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x + w, top: y - B, width: B, height: h + B, backgroundColor: band }} />
-      <View style={{ position: 'absolute', left: x + w - bandW, top: y - B, width: B + bandW, height: B, backgroundColor: band }} />
+      {/* band-colour bleed on whichever pair edges the band touches: the
+          front (bottom panel) as drawn, the 180°-rotated back mirrored; the
+          fold seam between them stays flush */}
+      {bandBleeds(inputs, x, y + h, w, h, B, false, 'top')}
+      {bandBleeds(inputs, x, y, w, h, B, true, 'bottom')}
       <View style={{ position: 'absolute', left: x, top: y, width: w, height: h, transform: 'rotate(180deg)' }}>
         <ScaledPanel d={d}>
           <HeritageBack i={inputs} chip={chip} />
@@ -430,6 +460,8 @@ export interface HeritageBatchItem {
   logoScale?: number
   /** Per-card QR target URL (cardQrUrl); verify/serial when absent. */
   qrUrl?: string
+  /** Org design document for org cards; absent = stock layout. */
+  design?: OrgLabelDesign | null
 }
 
 async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern, gradeColors?: Record<string, string> | null): Promise<HeritageInputs[]> {
@@ -437,7 +469,7 @@ async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern
   return Promise.all(
     items.map(it => buildHeritageInputs(
       it.data,
-      { bandColors: it.bandColors, pattern, gradeColors, logoScale: it.logoScale, qrUrl: it.qrUrl },
+      { bandColors: it.bandColors, pattern, gradeColors, logoScale: it.logoScale, qrUrl: it.qrUrl, design: it.design },
       it.logoBlack ?? dcmBlack,
     )),
   )
@@ -460,7 +492,7 @@ function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: 
           : <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
         {slice.map((inputs, i) => {
           const { x, y } = gridPos(i, false)
-          const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+          const chip = heritageChip(inputs)
           return (
             <React.Fragment key={i}>
               <PanelBleed x={x + offX} y={y + offY} inputs={inputs} d={d} />
@@ -487,7 +519,7 @@ function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: 
           : <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
         {slice.map((inputs, i) => {
           const { x, y } = gridPos(i, true)
-          const chip = resolveGradeChip(inputs.grade, !!inputs.printHardened)
+          const chip = heritageChip(inputs)
           return (
             <React.Fragment key={i}>
               <PanelBleed x={x + offX} y={y + offY} inputs={inputs} d={d} />

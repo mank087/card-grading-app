@@ -1,0 +1,82 @@
+{
+  "consumer-short": {
+    "svgFront": "05f6050fc3cd71c4",
+    "svgBack": "5071615aa6aeef39",
+    "pdf": "d5dd0a6246bc876a"
+  },
+  "consumer-ten": {
+    "svgFront": "c303e181d834d701",
+    "svgBack": "a39a7e2fb97d672e",
+    "pdf": "e196adcb51a45c0c"
+  },
+  "consumer-authentic": {
+    "svgFront": "f92fa8f5f6dab5d5",
+    "svgBack": "8df29bd132e01ad1",
+    "pdf": "58bdb85786888bd9"
+  },
+  "org-scaled-logo": {
+    "svgFront": "98b98e32bdb5a884",
+    "svgBack": "827cc093bcaab2f4",
+    "pdf": "f0289ec7b27d171d"
+  },
+  "grade-colors": {
+    "svgFront": "aa9f3ca23239a5bd",
+    "svgBack": "4a1ce8f157875b82",
+    "pdf": "b6f48d11ecaccd78"
+  },
+  "long-diamond": {
+    "svgFront": "8608051a1eb3b7aa",
+    "svgBack": "301f1c12761305b5",
+    "pdf": "1ca02db62578f856"
+  },
+  "long-mosaic": {
+    "svgFront": "1eedfc5f1dacf429",
+    "svgBack": "84faf4918a4676b0",
+    "pdf": "2524bdefc847edf4"
+  },
+  "long-gradient": {
+    "svgFront": "9ca5fa866c460d0a",
+    "svgBack": "5dbd42731cd1103f",
+    "pdf": "52d99a29e5ce8639"
+  },
+  "long-split": {
+    "svgFront": "0029c5d653d1e919",
+    "svgBack": "11ddeecc624740d8",
+    "pdf": "72b8648709a6ef90"
+  },
+  "long-stripes": {
+    "svgFront": "0d80a292262432f3",
+    "svgBack": "5cf35776b99e1736",
+    "pdf": "0c196acb2e9185bf"
+  },
+  "long-chevron": {
+    "svgFront": "c4c25c1cb6c6555b",
+    "svgBack": "cc090bf7d3156288",
+    "pdf": "40f2364bf3f45700"
+  },
+  "long-lightning": {
+    "svgFront": "70a1916b5098184b",
+    "svgBack": "0d2aa172cb5c244f",
+    "pdf": "a09f1a412c5a0735"
+  },
+  "long-shattered": {
+    "svgFront": "5e35800d10548e51",
+    "svgBack": "bb6594bc222d682a",
+    "pdf": "6ede5b97f8c93c07"
+  },
+  "long-fractured": {
+    "svgFront": "79bf605bb8a76c5f",
+    "svgBack": "e9b11e2db64a767e",
+    "pdf": "9f219af14ca72c3b"
+  },
+  "long-scales": {
+    "svgFront": "de83f98c1fb943f6",
+    "svgBack": "c9b8dd8deb8394aa",
+    "pdf": "326bf88fa658a205"
+  },
+  "long-prism": {
+    "svgFront": "78f568243a2ede7e",
+    "svgBack": "a132abc4c7161599",
+    "pdf": "719ec3bae6cf95ae"
+  }
+}

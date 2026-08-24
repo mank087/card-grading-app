@@ -479,7 +479,17 @@ export interface GradeChip {
   fill: string;
   /** Numeral + label colour, chosen for contrast against `fill`. */
   ink: string;
+  /**
+   * Keyline colour for chips that need one to exist against their field —
+   * the enterprise white theme, where a white chip on a white label is
+   * invisible without it. Absent on every stock chip (grade 10's foil ring is
+   * drawn by the renderer, not declared here).
+   */
+  keyline?: string;
 }
+
+/** Chip colourway. 'black' is the stock DCM chip; 'white' is enterprise-only (Label Designer). */
+export type GradeChipTheme = 'black' | 'white';
 
 export const GRADE_CHIPS: GradeChip[] = [
   { grade: 10, label: 'GEM MINT',  fill: '#C8A02C', ink: '#1A1206' },
@@ -563,6 +573,36 @@ export const GRADE_CHIP_FALLBACK_PRINT: GradeChip = {
 };
 
 /**
+ * Enterprise WHITE chip theme (Label Designer, Aug 2026). White plate, a
+ * keyline and numeral in a DARK ink — the print ramp's silver / gold / lime
+ * inks are built for a black plate and vanish on white, so this is its own
+ * table, not a fill swap. Grade 10 keeps the foil sweep in the numeral and
+ * ring (the renderers special-case grade 10; `ink` here is the solid used
+ * when a store overrides the foil). Same table for screen and print: flat
+ * dark solids on white are the one thing every printer gets right.
+ */
+export const GRADE_CHIP_WHITE = '#FFFFFF';
+/** Label ink under a foil-10 numeral on the white theme (was ivory on black). */
+export const GRADE_CHIP_WHITE_LABEL_INK = '#1F1D19';
+
+export const GRADE_CHIPS_WHITE: GradeChip[] = [
+  { grade: 10, label: 'GEM MINT',  fill: GRADE_CHIP_WHITE, ink: '#B8860B', keyline: '#B8860B' }, // foil in practice
+  { grade: 9,  label: 'MINT',      fill: GRADE_CHIP_WHITE, ink: '#4B5563', keyline: '#4B5563' }, // slate silver
+  { grade: 8,  label: 'NM-MINT',   fill: GRADE_CHIP_WHITE, ink: '#1D4ED8', keyline: '#1D4ED8' }, // blue
+  { grade: 7,  label: 'NEAR MINT', fill: GRADE_CHIP_WHITE, ink: '#0E7490', keyline: '#0E7490' }, // teal
+  { grade: 6,  label: 'EX-NM',     fill: GRADE_CHIP_WHITE, ink: '#15803D', keyline: '#15803D' }, // green
+  { grade: 5,  label: 'EXCELLENT', fill: GRADE_CHIP_WHITE, ink: '#B45309', keyline: '#B45309' }, // amber
+  { grade: 4,  label: 'VG-EX',     fill: GRADE_CHIP_WHITE, ink: '#C2410C', keyline: '#C2410C' }, // orange
+  { grade: 3,  label: 'VERY GOOD', fill: GRADE_CHIP_WHITE, ink: '#B91C1C', keyline: '#B91C1C' }, // red
+  { grade: 2,  label: 'GOOD',      fill: GRADE_CHIP_WHITE, ink: '#7F1D1D', keyline: '#7F1D1D' }, // maroon
+  { grade: 1,  label: 'POOR',      fill: GRADE_CHIP_WHITE, ink: '#3F3F46', keyline: '#3F3F46' }, // graphite
+];
+
+export const GRADE_CHIP_FALLBACK_WHITE: GradeChip = {
+  grade: 0, label: 'AUTHENTIC', fill: GRADE_CHIP_WHITE, ink: '#374151', keyline: '#374151',
+};
+
+/**
  * Resolve the chip for a grade. Accepts the string form the label pipeline
  * carries ('9', '9.5', 'A', '—'). Half grades round to nearest whole, matching
  * the whole-number scale the slab prints.
@@ -570,10 +610,12 @@ export const GRADE_CHIP_FALLBACK_PRINT: GradeChip = {
 export function resolveGradeChip(
   grade: number | string | null | undefined,
   /** Use the print-hardened ramp. See GRADE_CHIPS_PRINT for why it differs. */
-  forPrint = false
+  forPrint = false,
+  /** Enterprise Label Designer colourway; 'black' (default) is the stock chip on every surface. */
+  theme: GradeChipTheme = 'black'
 ): GradeChip {
-  const table = forPrint ? GRADE_CHIPS_PRINT : GRADE_CHIPS;
-  const fallback = forPrint ? GRADE_CHIP_FALLBACK_PRINT : GRADE_CHIP_FALLBACK;
+  const table = theme === 'white' ? GRADE_CHIPS_WHITE : forPrint ? GRADE_CHIPS_PRINT : GRADE_CHIPS;
+  const fallback = theme === 'white' ? GRADE_CHIP_FALLBACK_WHITE : forPrint ? GRADE_CHIP_FALLBACK_PRINT : GRADE_CHIP_FALLBACK;
   if (grade == null) return fallback;
   const n = typeof grade === 'number' ? grade : Number(String(grade).trim());
   if (!isFinite(n)) return fallback;
