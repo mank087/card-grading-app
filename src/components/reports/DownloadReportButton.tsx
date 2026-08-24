@@ -1236,6 +1236,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           // Org front mark (black variant); the QR disc follows slabData.logoDataUrl
           logoBlack: orgLogos?.branding ? orgLogos.mark : undefined,
           logoScale: orgLogos?.logoScale ?? 1,
+          design: orgLogos?.design ?? null,
           // Org cards carry an ORG serial — /verify/[serial] wouldn't resolve,
           // so hand the generator the same URL the QR image already encodes.
           qrUrl: cardQrUrl(card.id, card.serial, orgLogos?.branding, `${window.location.origin}/${cardType}/${card.id}`),

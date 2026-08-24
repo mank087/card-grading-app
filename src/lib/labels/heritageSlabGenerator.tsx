@@ -26,7 +26,7 @@ import {
   BAND_PATTERNS,
 } from '@/lib/labelLab/heritageSlabPdfDoc'
 import { heritageTheme, heritageGeometry, HERITAGE_PX } from '@/lib/labelLab/heritageLayout'
-import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { designDims, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import {
   PageHeader,
   CornerMarks,
@@ -207,7 +207,7 @@ export async function generateHeritageSlabLabelVector(
   opts: HeritageRenderOptions,
 ): Promise<Blob> {
   const inputs = await buildHeritageInputs(data, opts)
-  return pdf(<HeritageProductionDoc inputs={inputs} d={resolveDims(opts.dims)} /> as any).toBlob()
+  return pdf(<HeritageProductionDoc inputs={inputs} d={resolveDims(opts.dims ?? designDims(opts.design))} /> as any).toBlob()
 }
 
 export async function downloadHeritageSlabLabel(
@@ -432,7 +432,7 @@ export async function generateHeritageFoldOverLabelVector(
   opts: HeritageRenderOptions,
 ): Promise<Blob> {
   const inputs = await buildHeritageInputs(data, opts)
-  return pdf(<HeritageFoldOverDoc inputs={inputs} d={resolveDims(opts.dims)} /> as any).toBlob()
+  return pdf(<HeritageFoldOverDoc inputs={inputs} d={resolveDims(opts.dims ?? designDims(opts.design))} /> as any).toBlob()
 }
 
 export async function downloadHeritageFoldOverLabel(
@@ -595,7 +595,7 @@ export async function generateBatchHeritageSlabLabelsVector(
   dims?: HeritageDims,
 ): Promise<Blob> {
   const entries = await buildBatchInputs(items, pattern, gradeColors)
-  return pdf(<HeritageBatchDuplexDoc entries={entries} d={resolveDims(dims)} /> as any).toBlob()
+  return pdf(<HeritageBatchDuplexDoc entries={entries} d={resolveDims(dims ?? designDims(items[0]?.design))} /> as any).toBlob()
 }
 
 /** Batch fold-over sheets (single-sided). */
@@ -606,5 +606,5 @@ export async function generateBatchHeritageFoldOverLabelsVector(
   dims?: HeritageDims,
 ): Promise<Blob> {
   const entries = await buildBatchInputs(items, pattern, gradeColors)
-  return pdf(<HeritageBatchFoldOverDoc entries={entries} d={resolveDims(dims)} /> as any).toBlob()
+  return pdf(<HeritageBatchFoldOverDoc entries={entries} d={resolveDims(dims ?? designDims(items[0]?.design))} /> as any).toBlob()
 }

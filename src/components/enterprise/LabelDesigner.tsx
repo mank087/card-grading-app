@@ -27,7 +27,7 @@ import {
 } from '@/lib/labelLab/heritageLayout'
 import { MODERN_LOGO_MAX_SCALE } from '@/lib/labels/logoScale'
 import {
-  DESIGN_LIMITS, defaultOrgLabelDesign, designEquals, normalizeOrgLabelDesign,
+  DESIGN_LIMITS, LABEL_SIZE_PRESETS, defaultOrgLabelDesign, designEquals, normalizeOrgLabelDesign,
   type OrgLabelDesign, type BandPosition, type LogoZone,
 } from '@/lib/labels/orgLabelDesign'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
@@ -493,6 +493,20 @@ export default function LabelDesigner({
             <option value="heritage">Heritage (default)</option>
             <option value="modern">Modern</option>
           </select>
+          <div className="mt-2">
+            <label className={labelCls}>Label size</label>
+            <select value={design.size.preset} className={inputCls} disabled={disabled || !heritage}
+              onChange={e => set(x => {
+                const p = LABEL_SIZE_PRESETS.find(s => s.id === e.target.value) ?? LABEL_SIZE_PRESETS[0]
+                x.size = { preset: p.id, widthIn: p.widthIn, heightIn: p.heightIn }
+              })}>
+              {LABEL_SIZE_PRESETS.map(p => <option key={p.id} value={p.id}>{p.name} — {p.widthIn}&quot; × {p.heightIn}&quot;</option>)}
+            </select>
+            <p className="text-[11px] text-gray-400 mt-1">
+              {LABEL_SIZE_PRESETS.find(p => p.id === design.size.preset)?.note} The same layout prints scaled to the slot; the preview shows the slot&apos;s proportions.
+              {!heritage && ' Modern labels print at the standard size.'}
+            </p>
+          </div>
           {!heritage && (
             <p className="text-[11px] text-amber-700 mt-2">
               The Modern label currently takes your logo version and size. Band placement, border, chip colour and text size are Heritage features for now — switch to Heritage for the full designer.

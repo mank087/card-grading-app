@@ -69,6 +69,36 @@ export interface OrgLabelDesign {
     /** Distance from the die-cut edge to the stroke's outer edge, inches. */
     inset: number
   }
+  /**
+   * Physical label slot. The layout is authored for the standard 2.8" x 0.8"
+   * slab; other holders (Zion Mag Pro) print the same layout scaled to their
+   * slot — exactly how the consumer Label Studio handles it.
+   */
+  size: {
+    preset: LabelSizePreset
+    widthIn: number
+    heightIn: number
+  }
+}
+
+export type LabelSizePreset = 'standard' | 'zion'
+
+/** Slab label slots an org can print for. Same numbers as the consumer wizard's SLAB_SIZES. */
+export const LABEL_SIZE_PRESETS: { id: LabelSizePreset; name: string; widthIn: number; heightIn: number; note: string }[] = [
+  { id: 'standard', name: 'Standard slab', widthIn: 2.8, heightIn: 0.8, note: 'Most magnetic one-touch and standard slab holders.' },
+  { id: 'zion', name: 'Zion Mag Pro', widthIn: 2.51, heightIn: 0.76, note: 'The smaller label slot in Zion Mag Pro holders.' },
+]
+
+/** Print dims for a design, or undefined for the standard slot (renderers treat undefined as stock). */
+export function designDims(d: OrgLabelDesign | null | undefined): { widthIn: number; heightIn: number } | undefined {
+  if (!d || d.size.preset === 'standard') return undefined
+  return { widthIn: d.size.widthIn, heightIn: d.size.heightIn }
+}
+
+/** Width/height ratio the on-screen preview should stretch to; undefined = natural 3.5:1. */
+export function designAspect(d: OrgLabelDesign | null | undefined): number | undefined {
+  const dims = designDims(d)
+  return dims ? dims.widthIn / dims.heightIn : undefined
 }
 
 /** Ranges the editor offers and the API clamps to. */
@@ -99,6 +129,7 @@ export function defaultOrgLabelDesign(): OrgLabelDesign {
     chip: { theme: 'black', scale: 1, grade10Color: null },
     text: { scale: 1 },
     border: { enabled: false, color: '#1C1B18', width: 0.02, inset: 0.05 },
+    size: { preset: 'standard', widthIn: 2.8, heightIn: 0.8 },
   }
 }
 
@@ -156,6 +187,9 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
   const chip = (r.chip && typeof r.chip === 'object' ? r.chip : {}) as Record<string, unknown>
   const text = (r.text && typeof r.text === 'object' ? r.text : {}) as Record<string, unknown>
   const border = (r.border && typeof r.border === 'object' ? r.border : {}) as Record<string, unknown>
+  const size = (r.size && typeof r.size === 'object' ? r.size : {}) as Record<string, unknown>
+  // Presets only — the dims are always the preset's, never free numbers.
+  const sizePreset = LABEL_SIZE_PRESETS.find(p => p.id === size.preset) ?? LABEL_SIZE_PRESETS.find(p => p.id === base.size.preset)!
 
   const zone = oneOf(logo.zone, LOGO_ZONES, base.logo.zone)
   const scaleLimit = zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
@@ -196,6 +230,7 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
       width: num(border.width, base.border.width, DESIGN_LIMITS.borderWidth.min, DESIGN_LIMITS.borderWidth.max, 3),
       inset: num(border.inset, base.border.inset, DESIGN_LIMITS.borderInset.min, DESIGN_LIMITS.borderInset.max, 3),
     },
+    size: { preset: sizePreset.id, widthIn: sizePreset.widthIn, heightIn: sizePreset.heightIn },
   }
 }
 

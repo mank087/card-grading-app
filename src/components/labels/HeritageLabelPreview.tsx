@@ -35,7 +35,7 @@ import {
   type HeritageGeometry,
 } from '@/lib/labelLab/heritageLayout'
 import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK } from '@/lib/labelPresets'
-import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { designAspect, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 const FONT = 'Helvetica, Arial, "Noto Sans JP", sans-serif'
 
@@ -407,14 +407,17 @@ export function HeritageLabelPreview({ data, side, pattern, bandColors, classNam
   const uid = 'h' + useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const T = heritageTheme(true)
   const geom = useMemo(() => heritageGeometry(design), [design])
+  // An org design that targets a non-standard slot (Zion) previews at that
+  // slot's aspect, the same stretch the print pipeline applies.
+  const aspect = stretchAspect ?? designAspect(design)
   return (
     <svg
       viewBox={`0 0 ${PX.W} ${PX.H}`}
       className={className}
-      preserveAspectRatio={stretchAspect ? 'none' : undefined}
+      preserveAspectRatio={aspect ? 'none' : undefined}
       style={
-        stretchAspect
-          ? { display: 'block', width: '100%', height: 'auto', aspectRatio: String(stretchAspect) }
+        aspect
+          ? { display: 'block', width: '100%', height: 'auto', aspectRatio: String(aspect) }
           : { display: 'block', width: '100%', height: 'auto' }
       }
       role="img"
