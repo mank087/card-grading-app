@@ -46,7 +46,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.16';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.17';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -1849,7 +1849,7 @@ export async function gradeCardConversational(
 
   const zoomPromise: Promise<ZoomResult> | null =
     outputFormat === 'json'
-      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext })
+      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext, cardType })
       : null;
 
   // Retry configuration for transient failures
@@ -2295,6 +2295,10 @@ Provide detailed analysis as markdown with all required sections.`
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
         // displayed pass rows below the consensus when a cap was corroboration-limited.
         const appliedFaceCaps: Record<string, number> = {};
+        // v9.17: the customer-language findings behind each applied face cap, so the
+        // face prose pointer (Step 7.6) can say WHAT magnification found instead of
+        // "see the limiting factors above" (which pointed at nothing for a 9).
+        const zoomFacePhrases: Record<string, string> = {};
         // v9.3 RIGID-CASE EXCLUSION: cosmetic zoom findings on a card photographed
         // inside a rigid holder are unreliable — the plastic's reflections, edge
         // shadows and dust read as scratches/stains/whitening at crop resolution
@@ -2362,6 +2366,7 @@ Provide detailed analysis as markdown with all required sections.`
                       ? `faint ${d.type} visible only under magnification (${humanizeZoomRegion(d.region)})`
                       : `${d.severity} ${d.type} (${humanizeZoomRegion(d.region)})`)
                     .join('; ') + (faceDefects.length > 3 ? ` +${faceDefects.length - 3} more` : '');
+                  zoomFacePhrases[rawKey] = facePhrases;
                   const addendum = ` Magnified zoom inspection subsequently found: ${facePhrases} — this score reflects those findings.`;
                   const summaryKey = `${face}_summary`;
                   const catSection = jsonData[cat];
@@ -3236,8 +3241,15 @@ Provide detailed analysis as markdown with all required sections.`
               // When a cap actually lowered this face, append a one-line pointer so a
               // "supporting a perfect score" sentence can't sit beside a clamped number
               // with no on-panel explanation. Additive only — never rewrites the prose.
-              if (faceClamped && cap < 10 && typeof fsec.summary === 'string' && !/magnified inspection/i.test(fsec.summary)) {
-                fsec.summary = `${fsec.summary.trim()} Magnified inspection adjusted this face to ${cap}/10 — see the limiting factors and condition summary above.`;
+              if (faceClamped && cap < 10 && typeof fsec.summary === 'string' && !/magnified (zoom )?inspection/i.test(fsec.summary)) {
+                // v9.17: name the finding when this face was zoom-capped. A 9 is never
+                // narrated in the final summary, so this line was the only place a
+                // customer could learn why "no confirmed corner defect" scored 9 — and
+                // it pointed at nothing (customer report Aug 25 2026).
+                const phrases = zoomFacePhrases[`${cat}_${face}`];
+                fsec.summary = phrases
+                  ? `${fsec.summary.trim()} Magnified inspection found ${phrases} and set this face to ${cap}/10 — see the magnified evidence photo for this section.`
+                  : `${fsec.summary.trim()} Magnified inspection adjusted this face to ${cap}/10 — see the limiting factors and condition summary above.`;
               }
             }
           }

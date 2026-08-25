@@ -191,6 +191,42 @@ export function buildFinalSummary(input: NarratorInput): string {
       }
     }
 
+    // v9.17: a 9 that the MAGNIFIED pass produced must be explained. The rule
+    // above ("a 9 is not a flaw worth narrating") is right when a holistic pass
+    // scored the 9, but when zoom capped a face the holistic prose says "no
+    // confirmed defect" and the customer reads "just shy of perfect" with no
+    // reason at all (customer report Aug 25 2026). Name the category and what
+    // magnification saw, in the same customer language the section uses.
+    if (weakest === 9 && input.zoomAdjustments.length > 0) {
+      const held: string[] = [];
+      for (const adj of input.zoomAdjustments) {
+        const m = adj.match(/^(centering|corners|edges|surface)\s+9\/10\s+[-—]+\s*(.+)$/);
+        if (!m) continue;
+        const cat = m[1] as Category;
+        if (subgrades[cat] !== 9) continue;
+        // Group identical descriptors so three corners read as one phrase:
+        // "faint softening visible only under magnification (front top-left,
+        // front top-right and front bottom-right corner)" instead of 3× the same.
+        const items = m[2].replace(/\s*\+\d+ more$/, '').split(/,\s*(?=(?:faint|minor|moderate|heavy)\b)/);
+        const grouped = new Map<string, string[]>();
+        for (const it of items) {
+          const mm = it.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+          const desc = (mm ? mm[1] : it).trim();
+          const loc = mm ? mm[2].trim() : '';
+          if (!grouped.has(desc)) grouped.set(desc, []);
+          if (loc) grouped.get(desc)!.push(loc);
+        }
+        const reasons = [...grouped.entries()].slice(0, 2)
+          .map(([desc, locs]) => locs.length ? `${desc} (${joinList(locs.slice(0, 3))})` : desc)
+          .join(' and ');
+        held.push(`The ${CATEGORY_LABELS[cat]} held the grade at 9 - ${friendlyDefect(reasons)}.`);
+      }
+      if (held.length > 0) {
+        parts.push(held.join(' '));
+        parts.push('The magnified photo behind this finding is attached to the report.');
+      }
+    }
+
     // Server-side grade cap (already written in customer language, e.g. the
     // rigid-holder note or the Gem-Mint unanimity note)
     if (input.gradeCapNote) {
@@ -214,6 +250,7 @@ export function buildFinalSummary(input: NarratorInput): string {
   let body = parts.join(' ');
   const optionalDropOrder = [
     /\s*The (?:centering|corners|edges|surface)(?:, | and |[a-z ,]*)* (?:is|are) otherwise excellent\./, // strengths first
+    /\s*The magnified photo behind this finding is attached to the report\./,
     /\s*Photo quality limits how confidently this card can be assessed\./,
   ];
   for (const rx of optionalDropOrder) {

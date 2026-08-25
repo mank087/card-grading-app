@@ -700,12 +700,35 @@ export async function detectCardGeometry(
   return out;
 }
 
+/**
+ * v9.17: card types whose corners are die-cut with a FACTORY RADIUS. On these,
+ * "softening/rounding" (corner no longer a sharp point) is the manufactured shape,
+ * not wear. Everything except sports cards; 'other' is mostly TCGs (Dragon Ball,
+ * Weiss, Digimon…) so it is treated as rounded too. Measured Aug 25 2026: a
+ * Yu-Gi-Oh card held at 9 in 3 of 4 regrades on clean die-cut corners, and a
+ * Pokemon back corner read as "moderate softening" cost a full grade.
+ */
+export function hasFactoryRoundedCorners(cardType?: string | null): boolean {
+  if (!cardType) return false;
+  return String(cardType).toLowerCase() !== 'sports';
+}
+
+const CARD_TYPE_LABEL: Record<string, string> = {
+  pokemon: 'Pokemon', mtg: 'Magic: The Gathering', lorcana: 'Disney Lorcana', yugioh: 'Yu-Gi-Oh!',
+  onepiece: 'One Piece', starwars: 'Star Wars Unlimited', other: 'non-sports trading card game',
+};
+
+/** Evidence words that make a "softening" call on a factory-rounded corner credible. */
+const SOFTENING_EVIDENCE_RX = /whiten|white\b|fiber|fibre|fuzz|fray|feather|chip|crush|dent|flake|fleck|lift|peel|delamin|asymmetr|uneven|rough|worn|wear|blunt|crease|bend|bent/i;
+
 export async function runZoomInspection(
   frontImageUrl: string,
   backImageUrl: string,
-  options?: { priorityNote?: string; model?: string; precomputedGeometry?: CardGeometry }
+  options?: { priorityNote?: string; model?: string; precomputedGeometry?: CardGeometry; cardType?: string }
 ): Promise<ZoomResult> {
   const empty: ZoomResult = { ok: false, regionsInspected: 0, defects: [], faceCaps: {}, structuralFindings: [] };
+  const roundedCorners = hasFactoryRoundedCorners(options?.cardType);
+  const cardTypeLabel = CARD_TYPE_LABEL[String(options?.cardType || '').toLowerCase()] || String(options?.cardType || 'trading card');
   try {
     const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
     if (!frontRes.ok || !backRes.ok) throw new Error(`image download failed (${frontRes.status}/${backRes.status})`);
@@ -810,6 +833,12 @@ export async function runZoomInspection(
     // ~a cent and no wall-clock (parallel decode).
     const batchResults = await Promise.all(batches.map(async (batch) => {
       const content: any[] = [];
+      if (roundedCorners) {
+        content.push({
+          type: 'text',
+          text: `CARD TYPE: ${cardTypeLabel}. CORNER GEOMETRY: this card's corners are die-cut with a FACTORY RADIUS. A smooth, evenly rounded corner outline is the manufactured shape, NOT softening and NOT rounding wear — do NOT report "softening" because the corner is not a sharp point (the light-border "rounded rather than a sharp point" test does not apply to this card). Report a corner defect on this card ONLY when you can see whitening or fiber exposure at the cut, fuzz or fraying, a chip, a crushed/dented/blunted tip, peeling layers, or a visibly uneven radius compared with the other corners. Describe that evidence in the description.`,
+        });
+      }
       if (options?.priorityNote) {
         content.push({ type: 'text', text: `PRIORITY: ${options.priorityNote}` });
       }
@@ -952,6 +981,29 @@ export async function runZoomInspection(
     }
     if (minorityDropped > 0) {
       console.log(`[ZOOM] majority vote: ${minorityDropped} single-sample finding(s) dropped (needed ${voteThreshold}/${samples.length} votes)`);
+    }
+    // v9.17 FACTORY-RADIUS GUARD: on die-cut TCG corners a "softening/rounding"
+    // verdict whose description only says the corner is round is the factory
+    // shape, not wear. Keep it only when the description cites real evidence
+    // (whitening, fiber, fuzz, chip, crush, uneven radius…). Belt-and-braces
+    // with the prompt note above — the prompt reduces the calls, this removes
+    // the ones that slip through. Never touches structural or whitening types.
+    if (roundedCorners && defects.length > 0) {
+      const kept: ZoomDefect[] = [];
+      let radiusDropped = 0;
+      for (const d of defects) {
+        const isSoftening = /^(softening|rounding|rounded)$/i.test(d.type);
+        if (isSoftening && d.category === 'corners' && !SOFTENING_EVIDENCE_RX.test(d.description || '')) {
+          radiusDropped++;
+          console.log(`[ZOOM] factory-radius guard (${cardTypeLabel}): dropped "${d.type}" at ${d.region} — "${d.description}"`);
+          continue;
+        }
+        kept.push(d);
+      }
+      if (radiusDropped > 0) {
+        defects.length = 0;
+        defects.push(...kept);
+      }
     }
     if (backgroundSuppressed > 0) {
       const bgRegions = [...cardAreaVotes.entries()].filter(([id]) => !regionIsCard(id)).map(([id]) => id);
