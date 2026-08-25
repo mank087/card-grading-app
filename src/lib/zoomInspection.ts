@@ -839,6 +839,16 @@ export async function runZoomInspection(
           text: `CARD TYPE: ${cardTypeLabel}. CORNER GEOMETRY: this card's corners are die-cut with a FACTORY RADIUS. A smooth, evenly rounded corner outline is the manufactured shape, NOT softening and NOT rounding wear — do NOT report "softening" because the corner is not a sharp point (the light-border "rounded rather than a sharp point" test does not apply to this card). Report a corner defect on this card ONLY when you can see whitening or fiber exposure at the cut, fuzz or fraying, a chip, a crushed/dented/blunted tip, peeling layers, or a visibly uneven radius compared with the other corners. Describe that evidence in the description.`,
         });
       }
+      if (String(options?.cardType || '').toLowerCase() === 'yugioh') {
+        // Every genuine Yu-Gi-Oh card carries a small square holographic security
+        // foil (the "Eye of Anubis" seal) in the FRONT bottom-right corner. At crop
+        // resolution its rainbow sparkle reads as "exposed material / coating loss":
+        // a clean card was regraded 9 → 6 on a "heavy chip" there (Aug 25 2026).
+        content.push({
+          type: 'text',
+          text: 'YU-GI-OH SECURITY FOIL: the small square rainbow/holographic seal printed in the FRONT bottom-right corner (beside the copyright line) is a manufacturing feature on every genuine card. Its bright, speckled, multicolour sparkle is NOT a chip, NOT coating loss and NOT exposed material — never report a defect at that seal. Only report the bottom-right front corner if the CARDSTOCK outside the seal shows whitening, fiber, or a crushed tip.',
+        });
+      }
       if (options?.priorityNote) {
         content.push({ type: 'text', text: `PRIORITY: ${options.priorityNote}` });
       }
