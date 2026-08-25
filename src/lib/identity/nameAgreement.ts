@@ -22,10 +22,9 @@ const VARIANT_TOKENS = new Set([
   'rainbow', 'gold', 'secret', 'promo', 'the', 'of', 'and', 'level', 'up',
 ]);
 
-/** Possessive owner prefixes: "Team Rocket's", "Erika's", "Brock's", "Blaine's" … */
-const OWNER_RX = /\b[a-z][a-z .]*'s\b/g;
-/** Regional / form prefixes that describe the SAME species line: keep species, drop the prefix? No —
- *  "Alolan Raichu" and "Raichu" are different cards; we keep these tokens so they must both agree. */
+// Owner possessives ("Misty's Determination", "Team Rocket's Mewtwo") are kept as
+// tokens: the model often reads just the owner ("Misty"), and the owner token is
+// exactly what must agree. Possessive 's collapses to a 1-char token and is dropped.
 
 export interface NameAgreement {
   agrees: boolean;
@@ -40,12 +39,16 @@ export interface NameAgreement {
 function normalise(name: string): string {
   return String(name || '')
     .toLowerCase()
-    .replace(/[’`]/g, "'")
-    .replace(OWNER_RX, ' ')
+    .replace(/[’`']/g, ' ')
     .replace(/[^a-z0-9\s-]/g, ' ')
     .replace(/-/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Meaningful tokens: variant/owner-suffix noise and 1-char fragments removed. */
+function tokens(name: string): string[] {
+  return normalise(name).split(' ').filter(t => t.length > 1 && !VARIANT_TOKENS.has(t));
 }
 
 function levenshtein(a: string, b: string): number {
@@ -65,15 +68,19 @@ function levenshtein(a: string, b: string): number {
 
 /** Species key: the name with variant/owner tokens removed. Empty for Trainer/Energy-style names. */
 export function speciesKey(name: string): string {
-  const tokens = normalise(name).split(' ').filter(Boolean).filter(t => !VARIANT_TOKENS.has(t));
-  return tokens.join(' ');
+  return tokens(name).join(' ');
 }
 
 /**
  * Does the database card's name agree with what the model read?
  * - Empty / too-short AI name → agrees (nothing to check against).
- * - Same species key (exact, or Levenshtein ≤ 1 for keys of 6+ chars) → agrees.
- * - Otherwise fall back to full-name similarity ≥ 0.8 (Trainer / Energy / odd formats).
+ * - Same species key → agrees. One key's tokens a subset of the other's → agrees:
+ *   the model often reads the short form ("Pikachu" for "Flying Pikachu V",
+ *   "Misty" for "Misty's Determination", "Charizard" for "Special Delivery
+ *   Charizard"); the set + number then decides the exact printing. Subset is
+ *   token-level, so "Mew" ⊄ "Mewtwo" and "Alolan Raichu" ⊄ "Alolan Rattata".
+ * - Levenshtein ≤ 1 on keys of 6+ chars (OCR slips like "Charizrd").
+ * - Otherwise full-name similarity ≥ 0.8 (odd formats).
  */
 export function namesAgree(aiName: string | null | undefined, dbName: string | null | undefined): NameAgreement {
   const ai = normalise(aiName || '');
@@ -81,22 +88,36 @@ export function namesAgree(aiName: string | null | undefined, dbName: string | n
   if (!ai || ai.replace(/\s/g, '').length < 3) return { agrees: true, similarity: 1, reason: 'no AI name to check', aiKey: ai, dbKey: db };
   if (!db) return { agrees: true, similarity: 1, reason: 'no DB name to check', aiKey: ai, dbKey: db };
 
-  const aiKey = speciesKey(ai);
-  const dbKey = speciesKey(db);
+  const aiTok = tokens(ai);
+  const dbTok = tokens(db);
+  const aiKey = aiTok.join(' ');
+  const dbKey = dbTok.join(' ');
 
   if (aiKey && dbKey) {
     if (aiKey === dbKey) return { agrees: true, similarity: 1, reason: 'species match', aiKey, dbKey };
+    const aiSet = new Set(aiTok), dbSet = new Set(dbTok);
+    const aiInDb = aiTok.every(t => dbSet.has(t));
+    const dbInAi = dbTok.every(t => aiSet.has(t));
+    if (aiInDb || dbInAi) {
+      return { agrees: true, similarity: Math.min(aiTok.length, dbTok.length) / Math.max(aiTok.length, dbTok.length), reason: aiInDb ? 'read is a short form of the DB name' : 'DB name is a short form of the read', aiKey, dbKey };
+    }
     const d = levenshtein(aiKey, dbKey);
     const maxLen = Math.max(aiKey.length, dbKey.length);
     if (maxLen >= 6 && d <= 1) return { agrees: true, similarity: 1 - d / maxLen, reason: 'species match (1 edit)', aiKey, dbKey };
-    // One key contained in the other as a whole token sequence ("charizard" in "charizard ex"
-    // is already handled by stripping; this catches "mr mime" vs "mr mime jr" style extensions
-    // only when the shorter key is the whole of the longer key's start and the extra is a suffix word).
-    const shorter = aiKey.length <= dbKey.length ? aiKey : dbKey;
-    const longer = shorter === aiKey ? dbKey : aiKey;
-    if (longer.startsWith(shorter + ' ') && longer.slice(shorter.length + 1).split(' ').length === 1 && shorter.split(' ').length >= 2) {
-      return { agrees: true, similarity: 0.85, reason: 'species match (suffix word)', aiKey, dbKey };
+    // Single-token OCR slip inside a multi-token name ("Charizrd VMAX" vs "Charizard VMAX")
+    if (aiTok.length === dbTok.length && aiTok.length > 1) {
+      const slips = aiTok.filter((t, i) => t !== dbTok[i]);
+      if (slips.length === 1) {
+        const i = aiTok.indexOf(slips[0]);
+        if (aiTok[i].length >= 6 && levenshtein(aiTok[i], dbTok[i]) <= 1) return { agrees: true, similarity: 0.9, reason: 'species match (1 edit in one token)', aiKey, dbKey };
+      }
     }
+    // Both names have real tokens and none of the rules matched: that is a
+    // different card. Do NOT fall through to whole-string similarity — a long
+    // shared prefix ("Team Rocket's Mewtwo" / "Team Rocket's Meowth") scores
+    // 0.8 there and would pass.
+    const sim = 1 - levenshtein(ai, db) / Math.max(ai.length, db.length);
+    return { agrees: false, similarity: sim, reason: `name mismatch ("${aiKey}" vs "${dbKey}")`, aiKey, dbKey };
   }
 
   // Full-name similarity fallback (Trainer / Energy cards, or names that collapsed to empty keys)
