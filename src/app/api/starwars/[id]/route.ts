@@ -11,6 +11,7 @@ import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
+import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
@@ -163,6 +164,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
   // Check for query parameters
   const { searchParams } = new URL(request.url);
   const forceRegrade = searchParams.get('force_regrade') === 'true';
+  const reidentify = searchParams.get('reidentify') === 'true';
   const statusOnly = searchParams.get('status_only') === 'true';
 
   console.log(`[GET /api/starwars/${cardId}] Starting Star Wars card request (force_regrade: ${forceRegrade}, status_only: ${statusOnly})`);
@@ -1084,6 +1086,10 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
     });
 
     // Try to update with all fields first
+    // 🪪 Regrade identity guard: a force-regrade refreshes the condition grade only;
+    // the card keeps its stored identification unless ?reidentify=true.
+    await preserveIdentityOnRegrade(supabase, cardId, updateData as any, { forceRegrade, reidentify, tag: `GET /api/starwars/${cardId}` });
+
     let { error: updateError } = await supabase
       .from("cards")
       .update(updateData)

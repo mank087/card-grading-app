@@ -21,15 +21,35 @@ export function oneDigitOff(a: string | null | undefined, b: string | null | und
 }
 
 /**
+ * Number of differing positions between two same-length strings (case-insensitive),
+ * or Infinity when lengths differ or either is empty.
+ */
+export function positionsOff(a: string | null | undefined, b: string | null | undefined): number {
+  const x = String(a ?? '').trim().toUpperCase();
+  const y = String(b ?? '').trim().toUpperCase();
+  if (!x || !y || x.length !== y.length) return Infinity;
+  let diffs = 0;
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) diffs++;
+  return diffs;
+}
+
+/**
  * Among candidates, find the ONE whose number is a single-character variant
  * of the AI-extracted number. Returns null unless exactly one qualifies.
+ * `maxDiffs` widens the tolerance (e.g. 2 for a set-code prefix misread such as
+ * "PHNI" for "PHRE") — only use a wider tolerance when the card NAME has
+ * already matched strongly, otherwise ambiguity climbs fast.
  */
 export function findUniqueDigitVariant<T>(
   candidates: T[],
   getNumber: (c: T) => string | null | undefined,
-  aiNumber: string | null | undefined
+  aiNumber: string | null | undefined,
+  maxDiffs: number = 1
 ): T | null {
   if (!aiNumber) return null;
-  const hits = candidates.filter(c => oneDigitOff(aiNumber, getNumber(c)));
+  const hits = candidates.filter(c => {
+    const d = positionsOff(aiNumber, getNumber(c));
+    return d >= 1 && d <= maxDiffs;
+  });
   return hits.length === 1 ? hits[0] : null;
 }

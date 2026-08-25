@@ -11,6 +11,7 @@ import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
+import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
@@ -175,6 +176,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
   // Check for query parameters
   const { searchParams } = new URL(request.url);
   const forceRegrade = searchParams.get('force_regrade') === 'true';
+  const reidentify = searchParams.get('reidentify') === 'true';
   const statusOnly = searchParams.get('status_only') === 'true';
 
   console.log(`[GET /api/yugioh/${cardId}] Starting Yu-Gi-Oh card request (force_regrade: ${forceRegrade}, status_only: ${statusOnly})`);
@@ -852,10 +854,14 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
     // DATABASE LOOKUP: Cross-reference AI identification with internal Yu-Gi-Oh database
     let matchedDatabaseCard: any = null;
     let databaseMatchConfidence: string | null = null;
+    // Pre-validation snapshot of the model's own read (persisted as
+    // ai_card_info_original so a wrong DB override can always be undone).
+    let aiCardInfoOriginalYgo: any = null;
 
     if (conversationalGradingData?.card_info) {
       try {
         const aiCardInfo = conversationalGradingData.card_info;
+        aiCardInfoOriginalYgo = { ...aiCardInfo };
         console.log(`[GET /api/yugioh/${cardId}] Looking up card in internal database...`);
         console.log(`[GET /api/yugioh/${cardId}]   AI identified: name="${aiCardInfo.card_name}", card_id="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}"`);
 
@@ -865,19 +871,35 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
           aiCardInfo.set_name
         );
 
-        // NOTE (type-only): matchResult.confidence is a MatchConfidenceFlags object, not a
-        // string — the `!== 'low'` check is always true at runtime. Preserved as-is; the
-        // intended field is matchResult.confidence.overallConfidence (pre-existing behavior).
-        if (matchResult.card && (matchResult.confidence as any) !== 'low') {
-          matchedDatabaseCard = matchResult.card;
-          databaseMatchConfidence = matchResult.confidence as any;
+        // Aug 25 2026: the old check compared the flags OBJECT to the string 'low'
+        // (always true), so every match — including a score-80 "name mismatch" —
+        // overwrote the card's identity. Only a HIGH match, or one where both the
+        // set code and the name agreed, may rewrite what the card is. Anything
+        // weaker keeps the model's read and records the candidate for review.
+        const mf = matchResult.confidence;
+        const trustworthy = !!matchResult.card && (mf.overallConfidence === 'high' || (mf.nameMatched && mf.setCodeMatched));
+        const candidate = matchResult.card;
+        if (candidate && !trustworthy) {
+          console.log(`[GET /api/yugioh/${cardId}] DB candidate "${candidate.name}" (${candidate.set_code}) NOT applied — ${mf.overallConfidence} confidence, name ${mf.nameScore}/100, set code ${mf.setCodeScore}/100${mf.warnings.length ? ` — ${mf.warnings.join(' | ')}` : ''}`);
+          conversationalGradingData.card_info._database_candidate = {
+            yugioh_card_id: candidate.card_id,
+            name: candidate.name,
+            set_code: candidate.set_code,
+            match_confidence: mf.overallConfidence,
+            match_score: matchResult.score,
+            warnings: mf.warnings,
+          };
+        }
+        if (trustworthy && candidate) {
+          const dbCard = candidate;
+          matchedDatabaseCard = dbCard;
+          databaseMatchConfidence = mf.overallConfidence;
 
           console.log(`[GET /api/yugioh/${cardId}] Database match found (${databaseMatchConfidence} confidence):`);
-          console.log(`[GET /api/yugioh/${cardId}]   DB: ${matchResult.card.name} (${matchResult.card.set_name}) #${matchResult.card.card_id}`);
-          console.log(`[GET /api/yugioh/${cardId}]   Rarity: ${matchResult.card.set_rarity}, Type: ${matchResult.card.type}`);
+          console.log(`[GET /api/yugioh/${cardId}]   DB: ${dbCard.name} (${dbCard.set_name}) #${dbCard.card_id}`);
+          console.log(`[GET /api/yugioh/${cardId}]   Rarity: ${dbCard.set_rarity}, Type: ${dbCard.type}`);
 
           // Enhance card_info with verified database data
-          const dbCard = matchResult.card;
 
           conversationalGradingData.card_info = {
             ...conversationalGradingData.card_info,
@@ -952,6 +974,13 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
 
       // Conversational grading raw JSON
       conversational_grading: conversationalGradingResult,
+
+      // Identification provenance (Aug 25 2026): what the DB override was based on,
+      // and the model's own read before it — Pokemon/Sports already store these.
+      validated_source: matchedDatabaseCard ? 'yugioh_cards' : null,
+      validation_tier: matchedDatabaseCard ? 'exact' : null,
+      validation_confidence: matchedDatabaseCard ? (databaseMatchConfidence || 'high') : null,
+      ai_card_info_original: aiCardInfoOriginalYgo,
 
       // Structured conversational grading fields (parsed from JSON)
       conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
@@ -1057,6 +1086,10 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
     });
 
     // Try to update with all fields first
+    // 🪪 Regrade identity guard: a force-regrade refreshes the condition grade only;
+    // the card keeps its stored identification unless ?reidentify=true.
+    await preserveIdentityOnRegrade(supabase, cardId, updateData as any, { forceRegrade, reidentify, tag: `GET /api/yugioh/${cardId}` });
+
     let { error: updateError } = await supabase
       .from("cards")
       .update(updateData)

@@ -286,7 +286,15 @@ export async function lookupStarWarsCard(
       if (bestNameSim >= 0.8) score += 20;       // Strong name verification → 95
       else if (bestNameSim >= 0.5) score += 15;   // Decent name verification → 90
       else if (bestNameSim >= 0.3) score += 10;   // Weak name verification → 85
-      // Even without name match, number + set is still reliable
+      else if (cardName || characterName) {
+        // Aug 25 2026: the AI READ a name and it does not match this printing —
+        // that is a misread card number landing on a real but different card,
+        // not a verification. Do not accept it (the route treats medium as a
+        // database match and rewrites set/number/rarity/pricing from it).
+        warnings.push(`Card number ${cardNumber} found "${result.card_name}" but AI identified "${cardName || characterName}" — name mismatch, number hit rejected`);
+        continue;
+      }
+      // No name available at all: number + set is still a reasonable signal (75-80)
 
       // Boost for set match
       if (setName && result.set_name) {

@@ -86,6 +86,22 @@ export async function lookupNarutoCard(aiInfo: {
   const none: NarutoMatchResult = { card: null, set: null, confidence: 'low', matchedBy: 'none', warnings };
 
   const rawNumber = aiInfo.card_number || null;
+  // Aug 25 2026: a number hit must agree with the character the model READ.
+  // A misread Kayou number lands on a real but different card; before this the
+  // exact/prefix strategies returned it at 'high' with no name check and the
+  // route renamed the card (no pre-override snapshot to recover from).
+  const aiName = String(aiInfo.character_name || aiInfo.card_name || '').toLowerCase().replace(/[^a-z0-9s]/g, ' ').replace(/s+/g, ' ').trim();
+  const nameAgrees = (row: any): boolean => {
+    if (!aiName) return true; // nothing to check against
+    const rowName = String(row?.character_name || '').toLowerCase().replace(/[^a-z0-9s]/g, ' ').replace(/s+/g, ' ').trim();
+    if (!rowName) return true;
+    if (rowName.includes(aiName) || aiName.includes(rowName)) return true;
+    const a = new Set(aiName.split(' ')), b = rowName.split(' ');
+    return b.some(w => w.length >= 3 && a.has(w));
+  };
+  const rejectNumberHit = (row: any, how: string) => {
+    warnings.push(`Number ${rawNumber} (${how}) found "${row?.character_name}" but AI identified "${aiInfo.character_name || aiInfo.card_name}" — name mismatch, number hit rejected`);
+  };
 
   if (rawNumber) {
     const normalized = normalizeKayouNumber(rawNumber);
@@ -96,7 +112,8 @@ export async function lookupNarutoCard(aiInfo: {
       .select('*')
       .eq('card_number', normalized)
       .maybeSingle();
-    if (exact) {
+    if (exact && !nameAgrees(exact)) rejectNumberHit(exact, 'exact');
+    if (exact && nameAgrees(exact)) {
       return {
         card: exact as NarutoCard,
         set: await getSet(exact.set_id),
@@ -114,7 +131,8 @@ export async function lookupNarutoCard(aiInfo: {
         .select('*')
         .ilike('card_number', `${noTier}%`)
         .limit(2);
-      if (tierless && tierless.length === 1) {
+      if (tierless && tierless.length === 1 && !nameAgrees(tierless[0])) rejectNumberHit(tierless[0], 'tier-stripped');
+      if (tierless && tierless.length === 1 && nameAgrees(tierless[0])) {
         warnings.push(`Matched ignoring tier suffix: "${rawNumber}" → "${tierless[0].card_number}"`);
         return {
           card: tierless[0] as NarutoCard,
@@ -131,7 +149,8 @@ export async function lookupNarutoCard(aiInfo: {
         .select('*')
         .ilike('card_number', `${normalized}%`)
         .limit(2);
-      if (prefixed && prefixed.length === 1) {
+      if (prefixed && prefixed.length === 1 && !nameAgrees(prefixed[0])) rejectNumberHit(prefixed[0], 'prefix');
+      if (prefixed && prefixed.length === 1 && nameAgrees(prefixed[0])) {
         warnings.push(`Matched by number prefix: "${rawNumber}" → "${prefixed[0].card_number}"`);
         return {
           card: prefixed[0] as NarutoCard,

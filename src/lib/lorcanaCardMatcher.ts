@@ -569,8 +569,12 @@ export async function lookupLorcanaCard(
           return bestMatch;
         }
       }
-      // If only one result, use it with medium confidence
-      if (numberResults.length === 1) {
+      // If only one result AND the AI gave no name, use it with medium confidence.
+      // Aug 25 2026: a name that scored low above must not fall through to a
+      // name-blind number match (the route applies medium matches and renames).
+      if (aiIdentification.name) {
+        console.log(`[Lorcana Matcher] number-only candidate(s) rejected: name "${aiIdentification.name}" does not match ${numberResults.map(r => r.full_name).slice(0, 3).join(' / ')}`);
+      } else if (numberResults.length === 1) {
         console.log(`[Lorcana Matcher] Single match by number: ${numberResults[0].full_name} (${numberResults[0].set_name})`);
         return {
           card: numberResults[0],

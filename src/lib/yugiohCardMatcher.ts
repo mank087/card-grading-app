@@ -60,22 +60,41 @@ export interface MatchResult {
 /**
  * Calculate similarity score between two strings (0-1)
  */
-function calculateSimilarity(str1: string, str2: string): number {
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
 
+function calculateSimilarity(str1: string, str2: string): number {
+  const norm = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const s1 = norm(str1);
+  const s2 = norm(str2);
+  if (!s1 || !s2) return 0;
   if (s1 === s2) return 1.0;
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
 
-  // Simple word overlap score
-  const words1 = s1.split(/\s+/);
-  const words2 = s2.split(/\s+/);
+  // Word overlap (order-insensitive) …
+  const words1 = s1.split(' ');
+  const words2 = s2.split(' ');
   const commonWords = words1.filter(w => words2.includes(w));
-  if (commonWords.length > 0) {
-    return commonWords.length / Math.max(words1.length, words2.length);
-  }
+  const overlap = commonWords.length > 0 ? commonWords.length / Math.max(words1.length, words2.length) : 0;
 
-  return 0;
+  // … combined with an edit-distance ratio so "Kewl Tune Synchro" vs "Kewl Tune
+  // Clip" (shared prefix, different card) and OCR-mangled names score sensibly.
+  // Aug 25 2026: the word-overlap-only score let unrelated names sit at 0 while a
+  // misread set code decided the match.
+  const edit = 1 - levenshtein(s1, s2) / Math.max(s1.length, s2.length);
+  return Math.max(overlap, edit);
 }
 
 /**
@@ -245,23 +264,49 @@ export async function lookupYugiohCard(
       if (nameSim < 0.3) {
         warnings.push(`Set code ${setCode} found "${directMatch.name}" but AI identified "${cardName}" — name mismatch`);
         // The misread code may have landed on a DIFFERENT real printing.
-        // If the NAME matches printings and exactly one has a set code one
-        // character off from the AI's, correct to that printing.
+        // If the NAME matches printings and exactly one has a set code within
+        // two characters of the AI's (prefix misreads like PHNI↔PHRE are two
+        // characters), correct to that printing.
         const nameResults = await searchByName(cardName);
         const strongNameResults = nameResults.filter(r => calculateSimilarity(cardName, r.name) >= 0.9);
-        const variant = findUniqueDigitVariant(strongNameResults, r => r.set_code, setCode);
+        const variant = findUniqueDigitVariant(strongNameResults, r => r.set_code, setCode, 2);
         if (variant) {
           console.log(`[YGO Matcher] 🔢 Set-code misread corrected: "${setCode}" → "${variant.set_code}" (${variant.name})`);
-          warnings.push(`Set code corrected from "${setCode}" to "${variant.set_code}" (single-character misread; name matched)`);
+          warnings.push(`Set code corrected from "${setCode}" to "${variant.set_code}" (misread; name matched)`);
           flags.setCodeMatched = true;
           flags.setCodeScore = 90;
           flags.nameMatched = true;
           flags.nameScore = 100;
           bestCard = variant;
           bestScore = 92;
+        } else if (strongNameResults.length > 0) {
+          // Aug 25 2026: NEVER accept a set-code hit whose name does not match.
+          // The printed name is the most reliable thing the model reads; a
+          // four-letter set prefix is the least. A misread "PHNI-EN039" resolved
+          // to a real printing (Aromalilith Magnolia) and renamed a customer's
+          // "Kewl Tune Synchro" (PHRE-EN039). Trust the name; prefer the printing
+          // in the AI's set when it names one, else the first strong name hit.
+          const inSet = setName
+            ? strongNameResults.find(r => r.set_name && calculateSimilarity(setName, r.set_name) > 0.5)
+            : undefined;
+          bestCard = inSet || strongNameResults[0];
+          bestScore = 85;
+          flags.setCodeMatched = false;
+          flags.setCodeScore = 0;
+          flags.nameMatched = true;
+          flags.nameScore = 100;
+          warnings.push(`Set code "${setCode}" disagrees with the card name; name trusted → ${bestCard.name} (${bestCard.set_code})`);
+          console.log(`[YGO Matcher] 🪪 name beats set code: "${setCode}" would be "${directMatch.name}", keeping "${bestCard.name}" (${bestCard.set_code})`);
         } else {
-          bestCard = directMatch;
-          bestScore = 80;
+          // No printing matches the name either: do not auto-identify. Returning
+          // the set-code card here is exactly the rename bug; leave the AI's read
+          // in place (low confidence) for a human to check.
+          bestCard = null;
+          bestScore = 40;
+          flags.setCodeMatched = false;
+          flags.setCodeScore = 0;
+          warnings.push(`Set code "${setCode}" and name "${cardName}" point at different cards and no printing matches the name — not auto-identified`);
+          console.log(`[YGO Matcher] ⚠️ set code "${setCode}" (${directMatch.name}) contradicts name "${cardName}" — no match returned`);
         }
       } else {
         bestCard = directMatch;

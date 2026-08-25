@@ -11,6 +11,7 @@ import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
+import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
   // Check for query parameters
   const { searchParams } = new URL(request.url);
   const forceRegrade = searchParams.get('force_regrade') === 'true';
+  const reidentify = searchParams.get('reidentify') === 'true';
   const statusOnly = searchParams.get('status_only') === 'true';
 
   console.log(`[GET /api/sports/${cardId}] Starting sports card request (force_regrade: ${forceRegrade}, status_only: ${statusOnly})`);
@@ -1268,6 +1270,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       decimal_grade: conversationalGradingData?.decimal_grade,
       whole_grade: conversationalGradingData?.whole_grade
     });
+
+    // 🪪 Regrade identity guard: a force-regrade refreshes the condition grade only;
+    // the card keeps its stored identification unless ?reidentify=true.
+    await preserveIdentityOnRegrade(supabase, cardId, updateData as any, { forceRegrade, reidentify, tag: `GET /api/sports/${cardId}` });
 
     const { error: updateError } = await supabase
       .from("cards")

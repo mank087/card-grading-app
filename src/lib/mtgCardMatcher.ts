@@ -666,8 +666,13 @@ export async function lookupMtgCard(
           return bestMatch;
         }
       }
-      // If only one result, use it with medium confidence
-      if (numberResults.length === 1) {
+      // If only one result AND the AI gave no name, use it with medium confidence.
+      // Aug 25 2026: when a name WAS given and scored low above, falling through
+      // here returned a name-contradicting card at medium, which the route applies
+      // (renamed customer cards in the Yu-Gi-Oh equivalent). Name disagreement ends here.
+      if (name) {
+        console.log(`[MTG Matcher] number-only candidate(s) rejected: name "${name}" does not match ${numberResults.map(r => r.name).slice(0, 3).join(' / ')}`);
+      } else if (numberResults.length === 1) {
         console.log(`[MTG Matcher] Single match by number: ${numberResults[0].name} (${numberResults[0].set_name})`);
         return {
           card: numberResults[0],
