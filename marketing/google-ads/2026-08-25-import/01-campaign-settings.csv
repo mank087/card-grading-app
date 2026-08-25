@@ -1,0 +1,6 @@
+﻿Campaign,Campaign Type,Networks,Budget,Budget type,Bid Strategy Type,Maximum CPC bid limit,Target ROAS,Final URL expansion,Tracking template,Languages,Campaign Status
+Search - Pokemon,,Google search,,,,0.75,,,{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword},,
+Search-sports,,Google search,,,,0.75,,,{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword},,
+Search-general audience,,Google search,,,,1.00,,,{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword},,
+Sales-Performance Max - ALL,,,,,,,250%,Disabled,{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword},,
+Search-enterprise,Search,Google search,15.00,Daily,Maximize clicks,2.50,,,{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword},en,Paused

@@ -1,0 +1,29 @@
+{
+  "groups": {
+    "Search - Pokemon > Pokemon - Service & Price": 11,
+    "Search - Pokemon > Pokemon - Estimate & Worth Grading": 10,
+    "Search - Pokemon > Pokemon - Centering & Subgrades": 13,
+    "Search - Pokemon > Pokemon - Grading App": 13,
+    "Search - Pokemon > Pokemon - Online & From Photo": 16,
+    "Search-sports > Sports - Online & From Photo": 21,
+    "Search-sports > Sports - Estimate & Worth Grading": 13,
+    "Search-sports > Sports - Players": 13,
+    "Search-sports > Sports - Grading App": 6,
+    "Search-sports > Sports - Service & Price": 16,
+    "Search-sports > Sports - Centering & Subgrades": 11,
+    "Search-sports > Sports - Brands": 6,
+    "Search-general audience > General - AI Card Grader": 12,
+    "Search-general audience > General - Grading App": 26,
+    "Search-general audience > General - Centering & Subgrades": 29,
+    "Search-general audience > General - Online & From Photo": 45,
+    "Search-general audience > General - Estimate & Checker": 25,
+    "Search-general audience > General - TCG Grading": 18,
+    "Search-general audience > General - Collectible & Non-Sport": 25,
+    "Search-enterprise > Enterprise - Wholesale & In-Store": 24,
+    "Search-enterprise > Enterprise - Dealers & Card Shows": 16,
+    "Search-enterprise > Enterprise - Breakers & Streamers": 20
+  },
+  "negatives": 219,
+  "assets": 62,
+  "ads": 22
+}
