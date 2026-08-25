@@ -90,10 +90,10 @@ export async function lookupNarutoCard(aiInfo: {
   // A misread Kayou number lands on a real but different card; before this the
   // exact/prefix strategies returned it at 'high' with no name check and the
   // route renamed the card (no pre-override snapshot to recover from).
-  const aiName = String(aiInfo.character_name || aiInfo.card_name || '').toLowerCase().replace(/[^a-z0-9s]/g, ' ').replace(/s+/g, ' ').trim();
+  const aiName = String(aiInfo.character_name || aiInfo.card_name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const nameAgrees = (row: any): boolean => {
     if (!aiName) return true; // nothing to check against
-    const rowName = String(row?.character_name || '').toLowerCase().replace(/[^a-z0-9s]/g, ' ').replace(/s+/g, ' ').trim();
+    const rowName = String(row?.character_name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!rowName) return true;
     if (rowName.includes(aiName) || aiName.includes(rowName)) return true;
     const a = new Set(aiName.split(' ')), b = rowName.split(' ');
