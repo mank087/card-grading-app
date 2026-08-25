@@ -1,0 +1,4 @@
+﻿Campaign,Networks,Budget,Budget type,Bid Strategy Type,Maximum CPC bid limit,Campaign Status
+Search - Pokemon,Google search,,,,,
+Search-sports,Google search,,,,,
+Search-enterprise,Google search,15.00,Daily,Maximize clicks,2.50,Paused
