@@ -14,6 +14,8 @@ import {
   searchLocalByNameNumberSetId,
   searchLocalByNameNumberTotal
 } from './pokemonTcgApi';
+import { namesAgree, speciesKey, type NameAgreement } from './identity/nameAgreement';
+import { findUniqueDigitVariant } from './cardNumberUtils';
 
 export interface PokemonApiVerificationResult {
   success: boolean;
@@ -28,6 +30,10 @@ export interface PokemonApiVerificationResult {
     corrected: string | null;
   }[];
   error?: string;
+  /** Aug 25 2026: how the matched card's name compared with what the model read */
+  name_agreement?: NameAgreement;
+  /** A set+number hit that was REJECTED because its name contradicted the model's read */
+  rejected_candidate?: { id: string; name: string; set_name: string; number: string; reason: string };
 }
 
 export interface CardInfoForVerification {
@@ -324,6 +330,77 @@ async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise
 }
 
 /**
+ * Aug 25 2026: NAME-AWARE set+number lookup. The bare set+number hit is where a
+ * misread digit becomes a different real card (Alolan Raichu ↔ Alolan Rattata,
+ * Double Colorless ↔ Double Turbo Energy sit in the same sets with nearby
+ * numbers). When the model read a name:
+ *   1. take the set+number row only if its name agrees with that read;
+ *   2. otherwise look for the ONE card in the same set whose name agrees and
+ *      whose number is a single digit off (OCR-class misread) — correct to it;
+ *   3. otherwise return nothing and record the rejected candidate.
+ * With no AI name, behave as before (caller marks the result medium).
+ */
+async function queryBySetIdAndNumberChecked(
+  setId: string,
+  cardNumber: string,
+  aiName: string,
+  result: PokemonApiVerificationResult,
+): Promise<{ card: PokemonCard | null; corrected?: boolean }> {
+  const hit = await queryBySetIdAndNumber(setId, cardNumber);
+  if (!aiName) return { card: hit };
+  if (hit) {
+    const agreement = namesAgree(aiName, hit.name);
+    if (agreement.agrees) {
+      result.name_agreement = agreement;
+      return { card: hit };
+    }
+    console.log(`[Pokemon Local Verification] set+number hit "${hit.name}" REJECTED — ${agreement.reason}`);
+    result.rejected_candidate = { id: hit.id, name: hit.name, set_name: hit.set?.name || '', number: String(hit.number), reason: agreement.reason };
+  }
+  // Digit-misread rescue within the same set, anchored on the species the model read
+  try {
+    const key = speciesKey(aiName) || aiName;
+    const firstToken = key.split(' ')[0];
+    const pool = await searchLocalNameInSet(firstToken, setId);
+    const agreeing = pool.filter(c => namesAgree(aiName, c.name).agrees);
+    const variant = findUniqueDigitVariant(agreeing, c => String(c.number), normalizeCardNumber(cardNumber));
+    if (variant) {
+      console.log(`[Pokemon Local Verification] 🔢 number misread corrected within set ${setId}: "${cardNumber}" → "${variant.number}" (${variant.name})`);
+      result.corrections.push({ field: 'card_number', original: cardNumber, corrected: `${variant.number}/${variant.set.printedTotal}` });
+      result.name_agreement = namesAgree(aiName, variant.name);
+      return { card: variant, corrected: true };
+    }
+  } catch (e: any) {
+    console.warn('[Pokemon Local Verification] rescue lookup failed:', e?.message);
+  }
+  return { card: null };
+}
+
+/** Name-only scan inside one set (used by the misread rescue). */
+async function searchLocalNameInSet(nameToken: string, setId: string): Promise<PokemonCard[]> {
+  try {
+    const { supabaseServer } = await import('./supabaseServer');
+    const { data } = await supabaseServer()
+      .from('pokemon_cards')
+      .select('*')
+      .eq('set_id', setId)
+      .ilike('name', `%${nameToken}%`)
+      .limit(25);
+    if (!data?.length) return [];
+    // Reuse the local→API shape converter via a number-less search helper is not exposed;
+    // map the minimal fields the rescue needs (id, name, number, set).
+    return (data as any[]).map(r => ({
+      id: r.id,
+      name: r.name,
+      number: String(r.number),
+      set: { id: r.set_id, name: r.set_name, printedTotal: r.set_printed_total, releaseDate: r.set_release_date },
+    })) as unknown as PokemonCard[];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Query local database by name and set name
  * Fallback method when set ID is not available
  */
@@ -505,10 +582,12 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     const setId = SET_CODE_TO_ID[setCode.toUpperCase()];
     if (setId) {
       console.log(`[Pokemon Local Verification] Strategy 1: Set code ${setCode} -> ${setId}`);
-      dbCard = await queryBySetIdAndNumber(setId, cardNumber);
+      const checked = await queryBySetIdAndNumberChecked(setId, cardNumber, cardName, result);
+      dbCard = checked.card;
       if (dbCard) {
         result.verification_method = 'set_id_number';
-        result.confidence = 'high';
+        // No AI name to cross-check → the number alone is not "high"
+        result.confidence = cardName ? 'high' : 'medium';
       }
     }
   }
@@ -531,10 +610,11 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     const setId = SET_NAME_TO_ID[setName];
     if (setId) {
       console.log(`[Pokemon Local Verification] Strategy 2: Set name "${setName}" -> ${setId}`);
-      dbCard = await queryBySetIdAndNumber(setId, cardNumber);
+      const checked = await queryBySetIdAndNumberChecked(setId, cardNumber, cardName, result);
+      dbCard = checked.card;
       if (dbCard) {
         result.verification_method = 'set_id_number';
-        result.confidence = 'high';
+        result.confidence = cardName ? 'high' : 'medium';
       }
     }
   }
@@ -663,13 +743,14 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
       }
     }
 
-    // VALIDATION: Reject if card name doesn't match at all
-    const normalizedOriginal = cardName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normalizedMatched = dbCardName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (normalizedOriginal && normalizedMatched &&
-        !normalizedMatched.includes(normalizedOriginal.substring(0, 5)) &&
-        !normalizedOriginal.includes(normalizedMatched.substring(0, 5))) {
-      console.log(`[Pokemon Local Verification] REJECTED: Name mismatch (${cardName} vs ${dbCardName})`);
+    // VALIDATION: Reject if the card name does not agree with what the model read.
+    // Aug 25 2026: species-level agreement (variant tokens stripped) replaces the
+    // old 5-character prefix test that passed "Alolan Raichu" for "Alolan Rattata".
+    const agreement = namesAgree(cardName, dbCardName);
+    result.name_agreement = agreement;
+    if (!agreement.agrees) {
+      console.log(`[Pokemon Local Verification] REJECTED: ${agreement.reason} (${cardName} vs ${dbCardName})`);
+      result.rejected_candidate = { id: dbCard.id, name: dbCardName, set_name: dbSetName, number: String(dbCard.number), reason: agreement.reason };
       result.success = false;
       result.verified = false;
       result.pokemon_api_id = null;
@@ -733,12 +814,16 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
 
   const dbCard = verificationResult.pokemon_api_data;
 
-  // Only apply corrections for high/medium confidence matches
-  const shouldApplyCorrections = verificationResult.corrections.length > 0 &&
+  // Only apply corrections for high/medium confidence matches WHOSE NAME AGREED
+  // with the model's read (Aug 25 2026 — a number-first match must never rename
+  // or re-set a card on the strength of the number alone).
+  const nameAgreed = verificationResult.name_agreement?.agrees !== false;
+  const shouldApplyCorrections = verificationResult.corrections.length > 0 && nameAgreed &&
     (verificationResult.confidence === 'high' || verificationResult.confidence === 'medium');
 
-  // For card_number specifically, only correct if the match is high confidence
-  const shouldCorrectCardNumber = verificationResult.confidence === 'high';
+  // For card_number and card_name specifically, only correct on a high-confidence match
+  const shouldCorrectCardNumber = verificationResult.confidence === 'high' && nameAgreed;
+  const shouldCorrectCardName = verificationResult.confidence === 'high' && nameAgreed;
 
   console.log(`[Pokemon Local Update] Confidence: ${verificationResult.confidence}, ` +
               `Applying corrections: ${shouldApplyCorrections}, ` +
@@ -758,7 +843,7 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
 
     // Override card info with verified data (only for high/medium confidence matches)
     ...(shouldApplyCorrections && {
-      card_name: dbCard.name,
+      ...(shouldCorrectCardName && { card_name: dbCard.name }),
       card_set: dbCard.set.name,
       release_date: dbCard.set.releaseDate?.split('/')[0] || null,
       ...(shouldCorrectCardNumber && {

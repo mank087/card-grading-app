@@ -1703,7 +1703,11 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: cardId,
-          card_info: conversationalGradingData?.card_info || null
+          card_info: conversationalGradingData?.card_info || null,
+          // Aug 25 2026: the verify endpoint must obey the same regrade rule as
+          // this route — a force-regrade refreshes condition, not identity.
+          regrade: forceRegrade,
+          reidentify,
         })
       }).then(async (verifyResponse) => {
         if (verifyResponse.ok) {

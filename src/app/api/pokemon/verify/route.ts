@@ -6,6 +6,8 @@ import {
   extractPokemonMetadata,
   type CardInfoForVerification
 } from "@/lib/pokemonApiVerification";
+import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
+import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 
 /**
  * POST /api/pokemon/verify
@@ -34,6 +36,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { card_id, card_info: overrideCardInfo } = body;
+    // Aug 25 2026: regrade context from the grading route. On a regrade of an
+    // already-identified card, verification may refresh pokemon_api_* metadata
+    // but must not rewrite identity unless reidentify was requested.
+    const isRegrade = body?.regrade === true;
+    const reidentify = body?.reidentify === true;
 
     if (!card_id) {
       return NextResponse.json(
@@ -59,7 +66,17 @@ export async function POST(request: NextRequest) {
         release_date,
         manufacturer_name,
         conversational_card_info,
-        pokemon_api_verified
+        pokemon_api_verified,
+        serial,
+        conversational_decimal_grade,
+        conversational_whole_grade,
+        conversational_condition_label,
+        serial_numbering,
+        first_print_rookie,
+        holofoil,
+        validated_source,
+        ai_card_info_original,
+        label_data
       `)
       .eq("id", card_id)
       .single();
@@ -140,15 +157,69 @@ export async function POST(request: NextRequest) {
           pokemon_api_verified: true,
           pokemon_api_id: verificationResult.pokemon_api_id,
           rarity_or_variant: metadata.rarity || convInfo.rarity_or_variant,
-          tcgplayer_url: tcgplayerUrl
+          tcgplayer_url: tcgplayerUrl,
+          ...(verificationResult.name_agreement ? { _name_agreement: verificationResult.name_agreement } : {}),
+          ...(verificationResult.rejected_candidate ? { _rejected_candidate: verificationResult.rejected_candidate } : {}),
         };
+
+        const identityKeys = ['card_name', 'card_set', 'card_number', 'release_date'] as const;
+        const overridesIdentity = identityKeys.some(k => (updateFields as any)[k] != null && (updateFields as any)[k] !== (card as any)[k]);
+
+        const updateData: Record<string, any> = {
+          ...updateFields,
+          conversational_card_info: updatedCardInfo,
+        };
+
+        // Aug 25 2026: keep a pre-override snapshot so any rewrite is reversible
+        // (Pokemon/Sports grading routes already do this; verify never did).
+        if (overridesIdentity && !(card as any).ai_card_info_original) {
+          updateData.ai_card_info_original = {
+            card_name: card.card_name, card_set: card.card_set, card_number: card.card_number,
+            release_date: card.release_date, ...(convInfo || {}), _snapshot_by: 'pokemon/verify',
+          };
+        }
+
+        // Regrade identity guard — same rule as the category routes. On a plain
+        // regrade of an identified card this strips the identity rewrites and
+        // leaves the pokemon_api_* metadata refresh in place.
+        await preserveIdentityOnRegrade(supabase, card_id, updateData, { forceRegrade: isRegrade, reidentify, tag: `POST /api/pokemon/verify ${card_id}` });
+
+        // Keep the printed label in step with the row whenever identity changed.
+        const finalName = updateData.card_name ?? card.card_name;
+        const finalSet = updateData.card_set ?? card.card_set;
+        const finalNumber = updateData.card_number ?? card.card_number;
+        const finalYear = updateData.release_date ?? card.release_date;
+        if (finalName !== card.card_name || finalSet !== card.card_set || finalNumber !== card.card_number || finalYear !== card.release_date) {
+          try {
+            const c = card as any;
+            const cardForLabel: CardForLabel = {
+              id: card_id,
+              category: 'Pokemon',
+              serial: c.serial,
+              conversational_decimal_grade: c.conversational_decimal_grade ?? null,
+              conversational_whole_grade: c.conversational_whole_grade ?? null,
+              conversational_condition_label: c.conversational_condition_label ?? null,
+              conversational_card_info: updateData.conversational_card_info ?? convInfo ?? null,
+              card_name: finalName,
+              card_set: finalSet,
+              card_number: finalNumber,
+              featured: c.featured,
+              pokemon_featured: c.featured,
+              release_date: finalYear,
+              serial_numbering: c.serial_numbering,
+              first_print_rookie: c.first_print_rookie,
+              holofoil: c.holofoil,
+            };
+            updateData.label_data = generateLabelData(cardForLabel);
+            console.log(`[Pokemon Verify API] label regenerated: ${updateData.label_data?.primaryName} / ${updateData.label_data?.contextLine}`);
+          } catch (labelErr: any) {
+            console.warn(`[Pokemon Verify API] label regeneration failed (row still updated): ${labelErr?.message}`);
+          }
+        }
 
         const { error: updateError } = await supabase
           .from("cards")
-          .update({
-            ...updateFields,
-            conversational_card_info: updatedCardInfo
-          })
+          .update(updateData)
           .eq("id", card_id);
 
         if (updateError) {

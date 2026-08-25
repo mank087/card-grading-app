@@ -10,6 +10,7 @@
 
 import { supabaseServer } from './supabaseServer';
 import { findUniqueDigitVariant } from './cardNumberUtils';
+import { namesAgree } from './identity/nameAgreement';
 
 export interface TcgCard {
   game: string;
@@ -89,12 +90,10 @@ export async function lookupTcgCard(aiInfo: {
       // When the AI extracted a name, an exact-code match whose DB name is
       // completely incompatible is not trusted (mirrors the MTG name check) —
       // the digit-misread rescue below then gets a chance to fix the code.
-      const nameCompatible = (dbName: string | null | undefined): boolean => {
-        const ai = (aiInfo.card_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (!ai || ai.length < 3) return true; // nothing to validate against
-        const db = (dbName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        return db.includes(ai.slice(0, 5)) || ai.includes(db.slice(0, 5));
-      };
+      // Aug 25 2026: species-level agreement (shared helper) replaces the 5-char
+      // prefix test that passed same-prefix different cards.
+      const nameCompatible = (dbName: string | null | undefined): boolean =>
+        namesAgree(aiInfo.card_name, dbName).agrees;
 
       // Code within the known game — definitive when the name agrees
       if (game) {
