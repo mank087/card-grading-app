@@ -3049,7 +3049,7 @@ PURPOSE: Assess centering for both front and back independently.
 
 🎯 CENTERING MEASUREMENT PRINCIPLE: PROVE PERFECT, DON'T ASSUME IT
 
-**CENTERING SCORING GUIDE (v8.5 UPDATED)**
+**CENTERING SCORING GUIDE (v9.19 — measured, not judged; boundary resolves downward)**
 
 **Professional-Market Centering Standards:**
 • 55/45 or better on front = Centering score 10 (matches the professional Gem Mint requirement)
@@ -3075,25 +3075,35 @@ a near-even ratio (50/50, 52/48) for a card whose borders differ visibly is the
 single most damaging error in the whole rubric: it hands a Gem Mint to a card the
 owner can see is off-centre, and it destroys trust in every other subgrade.
 
-**PHOTO-BASED MEASUREMENT TOLERANCE (v9.18):**
+**PHOTO-BASED MEASUREMENT TOLERANCE (v9.19):**
 Photo measurement is imprecise, so ONE tolerance applies:
 
-• MEASUREMENT TOLERANCE: ±2% on all centering ratios measured from photos.
-  If the measured ratio falls between 55/45 and 57/43, score 10.
+• MEASUREMENT TOLERANCE: ±2% on all centering ratios measured from photos. This
+  describes the PRECISION OF YOUR MEASUREMENT. It does NOT move the grade-10
+  boundary, and it is never a reason to round a score up.
+
+• THE BOUNDARY RESOLVES DOWNWARD. 55/45 is the grade-10 threshold. If your
+  measurement lands so close to 55/45 that the ±2% precision cannot tell you which
+  side it falls on, score 9 and widen the uncertainty band — do not score 10.
+  An overgraded card is discovered by its owner at resale; an undergraded one is
+  discovered immediately and can be re-examined.
 
 • TILT: if the card is photographed at an angle, correct for it by measuring the
   borders at the MIDPOINT of each edge (where foreshortening is symmetric), not by
   widening the tolerance. Perspective shifts a border a few percent; it does not
   turn a 33/67 card into a 50/50 card.
 
-• A measured ratio worse than 57/43 scores below 10, however clean the rest of the
+• A measured ratio worse than 55/45 scores below 10, however clean the rest of the
   card is. Do not round the score up because the card is otherwise attractive.
 
 **Centering Assessment Approach:**
-• If borders look equal or nearly equal → score 10 (55/45 or better)
-• If you can see a slight difference but it's minor → measure and score accordingly
-• Do NOT assume poor centering without visible evidence of unequal borders
-• When uncertain between 55/45 and 56/44, give the benefit of the doubt → score 10
+• Measure both opposing borders and compute the ratio — every time, for every axis
+• 55/45 or better, measured → score 10
+• Worse than 55/45, measured → score from the ratio table
+• If you cannot obtain two border widths for an axis, say the axis was NOT
+  MEASURABLE. "They look equal" is not a measurement and must never produce a 10.
+• When uncertain between 55/45 and 56/44, score 9 and widen the uncertainty band.
+  There is no benefit of the doubt on centering — the boundary resolves downward.
 
 **Border Equality Definition (Strict):**
 • Borders are "equal" (50/50) ONLY when measured difference is < 0.1mm
@@ -3515,9 +3525,10 @@ Reasons a 10 is NOT available:
 at 9 — image-quality limits raise UNCERTAINTY, never lower scores (Section 5 blur rule). Score
 the most likely ratio from visible evidence and widen the uncertainty band.
 
-NOTE: A measured ratio between 55/45 and 57/43 is WITHIN the ±2% photo tolerance of the
-grade-10 boundary. Per the boundary rule, this scores 10 unless the borders are visibly
-different at normal viewing distance. Do NOT apply a "conservative 9" to boundary cases.
+NOTE (v9.19): 55/45 is the grade-10 boundary and it resolves DOWNWARD. A measured ratio
+worse than 55/45 scores 9 or below. Where the ±2% measurement precision cannot establish
+which side of 55/45 the card falls on, score 9 and widen the uncertainty band — the
+tolerance describes your measurement error, it does not extend the grade-10 band.
 ---
 FRONT/BACK CENTERING INDEPENDENCE
 ---
