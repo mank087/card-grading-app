@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import { CardShow, getShowStatus, getDaysUntil, formatDateRange, generateMetaDescription } from '@/types/cardShow'
+import FeaturedCardsCarousel from '@/components/FeaturedCardsCarousel'
 
 // Track conversion events
 const trackSignupClick = (showSlug: string, location: string) => {
@@ -93,9 +93,23 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
+  const [featuredCards, setFeaturedCards] = useState<any[]>([])
+
   useEffect(() => {
     const session = getStoredSession()
     setUser(session?.user || null)
+  }, [])
+
+  // Same public endpoint the homepage uses. Fetched client-side and rendered
+  // only when it returns something, so a slow or failed call leaves the page
+  // intact rather than showing an empty rail.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/cards/featured')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setFeaturedCards(d.cards || []) })
+      .catch(err => console.error('Error fetching featured cards:', err))
+    return () => { cancelled = true }
   }, [])
 
   const handleOAuthSignup = async (provider: 'google' | 'facebook' | 'apple') => {
@@ -145,18 +159,9 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
   const status = getShowStatus(show)
   const daysUntil = getDaysUntil(show)
 
-  // show_type is free text across 10 distinct values ("Sports", "Pokemon TCG",
-  // "Mixed (TCG & Pop Culture)", "Multi", "convention"...), so classify rather
-  // than switch. A sports-only show has no reason to lead with an Umbreon, and
-  // a Pokemon regional has none to lead with LeBron -- the sample results are
-  // the page's proof, and proof that does not match the room is weaker proof.
-  const showTypeText = `${show.show_type || ''}`.toLowerCase()
-  const mentionsSports = /sport/.test(showTypeText)
-  const mentionsTcg = /tcg|pokemon|magic|gathering/.test(showTypeText)
-  const emphasis: 'sports' | 'tcg' | 'both' =
-    mentionsSports && !mentionsTcg ? 'sports'
-      : mentionsTcg && !mentionsSports ? 'tcg'
-      : 'both'
+  // NOTE: the show_type classifier that used to live here ordered the two
+  // hardcoded sample cards by show type. Both samples are gone, replaced by the
+  // live featured-cards rail, so it had nothing left to order.
 
   return (
     <main className="min-h-screen bg-gray-900">
@@ -532,60 +537,18 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
         </div>
       </section>
 
-      {/* Example Reports - Compact */}
-      <section className="py-12 bg-gray-900">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-bold text-white text-center mb-8">
-            Real Grading Results
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Pokemon Example — ordered by show type, see `emphasis` above */}
-            <div className={`flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700 ${emphasis === 'sports' ? 'order-2' : 'order-1'}`}>
-              <Image
-                src="/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg"
-                alt="Pokemon Card Example"
-                width={100}
-                height={140}
-                className="rounded-lg shadow-lg flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-400 mb-1">Pokemon</div>
-                <div className="text-white font-bold mb-2">Umbreon ex</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div><span className="text-gray-500">Centering:</span> <span className="text-emerald-400">9</span></div>
-                  <div><span className="text-gray-500">Corners:</span> <span className="text-emerald-400">10</span></div>
-                  <div><span className="text-gray-500">Edges:</span> <span className="text-emerald-400">10</span></div>
-                  <div><span className="text-gray-500">Surface:</span> <span className="text-emerald-400">10</span></div>
-                </div>
-                <div className="mt-2 text-lg font-bold text-emerald-400">Grade: 9</div>
-              </div>
-            </div>
-
-            {/* Sports Example — ordered by show type, see `emphasis` above */}
-            <div className={`flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700 ${emphasis === 'sports' ? 'order-1' : 'order-2'}`}>
-              <Image
-                src="/Sports/DCM-Card-LeBron-James-547249-front.jpg"
-                alt="Sports Card Example"
-                width={100}
-                height={140}
-                className="rounded-lg shadow-lg flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-400 mb-1">Sports</div>
-                <div className="text-white font-bold mb-2">LeBron James</div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div><span className="text-gray-500">Centering:</span> <span className="text-emerald-400">10</span></div>
-                  <div><span className="text-gray-500">Corners:</span> <span className="text-emerald-400">9</span></div>
-                  <div><span className="text-gray-500">Edges:</span> <span className="text-emerald-400">9</span></div>
-                  <div><span className="text-gray-500">Surface:</span> <span className="text-emerald-400">9</span></div>
-                </div>
-                <div className="mt-2 text-lg font-bold text-emerald-400">Grade: 9</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Real graded slabs instead of two hardcoded examples. Same rail as the
+          homepage, extracted to a shared component. Live cards are stronger
+          proof than fixtures, and they refresh themselves. */}
+      {featuredCards.length > 0 && (
+        <FeaturedCardsCarousel
+          featuredCards={featuredCards}
+          heading="Real Grading Results"
+          subheading="Recently graded by collectors. Tap any card for its full report."
+          showViewAll={false}
+          theme="dark"
+        />
+      )}
 
       {/* Show Details - Moved Lower */}
       <section className="py-12 bg-gray-800 border-t border-gray-700">
