@@ -1,0 +1,313 @@
+<title>DCM Engineering Handover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg:#f5f4f1; --surface:#fff; --raise:#fbfaf8; --ink:#1a1a19; --ink-2:#4c4c49; --ink-3:#82817c;
+    --line:#e3e1dc; --accent:#5b3fa8; --accent-soft:#ece7f9;
+    --good:#1f6f43; --good-soft:#e4f2e9; --warn:#8a5a00; --warn-soft:#fdf3d8; --bad:#a3271f; --bad-soft:#fbe7e4;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#15161a; --surface:#1d1f24; --raise:#23262c; --ink:#eceef2; --ink-2:#b9bdc5; --ink-3:#868b94;
+    --line:#2f333a; --accent:#a996f0; --accent-soft:#241f3d;
+    --good:#6fcf97; --good-soft:#16301f; --warn:#f2c14e; --warn-soft:#372b0c; --bad:#f08c85; --bad-soft:#3a1815;
+  } }
+  :root[data-theme="dark"] {
+    --bg:#15161a; --surface:#1d1f24; --raise:#23262c; --ink:#eceef2; --ink-2:#b9bdc5; --ink-3:#868b94;
+    --line:#2f333a; --accent:#a996f0; --accent-soft:#241f3d;
+    --good:#6fcf97; --good-soft:#16301f; --warn:#f2c14e; --warn-soft:#372b0c; --bad:#f08c85; --bad-soft:#3a1815;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif; line-height:1.6; margin:0; }
+  .wrap { max-width:1000px; margin:0 auto; padding:44px 22px 100px; }
+  header.top { border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:10px; }
+  .kicker { font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 10px; }
+  h1 { font-family:"Newsreader",Georgia,serif; font-size:44px; line-height:1.08; margin:0 0 10px; font-weight:600; letter-spacing:-.01em; }
+  .sub { color:var(--ink-2); font-size:16px; margin:0; max-width:70ch; }
+  .stamp { color:var(--ink-3); font-size:13px; margin:14px 0 0; font-family:"IBM Plex Mono",monospace; }
+  nav.toc { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 20px; margin:26px 0 34px; }
+  nav.toc p { margin:0 0 8px; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
+  nav.toc ol { margin:0; padding-left:20px; columns:2; column-gap:30px; }
+  @media (max-width:700px){ nav.toc ol { columns:1; } }
+  nav.toc li { margin:3px 0; font-size:14px; }
+  nav.toc a { color:var(--ink-2); text-decoration:none; } nav.toc a:hover { color:var(--accent); text-decoration:underline; }
+  h2 { font-family:"Newsreader",Georgia,serif; font-size:27px; margin:46px 0 6px; font-weight:600; scroll-margin-top:20px; letter-spacing:-.005em; }
+  h2 .n { color:var(--accent); font-family:"IBM Plex Mono",monospace; font-size:15px; margin-right:10px; font-weight:500; }
+  h3 { font-size:16px; margin:26px 0 8px; font-weight:600; }
+  h4 { font-size:14px; margin:18px 0 6px; font-weight:600; color:var(--ink-2); }
+  p, li { color:var(--ink-2); } p { margin:0 0 12px; max-width:76ch; }
+  ul, ol.body { margin:0 0 14px; padding-left:22px; } li { margin:5px 0; max-width:76ch; }
+  strong { color:var(--ink); font-weight:600; }
+  code { font-family:"IBM Plex Mono",Consolas,monospace; font-size:12.5px; background:var(--raise); border:1px solid var(--line); padding:1px 5px; border-radius:4px; white-space:nowrap; }
+  .lede { background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:18px 20px; margin:0 0 10px; }
+  .lede p { max-width:none; margin:0 0 10px; } .lede p:last-child { margin:0; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px; margin:18px 0; }
+  .stat { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .stat .k { font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); margin:0 0 3px; }
+  .stat .v { font-size:20px; font-weight:600; color:var(--ink); margin:0; font-variant-numeric:tabular-nums; }
+  .stat .s { font-size:11.5px; color:var(--ink-3); margin:2px 0 0; }
+  .tbl { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--surface); margin:14px 0; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; min-width:520px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); font-weight:600; background:var(--raise); position:sticky; top:0; }
+  tr:last-child td { border-bottom:0; } td { color:var(--ink-2); }
+  td:first-child { color:var(--ink); font-weight:500; }
+  .pill { display:inline-block; font-size:11px; font-weight:600; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+  .live { background:var(--good-soft); color:var(--good); } .open { background:var(--warn-soft); color:var(--warn); } .risk { background:var(--bad-soft); color:var(--bad); } .info { background:var(--accent-soft); color:var(--accent); }
+  .note { background:var(--accent-soft); border-radius:8px; padding:13px 16px; font-size:13.5px; margin:14px 0; }
+  .note strong { color:var(--ink); }
+  .danger { background:var(--bad-soft); border-radius:8px; padding:13px 16px; font-size:13.5px; margin:14px 0; }
+  .danger strong { color:var(--ink); }
+  .tl { border-left:2px solid var(--line); margin:16px 0 16px 6px; padding:0; list-style:none; }
+  .tl li { position:relative; padding:0 0 18px 22px; max-width:78ch; }
+  .tl li::before { content:''; position:absolute; left:-6px; top:7px; width:10px; height:10px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); }
+  .tl .mo { font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); font-weight:600; display:block; margin-bottom:2px; letter-spacing:.03em; }
+  footer.end { margin-top:60px; padding-top:20px; border-top:1px solid var(--line); font-size:13px; color:var(--ink-3); }
+</style>
+<div class="wrap">
+<header class="top">
+  <p class="kicker">Engineering handover · confidential</p>
+  <h1>DCM Grading</h1>
+  <p class="sub">Everything a new engineer needs to run, extend and avoid breaking the platform: the codebase, the grading engine's version history, the incidents, the landmines, and what is still open.</p>
+  <p class="stamp">Prepared 26 Aug 2026 · covers 13 Nov 2025 → 26 Aug 2026 · 1,401 commits</p>
+</header>
+
+<nav class="toc">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#s1">The business</a></li>
+    <li><a href="#s2">Architecture &amp; repo map</a></li>
+    <li><a href="#s3">The grading engine</a></li>
+    <li><a href="#s4">Engine version history</a></li>
+    <li><a href="#s5">Timeline by month</a></li>
+    <li><a href="#s6">Labels: Studio, Lab, Heritage, Designer</a></li>
+    <li><a href="#s7">Mobile apps</a></li>
+    <li><a href="#s8">Enterprise / white-label</a></li>
+    <li><a href="#s9">Pricing, credits, subscriptions</a></li>
+    <li><a href="#s10">Card identification &amp; databases</a></li>
+    <li><a href="#s11">Marketing systems</a></li>
+    <li><a href="#s12">Incidents &amp; postmortems</a></li>
+    <li><a href="#s13">Legal &amp; compliance</a></li>
+    <li><a href="#s14">Operational runbook</a></li>
+    <li><a href="#s15">Landmines</a></li>
+    <li><a href="#s16">Open items</a></li>
+  </ol>
+</nav>
+
+<div class="lede">
+  <p><strong>DCM Grading is an AI trading-card grading platform.</strong> A collector photographs a card front and back; the platform identifies it, grades it (centering, corners, edges, surface, with a weakest-link final grade 1-10), writes a condition report, prices it from real sold listings, generates a printable slab label, and can list it to eBay. Web is the primary product; iOS and Android apps have near parity.</p>
+  <p><strong>The single most important thing to understand:</strong> the grading engine is a stack of stochastic vision-model calls whose behaviour is governed as much by a 5,437-line prompt as by code. Nearly every serious bug in this project's history has been a perception or prompt problem, not a logic problem, and the defence against them is the anchor harness plus measured evidence — never intuition.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><p class="k">Inception</p><p class="v">13 Nov 2025</p><p class="s">first commit</p></div>
+  <div class="stat"><p class="k">Commits</p><p class="v">1,401</p><p class="s">single repo</p></div>
+  <div class="stat"><p class="k">Web source</p><p class="v">281,612</p><p class="s">lines, 714 files</p></div>
+  <div class="stat"><p class="k">Mobile</p><p class="v">28,830</p><p class="s">lines, Expo SDK 54</p></div>
+  <div class="stat"><p class="k">Master rubric</p><p class="v">5,437</p><p class="s">lines of prompt</p></div>
+  <div class="stat"><p class="k">Cards graded</p><p class="v">~31,400</p><p class="s">production</p></div>
+  <div class="stat"><p class="k">Users</p><p class="v">10,273</p><p class="s">profiles</p></div>
+  <div class="stat"><p class="k">OpenAI spend</p><p class="v">~$34/day</p><p class="s">measured Jul 2026</p></div>
+</div>
+
+<h2 id="s1"><span class="n">01</span>The business</h2>
+<p><strong>Legal entity: Dynamic Collectibles Management LLC.</strong> "DCM" is an informal abbreviation of that name. <strong>Never write "d/b/a DCM Grading"</strong> — there is no registered DBA, and it appears in legal docs only as shorthand. Domain: dcmgrading.com.</p>
+<p>The engine is branded <strong>DCM Optic™</strong> in customer-facing copy. As of Aug 17 2026 the word "AI" was deliberately removed from marketing (negative connotation with collectors), except on <code>/ai-card-grading</code> and <code>/psa-alternative</code>, which are kept as SEO capture pages, and in legal disclosures.</p>
+<h3>Revenue</h3>
+<div class="tbl"><table>
+  <tr><th>Product</th><th>Price</th><th>Notes</th></tr>
+  <tr><td>Credits</td><td>$2.99 / 1 · $9.99 / 5 · $19.99 / 20 · $99 / 150</td><td>1 credit = 1 grade. Stripe on web, StoreKit IAP on iOS</td></tr>
+  <tr><td>Card Lovers</td><td>$49.99 / 70 per month · $449 / 900 per year</td><td>Subscription; annual works out near $0.50 a grade</td></tr>
+  <tr><td>Enterprise</td><td>Dealer $199 / 400 · Enterprise $399 / 1,000</td><td>Co-branded storefronts; ~$0.40-0.50 a card</td></tr>
+  <tr><td>Affiliates</td><td>20% commission, 10% buyer discount</td><td>Stripe promo codes</td></tr>
+</table></div>
+<div class="note"><strong>Claims guardrails</strong> (marketing/DCM_SOCIAL_STRATEGY_2026.md §9 and BENEFITS_MESSAGING.md, which supersedes it in places). Never: "more accurate than PSA/BGS/SGC", any guaranteed-grade implication, competitor names in a disparaging frame, resale multipliers ("sells for 3x raw"), or the phrases <em>pre-grade / pre-check / second opinion / know before you go</em> — that positioning was formally retired. Always: market the <em>method</em> (consistent rubric, no tier, published subgrades, published uncertainty), never the <em>outcome</em>.</div>
+
+<h2 id="s2"><span class="n">02</span>Architecture &amp; repo map</h2>
+<p><strong>Stack:</strong> Next.js 14 App Router · TypeScript · Tailwind · Supabase (Postgres, Auth, Storage) · Stripe · Vercel (hosting + cron) · Resend and AWS SES (email) · OpenAI vision. Mobile is React Native / Expo SDK 54 in <code>dcm-mobile/</code> inside the same repo.</p>
+<div class="tbl"><table>
+  <tr><th>Path</th><th>What lives there</th></tr>
+  <tr><td><code>src/app/api/</code></td><td>49 route groups. The 8 per-category grading routes (<code>pokemon/[id]</code>, <code>sports/[id]</code>, <code>mtg</code>, <code>lorcana</code>, <code>onepiece</code>, <code>yugioh</code>, <code>starwars</code>, <code>other</code>) are near-duplicates of one another — a change to one usually needs all eight</td></tr>
+  <tr><td><code>src/lib/</code></td><td>100 modules. <code>visionGrader.ts</code> + <code>zoomInspection.ts</code> are the engine (4,577 lines together); <code>gradeNarrator.ts</code>, <code>labelDataGenerator.ts</code>, <code>slabLabelGenerator.ts</code>, <code>yearGuard.ts</code>, <code>credits.ts</code>, <code>affiliates.ts</code>, <code>popReport.ts</code>, <code>ebay/</code>, <code>pricing/</code>, <code>labels/</code>, <code>labelLab/</code>, <code>slabby/</code></td></tr>
+  <tr><td><code>prompts/</code></td><td><code>master_grading_rubric_v5.txt</code> (5,437 lines, ~70K tokens) plus per-type deltas, loaded by <code>promptLoader_v5.ts</code>. v4.2 files are dead. <strong>Prompts deploy with the app</strong> — a prompt change needs a Vercel deploy to take effect</td></tr>
+  <tr><td><code>scripts/</code></td><td>411 scripts. Durable ones: <code>repeatability-harness.ts</code> (the anchor gate), <code>label-design-snapshot.ts</code>, <code>send-ses-campaign.ts</code>, <code>measure-card-borders.ts</code>, the DB importers. Anything <code>_tmp-*</code> is throwaway from a past session</td></tr>
+  <tr><td><code>docs/</code></td><td>~30 planning/audit documents. The big ones are named in the sections below; <code>docs/legal/</code> is gitignored (contains PII)</td></tr>
+  <tr><td><code>dcm-mobile/</code></td><td>Expo app: <code>app/(tabs)</code>, <code>app/card/[id].tsx</code>, <code>components/grading/</code>, <code>lib/</code></td></tr>
+  <tr><td><code>supabase/migrations/</code></td><td>45 migrations; a legacy <code>migrations/</code> folder holds 75 more. <strong>Migrations are applied by hand</strong> by the owner in the Supabase SQL editor — there is no automatic runner</td></tr>
+  <tr><td><code>CLAUDE_GUIDE.md</code></td><td>2,965-line reference: routes, schema, data flows, env vars. Start here for anything not covered in this handover</td></tr>
+</table></div>
+<h3>Database essentials</h3>
+<p>Core tables: <code>cards</code> (very wide — 200+ columns, the grading JSON plus per-category identity columns), <code>users</code>, <code>profiles</code>, <code>user_credits</code>, <code>credit_transactions</code>, <code>organizations</code>. Card databases: <code>pokemon_cards</code>/<code>_ja</code>, <code>mtg_cards</code>, <code>lorcana_cards</code>, <code>yugioh_cards</code> + <code>yugioh_card_printings</code>, <code>onepiece_cards</code>, <code>starwars_cards</code>, <code>naruto_cards</code>, <code>tcg_cards</code>, <code>sports_sets</code>. Pricing: <code>dcm_cached_prices</code>, <code>card_price_history</code>, <code>ebay_price_*</code>. Storage buckets: <strong><code>cards</code></strong> (not "card-images"), <code>blog-images</code>, <code>slabby-drafts</code>.</p>
+
+<h2 id="s3"><span class="n">03</span>The grading engine</h2>
+<p>One grade fires roughly five independent stochastic model calls. Understanding this pipeline is the job.</p>
+<ol class="body">
+  <li><strong>Geometry gate</strong> — one vision call returns frame-fill % and a corner quad (0-1000 normalised) per face. Decides whether zoom crops are image-relative or card-relative.</li>
+  <li><strong>Main ensemble</strong> — a single OpenAI call with <code>n=3</code> completions over the full rubric. Server takes a <em>median per category</em>, not the model's own summary.</li>
+  <li><strong>Zoom inspection</strong> — the card is cropped into ~28-40 corner/edge/surface regions at native resolution and inspected in parallel batches of ≤8, 5 samples each, majority-voted. Findings can only <em>lower</em> scores.</li>
+  <li><strong>Structural verification</strong> — any crease/bend claim gets a separate temp-0, n=3 verification call with an evidence enum before it is allowed to cap the grade at 4.</li>
+  <li><strong>Server-side consensus and caps</strong> — weakest link (final = MIN of subgrades), rigid-case exclusions, Gem-Mint majority gate, uncertainty gate, then <code>gradeNarrator.ts</code> writes the customer-facing summary <em>after</em> all mutations.</li>
+</ol>
+<div class="note"><strong>Why narrate-after-consensus exists:</strong> before v9.1 the model's prose was written against its own pre-mutation numbers, so a card capped to 6 could carry a summary saying "surfaces are clean". Every number in the final summary is now generated from the post-cap values. If you add a new cap, feed it into the narrator or you will recreate that bug.</div>
+<h3>Measured properties</h3>
+<ul>
+  <li><strong>n=3 is load-bearing.</strong> Measured on 2,695 cards: n=1 would flip 11.7% of grades and disable the Gem-Mint unanimity gate. Do not "optimise" it away.</li>
+  <li><strong>Attention dilutes with image count.</strong> One crop detects a test defect 3/3; ≤10 crops 3/3; 20 crops 2/3; 24-40 crops in a single call <strong>0/5</strong>. This is why zoom batches are capped at 8 and why "just put the crops in the main call" has already lost an A/B twice.</li>
+  <li><strong>Image detail:</strong> <code>detail:'high'</code> beat <code>'original'</code> (Aug 21 A/B) — full-res nearly doubled run-to-run spread for +9% cost. OpenAI downscales anyway: a 3,000px upload reaches the model at roughly 768px on the short side.</li>
+  <li><strong>Repeatability</strong> on the anchor set is currently spread 0.00 with 10/11 within tolerance.</li>
+</ul>
+
+<h2 id="s4"><span class="n">04</span>Engine version history</h2>
+<p><code>DCM_PROMPT_VERSION</code> in <code>src/lib/visionGrader.ts</code> is the single source of truth and is stamped on every card as <code>conversational_prompt_version</code>.</p>
+<div class="tbl"><table>
+  <tr><th>Version</th><th>Date</th><th>What changed and why</th></tr>
+  <tr><td>v8.8</td><td>Jul 1</td><td>Prompt consistency pass. Trigger: a customer graded one Shaq 7× and got 7/9/8/7/6/6/6. Unified scoring ladders; honest uncertainty derived from measured signals instead of the model's self-report</td></tr>
+  <tr><td>v8.9</td><td>Jul</td><td>Server-side ensemble (n=3, median consensus) + regioned zoom inspection introduced</td></tr>
+  <tr><td>v9.0-9.1</td><td>Jul 3</td><td>Narrate-after-consensus (<code>gradeNarrator.ts</code>); zoom corroboration rule; severity ladder recalibrated (minor 9 / moderate 8 / heavy 6)</td></tr>
+  <tr><td>v9.2</td><td>Jul</td><td>Evidence reconciliation — structured section scores clamped so no sub-number can display above the grade</td></tr>
+  <tr><td>v9.3</td><td>Jul</td><td>Gem-Mint unanimity gate + rigid-case exclusion, in response to a grade-10 influx (10-rate spiked to 55.8% vs a 24.5% baseline)</td></tr>
+  <tr><td>v9.4</td><td>Jul 10</td><td><strong>Zoom perception rebuild.</strong> Edge strips were reaching the model at ⅓ native resolution; batching was diluting attention. Fixed both. Expect fewer 10s after this</td></tr>
+  <tr><td>v9.4.1</td><td>Jul 12</td><td>Geometry gate added after customers reported invented edge findings — a crumb on a tablecloth had been graded as a "moderate stain"</td></tr>
+  <tr><td>v9.4.2</td><td>Jul 16</td><td>Evidence crops (every finding stores its magnified crop); minors need 3/5 votes; the Pokémon back-swirl false-crease trap</td></tr>
+  <tr><td>v9.5-9.8</td><td>Jul</td><td>CV centering measurement added (shadow mode); face prose carries zoom findings; structural claims need 3 votes</td></tr>
+  <tr><td>v9.11</td><td>Jul</td><td>Year evidence gate — the model must cite where it read the year; <code>yearGuard.ts</code> drops unverified ones</td></tr>
+  <tr><td>v9.12-9.14</td><td>Aug</td><td>Zoom runs on the same model as the ensemble; Gem-Mint gate relaxed from unanimity to majority (backfill upgraded 131 held cards 9→10)</td></tr>
+  <tr><td>v9.15-9.16</td><td>Aug</td><td>Majority gem gate refinements</td></tr>
+  <tr><td>v9.17</td><td>Aug 25</td><td>Category-aware zoom: TCG cards have factory-rounded corners, which the crop pass was calling "softening". Plus narrated zoom holds at 9, and a Yu-Gi-Oh security-foil exemption</td></tr>
+  <tr><td><strong>v9.18</strong></td><td><strong>Aug 26</strong></td><td><strong>Current.</strong> Centering must be measured, not judged — four stacked leniency rules removed (see §12)</td></tr>
+</table></div>
+<h3>The anchor harness — your safety net</h3>
+<p><code>scripts/repeatability-harness.ts</code> grades 12 golden calibration cards (<code>scripts/calibration-set.json</code>) N times and reports grade spread, accuracy within tolerance, and must-detect hits. <strong>Run it before and after any prompt or engine change.</strong> Current baseline: 10/11 within tolerance, spread 0.00, 11/11 stable. Each anchor exists because a real customer complaint or bug produced it — the Xerosic must detect whitening, the Pineiro must detect a crease, the Gengar must <em>not</em> hallucinate one.</p>
+<div class="danger"><strong>Known bad anchor:</strong> the 1991 Fleer Jordan (expected 10) has graded 8 on every version tested. It is photographed white-border-on-light-desk (card/background contrast of 2 out of 255, the worst in the set) <em>and</em> the design has an intentionally thicker bottom band. Nothing can measure its centering. Treat its failure as expected, not as a regression, until the card is rephotographed.</div>
+
+<h2 id="s5"><span class="n">05</span>Timeline by month</h2>
+<ul class="tl">
+  <li><span class="mo">Nov-Dec 2025</span> Project inception (13 Nov). Core grading flow, credits, Stripe, auth, the first card databases. 425 commits in seven weeks — the foundation.</li>
+  <li><span class="mo">Jan-Mar 2026</span> Label Studio and colour extraction; Label Lab vector-PDF rig; affiliates; pop report; admin dashboard.</li>
+  <li><span class="mo">Apr 2026</span> Mobile app build-out to web parity. Card colour extraction system (27-29 Apr).</li>
+  <li><span class="mo">May 2026</span> 246 commits — the busiest month. Sign in with Apple (web + native). Mobile IAP compliance rebuild: iOS StoreKit, Android Stripe-in-WebView.</li>
+  <li><span class="mo">Jun 2026</span> Label Lab v4 vector PDFs. TCG database importers and freshness checks.</li>
+  <li><span class="mo">Jul 2026</span> The hard month. Full grading-system audit (1 Jul) → v8.8. Narrative mismatch fix → v9.1. Architecture review after the engine got <em>worse</em> (8 Jul). Market-pricing overhaul. Grade-10 influx investigation. Zoom perception rebuild v9.4. Privacy/security audit finds the <code>cards</code> table world-readable. CIPA/Meta-Pixel demand letter → consent gate. Duplicate-charge incident. Upload-toast bug. Type-debt cleanup: 4,786 TS errors → zero. Full codebase audit.</li>
+  <li><span class="mo">Aug 2026</span> gpt-5.6-luna A/B → canary rollout. Heritage label ships. Enterprise white-label Phase 1 + audit. Dissent-downgrade audit + backfill. Mobile label parity. DCM Optic rebrand. Enterprise Label Designer. Marketing push: blog drafts, reels, email campaign, Google Ads rebuild. Centering measurement failure found and partly fixed (v9.17, v9.18).</li>
+</ul>
+
+<h2 id="s6"><span class="n">06</span>Labels: Studio, Lab, Heritage, Designer</h2>
+<p>Four related things that are easy to confuse:</p>
+<div class="tbl"><table>
+  <tr><th>Name</th><th>Audience</th><th>What it is</th></tr>
+  <tr><td>Label Studio</td><td>Consumers</td><td>Production label customiser (web + mobile). Styles, colours, holder sizes, save-to-card overrides</td></tr>
+  <tr><td>Label Lab</td><td>Admin only</td><td><code>/admin/label-lab</code> — closed rig for validating vector-PDF rendering before promoting to Studio</td></tr>
+  <tr><td>Heritage</td><td>Everyone</td><td>The ivory label style shipped 4 Aug 2026, now the default look. Band colour is derived from the card's own <code>card_colors</code> palette</td></tr>
+  <tr><td>Enterprise Label Designer</td><td>Org admins</td><td>Built 24 Aug. Drag/resize the logo, band, chip, border on the org's slab label. Lives in <code>/store/settings</code> and admin org settings only — <strong>deliberately never exposed to consumers</strong></td></tr>
+</table></div>
+<h3>How labels render</h3>
+<p>The single source of truth for Heritage is <code>HeritageLabelPreview</code> (SVG) plus <code>heritageLayout.ts</code> geometry. Everything else composites from it: <code>heritageSlabPdfDoc.tsx</code> (react-pdf, for print), <code>heritageRaster.ts</code> (browser canvas), <code>heritageSlabGenerator.tsx</code>, <code>cardImageGenerator.ts</code> (eBay/social images), the report component, and the mobile <code>SlabCard</code>.</p>
+<p>The org's design document lives at <code>organizations.storefront.slab.design</code> and is read only through <code>resolveOrgLabelDesign()</code>; legacy flat keys are always written alongside it via <code>designToLegacySlab</code> for backwards compatibility.</p>
+<div class="danger"><strong>Run <code>scripts/label-design-snapshot.ts check</code> after any Heritage renderer change.</strong> It hashes 16 fixtures (SVG + PDF) and is the only thing standing between a small geometry tweak and silently breaking every printed label. The PDF normaliser strips <code>/ID</code> and date objects so hashes are stable.</div>
+<p>Known react-pdf gotchas: <code>rgba()</code> is unsupported (use hex + opacity), and the fold-over label needs edge-aware bleeds. Grade colour was hardcoded purple in seven files at one point — check for stragglers before assuming a colour prop is respected.</p>
+
+<h2 id="s7"><span class="n">07</span>Mobile apps</h2>
+<p>iOS and Android, Expo SDK 54, near-parity with web. Runtime version <strong>1.0.2</strong> is live in both stores (since 5 Aug 2026).</p>
+<div class="danger"><strong>OTA publishing rules, learned the hard way.</strong> Publish at 1.0.2 <em>and</em> at the legacy lanes (iOS 1.0.1, Android 1.0.0) until old installs age out. <strong>Never omit <code>--platform</code>.</strong> And <strong>never OTA master to Android blind</strong>: the credits page has a platform fork (iOS StoreKit vs Android Stripe-in-WebView) and pushing the wrong bundle breaks purchasing or violates store policy.</div>
+<h3>Purchase architecture</h3>
+<p>Credit packs are consumables (<code>dcm.credits.{basic,pro,elite,vip}</code>). Apple guideline 3.1.1 forbids exposing <code>restorePurchases()</code> for consumables, so iOS uses native StoreKit and Android uses Stripe inside a WebView (Google-approved). The fork is in <code>pages/credits.tsx</code>. Server verification is <code>/api/iap/apple/verify</code> and <code>/api/iap/google/verify</code>, with webhooks for each; transactions land in <code>iap_transactions</code>.</p>
+<h3>Other mobile facts</h3>
+<ul>
+  <li>All Firebase Analytics, Meta App Events and ATT tracking were removed 20 Jul 2026. That was a <em>native</em> change: it needs an EAS rebuild and store resubmit, not an OTA. Sentry and Facebook login were preserved.</li>
+  <li>Apple Sign In web JWT secret <strong>expires 1 Nov 2026</strong> and must be regenerated.</li>
+  <li>Apple Developer Program is enrolled as an Individual; conversion to Organization is deferred until after the Android launch.</li>
+  <li>Mobile card detail does not use the shared <code>CardSlab</code> component the way web does — slab markup is inlined in eight web detail clients, which is why parity bugs recur.</li>
+</ul>
+
+<h2 id="s8"><span class="n">08</span>Enterprise / white-label</h2>
+<p>Driven by card shops wanting to grade under their own brand. First customer: Apex Grading (launch 28 Aug 2026). <strong>Strategy is co-brand, never fully white-label</strong> — the store's logo leads on labels, reports and the verification page, but DCM remains the named engine.</p>
+<p>Phase 1 shipped 14 Aug (Dealer $199/400, Enterprise $399/1,000, payer scope, storefronts), followed by an audit and fix pass on 17 Aug that required two migrations applied in order (billing index first). Each org gets a storefront at <code>/enterprise/{slug}</code>, branded slab labels, a serial registry and branded card pages.</p>
+<p>Open: the embeddable verification widget (the app currently sends no <code>frame-ancestors</code> headers, so embedding is blocked), and Modern-style print parity in the Label Designer, which was excluded on purpose.</p>
+
+<h2 id="s9"><span class="n">09</span>Pricing, credits, subscriptions</h2>
+<p>Credits are deducted through <code>/api/stripe/deduct</code>, which is <strong>idempotent</strong> — that was added after the July duplicate-charge incident. Client-side submit locks were added at the same time.</p>
+<p><strong>Market pricing</strong> has two paths: sports uses the SportsCardsPro/PriceCharting API (a 6.1M-row local mirror was imported in July then dropped on 4 Jul because it blew the Supabase storage budget — the code degrades to the API automatically via <code>SPORTS_LOCAL_DB_ENABLED</code>); everything else falls back to eBay Browse API <em>active listings</em>, which is why non-sports pricing is labelled an "asking range" rather than a sold price. <code>dcmEstimate.ts</code> interpolates between graded tiers with a 0.35-0.70 market multiplier.</p>
+<p>Card Lovers renewals are idempotent and reconciled; a July review found the upgrade route 100% broken (two stacked bugs) and fixed it. One policy decision remains open on upgrade credit maths.</p>
+
+<h2 id="s10"><span class="n">10</span>Card identification &amp; databases</h2>
+<p>The model reads the card, then the route looks it up in our own database and, on a match, overwrites set name, number, year and rarity — sometimes the name too. <code>validated_source</code> records which table did it.</p>
+<div class="danger"><strong>The identity rule, added 25 Aug 2026:</strong> a <code>force_regrade</code> must refresh the <em>condition</em> grade only, never the identity. <code>src/lib/grading/preserveIdentity.ts</code> enforces this across all eight routes; pass <code>?reidentify=true</code> to opt back in. This exists because a regrade renamed two customers' cards ("Kewl Tune Synchro" → "Aromalilith Magnolia") when a misread set code hit a real but different printing.</div>
+<p>The matching rule that follows from it: <strong>the printed name beats the number.</strong> A set-code or collector-number hit whose name disagrees is never accepted. That guard now exists in Yu-Gi-Oh, MTG, Lorcana, Star Wars and Naruto; One Piece and Sports already had it. Pokémon and the generic TCG matcher still use a weak 5-character prefix test (open item).</p>
+<p>Other traps: Scryfall rejects default HTTP user agents (send a custom UA or the MTG database silently goes stale); the Pokémon route fires a background <code>/api/pokemon/verify</code> after every grade that can rewrite identity in a second UPDATE; <code>cards.user_condition_report</code> ships in two incompatible shapes, so always optional-chain it.</p>
+
+<h2 id="s11"><span class="n">11</span>Marketing systems</h2>
+<ul>
+  <li><strong>Email:</strong> <code>scripts/send-ses-campaign.ts</code> — AWS SES, resumable CSV log, RFC 8058 one-click unsubscribe, and an <code>assertCompliant()</code> gate that refuses to send without a postal address, <code>{{unsubscribeUrl}}</code> and the legal entity name. Audience is <code>profiles.marketing_emails_enabled</code>; ~9,865 opted in. Mirror SES bounces back with <code>scripts/sync-ses-suppression-to-db.ts</code> after every send.</li>
+  <li><strong>Blog:</strong> markdown + remark-gfm, images in the <code>blog-images</code> bucket, a <code>[[credit-packs]]</code> embed. House rule: no em dashes or other AI writing artifacts.</li>
+  <li><strong>Video:</strong> deterministic SVG frames rendered with sharp, encoded by ffmpeg-static, SFX synthesised in-script (no <code>Math.random</code> — it breaks reproducibility). Delivered: the mail-away vs instant comparison reel, the eBay-sold template, and the Chase Card Pull press-and-hold reel. Slabby is the mascot rig (Remotion).</li>
+  <li><strong>Google Ads:</strong> rebuilt 25 Aug. Generators at <code>scripts/google-ads-editor-import.mjs</code>, <code>google-ads-pmax-import.mjs</code> and <code>google-ads-card-shows-import.ts</code> emit Editor-importable CSVs. The card-show generator reads the <code>card_shows</code> table and produces one campaign per show, flighted from 10 days before to the last day.</li>
+</ul>
+
+<h2 id="s12"><span class="n">12</span>Incidents &amp; postmortems</h2>
+<div class="tbl"><table>
+  <tr><th>Date</th><th>Incident</th><th>Root cause &amp; resolution</th></tr>
+  <tr><td>Jul 18</td><td><span class="pill risk">Critical</span> Data exposure</td><td>The <code>cards</code> table and customer emails were world-readable via the anon key — RLS had never been re-enabled after a debugging session. Migration applied; anon probe now returns permission denied. Public-by-default and deletion gaps remain open</td></tr>
+  <tr><td>Jul 24</td><td>Duplicate charges</td><td>A customer was charged 4 credits in 0.72s for one grade: stalled uploads queued during a network outage and all flushed on reconnect, against a deduct API with zero idempotency. Refunded; idempotency + client locks shipped</td></tr>
+  <tr><td>Jul 24</td><td>Silent upload loss</td><td>A paying customer had zero cards: the size advisory for 1000-1600px images called a bare <code>toast(...)</code> that was not a function, destroying the upload. One-line fix plus telemetry</td></tr>
+  <tr><td>Jul 26-28</td><td>Two-day outage</td><td>A codemod added <code>&lt;SectionDefects&gt;</code> JSX to all eight card detail clients but the import to only one. Every non-MTG detail page crashed for two days until a customer reported it. This directly motivated the type-debt cleanup</td></tr>
+  <tr><td>Aug 8</td><td><span class="pill risk">Critical</span> Production DB outage</td><td>A backfill dry run paged all ~28,000 <code>cards</code> rows selecting the full <code>conversational_grading</code> JSON and took Supabase down. <strong>See §15</strong></td></tr>
+  <tr><td>Aug 25</td><td>Regrade renamed cards</td><td>Force-regrade re-ran identification; a misread Yu-Gi-Oh set code hit a real but different printing. Identity guard + name-beats-number rules shipped across all matchers</td></tr>
+  <tr><td>Aug 26</td><td>Centering systematically wrong</td><td>A customer's 1969 Topps Olsen graded 10 with centering "52/48" when the true ratio is 32/68 (measured: top border 41px, bottom 87px). Investigation found the model reported <strong>96%</strong> of the last 1,198 cards as 55/45-or-better and <em>never once</em> worse than 65/35. Cause: four stacked leniency rules in the rubric, including "always give the benefit of the doubt". Removed in v9.18; the card regraded to 9</td></tr>
+</table></div>
+
+<h2 id="s13"><span class="n">13</span>Legal &amp; compliance</h2>
+<ul>
+  <li><strong>Active legal hold:</strong> Samaniego v. DCM, a CIPA/ECPA pre-arbitration demand (17 Jul 2026) over the Meta Pixel. Evidence is preserved; a consent gate shipped 18 Jul. Do not delete analytics or tracking records.</li>
+  <li>Privacy/security audit findings C1-C3 are closed; public-by-default card visibility and account-deletion gaps remain open.</li>
+  <li>CAN-SPAM compliance is enforced in code by the campaign script, not by convention.</li>
+  <li>Mobile tracking removal (Jul 20) was partly motivated by the same exposure.</li>
+</ul>
+
+<h2 id="s14"><span class="n">14</span>Operational runbook</h2>
+<div class="tbl"><table>
+  <tr><th>Task</th><th>How</th></tr>
+  <tr><td>Deploy web</td><td>Push to <code>master</code>. Vercel builds automatically. Poll with <code>npx vercel ls --prod</code> then <code>npx vercel inspect &lt;url&gt;</code> until status is Ready and the domain aliases are attached. <strong>Prompt changes require this deploy</strong></td></tr>
+  <tr><td>Typecheck</td><td><code>npx tsc --noEmit</code>. <code>ignoreBuildErrors</code> is <strong>false</strong> — type errors fail the build. Do not revert that</td></tr>
+  <tr><td>Grading gate</td><td><code>npx tsx scripts/repeatability-harness.ts 1 &lt;tag&gt;</code> before and after engine/prompt changes</td></tr>
+  <tr><td>Label gate</td><td><code>npx tsx scripts/label-design-snapshot.ts check</code> after Heritage renderer changes</td></tr>
+  <tr><td>Mobile OTA</td><td><code>eas update --platform &lt;ios|android&gt;</code> at 1.0.2 <em>and</em> the legacy lane. Never omit the platform flag</td></tr>
+  <tr><td>Regrade a card</td><td><code>GET /api/{route}/{id}?force_regrade=true&amp;user_id={uid}</code>. Does not charge a credit. Identity is preserved automatically</td></tr>
+  <tr><td>Email campaign</td><td><code>npx tsx scripts/send-ses-campaign.ts --template … --subject … --from … --reply-to …</code>; add <code>--test --to</code> for a smoke test, and clear the campaign log afterwards so the real send is not skipped</td></tr>
+  <tr><td>Scripts needing env</td><td><code>DOTENV_CONFIG_PATH=.env.local npx tsx script.ts</code>, and put <code>import 'dotenv/config'</code> first — some modules build their Supabase client at import time</td></tr>
+</table></div>
+
+<h2 id="s15"><span class="n">15</span>Landmines</h2>
+<div class="danger">
+  <p><strong>Production database.</strong> Never scan whole tables. Never bulk-select heavy JSON columns (<code>conversational_grading</code>, <code>pokemon_api_data</code>, <code>cv_centering</code>). Page in small batches with a delay, select only the columns you need, and stop immediately on 522s. This took the site down on 8 Aug 2026.</p>
+</div>
+<ul>
+  <li><strong>Do not delete "detection-pressure" prompt lines.</strong> The v9.4 Phase-1 attempt removed three "when in doubt, treat as a defect" lines and accuracy fell to 68%, with a creased card graded 9. They were compensating for blind zoom crops. They were restored verbatim and only coexist with 91% accuracy because the perception underneath was fixed first.</li>
+  <li><strong>Do not retry the v9.6 "corners diet" naively.</strong> Removing per-corner prose reproducibly regressed the vintage-texture false-positive anchor. The prose is load-bearing.</li>
+  <li><strong>Do not put all zoom crops in the main call.</strong> Measured 0/5 detection. It has lost this A/B twice.</li>
+  <li><strong>Eight routes, not one.</strong> Any grading-route change usually needs all eight category routes.</li>
+  <li><strong>Windows/Bash quirks:</strong> patching regex text through a Bash heredoc silently eats backslashes (<code>\s</code> became <code>s</code> and shipped). Use the file-edit tools for anything containing escapes.</li>
+  <li><strong>gpt-5.6-luna rejects <code>temperature</code> and <code>top_p</code></strong>, and reasoning tokens consume <code>max_completion_tokens</code> — a 250-token budget returns empty content. Budget generously.</li>
+  <li><strong>Orphan-user backfill is deliberately deferred.</strong> Do not re-propose it.</li>
+</ul>
+
+<h2 id="s16"><span class="n">16</span>Open items</h2>
+<div class="tbl"><table>
+  <tr><th>Item</th><th>State</th><th>Notes</th></tr>
+  <tr><td>Centering accuracy</td><td><span class="pill open">Parked by decision</span></td><td>v9.18 stopped the automatic 10, but the model still cannot measure. Owner's decision (26 Aug): leave it and lean on the confidence score. <strong>Caveat:</strong> centering disagreement is <em>not</em> currently an input to the uncertainty calculation, so confidence does not yet absorb it. Two small additions would close that (feed CV/model disagreement and "not measurable" into uncertainty)</td></tr>
+  <tr><td>CV quad refinement</td><td><span class="pill info">Stashed</span></td><td>Fixes the Olsen exactly, regresses other cards. In <code>git stash</code> plus a saved patch. Needs a hand-measured ground-truth set of 60-100 cards before it can be tuned</td></tr>
+  <tr><td>Strip-comparison centering</td><td><span class="pill info">Prototype</span></td><td><code>scripts/strip-centering-prototype.ts</code>. Right where production is badly wrong, but only 62% self-consistent. Blocked on the same localisation problem</td></tr>
+  <tr><td>Pokémon identity gate</td><td><span class="pill open">Open</span></td><td>The verify endpoint's 5-character name test can pass "Alolan Raichu" for "Alolan Rattata". Plan written, not built</td></tr>
+  <tr><td>Grading GETs lack JWT auth</td><td><span class="pill risk">Open</span></td><td>Client-supplied <code>user_id</code>. From the Jul 28 code audit</td></tr>
+  <tr><td>Public-by-default cards, deletion gaps</td><td><span class="pill risk">Open</span></td><td>From the privacy audit</td></tr>
+  <tr><td>Enterprise embed widget</td><td><span class="pill open">Not built</span></td><td>Needs <code>frame-ancestors</code> headers</td></tr>
+  <tr><td>Mobile label parity</td><td><span class="pill open">Open</span></td><td>Heritage back label missing natively; fix plan written</td></tr>
+  <tr><td>Mobile web bottom nav</td><td><span class="pill open">Blocked</span></td><td>App WebViews hide web chrome by CSS injection; needs an embedded-mode fix first</td></tr>
+  <tr><td>Comic grading</td><td><span class="pill info">Admin only</span></td><td>Comic Lab shipped; needs real anchors before production</td></tr>
+  <tr><td>Google Ads follow-through</td><td><span class="pill open">With owner</span></td><td>GA4 conversion import, PMax asset-group images, card-show campaigns to import</td></tr>
+  <tr><td>Apple JWT secret</td><td><span class="pill risk">Expires 1 Nov 2026</span></td><td>Sign in with Apple breaks on web if not regenerated</td></tr>
+</table></div>
+
+<footer class="end">
+  <p><strong>Where to look next.</strong> <code>CLAUDE_GUIDE.md</code> for routes, schema and env vars. <code>docs/</code> for the audit and plan documents referenced throughout — particularly <code>GRADING_SYSTEM_AUDIT_2026-07-01.md</code>, <code>GRADING_ARCHITECTURE_REVIEW_2026-07-08.md</code>, <code>GRADING_ACCURACY_ROADMAP_2026-07-12.md</code> and <code>MARKET_PRICING_OPTIMIZATION_PLAN_2026-07-03.md</code>. Session-to-session context lives in the project memory directory, indexed by <code>MEMORY.md</code>.</p>
+  <p>Prepared 26 Aug 2026 for Dynamic Collectibles Management LLC.</p>
+</footer>
+</div>
