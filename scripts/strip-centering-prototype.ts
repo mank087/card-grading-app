@@ -20,7 +20,7 @@
  * NEXT: n=5 voting instead of 2 calls; verified/deskewed edges before cropping;
  * a hand-measured ground-truth set to tune against.
  *
- * NOTE: luna rejects , and max_completion_tokens must be generous
+ * NOTE: luna rejects the temperature param, and max_completion_tokens must be generous
  * (reasoning tokens consume it — 250 returned empty content on most calls).
  *
  *   DOTENV_CONFIG_PATH=.env.local npx tsx scripts/strip-centering-prototype.ts [--sheet]
