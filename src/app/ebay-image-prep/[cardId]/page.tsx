@@ -38,10 +38,17 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
-// Canonical grade -> condition label. The local copy this replaced was wrong at
-// the top of the scale: it inserted "Pristine" at 10, which pushed "Gem Mint"
-// down to 9 and dropped "Mint" entirely. That mislabels a DCM 9 as "Gem Mint"
-// in generated eBay listing copy, misrepresenting the card to a BUYER.
+// Canonical grade -> condition label, shared with labelDataGenerator.
+//
+// This replaced a private copy in this file that had the wrong scale at the top:
+// it inserted "Pristine" at 10, pushing "Gem Mint" down to 9 and dropping "Mint".
+// It never reached a listing. Every call site reads `labelData.condition ||
+// getConditionLabel(grade)`, and labelDataGenerator.getCondition() has always used
+// the canonical mapping, so the stored condition wins and the local copy only ever
+// stood in for a card with no label condition at all.
+//
+// Collapsed anyway: one rule living in three places is free to drift, and two of
+// the three had already drifted.
 import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
 
 declare global {
