@@ -62,7 +62,13 @@ async function main() {
     const isTcg = /TCG|Pokemon|Magic/i.test(sh.show_type + ' ' + sh.name), isSports = /Sports/i.test(sh.show_type + ' ' + sh.name), isMulti = !isTcg && !isSports || /Multi/i.test(sh.show_type)
     const venue = (sh.venue_name || '').trim()
 
-    camps.push({ Campaign: camp, 'Campaign Type': 'Search', Networks: 'Google search', Budget: BUDGET, 'Budget type': 'Daily', 'Bid Strategy Type': 'Maximize clicks', 'Maximum CPC bid limit': CPC_CAP, 'Start Date': fmtDate(runFrom), 'End Date': fmtDate(end), Languages: 'en', 'Tracking template': TRACKING, 'Campaign Status': 'Enabled', 'Ad rotation': 'Optimize for clicks' })
+    camps.push({ Campaign: camp, 'Campaign Type': 'Search', Networks: 'Google search', Budget: BUDGET, 'Budget type': 'Daily', 'Bid Strategy Type': 'Maximize clicks', 'Maximum CPC bid limit': CPC_CAP, 'Start Date': fmtDate(runFrom), 'End Date': fmtDate(end), Languages: 'en', 'Tracking template': TRACKING, 'Campaign Status': 'Enabled', 'Ad rotation': 'Optimize for clicks',
+      // Google blocks location-targeting edits until EU political ad status is
+      // declared, even for campaigns targeting only US cities. Editor reports it
+      // as an error and refuses to post, while the web UI has nothing to prompt
+      // on because the campaign is still an unposted local draft. Declaring it
+      // in the import avoids that deadlock entirely.
+      'EU political ads': "Doesn't have EU political ads" })
     locs.push({ Campaign: camp, Location: `${sh.city}, ${stateName}, United States` })
     if (metro !== sh.city) locs.push({ Campaign: camp, Location: `${metro.replace(' DC', ', District of Columbia')}${/District/.test(metro) ? '' : `, ${stateName}`}, United States` })
     locs.push({ Campaign: camp, Location: `${stateName}, United States` })
@@ -122,7 +128,7 @@ async function main() {
     if (venue) mk(`${short} - Venue`, [H_venue, H_show, H_dates, H_city], { 1: '1', 2: '2' })
   }
 
-  writeCsv('01-campaigns.csv', ['Campaign', 'Campaign Type', 'Networks', 'Budget', 'Budget type', 'Bid Strategy Type', 'Maximum CPC bid limit', 'Start Date', 'End Date', 'Languages', 'Tracking template', 'Ad rotation', 'Campaign Status'], camps)
+  writeCsv('01-campaigns.csv', ['Campaign', 'Campaign Type', 'Networks', 'Budget', 'Budget type', 'Bid Strategy Type', 'Maximum CPC bid limit', 'Start Date', 'End Date', 'Languages', 'Tracking template', 'Ad rotation', 'Campaign Status', 'EU political ads'], camps)
   writeCsv('01b-locations.csv', ['Campaign', 'Location'], locs)
   writeCsv('02-negatives.csv', ['Campaign', 'Keyword', 'Criterion Type', 'Status'], negs)
   writeCsv('03a-sitelinks.csv', ['Campaign', 'Link Text', 'Description Line 1', 'Description Line 2', 'Final URL'], links)

@@ -145,6 +145,19 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
   const status = getShowStatus(show)
   const daysUntil = getDaysUntil(show)
 
+  // show_type is free text across 10 distinct values ("Sports", "Pokemon TCG",
+  // "Mixed (TCG & Pop Culture)", "Multi", "convention"...), so classify rather
+  // than switch. A sports-only show has no reason to lead with an Umbreon, and
+  // a Pokemon regional has none to lead with LeBron -- the sample results are
+  // the page's proof, and proof that does not match the room is weaker proof.
+  const showTypeText = `${show.show_type || ''}`.toLowerCase()
+  const mentionsSports = /sport/.test(showTypeText)
+  const mentionsTcg = /tcg|pokemon|magic|gathering/.test(showTypeText)
+  const emphasis: 'sports' | 'tcg' | 'both' =
+    mentionsSports && !mentionsTcg ? 'sports'
+      : mentionsTcg && !mentionsSports ? 'tcg'
+      : 'both'
+
   return (
     <main className="min-h-screen bg-gray-900">
       {/* HERO SECTION - Conversion Optimized */}
@@ -168,16 +181,69 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                 {daysUntil === 0 ? 'TODAY' : daysUntil === 1 ? 'TOMORROW' : `${daysUntil} DAYS`}
               </span>
             ) : null}
-            <span className="text-gray-400 text-sm">{show.name}</span>
+            <span className="text-gray-400 text-sm">{show.city}{show.state ? `, ${show.state}` : ''}</span>
           </div>
 
-          {/* Main Headline - Mobile First */}
+          {/* Show identity FIRST, product pitch second.
+              The visitor searched this show by name and wants dates, venue and
+              address. Leading with "Grade Cards Instantly From Your Phone" reads
+              as bait to them, and to Google's landing page experience score,
+              which compares what the ad promised against what the page delivers.
+              Our own ad copy promises "Dates, Venue & Highlights", so those have
+              to be the first thing here, not the last. The signup card to the
+              right is unmoved and still above the fold. */}
           <div className="text-center mb-6">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 leading-tight">
-              Grade Cards <span className="text-emerald-400">Instantly</span><br className="md:hidden" /> From Your Phone
+              {show.name}
             </h1>
+
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-base md:text-lg text-gray-200 mb-2">
+              <span className="font-semibold text-emerald-400">
+                {formatDateRange(show.start_date, show.end_date)}
+              </span>
+              {show.venue_name && (
+                <>
+                  <span className="text-gray-600" aria-hidden="true">&middot;</span>
+                  <span>{show.venue_name}</span>
+                </>
+              )}
+            </div>
+
+            {(show.venue_address || show.city) && (
+              <p className="text-sm text-gray-400 mb-3">
+                {show.venue_address || `${show.city}${show.state ? `, ${show.state}` : ''}`}
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    [show.venue_name, show.venue_address, show.city, show.state].filter(Boolean).join(', ')
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                >
+                  Directions
+                </a>
+              </p>
+            )}
+
+            {/* highlights is populated on every active show and was rendered
+                nowhere. It is the most specific, least generic content the page
+                has -- exactly what "useful, original content" means. */}
+            {show.highlights && show.highlights.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                {show.highlights.slice(0, 4).map((h, i) => (
+                  <span
+                    key={i}
+                    className="px-3 py-1 rounded-full text-xs font-medium bg-gray-800/70 backdrop-blur border border-gray-700 text-gray-200"
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto">
-              Know if a card is worth buying in 60 seconds. Pre-screen before you pay, right at the show.
+              Going? Know if a card is worth buying in 60 seconds. Grade it from a
+              photo at the table, before you pay.
             </p>
           </div>
 
@@ -226,7 +292,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
             </div>
 
             {/* Right: Signup Card */}
-            <div className="w-full lg:w-1/2 max-w-md">
+            <div id="signup" className="w-full lg:w-1/2 max-w-md scroll-mt-6">
               <div className="bg-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Free Credit Header */}
                 <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3">
@@ -474,8 +540,8 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
           </h2>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Pokemon Example */}
-            <div className="flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            {/* Pokemon Example — ordered by show type, see `emphasis` above */}
+            <div className={`flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700 ${emphasis === 'sports' ? 'order-2' : 'order-1'}`}>
               <Image
                 src="/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg"
                 alt="Pokemon Card Example"
@@ -496,8 +562,8 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
               </div>
             </div>
 
-            {/* Sports Example */}
-            <div className="flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            {/* Sports Example — ordered by show type, see `emphasis` above */}
+            <div className={`flex items-center gap-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700 ${emphasis === 'sports' ? 'order-1' : 'order-2'}`}>
               <Image
                 src="/Sports/DCM-Card-LeBron-James-547249-front.jpg"
                 alt="Sports Card Example"
@@ -543,7 +609,14 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                   </div>
                 </div>
                 {show.venue_name && (
-                  <div className="text-gray-400 text-sm mt-2">{show.venue_name}</div>
+                  <div className="text-gray-400 text-sm mt-2">
+                    {show.venue_name}
+                    {/* venue_address is set on most shows and was never rendered,
+                        so the page named a venue without ever saying where it is. */}
+                    {show.venue_address && (
+                      <span className="block text-gray-500">{show.venue_address}</span>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="hidden lg:block">
@@ -573,6 +646,39 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
               <p className="text-gray-300 mt-6">{show.description}</p>
             )}
 
+            {/* Only when the hero's 4-chip cap actually truncated something.
+                Most shows carry 3-4 highlights, so rendering the full list here
+                unconditionally just repeats the hero a screen later. */}
+            {show.highlights && show.highlights.length > 4 && (
+              <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2 mt-6">
+                {show.highlights.map((h, i) => (
+                  <li key={i} className="flex items-start gap-2 text-gray-300">
+                    <svg className="w-4 h-4 mt-1 flex-shrink-0 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span>{h}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* A forward action at the point of highest intent. Previously the
+                only link in this section pointed off-site to the show's own
+                website, so the most engaged reader on the page had nowhere to
+                go but away. */}
+            <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3">
+              <a
+                href="#signup"
+                onClick={() => trackSignupClick(show.slug, 'show_details')}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-bold bg-emerald-500 hover:bg-emerald-400 text-gray-900 transition-colors"
+              >
+                Grade a card at {show.city} free
+              </a>
+              <span className="text-sm text-gray-400">
+                Two free grades. 10% off credits with code <span className="font-mono font-semibold text-emerald-400">CARDSHOW</span>.
+              </span>
+            </div>
+
             {show.website_url && (
               <a
                 href={show.website_url}
@@ -594,10 +700,14 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
       <section className="py-12 bg-gradient-to-r from-emerald-900 to-teal-900">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Ready to Grade Cards at {show.short_name || show.name}?
+            Heading to {show.short_name || show.name}?
           </h2>
+          {/* Was "get 1 credit". Signup actually grants 2 (credits.ts:103), and
+              the hero and homepage both say two, so this undersold the offer
+              and contradicted the rest of the page. */}
           <p className="text-gray-300 mb-6">
-            Sign up free and get 1 credit to try DCM at the show.
+            Two free grades when you sign up. Check centering and condition at the
+            table, before you pay for the card.
           </p>
           {user ? (
             <Link
