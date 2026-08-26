@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A second push to the same branch cancels the first — no point burning
+# minutes on a commit that has already been superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Gate 1. The build already fails on type errors (ignoreBuildErrors is
+      # false and must stay that way), so this catches them before a deploy.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Gate 2. Unit tests only — node environment, no network. Grading calls
+      # cost money and are nondeterministic, so live-model evaluation lives in
+      # scripts/repeatability-harness.ts and is run deliberately, never here.
+      - name: Unit tests
+        run: npm test
+
+      # NOT a gate, deliberately. Scoped to src/lib + src/app/api this still
+      # reports ~970 problems (834 errors, mostly no-explicit-any), so there is
+      # no clean baseline to enforce and failing the build on it would just
+      # train everyone to ignore CI. Printed so the number is visible and can
+      # be ratcheted down later. Promote to a gate once it reaches zero.
+      - name: Lint (informational)
+        run: npm run lint:ci
+        continue-on-error: true
