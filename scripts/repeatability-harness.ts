@@ -69,6 +69,11 @@ function report(cards: CalCard[]) {
   console.log(`\n${'-'.repeat(92)}`);
   console.log(`REPEATABILITY: mean grade spread = ${(spreadSum / Math.max(1, spreadCount)).toFixed(2)}  |  perfectly-stable cards (spread 0): ${stable}/${spreadCount}`);
   console.log(`ACCURACY:      runs within tolerance = ${within}/${withinDen} (${withinDen ? (100 * within / withinDen).toFixed(0) : 0}%)`);
+  // Coverage is stated explicitly so a shrinking anchor set cannot hide behind a
+  // healthy-looking pass rate: "9/10 within tolerance" means nothing if the set is 12.
+  const graded = cards.filter(c => rows.some(r => r.id === c.id && r.grade != null)).length;
+  const covLine = `COVERAGE:      ${graded}/${cards.length} anchors have grades on file`;
+  console.log(graded < cards.length ? `${covLine}  <-- ${cards.length - graded} NOT COVERED, pass rate is over the rest` : covLine);
   console.log(`${'='.repeat(92)}\n(lower spread = more repeatable; higher within-tolerance = more accurate)`);
 }
 
@@ -79,9 +84,31 @@ function report(cards: CalCard[]) {
 
   const done = new Set(readRows().map(r => `${r.id}|${r.run}`));
   console.log(`Harness: N=${N} per card × ${cards.length} cards → ${OUT}\n(${done.size} grades already on file, will skip those)`);
+  // Anchor lookup distinguishes THREE outcomes. Conflating them (the pre-Aug-26
+  // behaviour: any falsy `card` printed "CARD NOT FOUND") made a transient network
+  // blip look like seven deleted anchors, which is exactly how a harness loses its
+  // credibility. Missing anchors shrink the set permanently and must be loud;
+  // transient errors are retryable and must not be mistaken for them.
+  const missing: string[] = [];
+  const errored: string[] = [];
   for (const c of cards) {
-    const { data: card } = await supabase.from('cards').select('front_path, back_path').eq('id', c.id).single();
-    if (!card) { console.log(`✗ ${c.label} — CARD NOT FOUND`); continue; }
+    const { data: card, error: cardErr } = await supabase
+      .from('cards').select('front_path, back_path').eq('id', c.id).maybeSingle();
+    if (cardErr) {
+      errored.push(c.label);
+      console.log(`⚠ ${c.label} — LOOKUP FAILED (retryable): ${cardErr.message}`);
+      continue;
+    }
+    if (!card) {
+      missing.push(c.label);
+      console.log(`✗ ${c.label} — ANCHOR MISSING from cards table (set has shrunk)`);
+      continue;
+    }
+    if (!card.front_path || !card.back_path) {
+      missing.push(c.label);
+      console.log(`✗ ${c.label} — ANCHOR HAS NO IMAGES (set has shrunk)`);
+      continue;
+    }
     for (let run = 1; run <= N; run++) {
       if (done.has(`${c.id}|${run}`)) { console.log(`  skip ${c.label} run ${run}`); continue; }
       const { data: f } = await supabase.storage.from('cards').createSignedUrl((card as any).front_path, 3600);
@@ -104,6 +131,20 @@ function report(cards: CalCard[]) {
       fs.appendFileSync(OUT, JSON.stringify(row) + '\n');
       console.log(`  ✓ ${c.label} run ${run}: grade=${row.grade} struct=${row.structural}${row.err ? ' ERR ' + row.err : ''}`);
     }
+  }
+  if (missing.length || errored.length) {
+    console.log(`\n${'!'.repeat(92)}`);
+    console.log(`ANCHOR SET HEALTH: ${cards.length - missing.length - errored.length}/${cards.length} anchors gradeable this run`);
+    if (missing.length) {
+      console.log(`  PERMANENTLY MISSING (${missing.length}) — the golden set has shrunk, replace or remove these:`);
+      for (const m of missing) console.log(`    - ${m}`);
+    }
+    if (errored.length) {
+      console.log(`  LOOKUP FAILED (${errored.length}) — transient, safe to re-run (the harness resumes):`);
+      for (const m of errored) console.log(`    - ${m}`);
+    }
+    console.log(`A pass rate below is computed over the anchors that RAN, not the full set.`);
+    console.log('!'.repeat(92));
   }
   report(cards);
 })().catch(e => { console.error('Fatal:', e); process.exit(1); });
