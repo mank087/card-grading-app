@@ -3084,9 +3084,13 @@ Photo measurement is imprecise, so ONE tolerance applies:
 
 • THE BOUNDARY RESOLVES DOWNWARD. 55/45 is the grade-10 threshold. If your
   measurement lands so close to 55/45 that the ±2% precision cannot tell you which
-  side it falls on, score 9 and widen the uncertainty band — do not score 10.
+  side it falls on, score 9. Do not score 10.
   An overgraded card is discovered by its owner at resale; an undergraded one is
   discovered immediately and can be re-examined.
+  (Do NOT reach for the uncertainty band here. Per GRADE UNCERTAINTY MAPPING it is
+  driven solely by the confidence letter, which reports IMAGE VISIBILITY. A
+  borderline measurement on a perfectly clear photo is not an image-quality
+  problem and must not be reported as one.)
 
 • TILT: if the card is photographed at an angle, correct for it by measuring the
   borders at the MIDPOINT of each edge (where foreshortening is symmetric), not by
@@ -3527,8 +3531,8 @@ the most likely ratio from visible evidence and widen the uncertainty band.
 
 NOTE (v9.19): 55/45 is the grade-10 boundary and it resolves DOWNWARD. A measured ratio
 worse than 55/45 scores 9 or below. Where the ±2% measurement precision cannot establish
-which side of 55/45 the card falls on, score 9 and widen the uncertainty band — the
-tolerance describes your measurement error, it does not extend the grade-10 band.
+which side of 55/45 the card falls on, score 9 — the tolerance describes your measurement
+error, it does not extend the grade-10 band.
 ---
 FRONT/BACK CENTERING INDEPENDENCE
 ---
