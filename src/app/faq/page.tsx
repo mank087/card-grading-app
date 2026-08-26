@@ -148,15 +148,14 @@ const faqs: FAQItem[] = [
     question: 'What grading scale does DCM use?',
     answer: (
       <>
-        <p className="mb-3">DCM uses a 10-point scale with 0.5 precision, aligned with industry-standard grading criteria:</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li><strong>10:</strong> Gem Mint — Zero defects, perfect in every way</li>
-          <li><strong>9.5:</strong> Gem Mint — Near-perfect with only microscopic imperfections</li>
-          <li><strong>9:</strong> Mint — Minor imperfections under close inspection</li>
-          <li><strong>8.5-8:</strong> Near Mint-Mint — Slight wear visible upon examination</li>
-          <li><strong>7.5-7:</strong> Near Mint — Minor wear visible at normal distance</li>
-          <li><strong>6.5-6:</strong> Excellent-Mint — Visible wear but displays well</li>
-          <li><strong>5.5 and below:</strong> Varying degrees of wear or damage</li>
+        <p className="mb-3">DCM uses a 10-point scale in whole numbers. There are no half grades.</p>
+        <ul className="list-disc list-inside space-y-1 mb-3">
+          <li><strong>10:</strong> Gem Mint — No confirmed handling defects</li>
+          <li><strong>9:</strong> Mint — One to three minor defects, close inspection only</li>
+          <li><strong>8:</strong> Near Mint-Mint — One moderate defect, or several minor ones</li>
+          <li><strong>7:</strong> Near Mint — Multiple moderate defects</li>
+          <li><strong>6:</strong> Excellent-Mint — Widespread moderate wear, or one heavy defect</li>
+          <li><strong>5 and below:</strong> Heavy wear or structural damage</li>
         </ul>
       </>
     ),
@@ -346,11 +345,11 @@ const faqs: FAQItem[] = [
         <p className="mb-3">Grade differences can occur for several reasons:</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li><strong>Image limitations:</strong> Photos may not capture all defects visible under physical inspection</li>
-          <li><strong>Subjectivity:</strong> Even professional graders can vary by ±0.5 points on the same card</li>
+          <li><strong>Subjectivity:</strong> Even professional graders can vary by a point on the same card</li>
           <li><strong>Different standards:</strong> PSA, BGS, and CGC have slightly different criteria</li>
           <li><strong>Timing:</strong> Grading standards can shift over time</li>
         </ul>
-        <p>Use our uncertainty range as a guide. A card graded 9.0 with ±0.5 uncertainty could reasonably receive an 8.5-9.5 from a professional service.</p>
+        <p>Use our uncertainty range as a guide. It reports how much of the card the photos let us assess, in whole points: ±0 when visibility is excellent, up to ±3 when it is poor. A card graded 9 with ±1 could reasonably come back an 8 or a 10 from another service.</p>
       </>
     ),
     category: 'Accuracy & Comparison',

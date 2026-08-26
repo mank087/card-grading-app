@@ -38,6 +38,11 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
+// Canonical grade -> condition label. The local copy this replaced was wrong at
+// the top of the scale: it inserted "Pristine" at 10, which pushed "Gem Mint"
+// down to 9 and dropped "Mint" entirely. That mislabels a DCM 9 as "Gem Mint"
+// in generated eBay listing copy, misrepresenting the card to a BUYER.
+import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
 
 declare global {
   interface Window {
@@ -70,19 +75,6 @@ function getGradeColor(grade: number): string {
   return '#EF4444';
 }
 
-function getConditionLabel(grade: number): string {
-  if (grade >= 10) return 'Pristine';
-  if (grade >= 9) return 'Gem Mint';
-  if (grade >= 8) return 'Near Mint-Mint';
-  if (grade >= 7) return 'Near Mint';
-  if (grade >= 6) return 'Excellent-Mint';
-  if (grade >= 5) return 'Excellent';
-  if (grade >= 4) return 'Very Good-Excellent';
-  if (grade >= 3) return 'Very Good';
-  if (grade >= 2) return 'Good';
-  if (grade >= 1) return 'Fair';
-  return 'Poor';
-}
 
 // Convert a remote image URL to a JPEG base64 (PDF lib doesn't support WebP)
 async function imageToJpegBase64(imageUrl: string): Promise<string> {

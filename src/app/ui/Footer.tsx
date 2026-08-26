@@ -236,6 +236,11 @@ function FooterInner({ currentYear }: { currentYear: number }) {
                 </Link>
               </li>
               <li>
+                <Link href="/grading-standard" className="text-gray-400 hover:text-white transition-colors">
+                  Grading Standard
+                </Link>
+              </li>
+              <li>
                 <Link href="/reports-and-labels" className="text-gray-400 hover:text-white transition-colors">
                   Reports & Labels
                 </Link>
