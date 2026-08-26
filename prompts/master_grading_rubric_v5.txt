@@ -3053,29 +3053,41 @@ PURPOSE: Assess centering for both front and back independently.
 
 **Professional-Market Centering Standards:**
 • 55/45 or better on front = Centering score 10 (matches the professional Gem Mint requirement)
-• ~20% of cards achieve 55/45 or better — centering 10 is achievable, not rare
+• ~20% of cards achieve 55/45 or better — centering 10 is achievable, but it is NOT the default
 • True 50/50 is uncommon (<5%), but 55/45 is a reasonable threshold for modern cards
-• When borders appear roughly equal and you cannot see a clear difference, 55/45 or better is appropriate
 
-**PHOTO-BASED MEASUREMENT TOLERANCE (v8.6):**
-Photo-based centering measurement has inherent imprecision due to camera angle,
-lens distortion, sleeve/holder position, and image compression. Account for this:
+**MEASURE BEFORE YOU SCORE (v9.18 — MANDATORY):**
+Centering is the one category that is MEASURED, not judged. Do not describe the
+borders as "even", "balanced" or "roughly equal" and score from that impression.
+For each axis, on each face:
+
+1. Identify the card's CUT EDGE and the outer boundary of the PRINTED FIELD
+   (the border is the cardstock between them).
+2. State the two opposing border widths in the SAME units, as a comparison:
+   e.g. "top border ≈ 1.0 unit, bottom border ≈ 2.1 units".
+3. Compute the ratio from those two widths: top/(top+bottom). A bottom border
+   twice the top is 33/67, NOT 52/48.
+4. Report that computed ratio. If you did not compare two widths, you did not
+   measure, and you must say the axis was not measurable rather than guess.
+
+A ratio you did not derive from two stated widths is not a measurement. Reporting
+a near-even ratio (50/50, 52/48) for a card whose borders differ visibly is the
+single most damaging error in the whole rubric: it hands a Gem Mint to a card the
+owner can see is off-centre, and it destroys trust in every other subgrade.
+
+**PHOTO-BASED MEASUREMENT TOLERANCE (v9.18):**
+Photo measurement is imprecise, so ONE tolerance applies:
 
 • MEASUREMENT TOLERANCE: ±2% on all centering ratios measured from photos.
-  If measured centering falls in the 55/45 to 57/43 range, this is within the
-  margin of photo-based measurement error. Score 10 unless borders are VISIBLY
-  DIFFERENT at normal viewing distance.
+  If the measured ratio falls between 55/45 and 57/43, score 10.
 
-• PHOTO PERSPECTIVE BIAS: If the card image shows any tilt, angle, or perspective
-  (not perfectly flat/overhead), centering ratios will appear worse than actual.
-  Cards photographed at even a slight angle look more off-center than they are.
-  When perspective is detected, widen your centering tolerance by an additional ±3%
-  before scoring.
+• TILT: if the card is photographed at an angle, correct for it by measuring the
+  borders at the MIDPOINT of each edge (where foreshortening is symmetric), not by
+  widening the tolerance. Perspective shifts a border a few percent; it does not
+  turn a 33/67 card into a 50/50 card.
 
-• BENEFIT OF THE DOUBT: When centering is borderline between two scores (e.g.,
-  55/45 vs. 56/44), always give the benefit of the doubt and assign the higher
-  centering score. The card deserves the benefit because photo measurement cannot
-  match physical measurement precision.
+• A measured ratio worse than 57/43 scores below 10, however clean the rest of the
+  card is. Do not round the score up because the card is otherwise attractive.
 
 **Centering Assessment Approach:**
 • If borders look equal or nearly equal → score 10 (55/45 or better)
