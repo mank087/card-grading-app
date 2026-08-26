@@ -19,6 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { gradeCardConversational } from '../src/lib/visionGrader';
+import { resolveGradingModel, describeDecision, BASELINE_MODEL, CANARY_MODEL } from '../src/lib/grading/modelRouter';
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 // consolidatedGrader experiment lives only on grading-v9.2-joey-fixes; this branch runs the default engine
 const grade = gradeCardConversational;
@@ -84,6 +85,9 @@ function report(cards: CalCard[]) {
 
   const done = new Set(readRows().map(r => `${r.id}|${r.run}`));
   console.log(`Harness: N=${N} per card × ${cards.length} cards → ${OUT}\n(${done.size} grades already on file, will skip those)`);
+  // Name what this run exercises. A repeatability number that does not say which
+  // model produced it is unattributable as soon as two runs are compared.
+  console.log(`model: ${describeDecision(resolveGradingModel(cards[0]?.id))}  |  baseline=${BASELINE_MODEL} canary=${CANARY_MODEL}\n`);
   // Anchor lookup distinguishes THREE outcomes. Conflating them (the pre-Aug-26
   // behaviour: any falsy `card` printed "CARD NOT FOUND") made a transient network
   // blip look like seven deleted anchors, which is exactly how a harness loses its
@@ -115,7 +119,12 @@ function report(cards: CalCard[]) {
       const { data: b } = await supabase.storage.from('cards').createSignedUrl((card as any).back_path, 3600);
       let row: Row;
       try {
-        const r: any = await grade(f!.signedUrl, b!.signedUrl, c.cardType as any);
+        // routingKey is REQUIRED. modelRouter calls its omission "a trapdoor for
+        // scripts": without a key resolveGradingModel() always returns BASELINE,
+        // so the harness would silently test only one side of a canary split and
+        // report it as the engine's behaviour. Harmless while BASELINE_MODEL and
+        // CANARY_MODEL are both gpt-5.6-luna; wrong the moment they differ.
+        const r: any = await grade(f!.signedUrl, b!.signedUrl, c.cardType as any, { routingKey: c.id });
         const j = JSON.parse(r.markdown_report);
         const ws = j.weighted_scores || {};
         const hay = [j.final_grade?.summary || '', JSON.stringify(j.structural_damage || {}), JSON.stringify(j.grading_passes?.consensus_notes || [])].join(' ').toLowerCase();

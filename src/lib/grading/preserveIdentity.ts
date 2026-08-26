@@ -78,6 +78,17 @@ export interface PreserveIdentityResult {
   reason: string;
   /** Identity columns whose regraded value differed from the stored one (what would have changed) */
   changedColumns: string[];
+  /**
+   * True when the guard could not do its job and the caller MUST NOT save.
+   *
+   * `preserved: false` alone is ambiguous — it covers both "nothing to preserve"
+   * (not a regrade, reidentify was requested, card was never identified) and
+   * "I could not read the stored identity". The first three are fine to proceed
+   * on. The last one is not: proceeding lets the regrade's fresh identification
+   * overwrite a correct stored identity, which is the exact failure this guard
+   * exists to prevent. Callers must check `abort` before writing.
+   */
+  abort?: boolean;
 }
 
 /**
@@ -116,8 +127,14 @@ export async function preserveIdentityOnRegrade(
       ({ data: existing, error } = await supabase.from('cards').select(core.join(', ')).eq('id', cardId).maybeSingle());
     }
     if (error || !existing) {
-      console.warn(`[${tag}] 🪪 identity guard skipped (fetch failed: ${error?.message || 'no row'})`);
-      return { preserved: false, reason: 'fetch failed', changedColumns: [] };
+      // FAIL CLOSED. Previously this returned preserved:false and the caller
+      // carried on, letting the regrade rename a correctly-identified card
+      // whenever the read happened to fail — a transient network blip was
+      // enough. Refusing the save is recoverable; a silently renamed card is
+      // not, because the customer sees the wrong card and we have overwritten
+      // what it used to be.
+      console.error(`[${tag}] 🪪 identity guard COULD NOT READ stored identity (${error?.message || 'no row'}) — aborting save`);
+      return { preserved: false, reason: 'fetch failed', changedColumns: [], abort: true };
     }
 
     const row = existing as Record<string, any>;
@@ -162,7 +179,9 @@ export async function preserveIdentityOnRegrade(
     }
     return { preserved: true, reason: 'ok', changedColumns: changed };
   } catch (e: any) {
-    console.warn(`[${tag}] 🪪 identity guard error (payload left untouched): ${e?.message || e}`);
-    return { preserved: false, reason: 'error', changedColumns: [] };
+    // Same reasoning as the fetch-failure path: if the guard threw, it did not
+    // run, so we cannot know whether the payload would rename the card.
+    console.error(`[${tag}] 🪪 identity guard THREW (${e?.message || e}) — aborting save`);
+    return { preserved: false, reason: 'error', changedColumns: [], abort: true };
   }
 }

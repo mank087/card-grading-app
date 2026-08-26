@@ -19,12 +19,12 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
 } from '@/lib/pricing/batchPriceRefresh';
+import { requireCron } from '@/lib/cronAuth';
 
 // Vercel Pro: up to 300s per invocation. We stop a bit before the cutoff
 // so the in-flight batch can finish its final card cleanly.
 export const maxDuration = 300;
 
-const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_DURATION_MS = 270_000;          // 4m30s — leaves 30s headroom
 const DELAY_BETWEEN_CALLS_MS = 250;
 // Hard cap so the cron can't accidentally chew through the entire DB in
@@ -36,11 +36,8 @@ export async function GET(request: NextRequest) {
   const startedAt = Date.now();
 
   // Vercel sends CRON_SECRET via the Authorization header for scheduled jobs.
-  const authHeader = request.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-    console.warn('[Price Cron] Unauthorized');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireCron(request, 'Price Cron');
+  if (!auth.ok) return auth.response;
 
   try {
     console.log('[Price Cron] Starting weekly price-refresh run');

@@ -182,7 +182,12 @@ export async function POST(request: NextRequest) {
         // Regrade identity guard — same rule as the category routes. On a plain
         // regrade of an identified card this strips the identity rewrites and
         // leaves the pokemon_api_* metadata refresh in place.
-        await preserveIdentityOnRegrade(supabase, card_id, updateData, { forceRegrade: isRegrade, reidentify, tag: `POST /api/pokemon/verify ${card_id}` });
+        const idGuard = await preserveIdentityOnRegrade(supabase, card_id, updateData, { forceRegrade: isRegrade, reidentify, tag: `POST /api/pokemon/verify ${card_id}` });
+        // FAIL CLOSED: the guard could not read the stored identity, so saving now
+        // could rename a correctly-identified card. Refuse and let the caller retry.
+        if (idGuard.abort) {
+          throw new Error(`identity guard aborted the save (${idGuard.reason}) — regrade not applied`);
+        }
 
         // Keep the printed label in step with the row whenever identity changed.
         const finalName = updateData.card_name ?? card.card_name;

@@ -32,11 +32,11 @@ import {
   categoryToRouteSlug,
 } from '@/lib/postGradeEmailTemplates';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireCron } from '@/lib/cronAuth';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Cron secret for security (set in Vercel environment variables)
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * GET /api/cron/send-scheduled-emails
@@ -45,11 +45,8 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret (Vercel sends this in Authorization header)
-    const authHeader = request.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      console.warn('[Cron] Unauthorized request');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireCron(request, 'Cron');
+    if (!auth.ok) return auth.response;
 
     console.log('[Cron] Starting scheduled email job...');
 

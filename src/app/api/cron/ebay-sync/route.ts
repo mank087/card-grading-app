@@ -25,18 +25,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { syncUser } from '@/lib/ebay/sync';
+import { requireCron } from '@/lib/cronAuth';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_USERS_PER_RUN = 50;
 const TOTAL_CAP = 200;
 const PER_USER_CAP = 60;
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireCron(request, 'ebay-sync');
+    if (!auth.ok) return auth.response;
 
     console.log('[ebay-sync] Starting cron run');
 

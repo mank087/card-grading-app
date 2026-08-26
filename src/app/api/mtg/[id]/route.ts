@@ -1302,7 +1302,12 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
     // 🪪 Regrade identity guard: a force-regrade refreshes the condition grade only;
     // the card keeps its stored identification unless ?reidentify=true.
-    await preserveIdentityOnRegrade(supabase, cardId, updateData as any, { forceRegrade, reidentify, tag: `GET /api/mtg/${cardId}` });
+    const idGuard = await preserveIdentityOnRegrade(supabase, cardId, updateData as any, { forceRegrade, reidentify, tag: `GET /api/mtg/${cardId}` });
+    // FAIL CLOSED: the guard could not read the stored identity, so saving now
+    // could rename a correctly-identified card. Refuse and let the caller retry.
+    if (idGuard.abort) {
+      throw new Error(`identity guard aborted the save (${idGuard.reason}) — regrade not applied`);
+    }
 
     const { error: updateError } = await supabase
       .from("cards")

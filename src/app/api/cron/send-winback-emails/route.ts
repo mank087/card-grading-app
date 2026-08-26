@@ -18,8 +18,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireCron } from '@/lib/cronAuth';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 const DAILY_CAP = 300;
 const INACTIVITY_DAYS = 14;
 
@@ -30,11 +30,8 @@ interface EligibleUser {
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      console.warn('[WinbackCron] Unauthorized request');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireCron(request, 'WinbackCron');
+    if (!auth.ok) return auth.response;
 
     console.log('[WinbackCron] Starting daily winback scan...');
 
