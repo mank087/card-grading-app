@@ -13,14 +13,14 @@ declare global {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
-import { reportUploadEvent } from '@/lib/uploadTelemetry'
+import { reportUploadEvent, beginCaptureAttempt, getCaptureAttemptId } from '@/lib/uploadTelemetry'
 import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage, getImageDimensions } from '@/lib/imageCompression'
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality'
 import { ImageQualityValidation } from '@/types/camera'
 import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
 import { useDeviceDetection } from '@/hooks/useDeviceDetection'
 import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
-import MobileCamera from '@/components/camera/MobileCamera'
+import MobileCamera, { type WebCaptureMethod } from '@/components/camera/MobileCamera'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -279,7 +279,23 @@ function UniversalUploadPageContent() {
   const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery' | 'review'>('select')
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
   const [originalUploadMethod, setOriginalUploadMethod] = useState<'camera' | 'gallery'>('camera')
-  const { showCameraOption } = useDeviceDetection()
+
+  /**
+   * CAPTURE-GATE P0: how each side was actually obtained.
+   *
+   * Tracked PER SIDE because a submission can pair a camera front with a
+   * gallery back, and a single combined value hides an unusable back behind a
+   * good front. Persisted to cards.capture_source on insert — until now the
+   * upload method lived only in `originalUploadMethod`, which is used solely
+   * to restore the UI mode and never leaves the browser. That is why nothing
+   * could answer "which capture path produces the bad photos", which is the
+   * first question anyone asks about this problem.
+   */
+  const [captureSources, setCaptureSources] = useState<{
+    front?: { source: string; capture_method?: string }
+    back?: { source: string; capture_method?: string }
+  }>({})
+  const { showCameraOption, isMobileDevice, isTabletDevice } = useDeviceDetection()
 
   // Photo tips popup state
   const shouldShowPhotoTips = useShouldShowPhotoTips()
@@ -372,7 +388,35 @@ function UniversalUploadPageContent() {
   };
 
   // Handle file selection and compression
-  const handleFileSelect = async (originalFile: File, side: 'front' | 'back', source: 'camera' | 'gallery' | 'crop' = 'gallery') => {
+  const handleFileSelect = async (
+    originalFile: File,
+    side: 'front' | 'back',
+    source: 'camera' | 'gallery' | 'crop' = 'gallery',
+    captureMethod?: WebCaptureMethod
+  ) => {
+    // P0: record how this side arrived, before any early return below can skip
+    // it. Recorded even for images that go on to fail the resolution gate —
+    // a rejected submission is still evidence about which path produces bad
+    // photos, and dropping it would bias the dataset toward what succeeded.
+    setCaptureSources(prev => ({
+      ...prev,
+      [side]: {
+        source,
+        ...(captureMethod ? { capture_method: captureMethod } : {}),
+      },
+    }))
+    // Opens the attempt funnel on the first photo of a submission. Everything
+    // after this carries the same attempt_id, so an attempt that never reaches
+    // grade_started is measurable as an abandonment.
+    if (!getCaptureAttemptId()) beginCaptureAttempt()
+    reportUploadEvent({
+      event: 'capture_attempted',
+      side,
+      capture_source: source,
+      capture_method: captureMethod,
+      client_surface: isMobileDevice || isTabletDevice ? 'web_mobile' : 'web_desktop',
+    }, getStoredSession()?.access_token)
+
     console.log('[Upload] handleFileSelect started:', side, 'size:', originalFile.size, 'type:', originalFile.type)
     const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
@@ -529,6 +573,21 @@ function UniversalUploadPageContent() {
             console.log(`[Upload] ${side} image quality: ${quality.confidenceLetter} (score ${quality.overallScore})`)
             if (quality.confidenceLetter === 'C' || quality.confidenceLetter === 'D') {
               reportUploadEvent({ event: 'quality_advisory_cd', side, reason: `grade ${quality.confidenceLetter} score ${quality.overallScore}` }, getStoredSession()?.access_token)
+            }
+            // Blur/exposure are hard constraints now, so !isValid means the
+            // photo genuinely failed one — worth its own event, because
+            // "warned then abandoned" is the pattern that says the warning is
+            // driving people away rather than getting them to retake.
+            if (!quality.isValid) {
+              reportUploadEvent({
+                event: 'local_quality_warning',
+                side,
+                rule_code: !quality.checks.blur.passed ? 'severe_blur' : 'dark',
+                metadata: {
+                  blur_score: quality.checks.blur.score,
+                  brightness_score: quality.checks.brightness.score,
+                },
+              }, getStoredSession()?.access_token)
             }
             if (side === 'front') setFrontQuality(quality)
             else setBackQuality(quality)
@@ -830,6 +889,12 @@ function UniversalUploadPageContent() {
           user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
           user_condition_processed: processedConditionReport,
           has_user_condition_report: hasConditionData || hasCardDescription,
+          // CAPTURE-GATE P0 — how each side was obtained. See captureSources.
+          capture_source: {
+            client_surface: isMobileDevice || isTabletDevice ? 'web_mobile' : 'web_desktop',
+            front: captureSources.front ?? null,
+            back: captureSources.back ?? null,
+          },
         })
 
         dbError = insertError
@@ -977,6 +1042,8 @@ function UniversalUploadPageContent() {
       // CRITICAL: Trigger the grading API (fire-and-forget)
       // This starts the actual AI grading process in the background
       console.log(`[Upload] Triggering AI grading for ${config.category} card: ${cardId}`)
+      // Closes the attempt funnel — see capture_attempted above.
+      reportUploadEvent({ event: 'grade_started', submission_id: cardId }, session?.access_token)
       fetch(`${config.apiEndpoint}/${cardId}`).catch(err => {
         console.error(`[Upload] Failed to trigger grading for ${cardId}:`, err)
       })
@@ -1137,11 +1204,11 @@ function UniversalUploadPageContent() {
     console.log('[Upload] Reset upload state - ready for new card')
   }
 
-  const handleCameraCapture = (file: File) => {
+  const handleCameraCapture = (file: File, meta?: { captureMethod: WebCaptureMethod }) => {
     console.log('[Upload] Camera captured:', currentSide, 'file size:', file.size)
 
     // Process captured image (async - will set isCompressing)
-    handleFileSelect(file, currentSide, 'camera')
+    handleFileSelect(file, currentSide, 'camera', meta?.captureMethod)
 
     // Determine next step based on what photos we have
     const willHaveFront = currentSide === 'front' || frontFile

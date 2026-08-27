@@ -133,9 +133,15 @@ export default function ImagePreview({
 
       {/* Action Buttons */}
       <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 space-y-3">
+        {/* isValid can now actually be false — focus and lighting are hard
+            constraints rather than averaged scores — so this warning means the
+            photo is genuinely unusable, not merely imperfect. Say so plainly.
+            The override stays: the authoritative block is server-side, and a
+            client that guesses wrong should not be the thing that stops a
+            paying customer. */}
         {hasQualityIssues && (
           <p className="text-center text-yellow-400 text-sm mb-2">
-            You can retake for better quality or continue with this image
+            This photo may be too poor to grade accurately. Retaking is strongly recommended.
           </p>
         )}
 

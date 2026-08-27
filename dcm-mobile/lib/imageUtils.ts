@@ -3,7 +3,6 @@ import * as Crypto from 'expo-crypto'
 
 export interface QualityResult {
   score: number
-  grade: 'A' | 'B' | 'C' | 'D'
   /**
    * Label for what this module can actually measure on-device:
    * resolution + framing. It is intentionally NOT called "sharpness".
@@ -11,9 +10,21 @@ export interface QualityResult {
    * cannot measure blur or brightness, so we must not claim to.
    */
   resolutionLabel: string
-  uncertainty: string
   suggestions: string[]
 }
+// REMOVED: `grade` ('A'|'B'|'C'|'D') and `uncertainty` ('±0.5' etc).
+//
+// Both were fabrications. assessQuality measures resolution and framing only,
+// so an A/B/C/D badge and a stated grade uncertainty presented a resolution
+// heuristic as an overall quality verdict — and because the aspect deduction
+// below was unreachable, every modern phone produced a flat 90, rendered as a
+// confident green "B (90/100)" on a photo that could be completely out of
+// focus. The panel underneath was already honest ("Resolution: Good", plus a
+// line saying sharpness is judged during grading); the badge contradicted it.
+//
+// Real image confidence comes from the server as
+// cards.conversational_image_confidence. Do not reintroduce a client-side
+// letter grade unless this module can actually measure focus.
 
 export interface CompressedImage {
   uri: string
@@ -154,8 +165,52 @@ export interface PreviewViewInfo {
   /** Measured layout size of the camera preview container (dp). */
   containerW: number
   containerH: number
-  /** Guide box width as a fraction of the container width (styles.guide width: '70%'). */
+  /** Guide box width as a fraction of container width — from computeGuideWidthFraction. */
   guideWidthFraction: number
+}
+
+/**
+ * Size the framing guide to the preview, and be the ONE place that decides it.
+ *
+ * The guide used to be a flat `width: '70%'` in the stylesheet, with the crop
+ * math separately passing a hardcoded `guideWidthFraction: 0.7`. Two constants
+ * that had to agree, in two files, with nothing enforcing it. Both callers now
+ * read this function, so the box the user aims at and the region we actually
+ * crop cannot drift apart.
+ *
+ * 70% of WIDTH is also just small on a tall phone: the card-aspect box is
+ * height-constrained there, so a width-derived guide leaves most of the
+ * viewport unused and quietly teaches people to shoot from too far away —
+ * which is the complaint this whole effort exists to fix. Deriving from
+ * whichever dimension actually binds makes the guide as large as fits.
+ *
+ * Headroom matters: computeGuideCrop pads 8% per side beyond the guide, and
+ * that pad has to land inside the photo. The vertical cap is the tighter of
+ * the two because aspect-fill leaves spare pixels off the sides in portrait
+ * but none top-and-bottom.
+ */
+const GUIDE_MAX_W_FRACTION = 0.88
+const GUIDE_MAX_H_FRACTION = 0.78
+const GUIDE_MIN_FRACTION = 0.6
+const GUIDE_FALLBACK_FRACTION = 0.7
+
+export function computeGuideWidthFraction(
+  containerW: number,
+  containerH: number,
+  orientation: 'portrait' | 'landscape' = 'portrait',
+): number {
+  if (!(containerW > 0) || !(containerH > 0)) return GUIDE_FALLBACK_FRACTION
+
+  const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
+  const maxW = containerW * GUIDE_MAX_W_FRACTION
+  const widthIfHeightBound = containerH * GUIDE_MAX_H_FRACTION * cardAspect
+
+  const guideW = Math.min(maxW, widthIfHeightBound)
+  const fraction = guideW / containerW
+
+  // Clamp so an unexpected layout measurement can never produce a guide that
+  // pushes the padded crop outside the frame.
+  return Math.max(GUIDE_MIN_FRACTION, Math.min(GUIDE_MAX_W_FRACTION, fraction))
 }
 
 export async function processCardCapture(
@@ -339,7 +394,7 @@ function computeCardCrop(
  * server-side by the AI grader (conversational_image_confidence), which
  * is the value users ultimately see on the card detail screen.
  */
-export function assessQuality(compressed: CompressedImage): QualityResult {
+export function assessQuality(compressed: CompressedImage, sourceAspect?: number): QualityResult {
   const { width, height } = compressed
   const megapixels = (width * height) / 1000000
 
@@ -351,7 +406,7 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
   else if (megapixels >= 2) score += 8
   else {
     score -= 20
-    suggestions.push('Image resolution is very low — move phone closer to the card')
+    suggestions.push('Image resolution is very low — move the phone closer to the card')
   }
 
   if (width >= 1500 && height >= 1500) score += 5
@@ -360,38 +415,42 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
     suggestions.push('Image is too small — try taking the photo again')
   }
 
-  // Aspect ratio check — a card should be roughly 2.5:3.5 or 3.5:2.5
-  const aspect = width / height
-  const cardAspect = 2.5 / 3.5
-  const invAspect = 3.5 / 2.5
-  const aspectDiff = Math.min(Math.abs(aspect - cardAspect), Math.abs(aspect - invAspect))
-  if (aspectDiff > 0.3) {
-    score -= 10
-    suggestions.push('Image does not appear to be a trading card — ensure the card fills the frame')
-  }
-
   // Minimum dimension check — very small images are likely not useful
   if (width < 400 || height < 400) {
     score -= 15
     suggestions.push('Image is too small for accurate grading')
   }
 
+  // ASPECT: only meaningful when the CALLER chose the bounds.
+  //
+  // This check used to run on `compressed`, which is unreachable dead code:
+  // computeCardCrop has already forced the output to exactly 2.5:3.5, so
+  // aspectDiff was always ~0 and the deduction could never fire. That is why
+  // every modern phone scored a flat 90.
+  //
+  // The fix is NOT to run it on the raw camera frame instead. A camera photo
+  // is 4:3 or 16:9 because of the SENSOR, not because of how the card was
+  // framed — testing it there would replace dead code with misleading code.
+  // It is only informative for gallery picks and manual crops, where the user
+  // picked the bounds, so the caller passes sourceAspect for those and omits
+  // it for camera captures.
+  //
+  // Real card-aspect measurement belongs server-side, computed from the
+  // detected corner quad after perspective is accounted for.
+  if (sourceAspect != null && Number.isFinite(sourceAspect) && sourceAspect > 0) {
+    const cardAspect = 2.5 / 3.5
+    const invAspect = 3.5 / 2.5
+    const aspectDiff = Math.min(Math.abs(sourceAspect - cardAspect), Math.abs(sourceAspect - invAspect))
+    if (aspectDiff > 0.3) {
+      score -= 10
+      suggestions.push('This photo is not card-shaped — crop it so the card fills the frame')
+    }
+  }
+
   score = Math.max(0, Math.min(100, score))
 
-  // Thresholds match web's src/utils/imageQuality.ts:172-185 (95/80/60).
-  // Conservative on purpose: handheld phone cameras under household
-  // lighting almost never hit the A bar, and that's intentional —
-  // calling a slightly soft photo "A — Excellent!" sets the user up for
-  // disappointment when the server's actual confidence comes back B or C.
-  // The ±0.25/±0.5/±1.0/±1.5 uncertainty bakes in margin so users with
-  // borderline image quality understand the grade has wiggle room.
-  const grade: QualityResult['grade'] =
-    score >= 95 ? 'A' : score >= 80 ? 'B' : score >= 60 ? 'C' : 'D'
-
-  const uncertainty =
-    grade === 'A' ? '±0.25' : grade === 'B' ? '±0.5' : grade === 'C' ? '±1.0' : '±1.5'
-
-  // Resolution label — the only per-image signal we can measure honestly.
+  // Resolution label — the only per-image signal this module can measure
+  // honestly (see the note on top of this function).
   let resolutionLabel = 'Good'
   if (score < 60) {
     resolutionLabel = 'Low'
@@ -402,20 +461,55 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
 
   return {
     score,
-    grade,
     resolutionLabel,
-    uncertainty,
     suggestions,
   }
 }
 
 /**
- * Generate a hash for duplicate detection.
- * Uses the filename from the URI since each capture produces a unique filename.
+ * Generate a hash of the image CONTENT for duplicate detection.
+ *
+ * This used to hash the filename, with the reasoning "each capture produces a
+ * unique filename" — which is precisely what made it useless. Unique filenames
+ * mean two identical images always hashed differently, so the front/back
+ * duplicate guard in grade/capture.tsx could never fire. The app appeared to
+ * check for duplicates and did not.
+ *
+ * Hashes the compressed/processed file rather than the original: it is the
+ * smaller read, and it is the image that actually gets uploaded and graded.
+ *
+ * Reads through fetch → blob → FileReader rather than expo-file-system's
+ * base64 read, so the payload is streamed by the platform instead of
+ * materialising a multi-megabyte base64 string in the JS heap on phones that
+ * cannot spare it.
+ *
+ * Returns null when the content cannot be read. Callers must treat null as
+ * "unknown", never as "not a duplicate" — failing to hash is not evidence
+ * that two images differ.
  */
-export async function hashImage(uri: string): Promise<string> {
-  const filename = uri.split('/').pop() || uri
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, filename)
+export async function hashImage(uri: string): Promise<string | null> {
+  try {
+    const response = await fetch(uri)
+    const blob = await response.blob()
+
+    const base64: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('read failed'))
+      reader.onload = () => {
+        const result = String(reader.result || '')
+        // strip the "data:image/jpeg;base64," prefix
+        const comma = result.indexOf(',')
+        resolve(comma >= 0 ? result.slice(comma + 1) : result)
+      }
+      reader.readAsDataURL(blob)
+    })
+
+    if (!base64) return null
+    return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64)
+  } catch (err) {
+    console.warn('[imageUtils] hashImage failed:', err)
+    return null
+  }
 }
 
 /**

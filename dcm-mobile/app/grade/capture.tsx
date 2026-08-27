@@ -8,9 +8,10 @@ import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { StatusBar } from 'expo-status-bar'
 import { Colors } from '@/lib/constants'
-import { assessQuality, compressImage, hashImage, processCardCapture, QualityResult, CompressedImage } from '@/lib/imageUtils'
+import { assessQuality, compressImage, hashImage, processCardCapture, computeGuideWidthFraction, QualityResult, CompressedImage } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
+import { reportUploadEvent, beginCaptureAttempt } from '@/lib/uploadTelemetry'
 import { useResponsive } from '@/hooks/useResponsive'
 
 export default function CaptureScreen() {
@@ -65,10 +66,20 @@ export default function CaptureScreen() {
   // Timers outlive the screen if the user backs out mid-focus.
   useEffect(() => () => { focusTimers.current.forEach(clearTimeout) }, [])
 
+  // CAPTURE-GATE P0: open a capture attempt on mount. Every telemetry event
+  // from here through grade start carries this id, which is what makes
+  // abandonment computable — an attempt that emits capture_attempted but never
+  // grade_started is a user who gave up, and no card row would ever record it.
+  useEffect(() => { beginCaptureAttempt() }, [])
+
   // Measured size of the camera preview container. Feeds the geometry-aware
   // capture crop (lib/imageUtils computeGuideCrop) so the crop matches the
   // on-screen guide box instead of the legacy hardcoded 85% band.
   const cameraLayoutRef = useRef<{ containerW: number; containerH: number } | null>(null)
+  // Same measurement as the ref, held in state so the guide box can re-render
+  // at the right size. The ref stays for the capture path, which needs the
+  // freshest value without depending on a render having happened.
+  const [cameraLayout, setCameraLayout] = useState<{ containerW: number; containerH: number } | null>(null)
 
   // Captured images
   const [frontUri, setFrontUri] = useState<string | null>(null)
@@ -79,6 +90,9 @@ export default function CaptureScreen() {
   const [backQuality, setBackQuality] = useState<QualityResult | null>(null)
   const [frontHash, setFrontHash] = useState<string | null>(null)
   const [backHash, setBackHash] = useState<string | null>(null)
+  // CAPTURE-GATE P0: which path produced each side ('camera' | 'gallery').
+  // Forwarded to the review screen and persisted on the card row.
+  const [captureSources, setCaptureSources] = useState<{ front?: string; back?: string }>({})
 
   // Preview state
   const insets = useSafeAreaInsets()
@@ -137,11 +151,21 @@ export default function CaptureScreen() {
         setPreviewQuality(null)
         return
       }
-      const quality = assessQuality(compressed)
+      // Gallery images are never auto-cropped, so the file's aspect IS the
+      // user's framing — the one case where an aspect check is informative.
+      const quality = assessQuality(compressed, compressed.width / compressed.height)
       const hash = await hashImage(compressed.uri)
 
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
+      setCaptureSources(prev => ({ ...prev, [currentSide]: 'gallery' }))
+      reportUploadEvent({
+        event: 'capture_attempted',
+        side: currentSide,
+        capture_source: 'gallery',
+        image_width: compressed.width,
+        image_height: compressed.height,
+      })
 
       if (currentSide === 'front') {
         setFrontUri(compressed.uri)
@@ -149,7 +173,9 @@ export default function CaptureScreen() {
         setFrontQuality(quality)
         setFrontHash(hash)
       } else {
-        if (frontHash && hash === frontHash) {
+        // Both hashes must be present to compare. A null hash means the
+        // content could not be read — that is "unknown", never "different".
+        if (frontHash && hash && hash === frontHash) {
           Alert.alert('Duplicate Image', 'Front and back images appear to be the same. Please pick the other side.')
           setPreviewUri(null)
           setPreviewQuality(null)
@@ -308,7 +334,14 @@ export default function CaptureScreen() {
         orientation,
         photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
         cameraLayoutRef.current
-          ? { ...cameraLayoutRef.current, guideWidthFraction: 0.7 }
+          ? {
+              ...cameraLayoutRef.current,
+              guideWidthFraction: computeGuideWidthFraction(
+                cameraLayoutRef.current.containerW,
+                cameraLayoutRef.current.containerH,
+                orientation,
+              ),
+            }
           : undefined,
       )
 
@@ -323,14 +356,25 @@ export default function CaptureScreen() {
         return
       }
 
-      // Quality assessment
+      // Quality assessment. No sourceAspect: processCardCapture has already
+      // cropped to 2.5:3.5, and the pre-crop sensor aspect (4:3 / 16:9) says
+      // nothing about how the card was framed.
       const quality = assessQuality(compressed)
 
-      // Hash for duplicate detection
+      // Hash the image CONTENT for duplicate detection (was the filename,
+      // which could never match).
       const hash = await hashImage(compressed.uri)
 
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
+      setCaptureSources(prev => ({ ...prev, [currentSide]: 'camera' }))
+      reportUploadEvent({
+        event: 'capture_attempted',
+        side: currentSide,
+        capture_source: 'camera',
+        image_width: compressed.width,
+        image_height: compressed.height,
+      })
 
       // Store for current side
       if (currentSide === 'front') {
@@ -339,8 +383,9 @@ export default function CaptureScreen() {
         setFrontQuality(quality)
         setFrontHash(hash)
       } else {
-        // Check for duplicate
-        if (frontHash && hash === frontHash) {
+        // Check for duplicate. Both hashes must be present — a null hash means
+        // unreadable content, which is "unknown", not "different".
+        if (frontHash && hash && hash === frontHash) {
           Alert.alert('Duplicate Image', 'Front and back images appear to be the same. Please capture the other side of the card.')
           setPreviewUri(null)
           setPreviewQuality(null)
@@ -391,12 +436,19 @@ export default function CaptureScreen() {
           frontHeight: String(frontCompressed?.height || 0),
           backWidth: String(backCompressed?.width || 0),
           backHeight: String(backCompressed?.height || 0),
+          // CAPTURE-GATE P0: per-side capture path, forwarded so the review
+          // screen can persist it on the card row. Per side because a card can
+          // pair a camera front with a gallery back, and a combined value would
+          // hide an unusable back behind a good front.
+          frontSource: captureSources.front || '',
+          backSource: captureSources.back || '',
         },
       })
     }
   }
 
   const handleRetake = () => {
+    reportUploadEvent({ event: 'retake_started', side: currentSide })
     setPreviewUri(null)
     setPreviewQuality(null)
     if (currentSide === 'front') {
@@ -412,10 +464,23 @@ export default function CaptureScreen() {
     }
   }
 
-  const gradeColor = previewQuality?.grade === 'A' ? Colors.green[500]
-    : previewQuality?.grade === 'B' ? Colors.blue[500]
-    : previewQuality?.grade === 'C' ? Colors.amber[500]
-    : Colors.red[500]
+  // One source of truth for the guide box: this drives both the on-screen
+  // rectangle and the crop region passed to processCardCapture.
+  const guideWidthFraction = computeGuideWidthFraction(
+    cameraLayout?.containerW ?? 0,
+    cameraLayout?.containerH ?? 0,
+    orientation,
+  )
+
+  // Resolution-only tint. Previously derived from a fabricated A/B/C/D grade
+  // (see the note on QualityResult) which coloured the confirm button green on
+  // photos nothing had checked for focus. Now it reflects the one thing this
+  // screen can actually measure, and the action button no longer borrows it.
+  const resolutionColor = !previewQuality || previewQuality.score >= 75
+    ? Colors.green[500]
+    : previewQuality.score >= 60
+      ? Colors.amber[500]
+      : Colors.red[500]
 
   // Preview mode
   if (previewUri && previewQuality) {
@@ -439,8 +504,8 @@ export default function CaptureScreen() {
             <Text style={styles.previewStep}>STEP {isFront ? '1' : '2'} OF 2</Text>
             <Text style={styles.previewSideLabel}>{isFront ? 'Front' : 'Back'} Image</Text>
           </View>
-          <View style={[styles.qualityBadge, { backgroundColor: gradeColor }]}>
-            <Text style={styles.qualityBadgeText}>{previewQuality.grade} ({previewQuality.score}/100)</Text>
+          <View style={[styles.qualityBadge, { backgroundColor: resolutionColor }]}>
+            <Text style={styles.qualityBadgeText}>Resolution: {previewQuality.resolutionLabel}</Text>
           </View>
         </View>
 
@@ -467,7 +532,9 @@ export default function CaptureScreen() {
               <Text style={styles.qualityLabel}>Resolution: {previewQuality.resolutionLabel}</Text>
             </View>
             <Text style={styles.qualityNote}>Sharpness and lighting are evaluated by DCM Optic™ during grading.</Text>
-            <Text style={styles.uncertaintyText}>Grade uncertainty: {previewQuality.uncertainty}</Text>
+            {/* "Grade uncertainty: ±0.5" was removed with the A/B/C/D badge:
+                it was derived from the same resolution-only score, so it
+                stated a precision nothing had measured. */}
             {previewQuality.suggestions.map((s, i) => (
               <Text key={i} style={styles.suggestionText}>{s}</Text>
             ))}
@@ -485,7 +552,7 @@ export default function CaptureScreen() {
             <Text style={styles.retakeText}>Retake</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.useButton, { backgroundColor: gradeColor }]}
+            style={[styles.useButton, { backgroundColor: Colors.blue[500] }]}
             onPress={handleUseImage}
             accessibilityLabel={currentSide === 'front' ? 'Use this front photo and continue to back' : 'Use this back photo and continue to review'}
             accessibilityRole="button"
@@ -575,6 +642,11 @@ export default function CaptureScreen() {
             onLayout={e => {
               const { width, height } = e.nativeEvent.layout
               cameraLayoutRef.current = { containerW: width, containerH: height }
+              setCameraLayout(prev =>
+                prev && prev.containerW === width && prev.containerH === height
+                  ? prev
+                  : { containerW: width, containerH: height }
+              )
             }}
           >
             <CameraView
@@ -623,7 +695,17 @@ export default function CaptureScreen() {
               />
             )}
             <View style={styles.guideContainer} pointerEvents="none">
-              <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
+              <View
+                style={[
+                  styles.guide,
+                  {
+                    aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5,
+                    // Sized by the same function the crop uses, so what the
+                    // user frames is exactly what gets cropped.
+                    width: `${guideWidthFraction * 100}%`,
+                  },
+                ]}
+              >
                 <View style={[styles.corner, styles.cornerTL]} />
                 <View style={[styles.corner, styles.cornerTR]} />
                 <View style={[styles.corner, styles.cornerBL]} />
@@ -662,8 +744,18 @@ export default function CaptureScreen() {
         </View>
       )}
 
-      {/* Status bar — captured indicators */}
+      {/* Status bar — framing instruction + captured indicators */}
       <View style={styles.statusBar}>
+        {/* The guide box alone was not a strong enough instruction: users
+            framed the card comfortably inside it and shot from too far away,
+            which is the top cause of cards the grader cannot identify. State
+            the target explicitly. Camera mode only — there is no guide box to
+            reach for when picking from the gallery. */}
+        {mode === 'camera' && (
+          <Text style={styles.framingHint}>
+            Move close — the card should reach all four corners
+          </Text>
+        )}
         <View style={styles.capturedIndicators}>
           <View style={[styles.indicator, frontUri && styles.indicatorDone]}>
             <Text style={styles.indicatorText}>Front {frontUri ? '✓' : ''}</Text>
@@ -805,7 +897,11 @@ const styles = StyleSheet.create({
 
   // Guide (absolute overlay on camera)
   guideContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  guide: { width: '70%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 4, position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
+  // NO width here on purpose — it is set inline from computeGuideWidthFraction,
+  // the same function that tells the crop where the guide was. A width in this
+  // stylesheet is a second copy of that number with nothing keeping the two in
+  // agreement, which is exactly how the old '70%' drifted from its meaning.
+  guide: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 4, position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
   // Label sits ABOVE the guide box, not on the card the user is framing —
   // the old top:'45%' put "FRONT"/"BACK" across the middle of the card.
   guideLabel: { position: 'absolute', alignSelf: 'center', top: -30, color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '700', letterSpacing: 3, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
@@ -817,6 +913,7 @@ const styles = StyleSheet.create({
 
   // Status
   statusBar: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.6)' },
+  framingHint: { color: Colors.white, fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   capturedIndicators: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
   indicator: { paddingHorizontal: 16, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: Colors.gray[600] },
   indicatorDone: { borderColor: Colors.green[500], backgroundColor: 'rgba(34,197,94,0.2)' },

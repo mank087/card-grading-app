@@ -10,6 +10,7 @@
 
 import OpenAI from 'openai';
 import type { MtgCard } from './mtgCardMatcher';
+import { BASELINE_MODEL, applyModelCompat } from './grading/modelRouter';
 
 const MAX_CANDIDATES = 8;
 
@@ -100,15 +101,23 @@ Use null with confidence "low" if no candidate clearly matches. Do NOT guess bet
       }))
     ];
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5.1',
+    // Route through modelRouter rather than naming a model here. This call
+    // sat on a hardcoded 'gpt-5.1' after the luna canary graduated, so it ran
+    // mid-grade at ~6x the input cost — and it made cards.grading_model partly
+    // untrue: a card stamped gpt-5.6-luna could have had its printing decided
+    // by 5.1. applyModelCompat also strips temperature/top_p, which reasoning
+    // models 400 on rather than ignore.
+    const { config: disambigConfig } = applyModelCompat({
+      model: BASELINE_MODEL,
       max_completion_tokens: 2000,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content }
       ]
-    });
+    }, BASELINE_MODEL);
+
+    const response = await openai.chat.completions.create(disambigConfig as any);
 
     const raw = response.choices[0]?.message?.content;
     if (!raw) return noPick('Empty model response');

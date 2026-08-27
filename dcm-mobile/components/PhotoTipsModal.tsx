@@ -7,13 +7,18 @@ import { Colors } from '@/lib/constants'
 
 const STORAGE_KEY = 'dcm_hide_photo_tips'
 
+// Ordered by how often each one is the actual problem. Distance is first
+// because "photographed from too far away" is the single largest cause of
+// cards the grader cannot identify, let alone assess — and "fill the frame"
+// was too soft an instruction to change behaviour. Name the target: the
+// corners of the guide box.
 const TIPS: Array<{ icon: string; text: string }> = [
+  { icon: '🔍', text: 'Move close — the card should reach all four corners of the guide box' },
+  { icon: '✨', text: 'Tap the card on screen to focus, and hold still until it looks sharp' },
   { icon: '☀️', text: 'Use natural lighting or a bright, diffused light source' },
   { icon: '⚡', text: 'Avoid flash photography that creates glare' },
   { icon: '📐', text: 'Keep the card flat and parallel to the camera' },
   { icon: '🔓', text: 'Remove from holders if possible for clearest images' },
-  { icon: '🔍', text: 'Fill the frame with the card, leaving minimal background' },
-  { icon: '✨', text: 'Ensure the entire card is in sharp focus' },
   { icon: '🎨', text: 'Use a contrasting, solid-color background' },
 ]
 

@@ -4,16 +4,28 @@ import { useState, useEffect, useCallback } from 'react';
 import { useCamera } from '@/hooks/useCamera';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
-import { validateImageQuality } from '@/utils/imageQuality';
+import { validateImageQuality, getImageDataFromCanvas } from '@/utils/imageQuality';
 import { cropCanvasToGuideFrame, canvasToJpegFile } from '@/utils/guideCrop';
 import { computeGuideLayoutPx } from '@/utils/cameraGuideGeometry';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
 
+/**
+ * How the browser actually produced the frame.
+ *
+ * 'image_capture_still' is a true still off the camera's photo pipeline
+ * (ImageCapture.takePhoto — Chrome/Edge/Android); 'video_frame_grab' is a
+ * copy of the preview frame, capped at the negotiated stream mode, which is
+ * all iOS Safari can give us. They are materially different in quality, and
+ * until now the distinction was computed and then discarded — so nothing could
+ * tell whether poor photos correlated with the fallback path.
+ */
+export type WebCaptureMethod = 'image_capture_still' | 'video_frame_grab';
+
 interface MobileCameraProps {
   side: 'front' | 'back';
-  onCapture: (file: File) => void;
+  onCapture: (file: File, meta?: { captureMethod: WebCaptureMethod }) => void;
   onCancel: () => void;
 }
 
@@ -31,6 +43,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
   const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  // Which path produced the frame — carried through to the card row so the
+  // capture-quality dataset can separate true stills from preview grabs.
+  const [captureMethod, setCaptureMethod] = useState<WebCaptureMethod>('video_frame_grab');
   const [isProcessing, setIsProcessing] = useState(false);
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
@@ -152,13 +167,18 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
       setCapturedImageUrl(previewUrl);
       setCapturedFile(file);
+      setCaptureMethod(captured.captureSource === 'photo' ? 'image_capture_still' : 'video_frame_grab');
       setIsProcessing(false);
 
-      // Validate quality directly from the final canvas (no re-decode of the JPEG)
+      // Validate quality directly from the final canvas (no re-decode of the
+      // JPEG). Read it down to analysis size rather than pulling the full
+      // 3000px buffer — the old full-res getImageData allocated ~50MB here and
+      // then fed a 12M-pixel main-thread convolution, which is a stall or an
+      // out-of-memory reload on exactly the low-end phones that produce the
+      // worst photos.
       try {
-        const qctx = qualityCanvas.getContext('2d');
-        if (qctx) {
-          const imageData = qctx.getImageData(0, 0, qualityCanvas.width, qualityCanvas.height);
+        const imageData = getImageDataFromCanvas(qualityCanvas);
+        if (imageData) {
           setQualityValidation(validateImageQuality(imageData));
         }
       } catch (err) {
@@ -173,7 +193,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
   const handleConfirm = () => {
     if (capturedFile) {
-      onCapture(capturedFile);
+      onCapture(capturedFile, { captureMethod });
     }
   };
 

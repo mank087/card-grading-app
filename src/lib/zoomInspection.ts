@@ -79,6 +79,32 @@ export interface ZoomResult {
   structuralFindings: Array<{ type: string; location: string; description: string }>;
   /** v9.5 measured centering per face; null/undefined = low confidence, model estimate stands */
   centering?: { front: CenteringMeasurement | null; back: CenteringMeasurement | null };
+  /**
+   * Capture-gate P0: what the geometry gate saw.
+   *
+   * The gate already computes these on every grade — how much of the frame the
+   * card occupies, and where its four corners are. Until now the fill numbers
+   * went to a console.log and evaporated, so nothing could report how often a
+   * card was photographed too far away, which is the top customer complaint.
+   * Surfacing them here lets the caller persist them.
+   *
+   * `outcome` is the headline metric:
+   *   full          — normal blind edge-hugging crops
+   *   card_relative — fill below threshold, but corners found, so crops were
+   *                   re-derived from the quad (degraded but usable)
+   *   abandoned     — fill below threshold AND no usable quad; the entire
+   *                   magnified inspection was skipped and the card was graded
+   *                   from the holistic ensemble alone. The user was still
+   *                   charged. This is the number the gate exists to drive down.
+   */
+  capture?: {
+    frontFill: number | null;
+    backFill: number | null;
+    frontQuad: Pt[] | null;
+    backQuad: Pt[] | null;
+    outcome: 'full' | 'card_relative' | 'abandoned';
+    gateModel: string | null;
+  };
 }
 
 interface RegionSpec {
@@ -768,6 +794,17 @@ export async function runZoomInspection(
     const MIN_FILL_PERCENT = 68;
     const geometry: { front?: Pt[]; back?: Pt[] } = {};
     const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
+    // Capture-gate P0: accumulate what the gate saw so the caller can persist
+    // it. Defaults to 'full' and is narrowed below — a gate that errors leaves
+    // this as the honest "we proceeded normally, we just don't know".
+    const capture: NonNullable<ZoomResult['capture']> = {
+      frontFill: null,
+      backFill: null,
+      frontQuad: null,
+      backQuad: null,
+      outcome: 'full',
+      gateModel: options?.model ?? null,
+    };
     try {
       // v9.13: when the caller already ran the gate (CV-centering advisory path
       // runs it BEFORE the grading ensemble), reuse its result — same single
@@ -780,6 +817,11 @@ export async function runZoomInspection(
       }
       const worst = Math.min(gate.frontFill ?? 100, gate.backFill ?? 100);
       console.log(`[ZOOM] frame-fill: front ${gate.frontFill}% / back ${gate.backFill}%`);
+      // P0: keep the reading instead of only logging it.
+      capture.frontFill = gate.frontFill;
+      capture.backFill = gate.backFill;
+      capture.frontQuad = gate.front ?? null;
+      capture.backQuad = gate.back ?? null;
       // v9.5: quads are captured for CENTERING MEASUREMENT whenever plausible,
       // independent of the fill decision (measureGeometry). Card-relative CROPS
       // still engage only for margin photos (fill < threshold) — for full-frame
@@ -790,10 +832,15 @@ export async function runZoomInspection(
         if (gate.front && gate.back) {
           geometry.front = gate.front;
           geometry.back = gate.back;
+          capture.outcome = 'card_relative';
           console.log(`[ZOOM] card fills ~${worst}% of frame — using CARD-RELATIVE crops from detected corner quads`);
         } else {
+          capture.outcome = 'abandoned';
           console.log(`[ZOOM] card fills only ~${worst}% of frame and no plausible corner quad detected — skipping regioned inspection`);
-          return { ...empty, error: `card fills only ~${worst}% of the frame and its corners could not be located — magnified inspection needs the card closer to the camera` };
+          // Carry `capture` out on the failure path too — this is precisely the
+          // case the dataset needs most, and returning `empty` here is how the
+          // measurement was being lost for the worst photos.
+          return { ...empty, capture, error: `card fills only ~${worst}% of the frame and its corners could not be located — magnified inspection needs the card closer to the camera` };
         }
       }
     } catch (e: any) {
@@ -1093,7 +1140,7 @@ export async function runZoomInspection(
 
     console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
-    return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings, centering };
+    return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings, centering, capture };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };

@@ -17,6 +17,14 @@ export type UploadTelemetryEvent =
   | 'compress_error'
   | 'quality_advisory_cd'
   | 'submit_error'
+  // CAPTURE-GATE P0 — attempt lifecycle, for measuring abandonment.
+  | 'capture_attempted'
+  | 'local_quality_warning'
+  | 'photo_replaced'
+  | 'preflight_passed'
+  | 'preflight_rejected'
+  | 'retake_started'
+  | 'grade_started'
 
 export interface UploadTelemetryPayload {
   event: UploadTelemetryEvent
@@ -26,6 +34,42 @@ export interface UploadTelemetryPayload {
   image_height?: number
   file_type?: string
   file_size_bytes?: number
+  /** Groups every event in one capture attempt — the abandonment join key. */
+  attempt_id?: string
+  submission_id?: string
+  /** From the shared contract in lib/grading/captureReasonCodes.ts. */
+  rule_code?: string
+  client_surface?: string
+  capture_source?: string
+  capture_method?: string
+  gate_version?: string
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Stable id for one capture attempt, from first photo through grade start.
+ *
+ * Session-scoped rather than persisted: it needs to survive navigating between
+ * capture and review, not to be durable across app restarts. An abandoned
+ * attempt is one that never emits grade_started, which is exactly what we want
+ * a page reload to look like.
+ */
+let currentAttemptId: string | null = null
+
+export function beginCaptureAttempt(): string {
+  currentAttemptId =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return currentAttemptId
+}
+
+export function getCaptureAttemptId(): string | null {
+  return currentAttemptId
+}
+
+export function endCaptureAttempt(): void {
+  currentAttemptId = null
 }
 
 export function reportUploadEvent(payload: UploadTelemetryPayload, accessToken?: string | null): void {
@@ -36,7 +80,14 @@ export function reportUploadEvent(payload: UploadTelemetryPayload, accessToken?:
       method: 'POST',
       headers,
       keepalive: true,
-      body: JSON.stringify({ ...payload, page: typeof window !== 'undefined' ? window.location.pathname : undefined }),
+      body: JSON.stringify({
+        // Attach the current attempt automatically so no call site has to
+        // remember — a missing attempt_id silently drops that event out of the
+        // abandonment funnel rather than erroring.
+        attempt_id: currentAttemptId ?? undefined,
+        ...payload,
+        page: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      }),
     }).catch(() => { /* telemetry must never surface errors */ })
   } catch { /* never throw from telemetry */ }
 }

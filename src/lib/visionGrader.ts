@@ -28,6 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { recordCvCentering } from './grading/cvCenteringLog';
+import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -2290,6 +2291,31 @@ Provide detailed analysis as markdown with all required sections.`
         // the holistic passes miss (whitening flecks, corner softening, creases). Zoom
         // findings map to ladder caps deterministically and only ever LOWER scores.
         const zoom = zoomPromise ? await zoomPromise : null;
+
+        // CAPTURE-GATE P0: persist the frame-fill / corner-quad reading the
+        // geometry gate just produced.
+        //
+        // Written HERE, at the first moment the data exists, rather than
+        // appended to the final grading update — everything between this point
+        // and that write (grade recalc, narration, label generation) can throw,
+        // and the grades most likely to throw are the degraded ones this
+        // dataset most needs. Awaited for the same reason: a fire-and-forget
+        // write can be dropped when the serverless invocation ends, and it
+        // would be dropped non-randomly.
+        //
+        // Never throws; a failed write must not fail a paid grade.
+        try {
+          const captureRecord = buildCaptureQualityRecord(zoom);
+          if (captureRecord) {
+            await recordCaptureQuality(options?.routingKey, captureRecord);
+            if (captureRecord.zoom_outcome !== 'full') {
+              console.log(`[CAPTURE] ${captureRecord.zoom_outcome} — front fill ${captureRecord.front.fill_percent}% / back ${captureRecord.back.fill_percent}%`);
+            }
+          }
+        } catch (e: any) {
+          console.warn('[CAPTURE] capture-quality persistence failed (non-blocking):', e?.message || e);
+        }
+
         const zoomAdjustments: string[] = [];
         // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Switch } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Switch, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Crypto from 'expo-crypto'
 import { Colors, CardCategories } from '@/lib/constants'
+import { reportUploadEvent } from '@/lib/uploadTelemetry'
 import CategoryPicker from '@/components/CategoryPicker'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -45,7 +46,15 @@ function generateUUID(): string {
 
 export default function ReviewScreen() {
   const router = useRouter()
-  const params = useLocalSearchParams<{ category: string; subCategory: string; frontUri: string; backUri: string }>()
+  const params = useLocalSearchParams<{
+    category: string
+    subCategory: string
+    frontUri: string
+    backUri: string
+    /** CAPTURE-GATE P0: 'camera' | 'gallery' per side, forwarded from capture. */
+    frontSource?: string
+    backSource?: string
+  }>()
   const { user, session } = useAuth()
   const { balance, refresh: refreshCredits } = useCredits()
   const { addToQueue } = useGradingQueue()
@@ -175,6 +184,15 @@ export default function ReviewScreen() {
           user_condition_processed: null,
           has_user_condition_report: true,
         } : {}),
+        // CAPTURE-GATE P0: how each side was obtained. Per side, because a
+        // card can pair a camera front with a gallery back. This is the only
+        // way to answer which capture path produces the unusable photos —
+        // nothing recorded it before.
+        capture_source: {
+          client_surface: Platform.OS === 'ios' ? 'native_ios' : 'native_android',
+          front: params.frontSource ? { source: params.frontSource } : null,
+          back: params.backSource ? { source: params.backSource } : null,
+        },
         })
 
         dbError = insertError
@@ -231,6 +249,11 @@ export default function ReviewScreen() {
       // progress steps, and Grade Another / My Collection actions.
       // Users can leave that screen at any time to browse the app — the
       // status bar follows them.
+      // CAPTURE-GATE P0: closes the attempt funnel. An attempt that reached
+      // capture_attempted but never gets here was abandoned — the metric the
+      // enforcement phase ships against, and one no card row can express.
+      reportUploadEvent({ event: 'grade_started', submission_id: cardId })
+
       addToQueue({
         cardId,
         category,

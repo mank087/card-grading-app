@@ -20,6 +20,7 @@
  */
 
 import OpenAI from 'openai';
+import { BASELINE_MODEL, applyModelCompat } from './grading/modelRouter';
 
 // ============================================================================
 // Parallel-features glossary (WS2c.2)
@@ -190,7 +191,6 @@ export interface ParallelVisionResult {
 }
 
 const MAX_CANDIDATES = 40; // incl. the Base entry
-const MODEL = 'gpt-5.1';
 
 export async function disambiguateParallelVisually(opts: {
   frontImageUrl: string;
@@ -266,10 +266,23 @@ export async function disambiguateParallelVisually(opts: {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const response = await openai.chat.completions.create({
-      model: MODEL,
+    // Routed through modelRouter rather than a hardcoded model. Two reasons,
+    // and the second is not optional:
+    //
+    // 1. Cost/attribution — this ran on gpt-5.1 mid-grade after the luna
+    //    canary graduated (~6x input), and made cards.grading_model partly
+    //    untrue for the cards it touched.
+    // 2. temperature — gpt-5.6-* return 400 on `temperature`/`top_p` rather
+    //    than ignoring them, so the temperature: 0 below would break every
+    //    call the moment the model changed. applyModelCompat strips it. This
+    //    is why swapping the model string alone would have been wrong.
+    //
+    // max_tokens → max_completion_tokens to match how the rest of the codebase
+    // calls these models.
+    const { config: visionConfig } = applyModelCompat({
+      model: BASELINE_MODEL,
       temperature: 0,
-      max_tokens: 300,
+      max_completion_tokens: 300,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -283,7 +296,9 @@ export async function disambiguateParallelVisually(opts: {
           ],
         },
       ],
-    });
+    }, BASELINE_MODEL);
+
+    const response = await openai.chat.completions.create(visionConfig as any);
 
     const raw = response.choices?.[0]?.message?.content || '';
     const parsed = parseVisionJson(raw);
