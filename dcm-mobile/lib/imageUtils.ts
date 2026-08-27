@@ -10,6 +10,9 @@ export interface QualityResult {
    * cannot measure blur or brightness, so we must not claim to.
    */
   resolutionLabel: string
+  /** Pixel dimensions of the processed image, for factual display. */
+  width: number
+  height: number
   suggestions: string[]
 }
 // REMOVED: `grade` ('A'|'B'|'C'|'D') and `uncertainty` ('±0.5' etc).
@@ -449,19 +452,35 @@ export function assessQuality(compressed: CompressedImage, sourceAspect?: number
 
   score = Math.max(0, Math.min(100, score))
 
-  // Resolution label — the only per-image signal this module can measure
-  // honestly (see the note on top of this function).
-  let resolutionLabel = 'Good'
+  // Resolution label. NOTE THE ASYMMETRY, it is deliberate: this can say a
+  // photo is BAD but never that it is GOOD.
+  //
+  // The score measures the FILE, not the CARD. A photo taken from two feet
+  // away is still 2143x3000 and still ~6MP, so it scores 90 — while the card
+  // occupies a fifth of the frame and cannot be graded. That exact case shipped
+  // with a green "Resolution: Good" badge on a visibly blurry, distant photo.
+  //
+  // Detecting card-in-frame needs pixel access this module does not have, so
+  // the honest position is: report the dimensions as a fact, flag them when
+  // they are too small, and never imply approval. Framing and sharpness are the
+  // server's call.
+  let resolutionLabel = ''
   if (score < 60) {
-    resolutionLabel = 'Low'
-    suggestions.push('Take a clearer, well-lit photo for best grading accuracy')
+    resolutionLabel = 'Low resolution'
+    suggestions.push('Move closer and retake — this photo is too low-resolution to grade reliably')
   } else if (score < 75) {
-    resolutionLabel = 'Acceptable'
+    resolutionLabel = 'Low-ish resolution'
   }
+
+  // Always shown, because framing is the failure this module cannot see and
+  // the one most often responsible for an ungradeable submission.
+  suggestions.push('Check the card fills the frame — a distant card cannot be graded accurately')
 
   return {
     score,
     resolutionLabel,
+    width,
+    height,
     suggestions,
   }
 }

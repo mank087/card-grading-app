@@ -476,8 +476,12 @@ export default function CaptureScreen() {
   // (see the note on QualityResult) which coloured the confirm button green on
   // photos nothing had checked for focus. Now it reflects the one thing this
   // screen can actually measure, and the action button no longer borrows it.
+  // Never green. This screen cannot see whether the card fills the frame — the
+  // most common reason a submission is ungradeable — so a reassuring badge is a
+  // claim it has no basis for. Neutral by default, warning colours only when
+  // the one thing it CAN measure is bad.
   const resolutionColor = !previewQuality || previewQuality.score >= 75
-    ? Colors.green[500]
+    ? Colors.gray[600]
     : previewQuality.score >= 60
       ? Colors.amber[500]
       : Colors.red[500]
@@ -504,8 +508,15 @@ export default function CaptureScreen() {
             <Text style={styles.previewStep}>STEP {isFront ? '1' : '2'} OF 2</Text>
             <Text style={styles.previewSideLabel}>{isFront ? 'Front' : 'Back'} Image</Text>
           </View>
+          {/* States the measurement, not a verdict. "Resolution: Good" in green
+              sat on a photo of a distant, blurry card and read as approval —
+              the file was 6MP, the card was a fifth of it. */}
           <View style={[styles.qualityBadge, { backgroundColor: resolutionColor }]}>
-            <Text style={styles.qualityBadgeText}>Resolution: {previewQuality.resolutionLabel}</Text>
+            <Text style={styles.qualityBadgeText}>
+              {previewQuality.resolutionLabel
+                ? previewQuality.resolutionLabel
+                : `${previewQuality.width} × ${previewQuality.height}`}
+            </Text>
           </View>
         </View>
 
@@ -529,9 +540,15 @@ export default function CaptureScreen() {
                 sharpness/lighting actually get evaluated. */}
             <View style={styles.qualityRow}>
               <Ionicons name="scan" size={16} color={Colors.gray[500]} />
-              <Text style={styles.qualityLabel}>Resolution: {previewQuality.resolutionLabel}</Text>
+              <Text style={styles.qualityLabel}>
+                Image size: {previewQuality.width} × {previewQuality.height}
+                {previewQuality.resolutionLabel ? ` — ${previewQuality.resolutionLabel}` : ''}
+              </Text>
             </View>
-            <Text style={styles.qualityNote}>Sharpness and lighting are evaluated by DCM Optic™ during grading.</Text>
+            <Text style={styles.qualityNote}>
+              This is the photo&apos;s size, not its quality. Framing, sharpness and lighting are
+              evaluated by DCM Optic&trade; during grading.
+            </Text>
             {/* "Grade uncertainty: ±0.5" was removed with the A/B/C/D badge:
                 it was derived from the same resolution-only score, so it
                 stated a precision nothing had measured. */}
