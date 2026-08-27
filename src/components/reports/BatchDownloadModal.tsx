@@ -15,6 +15,7 @@ import { loadLogosForCard, cardQrUrl, type OrgLogoSet } from '../../lib/orgBrand
 import { getAuthenticatedClient } from '../../lib/directAuth';
 import { estimateProfessionalGrades, DcmGradingInput } from '../../lib/professionalGradeMapper';
 import QRCode from 'qrcode';
+import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
 
 interface CardData {
   id: string;
@@ -321,9 +322,13 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       conditionLabel: cleanLabelData.condition || card.conversational_condition_label || '',
       labelCondition: cleanLabelData.condition,
       gradeRange: (() => {
-        const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';
+        // Derived from the confidence letter so batch PDFs agree with the card
+        // detail page and with single-card reports — see the note in
+        // DownloadReportButton. The stored string disagrees with the letter on
+        // ~11% of cards.
+        const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence);
         const match = uncertaintyStr.match(/±\s*([\d.]+)/);
-        const uncertaintyValue = match ? match[1] : '0.25';
+        const uncertaintyValue = match ? match[1] : '1';
         return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;
       })(),
       cardDetails: safeContextLine,

@@ -284,8 +284,6 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
     return {
       isValid: true,
       overallScore: 70,
-      confidenceLetter: 'C',
-      gradeUncertainty: '±1.0',
       checks: { blur: unknown, brightness: unknown },
       suggestions: ['Image quality could not be checked on this device — DCM Optic™ will assess it during grading'],
     };
@@ -299,28 +297,10 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
   // Both must hold. Neither can compensate for the other.
   const isValid = blurCheck.passed && brightnessCheck.passed;
 
-  // Confidence letter stays deliberately conservative: we verify focus and
-  // exposure only, while the grader also weighs glare, corner visibility and
-  // shadows. Promising an A on two of five signals sets up disappointment when
-  // the server's real confidence comes back lower.
-  let confidenceLetter: 'A' | 'B' | 'C' | 'D';
-  let gradeUncertainty: string;
-  if (!isValid) {
-    confidenceLetter = 'D';
-    gradeUncertainty = '±1.5';
-  } else if (overallScore >= 95) {
-    confidenceLetter = 'A';
-    gradeUncertainty = '±0.25';
-  } else if (overallScore >= 80) {
-    confidenceLetter = 'B';
-    gradeUncertainty = '±0.5';
-  } else if (overallScore >= 60) {
-    confidenceLetter = 'C';
-    gradeUncertainty = '±1.0';
-  } else {
-    confidenceLetter = 'D';
-    gradeUncertainty = '±1.5';
-  }
+  // NO confidence letter and NO uncertainty here on purpose — see the note on
+  // ImageQualityValidation. This module knows focus and exposure; the letter is
+  // a visibility judgement the grader makes with far more evidence, and a
+  // client-side guess at it contradicted the real one on the same card.
 
   const suggestions: string[] = [];
   if (!blurCheck.passed) {
@@ -333,15 +313,16 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
         : 'Reduce direct light or change angle to avoid glare'
     );
   }
-  if (isValid && confidenceLetter === 'C') {
-    suggestions.push('Fair image quality — the grade may vary by ±1.0');
+  // Soft advisory when both checks pass but neither is comfortable. States the
+  // consequence without naming a grade band — "may reduce accuracy" is true and
+  // checkable; "±1.0 grades" was neither.
+  if (isValid && overallScore < 60) {
+    suggestions.push('Focus or lighting is marginal — this may reduce grading accuracy');
   }
 
   return {
     isValid,
     overallScore,
-    confidenceLetter,
-    gradeUncertainty,
     checks: { blur: blurCheck, brightness: brightnessCheck },
     suggestions,
   };

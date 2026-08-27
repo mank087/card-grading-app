@@ -61,14 +61,36 @@ export interface QualityCheckResult {
 export interface ImageQualityValidation {
   isValid: boolean;
   overallScore: number;
-  confidenceLetter: 'A' | 'B' | 'C' | 'D';
-  gradeUncertainty: string;
   checks: {
     blur: QualityCheckResult;
     brightness: QualityCheckResult;
   };
   suggestions: string[];
 }
+// REMOVED: `confidenceLetter` ('A'|'B'|'C'|'D') and `gradeUncertainty` ('±0.5').
+//
+// Both misrepresented what this check knows, in two separate ways.
+//
+// 1. WRONG SCALE. They claimed A=±0.25 / B=±0.5 / C=±1.0 / D=±1.5. The grading
+//    rubric — the only source of the uncertainty value — defines A=±0, B=±1,
+//    C=±2, D=±3 (prompts/master_grading_rubric_v5.txt, CONFIDENCE LETTER
+//    MAPPING). So the camera understated uncertainty by half, in decimals, on
+//    a scale where grades are whole numbers 1-10.
+//
+// 2. WRONG CONSTRUCT, which no amount of renumbering fixes. The rubric letter
+//    grades overall VISIBILITY across corners, edges, surface and centering,
+//    including glare, holders and obstructions. This module measures focus and
+//    brightness — two of roughly six inputs, and not the ones that most often
+//    drive a C. A letter derived from half the evidence would keep
+//    contradicting the grade report the customer gets minutes later.
+//
+// The camera now reports only what it measured (see checks) and leaves the
+// letter to grading, which is what cards.conversational_image_confidence is.
+// This mirrors the same correction already made in the native app —
+// see the note on QualityResult in dcm-mobile/lib/imageUtils.ts.
+//
+// For display, derive uncertainty from the SERVER's letter via
+// getUncertaintyFromConfidence() in src/lib/gradeDisplayUtils.ts.
 
 /**
  * Upload Method Types

@@ -38,6 +38,7 @@ import {
 // Collapsed anyway: one rule living in three places is free to drift, and two of
 // the three had already drifted.
 import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
+import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
 
 
 
@@ -1098,7 +1099,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         backImageUrl: backImageBase64,
         conditionLabel: labelData.condition || getConditionLabel(grade),
         labelCondition: labelData.condition || getConditionLabel(grade),
-        gradeRange: card.conversational_grade_uncertainty || '±0.5',
+        // Derived from the confidence letter, matching the card detail page and
+        // the PDF reports. The stored string disagrees with the letter on ~11%
+        // of cards, and the old '±0.5' fallback was not a value on the rubric's
+        // scale (A=±0, B=±1, C=±2, D=±3) — a listing is public, so it is the
+        // worst place to state an uncertainty the grade report contradicts.
+        gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence),
         // Professional grades
         heritage: (() => {
           const sel = resolveHeritageSelection(labelStyle, customLabelConfig);

@@ -570,9 +570,12 @@ function UniversalUploadPageContent() {
           const imageData = await getImageDataFromFile(result.compressedFile)
           if (imageData) {
             const quality = validateImageQuality(imageData)
-            console.log(`[Upload] ${side} image quality: ${quality.confidenceLetter} (score ${quality.overallScore})`)
-            if (quality.confidenceLetter === 'C' || quality.confidenceLetter === 'D') {
-              reportUploadEvent({ event: 'quality_advisory_cd', side, reason: `grade ${quality.confidenceLetter} score ${quality.overallScore}` }, getStoredSession()?.access_token)
+            console.log(`[Upload] ${side} image quality: score ${quality.overallScore}, valid=${quality.isValid}`)
+            // Was gated on a client-invented confidence letter. Now keyed off
+            // what is actually measured: a failed check, or a passing-but-poor
+            // score. The event name is kept so historical rows stay comparable.
+            if (!quality.isValid || quality.overallScore < 60) {
+              reportUploadEvent({ event: 'quality_advisory_cd', side, reason: `score ${quality.overallScore} valid=${quality.isValid}` }, getStoredSession()?.access_token)
             }
             // Blur/exposure are hard constraints now, so !isValid means the
             // photo genuinely failed one — worth its own event, because
@@ -1243,7 +1246,10 @@ function UniversalUploadPageContent() {
     const quality = side === 'front' ? frontQuality : backQuality
     const dismissed = side === 'front' ? frontQualityDismissed : backQualityDismissed
     if (!quality || dismissed) return null
-    if (quality.confidenceLetter !== 'C' && quality.confidenceLetter !== 'D') return null
+    // Shown when a check actually failed, or when both passed but the result is
+    // poor. Previously gated on a client-side confidence letter whose scale did
+    // not match the grading rubric.
+    if (quality.isValid && quality.overallScore >= 60) return null
 
     const setDismissed = side === 'front' ? setFrontQualityDismissed : setBackQualityDismissed
     const issues = [quality.checks.blur, quality.checks.brightness].filter(check => check.score < 75 || !check.passed)
@@ -1254,11 +1260,10 @@ function UniversalUploadPageContent() {
           <span className="text-base leading-none">⚠️</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-amber-800">
-              {side === 'front' ? 'Front' : 'Back'} image quality: Grade {quality.confidenceLetter}
-              {quality.confidenceLetter === 'C' ? ' (Fair)' : ' (Poor)'}
+              {side === 'front' ? 'Front' : 'Back'} image: {quality.isValid ? 'focus or lighting is marginal' : 'focus or lighting needs attention'}
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
-              May reduce grading accuracy ({quality.gradeUncertainty} grades)
+              This may reduce grading accuracy. A sharper, evenly lit photo grades more reliably.
             </p>
             {issues.length > 0 && (
               <ul className="mt-1 text-xs text-amber-700 space-y-0.5">

@@ -29,6 +29,7 @@ import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { useOrgContext } from '@/contexts/OrgContext';
+import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
 
 /**
  * Download Report Button Component
@@ -428,10 +429,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         conditionLabel: cleanLabelData.condition || card.conversational_condition_label,
         labelCondition: cleanLabelData.condition,
         gradeRange: (() => {
-          // Extract just the uncertainty value (e.g., "10.0 ± 0.25" → "0.25")
-          const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';
+          // Derive from the confidence LETTER, not the stored uncertainty string.
+          //
+          // The two disagree on ~11% of cards (audited over the last 200: B
+          // cards storing ±2 or ±3, an A storing ±1), because the stored value
+          // comes straight from the model while the rubric says the letter is
+          // the only source. The card detail page already recomputes from the
+          // letter — this did not, so the same card could read "±1" on screen
+          // and "± 3" in its PDF. The old '±0.25' fallback was not even a value
+          // on the scale (rubric: A=±0, B=±1, C=±2, D=±3).
+          const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence);
           const match = uncertaintyStr.match(/±\s*([\d.]+)/);
-          const uncertaintyValue = match ? match[1] : '0.25';
+          const uncertaintyValue = match ? match[1] : '1';
           return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;
         })(),
         // Deprecated - kept for backward compatibility (using safe values)

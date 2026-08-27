@@ -57,30 +57,25 @@ export default function ImagePreview({
               ? 'bg-green-900/50 border border-green-500'
               : 'bg-yellow-900/50 border border-yellow-500'
           }`}>
+            {/* Reports the two things this check actually measures. The old
+                "Image Quality: Grade B · ±0.5" header asserted a confidence
+                letter from focus and brightness alone, on a scale that did not
+                match the grading rubric (which defines B as ±1, C as ±2, D as
+                ±3) — so the badge here routinely contradicted the grade report
+                the customer received minutes later. The real letter now comes
+                only from grading. */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">
                 {qualityValidation.isValid ? '✓' : '⚠️'}
               </span>
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className={`font-semibold ${
-                    qualityValidation.isValid ? 'text-green-300' : 'text-yellow-300'
-                  }`}>
-                    Image Quality: Grade {qualityValidation.confidenceLetter}
-                  </p>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                    qualityValidation.confidenceLetter === 'A' ? 'bg-green-600 text-white' :
-                    qualityValidation.confidenceLetter === 'B' ? 'bg-blue-600 text-white' :
-                    qualityValidation.confidenceLetter === 'C' ? 'bg-yellow-600 text-white' :
-                    'bg-red-600 text-white'
-                  }`}>
-                    {qualityValidation.confidenceLetter === 'A' ? 'Excellent' :
-                     qualityValidation.confidenceLetter === 'B' ? 'Good' :
-                     qualityValidation.confidenceLetter === 'C' ? 'Fair' : 'Poor'}
-                  </span>
-                </div>
+                <p className={`font-semibold ${
+                  qualityValidation.isValid ? 'text-green-300' : 'text-yellow-300'
+                }`}>
+                  {qualityValidation.isValid ? 'Focus and lighting look good' : 'Focus or lighting needs attention'}
+                </p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Score: {qualityValidation.overallScore}/100 • Grade Uncertainty: {qualityValidation.gradeUncertainty}
+                  Glare, framing and corner visibility are assessed by DCM Optic™ during grading.
                 </p>
               </div>
             </div>
@@ -101,20 +96,10 @@ export default function ImagePreview({
               </div>
             </div>
 
-            {/* Confidence Letter Explanation */}
-            <div className="mt-2 pt-2 border-t border-gray-600">
-              <p className="text-gray-400 text-xs">
-                <span className="font-semibold">Grade {qualityValidation.confidenceLetter}:</span>{' '}
-                {qualityValidation.confidenceLetter === 'A' &&
-                  'Exceptional quality - sharp, well-lit, no glare. DCM Optic™ grading highly accurate (±0.25 grades).'}
-                {qualityValidation.confidenceLetter === 'B' &&
-                  'Good quality - clear focus and lighting. DCM Optic™ grading accuracy is good (±0.5 grades).'}
-                {qualityValidation.confidenceLetter === 'C' &&
-                  'Acceptable quality but may have blur, shadows, or glare. DCM Optic™ grading may vary (±1.0 grade).'}
-                {qualityValidation.confidenceLetter === 'D' &&
-                  'Poor quality - significant blur or lighting issues. DCM Optic™ grading accuracy reduced (±1.5 grades).'}
-              </p>
-            </div>
+            {/* The four "Grade A/B/C/D means ±0.25/±0.5/±1.0/±1.5" blurbs that
+                stood here are gone. Every number in them was wrong against the
+                rubric, and they promised a grading accuracy this screen has no
+                basis to promise. */}
 
             {/* Suggestions */}
             {qualityValidation.suggestions.length > 0 && (
