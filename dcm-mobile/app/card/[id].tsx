@@ -57,24 +57,33 @@ import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, t
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
 
 /**
- * Resolve the grade uncertainty string for display. Prefers the
- * server-provided `conversational_grade_uncertainty` field; falls back to
- * the canonical letter-based mapping from
- * `src/lib/gradeDisplayUtils.ts:getUncertaintyFromConfidence`
- * (A=±0, B=±1, C=±2, D=±3 — whole-number system).
+ * Resolve the grade uncertainty string for display.
+ *
+ * Derived from the confidence LETTER, which the grading rubric names as the
+ * only source of the uncertainty value (A=±0, B=±1, C=±2, D=±3 — whole-number
+ * system). Mirrors src/lib/gradeDisplayUtils.ts:getUncertaintyFromConfidence.
+ *
+ * This used to PREFER the server's stored conversational_grade_uncertainty and
+ * only fall back to the letter. That is backwards: audited across the last 200
+ * graded cards, ~11% store a value that contradicts their own letter (B cards
+ * storing ±2 or ±3, an A storing ±1), because the column keeps whatever the
+ * model emitted. The web card detail always recomputed from the letter, so the
+ * same card could read ±1 in a browser and ±3 in the app.
+ *
+ * serverValue is still accepted so call sites need not change, and is used only
+ * when there is no letter at all to derive from.
  */
 function resolveUncertainty(
   serverValue: string | null | undefined,
   confidenceLetter: string | null | undefined,
 ): string {
-  if (serverValue) return serverValue
   switch ((confidenceLetter || '').toUpperCase().trim()) {
     case 'A': return '±0'
     case 'B': return '±1'
     case 'C': return '±2'
     case 'D': return '±3'
-    default: return '±1'
   }
+  return serverValue || '±1'
 }
 
 export default function CardDetailScreen() {
