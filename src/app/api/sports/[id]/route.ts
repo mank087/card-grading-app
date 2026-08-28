@@ -28,6 +28,7 @@ import { matchSportsCardLocal, isSportsLocalDbAvailable } from "@/lib/sportsCard
 import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
 // v9.11: discard any year the model could not actually read off the card
 import { applyYearGuard } from "@/lib/yearGuard";
+import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -915,6 +916,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     let yearGuardOutcome: string | null = null;
     if (conversationalGradingData?.card_info) {
       const guard = applyYearGuard(conversationalGradingData.card_info, `sports/${cardId}`);
+      // Same evidence rule for the card number. Sports is where this failed:
+      // a "Scoring Kings" insert printed "8 OF 12" was labelled 101.
+      // See src/lib/cardNumberGuard.ts.
+      applyCardNumberGuard(conversationalGradingData.card_info, `sports/${cardId}`);
       aiYearHint = guard.originalYear;
       yearGuardOutcome = guard.outcome;
 

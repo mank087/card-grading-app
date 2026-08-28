@@ -16,6 +16,7 @@ import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
 import { applyYearGuard } from "@/lib/yearGuard";
+import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
 import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
@@ -849,6 +850,9 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
     // 🛡️ v9.11 YEAR GUARD — discard any year not backed by legible card text
     if (conversationalGradingData?.card_info) {
       applyYearGuard(conversationalGradingData.card_info, `yugioh/${cardId}`);
+      // Same evidence rule for the card number — a wrong one is printed on the
+      // slab label and looks authoritative. See src/lib/cardNumberGuard.ts.
+      applyCardNumberGuard(conversationalGradingData.card_info, `yugioh/${cardId}`);
     }
 
     // DATABASE LOOKUP: Cross-reference AI identification with internal Yu-Gi-Oh database

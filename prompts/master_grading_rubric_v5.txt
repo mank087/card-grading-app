@@ -1830,6 +1830,22 @@ plain base-set number.
   with no printed number is common and null is the correct answer. Do NOT supply a number from
   memory of the set — that is the single most common way a wrong number reaches the label.
 
+📎 **CARD NUMBER EVIDENCE (v9.20 — REQUIRED output fields, enforced in code):**
+Exactly as with the year, you must show where you read the number:
+• `"card_number_text_seen"`: the exact characters containing the number, transcribed verbatim
+  from the card — "8 OF 12", "#RC-25", "150". Not a description, the characters themselves.
+• `"card_number_source"`: one of exactly these values —
+    front_number      the number printed on the card face
+    back_number       a plain number printed on the back
+    insert_numbering  an "N OF M" / "N/M" insert marking
+    not_visible       no number is printed, or it cannot be read
+❌ If `card_number_source` is "not_visible", `card_number` MUST be null.
+❌ If you cannot transcribe `card_number_text_seen`, you did not read a number — set
+   `card_number` to null.
+⚠️ These are VERIFIED SERVER-SIDE. A card_number whose characters do not appear in your own
+   `card_number_text_seen` is discarded before it reaches the label. Quoting text you did not
+   read does not make the number survive — it just loses a number you might have read correctly.
+
 **CRITICAL - UNCERTAINTY RULE (applies to ALL card_info fields):**
 • If a field cannot be determined with high confidence from visible markings on the card itself (copyright text, set logo, printed date, printed card number, etc.), return `null` for that field. DO NOT GUESS.
 • A blank/null value on the printed slab label is ALWAYS better than a wrong value. Customers can correct null; they cannot correct a confidently wrong value they don't notice.
@@ -1941,6 +1957,8 @@ This never changes the GRADE — it lets the system flag identity for review.
     "year_source": "back_copyright|printed_date|set_logo|season_indicator|not_visible",  // REQUIRED
     "manufacturer": "string|null",
     "card_number": "string|null",  // EXACT as printed - do not modify
+    "card_number_text_seen": "string|null",   // REQUIRED — verbatim characters you read
+    "card_number_source": "front_number|back_number|insert_numbering|not_visible",  // REQUIRED
     "authentic": true|false,
 
     // Card-type-specific fields (see delta files)
