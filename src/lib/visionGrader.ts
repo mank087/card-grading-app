@@ -2477,9 +2477,20 @@ Provide detailed analysis as markdown with all required sections.`
           // Explain zoom adjustments in the consensus notes — the three-pass table shows
           // holistic pass scores, so without this a zoom-lowered consensus row looks like
           // it "came from nowhere" (e.g. passes all 10 but consensus 8).
+          // v9.21 WORDING: "Regioned zoom inspection (40 magnified crops)" read as
+          // a promise of 40 viewable images. Only crops behind an actual DEFECT are
+          // uploaded and linked; on a clean card nothing is retained, so a customer
+          // went looking for a report that does not exist. Describe what was DONE,
+          // and point at the evidence only when there is evidence to point at.
+          const evidenceCount = Array.isArray(zoom.defects)
+            ? zoom.defects.filter((d: any) => d?.evidenceUrl).length
+            : 0;
+          const evidencePointer = evidenceCount > 0
+            ? ` The magnified photo behind each finding is linked on the finding itself${evidenceCount === 1 ? '' : ` (${evidenceCount} photos)`}.`
+            : '';
           if (zoomAdjustments.length > 0 && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             jsonData.grading_passes.consensus_notes.push(
-              `Regioned zoom inspection (${zoom.regionsInspected} magnified crops) found defects the holistic passes missed — consensus adjusted: ${zoomAdjustments.join(' | ')}`
+              `Close inspection of ${zoom.regionsInspected} magnified regions (corners, edges and surface, front and back) found defects the whole-card evaluations missed — grade adjusted: ${zoomAdjustments.join(' | ')}.${evidencePointer}`
             );
           } else if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             // v9.3: ALWAYS record that zoom ran, even with zero findings. Previously a
@@ -2487,7 +2498,7 @@ Provide detailed analysis as markdown with all required sections.`
             // JSON — which blinded two production investigations (Jul 10: could not
             // tell whether the grade-10 influx correlated with zoom fallbacks).
             jsonData.grading_passes.consensus_notes.push(
-              `Regioned zoom inspection ran (${zoom.regionsInspected} magnified crops): no defects found beyond the holistic evaluation.`
+              `Close inspection of ${zoom.regionsInspected} magnified regions (corners, edges and surface, front and back) found no defects beyond the whole-card evaluations.`
             );
           }
         } else if (zoom && !zoom.ok) {
@@ -2495,8 +2506,11 @@ Provide detailed analysis as markdown with all required sections.`
           // v9.3: persist the fallback so the stored JSON shows this card was graded
           // WITHOUT magnified inspection (previously console-only — invisible in the DB).
           if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            // Kept explicit rather than silent: this card was graded WITHOUT the
+            // close-inspection stage, and the customer is entitled to know that
+            // the grade rests on the whole-card evaluations alone.
             jsonData.grading_passes.consensus_notes.push(
-              `Magnified zoom inspection was unavailable for this grade (${zoom.error}) — assessment is from the holistic ensemble only.`
+              `Close magnified inspection could not be completed for this card (${zoom.error}), so the grade is based on the whole-card evaluations alone. Re-photographing the card closer, filling the frame, allows the detailed pass to run.`
             );
           }
         }

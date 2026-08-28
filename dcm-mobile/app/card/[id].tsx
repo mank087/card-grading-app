@@ -2105,6 +2105,18 @@ export default function CardDetailScreen() {
                               <Text style={{ fontSize: 8, fontWeight: '600', color: Colors.gray[700] }}>{d.type} ({d.severity})</Text>
                               {d.location && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>Location: {d.location}</Text>}
                               {d.description && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>{d.description}</Text>}
+                              {/* The magnified crop the finding was actually made
+                                  from. The web detail page has linked this since
+                                  v9.4.2; the app did not, so app users were told a
+                                  defect existed with no way to look at it. */}
+                              {d.evidence_url && (
+                                <Text
+                                  style={{ fontSize: 8, color: Colors.blue[500], marginTop: 2, textDecorationLine: 'underline' }}
+                                  onPress={() => Linking.openURL(d.evidence_url).catch(() => {})}
+                                >
+                                  View magnified evidence photo
+                                </Text>
+                              )}
                             </View>
                           ))}
                         </View>
@@ -2953,7 +2965,19 @@ function DefectSection({ side, defects }: { side: string; defects: any }) {
               {d.defects.map((def: any, i: number) => (
                 <View key={i} style={s.defectItem}>
                   <View style={[s.sevDot, { backgroundColor: def.severity === 'heavy' ? Colors.red[500] : def.severity === 'moderate' ? Colors.amber[500] : Colors.green[500] }]} />
-                  <Text style={s.defectDesc}>{def.description}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.defectDesc}>{def.description}</Text>
+                    {/* See the note on the other defect renderer: web has linked
+                        this since v9.4.2, the app never did. */}
+                    {def.evidence_url && (
+                      <Text
+                        style={s.evidenceLink}
+                        onPress={() => Linking.openURL(def.evidence_url).catch(() => {})}
+                      >
+                        View magnified evidence photo
+                      </Text>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -3151,6 +3175,7 @@ const s = StyleSheet.create({
   defectItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 },
   sevDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   defectDesc: { fontSize: 12, color: Colors.gray[600], flex: 1, lineHeight: 16 },
+  evidenceLink: { fontSize: 11, color: Colors.blue[500], textDecorationLine: 'underline', marginTop: 3 },
 
   // Delete
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.red[100], backgroundColor: Colors.red[50] },
