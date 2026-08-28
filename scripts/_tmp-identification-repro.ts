@@ -25,7 +25,11 @@ const EXPECT = argOf('--expect', "o'neal").toLowerCase();
 (async () => {
   let { prompt } = loadGradingPrompt('sports' as any);
   if (process.argv.includes('--no-rule')) {
-    const a = prompt.indexOf('🚨 **SUBJECT ATTRIBUTION');
+    for (const [x,y] of [['🚨 **SUBJECT ATTRIBUTION','🚨 **UNIVERSAL YEAR'],['🔄 **READ IN THE CARD','🚨 **CANONICAL FIELD']]) {
+      const i = prompt.indexOf(x), j = prompt.indexOf(y);
+      if (i > 0 && j > i) prompt = prompt.slice(0, i) + prompt.slice(j);
+    }
+    const a = -1;
     const b = prompt.indexOf('🚨 **UNIVERSAL YEAR');
     if (a > 0 && b > a) prompt = prompt.slice(0, a) + prompt.slice(b);
   }

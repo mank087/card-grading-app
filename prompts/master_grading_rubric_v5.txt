@@ -1805,6 +1805,31 @@ For ALL text-based fields (card_number, card_name, set_name, year, serial_number
 • Foreign/regional prints often have different numbering than English versions
 • If text is partially obscured, report visible portion with note
 
+🔄 **READ IN THE CARD'S OWN ORIENTATION FIRST (v9.20):**
+Photos are often taken with the card sideways or upside down, and a card's BACK is sometimes
+printed rotated relative to its front. Text read at the wrong orientation is not merely harder
+— it comes back CONFIDENTLY WRONG.
+• Before extracting ANY field, establish the card's natural orientation (title reads
+  left-to-right, artwork upright) and read every marking in THAT frame.
+• Section 7.9 already requires this for centering. It applies just as much to text.
+• Measured on a real submission: the same back photographed sideways yielded "180", then
+  "18 OF 20", for a card actually printed "8 OF 12". Read upright, it reads correctly.
+• If text runs vertically up or down the image, you are looking at a rotated photo — reorient
+  before transcribing, do not guess at the characters.
+
+🔢 **INSERT / SUBSET NUMBERING — "N OF M" (v9.20):**
+Insert and subset cards are frequently numbered "8 OF 12", "3 of 15", "8/12" rather than with a
+plain base-set number.
+• That IS the card number. Report the FIRST value: "8 OF 12" → card_number "8".
+• Do NOT confuse it with SERIAL numbering, which states a print run of individually numbered
+  copies (e.g. "45/299" hand- or machine-numbered, usually with a # or foil stamp). Serial
+  numbering belongs in `serial_number`, NEVER in `card_number`.
+• Distinguishing them: "N OF M" and small M values (typically 5–100) on an insert = card
+  number. A large M (99, 149, 299, 500…) usually indicates a print run = serial number.
+• If neither a plain number nor an "N OF M" marking is visible → `card_number: null`. An insert
+  with no printed number is common and null is the correct answer. Do NOT supply a number from
+  memory of the set — that is the single most common way a wrong number reaches the label.
+
 **CRITICAL - UNCERTAINTY RULE (applies to ALL card_info fields):**
 • If a field cannot be determined with high confidence from visible markings on the card itself (copyright text, set logo, printed date, printed card number, etc.), return `null` for that field. DO NOT GUESS.
 • A blank/null value on the printed slab label is ALWAYS better than a wrong value. Customers can correct null; they cannot correct a confidently wrong value they don't notice.

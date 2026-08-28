@@ -122,7 +122,22 @@ print stats through the season BEFORE the issue year).
   - "150" → card_number: "150"
   - "#RC-25" → card_number: "RC-25"
   - "AU-TB" → card_number: "AU-TB"
-  - "45/299 Silver Prizm" → card_number: "45/299", subset: "Silver Prizm"
+  - "8 OF 12" (insert set) → card_number: "8"   ← the FIRST value, see master rubric
+  - "45/299 Silver Prizm" → serial_number: "45/299", subset: "Silver Prizm",
+    card_number: whatever plain number is printed elsewhere, else null
+    🚨 "45/299" is a PRINT RUN, not a card number. It was previously shown here as
+    card_number and that was wrong — a serially numbered card still has its own card number,
+    or none at all.
+
+🚨 **IF NO NUMBER IS PRINTED, RETURN null:**
+• Many inserts carry no card number at all. `null` is the correct, expected answer.
+• Do NOT recall a number from your knowledge of the set. A wrong number is printed on the
+  customer's slab label and looks authoritative; a blank one they can correct.
+• Real failure (2026-08-28): a "Scoring Kings" insert printed "8 OF 12" was stored as "101".
+  Across repeated runs the same card also produced 11, 180, 13, 10, NNO and SK11 — several with
+  identification_confidence "high". None were on the card.
+• The back of that card was photographed sideways. Reorient before reading — see the
+  orientation rule in the master rubric.
 
 **sport_or_category**: Sport category
 • Primary sport type
