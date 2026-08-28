@@ -3126,6 +3126,28 @@ PURPOSE: Assess centering for both front and back independently.
 
 🎯 CENTERING MEASUREMENT PRINCIPLE: PROVE PERFECT, DON'T ASSUME IT
 
+🚨 **CLASSIFY EACH FACE BEFORE MEASURING IT (v9.21) — card_type is NOT a formality.**
+
+`card_type` decides whether a border ratio is meaningful at all. It is enforced server-side:
+a face that is not "Standard Bordered" CANNOT receive centering 10 from border measurement,
+because there is no even printed border to measure against.
+
+• **Classify the FRONT and the BACK independently.** A bordered front implies NOTHING about the
+  back. Many vintage and insert cards pair a bordered front with a full-bleed or asymmetric back.
+• "Standard Bordered" means a printed border of intentionally EVEN width runs on all four sides.
+  If the design's margins are deliberately unequal, or artwork reaches the cut edge on any side,
+  it is NOT standard bordered.
+• Use "Borderless" when art runs to the cut edge, "Asymmetric Insert" when the design's margins
+  are intentionally uneven, "Die-Cut" for shaped cards, "Foil-Frame" for frame-only designs.
+
+❌ **Real failure (2026-08-28, do not repeat):** a 1971 Alex Karras back — an intentionally
+asymmetric, near-full-bleed design — was classified "Standard Bordered" and assigned a confident
+48/52. That ratio was measured against reference points the design does not have. The honest
+output was "Asymmetric Insert" with no left_right/top_bottom ratio.
+
+⚠️ If the design gives you nothing even to measure, say so and return "XX/XX". A blank
+measurement is a correct answer; an invented one becomes a printed grade on a slab.
+
 **CENTERING SCORING GUIDE (v9.19 — measured, not judged; boundary resolves downward)**
 
 **Professional-Market Centering Standards:**
@@ -3515,7 +3537,17 @@ CENTERING SCORE GUIDE (Professional-Market Aligned, Whole Numbers)
 ---
 🚨 **THIS IS THE ONLY RATIO→SCORE TABLE IN THIS RUBRIC (v8.8).** Every centering score MUST
 come from this table. All other tables in this section estimate the RATIO only.
-Boundary rule: measured ratio within ±2% of a band boundary → assign the HIGHER score.
+
+🚨 **BOUNDARY RULE (v9.21) — A RATIO ON A BAND EDGE RESOLVES DOWNWARD.**
+This previously read "within ±2% of a band boundary → assign the HIGHER score", which
+contradicted the "boundary resolves downward" rule stated earlier in this same section and
+made the real Gem threshold about 57/43 rather than 55/45. A photograph cannot reliably
+separate 55/45 from 57/43, so the tie goes AGAINST the higher score.
+• A ratio must fall fully inside a band to earn that band's score.
+• 55/45 exactly = 10 (the band is inclusive of its own edge, see below).
+• 56/44 = 9. There is no rounding up into a band you did not measure into.
+This is also enforced server-side; a score that does not match its own stated ratio is
+lowered after grading.
 
 **All centering scores are WHOLE NUMBERS - no decimals**
 

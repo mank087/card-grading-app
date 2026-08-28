@@ -29,6 +29,7 @@ import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
+import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote } from './grading/centeringPolicy';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -47,7 +48,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.20';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.21';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -2592,6 +2593,98 @@ Provide detailed analysis as markdown with all required sections.`
               );
             }
           }
+        }
+
+        // ── v9.21 CENTERING POLICY ────────────────────────────────────────
+        // When is a centering 10 actually earned? Customer report Aug 28 2026:
+        // vintage cards visibly off-centre scored centering 10. Don Maynard was
+        // submitted twice; the model said 48/52 then 50/50 while CV measured
+        // 26/74 then 25/75, and both scored 10.
+        //
+        // Six rules, five of which need no CV at all — see centeringPolicy.ts.
+        // Every one can only LOWER a score. CV appears once (R6, front only,
+        // both axes, blatant disagreement) and may only cap, never set.
+        //
+        // CENTERING_POLICY=shadow (default) logs what it WOULD do and changes
+        // nothing. =enforce applies it. =off disables entirely.
+        try {
+          const policyMode = process.env.CENTERING_POLICY || 'shadow';
+          if (policyMode !== 'off') {
+            const passList = [pass1, pass2, pass3].filter(Boolean);
+            const passDevs = passList
+              .map((p: any) => (typeof p?.centering_dev === 'number' ? p.centering_dev : null))
+              .filter((n): n is number => typeof n === 'number');
+            const passCenteringScores = passList
+              .map((p: any) => (typeof p?.centering === 'number' ? p.centering : null))
+              .filter((n): n is number => typeof n === 'number');
+            const yearNum = Number(String(jsonData.card_info?.year ?? '').slice(0, 4)) || null;
+            const confLetter = jsonData.image_quality?.confidence_letter
+              ?? jsonData.image_quality?.grade ?? null;
+
+            for (const face of ['front', 'back'] as const) {
+              const sec = jsonData.centering?.[face];
+              if (!sec || typeof sec !== 'object') continue;
+              const proposed = typeof sec.score === 'number' ? sec.score : null;
+              if (proposed == null) continue;
+
+              // Centering is judged on the WORST axis, so the policy sees the
+              // worst of the two stated ratios.
+              const devLR = ratioDeviation(sec.left_right);
+              const devTB = ratioDeviation(sec.top_bottom);
+              const worstRatio = (devTB !== null && (devLR === null || devTB > devLR))
+                ? sec.top_bottom : sec.left_right;
+
+              const m = zoom?.centering?.[face];
+              const cvEvidence = m
+                ? { dev: typeof m.worstAxisPct === 'number' ? Math.abs(m.worstAxisPct - 50) : null, bothAxes: !!m.bothAxes }
+                : null;
+
+              const result = applyCenteringPolicy({
+                face,
+                proposedScore: proposed,
+                ratio: worstRatio ?? null,
+                passDevs,
+                layout: layoutFromCardType(sec.card_type),
+                passScores: passCenteringScores,
+                cv: cvEvidence,
+                imageConfidence: confLetter,
+                year: yearNum,
+              });
+
+              if (result.capped || result.reviewFlag) {
+                console.log(
+                  `[GRADE RECALC] 🎯 centering policy (${policyMode}) ${face}: ${proposed} → ${result.score} ` +
+                  `[${result.firedRules.join(',')}] ${result.reasons.join(' | ')}`
+                );
+              }
+
+              // Recorded in both modes so the shadow run is queryable.
+              sec.policy = {
+                mode: policyMode,
+                proposed_score: proposed,
+                policy_score: result.score,
+                fired_rules: result.firedRules,
+                reasons: result.reasons,
+                review: result.reviewFlag,
+              };
+
+              if (policyMode === 'enforce' && result.capped) {
+                sec.score = result.score;
+                if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[`centering_${face}`] === 'number') {
+                  jsonData.raw_sub_scores[`centering_${face}`] = Math.min(
+                    jsonData.raw_sub_scores[`centering_${face}`], result.score
+                  );
+                }
+                const note = centeringCapNote(result);
+                if (note) sec.analysis = `${note} ${sec.analysis ?? ''}`.trim();
+                // Weakest link: the category follows the worse face.
+                serverRounded.centering = Math.min(serverRounded.centering, result.score);
+              }
+            }
+          }
+        } catch (e: any) {
+          // Never let policy evaluation fail a paid grade.
+          console.warn('[GRADE RECALC] centering policy failed (non-blocking):', e?.message || e);
         }
 
         // Step 3.8 (v9.2) EVIDENCE RECONCILIATION: a deduction of 2+ points requires a
