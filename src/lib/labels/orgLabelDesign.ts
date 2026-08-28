@@ -81,13 +81,26 @@ export interface OrgLabelDesign {
   }
 }
 
-export type LabelSizePreset = 'standard' | 'zion'
+export type LabelSizePreset = 'standard' | 'zion' | 'custom'
 
-/** Slab label slots an org can print for. Same numbers as the consumer wizard's SLAB_SIZES. */
+/**
+ * Slab label slots an org can print for. Same numbers as the consumer wizard's
+ * SLAB_SIZES (src/components/labelWizard/wizardTypes.ts) — verified identical:
+ * standard 2.8 x 0.8, Zion Mag Pro 2.51 x 0.76. Keep them in step.
+ *
+ * 'custom' carries the DEFAULT dims it seeds from, not fixed ones — the actual
+ * width/height live on the design and are clamped in normalizeOrgLabelDesign.
+ */
 export const LABEL_SIZE_PRESETS: { id: LabelSizePreset; name: string; widthIn: number; heightIn: number; note: string }[] = [
   { id: 'standard', name: 'Standard slab', widthIn: 2.8, heightIn: 0.8, note: 'Most magnetic one-touch and standard slab holders.' },
   { id: 'zion', name: 'Zion Mag Pro', widthIn: 2.51, heightIn: 0.76, note: 'The smaller label slot in Zion Mag Pro holders.' },
+  { id: 'custom', name: 'Custom size', widthIn: 2.8, heightIn: 0.8, note: 'Enter the exact slot dimensions for your holder.' },
 ]
+
+/** True when this preset's dimensions are typed by the user rather than fixed. */
+export function isCustomSize(preset: LabelSizePreset): boolean {
+  return preset === 'custom'
+}
 
 /** Print dims for a design, or undefined for the standard slot (renderers treat undefined as stock). */
 export function designDims(d: OrgLabelDesign | null | undefined): { widthIn: number; heightIn: number } | undefined {
@@ -111,6 +124,12 @@ export const DESIGN_LIMITS = {
   textScale: { min: 0.85, max: 1.15, step: 0.05 },
   borderWidth: { min: 0.01, max: 0.05, step: 0.005 },
   borderInset: { min: 0.04, max: 0.1, step: 0.005 },
+  // Custom slot dimensions. Deliberately the SAME range the consumer Label
+  // Studio offers (see the DimensionInput pair in LabelStudioClient), so an org
+  // cannot ask for something a consumer could not, and both UIs describe the
+  // same envelope.
+  customWidth: { min: 0.5, max: 4.0, step: 0.05 },
+  customHeight: { min: 0.3, max: 4.0, step: 0.05 },
 } as const
 
 const BAND_POSITIONS: BandPosition[] = ['left', 'right', 'top', 'bottom']
@@ -188,8 +207,21 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
   const text = (r.text && typeof r.text === 'object' ? r.text : {}) as Record<string, unknown>
   const border = (r.border && typeof r.border === 'object' ? r.border : {}) as Record<string, unknown>
   const size = (r.size && typeof r.size === 'object' ? r.size : {}) as Record<string, unknown>
-  // Presets only — the dims are always the preset's, never free numbers.
+  // A named preset supplies its own fixed dims. 'custom' is the one case where
+  // the client's numbers survive — clamped, never trusted raw, since these
+  // become print dimensions on a PDF.
   const sizePreset = LABEL_SIZE_PRESETS.find(p => p.id === size.preset) ?? LABEL_SIZE_PRESETS.find(p => p.id === base.size.preset)!
+  // `num` coerces before testing finiteness, and Number(null) / Number('') are
+  // 0 — finite, so they would clamp to the MINIMUM instead of falling back,
+  // silently printing a 0.3" tall label. Absent means absent.
+  const present = (v: unknown) => (v === null || v === undefined || v === '' ? undefined : v)
+  const resolvedSize = isCustomSize(sizePreset.id)
+    ? {
+        preset: 'custom' as LabelSizePreset,
+        widthIn: num(present(size.widthIn), sizePreset.widthIn, DESIGN_LIMITS.customWidth.min, DESIGN_LIMITS.customWidth.max),
+        heightIn: num(present(size.heightIn), sizePreset.heightIn, DESIGN_LIMITS.customHeight.min, DESIGN_LIMITS.customHeight.max),
+      }
+    : { preset: sizePreset.id, widthIn: sizePreset.widthIn, heightIn: sizePreset.heightIn }
 
   const zone = oneOf(logo.zone, LOGO_ZONES, base.logo.zone)
   const scaleLimit = zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
@@ -230,7 +262,7 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
       width: num(border.width, base.border.width, DESIGN_LIMITS.borderWidth.min, DESIGN_LIMITS.borderWidth.max, 3),
       inset: num(border.inset, base.border.inset, DESIGN_LIMITS.borderInset.min, DESIGN_LIMITS.borderInset.max, 3),
     },
-    size: { preset: sizePreset.id, widthIn: sizePreset.widthIn, heightIn: sizePreset.heightIn },
+    size: resolvedSize,
   }
 }
 

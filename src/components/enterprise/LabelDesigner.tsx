@@ -498,10 +498,53 @@ export default function LabelDesigner({
             <select value={design.size.preset} className={inputCls} disabled={disabled || !heritage}
               onChange={e => set(x => {
                 const p = LABEL_SIZE_PRESETS.find(s => s.id === e.target.value) ?? LABEL_SIZE_PRESETS[0]
-                x.size = { preset: p.id, widthIn: p.widthIn, heightIn: p.heightIn }
+                // Switching TO custom seeds from whatever is currently set, so
+                // an org tweaking a Zion label starts from 2.51 x 0.76 rather
+                // than jumping back to stock.
+                x.size = p.id === 'custom'
+                  ? { preset: 'custom', widthIn: x.size.widthIn, heightIn: x.size.heightIn }
+                  : { preset: p.id, widthIn: p.widthIn, heightIn: p.heightIn }
               })}>
-              {LABEL_SIZE_PRESETS.map(p => <option key={p.id} value={p.id}>{p.name} — {p.widthIn}&quot; × {p.heightIn}&quot;</option>)}
+              {LABEL_SIZE_PRESETS.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.id === 'custom' ? p.name : `${p.name} — ${p.widthIn}" × ${p.heightIn}"`}
+                </option>
+              ))}
             </select>
+
+            {/* Free dimensions, mirroring the consumer Label Studio's custom
+                preset (same 0.5–4.0 x 0.3–4.0 envelope). Committed on blur so a
+                half-typed "2." never lands in the design. */}
+            {design.size.preset === 'custom' && (
+              <div className="flex gap-2 mt-2">
+                {([
+                  { key: 'widthIn' as const, label: 'Width (in)', lim: DESIGN_LIMITS.customWidth },
+                  { key: 'heightIn' as const, label: 'Height (in)', lim: DESIGN_LIMITS.customHeight },
+                ]).map(({ key, label, lim }) => (
+                  <div key={key} className="flex-1">
+                    <label className="block text-[11px] text-gray-500 mb-1">{label}</label>
+                    <input
+                      type="number"
+                      className={inputCls}
+                      disabled={disabled || !heritage}
+                      min={lim.min}
+                      max={lim.max}
+                      step={lim.step}
+                      defaultValue={design.size[key]}
+                      key={`${key}-${design.size[key]}`}
+                      onBlur={e => {
+                        const n = Number(e.target.value)
+                        const next = Number.isFinite(n)
+                          ? Math.min(lim.max, Math.max(lim.min, Math.round(n * 100) / 100))
+                          : design.size[key]
+                        e.target.value = String(next)
+                        set(x => { x.size = { ...x.size, preset: 'custom', [key]: next } })
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="text-[11px] text-gray-400 mt-1">
               {LABEL_SIZE_PRESETS.find(p => p.id === design.size.preset)?.note} The same layout prints scaled to the slot; the preview shows the slot&apos;s proportions.
               {!heritage && ' Modern labels print at the standard size.'}
