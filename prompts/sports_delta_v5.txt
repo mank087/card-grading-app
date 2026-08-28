@@ -29,12 +29,26 @@ REQUIRED FIELDS (All Sports Cards)
   reflected in rookie_or_first, not appended to card_name
 
 **player_or_character**: Player/athlete name
+• The name the card is TITLED for — the FRONT nameplate, or the heading above the back blurb.
+• 🚨 NOT a name that merely appears in the back's prose. Milestone, "Scoring Kings", record and
+  award inserts routinely name a RIVAL inside the write-up; that rival is a distractor, not the
+  subject. See SUBJECT ATTRIBUTION in the master rubric.
+• 🔎 Cross-check against the JERSEY IN THE PHOTO. If the player you named played for a different
+  team than the uniform shows, the name is wrong — re-read the front nameplate.
 • Full name as printed on card
 • Example: "Ken Griffey Jr."
 • Example: "Tom Brady"
 • Example: "LeBron James"
 • If multiple players (dual/triple card): List all, separated by " / "
 • Example: "Michael Jordan / Scottie Pippen"
+• ❌ Real failure: a Shaquille O'Neal insert read as "David Robinson" because the back blurb said
+  Shaq was "edged out … by the Spurs' David Robinson". Front said SHAQUILLE O'NEAL; jersey was
+  Orlando Magic #32. Both were ignored in favour of a name in the prose.
+
+**team**: The team shown in the PHOTO
+• Read it from the visible uniform, logo and colours — never infer it from the player's career.
+• If it disagrees with the player name you chose, one of them is wrong. The uniform is the
+  evidence; the inferred name is the guess.
 
 **set_name**: Set or series name
 • Official set name from manufacturer

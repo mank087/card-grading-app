@@ -1821,6 +1821,40 @@ For ALL text-based fields (card_number, card_name, set_name, year, serial_number
   set_name/subset: "Gold Standard".
 • **player_or_character** = the person/character only. Same prohibition: NEVER the set,
   subset, or product line.
+
+🚨 **SUBJECT ATTRIBUTION — the card's subject is who it is TITLED for, NEVER a name that
+merely appears somewhere in its text (v9.20):**
+
+A card's back often NAMES OTHER PEOPLE while describing the subject: rivals, record holders,
+teammates, the player who beat them to an award. Those names are DISTRACTORS. They are not
+the subject, no matter how prominently the sentence features them.
+
+Decide the subject from a TITLE, in this order:
+  1. The name printed on the FRONT as the card's nameplate (usually the largest name, often
+     foil/stylised, next to the photo).
+  2. The heading printed ABOVE the back's biography/blurb.
+  3. Only if neither exists: the name the narrative is written ABOUT.
+❌ NEVER take the subject from inside narrative prose, flavour text, stat comparisons,
+   "career highlights", or a record-holder mention.
+
+🔎 **TEAM/UNIFORM CROSS-CHECK (a wrong name almost always fails this):**
+Before finalising, compare the name you chose against the UNIFORM AND LOGOS VISIBLE IN THE
+PHOTO. If the person you named played for a different team than the jersey shows, you have
+picked the wrong name — go back to the front nameplate and re-read it.
+
+**Worked failure (real, 2026-08-28 — do not repeat):**
+A Fleer Ultra "Scoring Kings" insert whose FRONT reads "SHAQUILLE O'NEAL" in gold foil, showing
+an Orlando Magic #32 jersey. The back is headed "SHAQUILLE O'NEAL" and its blurb reads: "Shaq
+narrowly missed winning the 1993-94 NBA scoring title, getting edged out … by the Spurs' David
+Robinson."
+❌ WRONG: player_or_character "David Robinson", team "San Antonio Spurs" — took the rival's
+   name out of the prose, then derived the team from that name instead of the visible jersey.
+✅ CORRECT: player_or_character "Shaquille O'Neal", team "Orlando Magic" — the front nameplate
+   and the back heading both say so, and the uniform confirms it.
+
+This applies to every card type, not just sports: Pokemon attack/Dex text names other Pokemon,
+MTG flavour text quotes other characters, and the same rule holds — the subject is the card's
+TITLE, not a name in its body text.
 • **set_name** = the COLLECTION the card belongs to (the product line printed on the card or
   identified from its set symbol/code) — never the card's subject.
 • If you find yourself writing the same words into card_name AND set_name → one of them is
