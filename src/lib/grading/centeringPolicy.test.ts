@@ -14,6 +14,7 @@ import {
   ratioDeviation,
   centeringCapNote,
   centeringUnmeasurableNote,
+  foldR0IntoPass,
   MAX_PASS_SPREAD,
   type CenteringPolicyInput,
 } from './centeringPolicy';
@@ -289,5 +290,49 @@ describe('R0 — a face with no centre to measure is centred', () => {
     expect(note).toMatch(/no even printed border/i);
     expect(note).not.toMatch(/measured|perfect/i);
     expect(centeringUnmeasurableNote(applyCenteringPolicy(base()))).toBeNull();
+  });
+});
+
+describe('foldR0IntoPass — R0 must survive the gates below it', () => {
+  // The Venom shape: every pass scored centering 9 and everything else 10, so
+  // every pass final is 9. Left unfolded, the ensemble final stays 9, finalGrade
+  // = min(9, subgradeCap) stays 9, and the weakest-link display pass pulls the
+  // centering subgrade back to 9 — R0 does nothing at all.
+  it('lifts a pass whose final was pinned by the centering deduction', () => {
+    const r = foldR0IntoPass({ centering: 9, corners: 10, edges: 10, surface: 10, final: 9 });
+    expect(r).toEqual({ centering: 10, final: 10 });
+  });
+
+  it('leaves a pass held down by another category', () => {
+    const r = foldR0IntoPass({ centering: 9, corners: 8, edges: 10, surface: 10, final: 8 });
+    expect(r).toEqual({ centering: 10, final: 8 });
+  });
+
+  it('leaves a pass held down holistically, below its own centering score', () => {
+    // final 7 under centering 9 — the pass had a reason R0 knows nothing about.
+    const r = foldR0IntoPass({ centering: 9, corners: 10, edges: 10, surface: 10, final: 7 });
+    expect(r).toEqual({ centering: 10, final: 7 });
+  });
+
+  it('does not lift past what the other categories allow', () => {
+    const r = foldR0IntoPass({ centering: 8, corners: 9, edges: 10, surface: 10, final: 8 });
+    expect(r).toEqual({ centering: 10, final: 9 });
+  });
+
+  it('never lowers a final', () => {
+    for (const final of [7, 8, 9, 10]) {
+      const r = foldR0IntoPass({ centering: 9, corners: 10, edges: 10, surface: 10, final });
+      expect(r.final!).toBeGreaterThanOrEqual(final);
+    }
+  });
+
+  it('caps the lift at 10', () => {
+    const r = foldR0IntoPass({ centering: 9, corners: 10, edges: 10, surface: 10, final: 9 });
+    expect(r.final).toBe(10);
+  });
+
+  it('survives a pass with categories missing', () => {
+    expect(foldR0IntoPass({ centering: 9 })).toEqual({ centering: 10, final: undefined });
+    expect(foldR0IntoPass({ centering: 9, final: 9 })).toEqual({ centering: 10, final: 10 });
   });
 });

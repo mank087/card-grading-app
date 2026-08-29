@@ -385,3 +385,46 @@ export function centeringUnmeasurableNote(result: CenteringPolicyResult): string
 
 /** The tier label to show for a face R0 scored, in place of a measured tier. */
 export const R0_QUALITY_TIER = 'Centered';
+
+/** One evaluation pass, as far as the R0 fold is concerned. */
+export interface PassForR0Fold {
+  centering: number;
+  corners?: number;
+  edges?: number;
+  surface?: number;
+  final?: number;
+}
+
+/**
+ * Fold an R0 outcome into one displayed pass.
+ *
+ * WHY THIS EXISTS. R0 raises the server's centering subgrade, but each pass
+ * scored centering itself and each pass's `final` is a weakest link over its
+ * own subgrades — so the deduction R0 reverses is baked into the pass finals
+ * too. Leave them and the ensemble final stays 9, finalGrade =
+ * min(ensembleFinal, subgradeCap) stays 9, and the weakest-link display pass
+ * drags the centering subgrade back down to match. R0 becomes a no-op on
+ * exactly the cards it targets.
+ *
+ * Folding it in (as v9.1 already does for zoom and structural caps) means every
+ * downstream gate sees a card with no centering deduction, rather than each
+ * gate carrying its own R0 exception.
+ *
+ * The lift is deliberately narrow: a pass's final moves ONLY when centering was
+ * demonstrably the binding constraint on it — the final equals the centering
+ * score, and the other three categories allow better. A pass held down for a
+ * holistic reason R0 knows nothing about keeps its number.
+ */
+export function foldR0IntoPass(p: PassForR0Fold): { centering: number; final: number | undefined } {
+  const centeringBefore = p.centering;
+  const otherMin = Math.min(
+    typeof p.corners === 'number' ? p.corners : 10,
+    typeof p.edges === 'number' ? p.edges : 10,
+    typeof p.surface === 'number' ? p.surface : 10,
+  );
+  let final = p.final;
+  if (typeof final === 'number' && final === centeringBefore && centeringBefore < otherMin) {
+    final = Math.min(otherMin, 10);
+  }
+  return { centering: 10, final };
+}

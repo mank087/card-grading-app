@@ -29,7 +29,7 @@ import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
-import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER } from './grading/centeringPolicy';
+import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -2237,7 +2237,10 @@ Provide detailed analysis as markdown with all required sections.`
         // Median is robust to a single outlier evaluation (mean is not): (9,9,6) → 9.
         // It also subsumes the old v8.5 consensusBoost — median of (10,10,9) is 10.
         const med3 = (a: number, b: number, c: number) => [a, b, c].sort((x, y) => x - y)[1];
-        const [f1, f2, f3] = [pass1.final, pass2.final, pass3.final];
+        // `let`, not const: the R0 fold below may lift a pass's final when the
+        // only thing holding it down was a centering deduction on a face with no
+        // centre to measure. Every consumer of f1/f2/f3 runs after that point.
+        let [f1, f2, f3] = [pass1.final, pass2.final, pass3.final];
         const boostedAvg = {
           centering: med3(pass1.centering, pass2.centering, pass3.centering),
           corners: med3(pass1.corners, pass2.corners, pass3.corners),
@@ -2635,6 +2638,7 @@ Provide detailed analysis as markdown with all required sections.`
             // weakest of the two — which a per-face Math.min cannot express.
             const faceScores: Partial<Record<'front' | 'back', number>> = {};
             let touchedAFace = false;
+            let r0Raised = false;
             const passList = [pass1, pass2, pass3].filter(Boolean);
             const passDevs = passList
               .map((p: any) => (typeof p?.centering_dev === 'number' ? p.centering_dev : null))
@@ -2722,7 +2726,43 @@ Provide detailed analysis as markdown with all required sections.`
               }
 
               if (applyR0 || applyCap) touchedAFace = true;
+              if (applyR0) r0Raised = true;
               faceScores[face] = (applyR0 || applyCap) ? result.score : proposed;
+            }
+
+            // ── Fold R0 into the passes ───────────────────────────────────────
+            //
+            // Without this R0 is a NO-OP on exactly the cards it targets, and
+            // the reason is worth spelling out. Each pass scored centering 9 on
+            // a borderless face, and each pass's own `final` is a weakest link
+            // over its own subgrades, so it carries that same deduction. R0
+            // raises the server's centering subgrade to 10, but serverRounded
+            // .final still holds the ensemble's 9 — and finalGrade is
+            // Math.min(serverRounded.final, subgradeCap), so it stays 9. The
+            // weakest-link display block then sees subgrades(10) > final(9) and
+            // drags centering back down to 9 to match. Net effect: nothing,
+            // except a policy record claiming otherwise.
+            //
+            // Folding into the displayed passes — the same thing v9.1 does with
+            // zoom and structural caps — means every gate downstream (unanimity,
+            // dissent reflection, weakest-link display) sees a card with no
+            // centering deduction, instead of each gate needing its own R0
+            // exception. One place to reason about rather than five.
+            if (r0Raised) {
+              // The lift rule itself lives in centeringPolicy.foldR0IntoPass as a
+              // pure function, so it is unit-tested rather than reasoned about.
+              for (const p of [pass1, pass2, pass3]) {
+                if (!p || typeof p.centering !== 'number') continue;
+                const folded = foldR0IntoPass(p);
+                p.centering = folded.centering;
+                if (typeof folded.final === 'number') p.final = folded.final;
+              }
+              [f1, f2, f3] = [pass1.final, pass2.final, pass3.final];
+              const refreshed = med3(f1, f2, f3);
+              if (refreshed > serverRounded.final) {
+                console.log(`[GRADE RECALC] 🎯 R0 fold: pass finals → ${f1}/${f2}/${f3}, ensemble final ${serverRounded.final} → ${refreshed}`);
+                serverRounded.final = refreshed;
+              }
             }
 
             // Weakest link across the two faces, recomputed once. A per-face
