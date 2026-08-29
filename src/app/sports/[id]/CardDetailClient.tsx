@@ -9,6 +9,7 @@ declare global {
   }
 }
 import { useParams, useRouter } from "next/navigation";
+import { centeringQuality, displayCenteringRatio, centeringTierIcon } from "@/lib/centeringDisplay";
 import Image from "next/image";
 import SectionDefects from '@/components/reports/SectionDefects';
 import Link from "next/link";
@@ -4100,30 +4101,20 @@ export function SportsCardDetails() {
                     };
 
                     // Helper to format DCM analysis text into structured display
-                    const formatDCMAnalysis = (text: string, lrRatio: string, tbRatio: string, lrObj: { left: number; right: number }, tbObj: { left: number; right: number }, aiQualityTier?: string) => {
-                      // Priority 1: Use AI's quality tier if available (v5.0+)
-                      let quality;
-                      if (aiQualityTier && ['Perfect', 'Excellent', 'Good', 'Fair', 'Off-Center'].includes(aiQualityTier)) {
-                        // Use AI's tier directly
-                        const colorMap: Record<string, { color: string; colorClass: string }> = {
-                          'Perfect': { color: '#22c55e', colorClass: 'text-green-600' },
-                          'Excellent': { color: '#22c55e', colorClass: 'text-green-600' },
-                          'Good': { color: '#3b82f6', colorClass: 'text-blue-600' },
-                          'Fair': { color: '#eab308', colorClass: 'text-yellow-600' },
-                          'Off-Center': { color: '#ef4444', colorClass: 'text-orange-600' }
-                        };
-                        quality = { text: aiQualityTier, ...colorMap[aiQualityTier] };
-                      } else {
-                        // Fallback: Calculate from ratios (backward compatibility)
-                        quality = getQualityAssessment(lrObj, tbObj);
-                      }
-
-                      // Determine icon based on quality
-                      let icon = '✓';
-                      if (quality.text === 'Fair') icon = '⚠';
-                      if (quality.text === 'Off-Center') icon = '✗';
-
-                      return { text, qualityText: quality.text, icon, colorClass: quality.colorClass, lrRatio, tbRatio };
+                    // The ratio STRINGS are the source of truth here, not the parsed
+                    // objects — a face the grader could not measure arrives as "XX/XX",
+                    // "N/A" or (once parsed and re-joined) "NaN/NaN", and every one of
+                    // those has to read as "not measurable" rather than "Off-Center".
+                    const formatDCMAnalysis = (text: string, lrRatio: string, tbRatio: string, _lrObj: { left: number; right: number }, _tbObj: { left: number; right: number }, aiQualityTier?: string | null) => {
+                      const quality = centeringQuality(lrRatio, tbRatio, aiQualityTier);
+                      return {
+                        text,
+                        qualityText: quality.text,
+                        icon: centeringTierIcon(quality.text),
+                        colorClass: quality.colorClass,
+                        lrRatio: displayCenteringRatio(lrRatio),
+                        tbRatio: displayCenteringRatio(tbRatio),
+                      };
                     };
 
                     const frontLR = parseRatio(card.conversational_centering_ratios?.front_lr || centering.front_left_right_ratio_text || '50/50');
@@ -4167,7 +4158,7 @@ export function SportsCardDetails() {
                             {(card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis) && (() => {
                               const analysisText = card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis;
                               // Get AI's quality tier if available (v5.0+)
-                              const aiQualityTier = card.conversational_centering_ratios?.front_quality_tier;
+                              const aiQualityTier = centeringMeasurements.front_quality_tier || card.conversational_centering_ratios?.front_quality_tier || null;
                               const formatted = formatDCMAnalysis(
                                 analysisText,
                                 `${frontLR.left}/${frontLR.right}`,

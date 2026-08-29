@@ -29,7 +29,7 @@ import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
-import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote } from './grading/centeringPolicy';
+import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER } from './grading/centeringPolicy';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -48,7 +48,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.21';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.22';
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -2623,7 +2623,18 @@ Provide detailed analysis as markdown with all required sections.`
         // nothing. =enforce applies it. =off disables entirely.
         try {
           const policyMode = process.env.CENTERING_POLICY || 'shadow';
+          // R0 (a face with no centre to measure scores as centred) is gated
+          // SEPARATELY from the capping rules and defaults ON, because it was
+          // asked for explicitly while R1–R6 are still reading their shadow
+          // numbers. CENTERING_POLICY=off still kills everything.
+          // CENTERING_R0=shadow records R0 without applying it; =off disables it.
+          const r0Mode = process.env.CENTERING_R0 || 'enforce';
           if (policyMode !== 'off') {
+            // Per-face scores after policy, so the category can be recomputed
+            // once at the end. R0 can RAISE a face, and the category is the
+            // weakest of the two — which a per-face Math.min cannot express.
+            const faceScores: Partial<Record<'front' | 'back', number>> = {};
+            let touchedAFace = false;
             const passList = [pass1, pass2, pass3].filter(Boolean);
             const passDevs = passList
               .map((p: any) => (typeof p?.centering_dev === 'number' ? p.centering_dev : null))
@@ -2665,24 +2676,41 @@ Provide detailed analysis as markdown with all required sections.`
                 year: yearNum,
               });
 
-              if (result.capped || result.reviewFlag) {
+              if (result.capped || result.raised || result.reviewFlag) {
+                const mode = result.raised ? r0Mode : policyMode;
                 console.log(
-                  `[GRADE RECALC] 🎯 centering policy (${policyMode}) ${face}: ${proposed} → ${result.score} ` +
+                  `[GRADE RECALC] 🎯 centering policy (${mode}) ${face}: ${proposed} → ${result.score} ` +
                   `[${result.firedRules.join(',')}] ${result.reasons.join(' | ')}`
                 );
               }
 
-              // Recorded in both modes so the shadow run is queryable.
+              // Recorded in every mode so a shadow run stays queryable.
               sec.policy = {
-                mode: policyMode,
+                mode: result.firedRules.includes('R0') ? r0Mode : policyMode,
                 proposed_score: proposed,
                 policy_score: result.score,
                 fired_rules: result.firedRules,
                 reasons: result.reasons,
                 review: result.reviewFlag,
+                raised: result.raised,
               };
 
-              if (policyMode === 'enforce' && result.capped) {
+              // R0 raises and is gated on its own; R1–R6 cap under CENTERING_POLICY.
+              const applyR0 = result.firedRules.includes('R0') && r0Mode === 'enforce';
+              const applyCap = result.capped && policyMode === 'enforce';
+
+              if (applyR0) {
+                sec.score = result.score;
+                if (jsonData.raw_sub_scores) {
+                  jsonData.raw_sub_scores[`centering_${face}`] = result.score;
+                }
+                // Say WHY it is a 10, so the report does not imply the borders
+                // were measured and found perfect. They were not measured.
+                const note = centeringUnmeasurableNote(result);
+                if (note) sec.analysis = `${note} ${sec.analysis ?? ''}`.trim();
+                // The measured-ratio vocabulary does not apply to this face.
+                sec.quality_tier = R0_QUALITY_TIER;
+              } else if (applyCap) {
                 sec.score = result.score;
                 if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[`centering_${face}`] === 'number') {
                   jsonData.raw_sub_scores[`centering_${face}`] = Math.min(
@@ -2691,8 +2719,26 @@ Provide detailed analysis as markdown with all required sections.`
                 }
                 const note = centeringCapNote(result);
                 if (note) sec.analysis = `${note} ${sec.analysis ?? ''}`.trim();
-                // Weakest link: the category follows the worse face.
-                serverRounded.centering = Math.min(serverRounded.centering, result.score);
+              }
+
+              if (applyR0 || applyCap) touchedAFace = true;
+              faceScores[face] = (applyR0 || applyCap) ? result.score : proposed;
+            }
+
+            // Weakest link across the two faces, recomputed once. A per-face
+            // Math.min against the running category could only ever lower it,
+            // which would silently discard every raise R0 just made.
+            //
+            // Only recomputed when a face actually changed. The category is not
+            // always MIN(front, back) — a front-only submission carries a back
+            // the ensemble scored 0 — so recomputing unconditionally would
+            // rewrite cards this policy never touched.
+            const finals = Object.values(faceScores).filter((n): n is number => typeof n === 'number');
+            if (touchedAFace && finals.length) {
+              const category = Math.min(...finals);
+              if (category !== serverRounded.centering) {
+                console.log(`[GRADE RECALC] 🎯 centering category: ${serverRounded.centering} → ${category} (faces ${JSON.stringify(faceScores)})`);
+                serverRounded.centering = category;
               }
             }
           }

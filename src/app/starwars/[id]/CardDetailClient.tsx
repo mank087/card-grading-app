@@ -10,6 +10,7 @@ declare global {
   }
 }
 import { useParams, useRouter } from "next/navigation";
+import { centeringQuality, displayCenteringRatio } from "@/lib/centeringDisplay";
 import Image from "next/image";
 import SectionDefects from '@/components/reports/SectionDefects';
 import Link from "next/link";
@@ -4325,71 +4326,40 @@ export function StarWarsCardDetails() {
                 <div className="mb-6">
                   {(() => {
                     // Parse ratio string into numeric values
-                    const parseRatio = (ratioStr: string): { left: number; right: number } => {
-                      const parts = ratioStr.split('/').map(p => parseInt(p.trim()));
-                      if (parts.length !== 2) return { left: 50, right: 50 };
-                      return { left: parts[0], right: parts[1] };
-                    };
+                    // Ratio strings exactly as the grader reported them. Since v9.21 a face
+                    // with no border to measure comes back "XX/XX", and a card graded before
+                    // ratios were stored has nothing at all — neither of those is 50/50, so
+                    // neither gets defaulted to it.
+                    const frontLRRatio = card.conversational_centering_ratios?.front_lr || centering.front_left_right_ratio_text || '';
+                    const frontTBRatio = card.conversational_centering_ratios?.front_tb || centering.front_top_bottom_ratio_text || '';
+                    const backLRRatio = card.conversational_centering_ratios?.back_lr || centering.back_left_right_ratio_text || '';
+                    const backTBRatio = card.conversational_centering_ratios?.back_tb || centering.back_top_bottom_ratio_text || '';
 
-                    // Calculate quality assessment based on worst deviation
-                    const getQualityAssessment = (lrRatio: { left: number; right: number }, tbRatio: { left: number; right: number }) => {
-                      const lrDiff = Math.abs(lrRatio.left - 50);
-                      const tbDiff = Math.abs(tbRatio.left - 50);
-                      const worstDiff = Math.max(lrDiff, tbDiff);
-
-                      if (worstDiff <= 1) return { text: 'Perfect', color: '#22c55e', colorClass: 'text-green-600' };
-                      if (worstDiff <= 3) return { text: 'Excellent', color: '#22c55e', colorClass: 'text-green-600' };
-                      if (worstDiff <= 5) return { text: 'Good', color: '#3b82f6', colorClass: 'text-blue-600' };
-                      if (worstDiff <= 10) return { text: 'Fair', color: '#eab308', colorClass: 'text-yellow-600' };
-                      return { text: 'Off-Center', color: '#ef4444', colorClass: 'text-orange-600' };
-                    };
-
-                    // Format DCM analysis with structured display
-                    const formatDCMAnalysis = (text: string, lrRatio: string, tbRatio: string, lrObj: { left: number; right: number }, tbObj: { left: number; right: number }, aiQualityTier?: string) => {
-                      // Priority 1: Use AI's quality tier if available (v5.0+)
-                      let quality;
-                      if (aiQualityTier && ['Perfect', 'Excellent', 'Good', 'Fair', 'Off-Center'].includes(aiQualityTier)) {
-                        const colorMap: Record<string, { color: string; colorClass: string }> = {
-                          'Perfect': { color: '#22c55e', colorClass: 'text-green-600' },
-                          'Excellent': { color: '#22c55e', colorClass: 'text-green-600' },
-                          'Good': { color: '#3b82f6', colorClass: 'text-blue-600' },
-                          'Fair': { color: '#eab308', colorClass: 'text-yellow-600' },
-                          'Off-Center': { color: '#ef4444', colorClass: 'text-orange-600' }
-                        };
-                        quality = { text: aiQualityTier, ...colorMap[aiQualityTier] };
-                      } else {
-                        // Priority 2: Calculate from ratios
-                        quality = getQualityAssessment(lrObj, tbObj);
-                      }
-
-                      return {
-                        text: text || 'No analysis available',
-                        lrRatio,
-                        tbRatio,
-                        quality: quality.text,
-                        qualityColorClass: quality.colorClass
-                      };
-                    };
-
-                    // Get ratio strings and parse them
-                    const frontLRRatio = card.conversational_centering_ratios?.front_lr || centering.front_left_right_ratio_text || '50/50';
-                    const frontTBRatio = card.conversational_centering_ratios?.front_tb || centering.front_top_bottom_ratio_text || '50/50';
-                    const backLRRatio = card.conversational_centering_ratios?.back_lr || centering.back_left_right_ratio_text || '50/50';
-                    const backTBRatio = card.conversational_centering_ratios?.back_tb || centering.back_top_bottom_ratio_text || '50/50';
-
-                    const frontLRObj = parseRatio(frontLRRatio);
-                    const frontTBObj = parseRatio(frontTBRatio);
-                    const backLRObj = parseRatio(backLRRatio);
-                    const backTBObj = parseRatio(backTBRatio);
-
-                    // Get analysis text and quality tiers
+                    // Get analysis text and quality tiers. The grader's own tier rides in
+                    // conversational_grading (already unpacked into centeringMeasurements);
+                    // the conversational_centering_ratios column has never carried one.
                     const frontAnalysisText = card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis || 'No analysis available';
                     const backAnalysisText = card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis || 'No analysis available';
-                    const frontQualityTier = card.conversational_centering_ratios?.front_quality_tier ?? undefined;
-                    const backQualityTier = card.conversational_centering_ratios?.back_quality_tier ?? undefined;
+                    const frontQualityTier = centeringMeasurements.front_quality_tier || card.conversational_centering_ratios?.front_quality_tier || null;
+                    const backQualityTier = centeringMeasurements.back_quality_tier || card.conversational_centering_ratios?.back_quality_tier || null;
 
-                    const formattedFront = formatDCMAnalysis(frontAnalysisText, frontLRRatio, frontTBRatio, frontLRObj, frontTBObj, frontQualityTier);
-                    const formattedBack = formatDCMAnalysis(backAnalysisText, backLRRatio, backTBRatio, backLRObj, backTBObj, backQualityTier);
+                    const frontTier = centeringQuality(frontLRRatio, frontTBRatio, frontQualityTier);
+                    const backTier = centeringQuality(backLRRatio, backTBRatio, backQualityTier);
+
+                    const formattedFront = {
+                      text: frontAnalysisText || 'No analysis available',
+                      lrRatio: displayCenteringRatio(frontLRRatio),
+                      tbRatio: displayCenteringRatio(frontTBRatio),
+                      quality: frontTier.text,
+                      qualityColorClass: frontTier.colorClass
+                    };
+                    const formattedBack = {
+                      text: backAnalysisText || 'No analysis available',
+                      lrRatio: displayCenteringRatio(backLRRatio),
+                      tbRatio: displayCenteringRatio(backTBRatio),
+                      quality: backTier.text,
+                      qualityColorClass: backTier.colorClass
+                    };
 
                     return (
                       <div className="space-y-6">

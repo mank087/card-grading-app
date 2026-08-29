@@ -184,6 +184,7 @@ function parseRatio(ratioStr: string | null | undefined): { left: number; right:
 }
 
 const TIER_COLORS: Record<string, string> = {
+  Centered: 'text-green-600', // R0: no border to measure, so nothing to fall short of
   Perfect: 'text-green-600',
   Excellent: 'text-green-600',
   Good: 'text-blue-600',

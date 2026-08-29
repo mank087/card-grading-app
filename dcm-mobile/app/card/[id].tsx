@@ -1798,8 +1798,11 @@ export default function CardDetailScreen() {
               {/* Front and Back centering cards */}
               {['front', 'back'].map(side => {
                 const sideData = (cen as any)?.[side] || cen
-                const lr = sideData?.left_right || sideData?.[`${side}_left_right`] || sideData?.[`${side}_lr`] || 'N/A'
-                const tb = sideData?.top_bottom || sideData?.[`${side}_top_bottom`] || sideData?.[`${side}_tb`] || 'N/A'
+                // v9.21 answers "XX/XX" when a face has no border to measure. Show a dash
+                // for that rather than a placeholder the customer is left to decode.
+                const showRatio = (v: any) => (typeof v === 'string' && /^\d{1,3}\s*\/\s*\d{1,3}$/.test(v.trim()) ? v.trim() : '—')
+                const lr = showRatio(sideData?.left_right || sideData?.[`${side}_left_right`] || sideData?.[`${side}_lr`])
+                const tb = showRatio(sideData?.top_bottom || sideData?.[`${side}_top_bottom`] || sideData?.[`${side}_tb`])
                 const tier = sideData?.quality_tier || sideData?.[`${side}_quality_tier`] || null
                 const analysis = sideData?.analysis || sideData?.[`${side}_analysis`] || sideData?.[`${side}_notes`] || null
                 const scoreVal = sideData?.score ?? (sub?.centering != null ? Math.round(sub.centering) : null)
@@ -1810,12 +1813,13 @@ export default function CardDetailScreen() {
                 const worstAxis = sideData?.worst_axis
 
                 // Quality tier color
-                const tierColor = tier === 'Perfect' || tier === 'Excellent' ? Colors.green[600]
+                // "Centered" is the tier for a face with no border to measure (R0).
+                const tierColor = tier === 'Centered' || tier === 'Perfect' || tier === 'Excellent' ? Colors.green[600]
                   : tier === 'Good' ? Colors.blue[600]
                   : tier === 'Fair' ? Colors.amber[600]
                   : tier === 'Off-Center' ? Colors.red[600] : Colors.gray[600]
-                const tierIcon = tier === 'Perfect' || tier === 'Excellent' || tier === 'Good' ? '✓' : tier === 'Fair' ? '⚠' : tier === 'Off-Center' ? '✗' : '•'
-                const tierBg = tier === 'Perfect' || tier === 'Excellent' ? Colors.green[50]
+                const tierIcon = tier === 'Centered' || tier === 'Perfect' || tier === 'Excellent' || tier === 'Good' ? '✓' : tier === 'Fair' ? '⚠' : tier === 'Off-Center' ? '✗' : '•'
+                const tierBg = tier === 'Centered' || tier === 'Perfect' || tier === 'Excellent' ? Colors.green[50]
                   : tier === 'Good' ? Colors.blue[50]
                   : tier === 'Fair' ? Colors.amber[50]
                   : tier === 'Off-Center' ? Colors.red[50] : Colors.gray[50]

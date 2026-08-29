@@ -6,9 +6,10 @@
  * was submitted twice, the model said 48/52 then 50/50, and CV independently
  * measured 26/74 then 25/75. Both submissions scored centering 10.
  *
- * Every rule here can only ever LOWER a score. None can raise one. That is
- * deliberate: the goal is accuracy, and the failure being corrected is
- * exclusively over-generosity.
+ * R1–R6 can only ever LOWER a score, because the failure they correct is
+ * exclusively over-generosity. R0 (added 2026-08-29) is the deliberate
+ * exception and the only rule that raises one — see its block for the
+ * reasoning and for why it has to short-circuit the rest.
  *
  * ── Why this is a separate module ──────────────────────────────────────────
  * The rules previously lived inside the reconciliation block in
@@ -16,6 +17,7 @@
  * These are pure functions over plain data: thresholds become unit tests.
  *
  * ── The rules, and what each one is for ────────────────────────────────────
+ * R0  a face with no centre to measure IS centred  (the one rule that RAISES)
  * R1  ratio worse than 55/45 cannot be a 10   (kills the ±2% upward drift)
  * R2  no measured ratio at all cannot be a 10 (Dave Duerson: 10/10, no ratio)
  * R3  the three passes must agree             (if they disagree, nothing knows)
@@ -38,6 +40,33 @@ export type FaceLayout =
 
 /** Layouts where a border-derived ratio means anything. */
 const MEASURABLE_LAYOUTS: ReadonlySet<FaceLayout> = new Set<FaceLayout>(['standard_bordered']);
+
+/**
+ * R0: layouts where the DESIGN ITSELF provides no centre to measure, so a
+ * missing ratio is a property of the card rather than a failure to look.
+ *
+ * Deliberately narrow. 'indeterminate' is excluded because an unclassified
+ * face is an unknown, not a borderless one, and an unknown must not inherit
+ * the benefit of the doubt. 'obstructed' is excluded because a holder or a
+ * glare hiding the border is a photo problem, not a design property — the
+ * border is there, we just cannot see it. 'standard_bordered' is excluded
+ * because a face that claims an even border and then reports no ratio is
+ * contradicting itself; that is R2's case (Dave Duerson), not R0's.
+ */
+const UNMEASURABLE_BY_DESIGN_LAYOUTS: ReadonlySet<FaceLayout> =
+  new Set<FaceLayout>(['asymmetric', 'full_bleed']);
+
+/**
+ * R0 will not raise a face the model scored below this.
+ *
+ * Across the 60 unmeasured faces in production since v9.21 the scores are
+ * 9 (54), 10 (4) and null (2) — nothing lower — so today this guard costs
+ * nothing. It exists for the case that has not happened yet: a full-bleed face
+ * scored 6 means the model saw a specific problem it could describe without a
+ * ratio, and silently overriding that to a Gem 10 is a much larger claim than
+ * "there was no border here to measure".
+ */
+export const R0_MIN_PROPOSED = 9;
 
 /**
  * Map the rubric's existing `centering.<face>.card_type` vocabulary onto the
@@ -142,10 +171,12 @@ export interface CenteringPolicyInput {
 }
 
 export interface CenteringPolicyResult {
-  /** Score after policy. Never higher than proposedScore. */
+  /** Score after policy. Higher than proposedScore only when R0 fired. */
   score: number;
   /** True when a rule lowered the score. */
   capped: boolean;
+  /** True when R0 raised the score because the face has no centre to measure. */
+  raised: boolean;
   /** True when a human should look at this card. */
   reviewFlag: boolean;
   /** Rule ids that fired, e.g. ['R2','R6']. */
@@ -187,10 +218,47 @@ export function applyCenteringPolicy(input: CenteringPolicyInput): CenteringPoli
   let score = input.proposedScore;
   let reviewFlag = false;
 
+  const dev = ratioDeviation(input.ratio);
+
+  // ── R0: a face with no centre to measure is centred ───────────────────────
+  //
+  // The only rule here that RAISES a score, and it runs first because it is
+  // the exact inverse of R4 — the two must never both act on one face.
+  //
+  // A full-bleed or intentionally asymmetric design has no even border, so
+  // there is no ratio to state and no ratio to fall short of. Deducting for
+  // that penalises the card for its own artwork. The customer-visible version
+  // of this was the Venom (Fleer Ultra Pop Culture) card: full-bleed on both
+  // faces, honestly reported as unmeasurable, and scored 9/9 for it.
+  //
+  // KNOWN COST, accepted deliberately (product decision, 2026-08-29): replayed
+  // over the 52 cards graded since v9.21 that carry an unmeasured face, 13 move
+  // 9 → 10, and 10 of those 13 move because of the BACK. It also runs against
+  // R2/R4, which shipped the day before in response to a customer reporting
+  // unearned centering 10s; his Alex Karras back is an asymmetric near-full-
+  // bleed face and will now score 10 by rule rather than by measurement. That
+  // is the trade being made: no card is penalised for a design it cannot help,
+  // at the price of not catching a genuine miscut on a face nothing can read.
+  //
+  // Narrow on purpose — see UNMEASURABLE_BY_DESIGN_LAYOUTS and R0_MIN_PROPOSED
+  // for the three ways a face fails to qualify.
+  const unmeasurableByDesign =
+    input.layout !== null && UNMEASURABLE_BY_DESIGN_LAYOUTS.has(input.layout);
+  if (unmeasurableByDesign && dev === null && input.proposedScore >= R0_MIN_PROPOSED) {
+    return {
+      score: 10,
+      capped: false,
+      raised: 10 > input.proposedScore,
+      reviewFlag: false,
+      firedRules: ['R0'],
+      reasons: [`${input.layout} face has no centre to measure — scored as centred`],
+    };
+  }
+
   // Only a 10 is in question. Everything below is already conservative, and
   // capping a 7 to a 9 would be a no-op anyway.
   if (score < 10) {
-    return { score, capped: false, reviewFlag: false, firedRules, reasons };
+    return { score, capped: false, raised: false, reviewFlag: false, firedRules, reasons };
   }
 
   const cap = (rule: string, why: string, review = false) => {
@@ -199,8 +267,6 @@ export function applyCenteringPolicy(input: CenteringPolicyInput): CenteringPoli
     score = Math.min(score, 9);
     if (review) reviewFlag = true;
   };
-
-  const dev = ratioDeviation(input.ratio);
 
   // ── R1: the stated ratio must actually clear 55/45 ────────────────────────
   // The rubric contained two conflicting boundary rules; the one that won gave
@@ -274,7 +340,7 @@ export function applyCenteringPolicy(input: CenteringPolicyInput): CenteringPoli
     }
   }
 
-  return { score, capped: score < input.proposedScore, reviewFlag, firedRules, reasons };
+  return { score, capped: score < input.proposedScore, raised: false, reviewFlag, firedRules, reasons };
 }
 
 /**
@@ -284,6 +350,7 @@ export function applyCenteringPolicy(input: CenteringPolicyInput): CenteringPoli
  */
 export function centeringCapNote(result: CenteringPolicyResult): string | null {
   if (!result.capped) return null;
+  if (result.firedRules.includes('R0')) return null; // R0 raises; see centeringUnmeasurableNote
   if (result.firedRules.includes('R6')) {
     return 'An independent measurement of the borders disagreed with the visual assessment, so centering is held below Gem Mint pending review.';
   }
@@ -301,3 +368,20 @@ export function centeringCapNote(result: CenteringPolicyResult): string | null {
   }
   return 'Centering is held below Gem Mint because it could not be confirmed from these photos.';
 }
+
+/**
+ * Customer-facing sentence for a face R0 scored as centred. Returns null
+ * unless R0 fired.
+ *
+ * Says WHY the score is a 10 rather than leaving the customer to infer that
+ * the borders were measured and found perfect. They were not measured, because
+ * on this design there is nothing to measure — and a report that quietly
+ * claims otherwise is the same class of problem as the grade it replaced.
+ */
+export function centeringUnmeasurableNote(result: CenteringPolicyResult): string | null {
+  if (!result.firedRules.includes('R0')) return null;
+  return 'This card’s artwork runs to the edge with no even printed border, so there is no border ratio to measure. Centering is not counted against the grade on a design like this.';
+}
+
+/** The tier label to show for a face R0 scored, in place of a measured tier. */
+export const R0_QUALITY_TIER = 'Centered';

@@ -3128,9 +3128,12 @@ PURPOSE: Assess centering for both front and back independently.
 
 🚨 **CLASSIFY EACH FACE BEFORE MEASURING IT (v9.21) — card_type is NOT a formality.**
 
-`card_type` decides whether a border ratio is meaningful at all. It is enforced server-side:
-a face that is not "Standard Bordered" CANNOT receive centering 10 from border measurement,
-because there is no even printed border to measure against.
+`card_type` decides whether a border ratio is meaningful at all, and it is enforced
+server-side in BOTH directions:
+  • a face that IS "Standard Bordered" cannot claim a 10 without a measurement behind it
+  • a face that is NOT — artwork running to the cut, or deliberately uneven margins — is
+    scored as CENTERED, because there is no border to measure and therefore nothing for
+    the card to fall short of (v9.22)
 
 • **Classify the FRONT and the BACK independently.** A bordered front implies NOTHING about the
   back. Many vintage and insert cards pair a bordered front with a full-bleed or asymmetric back.
@@ -3147,6 +3150,17 @@ output was "Asymmetric Insert" with no left_right/top_bottom ratio.
 
 ⚠️ If the design gives you nothing even to measure, say so and return "XX/XX". A blank
 measurement is a correct answer; an invented one becomes a printed grade on a slab.
+
+✅ **DO NOT DEDUCT FOR A DESIGN THAT HAS NO BORDER (v9.22).** Having classified a face
+"Borderless", "Asymmetric Insert" or "Die-Cut" and returned "XX/XX", score that face on what
+you CAN see — the cut and the absence of defects — and do NOT hold back a point because
+centering "could not be confirmed". There is no centre to confirm. A full-art card is not a
+worse card for being full-art, and the server scores such a face as centred regardless, so a
+deduction here only makes your narrative disagree with the grade that gets printed.
+
+Write the analysis to match: describe the design, and say centering does not apply to it. Do
+NOT write "cannot be confirmed at Gem Mint level", "centering could not be verified", or any
+phrasing implying a measurement was attempted and fell short.
 
 **CENTERING SCORING GUIDE (v9.19 — measured, not judged; boundary resolves downward)**
 

@@ -13,6 +13,7 @@ import {
   applyCenteringPolicy,
   ratioDeviation,
   centeringCapNote,
+  centeringUnmeasurableNote,
   MAX_PASS_SPREAD,
   type CenteringPolicyInput,
 } from './centeringPolicy';
@@ -189,15 +190,17 @@ describe('R6 — CV may only ever cap', () => {
 });
 
 describe('general guarantees', () => {
-  it('never returns more than proposed', () => {
+  it('R1-R6 never return more than proposed', () => {
     for (const s of [1, 5, 8, 9, 10]) {
       expect(applyCenteringPolicy(base({ proposedScore: s, ratio: '90/10' })).score).toBeLessThanOrEqual(s);
     }
   });
 
   it('reports every rule that fired, not just the first', () => {
+    // 'indeterminate', not 'full_bleed' — a full-bleed face with no ratio is
+    // R0's case now and short-circuits before any of the capping rules run.
     const r = applyCenteringPolicy(base({
-      ratio: null, layout: 'full_bleed', passDevs: [1, 9], year: 1970,
+      ratio: null, layout: 'indeterminate', passDevs: [1, 9], year: 1970,
       imageConfidence: 'C', passScores: [10, 9, 10],
     }));
     expect(r.firedRules).toEqual(expect.arrayContaining(['R2', 'R3', 'R4', 'R5']));
@@ -207,5 +210,84 @@ describe('general guarantees', () => {
     expect(centeringCapNote(applyCenteringPolicy(base()))).toBeNull();
     const capped = applyCenteringPolicy(base({ cv: { dev: 25, bothAxes: true } }));
     expect(centeringCapNote(capped)).toMatch(/independent measurement/i);
+  });
+});
+
+describe('R0 — a face with no centre to measure is centred', () => {
+  // The Venom (Fleer Ultra Pop Culture) card: full-bleed both faces, honestly
+  // reported as unmeasurable, and scored 9/9 for it.
+  const venomFace = () => base({ layout: 'full_bleed', ratio: null, proposedScore: 9, passDevs: [], passScores: [9, 9, 9] });
+
+  it('raises a full-bleed face with no ratio to 10', () => {
+    const r = applyCenteringPolicy(venomFace());
+    expect(r.score).toBe(10);
+    expect(r.raised).toBe(true);
+    expect(r.capped).toBe(false);
+    expect(r.firedRules).toEqual(['R0']);
+  });
+
+  it('treats an asymmetric insert the same way', () => {
+    const r = applyCenteringPolicy(venomFace());
+    const a = applyCenteringPolicy(base({ layout: 'asymmetric', ratio: null, proposedScore: 9, passDevs: [], passScores: [9, 9, 9] }));
+    expect(a.score).toBe(r.score);
+    expect(a.firedRules).toEqual(['R0']);
+  });
+
+  it('short-circuits the capping rules, which would otherwise fight it', () => {
+    // R4 is R0's exact inverse; R2, R3 and R5 would all cap this face too.
+    const r = applyCenteringPolicy(base({
+      layout: 'full_bleed', ratio: null, proposedScore: 10,
+      passDevs: [1, 9], year: 1970, imageConfidence: 'D', passScores: [10, 9, 10],
+    }));
+    expect(r.score).toBe(10);
+    expect(r.firedRules).toEqual(['R0']);
+    expect(r.firedRules).not.toContain('R4');
+  });
+
+  it('applies to the back as readily as the front', () => {
+    // 10 of the 13 cards this moves are moved by the back.
+    const r = applyCenteringPolicy(base({ face: 'back', layout: 'full_bleed', ratio: null, proposedScore: 9 }));
+    expect(r.score).toBe(10);
+  });
+
+  it('leaves a bordered face that simply failed to measure to R2', () => {
+    // A face claiming an even border and then reporting no ratio is
+    // contradicting itself. That is Dave Duerson, and it must still cap.
+    const r = applyCenteringPolicy(base({ layout: 'standard_bordered', ratio: null, proposedScore: 10 }));
+    expect(r.score).toBe(9);
+    expect(r.firedRules).toContain('R2');
+    expect(r.firedRules).not.toContain('R0');
+  });
+
+  it('does not fire on an unknown or obstructed layout', () => {
+    for (const layout of ['indeterminate', 'obstructed', null] as const) {
+      const r = applyCenteringPolicy(base({ layout, ratio: null, proposedScore: 9 }));
+      expect(r.firedRules).not.toContain('R0');
+      expect(r.score).toBe(9);
+    }
+  });
+
+  it('does not fire when the face actually has a ratio', () => {
+    // A full-bleed face that somehow produced a measurement is not R0's case.
+    const r = applyCenteringPolicy(base({ layout: 'full_bleed', ratio: '70/30', proposedScore: 10 }));
+    expect(r.firedRules).not.toContain('R0');
+    expect(r.score).toBe(9);
+  });
+
+  it('will not rescue a face the model scored below the guard', () => {
+    for (const s of [1, 5, 8]) {
+      const r = applyCenteringPolicy(base({ layout: 'full_bleed', ratio: null, proposedScore: s }));
+      expect(r.firedRules).not.toContain('R0');
+      expect(r.score).toBe(s);
+    }
+  });
+
+  it('explains the 10 rather than implying the borders were measured', () => {
+    const r = applyCenteringPolicy(venomFace());
+    expect(centeringCapNote(r)).toBeNull();
+    const note = centeringUnmeasurableNote(r)!;
+    expect(note).toMatch(/no even printed border/i);
+    expect(note).not.toMatch(/measured|perfect/i);
+    expect(centeringUnmeasurableNote(applyCenteringPolicy(base()))).toBeNull();
   });
 });
