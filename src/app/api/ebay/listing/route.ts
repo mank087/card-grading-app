@@ -594,9 +594,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create listing via Trading API
-    const result = listingFormat === 'AUCTION'
-      ? await addAuctionItem(tradingConfig, listingDetails, shippingDetails, returnDetails)
-      : await addFixedPriceItem(tradingConfig, listingDetails, shippingDetails, returnDetails);
+    const createListing = (ship: ShippingDetails) => listingFormat === 'AUCTION'
+      ? addAuctionItem(tradingConfig, listingDetails, ship, returnDetails)
+      : addFixedPriceItem(tradingConfig, listingDetails, ship, returnDetails);
+
+    let result = await createListing(shippingDetails);
+
+    // Safety net: if eBay rejects the shipping block while we're sending
+    // USPSGroundAdvantage (e.g. an API schema-version mismatch — the exact
+    // failure customers hit on Aug 31 2026), retry ONCE with USPSPriority
+    // rather than failing the listing over the shipping service choice.
+    const shippingRejected = !result.success && (result.errors || []).some(e =>
+      /shippingdetails|shipping\s*service/i.test(e.message || ''));
+    if (shippingRejected && shippingDetails.domesticShippingService === 'USPSGroundAdvantage') {
+      console.warn('[eBay Listing] eBay rejected ShippingDetails with USPSGroundAdvantage — retrying once with USPSPriority', result.errors);
+      result = await createListing({ ...shippingDetails, domesticShippingService: 'USPSPriority' });
+    }
 
     if (!result.success) {
       // Release the claim — nothing was created on eBay.

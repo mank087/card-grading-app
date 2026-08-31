@@ -511,7 +511,11 @@ export async function callTradingApi(
     method: 'POST',
     headers: {
       'Content-Type': 'text/xml',
-      'X-EBAY-API-COMPATIBILITY-LEVEL': '1193',
+      // 1193 predates USPSGroundAdvantage in ShippingServiceCodeType — eBay
+      // validates the XML against the declared schema version, so the older
+      // level rejected the token with "Input data for tag <Item.ShippingDetails>
+      // is invalid or missing" (customer-hit, Aug 31 2026). Keep this current.
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '1451',
       'X-EBAY-API-CALL-NAME': callName,
       'X-EBAY-API-SITEID': siteId,
       'X-EBAY-API-IAF-TOKEN': config.accessToken,
