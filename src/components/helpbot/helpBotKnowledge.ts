@@ -319,7 +319,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'why-dcm',
     question: 'Why should I use DCM instead of traditional grading?',
     answer:
-      'Speed (60 seconds vs. weeks), cost (as low as $0.50 per card vs. $20\u2013$150+), convenience (grade from home), transparency (see exactly what was found), and unlimited re-grades. DCM is ideal for pre-screening, personal collections, and quick assessments.',
+      'Speed (60 seconds vs. weeks), cost ($2.99 for a single card, $0.66 a card with the VIP pack, as low as $0.50 a card with Card Lovers Annual, vs. $20\u2013$150+), convenience (grade from home), transparency (see exactly what was found), and unlimited re-grades. DCM is ideal for pre-screening, personal collections, and quick assessments.',
     keywords: ['why', 'advantage', 'benefit', 'better', 'instead', 'reason', 'worth it'],
     category: 'dcm-vs-mailaway',
     links: [{ label: 'Start grading', href: '/upload' }],

@@ -56,7 +56,7 @@ const BENEFIT_SLIDES = [
   {
     icon: '🔥',
     title: 'Get Bonus Credits',
-    description: 'Get up to 5 bonus credits on your first purchase — grades start at just $0.50/card.',
+    description: 'Get up to 5 bonus credits on your first purchase — grades are as low as $0.50 a card with Card Lovers Annual.',
     isCta: true,
   },
 ]

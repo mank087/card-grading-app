@@ -45,7 +45,7 @@ const DEFAULT_MESSAGES = [
   '2 free grades + bonus credits',
   'Grade cards in minutes, not weeks',
   'Labels, pricing & eBay listing',
-  'From $0.50/card — credits never expire',
+  'As low as $0.50 a card with Card Lovers Annual — credits never expire',
 ]
 
 export interface FloatingCtaBarProps {

@@ -340,7 +340,7 @@ export default function WhyDcmPage() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  From $0.50/Card
+                  From $0.50/Card with Card Lovers Annual
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -803,7 +803,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">No More Mailing & Waiting</h3>
-                  <p className="text-gray-400 text-xs mt-1">Mail-away grading companies take weeks and cost $20-$150+ per card. DCM delivers results in minutes from $0.50 per card.</p>
+                  <p className="text-gray-400 text-xs mt-1">Mail-away grading companies take weeks and cost $20-$150+ per card. DCM delivers results in minutes for $2.99 a single card, $0.66 a card with the VIP pack, and as low as $0.50 a card with Card Lovers Annual.</p>
                 </div>
               </div>
             </div>

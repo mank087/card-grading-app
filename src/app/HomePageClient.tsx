@@ -299,7 +299,9 @@ export default function Home() {
             <p className="text-lg text-gray-300 mb-6 max-w-xl">
               Every new account starts with 2 free credits, enough to grade two cards with full
               reports and labels included. When you buy your first pack, we top it up:
-              +1 bonus credit on Basic, +2 on Pro, +5 on Elite. Credits never expire, and you can{' '}
+              +1 bonus credit on Basic, +2 on Pro, +5 on Elite. After that it is $2.99 for a single card,
+              $0.66 a card with the 150-credit VIP pack, and as low as $0.50 a card with Card Lovers Annual.
+              Credits never expire, and you can{' '}
               <Link href="/cheapest-card-grading" className="text-purple-300 hover:text-purple-200 underline">
                 see how the cost compares
               </Link>{' '}

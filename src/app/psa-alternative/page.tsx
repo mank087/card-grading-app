@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = {
   title: 'PSA Alternative: Grade Any Card From a Photo in About 60 Seconds',
   description:
-    'Looking for a PSA alternative? DCM grades any trading card from two photos in about 60 seconds for $2.99, with four subgrades and a written reason for every deduction. No mailing, no insurance, no queue. Updated August 2026 with sourced PSA pricing.',
+    'Looking for a PSA alternative? DCM grades any trading card from two photos in about 60 seconds, as low as $0.50 a card with Card Lovers Annual or $2.99 for a single card, with four subgrades and a written reason for every deduction. No mailing, no insurance, no queue. Updated August 2026 with sourced PSA pricing.',
   keywords:
     'PSA alternative, alternative to PSA grading, PSA vs DCM, cheap card grading, fast card grading, AI card grading, online card grading, no-mail card grading, photo card grading',
   alternates: {
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'PSA Alternative. Grade Any Card From a Photo | DCM Grading',
     description:
-      'No mailing. $2.99 a card, down to $0.50 with Card Lovers Annual. Four subgrades on every grade. Every card type accepted.',
+      'No mailing. As low as $0.50 a card with Card Lovers Annual, or $2.99 for a single card. Four subgrades on every grade. Every card type accepted.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/psa-alternative',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'PSA Alternative. Grade Any Card From a Photo',
-    description: 'No mailing. $2.99 a card. Four subgrades on every grade.',
+    description: 'No mailing. As low as $0.50 a card with Card Lovers Annual. Four subgrades on every grade.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
 };
@@ -71,7 +71,7 @@ const serviceJsonLd = {
   },
   areaServed: 'Worldwide',
   description:
-    'Photo-based AI card grading. A PSA alternative with no mailing requirement, no card-value minimums, four subgrades on every card, and pricing from $2.99 per grade.',
+    'Photo-based AI card grading. A PSA alternative with no mailing requirement, no card-value minimums, four subgrades on every card, and pricing as low as $0.50 a card with Card Lovers Annual.',
   offers: {
     '@type': 'Offer',
     price: '2.99',
@@ -108,7 +108,7 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the best PSA alternative for grading cards in 2026?',
-    a: 'For a grade you can have today on a card that never leaves your hands, DCM is the closest alternative to PSA. It grades against a published rubric covering centering, corners, edges and surface, returns a whole-number grade from 1 to 10 with four subgrades and a written reason for every deduction, and costs $2.99 for a single card. Mail-in grading from PSA, Beckett, SGC or CGC remains the right call when the card is valuable enough that a sealed, serialized slab changes what a buyer will pay.',
+    a: 'For a grade you can have today on a card that never leaves your hands, DCM is the closest alternative to PSA. It grades against a published rubric covering centering, corners, edges and surface, returns a whole-number grade from 1 to 10 with four subgrades and a written reason for every deduction, and costs $2.99 for a single card, as low as $0.66 a card with the 150-credit VIP package. Mail-in grading from PSA, Beckett, SGC or CGC remains the right call when the card is valuable enough that a sealed, serialized slab changes what a buyer will pay.',
   },
   {
     q: 'Do I have to mail my cards in for DCM?',
@@ -197,7 +197,8 @@ export default function PsaAlternativePage() {
           </h1>
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
             The PSA alternative for most of a collection is grading at home: DCM grades any trading card from two
-            photos in <strong>about 60 seconds</strong> for <strong>$2.99</strong>, with four subgrades and a written
+            photos in <strong>about 60 seconds</strong> for <strong>$2.99</strong>, or{' '}
+            <strong>as low as $0.50 a card with Card Lovers Annual</strong>, with four subgrades and a written
             reason for every deduction, and the card never leaves your hands. No packing, no insurance, no queue. The
             honest limit is that DCM returns a digital grade and a printable label, not a sealed PSA slab, so the cards
             that genuinely need one still go out.
@@ -373,8 +374,8 @@ export default function PsaAlternativePage() {
                 body: 'Your cards stay in your possession. Two photos, upload, grade. There is no window where the card is a tracking number, and no insured shipping cost on either leg.',
               },
               {
-                title: '$2.99 a card, less in volume',
-                body: 'A single grade is $2.99. Five are $9.99, twenty are $19.99, a hundred and fifty are $99, and Card Lovers Annual is $449 for 900 grades. Two free grades to start.',
+                title: 'As low as $0.50 a card with Card Lovers Annual',
+                body: 'A single grade is $2.99. Five are $9.99 ($2.00 a card), twenty are $19.99 ($1.00 a card), and the 150-credit VIP pack is $99, which is $0.66 a card. Card Lovers Annual is $449 for 900 grades. Two free grades to start.',
               },
               {
                 title: 'No card-value minimum',
@@ -479,7 +480,7 @@ export default function PsaAlternativePage() {
         {/* Pricing */}
         <section className="mb-16">
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl">
-            <h2 className="text-3xl font-bold mb-4">Pricing That Won&apos;t Make You Think Twice</h2>
+            <h2 className="text-3xl font-bold mb-4">Pricing. As Low as $0.50 a Card with Card Lovers Annual</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-3xl font-bold">$2.99</p>

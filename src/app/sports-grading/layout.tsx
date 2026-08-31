@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Sports Card Grading — Instant DCM Optic™ Grades, Verified Against 2,900+ Sets',
   description:
-    'Grade sports cards instantly with DCM Optic™. Every card is matched against a catalog of 2,951 sets spanning 1901 to 2026, so parallels, serial numbering and rookie status are verified — not guessed. Baseball, basketball, football, hockey and more. From $0.50 a card.',
+    'Grade sports cards instantly with DCM Optic™. Every card is matched against a catalog of 2,951 sets spanning 1901 to 2026, so parallels, serial numbering and rookie status are verified — not guessed. Baseball, basketball, football, hockey and more. As low as $0.50 a card with Card Lovers Annual.',
   keywords:
     'sports card grading, grade sports cards, baseball card grading, basketball card grading, football card grading, hockey card grading, rookie card grading, PSA alternative, prizm parallel grading, topps chrome grading, bowman 1st grading, vintage baseball card grading, patch auto grading, instant sports grading',
   alternates: {
@@ -53,7 +53,7 @@ const serviceJsonLd = {
     '@type': 'Offer',
     price: '0.50',
     priceCurrency: 'USD',
-    description: 'Per-card grading, price varies by credit package',
+    description: 'Per-card grading. $2.99 for a single card, $0.66 a card with the 150-credit VIP pack, and as low as $0.50 a card with Card Lovers Annual.',
   },
 };
 

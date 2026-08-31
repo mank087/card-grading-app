@@ -1056,7 +1056,7 @@ export default function SportsGradingLanding() {
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
               <div className="text-3xl font-bold text-emerald-400 mb-2">$0.66</div>
-              <div className="text-gray-300">Per card (best value)</div>
+              <div className="text-gray-300">Per card on the VIP pack</div>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
               <div className="text-3xl font-bold text-emerald-400 mb-2">30+</div>
@@ -1544,7 +1544,7 @@ export default function SportsGradingLanding() {
           '2 free grades + bonus credits',
           'Know which rookies are worth submitting',
           'Parallels verified against 2,951 sets',
-          'From $0.50/card — credits never expire',
+          'As low as $0.50 a card with Card Lovers Annual — credits never expire',
         ]}
       />
     </main>

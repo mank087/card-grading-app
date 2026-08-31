@@ -56,7 +56,7 @@ const serviceJsonLd = {
     price: '0.50',
     priceCurrency: 'USD',
     description:
-      'Pricing from $0.50 per card with Card Lovers Annual membership. Pay-as-you-go starts at $2.99 for your first card.',
+      'As low as $0.50 a card with Card Lovers Annual. Pay-as-you-go is $2.99 for a single card, or $0.66 a card on the 150-credit VIP pack.',
     url: 'https://dcmgrading.com/credits',
   },
   hasOfferCatalog: {
@@ -110,7 +110,7 @@ const faqJsonLd = {
       name: 'How much does AI card grading cost?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Pay-as-you-go credit packs start at $2.99 for a single grade. Volume packs drop the per-grade cost. With the Card Lovers Annual membership it works out to about $0.50 per card. Compare that to traditional mail-in grading where the cheapest tiers are typically $20 or more per card before shipping.',
+        text: 'It is $2.99 for a single card, $0.66 a card with the 150-credit VIP pack, and as low as $0.50 a card with Card Lovers Annual ($449 for 900 grades). The packs in between are $2.00 a card (5 for $9.99) and $1.00 a card (20 for $19.99). Compare that to traditional mail-in grading where the cheapest tiers are typically $20 or more per card before shipping.',
       },
     },
     {
@@ -365,19 +365,19 @@ export default function AiCardGradingPage() {
         {/* Pricing */}
         <section className="mb-16">
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl">
-            <h2 className="text-3xl font-bold mb-4">Pricing. From $0.50 per Card</h2>
+            <h2 className="text-3xl font-bold mb-4">Pricing. As Low as $0.50 a Card with Card Lovers Annual</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-3xl font-bold">$2.99</p>
-                <p className="text-sm opacity-90 mt-1">First card, try it</p>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-3xl font-bold">$0.99</p>
-                <p className="text-sm opacity-90 mt-1">Per card on volume packs</p>
-              </div>
               <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-3xl font-bold">$0.50</p>
                 <p className="text-sm opacity-90 mt-1">Per card with Card Lovers Annual</p>
+              </div>
+              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-3xl font-bold">$0.66</p>
+                <p className="text-sm opacity-90 mt-1">Per card on the 150-credit VIP pack</p>
+              </div>
+              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-3xl font-bold">$2.99</p>
+                <p className="text-sm opacity-90 mt-1">A single card, no pack needed</p>
               </div>
             </div>
             <p className="text-lg opacity-95 mb-4">

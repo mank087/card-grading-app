@@ -56,20 +56,20 @@ const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 export const metadata: Metadata = {
   title: 'Buy Credits - Pricing & Packages',
   description:
-    'DCM Grading pricing: one grading credit is $2.99. Packs are 5 for $9.99 ($2.00 a grade), 20 for $19.99 ($1.00 a grade) and 150 for $99 ($0.66 a grade). Card Lovers is $49.99 a month for 70 grades or $449 a year for 900. Two free credits when you sign up.',
+    'DCM Grading pricing: as low as $0.66 a card with the VIP package (150 credits for $99), or $2.99 for a single grading credit. Packs in between are 5 for $9.99 ($2.00 a grade) and 20 for $19.99 ($1.00 a grade). Card Lovers is $49.99 a month for 70 grades or $449 a year for 900. Two free credits when you sign up.',
   keywords:
     'card grading pricing, buy grading credits, DCM credits, trading card grading cost, grading packages, cheap card grading, how much does DCM grading cost',
   openGraph: {
     title: 'Buy Credits - DCM Grading Pricing & Packages',
     description:
-      'One grading credit is $2.99. Packs go to $0.66 a grade on the 150-credit VIP pack. Card Lovers Annual is $449 for 900 grades.',
+      'As low as $0.66 a card with the VIP package (150 credits for $99), or $2.99 for a single grading credit. Card Lovers Annual is $449 for 900 grades.',
     type: 'website',
     siteName: 'DCM Grading',
   },
   twitter: {
     card: 'summary',
     title: 'Buy Credits - DCM Grading Pricing',
-    description: 'One credit is $2.99. Down to $0.66 a grade on the 150-credit pack. Two free credits to start.',
+    description: 'As low as $0.66 a card with the VIP package. $2.99 for a single credit. Two free credits to start.',
   },
   alternates: {
     canonical: 'https://dcmgrading.com/credits',

@@ -88,7 +88,7 @@ const faqs = [
   },
   {
     q: 'What is the cheapest card grading service?',
-    a: 'Among mail-in graders, SGC published the lowest base price in August 2026 at $15 per card on its Standard tier, with CGC at about $15 on a Bulk tier that requires a 25-card minimum. PSA and Beckett were both at roughly $80 on their cheapest open tiers after pausing their budget services. DCM grades a single card for $2.99, or $0.66 per card on the 150-credit pack, with no shipping or insurance to add.',
+    a: 'Among mail-in graders, SGC published the lowest base price in August 2026 at $15 per card on its Standard tier, with CGC at about $15 on a Bulk tier that requires a 25-card minimum. PSA and Beckett were both at roughly $80 on their cheapest open tiers after pausing their budget services. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, with no shipping or insurance to add.',
   },
   {
     q: 'Which card grading company is fastest?',
@@ -145,8 +145,8 @@ export default function CardGradingCompaniesPage() {
             <strong>SGC</strong>, <strong>CGC</strong>, <strong>TAG</strong> and <strong>DCM Grading</strong>. The
             first five are mail-in services: you ship the card, it is graded, and it comes back sealed in a slab. In
             August 2026 their published base prices ran from $15 to about $80 per card, with published turnarounds
-            from 15 to 100-plus business days. DCM is photo-based, grades in about 60 seconds for $2.99, and the card
-            never leaves your hands.
+            from 15 to 100-plus business days. DCM is photo-based, grades in about 60 seconds for $2.99 a single card
+            or as low as $0.66 a card with the VIP package, and the card never leaves your hands.
           </p>
           <p className="text-sm text-gray-500 mb-6">
             {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}. Business days throughout, shipping excluded. Sources

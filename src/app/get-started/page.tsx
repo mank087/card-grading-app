@@ -92,7 +92,7 @@ export default function GetStartedPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Affordable</h3>
-                <p className="text-gray-600"><Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">Starting at just $1 per card</Link>. Know your card's grade before deciding to submit elsewhere.</p>
+                <p className="text-gray-600"><Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">As low as $0.50 a card with Card Lovers Annual</Link>, or $2.99 for a single card. Know your card's grade before deciding to submit elsewhere.</p>
               </div>
             </div>
           </div>
@@ -532,11 +532,11 @@ export default function GetStartedPage() {
             Simple, Transparent Pricing
           </h2>
           <p className="text-lg text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            No subscriptions, no hidden fees. Pay only for what you use — here is{' '}
+            As low as $0.66 a card with the VIP package, or $2.99 for a single card. No subscriptions, no hidden fees — here is{' '}
             <Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">how the cost compares to mail-away grading</Link>.
           </p>
 
-          <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
+          <div className="max-w-5xl mx-auto grid md:grid-cols-4 gap-6">
             <div className="bg-gray-50 rounded-2xl p-6 border-2 border-gray-200">
               <div className="text-center">
                 <div className="text-sm font-semibold text-gray-500 uppercase mb-2">Basic</div>
@@ -548,13 +548,13 @@ export default function GetStartedPage() {
 
             <div className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-6 text-white relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full">
-                BEST VALUE
+                MOST POPULAR
               </div>
               <div className="text-center">
                 <div className="text-sm font-semibold text-purple-200 uppercase mb-2">Pro</div>
                 <div className="text-4xl font-bold mb-1">$9.99</div>
                 <div className="text-purple-200 text-sm mb-4">5 + 3 bonus credits</div>
-                <div className="text-purple-100 text-sm">$1.25 per card</div>
+                <div className="text-purple-100 text-sm">$2.00 per card</div>
               </div>
             </div>
 
@@ -563,7 +563,19 @@ export default function GetStartedPage() {
                 <div className="text-sm font-semibold text-gray-500 uppercase mb-2">Elite</div>
                 <div className="text-4xl font-bold text-gray-900 mb-1">$19.99</div>
                 <div className="text-gray-500 text-sm mb-4">20 + 5 bonus credits</div>
-                <div className="text-gray-600 text-sm">$0.80 per card</div>
+                <div className="text-gray-600 text-sm">$1.00 per card</div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 border-2 border-indigo-300 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                LOWEST PER CARD
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold text-gray-500 uppercase mb-2">VIP</div>
+                <div className="text-4xl font-bold text-gray-900 mb-1">$99</div>
+                <div className="text-gray-500 text-sm mb-4">150 credits</div>
+                <div className="text-indigo-700 text-sm font-semibold">$0.66 per card</div>
               </div>
             </div>
           </div>

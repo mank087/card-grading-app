@@ -909,7 +909,7 @@ export default function CardGradingLanding() {
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
               <div className="text-3xl font-bold text-purple-400 mb-2">$0.66</div>
-              <div className="text-gray-300">Per card (best value)</div>
+              <div className="text-gray-300">Per card on the VIP pack</div>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
               <div className="text-3xl font-bold text-purple-400 mb-2">30+</div>

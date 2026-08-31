@@ -43,19 +43,24 @@ Yu-Gi-Oh!, Star Wars, and other trading card games.
 
 Credit packs (one credit grades one card):
 
-| Pack  | Price   | Credits |
-|-------|---------|---------|
-| Basic | $2.99   | 1       |
-| Pro   | $9.99   | 5       |
-| Elite | $19.99  | 20      |
-| VIP   | $99     | 150     |
+| Pack  | Price   | Credits | Per card |
+|-------|---------|---------|----------|
+| Basic | $2.99   | 1       | $2.99    |
+| Pro   | $9.99   | 5       | $2.00    |
+| Elite | $19.99  | 20      | $1.00    |
+| VIP   | $99     | 150     | $0.66    |
 
 Card Lovers membership:
 
-| Plan    | Price        |
-|---------|--------------|
-| Monthly | $49.99/month |
-| Annual  | $449/year    |
+| Plan    | Price        | Credits   | Per card |
+|---------|--------------|-----------|----------|
+| Monthly | $49.99/month | 70/month  | $0.71    |
+| Annual  | $449/year    | 900/year  | $0.50    |
+
+Headline framing: a single card is $2.99, $0.66 a card with the 150-credit
+VIP pack, and as low as $0.50 a card with Card Lovers Annual. The $0.50
+figure is the Card Lovers Annual rate ($449 for 900 grades) and should
+never be quoted without that attribution.
 
 New accounts start with 2 free credits.
 

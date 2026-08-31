@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Pokémon Card Grading — Instant DCM Optic™ Grades, Verified Against 26,000+ Cards',
   description:
-    'Grade Pokémon cards instantly with DCM Optic™. Every card is matched against our own database of 20,933 English and 5,548 Japanese cards across 322 sets, so the set, number and rarity on your label are verified. Base Set Charizard to Prismatic Evolutions. From $0.50 a card.',
+    'Grade Pokémon cards instantly with DCM Optic™. Every card is matched against our own database of 20,933 English and 5,548 Japanese cards across 322 sets, so the set, number and rarity on your label are verified. Base Set Charizard to Prismatic Evolutions. As low as $0.50 a card with Card Lovers Annual.',
   keywords:
     'pokemon card grading, grade pokemon cards, pokemon PSA, charizard grading, pikachu card grade, vintage pokemon grading, WOTC card grading, base set charizard grade, japanese pokemon card grading, holo scratch grading, modern pokemon grading, instant pokemon grades',
   alternates: {
@@ -53,7 +53,7 @@ const serviceJsonLd = {
     '@type': 'Offer',
     price: '0.50',
     priceCurrency: 'USD',
-    description: 'Per-card grading, price varies by credit package',
+    description: 'Per-card grading. $2.99 for a single card, $0.66 a card with the 150-credit VIP pack, and as low as $0.50 a card with Card Lovers Annual.',
   },
 };
 

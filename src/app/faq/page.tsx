@@ -429,11 +429,12 @@ const faqs: FAQItem[] = [
     question: 'How much does DCM Grading cost?',
     answer: (
       <>
-        <p className="mb-3">DCM uses a credit-based system. Credits can be purchased in packages:</p>
+        <p className="mb-3">As low as $0.50 a card with Card Lovers Annual, or $2.99 for a single card. DCM uses a credit-based system, and credits can be purchased in packages:</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li>Each card grade costs 1 credit</li>
           <li>Re-grading a card (with new photos) costs 1 credit</li>
-          <li>Bulk packages offer significant savings</li>
+          <li>Basic is $2.99 for 1 credit; Pro is $9.99 for 5 ($2.00 a card); Elite is $19.99 for 20 ($1.00 a card); VIP is $99 for 150 ($0.66 a card)</li>
+          <li>Card Lovers Annual is $449 for 900 grades, as low as $0.50 a card</li>
         </ul>
         <p>Visit our <Link href="/credits" className="text-purple-600 hover:text-purple-800 underline">Credits page</Link> for current pricing and packages.</p>
       </>

@@ -15,14 +15,14 @@ import {
 export const metadata: Metadata = {
   title: 'Cheapest Card Grading (2026): Published Prices Compared',
   description:
-    'What is the cheapest card grading service? In August 2026 the mail-in majors published base prices from $15 to about $80 per card before shipping. DCM grades a card for $2.99, down to $0.66 per card on the 150-credit pack, with nothing to ship.',
+    'What is the cheapest card grading service? In August 2026 the mail-in majors published base prices from $15 to about $80 per card before shipping. DCM grades a card for $2.99, as low as $0.66 a card with the VIP package, with nothing to ship.',
   keywords:
     'cheapest card grading, card grading prices, how much does card grading cost, cheap card grading service, card grading cost comparison, affordable card grading',
   alternates: { canonical: 'https://dcmgrading.com/cheapest-card-grading' },
   openGraph: {
     title: 'Cheapest Card Grading (2026) | DCM Grading',
     description:
-      'Published base prices for PSA, Beckett, SGC and CGC next to $2.99 a card at home. Sourced, August 2026.',
+      'Published base prices for PSA, Beckett, SGC and CGC next to grading at home, as low as $0.50 a card with Card Lovers Annual. Sourced, August 2026.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/cheapest-card-grading',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Cheapest Card Grading (2026)',
-    description: 'Published base prices for the mail-in majors next to $2.99 a card at home.',
+    description: 'Published base prices for the mail-in majors next to grading at home, as low as $0.50 a card with Card Lovers Annual.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
 };
@@ -85,7 +85,7 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the cheapest card grading service?',
-    a: 'The cheapest published base price among the mail-in graders in August 2026 was SGC Standard at $15 per card, with CGC Bulk at about $15 but requiring a 25-card minimum. PSA and Beckett had both paused their budget tiers, leaving $79.99 and $79.95 as their cheapest open service levels. DCM grades a single card for $2.99, or $0.66 per card on the 150-credit pack, and nothing ships.',
+    a: 'The cheapest published base price among the mail-in graders in August 2026 was SGC Standard at $15 per card, with CGC Bulk at about $15 but requiring a 25-card minimum. PSA and Beckett had both paused their budget tiers, leaving $79.99 and $79.95 as their cheapest open service levels. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, and nothing ships.',
   },
   {
     q: 'How much does it cost to get a card graded?',
@@ -137,8 +137,8 @@ export default function CheapestCardGradingPage() {
             The cheapest published mail-in price in August 2026 was <strong>SGC Standard at $15</strong> per card, with
             CGC Bulk at about $15 on a 25-card minimum. PSA and Beckett had paused their budget tiers, leaving{' '}
             <strong>$79.99</strong> and <strong>$79.95</strong> as their cheapest open levels. None of those figures
-            includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, down to $0.66 per
-            card on the 150-credit pack.
+            includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, and{' '}
+            <strong>as low as $0.66 a card with the 150-credit VIP package</strong>.
           </p>
           <p className="text-sm text-gray-500">
             {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}. Per card, shipping excluded. Sources below.
@@ -337,7 +337,7 @@ export default function CheapestCardGradingPage() {
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
             <h2 className="text-3xl font-bold mb-4">Grade the binder for less than one submission</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
-              Two free grades to start. $2.99 a card after that, and nothing to ship.
+              Two free grades to start. After that it is $2.99 for a single card, $0.66 a card with the VIP pack, and as low as $0.50 a card with Card Lovers Annual. Nothing to ship.
             </p>
             <Link
               href="/get-started"
