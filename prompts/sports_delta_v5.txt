@@ -294,8 +294,10 @@ RARITY TIER HIERARCHY (Check in Order, Assign First Match)
 **4. Autographed**
 • On-card or sticker autograph
 • REQUIRES manufacturer authentication (hologram, certification, COA)
-• If autograph.present = true AND autograph.type = "manufacturer_authenticated" → rarity_tier = "autographed"
-• Unverified autographs = N/A grade (not counted as autograph tier)
+• If autograph.present = true AND autograph.authenticated = true → rarity_tier = "autographed"
+• Unverified autographs are NOT an N/A grade (v9.23). The card receives its full numeric grade,
+  surface scored as if the ink were absent, and carries the designation
+  "Altered - Unverified Autograph". It is simply not counted in the autograph rarity tier.
 
 **5. Memorabilia / Relic**
 • Embedded patch, jersey swatch, bat piece, ball piece, ticket stub, etc.

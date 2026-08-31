@@ -12,6 +12,8 @@
  * for reference/debugging; it is no longer what users see.
  */
 
+import { resolveAutographVerdict, UNVERIFIED_AUTOGRAPH_DESIGNATION } from './grading/autographPolicy';
+
 type Category = 'centering' | 'corners' | 'edges' | 'surface';
 const CATEGORIES: Category[] = ['centering', 'corners', 'edges', 'surface'];
 
@@ -240,8 +242,19 @@ export function buildFinalSummary(input: NarratorInput): string {
     parts.push(`Photo quality limits how confidently this card can be assessed.`);
   }
 
-  // Canonical tail — display surfaces and legacy parsers rely on this exact form
-  const tail = `Final grade: ${finalGrade} (${conditionLabel}).`;
+  // v9.23 DESIGNATION: the model states "Altered - Unverified Autograph" in its own
+  // prose, but that prose is discarded here (narrate-after-consensus), so the rebuilt
+  // summary has to carry the notation itself or the customer never sees it. It rides
+  // WITH the tail so the length budget can never trim it away — a designation is a
+  // fact about the card, not an optional flourish. Kept as a NOTATION: it explains the
+  // designation without qualifying or apologising for the numeric grade, which stands.
+  const designationNote = resolveAutographVerdict(jsonData).unverified
+    ? `Note: the card carries a hand-applied autograph with no manufacturer authentication and is designated ${UNVERIFIED_AUTOGRAPH_DESIGNATION}.`
+    : '';
+
+  // Canonical tail — display surfaces and legacy parsers rely on this exact form,
+  // and on it being the LAST sentence, so the note goes immediately before it.
+  const tail = `${designationNote ? `${designationNote} ` : ''}Final grade: ${finalGrade} (${conditionLabel}).`;
 
   // Length budget: drop the least essential sentences until the text fits the
   // tightest surface (~420 chars including the tail), rather than letting the

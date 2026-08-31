@@ -43,7 +43,14 @@ export interface DcmGradingInput {
   has_alterations?: boolean;
   crease_detected?: boolean;
   bent_corner_detected?: boolean;
-  // Autograph authentication - if true, handwriting is an authenticated autograph (not alteration)
+  /**
+   * True when the handwriting the grader saw is the card's autograph rather than a
+   * post-production marking. Despite the name it is set for ANY autograph, verified or
+   * not (v9.23): an unverified autograph keeps its full numeric grade and carries the
+   * "Altered - Unverified Autograph" designation instead of being downgraded, so it must
+   * not fall into the handwriting → AA / 1-Poor branch either. Non-signature handwriting
+   * (owner names, dates, notes) still lands there, unchanged.
+   */
   is_authenticated_autograph?: boolean;
 }
 

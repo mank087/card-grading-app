@@ -34,6 +34,7 @@ import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
+import { resolveAutographVerdict } from './grading/autographPolicy';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -48,7 +49,15 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.22';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.23';
+// v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
+// never an N/A. All four subgrades are scored normally, surface as if the ink were
+// absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
+// authenticated autograph is a feature; an autograph with no on-card claim of
+// authenticity still gets its full numeric grade and carries the designation
+// "Altered - Unverified Autograph" as a notation on the grade record and the label.
+// Rubric: [STEP 0A] + Tier A/C tables + surface ladder + STEP 9 caps; zoom pass now
+// lists signature ink under NOT-defects.
 // v9.11 (2026-07-29): YEAR EVIDENCE GATE — customer-reported wrong dates on sports
 // cards. card_info now REQUIRES year_text_seen (verbatim transcription) + year_source
 // (back_copyright | printed_date | set_logo | season_indicator | not_visible), and
@@ -3513,14 +3522,20 @@ Provide detailed analysis as markdown with all required sections.`
       // literal used invented field names (rookie_or_first, serial_number,
       // autograph{...}), so downstream consumers reading rookie_flag /
       // subset_insert_name / serial_number_fraction silently got undefined.
+      // v9.23: the autograph verdict drives BOTH fields. Previously every autographed
+      // card was stamped rarity_tier 'Authenticated Autograph' while simultaneously
+      // getting autograph_type 'unverified' — a flat contradiction. The tier now claims
+      // authentication only when the model actually observed it, and autograph_type
+      // carries the verified/unverified verdict that the designation is built from.
+      const autographVerdict = resolveAutographVerdict(jsonData);
       const rarityClassification: RarityClassification | undefined = jsonData.card_info ? {
-        rarity_tier: jsonData.card_info.autographed ? 'Authenticated Autograph'
+        rarity_tier: autographVerdict.verified ? 'Authenticated Autograph'
           : jsonData.card_info.memorabilia ? 'Memorabilia / Relic'
           : jsonData.card_info.rookie_or_first ? 'Rookie / Debut / First Edition'
           : (jsonData.card_info.parallel_type || jsonData.card_info.subset) ? 'Parallel / Insert Variant'
           : 'Unconfirmed',
         serial_number_fraction: jsonData.card_info.serial_numbering || jsonData.card_info.serial_number || null,
-        autograph_type: jsonData.card_info.autographed ? 'unverified' : 'none',
+        autograph_type: autographVerdict.autographType,
         memorabilia_type: jsonData.card_info.memorabilia || null,
         finish_material: jsonData.card_info.print_finish || jsonData.card_info.finish || '',
         rookie_flag: jsonData.card_info.rookie_or_first ? 'yes' : 'no',

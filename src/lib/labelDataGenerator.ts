@@ -20,6 +20,7 @@
  */
 
 import { getConditionFromGrade } from './conditionAssessment';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from './grading/autographPolicy';
 
 // ============================================================================
 // CJK/UNICODE HANDLING FOR PDF/CANVAS
@@ -200,6 +201,15 @@ export interface LabelData {
   gradeFormatted: string;
   condition: string;
 
+  /**
+   * Grade designation notation carried ALONGSIDE the numeric grade (v9.23).
+   * Currently only "Altered - Unverified Autograph": the card keeps its full numeric
+   * grade in all four categories, and this line states that the autograph carries no
+   * manufacturer authentication. null when the card has no designation.
+   * Optional for backwards compat with label_data blobs stored before v9.23.
+   */
+  designation?: string | null;
+
   // Metadata
   category: string;
   isAlteredAuthentic: boolean;
@@ -286,6 +296,7 @@ export interface CardForLabel {
   conversational_decimal_grade?: number | null;
   conversational_whole_grade?: number | null;
   conversational_condition_label?: string | null;
+  conversational_final_grade_summary?: string | null;
   dvg_decimal_grade?: number | null;
   dvg_whole_grade?: number | null;
 
@@ -554,6 +565,10 @@ function getCondition(card: CardForLabel, grade: number | null): string {
  */
 function checkAlteredAuthentic(card: CardForLabel): boolean {
   const label = card.conversational_condition_label?.toLowerCase() || '';
+  // v9.23: "Altered - Unverified Autograph" is a DESIGNATION, not an Authentic-Altered
+  // verdict. Those cards keep their full numeric grade, so the word "altered" in that
+  // phrase must not flip the label to "A / Authentic".
+  if (label.includes('unverified autograph')) return false;
   return label.includes('altered') ||
          label.includes('authentic altered') ||
          label.includes('(aa)');
@@ -1263,7 +1278,15 @@ export function generateLabelData(card: CardForLabel): LabelData {
   const condition = getCondition(card, grade);
   const isAlteredAuthentic = checkAlteredAuthentic(card);
 
+  // ========================================
+  // DESIGNATION (v9.23) — notation beside the grade, never a deduction
+  // ========================================
+  const designation = hasUnverifiedAutographDesignation(card)
+    ? UNVERIFIED_AUTOGRAPH_DESIGNATION
+    : null;
+
   return {
+    designation,
     primaryName,
     setName,
     subset,
@@ -1294,6 +1317,11 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
       ...card.label_data,
       primaryName: titleCaseShoutyWords(card.label_data.primaryName || 'Card'),
       ...(card.org_serial_display ? { serial: card.org_serial_display } : {}),
+      // Blobs stored before v9.23 have no designation — derive it from the card row so
+      // existing cards show the notation without a label_data backfill.
+      designation: card.label_data.designation !== undefined
+        ? card.label_data.designation
+        : (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null),
     };
   }
 

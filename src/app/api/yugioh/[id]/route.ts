@@ -1059,6 +1059,11 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       id: cardId,
       category: 'Yu-Gi-Oh',
       serial: card.serial,
+      // v9.23: the "Altered - Unverified Autograph" designation is derived by the label
+      // generator from the fresh autograph verdict (and, as a fallback, the rebuilt
+      // summary). Without these two fields label_data.designation is always undefined.
+      autograph_type: conversationalResultV3_3?.rarity_classification?.autograph_type || card.autograph_type || null,
+      conversational_final_grade_summary: conversationalGradingData?.final_grade_summary || null,
       conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
       conversational_whole_grade: conversationalGradingData?.whole_grade || null,
       conversational_condition_label: conversationalGradingData?.condition_label || null,

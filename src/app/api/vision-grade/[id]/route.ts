@@ -1738,9 +1738,14 @@ EXTRACTION RULES:
         rookie_card: conversationalGradingData?.card_info?.rookie_card !== undefined
           ? conversationalGradingData.card_info.rookie_card
           : card.rookie_card,
-        autograph_type: conversationalGradingData?.card_info?.autographed
-          ? 'on-card'
-          : (card.autograph_type || 'none'),
+        // v9.23: autograph_type carries the verified/unverified verdict — 'unverified'
+        // is what the "Altered - Unverified Autograph" designation is read back from.
+        // The rarity classifier already resolved it; only fall back to the old
+        // card_info.autographed heuristic when it produced nothing.
+        autograph_type: conversationalResultV3_3?.rarity_classification?.autograph_type
+          || (conversationalGradingData?.card_info?.autographed
+            ? 'on-card'
+            : (card.autograph_type || 'none')),
         memorabilia_type: conversationalGradingData?.card_info?.memorabilia
           ? 'unknown'
           : (card.memorabilia_type || 'none'),

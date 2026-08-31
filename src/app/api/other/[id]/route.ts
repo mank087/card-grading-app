@@ -13,6 +13,7 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
+import { resolveAutographVerdict } from "@/lib/grading/autographPolicy";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
@@ -935,11 +936,19 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     console.log(`[GET /api/other/${cardId}] ⏱️ Total processing time: ${processingTime}ms`);
 
     // Generate standardized label data for consistent display across all contexts
-    const parsedCardInfo = conversationalGradingResult ? JSON.parse(conversationalGradingResult).card_info : null;
+    const parsedGradingJson = conversationalGradingResult ? JSON.parse(conversationalGradingResult) : null;
+    const parsedCardInfo = parsedGradingJson?.card_info ?? null;
+    // v9.23: unlike the other category routes, /api/other never persisted
+    // autograph_type at all — an autographed "Other" card (celebrity, non-sport,
+    // wrestling) had no column to carry the verdict, so the designation had nowhere
+    // to land. Resolve it here and write it below.
+    const otherAutographVerdict = resolveAutographVerdict(parsedGradingJson);
     const cardForLabel: CardForLabel = {
       id: cardId,
       category: 'Other',
       serial: card.serial,
+      autograph_type: otherAutographVerdict.autographType,
+      conversational_final_grade_summary: gradingData.conversational_final_grade_summary ?? null,
       conversational_decimal_grade: gradingData.conversational_decimal_grade,
       conversational_whole_grade: gradingData.conversational_whole_grade,
       conversational_condition_label: gradingData.conversational_condition_label,
@@ -973,6 +982,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       ai_grading: conversationalGradingResult,
       conversational_grading: conversationalGradingResult,
       conversational_card_info: parsedCardInfo,
+      autograph_type: otherAutographVerdict.autographType,
       processing_time: processingTime,
       label_data: labelData,
       graded_from: resolveGradedFrom(request),

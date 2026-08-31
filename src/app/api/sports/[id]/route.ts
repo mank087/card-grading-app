@@ -12,6 +12,7 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
+import { resolveAutographVerdict } from "@/lib/grading/autographPolicy";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
@@ -432,16 +433,18 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
               };
 
               const cardInfoData = parsedConversationalData.card_info || {};
-              const alterationDetectionData = jsonData.alteration_detection || {};
-              // Check alteration_detection.autograph.present - PRIMARY detection path
-              const hasAlterationAutograph = alterationDetectionData.autograph?.present === true;
-              const autographVerified = alterationDetectionData.autograph?.verified;
+              // v9.23: this flag's ONLY job in professionalGradeMapper is to stop a
+              // signature being counted as a handwritten-marking alteration. An
+              // UNVERIFIED autograph must keep its full numeric grade too, so presence
+              // alone qualifies — the old `verified !== false` gate would have pushed
+              // designated cards into "AA Authentic Altered".
+              const hasAlterationAutograph = resolveAutographVerdict(jsonData).present;
               const hasAutographedFlag = cardInfoData.autographed === true;
               const hasAutographRarity = cardInfoData.rarity_or_variant?.toLowerCase()?.includes('autograph');
               const hasAutographInName = cardInfoData.card_name?.toLowerCase()?.includes('autograph');
               const isAuthentic = cardInfoData.authentic !== false;
               const isAuthenticatedAutograph = isAuthentic && (
-                (hasAlterationAutograph && autographVerified !== false) ||
+                hasAlterationAutograph ||
                 hasAutographedFlag ||
                 hasAutographRarity ||
                 hasAutographInName
@@ -489,8 +492,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           // Also check autograph detection for cards that don't need professional grade recalculation
           // This ensures autograph flag is set even for cached cards
           if (parsedConversationalData?.card_info && !parsedConversationalData.card_info.autographed) {
-            const altDet = jsonData.alteration_detection || {};
-            const hasAutoAlt = altDet.autograph?.present === true && altDet.autograph?.verified !== false;
+            // v9.23: presence alone — an unverified autograph is still an autograph.
+            const hasAutoAlt = resolveAutographVerdict(jsonData).present;
             const hasAutoInRarity = parsedConversationalData.card_info.rarity_or_variant?.toLowerCase()?.includes('autograph');
             const hasAutoInName = parsedConversationalData.card_info.card_name?.toLowerCase()?.includes('autograph');
             const isAuth = parsedConversationalData.card_info.authentic !== false;
@@ -814,12 +817,14 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 // Multiple ways to detect authenticated autographs:
                 const cardInfo = parsedJSONData.card_info || {};
                 const rarityFeatures = parsedJSONData.rarity_features || {};
-                const alterationDetection = parsedJSONData.alteration_detection || {};
-
                 // Check various indicators of authenticated autograph
-                // 1. alteration_detection.autograph.present - PRIMARY detection path from AI
-                const hasAlterationAutograph = alterationDetection.autograph?.present === true;
-                const autographVerified = alterationDetection.autograph?.verified;
+                // 1. autograph.present - PRIMARY detection path from AI.
+                //    v9.23: presence alone. This flag only cancels the handwriting →
+                //    "AA Authentic Altered" path in professionalGradeMapper, and an
+                //    unverified autograph must keep its full numeric grade as well.
+                const autographVerdict = resolveAutographVerdict(parsedJSONData);
+                const hasAlterationAutograph = autographVerdict.present;
+                const autographVerified = autographVerdict.verified;
                 // 2. card_info.autographed flag
                 const hasAutographedFlag = cardInfo.autographed === true;
                 // 3. rarity_or_variant contains "autograph"
@@ -832,9 +837,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 const isAuthentic = cardInfo.authentic !== false; // default to true if not specified
 
                 // Card is authenticated autograph if ANY autograph indicator is true AND card is marked authentic
-                // For alteration_detection path, also check if verified is not false
                 const isAuthenticatedAutograph = isAuthentic && (
-                  (hasAlterationAutograph && autographVerified !== false) ||
+                  hasAlterationAutograph ||
                   hasAutographedFlag ||
                   hasAutographRarity ||
                   hasAutographInName ||
@@ -1239,6 +1243,11 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       id: cardId,
       category: card.category || 'Sports',
       serial: card.serial,
+      // v9.23: the "Altered - Unverified Autograph" designation is derived by the label
+      // generator from the fresh autograph verdict (and, as a fallback, the rebuilt
+      // summary). Without these two fields label_data.designation is always undefined.
+      autograph_type: conversationalResultV3_3?.rarity_classification?.autograph_type || card.autograph_type || null,
+      conversational_final_grade_summary: conversationalGradingData?.final_grade_summary || null,
       conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
       conversational_whole_grade: conversationalGradingData?.whole_grade || null,
       conversational_condition_label: conversationalGradingData?.condition_label || null,

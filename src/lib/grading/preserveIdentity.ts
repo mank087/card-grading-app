@@ -62,8 +62,28 @@ export const IDENTITY_COLUMNS: readonly string[] = [
   'ygo_rarity', 'ygo_set_code', 'ygo_image_url',
 ];
 
-/** Label keys that carry the GRADE (refreshed on regrade); everything else in label_data is identity. */
-const LABEL_GRADE_KEYS = ['grade', 'gradeFormatted', 'condition'] as const;
+/**
+ * Identity columns that ALSO carry a grading verdict the regrade is entitled to refresh.
+ *
+ * `autograph_type` is the only one (v9.23). It is two things at once: an identity
+ * attribute ("this is an autograph card") and an authentication verdict ("...that carries
+ * no manufacturer authentication"). Blanket-preserving it meant a v9.23 regrade that
+ * correctly resolved 'unverified' had the value stomped back to the stored pre-v9.23
+ * value, so the "Altered - Unverified Autograph" designation never reached the row or
+ * the label. The predicate below lets ONLY the verdict half through: the fresh value
+ * wins when the designation is being applied or cleared, and identity churn between
+ * 'on-card'/'sticker'/'none' stays preserved as before.
+ */
+const VERDICT_REFRESHABLE: Record<string, (fresh: unknown, stored: unknown) => boolean> = {
+  autograph_type: (fresh, stored) => fresh === 'unverified' || stored === 'unverified',
+};
+
+/**
+ * Label keys that carry the GRADE (refreshed on regrade); everything else in label_data
+ * is identity. `designation` is here because it is a verdict of THIS grade, not an
+ * attribute of the card — a regrade must be able to add or drop the notation.
+ */
+const LABEL_GRADE_KEYS = ['grade', 'gradeFormatted', 'condition', 'designation'] as const;
 
 export interface PreserveIdentityOptions {
   forceRegrade: boolean;
@@ -143,11 +163,21 @@ export async function preserveIdentityOnRegrade(
     }
 
     const changed: string[] = [];
+    const refreshed: string[] = [];
     for (const key of payloadIdentityKeys) {
       if (!Object.prototype.hasOwnProperty.call(row, key)) continue; // column not selected (retry path)
       const before = JSON.stringify(updateData[key] ?? null);
       const stored = JSON.stringify(row[key] ?? null);
-      if (before !== stored) changed.push(key);
+      const differs = before !== stored;
+
+      // Verdict half of a dual-purpose column — keep the regrade's fresh value.
+      const refreshable = VERDICT_REFRESHABLE[key];
+      if (differs && refreshable && refreshable(updateData[key], row[key])) {
+        refreshed.push(`${key}: ${row[key] ?? 'null'} -> ${updateData[key] ?? 'null'}`);
+        continue;
+      }
+
+      if (differs) changed.push(key);
       updateData[key] = row[key] ?? null;
     }
 
@@ -176,6 +206,9 @@ export async function preserveIdentityOnRegrade(
       console.log(`[${tag}] 🪪 regrade kept stored identity "${row.card_name}" — regrade would have changed: ${changed.join(', ')}`);
     } else {
       console.log(`[${tag}] 🪪 regrade kept stored identity "${row.card_name}" (no differences)`);
+    }
+    if (refreshed.length > 0) {
+      console.log(`[${tag}] 🪪 grading verdict refreshed despite identity guard: ${refreshed.join(', ')}`);
     }
     return { preserved: true, reason: 'ok', changedColumns: changed };
   } catch (e: any) {

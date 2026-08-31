@@ -1216,11 +1216,15 @@ condition summaries, NOT a mandatory cap system. Grades are determined by the we
 **TIER A: NOT GRADEABLE (N/A)**
 | Condition | Action |
 |-----------|--------|
-| Unverified autograph/signature | N/A |
-| Handwritten markings detected | N/A |
+| Handwritten markings detected (names, dates, notes — NOT a signature) | N/A |
 | Suspected trimming | N/A |
 | Missing images (both sides) | N/A |
 | No valid card detected | null |
+
+🚨 **AUTOGRAPHS ARE NOT A TIER A CONDITION (v9.23):** An unverified autograph/signature is NOT
+"not gradeable". The card receives its full numeric grade in all four categories (surface scored
+as if the ink were absent) and carries the designation "Altered - Unverified Autograph".
+See [STEP 0A] AUTOGRAPH VERIFICATION PROTOCOL.
 
 **TIER B: SEVERE DAMAGE (Grade 1-4)**
 | Condition | Max Grade |
@@ -1245,6 +1249,11 @@ condition summaries, NOT a mandatory cap system. Grades are determined by the we
 | Heavy rounding 3+ corners | 5 |
 | Continuous edge chipping (>25%) | 5 |
 | Multiple visible scratches | 6 |
+
+🚨 **AUTOGRAPH INK CARVE-OUT (v9.23):** Hand-applied autograph/signature ink is NEVER a stain,
+scratch, deep scratch, print line, or ink/coating loss — no row in this table applies to it.
+Surface is scored around and beneath the strokes as if the ink were absent. Only genuine damage
+to the card itself (whitening, creases, scratches in the stock, gloss loss) is scored.
 
 **TIER D: VISIBLE WEAR (Grade 7)**
 | Condition | Max Grade |
@@ -1413,6 +1422,7 @@ EXECUTION REQUIREMENTS:
 CRITICAL: If ANY alteration flagged, final grade MUST be N/A (enforced later in scoring).
 Do not stop analysis; flag issues and continue full evaluation.
 EXCEPTION: Facsimile autographs and official reprints with manufacturer disclosure are legitimate cards - grade normally.
+EXCEPTION (v9.23 — AUTOGRAPHS): An autograph NEVER produces an N/A grade. A manufacturer-authenticated autograph is a feature. An unverified (hand-applied) autograph still receives a FULL numeric grade in all four categories and instead carries the designation "Altered - Unverified Autograph". Autographs are handled exclusively by [STEP 0A] — never route a signature through [STEP 0B] handwritten markings.
 ---
 [STEP 0A] AUTOGRAPH VERIFICATION PROTOCOL
 ---
@@ -1447,14 +1457,23 @@ An autograph is a signature, typically of a player, athlete, or character, appli
 
 **OUTPUT:**
 • autograph.present: true|false
-• autograph.type: "manufacturer_authenticated" | "unverified" | "none"
+• autograph.type: "none" | "on-card" | "sticker"
+• autograph.authenticated: true|false — true ONLY when a manufacturer authentication indicator above was actually observed
 • autograph.cert_markers: Array of authentication evidence found (or [])
+• autograph.designation: "Altered - Unverified Autograph" when present=true AND authenticated=false. Otherwise empty string ""
 • autograph.notes: When present=true → brief explanation of authentication determination. When present=false → empty string "" (do NOT write prose saying no autograph was found)
 
-**GRADING IMPACT:**
+**GRADING IMPACT (v9.23 — AN AUTOGRAPH IS NEVER AN N/A AND NEVER A SURFACE DEFECT):**
 • Manufacturer authenticated: Grade normally, autograph is a feature
-• Unverified signature: Apply N/A grade (card has been altered post-production)
 • Sticker autograph (authenticated): Note as "sticker" type, grade normally
+• Unverified signature (no official on-card claim of authenticity): DO NOT apply N/A and DO NOT cap the grade at 1.
+  → Grade ALL FOUR categories normally: centering, corners, edges, surface
+  → Score SURFACE AS IF THE AUTOGRAPH INK WERE ABSENT — judge the stock, gloss and print around and beneath the strokes. The ink itself, its spread, its sheen and any pen indentation from signing are NOT defects and are NOT scored
+  → Set autograph.designation = "Altered - Unverified Autograph" and state that designation in the final grade summary
+  → The card keeps its full numeric grade; the designation is a NOTATION carried alongside the grade, not a deduction
+
+🚨 **NEVER** report signature ink as a stain, scratch, scuff, print line, ink loss or coating loss.
+🚨 **NEVER** send a signature through [STEP 0B] HANDWRITTEN MARKINGS — a personal signature is an autograph, handled here.
 ---
 [STEP 0A-2] FACSIMILE AUTOGRAPH & OFFICIAL REPRINT DETECTION
 ---
@@ -1533,6 +1552,13 @@ When both = true: special_features includes "Facsimile Autograph, Official Repri
 ---
 PURPOSE: Detect post-production alterations that disqualify card from numeric grading.
 
+🚨 **CRITICAL: A PERSONAL SIGNATURE/AUTOGRAPH IS NOT A HANDWRITTEN MARKING (v9.23)**
+A signature — of a player, athlete, artist or character — is handled EXCLUSIVELY by [STEP 0A]
+AUTOGRAPH VERIFICATION PROTOCOL and its designation path. It is NEVER a Step 0B handwritten-marking
+alteration, NEVER an N/A, and NEVER a surface defect. Do not re-route it here to reach an N/A.
+Step 0B covers NON-signature handwriting only: owner names, dates, prices, notes, tallies, stamps,
+and the other marking types listed below — that policy is unchanged.
+
 🚨 **CRITICAL: MANUFACTURER ARTWORK IS NOT AN ALTERATION**
 Many trading cards feature printed artwork, illustrations, or stylized designs that may APPEAR hand-drawn but are legitimate manufacturer design elements. You MUST distinguish between:
 - **Manufacturer artwork** (printed as part of card production) → Grade normally
@@ -1581,8 +1607,7 @@ Many trading cards feature printed artwork, illustrations, or stylized designs t
 ✅ Background patterns, textures, or artistic elements
 
 **ACTUAL ALTERATIONS (Flag as N/A):**
-❌ Pen/pencil/marker writing added ON TOP of card surface
-❌ Personal signatures not authenticated by manufacturer
+❌ Pen/pencil/marker writing added ON TOP of card surface (names, dates, prices, notes — NOT a signature)
 ❌ Price tags, date stamps, or library markings
 ❌ Names written in ballpoint pen (owner identification)
 ❌ Sticker residue or tape damage
@@ -4554,6 +4579,14 @@ by the VISIBILITY TEST (Section 1.9) — how noticeable the defect is at normal 
 | 2 | Gouges/severe scratching; severe contamination; major damage |
 | 1 | Surface destroyed |
 
+🚨 **AUTOGRAPH INK IS NOT A SURFACE DEFECT (v9.23):** Hand-applied autograph/signature ink —
+verified or unverified — is NEVER scored on this ladder. It is not a scratch, mark, stain, print
+defect, gloss loss or ink/coating loss, and it can never be the WORST defect that sets the row.
+Score the surface AS IF THE INK WERE ABSENT: judge the stock, gloss and print AROUND and BENEATH
+the strokes, including pen indentation caused by the signing itself (also not scored). A card whose
+only "surface finding" is the signature has a clean surface and can score 10. Report only genuine
+damage to the card. An unverified autograph is handled by [STEP 0A]'s designation path, not here.
+
 🚨 **CORE PRINCIPLE: A defect you noticed WITHOUT zooming or searching = Surface score 7 or below.**
 🚨 A defect you found only by zooming in = 9 (one flaw) or 8 (two or more), never lower.
 Multiple defects: pick the count-aware row that matches (the ladder rows are count-aware).
@@ -5118,10 +5151,15 @@ STEP 9: GRADE CAPS APPLICATION
 Apply grade caps based on defect detection (from Section 2):
 
 **🚨 ALTERATION CAPS (Immediate N/A):**
-• Unverified autograph detected → FINAL GRADE = N/A
-• Handwritten marking detected → FINAL GRADE = N/A
+• Handwritten marking detected (non-signature: names/dates/prices/notes) → FINAL GRADE = N/A
 • Suspected trimming (strong evidence both sides) → FINAL GRADE = N/A
 • Missing images (both sides) → FINAL GRADE = N/A
+
+**🚨 AUTOGRAPH DESIGNATION (v9.23 — NOT a cap):**
+• Unverified autograph detected → FINAL GRADE IS UNCHANGED (full numeric grade from the four
+  subgrades, surface scored as if the ink were absent). Set autograph.designation =
+  "Altered - Unverified Autograph" and state it in final_grade_summary. Do NOT emit N/A and do
+  NOT cap the grade. See [STEP 0A].
 
 **🚨 STRUCTURAL DAMAGE CAPS:** See Section 1.11 for complete table.
 
