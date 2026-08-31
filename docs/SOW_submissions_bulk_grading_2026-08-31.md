@@ -29,31 +29,49 @@
 
 ---
 
-## Decisions (recommendations — confirm to start)
+## Owner direction (Aug 31) — supersedes earlier decisions 1 and parts of intake
+
+1. **No user-facing product name.** The entry point lives on the existing grading page: after the card
+   type/subtype selection and the camera / submit-photos options, a link — **"Submit more than one card →"** —
+   opens the batch flow. "Submissions" survives only as internal table/route naming; no branded surface, no
+   separate landing page.
+2. **No scanner-software coupling.** Intake is the standard OS file/gallery picker: the user navigates to
+   wherever the images live (scanner output folder, phone gallery, downloads) and multi-selects. Works on
+   desktop and mobile alike; a desktop folder-drop is a convenience enhancement, not the primary path. The
+   PaperStream "profile" is demoted to one paragraph of optional scanning tips in help content (the
+   cleanup-features-off advice stays — it genuinely affects grading accuracy — but it is user guidance, not
+   product scope).
+3. **Ordering/pairing signal:** filename sort primary (duplex scanners name sequentially), cross-checked
+   against `File.lastModified` (browsers cannot read true creation dates); disagreement between the two is
+   flagged, not silently resolved. The pairing-confirmation screen (front/back shown side by side per card)
+   plus the even-count and identity cross-checks remain the real protection.
+4. **Binder chosen at submission time** — pick existing or create inline, before anything is charged (cards
+   still file into it one-by-one as they grade; that is a resilience detail, not a choice deferred to grading).
+
+## Remaining decisions (recommendations — confirm to start)
 
 | # | Decision | Recommendation |
 |---|----------|----------------|
-| 1 | Name | **Submissions** |
-| 2 | Availability | **All tiers; per-submission cap is the tier lever** — 100 consumer, 500 Dealer, 1,000 Enterprise |
-| 3 | Visibility | **Private by default**; drain endpoint gets real auth (pilot for fixing the JWT-less grading GETs) |
-| 4 | Ceiling | **500 max at launch** (Enterprise), raise after the infra is proven |
+| 1 | Availability | **All tiers; per-submission cap is the tier lever** — 100 consumer, 500 Dealer, 1,000 Enterprise |
+| 2 | Visibility | **Private by default**; drain endpoint gets real auth (pilot for fixing the JWT-less grading GETs) |
+| 3 | Ceiling | **500 max at launch** (Enterprise), raise after the infra is proven |
 
 ---
 
 ## Workstreams
 
-### WS0 — Phase 0: measure first (1–2 days, includes the harness)
-Deliverables: PaperStream "DCM Card Batch" profile documented; calibration scan establishing actual file naming/order/orientation; measurement harness script that ingests a folder, pairs, runs cards through the existing single-card flow, and reports per-grade wall time (sizes the drain), scanner-vs-phone grade parity per subgrade (surface especially), and shadow CV-centering error on scanner vs phone input. Run against the 30–50 card validation set on both scanner backgrounds.
+### WS0 — Phase 0: measure first (1 day, includes the harness)
+Deliverables: calibration scan establishing the fi-8170's actual file naming/order/orientation; measurement harness script that ingests a folder, pairs, runs cards through the existing single-card flow, and reports per-grade wall time (sizes the drain), scanner-vs-phone grade parity per subgrade (surface especially), and shadow CV-centering error on scanner vs phone input. Run against the 30–50 card validation set on both scanner backgrounds. One paragraph of scanner-settings tips written for help content (cleanup off, margins, backgrounds).
 **Gate:** parity within tolerance or a scoped capture-note plan; drain throughput number replaces the guess.
 
 ### WS1 — Data model & migrations (0.5 day)
 `submissions` + `submission_items` tables per the feature plan (adds `front_hash`/`back_hash` and `waiting_for_credits` status from the review). One nullable FK on `cards`. **Sequencing:** explicitly ordered against the pending Aug 17 enterprise migrations — no racing migration sets.
 
 ### WS2 — Intake & upload (1.5 days)
-Directory drop (`webkitdirectory`) + ZIP fallback; client compression as today; capped concurrency (3–5) resumable uploader with per-file progress, retry/backoff, content-hash skip; serial **block reservation** per submission (kills the per-card round-trip + collision retry).
+Entry point on the grading page ("Submit more than one card →" under the camera/photos options, after card type/subtype). Standard multi-select file/gallery picker as the primary path (works on mobile too); desktop folder-drop (`webkitdirectory`) and ZIP as conveniences. Client compression as today; capped concurrency (3–5) resumable uploader with per-file progress, retry/backoff, content-hash skip; serial **block reservation** per submission (kills the per-card round-trip + collision retry).
 
 ### WS3 — Pairing & review grid (1.5 days)
-Convention detection (duplex-sequential / two-folder / filename-stem) — detected convention stated, user-changeable, never guessed silently. Contact-sheet grid with the full control set (swap, rotate one/all, global swap-all, reorder, remove, replace). Hard stop on odd counts in sequential mode. Front/back identity cross-check (cheap model call per pair) flags disagreements.
+Convention detection (duplex-sequential / two-folder / filename-stem) — detected convention stated, user-changeable, never guessed silently. Order by filename, cross-checked against `File.lastModified`; a disagreement between the two signals is flagged. Contact-sheet grid showing front/back side by side per card, with the full control set (swap, rotate one/all, global swap-all, reorder, remove, replace). Hard stop on odd counts in sequential mode. Front/back identity cross-check (cheap model call per pair) flags disagreements.
 
 ### WS4 — Preflight (1 day)
 The gate described above, tagged `capture_source: desktop_scanner`. Blank/misfeed exclusion, duplicate detection (perceptual hash vs the user's collection), per-pair pass/review/fail with reasons. Nothing failing preflight can be charged.
@@ -62,7 +80,7 @@ The gate described above, tagged `capture_source: desktop_scanner`. Blank/misfee
 Drain endpoint (claims N `queued` items, lease via `claimed_at`, grades via existing per-category pipelines); browser loop while the page is open; cron drains on schedule; `attempts` cap; rate-limit backoff + concurrency ceiling; **proper auth on the drain** (the model for fixing the other grading GETs). Charge per card at grade time via existing idempotent deduction; `waiting_for_credits` pause.
 
 ### WS6 — Binders & completion (1 day)
-Destination binder pick-or-create-inline; cards filed **as they grade**, `binder_cards.position` = scan order; accent color + first-graded-card cover on new binders; completion email via Resend ("297 graded · 3 need retry") — the close-the-lid experience depends on it.
+Destination binder pick-or-create-inline **at submission time, before commit** (owner direction); cards filed **as they grade**, `binder_cards.position` = scan order; accent color + first-graded-card cover on new binders; completion email via Resend ("297 graded · 3 need retry") — the close-the-lid experience depends on it.
 
 ### WS7 — Progress, history, retry UI (1.5 days)
 Live grid filling with grades, running counters, failure list with retry, pause/cancel, submission history page, one-click hand-off to batch label print.
@@ -70,7 +88,7 @@ Live grid filling with grades, running counters, failure list with retry, pause/
 ### WS8 — Validation & launch gates (1 day)
 Load test the drain at cap size; spend alarm wired (one user can 4× the platform's day); verify the cost table against measured reality; scanner-limitation note if WS0 demanded it; docs.
 
-**Total: ~10–11 dev-days (~2–2.5 calendar weeks).** Phases ship independently: WS0 alone is worth a day regardless; WS1–5 is a usable no-binder MVP; WS6–7 completes the loop.
+**Total: ~9.5–10.5 dev-days (~2 calendar weeks).** Phases ship independently: WS0 alone is worth a day regardless; WS1–5 is a usable no-binder MVP; WS6–7 completes the loop.
 
 ### Deferred (explicitly out of scope)
 - **Scanner-native centering** (the strategic prize): only scoped after WS0 data; per-source confidence policy letting measured centering set a score on scanner submissions. `submissions.source` already anticipates it.
