@@ -55,13 +55,56 @@
    remains only as a backstop for balance changes from another device after commit; it is not the primary
    mechanism.
 
-## Remaining decisions (recommendations — confirm to start)
+## Decisions — RESOLVED (owner, Aug 31)
 
-| # | Decision | Recommendation |
-|---|----------|----------------|
-| 1 | Availability | **All tiers; per-submission cap is the tier lever** — 100 consumer, 500 Dealer, 1,000 Enterprise |
-| 2 | Visibility | **Private by default**; drain endpoint gets real auth (pilot for fixing the JWT-less grading GETs) |
-| 3 | Ceiling | **500 max at launch** (Enterprise), raise after the infra is proven |
+| # | Decision | Resolution |
+|---|----------|------------|
+| 1 | Availability | **Everyone** — no tier gating; credits meter the spend |
+| 2 | Visibility | **Public**, same as every other graded card (same insert path; no special casing) |
+| 3 | Ceiling | **100 cards per submission** |
+
+## Grading execution — verified approach (code review, Aug 31)
+
+**Mechanism: internal self-call to the existing per-category GET routes, fire-and-poll — no refactor.** The 8 routes
+(~11,700 lines total) already carry the cross-instance grading lock (`acquireGradingLock` CAS on
+`cards.grade_status`), the failure/refund path, and all per-category divergence; extracting a callable core is an
+8×1,300-line refactor of the most business-critical path with no route test coverage. Rejected.
+
+- **Drain**: `POST /api/submissions/drain` (`maxDuration 60`, cronAuth-protected), ticked by a per-minute Vercel
+  cron plus a kick on submission commit. Each tick counts the submission's cards in `grade_status='processing'`
+  (the lock column is the authoritative in-flight counter — no in-memory state); if in-flight ≥ 4 it returns.
+  Otherwise it takes up to `4 − inFlight` queued items: `deductCredit` (card-id idempotent, handles org pools),
+  then dispatches the self-call with a ~55s abort — abort-after-dispatch is success, the grade continues in its
+  own 300s function, and the lock guarantees the next tick can't double-fire.
+- **Concurrency ceiling 4** — ~24 in-flight OpenAI requests / ~800K prompt tokens/min (one grade ≈ 6-8 HTTP
+  requests, ~28 completions, ~150-250K prompt tokens; the ~75K rubric prefix is cached and a burst keeps it
+  warm). Above ~5 concurrent, the zoom pass's OpenAI client — which has **no retries** and swallows failures —
+  starts silently degrading grades under 429s (grades drift optimistic). Raising the ceiling later requires
+  adding zoom-client retries FIRST and confirming zoom 429 rates in `api_usage_log`.
+- **Throughput**: 4-wide × ~90s/grade ≈ **~40 minutes for a full 100-card submission**.
+- **Reconcile**: any card `processing` > 10 min → `recordGradingFailure` (auto-refunds), matching the existing
+  client-side threshold.
+- **Model routing**: pin the submission's `routingKey` per-submission (not per-card) so a future canary split
+  can't grade one submission with two different models.
+- **Safety**: `SUBMISSIONS_DRAIN_ENABLED` env kill switch + per-submission spend ceiling (no budget guard exists
+  anywhere in the grading path today; usage logging is after-the-fact).
+- **Progress endpoint** (new, small): `GET /api/submissions/{id}/status` — one `.in('id', ...)` query returning
+  `grade_status`, whole grade, and batched signed thumbnail URLs for the whole submission. The existing
+  per-card `?status_only=true` path would mean 100 requests per poll tick; not viable.
+- **Progress UI**: 100 shimmer placeholders (one shared CSS animation), single poll every ~4s against the status
+  endpoint, lazy-loaded thumbnails fading in as cards complete (a trickle over ~40 min, not a burst). Confirmed
+  cheap; collection pages already render larger grids.
+- **Serial block reservation** stands (random-6-digit check-then-insert races at 100×; upload's retry is only
+  3 attempts).
+
+## Adjacent findings routed to the AEO track (not this feature's scope)
+
+The crawlability review surfaced pre-existing gaps that bulk grading amplifies: card detail pages emit their
+Product JSON-LD only after hydration (server metadata is good; body/schema are client-only); `sitemap.ts`
+silently caps at PostgREST's default 1,000 rows (newest-first — every new card evicts an old one) and filters
+neither `deleted_at` nor ungraded uploads; the `/verify/{serial}` sitemap entries added Aug 31 are pure
+redirects (should be removed or made real pages); `/collection/[username]` sets `robots: index` while
+robots.txt disallows `/collection`. Tracked as AEO follow-ups.
 
 ---
 
