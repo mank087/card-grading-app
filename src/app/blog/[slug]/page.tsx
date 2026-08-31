@@ -80,6 +80,14 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
       description,
       images: post.featured_image_path ? [post.featured_image_path] : undefined,
     },
+    alternates: {
+      canonical: `https://dcmgrading.com/blog/${slug}`,
+      types: {
+        'application/rss+xml': [
+          { url: 'https://dcmgrading.com/rss.xml', title: 'DCM Grading Blog' },
+        ],
+      },
+    },
   };
 }
 

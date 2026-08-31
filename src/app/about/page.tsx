@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     title: 'About DCM Grading',
     description: 'Built by collectors, for collectors. Card grading powered by DCM Optic™.',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/about',
+  },
 };
 
 export default function AboutPage() {

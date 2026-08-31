@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     title: 'DCM Grading Rubric',
     description: '30-point inspection with three-pass consensus technology for accurate card grades.',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/grading-rubric',
+  },
 };
 
 export default function GradingRubricPage() {

@@ -22,6 +22,14 @@ export const metadata: Metadata = {
     title: 'DCM Grading Blog',
     description: 'Card collecting news, grading tips, and market insights.',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/blog',
+    types: {
+      'application/rss+xml': [
+        { url: 'https://dcmgrading.com/rss.xml', title: 'DCM Grading Blog' },
+      ],
+    },
+  },
 };
 
 interface BlogPageProps {

@@ -17,6 +17,9 @@ export const metadata: Metadata = {
     type: 'article',
     siteName: 'DCM Grading',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/grading-standard',
+  },
 };
 
 // Rendered from docs/DCM_GRADING_STANDARD.md so the published page and the

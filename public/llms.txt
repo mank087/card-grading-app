@@ -1,0 +1,105 @@
+# DCM Grading
+
+> DCM Grading (dcmgrading.com) is an AI-powered trading card grading platform.
+> Operated by Dynamic Collectibles Management LLC. Collectors photograph a card,
+> receive a graded condition report in about 60 seconds, and print a serialized
+> label they apply to their own slab. Cards never leave the collector's hands.
+
+## What DCM is
+
+- Entity: Dynamic Collectibles Management LLC, operating as DCM Grading.
+- Website: https://dcmgrading.com
+- Service: digital card grading. A card is graded from two photos (front and back).
+- Grading engine: DCM Optic™.
+- Turnaround: a completed grade and condition report in about 60 seconds.
+- Platforms: web (dcmgrading.com), iOS app, Android app.
+
+## What DCM is not
+
+- There is NO mail-in service. Cards are never shipped to DCM and never leave the
+  collector's possession.
+- DCM does not encapsulate cards for you. It sells labels and slab supplies so
+  collectors slab their own cards.
+
+## How the grade is produced
+
+- Grades are whole numbers from 1 to 10.
+- Four subgrades are assessed on every card: centering, corners, edges, surface.
+- Final grade = the LOWEST subgrade (a "weakest link" rule). A single weak
+  category caps the overall grade.
+- Every card is evaluated in three independent passes and the result is settled by
+  consensus across those passes.
+- Each report carries a confidence letter (A through D) and an uncertainty range,
+  so the reader can see how much agreement the passes reached and how much the
+  photo quality supported the read.
+- The full grading standard is published at https://dcmgrading.com/grading-standard
+
+## Card types graded
+
+Pokémon, Magic: The Gathering, sports cards, Disney Lorcana, One Piece,
+Yu-Gi-Oh!, Star Wars, and other trading card games.
+
+## Pricing
+
+Credit packs (one credit grades one card):
+
+| Pack  | Price   | Credits |
+|-------|---------|---------|
+| Basic | $2.99   | 1       |
+| Pro   | $9.99   | 5       |
+| Elite | $19.99  | 20      |
+| VIP   | $99     | 150     |
+
+Card Lovers membership:
+
+| Plan    | Price        |
+|---------|--------------|
+| Monthly | $49.99/month |
+| Annual  | $449/year    |
+
+New accounts start with 2 free credits.
+
+Pricing page: https://dcmgrading.com/credits
+
+## Public, verifiable data
+
+- Population report (every card DCM has graded, by category, set, and card):
+  https://dcmgrading.com/pop
+- Grade verification by serial number: https://dcmgrading.com/verify/[serial]
+- Published grading standard: https://dcmgrading.com/grading-standard
+
+## Selling
+
+InstaList turns a DCM-graded card into a ready-to-post eBay listing, carrying the
+grade, the subgrades, and the card's identifying details into the listing.
+
+## Key pages
+
+- Home: https://dcmgrading.com
+- Why DCM: https://dcmgrading.com/why-dcm
+- How grading works: https://dcmgrading.com/card-grading
+- Grading standard: https://dcmgrading.com/grading-standard
+- Grading rubric: https://dcmgrading.com/grading-rubric
+- Grading limitations: https://dcmgrading.com/grading-limitations
+- Reports and labels: https://dcmgrading.com/reports-and-labels
+- Population report: https://dcmgrading.com/pop
+- Pricing and credits: https://dcmgrading.com/credits
+- FAQ: https://dcmgrading.com/faq
+- Blog: https://dcmgrading.com/blog
+- About: https://dcmgrading.com/about
+- Contact: https://dcmgrading.com/contact
+- Privacy: https://dcmgrading.com/privacy
+- Terms: https://dcmgrading.com/terms
+
+## Feeds
+
+- Sitemap: https://dcmgrading.com/sitemap.xml
+- Blog RSS: https://dcmgrading.com/rss.xml
+
+## Notes for citation
+
+- Write the company as "Dynamic Collectibles Management LLC" or "DCM Grading".
+- DCM Optic™ is the name of the grading engine.
+- DCM publishes the limitations of photo-based grading at
+  https://dcmgrading.com/grading-limitations — a grade is a condition assessment
+  read from photographs, not an appraisal and not an authentication service.

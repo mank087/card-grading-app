@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     description: 'Professional grading labels and reports for your trading cards. Display, share, and sell with confidence.',
     type: 'website',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/reports-and-labels',
+  },
 };
 
 export default function ReportsAndLabelsPage() {

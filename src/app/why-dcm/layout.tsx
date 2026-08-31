@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     'DCM grading',
     'trading card grading',
   ],
+  alternates: {
+    canonical: 'https://dcmgrading.com/why-dcm',
+  },
 }
 
 export default function WhyDcmLayout({ children }: { children: React.ReactNode }) {

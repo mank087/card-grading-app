@@ -5,6 +5,9 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 export const metadata: Metadata = {
   title: 'Grading Limitations | DCM Grading',
   description: 'Understanding the limitations of photo-based card grading. Learn what DCM Optic™ can and cannot reliably assess from card images.',
+  alternates: {
+    canonical: 'https://dcmgrading.com/grading-limitations',
+  },
 }
 
 export default function GradingLimitationsPage() {

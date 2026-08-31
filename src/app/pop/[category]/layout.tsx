@@ -20,6 +20,9 @@ export async function generateMetadata({
       siteName: 'DCM Grading',
       type: 'website',
     },
+    alternates: {
+      canonical: `https://dcmgrading.com/pop/${category}`,
+    },
   };
 }
 

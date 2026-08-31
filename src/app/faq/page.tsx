@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { isValidElement, type ReactNode } from 'react';
 import Link from 'next/link';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
@@ -16,6 +17,9 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'FAQ - DCM Grading',
     description: 'Answers to common questions about card grading powered by DCM Optic™.',
+  },
+  alternates: {
+    canonical: 'https://dcmgrading.com/faq',
   },
 };
 
@@ -521,10 +525,53 @@ const faqs: FAQItem[] = [
 // Group FAQs by category
 const categories = [...new Set(faqs.map(faq => faq.category))];
 
+/**
+ * Flatten a JSX answer to plain text for the FAQPage JSON-LD.
+ *
+ * `faqs` above stays the SINGLE source for both the visible page and the
+ * structured data — writing the answers a second time as strings is how the two
+ * drift apart, and Google penalises schema that does not match the rendered
+ * page. Block elements are joined with a space so sentences don't run together.
+ */
+function nodeToText(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join(' ');
+  if (isValidElement(node)) {
+    return nodeToText((node.props as { children?: ReactNode }).children);
+  }
+  return '';
+}
+
+function answerToText(node: ReactNode): string {
+  return nodeToText(node).replace(/\s+/g, ' ').trim();
+}
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  '@id': 'https://dcmgrading.com/faq#faq',
+  isPartOf: { '@id': 'https://dcmgrading.com/#website' },
+  mainEntity: faqs.map((faq) => ({
+    '@type': 'Question',
+    '@id': `https://dcmgrading.com/faq#${faq.id}`,
+    name: faq.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: answerToText(faq.answer),
+    },
+  })),
+};
+
 export default function FAQPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
       <FloatingCardsBackground />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero Section */}
         <div className="text-center mb-12">

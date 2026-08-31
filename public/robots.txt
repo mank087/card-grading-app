@@ -1,5 +1,5 @@
 # DCM Grading - Robots.txt
-# https://www.dcmgrading.com
+# https://dcmgrading.com
 
 User-agent: *
 Allow: /
@@ -17,8 +17,133 @@ Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
 
+# ---------------------------------------------------------------------------
+# AI / answer-engine crawlers
+# Explicitly allowed so DCM Grading can be cited in AI answers. Each agent gets
+# its own section because a named User-agent block REPLACES the "*" block for
+# that agent — the disallows have to be repeated, not inherited.
+# Machine-readable fact sheet for these agents: /llms.txt
+# ---------------------------------------------------------------------------
+
+# OpenAI — model training crawler
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# OpenAI — ChatGPT search index
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# OpenAI — user-initiated ChatGPT browsing
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Anthropic — Claude crawler
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Anthropic — Claude user-initiated fetch
+User-agent: Claude-Web
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Anthropic — legacy agent token
+User-agent: anthropic-ai
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Google — Gemini / Vertex AI grounding (separate from Googlebot)
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
+# Meta AI
+User-agent: meta-externalagent
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+Disallow: /data-deletion-status
+Disallow: /test-8167
+
 # Allow search engines to find our sitemap
-Sitemap: https://www.dcmgrading.com/sitemap.xml
+Sitemap: https://dcmgrading.com/sitemap.xml
 
 # Crawl-delay for polite crawling (optional, respected by some bots)
 Crawl-delay: 1

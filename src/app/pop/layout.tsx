@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     siteName: 'DCM Grading',
     type: 'website',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/pop',
+  },
 };
 
 export default function PopLayout({ children }: { children: React.ReactNode }) {

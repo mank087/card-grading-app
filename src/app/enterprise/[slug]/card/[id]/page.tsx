@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const serial = (card as any).org_serial_display || card.serial;
   const title = `${label.primaryName} — Graded ${grade} ${label.condition} | ${sf.org.name}`;
   const description = `${label.primaryName}${label.contextLine ? ` (${label.contextLine})` : ''} professionally graded ${grade}/10 ${label.condition} by ${sf.org.name}. Serial ${serial}. View the verified grading report with sub-scores and condition analysis.`;
-  const canonical = `https://www.dcmgrading.com/enterprise/${slug}/card/${card.id}`;
+  const canonical = `https://dcmgrading.com/enterprise/${slug}/card/${card.id}`;
 
   // OG image: short-lived signed URL is fine here (crawlers fetch at parse time).
   let ogImage: string | undefined;

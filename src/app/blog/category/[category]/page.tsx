@@ -74,6 +74,9 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       description: category.description || `Read our latest ${category.name.toLowerCase()} articles.`,
       type: 'website',
     },
+    alternates: {
+      canonical: `https://dcmgrading.com/blog/category/${categorySlug}`,
+    },
   };
 }
 

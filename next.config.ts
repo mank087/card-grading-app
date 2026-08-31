@@ -83,6 +83,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        // Host standardization: the bare apex is canonical. Both hosts used to
+        // serve 200s, which splits crawl budget and link equity between two
+        // origins and makes every canonical/JSON-LD @id ambiguous.
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.dcmgrading.com' }],
+        destination: 'https://dcmgrading.com/:path*',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

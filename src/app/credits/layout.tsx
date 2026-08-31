@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     title: 'Buy Credits - DCM Grading Pricing',
     description: 'Card grading powered by DCM Optic™ starting at $0.66 per grade. Instant results for Sports, Pokemon, MTG cards.',
   },
+  alternates: {
+    canonical: 'https://dcmgrading.com/credits',
+  },
 };
 
 export default function CreditsLayout({

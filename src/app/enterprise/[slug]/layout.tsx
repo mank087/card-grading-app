@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const description =
     sf.content.tagline ||
     (sf.content.description ? sf.content.description.slice(0, 155) : `${sf.org.name}: trading cards professionally graded and encapsulated in-store, with serialized labels you can verify online.`);
-  const canonical = `https://www.dcmgrading.com/enterprise/${slug}`;
+  const canonical = `https://dcmgrading.com/enterprise/${slug}`;
   return {
     // Org pages carry the ORG's identity — no DCM title template or branding.
     title: { absolute: `${sf.org.name} — Professional Card Grading` },
@@ -89,7 +89,7 @@ export default async function StorefrontLayout({
             <span>
               powered by{' '}
               <a
-                href="https://www.dcmgrading.com"
+                href="https://dcmgrading.com"
                 className="text-gray-400 hover:text-gray-600 underline underline-offset-2"
                 target="_blank"
                 rel="noopener noreferrer"

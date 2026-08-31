@@ -31,6 +31,58 @@ export const metadata: Metadata = {
     default: 'DCM Grading - Card Grading Powered by DCM Optic™',
     template: '%s | DCM Grading',
   },
+  alternates: {
+    // NOTE: deliberately no `canonical` here. Metadata is merged down the tree,
+    // so a canonical set on the root layout would be inherited by every page
+    // that does not set its own and point the whole site at one URL. Canonicals
+    // live on the individual pages/layouts. `types` is safe to inherit.
+    types: {
+      'application/rss+xml': [
+        { url: 'https://dcmgrading.com/rss.xml', title: 'DCM Grading Blog' },
+      ],
+    },
+  },
+};
+
+// Site-wide identity graph. Rendered server-side in <head> on every page so
+// answer engines and rich results resolve one canonical Organization node
+// (@id) that page-level schema can reference.
+const SITE_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://dcmgrading.com/#organization',
+      name: 'DCM Grading',
+      legalName: 'Dynamic Collectibles Management LLC',
+      url: 'https://dcmgrading.com',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://dcmgrading.com/DCM-logo.png',
+        width: 512,
+        height: 512,
+      },
+      description:
+        'DCM Grading is an AI-powered trading card grading platform that grades trading cards from photos using DCM Optic™ and issues printable labels collectors apply to their own slabs.',
+      sameAs: [
+        'https://www.facebook.com/dcmgrading',
+        'https://www.instagram.com/dcm_grading/',
+        'https://x.com/DCM_Grading',
+        'https://www.youtube.com/@DCM-Grading',
+        'https://www.tiktok.com/@dcm_grading',
+      ],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://dcmgrading.com/#website',
+      name: 'DCM Grading',
+      url: 'https://dcmgrading.com',
+      inLanguage: 'en-US',
+      publisher: { '@id': 'https://dcmgrading.com/#organization' },
+      // No SearchAction: /search is a serial-number lookup, not general site
+      // search — advertising it as such would route junk queries there.
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -47,6 +99,11 @@ export default function RootLayout({
       <head>
         {/* Facebook Domain Verification (site-ownership proof only — loads nothing) */}
         <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />
+        {/* Site-wide Organization + WebSite structured data (server-rendered) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSON_LD) }}
+        />
         {/* 2026-07-17: Google Analytics/Ads, Meta Pixel, and Reddit Pixel are now
             CONSENT-GATED — they load exclusively via <ConsentManager /> after the
             visitor explicitly accepts. Nothing tracking-related loads here. */}
