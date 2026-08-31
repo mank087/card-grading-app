@@ -66,6 +66,8 @@ import { resolveHeritageSelection, isTraditionalSelection } from '@/lib/labels/l
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
+import { DesignationBadge } from '@/components/grading/DesignationBadge';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -659,6 +661,7 @@ interface SportsCard {
   // Detection / label data
   stage0_detection?: any;
   custom_label_data?: any;
+  label_data?: any;
 
   // Timestamps
   created_at?: string;
@@ -3200,6 +3203,17 @@ export function OtherCardDetails() {
                 <p className="text-lg font-medium">
                   {card.conversational_condition_label || ebayCondition}
                 </p>
+
+                {/* v9.23: unverified-autograph designation — a notation beside the score */}
+                {(() => {
+                  const designation = card.label_data?.designation
+                    || (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null);
+                  return designation ? (
+                    <div className="mt-2">
+                      <DesignationBadge designation={designation} tone="onDark" />
+                    </div>
+                  ) : null;
+                })()}
 
                 <div className="mt-4 flex justify-center space-x-4 flex-wrap gap-2">
                   {/* 🎯 v3.2: Uncertainty badge - always derived from confidence letter */}

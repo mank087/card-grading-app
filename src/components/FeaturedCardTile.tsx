@@ -8,6 +8,7 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 import { GradeHeroBanner } from '@/components/grading/GradeHeroBanner'
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy'
 import { SubScoresDisplay } from '@/components/grading/SubScoresDisplay'
 import { PriceEstimateBadge } from '@/components/grading/PriceEstimateBadge'
 
@@ -194,6 +195,10 @@ export default function FeaturedCardTile({ card, hidePricing = false }: Featured
           conditionLabel={card.conversational_condition_label || labelData.condition}
           imageConfidence={card.conversational_image_confidence}
           isAlteredAuthentic={labelData.isAlteredAuthentic}
+          designation={
+            card.label_data?.designation ||
+            (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null)
+          }
           compact
         />
 

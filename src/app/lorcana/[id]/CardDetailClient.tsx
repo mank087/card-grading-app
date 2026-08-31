@@ -68,6 +68,8 @@ import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
+import { DesignationBadge } from '@/components/grading/DesignationBadge';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -676,6 +678,7 @@ interface SportsCard {
   dvg_image_quality?: string | null;
   dvg_reshoot_required?: boolean | null;
   custom_label_data?: any;
+  label_data?: any;
   dcm_selected_product_id?: string | null;
   dcm_selected_product_name?: string | null;
 
@@ -3276,6 +3279,17 @@ export function MTGCardDetails() {
                 <p className="text-lg font-medium">
                   {card.conversational_condition_label || ebayCondition}
                 </p>
+
+                {/* v9.23: unverified-autograph designation — a notation beside the score */}
+                {(() => {
+                  const designation = card.label_data?.designation
+                    || (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null);
+                  return designation ? (
+                    <div className="mt-2">
+                      <DesignationBadge designation={designation} tone="onDark" />
+                    </div>
+                  ) : null;
+                })()}
 
                 <div className="mt-4 flex justify-center space-x-4 flex-wrap gap-2">
                   {/* 🎯 v3.2: Uncertainty badge - always derived from confidence letter */}

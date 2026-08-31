@@ -1,6 +1,7 @@
 'use client'
 
 import { formatGrade, getUncertaintyFromConfidence, getConfidenceBadgeColor } from '@/lib/gradeDisplayUtils'
+import { DesignationBadge } from '@/components/grading/DesignationBadge'
 
 interface GradeHeroBannerProps {
   grade: number | null
@@ -8,6 +9,8 @@ interface GradeHeroBannerProps {
   imageConfidence?: string | null
   isAlteredAuthentic?: boolean
   compact?: boolean
+  /** e.g. "Altered - Unverified Autograph" — a notation shown under the condition text. */
+  designation?: string | null
 }
 
 export function GradeHeroBanner({
@@ -16,6 +19,7 @@ export function GradeHeroBanner({
   imageConfidence,
   isAlteredAuthentic = false,
   compact = false,
+  designation = null,
 }: GradeHeroBannerProps) {
   const hasGrade = grade !== null && grade !== undefined && grade !== 0
   const gradientClass = hasGrade
@@ -38,6 +42,11 @@ export function GradeHeroBanner({
       <p className={`${compact ? 'text-sm' : 'text-lg'} font-medium`}>
         {conditionText}
       </p>
+      {designation && (
+        <div className={compact ? 'mt-1.5' : 'mt-2'}>
+          <DesignationBadge designation={designation} tone="onDark" />
+        </div>
+      )}
       <div className={`${compact ? 'mt-2' : 'mt-4'} flex justify-center space-x-3 flex-wrap gap-1`}>
         <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
           Uncertainty: {getUncertaintyFromConfidence(imageConfidence)}
