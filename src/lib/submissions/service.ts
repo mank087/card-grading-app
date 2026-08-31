@@ -564,6 +564,67 @@ export async function cancelSubmission(
   });
 }
 
+/**
+ * Requeue every `failed` item so the next drain tick picks it back up.
+ *
+ * Deliberately carries no credit logic: an item that was never charged is
+ * charged for the first time at drain dispatch (deductCredit, keyed on
+ * card_id); an item that WAS already charged before it failed comes back
+ * from deductCredit as `alreadyCharged: true` and costs nothing again. This
+ * function only resets queue state.
+ */
+export async function retrySubmissionItems(
+  submissionId: string,
+  userId: string
+): Promise<SubmissionResult<{ submission: SubmissionRow; requeued: number }>> {
+  const loaded = await getOwnedSubmission(submissionId, userId);
+  if (!loaded.ok) return loaded;
+  const submission = loaded.data;
+
+  if (!['complete', 'failed', 'paused', 'running', 'blocked_insufficient_credits'].includes(submission.status)) {
+    return fail({
+      code: 'conflict',
+      message: `A ${submission.status} submission has nothing to retry.`,
+    });
+  }
+
+  const supabase = supabaseServer();
+  const { data: requeued, error: requeueError } = await supabase
+    .from('submission_items')
+    .update({ status: 'queued', attempts: 0, error: null, claimed_at: null })
+    .eq('submission_id', submissionId)
+    .eq('status', 'failed')
+    .select('id');
+
+  if (requeueError) {
+    console.error(`${LOG} retry requeue failed for ${submissionId}:`, requeueError.message);
+    return fail({ code: 'internal', message: 'Could not requeue failed cards' });
+  }
+
+  const requeuedCount = requeued?.length ?? 0;
+  let updatedSubmission = submission;
+
+  // Only submissions that had actually stopped need a status flip back to
+  // running. A submission still `running` with a handful of failed items
+  // (attempts exhausted but the rest still grading) needs no transition.
+  if (requeuedCount > 0 && ['complete', 'failed', 'paused', 'blocked_insufficient_credits'].includes(submission.status)) {
+    const { data: updated, error: updateError } = await supabase
+      .from('submissions')
+      .update({ status: 'running', completed_at: null })
+      .eq('id', submissionId)
+      .select(SUBMISSION_COLUMNS)
+      .maybeSingle();
+
+    if (updateError) {
+      console.error(`${LOG} retry status flip failed for ${submissionId}:`, updateError.message);
+      return fail({ code: 'internal', message: 'Could not resume the submission' });
+    }
+    updatedSubmission = (updated as unknown as SubmissionRow) ?? submission;
+  }
+
+  return ok({ submission: updatedSubmission, requeued: requeuedCount });
+}
+
 /** Submissions with outstanding work, for the drain's outer loop. */
 export async function listRunningSubmissions(limit = 10): Promise<SubmissionRow[]> {
   const supabase = supabaseServer();

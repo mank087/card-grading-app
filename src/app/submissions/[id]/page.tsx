@@ -151,19 +151,21 @@ export default function SubmissionStatusPage() {
     }
   }
 
-  // "Retry" has two real levers on the server core we can call: re-running
-  // commit flips a blocked_insufficient_credits/paused submission back to
-  // running if the balance now covers it, and kicking the drain (the same
-  // owner-callable path the cron uses) resumes anything still queued.
-  // Items that failed outright (attempts exhausted) have no un-fail endpoint
-  // in the server core — see report.
+  // POST /api/submissions/[id]/retry requeues every failed item (attempts=0,
+  // error=null) and flips a stopped submission back to running; the drain
+  // kick right after means the first tick doesn't wait for the cron.
   const retryFailed = async () => {
     if (!submissionId) return
     setRetrying(true)
     try {
-      await fetch(`/api/submissions/${submissionId}/commit`, { method: 'POST', headers: authHeaders() }).catch(() => null)
+      const res = await fetch(`/api/submissions/${submissionId}/retry`, { method: 'POST', headers: authHeaders() })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        toast.error(json?.message || 'Could not retry.')
+        return
+      }
       await fetch(`/api/submissions/drain?submission_id=${submissionId}`, { method: 'POST', headers: authHeaders() }).catch(() => null)
-      toast.success('Kicked the queue.')
+      toast.success(json.requeued > 0 ? `Retrying ${json.requeued} card${json.requeued === 1 ? '' : 's'}.` : 'Nothing to retry.')
       fetchStatus()
     } finally {
       setRetrying(false)
