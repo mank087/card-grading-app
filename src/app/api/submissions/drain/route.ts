@@ -1,0 +1,683 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Resend } from 'resend';
+import { supabaseServer } from '@/lib/supabaseServer';
+import { verifyAuth } from '@/lib/serverAuth';
+import { requireCron } from '@/lib/cronAuth';
+import { deductCredit } from '@/lib/credits';
+import { recordGradingFailure } from '@/lib/gradingFailure';
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
+import { addCardsToBinder } from '@/lib/binders/service';
+import {
+  getOwnedSubmission,
+  getSubmissionItems,
+  listRunningSubmissions,
+  tallyItems,
+} from '@/lib/submissions/service';
+import {
+  COST_PER_GRADE_USD,
+  MAX_IN_FLIGHT,
+  MAX_ITEM_ATTEMPTS,
+  STUCK_GRADE_MS,
+  SUBMISSION_SPEND_CEILING_USD,
+  type SubmissionItemRow,
+  type SubmissionRow,
+} from '@/lib/submissions/types';
+
+/**
+ * POST /api/submissions/drain
+ *
+ * The one place a submission's queue moves. Two drivers call it — the
+ * per-minute Vercel cron and the owner's open page ("kick") — running the
+ * same code path, so closing the tab pauses progress rather than breaking it.
+ *
+ * Mechanism (SOW "Grading execution — verified approach"): an internal
+ * self-call to the existing per-category GET route. Those 8 routes carry the
+ * cross-instance grading lock, the failure/refund path and every per-category
+ * divergence; extracting a callable core would be an 8×1,300-line refactor of
+ * the most business-critical path with no route test coverage. Rejected there,
+ * not revisited here.
+ *
+ * Each tick, per running submission:
+ *   1. count in-flight, skip if at the ceiling
+ *   2. claim up to the remaining headroom, charge, dispatch
+ *   3. reconcile what finished, failed or got stuck
+ *   4. file freshly graded cards into the binder, and close the submission
+ *      when nothing is left outstanding
+ *
+ * The drain is idempotent at every step: it holds no in-memory state, the
+ * authoritative in-flight counter is `cards.grade_status`, and a second
+ * concurrent drain loses the claim race rather than duplicating work.
+ */
+
+export const maxDuration = 60;
+
+const LOG = '[submissions/drain]';
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/** ~50s, comfortably inside maxDuration 60 with room to reconcile after. */
+const DISPATCH_ABORT_MS = 50_000;
+
+/** Never spin on more submissions than one 60s tick can serve. */
+const MAX_SUBMISSIONS_PER_TICK = 3;
+
+function drainEnabled(): boolean {
+  // Default ON. Only the explicit string 'false' disables it, so a missing or
+  // typo'd env var cannot silently stop every submission on the platform.
+  return (process.env.SUBMISSIONS_DRAIN_ENABLED || '').toLowerCase() !== 'false';
+}
+
+/**
+ * Origin for the self-call. `request.nextUrl.origin` is what the existing
+ * self-calling cron (api/cron/sync-costs) uses and it is the only value
+ * guaranteed to reach *this* deployment — a preview or branch deploy must
+ * call itself, not production. The env vars are the fallback for contexts
+ * where the origin comes back empty.
+ */
+function resolveOrigin(request: NextRequest): string {
+  const fromRequest = request.nextUrl?.origin;
+  if (fromRequest && /^https?:\/\//.test(fromRequest)) return fromRequest;
+  return (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://dcmgrading.com'
+  );
+}
+
+function siteUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://dcmgrading.com';
+}
+
+/** A card row is mid-grade exactly when it holds the lock (`processing:<ISO>`). */
+function isProcessing(gradeStatus: string | null | undefined): boolean {
+  return typeof gradeStatus === 'string' && gradeStatus.startsWith('processing:');
+}
+
+interface CardState {
+  id: string;
+  grade_status: string | null;
+  user_id: string | null;
+  category: string | null;
+  error_message: string | null;
+}
+
+async function loadCardStates(cardIds: string[]): Promise<Map<string, CardState>> {
+  const byId = new Map<string, CardState>();
+  if (!cardIds.length) return byId;
+
+  const supabase = supabaseServer();
+  // Narrow select: `cards` is ~290 columns and several are large JSON blobs.
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, grade_status, user_id, category, error_message')
+    .in('id', cardIds);
+
+  if (error) {
+    console.error(`${LOG} card state read failed:`, error.message);
+    return byId;
+  }
+  for (const row of data ?? []) byId.set((row as any).id, row as CardState);
+  return byId;
+}
+
+// ---------------------------------------------------------------------------
+// Claiming
+// ---------------------------------------------------------------------------
+
+/**
+ * Claim one item by compare-and-swap.
+ *
+ * `.eq('status', 'queued')` is part of the UPDATE's WHERE clause, so Postgres
+ * evaluates it under the row lock: exactly one of two concurrent drains
+ * flips the row and gets a row back, and the loser's `.select()` returns
+ * empty. There is no read-then-write window to lose. `claimed_at` is stamped
+ * in the same statement so the reconcile pass can age the lease out.
+ */
+async function claimItem(itemId: string): Promise<boolean> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from('submission_items')
+    .update({ status: 'dispatched', claimed_at: new Date().toISOString() })
+    .eq('id', itemId)
+    .eq('status', 'queued')
+    .select('id');
+
+  if (error) {
+    console.error(`${LOG} claim failed for item ${itemId}:`, error.message);
+    return false;
+  }
+  return !!data && data.length > 0;
+}
+
+/** Put a claim back — used when the charge fails, before anything was dispatched. */
+async function releaseClaim(itemId: string, errorText: string | null = null): Promise<void> {
+  const supabase = supabaseServer();
+  const { error } = await supabase
+    .from('submission_items')
+    .update({ status: 'queued', claimed_at: null, error: errorText })
+    .eq('id', itemId)
+    .eq('status', 'dispatched');
+  if (error) console.error(`${LOG} release failed for item ${itemId}:`, error.message);
+}
+
+async function setItemStatus(
+  itemId: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const supabase = supabaseServer();
+  const { error } = await supabase.from('submission_items').update(patch).eq('id', itemId);
+  if (error) console.error(`${LOG} item update failed for ${itemId}:`, error.message);
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch
+// ---------------------------------------------------------------------------
+
+/**
+ * Fire the grade and stop waiting after ~50s.
+ *
+ * Aborting is NOT a failure: the grading route runs in its own function with
+ * `maxDuration = 300` and keeps going after we hang up. The card's grading
+ * lock is what makes that safe — the next tick sees `processing:<ISO>` and
+ * counts it in-flight rather than re-firing it.
+ */
+async function dispatchGrade(
+  origin: string,
+  routeSlug: string,
+  cardId: string,
+  ownerId: string
+): Promise<{ dispatched: boolean; completed: boolean; error?: string }> {
+  const url = `${origin}/api/${routeSlug}/${cardId}?user_id=${encodeURIComponent(ownerId)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DISPATCH_ABORT_MS);
+
+  try {
+    const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    if (res.ok) return { dispatched: true, completed: true };
+    // A 429 is the route's own lock saying someone else is already grading
+    // this card. That is a successful dispatch from our side.
+    if (res.status === 429) return { dispatched: true, completed: false };
+    return {
+      dispatched: true,
+      completed: false,
+      error: `grading route returned ${res.status}`,
+    };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      // Expected on nearly every grade: ~90s of work, ~50s of patience.
+      return { dispatched: true, completed: false };
+    }
+    return { dispatched: false, completed: false, error: err?.message || 'dispatch failed' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Binder filing
+// ---------------------------------------------------------------------------
+
+/**
+ * File graded cards into the destination binder in scan order.
+ *
+ * Called during reconcile so cards land as they finish — interrupted at card
+ * 60 leaves 60 filed cards, not an empty binder and a stuck job. Completion
+ * runs it once more to catch stragglers. `addCardsToBinder` skips cards
+ * already present, so repeated calls are free.
+ */
+async function fileIntoBinder(
+  submission: SubmissionRow,
+  items: SubmissionItemRow[]
+): Promise<number> {
+  if (!submission.binder_id) return 0;
+
+  const cardIds = items
+    .filter((item) => item.status === 'graded' && item.card_id)
+    .sort((a, b) => a.position - b.position)
+    .map((item) => item.card_id as string);
+
+  if (!cardIds.length) return 0;
+
+  try {
+    return await addCardsToBinder(supabaseServer(), submission.binder_id, cardIds);
+  } catch (e: any) {
+    console.error(`${LOG} binder filing failed for ${submission.id}:`, e?.message);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Completion
+// ---------------------------------------------------------------------------
+
+async function sendCompletionEmail(
+  submission: SubmissionRow,
+  graded: number,
+  failed: number
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn(`${LOG} RESEND_API_KEY missing — skipping completion email`);
+    return;
+  }
+
+  // Addresses live in auth, not in profiles — same lookup the winback cron
+  // uses (src/app/api/cron/send-winback-emails/route.ts).
+  const supabase = supabaseServer();
+  let to: string | undefined;
+  try {
+    const { data: authUser } = await supabase.auth.admin.getUserById(submission.user_id);
+    to = authUser?.user?.email;
+  } catch (e: any) {
+    console.error(`${LOG} email lookup failed for ${submission.user_id}:`, e?.message);
+  }
+
+  if (!to) {
+    console.warn(`${LOG} no email on file for ${submission.user_id} — skipping completion email`);
+    return;
+  }
+
+  const link = `${siteUrl()}/submissions/${submission.id}`;
+  const label = submission.name?.trim() || 'Your submission';
+  const subject =
+    failed > 0
+      ? `${label}: ${graded} graded, ${failed} need a retry`
+      : `${label}: ${graded} card${graded === 1 ? '' : 's'} graded`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: 'DCM Grading <admin@dcmgrading.com>',
+      to: [to],
+      subject,
+      html: `
+        <p>${label} is finished.</p>
+        <p><strong>${graded}</strong> card${graded === 1 ? '' : 's'} graded${
+          failed > 0 ? ` &middot; <strong>${failed}</strong> need a retry` : ''
+        }.</p>
+        <p><a href="${link}">See the results</a></p>
+      `,
+    });
+    if (error) console.error(`${LOG} completion email failed:`, error.message);
+  } catch (e: any) {
+    console.error(`${LOG} completion email threw:`, e?.message);
+  }
+}
+
+/** Mark the submission finished, file the last cards, notify once. */
+async function completeSubmission(
+  submission: SubmissionRow,
+  items: SubmissionItemRow[]
+): Promise<void> {
+  const supabase = supabaseServer();
+  await fileIntoBinder(submission, items);
+
+  // Guarded on status='running' so only one drain wins the completion and
+  // therefore only one completion email is ever sent.
+  const { data, error } = await supabase
+    .from('submissions')
+    .update({ status: 'complete', completed_at: new Date().toISOString() })
+    .eq('id', submission.id)
+    .eq('status', 'running')
+    .select('id');
+
+  if (error) {
+    console.error(`${LOG} completion write failed for ${submission.id}:`, error.message);
+    return;
+  }
+  if (!data || data.length === 0) return; // another drain already closed it
+
+  const counts = tallyItems(items);
+  console.log(`${LOG} ${submission.id} complete: ${counts.graded} graded, ${counts.failed} failed`);
+  await sendCompletionEmail(submission, counts.graded, counts.failed);
+}
+
+// ---------------------------------------------------------------------------
+// Reconcile
+// ---------------------------------------------------------------------------
+
+/**
+ * Bring item status back in line with the card rows, which are the truth.
+ *
+ * Drift is normal, not exceptional: we hang up on every dispatch after ~50s,
+ * so an item is `dispatched` long after its grade actually landed. Nothing
+ * downstream counts anything the drain remembered.
+ */
+async function reconcile(submission: SubmissionRow, items: SubmissionItemRow[]): Promise<void> {
+  const inFlightItems = items.filter(
+    (item) => (item.status === 'dispatched' || item.status === 'grading') && item.card_id
+  );
+  if (!inFlightItems.length) return;
+
+  const cards = await loadCardStates(inFlightItems.map((item) => item.card_id as string));
+  const now = Date.now();
+
+  for (const item of inFlightItems) {
+    const card = cards.get(item.card_id as string);
+    if (!card) continue;
+
+    if (card.grade_status === 'complete') {
+      item.status = 'graded';
+      await setItemStatus(item.id, { status: 'graded', error: null });
+      continue;
+    }
+
+    if (card.grade_status === 'failed') {
+      const attempts = item.attempts + 1;
+      const retry = attempts < MAX_ITEM_ATTEMPTS;
+      item.status = retry ? 'queued' : 'failed';
+      item.attempts = attempts;
+      await setItemStatus(item.id, {
+        status: item.status,
+        attempts,
+        claimed_at: null,
+        error: (card.error_message || 'Grading failed').slice(0, 500),
+      });
+      continue;
+    }
+
+    if (isProcessing(card.grade_status)) {
+      // Still legitimately grading — unless the lease has aged out.
+      const claimedAt = item.claimed_at ? Date.parse(item.claimed_at) : NaN;
+      const stuck = !Number.isNaN(claimedAt) && now - claimedAt > STUCK_GRADE_MS;
+      if (!stuck) {
+        if (item.status !== 'grading') {
+          item.status = 'grading';
+          await setItemStatus(item.id, { status: 'grading' });
+        }
+        continue;
+      }
+
+      // Past the 10-minute threshold the client already uses: the function
+      // that held this lock is gone. recordGradingFailure marks the card
+      // failed AND refunds the credit, so the retry is on the house.
+      console.warn(`${LOG} card ${card.id} stuck processing — failing and refunding`);
+      await recordGradingFailure({
+        cardId: card.id,
+        userId: card.user_id,
+        category: card.category || submission.category,
+        errorMessage: 'Grading timed out (bulk submission drain)',
+      });
+
+      const attempts = item.attempts + 1;
+      const retry = attempts < MAX_ITEM_ATTEMPTS;
+      item.status = retry ? 'queued' : 'failed';
+      item.attempts = attempts;
+      await setItemStatus(item.id, {
+        status: item.status,
+        attempts,
+        claimed_at: null,
+        error: 'Grading timed out',
+      });
+      continue;
+    }
+
+    // grade_status null: the dispatch never took the lock (the route 404'd,
+    // the fetch never landed). Return it to the queue within its budget.
+    const attempts = item.attempts + 1;
+    const retry = attempts < MAX_ITEM_ATTEMPTS;
+    item.status = retry ? 'queued' : 'failed';
+    item.attempts = attempts;
+    await setItemStatus(item.id, {
+      status: item.status,
+      attempts,
+      claimed_at: null,
+      error: retry ? null : 'Grading never started',
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-submission tick
+// ---------------------------------------------------------------------------
+
+interface TickResult {
+  submission_id: string;
+  in_flight: number;
+  claimed: number;
+  dispatched: number;
+  filed: number;
+  status: string;
+  note?: string;
+}
+
+async function tickSubmission(submission: SubmissionRow, origin: string): Promise<TickResult> {
+  let items = await getSubmissionItems(submission.id);
+
+  // 1. Reconcile FIRST. Yesterday's `dispatched` rows are usually finished
+  //    grades, and counting them as in-flight would stall the queue forever.
+  await reconcile(submission, items);
+
+  const filed = await fileIntoBinder(submission, items);
+
+  const counts = tallyItems(items);
+
+  // 2. Completion.
+  if (counts.active === 0) {
+    await completeSubmission(submission, items);
+    return {
+      submission_id: submission.id,
+      in_flight: 0,
+      claimed: 0,
+      dispatched: 0,
+      filed,
+      status: 'complete',
+    };
+  }
+
+  // 3. Spend ceiling. A backstop, not a budget: with the 100-card cap a
+  //    submission tops out near $16, so this only fires if the item rows have
+  //    outrun what the submission declared — i.e. something is looping.
+  const chargeable = counts.dispatched + counts.grading + counts.graded;
+  const spentSoFar = chargeable * COST_PER_GRADE_USD;
+  const legitimateCeiling = (submission.card_count ?? 0) * COST_PER_GRADE_USD;
+  if (spentSoFar > SUBMISSION_SPEND_CEILING_USD && spentSoFar > legitimateCeiling) {
+    console.error(
+      `${LOG} ${submission.id} tripped the spend ceiling: ${chargeable} grades ` +
+      `(~$${spentSoFar.toFixed(2)}) against a declared ${submission.card_count} cards — pausing`
+    );
+    await supabaseServer()
+      .from('submissions')
+      .update({ status: 'paused' })
+      .eq('id', submission.id)
+      .eq('status', 'running');
+    return {
+      submission_id: submission.id,
+      in_flight: counts.dispatched + counts.grading,
+      claimed: 0,
+      dispatched: 0,
+      filed,
+      status: 'paused',
+      note: 'spend ceiling',
+    };
+  }
+
+  // 4. In-flight, counted from the card rows rather than item status — the
+  //    grading lock is the authoritative counter (SOW).
+  const maybeInFlight = items.filter(
+    (item) => (item.status === 'dispatched' || item.status === 'grading') && item.card_id
+  );
+  const cards = await loadCardStates(maybeInFlight.map((i) => i.card_id as string));
+  const inFlight = maybeInFlight.filter((item) =>
+    isProcessing(cards.get(item.card_id as string)?.grade_status)
+  ).length;
+
+  if (inFlight >= MAX_IN_FLIGHT) {
+    return {
+      submission_id: submission.id,
+      in_flight: inFlight,
+      claimed: 0,
+      dispatched: 0,
+      filed,
+      status: 'running',
+      note: 'at concurrency ceiling',
+    };
+  }
+
+  // 5. Claim, charge, dispatch.
+  const headroom = MAX_IN_FLIGHT - inFlight;
+  const queued = items
+    .filter((item) => item.status === 'queued' && item.card_id)
+    .sort((a, b) => a.position - b.position)
+    .slice(0, headroom);
+
+  // Route slug comes from the submission's category. Sports sub-categories
+  // and the Naruto/Other case both already collapse correctly inside
+  // categoryToRouteSlug, so there is nothing to duplicate here.
+  const routeSlug = categoryToRouteSlug(submission.category);
+  let claimed = 0;
+  let dispatched = 0;
+
+  for (const item of queued) {
+    if (!(await claimItem(item.id))) continue; // another drain got there first
+    claimed += 1;
+
+    // Charge BEFORE dispatch, keyed on card_id. A retried item that was
+    // already charged comes back alreadyCharged:true and costs nothing.
+    const charge = await deductCredit(submission.user_id, {
+      cardId: item.card_id as string,
+      description: `Grade card (bulk submission)`,
+    });
+
+    if (!charge.success) {
+      if ((charge.error || '').toLowerCase().includes('insufficient')) {
+        // Balance moved out from under a committed submission (spent from
+        // another device). Park it — this is the backstop the SOW describes,
+        // not the primary gate, which ran at commit.
+        console.warn(`${LOG} ${submission.id} out of credits mid-run — blocking`);
+        await releaseClaim(item.id);
+        await supabaseServer()
+          .from('submissions')
+          .update({ status: 'blocked_insufficient_credits' })
+          .eq('id', submission.id)
+          .eq('status', 'running');
+        return {
+          submission_id: submission.id,
+          in_flight: inFlight,
+          claimed,
+          dispatched,
+          filed,
+          status: 'blocked_insufficient_credits',
+        };
+      }
+      await releaseClaim(item.id, charge.error || 'Could not charge this card');
+      continue;
+    }
+
+    const result = await dispatchGrade(
+      origin,
+      routeSlug,
+      item.card_id as string,
+      submission.user_id
+    );
+
+    if (!result.dispatched) {
+      // Never reached the route, so nothing is grading and nothing will
+      // release the lock. Requeue; the charge stays and is not re-taken.
+      await releaseClaim(item.id, result.error || 'Dispatch failed');
+      continue;
+    }
+
+    dispatched += 1;
+    await setItemStatus(item.id, {
+      status: result.completed ? 'graded' : 'grading',
+      error: result.error ?? null,
+    });
+  }
+
+  return {
+    submission_id: submission.id,
+    in_flight: inFlight + dispatched,
+    claimed,
+    dispatched,
+    filed,
+    status: 'running',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Route
+// ---------------------------------------------------------------------------
+
+/**
+ * Two callers, one code path:
+ *  - the Vercel cron, carrying the CRON_SECRET bearer token
+ *  - the submission's owner, kicking their own queue from an open page
+ *
+ * The owner path takes `?submission_id=` and is scoped to that one submission
+ * after an ownership check. Unlike the 8 grading GETs, this endpoint never
+ * trusts a client-supplied user id — it is the model the code audit asked for.
+ */
+export async function POST(request: NextRequest) {
+  if (!drainEnabled()) {
+    return NextResponse.json({ success: false, error: 'Drain disabled', disabled: true });
+  }
+
+  const origin = resolveOrigin(request);
+  const submissionId = new URL(request.url).searchParams.get('submission_id');
+
+  const cron = requireCron(request, 'submissions/drain');
+  let submissions: SubmissionRow[] = [];
+
+  if (cron.ok) {
+    if (submissionId) {
+      const supabase = supabaseServer();
+      const { data } = await supabase
+        .from('submissions')
+        .select('id, user_id, name, category, sub_category, binder_id, status, source, card_count, routing_key, created_at, committed_at, completed_at')
+        .eq('id', submissionId)
+        .eq('status', 'running')
+        .maybeSingle();
+      submissions = data ? [data as unknown as SubmissionRow] : [];
+    } else {
+      submissions = await listRunningSubmissions(MAX_SUBMISSIONS_PER_TICK);
+    }
+  } else {
+    // Not the cron — the only other accepted caller is the owner of a named
+    // submission. No submission_id means there is nothing to authorize.
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.userId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!submissionId) {
+      return NextResponse.json(
+        { success: false, error: 'submission_id is required' },
+        { status: 400 }
+      );
+    }
+    const loaded = await getOwnedSubmission(submissionId, auth.userId);
+    if (!loaded.ok) {
+      return NextResponse.json({ success: false, error: 'Submission not found' }, { status: 404 });
+    }
+    if (loaded.data.status !== 'running') {
+      return NextResponse.json({
+        success: true,
+        skipped: `submission is ${loaded.data.status}`,
+        results: [],
+      });
+    }
+    submissions = [loaded.data];
+  }
+
+  const results: TickResult[] = [];
+  for (const submission of submissions) {
+    try {
+      results.push(await tickSubmission(submission, origin));
+    } catch (e: any) {
+      console.error(`${LOG} tick failed for ${submission.id}:`, e?.message);
+      results.push({
+        submission_id: submission.id,
+        in_flight: 0,
+        claimed: 0,
+        dispatched: 0,
+        filed: 0,
+        status: 'error',
+        note: e?.message || 'tick failed',
+      });
+    }
+  }
+
+  return NextResponse.json({ success: true, submissions: results.length, results });
+}
+
+/** Vercel cron issues GET. Same handler. */
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
