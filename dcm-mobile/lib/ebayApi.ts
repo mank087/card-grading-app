@@ -239,6 +239,74 @@ export async function createListing(data: CreateListingRequest): Promise<CreateL
   return result
 }
 
+// ─── Saved Listing Defaults / Templates ───
+
+/**
+ * One saved-defaults row (personal or org) as returned by
+ * GET /api/ebay/listing-defaults. shippingDefaults mirrors the WEB modal's
+ * shippingForm shape (camelCase, numbers as numbers) — not mobile's local
+ * `shipping` state — so callers must map it (see ebay-list.tsx).
+ */
+export interface ListingDefaultsRow {
+  descriptionTemplate: string | null
+  shippingDefaults: Record<string, unknown> | null
+}
+
+export interface ListingDefaultsResponse {
+  personal: ListingDefaultsRow | null
+  org: ListingDefaultsRow | null
+  orgRole: string | null
+  orgId: string | null
+}
+
+/**
+ * Fetch the caller's saved eBay listing defaults. Returns null on any failure
+ * (not connected, offline, 401) — every caller falls back to stock defaults,
+ * so a missing row is never an error the user has to see.
+ */
+export async function getListingDefaults(): Promise<ListingDefaultsResponse | null> {
+  try {
+    const headers = await getAuthHeaders()
+    const res = await fetch(`${API_BASE}/api/ebay/listing-defaults`, { headers })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Pick the defaults row that applies to a card, mirroring the web modal's
+ * cross-org guard: the org row applies only when the CALLER's org is also the
+ * CARD's org; otherwise personal.
+ */
+export function resolveActiveListingDefaults(
+  defaults: ListingDefaultsResponse | null,
+  cardOrgId: string | null | undefined
+): ListingDefaultsRow | null {
+  if (!defaults) return null
+  if (cardOrgId && defaults.orgId === cardOrgId && defaults.org) return defaults.org
+  return defaults.personal ?? null
+}
+
+// TWIN: src/lib/ebay/tradingApi.ts RETIRED_DOMESTIC_SERVICES /
+// normalizeDomesticService. Mobile can't import from src/, so this is a local
+// copy of the same forward-mapping — a saved default can still carry a retired
+// token and mobile's service chips only render known values.
+const RETIRED_SHIPPING_SERVICES: Record<string, string> = {
+  USPSFirstClass: 'USPSGroundAdvantage',
+  USPSFirstClassService: 'USPSGroundAdvantage',
+  USPSPriorityExpress: 'USPSPriorityMailExpress',
+}
+
+/** Map a possibly-retired/unknown saved service token onto a valid one. */
+export function normalizeShippingService(service: string | null | undefined): string {
+  if (!service) return DEFAULT_SHIPPING_SERVICE
+  const mapped = RETIRED_SHIPPING_SERVICES[service]
+  if (mapped) return mapped
+  return SHIPPING_SERVICES.some(s => s.value === service) ? service : DEFAULT_SHIPPING_SERVICE
+}
+
 // ─── Item Specifics / Aspects ───
 
 export async function getAspects(categoryId: string): Promise<any[]> {

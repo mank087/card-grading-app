@@ -350,6 +350,9 @@ export default function CardDetailScreen() {
   // the Market Value section; on selection it saves via /api/pricing/dcm-select
   // and re-runs the normal refreshPrice() flow.
   const [parallelPickerOpen, setParallelPickerOpen] = useState(false)
+  // Clearing a manually pinned product (DELETE /api/pricing/dcm-select) so the
+  // automatic match takes over again.
+  const [clearingSelection, setClearingSelection] = useState(false)
 
   // Tracks whether this screen is still mounted so async fetch+signed-URL
   // chains don't setState after the user has navigated away. Strict Mode and
@@ -455,6 +458,41 @@ export default function CardDetailScreen() {
     }
   }, [])
 
+  // Non-sports variant lookup for the product picker. Mirrors the web
+  // {Pokemon,MTG,Lorcana,OnePiece,Other}PriceLookup fetchVariants() bodies:
+  // identity fields ONLY. Deliberately no cardId / forceRefresh / dcmGrade —
+  // the category routes return the cached price envelope early when cardId is
+  // present, and that envelope carries no availableVariants.
+  const buildVariantLookup = useCallback((c: Card | null) => {
+    if (!c) return null
+    const ci = c.conversational_card_info as any
+    const setName = c.card_set || ci?.set_name || ''
+    const cardNumber = c.card_number || ci?.card_number || ''
+    const cardName = c.card_name || ci?.card_name || ''
+    switch (c.category || '') {
+      case 'Sports':
+        return null // sports uses the free-text SportsCardsPro search instead
+      case 'Pokemon':
+        return {
+          path: '/api/pricing/pokemon',
+          body: {
+            pokemonName: ci?.player_or_character || (c as any).pokemon_featured || cardName,
+            year: c.release_date || ci?.year || '',
+            setName,
+            cardNumber,
+          },
+        }
+      case 'MTG':
+        return { path: '/api/pricing/mtg', body: { cardName, setName, collectorNumber: cardNumber, year: c.release_date || ci?.year || '' } }
+      case 'Lorcana':
+        return { path: '/api/pricing/lorcana', body: { cardName, setName, collectorNumber: cardNumber } }
+      case 'One Piece':
+        return { path: '/api/pricing/onepiece', body: { cardName, setName, collectorNumber: cardNumber } }
+      default:
+        return { path: '/api/pricing/other', body: { cardName, setName, cardNumber, manufacturer: ci?.manufacturer || undefined } }
+    }
+  }, [])
+
   const refreshPrice = useCallback(async (silent = false, selectedProductId?: string) => {
     if (!card) return
     const req = buildPriceRequest(card)
@@ -489,6 +527,30 @@ export default function CardDetailScreen() {
       if (!silent) setRefreshingPrice(false)
     }
   }, [card, session?.access_token, buildPriceRequest, fetchCard])
+
+  // Drop a manually pinned product and fall back to automatic matching.
+  // Mirrors the web lookups' clearSelection(): DELETE /api/pricing/dcm-select
+  // (owner-only, clears dcm_selected_product_id/_name/_at) then a forced
+  // reprice with no selectedProductId so the auto-match runs again.
+  const clearSelection = useCallback(async () => {
+    if (!card || !session?.access_token) return
+    setClearingSelection(true)
+    try {
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const res = await fetch(`${API_BASE}/api/pricing/dcm-select?cardId=${encodeURIComponent(card.id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) throw new Error(data?.error || `Status ${res.status}`)
+      await refreshPrice(false)
+    } catch (err: any) {
+      console.warn('[clearSelection] error:', err)
+      Alert.alert('Could not reset', err?.message || 'Failed to clear your manual selection.')
+    } finally {
+      setClearingSelection(false)
+    }
+  }, [card, session?.access_token, refreshPrice])
 
   // Auto-refresh on mount when prices are stale (≥7 days) — matches web's 7-day cache TTL.
   // Defer the network call past first paint so the card detail screen renders
@@ -2202,6 +2264,23 @@ export default function CardDetailScreen() {
             const salesVol = prices?.salesVolume
             const matchConf = cached?.matchConfidence || card.dcm_price_match_confidence
             const prodName = prices?.productName || card.dcm_price_product_name
+            // A manually pinned product (cards.dcm_selected_product_id) means the
+            // prices above are for a product the owner chose, not the auto-match.
+            const pinnedId = (card as any).dcm_selected_product_id || null
+            const pinnedName = (card as any).dcm_selected_product_name || null
+            // Raw "high"/"medium"/"low"/"none" means nothing to a collector, so
+            // say what it implies — and let the owner tap through to fix it.
+            const conf = String(matchConf || '').toLowerCase()
+            const confLabel = pinnedId
+              ? 'Matched to the product you picked'
+              : conf === 'high'
+              ? 'Strong product match'
+              : conf === 'medium'
+              ? 'Close match — tap to check the product'
+              : conf === 'none'
+              ? 'No confident product match — tap to pick one'
+              : 'Low confidence match — tap to verify product'
+            const confWeak = !pinnedId && (conf === 'low' || conf === 'none' || conf === 'medium')
 
             // Build price-by-grade chart data
             const chartData: { label: string; price: number; color: string }[] = []
@@ -2225,7 +2304,18 @@ export default function CardDetailScreen() {
                 {/* Refresh row + cache info */}
                 <View style={s.priceHeaderRow}>
                   <View style={{ flex: 1 }}>
-                    {matchConf && <Text style={s.priceNote}>Match: {matchConf}{prodName ? ` · ${prodName}` : ''}</Text>}
+                    {matchConf ? (
+                      <TouchableOpacity
+                        onPress={() => setParallelPickerOpen(true)}
+                        disabled={!isOwner || refreshingPrice || clearingSelection}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={[s.priceNote, confWeak && { color: Colors.amber[600], fontWeight: '600' }]} numberOfLines={1}>
+                          {isOwner ? confLabel : confLabel.replace(/ — tap to .*$/, '')}
+                          {prodName ? ` · ${prodName}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                     {card.dcm_prices_cached_at
                       ? <Text style={s.priceNote}>Updated: {formatDate(card.dcm_prices_cached_at, { year: 'numeric', month: 'short', day: 'numeric' })}</Text>
                       : <Text style={s.priceNote}>Pricing data has not been fetched yet.</Text>}
@@ -2345,38 +2435,68 @@ export default function CardDetailScreen() {
                 {/* Parallel/variant searcher entry point (sports cards, owner only).
                     Shows WHAT product the cached prices came from, plus a
                     "wrong card?" escape hatch that opens the native searcher. */}
-                {card.category === 'Sports' && isOwner && (() => {
+                {(() => {
                   const ci = card.conversational_card_info as any
                   const num = card.card_number || ci?.card_number
+                  const isSportsCard = card.category === 'Sports'
                   const pickerQuery = [
                     ci?.player_or_character || card.featured || card.card_name,
                     card.release_date || ci?.year,
                     card.card_set || ci?.set_name,
                     num ? `#${num}` : '',
                   ].filter(Boolean).join(' ').trim()
+                  const busy = refreshingPrice || clearingSelection
                   return (
                   <View style={{ marginTop: 12 }}>
-                    {prodName ? (
+                    {/* Read back the pinned product so it's obvious the price is
+                        not the automatic match (web does this via isManualSelection). */}
+                    {pinnedId ? (
+                      <Text style={s.priceNote}>
+                        Priced as: {pinnedName || prodName || 'your selected product'} (manually selected)
+                      </Text>
+                    ) : prodName ? (
                       <Text style={s.priceNote}>Priced as: {prodName}</Text>
                     ) : null}
-                    <TouchableOpacity
-                      style={s.parallelPickerBtn}
-                      onPress={() => setParallelPickerOpen(true)}
-                      disabled={refreshingPrice}
-                    >
-                      <Ionicons name="search-outline" size={14} color={Colors.purple[600]} />
-                      <Text style={s.parallelPickerBtnText}>Wrong card or variant? Search</Text>
-                    </TouchableOpacity>
-                    <ParallelPicker
-                      visible={parallelPickerOpen}
-                      onClose={() => setParallelPickerOpen(false)}
-                      cardId={card.id}
-                      initialQuery={pickerQuery}
-                      currentProductId={(card as any).dcm_selected_product_id || (card as any).dcm_price_product_id || null}
-                      accessToken={session?.access_token || null}
-                      isOwner={isOwner}
-                      onSelected={(productId: string) => { setParallelPickerOpen(false); refreshPrice(false, productId) }}
-                    />
+                    {isOwner && (
+                      <>
+                        <TouchableOpacity
+                          style={s.parallelPickerBtn}
+                          onPress={() => setParallelPickerOpen(true)}
+                          disabled={busy}
+                        >
+                          <Ionicons name="search-outline" size={14} color={Colors.purple[600]} />
+                          <Text style={s.parallelPickerBtnText}>
+                            {isSportsCard ? 'Wrong card or variant? Search' : 'Wrong printing? Choose another'}
+                          </Text>
+                        </TouchableOpacity>
+                        {pinnedId ? (
+                          <TouchableOpacity
+                            style={[s.parallelPickerBtn, { marginTop: 6 }]}
+                            onPress={clearSelection}
+                            disabled={busy}
+                          >
+                            {clearingSelection
+                              ? <ActivityIndicator size="small" color={Colors.purple[600]} />
+                              : <Ionicons name="close-circle-outline" size={14} color={Colors.purple[600]} />}
+                            <Text style={s.parallelPickerBtnText}>
+                              {clearingSelection ? 'Resetting…' : 'Use the automatic match instead'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        <ParallelPicker
+                          visible={parallelPickerOpen}
+                          onClose={() => setParallelPickerOpen(false)}
+                          cardId={card.id}
+                          category={card.category}
+                          initialQuery={pickerQuery}
+                          variantLookup={isSportsCard ? null : buildVariantLookup(card)}
+                          currentProductId={pinnedId || (card as any).dcm_price_product_id || null}
+                          accessToken={session?.access_token || null}
+                          isOwner={isOwner}
+                          onSelected={(productId: string) => { setParallelPickerOpen(false); refreshPrice(false, productId) }}
+                        />
+                      </>
+                    )}
                   </View>
                   )
                 })()}

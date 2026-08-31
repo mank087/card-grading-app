@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint:ci": "eslint src/lib src/app/api"
+    "lint:ci": "eslint src/lib src/app/api",
+    "check:twin-drift": "npx tsx scripts/check-twin-drift.ts"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

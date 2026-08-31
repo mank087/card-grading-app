@@ -29,7 +29,12 @@ import { generateCardImages, generateRawCardImages, type CardImageData } from '@
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
-import { generateHtmlDescription } from '@/lib/ebay/listingDescription';
+import {
+  generateHtmlDescription,
+  renderDescriptionTemplate,
+  type ListingDescriptionFields,
+  type ListingBranding,
+} from '@/lib/ebay/listingDescription';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
@@ -266,28 +271,56 @@ export default function EbayImagePrepPage() {
           : SPORT_CATEGORIES.includes(cardCategoryRaw)
             ? 'sports'
             : 'other';
-        const description = generateHtmlDescription(
-          {
-            primaryName: labelData.primaryName || '',
-            setName: labelData.setName || '',
-            cardNumber: labelData.cardNumber || '',
-            grade: Math.round(labelData.grade ?? 0),
-            conditionLabel: labelData.condition || '',
-            overview: card.conversational_final_grade_summary || card.conversational_summary || '',
-            // Whole numbers, matching the web modal (raw weighted scores can
-            // carry decimals).
-            subgrades: {
-              centering: Math.round(subScores.centering),
-              corners: Math.round(subScores.corners),
-              edges: Math.round(subScores.edges),
-              surface: Math.round(subScores.surface),
-            },
-            serial: card.org_serial_display || card.serial || 'N/A',
+        const descriptionFields: ListingDescriptionFields = {
+          primaryName: labelData.primaryName || '',
+          setName: labelData.setName || '',
+          cardNumber: labelData.cardNumber || '',
+          grade: Math.round(labelData.grade ?? 0),
+          conditionLabel: labelData.condition || '',
+          overview: card.conversational_final_grade_summary || card.conversational_summary || '',
+          // Whole numbers, matching the web modal (raw weighted scores can
+          // carry decimals).
+          subgrades: {
+            centering: Math.round(subScores.centering),
+            corners: Math.round(subScores.corners),
+            edges: Math.round(subScores.edges),
+            surface: Math.round(subScores.surface),
           },
-          orgLogoSet?.branding
-            ? { name: orgLogoSet.branding.name, brandColor: orgLogoSet.branding.brandColor || null }
-            : null
-        );
+          serial: card.org_serial_display || card.serial || 'N/A',
+        };
+        const listingBranding: ListingBranding | null = orgLogoSet?.branding
+          ? { name: orgLogoSet.branding.name, brandColor: orgLogoSet.branding.brandColor || null }
+          : null;
+
+        // Saved description template (web parity with EbayListingModal): the
+        // user's/store's template replaces the standard layout entirely. Mobile
+        // gets its description from this page, so without this the template was
+        // silently dropped on native. Auth: the same ?token access token the
+        // page already uses for Supabase and the CoA upload.
+        //
+        // Cross-org guard mirrors the modal: the org template applies only when
+        // the CALLER's org is also the CARD's org, else personal. Best-effort —
+        // any failure falls through to the standard generated layout.
+        let savedTemplate: string | null = null;
+        try {
+          const defaultsRes = await fetch('/api/ebay/listing-defaults', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (defaultsRes.ok) {
+            const defaults = await defaultsRes.json();
+            const activeDefaults =
+              card.org_id && defaults?.orgId === card.org_id && defaults?.org
+                ? defaults.org
+                : defaults?.personal;
+            savedTemplate = activeDefaults?.descriptionTemplate || null;
+          }
+        } catch (err) {
+          console.warn('[eBay Image Prep] listing defaults fetch failed (non-fatal):', err);
+        }
+
+        const description = savedTemplate
+          ? renderDescriptionTemplate(savedTemplate, descriptionFields, listingBranding)
+          : generateHtmlDescription(descriptionFields, listingBranding);
         const itemSpecifics = mapCardToItemSpecifics(card, cardTypeForSpecifics);
         const categoryId = getCategoryForCardType(cardTypeForSpecifics);
 
