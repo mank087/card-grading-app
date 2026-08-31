@@ -420,7 +420,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Detailed Card Condition</h3>
-              <p className="text-gray-600 text-sm">Comprehensive 30-point inspection across centering, corners, edges, and surface.</p>
+              <p className="text-gray-600 text-sm">Comprehensive multi-point inspection across centering, corners, edges, and surface.</p>
             </div>
 
             {/* 3. Build Your Collection */}

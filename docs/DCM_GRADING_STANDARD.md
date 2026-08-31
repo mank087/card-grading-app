@@ -1,6 +1,6 @@
 # The DCM Grading Standard
 
-**Version 1.0** · Effective 26 August 2026 · Engine `DCM_Grading_v9.19`
+**Version 1.1** · Effective 31 August 2026 · Engine `DCM_Grading_v9.23`
 
 Published by Dynamic Collectibles Management LLC.
 
@@ -172,6 +172,57 @@ Scored across both faces on a systematic nine-zone grid, eighteen zones total.
 | 2 | Extensive damage, delamination, or heavy staining. |
 | 1 | Surface destroyed. |
 
+### 4.6 Full-art and borderless cards
+
+Centering is a measurement of border widths. A card printed without a border has
+no border widths to compare, and there is nothing there to be off-centre.
+
+**A card with no border is not judged off-centre.** Where a face carries no
+border on either axis, centering for that face is scored 10 and reported as
+*Centered* rather than as a ratio. We do not substitute the art, the frame, or a
+design element for a border and then measure that: a printed element is not a cut
+edge, and treating it as one would invent a deduction the card cannot have earned.
+
+Where a card is bordered on one axis and full-bleed on the other, only the
+bordered axis is measured. The full-bleed axis is reported as not applicable, not
+as a failed measurement.
+
+This applies to full-art, borderless, extended-art and full-bleed printings
+across every category we grade.
+
+### 4.7 Autographs
+
+**An autograph is never a surface defect, and it never replaces a numeric grade.**
+
+A signature is ink that someone deliberately put on the card. It is not handling
+damage, and it is not a manufacturing flaw. Scoring it as either would be a
+category error, and one that used to cost signed cards several points.
+
+A signed card receives a **full numeric grade**: all four categories are scored,
+and surface is scored **as if the ink were absent**. We judge the stock, the
+gloss, and the finish around and beneath the strokes, exactly as we would on the
+same card unsigned. A scratch under a signature is still a scratch. The signature
+itself is not.
+
+What differs is the designation, not the grade:
+
+- **Manufacturer-authenticated autographs** — a certification hologram, a
+  "Certified Autograph Issue" line, or an on-card authenticity claim from the
+  manufacturer — are a **feature of the card**. The grade stands on its own with
+  no additional notation.
+- **Unverified autographs** — a signature with no on-card claim of authenticity —
+  receive their **full numeric grade** and carry the notation
+  **"Altered - Unverified Autograph"** on the grade record and on the label.
+
+The notation says what we can and cannot establish from a photograph: that the
+card is signed, and that we are not authenticating the signature. It is a
+statement about provenance, not a condition penalty, and it does not lower any
+subgrade.
+
+Handwriting that is not a signature — a name, a date, a price, an inventory mark —
+is a post-production alteration, caught by the pre-grading verification in
+section 9, not by this rule.
+
 ---
 
 ## 5. The final grade: weakest link
@@ -301,6 +352,14 @@ recorded in the change log below. Grades are not retroactively restated when the
 standard changes. A report shows the standard and engine that produced it.
 
 ### Change log
+
+**v1.1 — 31 August 2026.** Adds section 4.6, full-art and borderless cards: a
+card with no border is not judged off-centre (engine `DCM_Grading_v9.22`). Adds
+section 4.7, autographs: an autograph is never a surface defect and never
+replaces a numeric grade; manufacturer-authenticated signatures are a feature,
+and unverified signatures receive a full numeric grade carrying the notation
+"Altered - Unverified Autograph" (engine `DCM_Grading_v9.23`). No other threshold
+changes.
 
 **v1.0 — 26 August 2026.** First publication as a standalone versioned standard.
 Consolidates the criteria previously held only in the grading engine. No

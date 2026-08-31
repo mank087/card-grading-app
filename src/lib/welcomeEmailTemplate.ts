@@ -202,7 +202,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null; unsubscrib
                 <tr>
                   <td align="center">
                     <p style="color: #d1fae5; font-size: 13px; margin: 0; font-weight: 600; letter-spacing: 0.3px;">
-                      &#10003; 10-Point Scale &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Instant Results &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; From $0.50/Card &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Keep Your Cards
+                      &#10003; 10-Point Scale &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Instant Results &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; As Low As $0.50/Card with Card Lovers Annual &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Keep Your Cards
                     </p>
                   </td>
                 </tr>
@@ -325,7 +325,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null; unsubscrib
                               </td>
                               <td valign="top">
                                 <p style="color: #ffffff; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">No More Mailing &amp; Waiting</p>
-                                <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Mail-away grading costs $20&ndash;$150+ and takes weeks. DCM delivers results in minutes from $0.50/card.</p>
+                                <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Mail-away grading costs $20&ndash;$150+ and takes weeks. DCM delivers results in about a minute, from $2.99 a card &ndash; or as low as $0.50 a card with Card Lovers Annual.</p>
                               </td>
                             </tr>
                           </table>
@@ -527,7 +527,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null; unsubscrib
                   <td align="center" class="pad-mobile" style="padding: 28px 30px;">
                     <p style="color: #34d399; font-size: 24px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Ready to Grade Your First Card?</p>
                     <p style="color: #9ca3af; font-size: 14px; margin: 0 0 20px 0; line-height: 1.5;">
-                      Upload a photo, get your grade in minutes.<br>Your first credit is on us &mdash; no card required.
+                      Upload a photo, get your grade in minutes.<br>Your first two credits are on us &mdash; no card required.
                     </p>
                     <!--[if mso]>
                     <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=mid-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
@@ -562,7 +562,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null; unsubscrib
                   <td align="center" class="pad-mobile" style="padding: 28px 30px;">
                     <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 700; line-height: 1.3;">Don&rsquo;t Mail Your Cards.<br>Grade Them Now.</p>
                     <p style="color: #d1fae5; font-size: 14px; margin: 0 0 20px 0; line-height: 1.5;">
-                      Detailed reports &bull; Custom labels &bull; Market pricing<br>All from $0.50 per grade. First grade free.
+                      Detailed reports &bull; Custom labels &bull; Market pricing<br>As low as $0.50 a grade with Card Lovers Annual. Two free grades to start.
                     </p>
                     <!--[if mso]>
                     <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=bottom-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#ffffff" fillcolor="#ffffff">

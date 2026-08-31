@@ -247,7 +247,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
             )}
 
             <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto">
-              Going? Know if a card is worth buying in 60 seconds. Grade it from a
+              Going? Know if a card is worth buying in about a minute. Grade it from a
               photo at the table, before you pay.
             </p>
           </div>
@@ -258,7 +258,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
               <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <span className="text-gray-200">30-Point DCM Optic™ Inspection</span>
+              <span className="text-gray-200">Multi-Point DCM Optic™ Inspection</span>
             </div>
             <div className="flex items-center gap-1.5 bg-gray-800/60 backdrop-blur px-3 py-1.5 rounded-full border border-gray-700">
               <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
@@ -496,7 +496,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                 </svg>
               </div>
               <h3 className="text-lg font-bold text-white mb-1">2. DCM Optic™ Analyzes</h3>
-              <p className="text-gray-400 text-sm">DCM inspects centering, corners, edges & surface in 60 seconds</p>
+              <p className="text-gray-400 text-sm">DCM inspects centering, corners, edges & surface in about a minute</p>
             </div>
             <div className="text-center">
               <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">

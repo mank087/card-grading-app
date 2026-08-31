@@ -3,18 +3,18 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
   title: 'Grading Rubric - How We Grade Cards',
-  description: 'Understand DCM\'s professional grading standards. Our 30-point inspection with three-pass consensus technology evaluates centering, corners, edges, and surface condition for accurate card grades.',
+  description: 'Understand DCM\'s professional grading standards. Our multi-point inspection with three-pass consensus technology evaluates centering, corners, edges, and surface condition for accurate card grades.',
   keywords: 'card grading rubric, grading standards, PSA grading scale, BGS grading, card condition, centering, corners, edges, surface, DCM Optic, three-pass grading, how cards are graded',
   openGraph: {
     title: 'Grading Rubric - How DCM Grades Cards',
-    description: 'Learn how DCM grades trading cards with our comprehensive 30-point inspection and three-pass consensus technology.',
+    description: 'Learn how DCM grades trading cards with our comprehensive multi-point inspection and three-pass consensus technology.',
     type: 'website',
     siteName: 'DCM Grading',
   },
   twitter: {
     card: 'summary',
     title: 'DCM Grading Rubric',
-    description: '30-point inspection with three-pass consensus technology for accurate card grades.',
+    description: 'Multi-point inspection with three-pass consensus technology for accurate card grades.',
   },
   alternates: {
     canonical: 'https://dcmgrading.com/grading-rubric',
@@ -91,10 +91,10 @@ export default function GradingRubricPage() {
           <div className="bg-purple-600 text-white rounded-2xl p-8 shadow-xl">
             <h2 className="text-3xl font-bold mb-4">The DCM Difference</h2>
             <p className="text-lg mb-4">
-              Mail-away grading takes weeks or months. DCM Optic™ uses computer vision trained on industry-standard grading criteria to deliver a full grade in under 60 seconds.
+              Mail-away grading takes weeks or months. DCM Optic™ uses computer vision trained on industry-standard grading criteria to deliver a full grade in about a minute.
             </p>
             <p className="text-lg">
-              Every card goes through the same multi-point evaluation, then through it twice more. Our <strong>three-pass consensus system</strong> evaluates each card three independent times and averages the results, so the grade you get is more stable than any single-pass system can produce.
+              Every card goes through the same multi-point evaluation, then through it twice more. Our <strong>three-pass consensus system</strong> evaluates each card three independent times and takes the median of the three passes, so one outlier pass can&apos;t drag the grade.
             </p>
           </div>
         </section>
@@ -109,7 +109,7 @@ export default function GradingRubricPage() {
               <h2 className="text-3xl font-bold text-gray-900">Three-Pass Consensus Technology</h2>
             </div>
             <p className="text-lg text-gray-700 mb-6">
-              Unlike single-pass grading systems, DCM Optic™ performs <strong>three complete, independent evaluations</strong> of every card. Averaging three passes produces tighter, more reliable grades than any single pass can.
+              Unlike single-pass grading systems, DCM Optic™ performs <strong>three complete, independent evaluations</strong> of every card. Taking the median of the three passes produces tighter, more reliable grades than any single pass can.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -143,13 +143,13 @@ export default function GradingRubricPage() {
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span><strong>Reduces variance:</strong> Averaging three independent evaluations produces more consistent, reliable grades</span>
+                  <span><strong>Reduces variance:</strong> Taking the median of three independent evaluations produces more consistent, reliable grades</span>
                 </li>
                 <li className="flex items-start">
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span><strong>Consensus-based defects:</strong> Only defects confirmed in 2+ passes affect the final grade</span>
+                  <span><strong>Corroborated findings:</strong> Structural damage, and magnified findings that would pull a category well below the main result, have to be corroborated before they count</span>
                 </li>
                 <li className="flex items-start">
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,6 +370,66 @@ export default function GradingRubricPage() {
                 </div>
               </div>
             </div>
+
+            {/* Phase 7: Magnified Inspection */}
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-amber-500">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900">Phase 7: Magnified Inspection</h3>
+                <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-1 rounded">×5 Samples per Region</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                A separate pass that stops looking at the whole card. Each corner, edge, and surface region is cut out of
+                your photo as its own magnified crop and examined on its own, at a level of detail the full-card view
+                cannot reach.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="font-semibold text-amber-600">Segmented Crops</p>
+                  <p className="text-sm text-gray-600">Every corner, edge, and surface region is inspected as an isolated, magnified image</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-600">Majority Voting</p>
+                  <p className="text-sm text-gray-600">Each region is sampled five times; a finding must appear in at least two of the five to count</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-600">Findings Can Lower a Face</p>
+                  <p className="text-sm text-gray-600">Corroborated magnified findings pull the affected face down — the close look can override the wide look</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-600">Category-Aware</p>
+                  <p className="text-sm text-gray-600">What counts as a defect depends on the card: factory-rounded TCG corners and signature ink are not damage</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Phase 8: Assembling the Grade */}
+            <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-gray-800">
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 8: Assembling the Grade</h3>
+              <p className="text-sm text-gray-600 mb-4">Three things turn eight component scores into one whole number</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="font-semibold text-gray-900">Median, not average</p>
+                  <p className="text-sm text-gray-600">
+                    The three passes are reconciled by taking the <strong>median</strong> — deliberately, because the median is
+                    robust to one outlier pass and an average is not. Three passes reading 9, 9 and 6 give you a 9.
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Worse face wins</p>
+                  <p className="text-sm text-gray-600">
+                    Each category scores as the <strong>lower of its two faces</strong>. Clean front edges do not offset a chipped
+                    back edge — the edges score is the back&apos;s.
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Weakest link</p>
+                  <p className="text-sm text-gray-600">
+                    The final grade is the <strong>lowest of the four category scores</strong>. A card that is a 10 on centering,
+                    corners and edges but a 7 on surface is a 7.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -466,7 +526,7 @@ export default function GradingRubricPage() {
                   <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-green-800">A</span>
-                      <span className="text-sm font-semibold text-green-700">95-100% Visibility</span>
+                      <span className="text-sm font-semibold text-green-700">Fully readable</span>
                     </div>
                     <p className="text-sm text-gray-700">
                       Crystal clear images with perfect lighting, sharp focus, and no obstructions. Highest grading confidence.
@@ -476,7 +536,7 @@ export default function GradingRubricPage() {
                   <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-blue-800">B</span>
-                      <span className="text-sm font-semibold text-blue-700">85-94% Visibility</span>
+                      <span className="text-sm font-semibold text-blue-700">Minor limitations</span>
                     </div>
                     <p className="text-sm text-gray-700">
                       Clear images with minor issues like slight glare, card in sleeve/top loader. High grading confidence.
@@ -486,7 +546,7 @@ export default function GradingRubricPage() {
                   <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-l-4 border-yellow-500">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-yellow-800">C</span>
-                      <span className="text-sm font-semibold text-yellow-700">70-84% Visibility</span>
+                      <span className="text-sm font-semibold text-yellow-700">Moderate limitations</span>
                     </div>
                     <p className="text-sm text-gray-700">
                       Acceptable images with moderate glare, card in thick holder/slab, or focus issues. Moderate confidence.
@@ -496,7 +556,7 @@ export default function GradingRubricPage() {
                   <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border-l-4 border-red-500">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-red-800">D</span>
-                      <span className="text-sm font-semibold text-red-700">&lt;70% Visibility</span>
+                      <span className="text-sm font-semibold text-red-700">Severe limitations</span>
                     </div>
                     <p className="text-sm text-gray-700">
                       Images with significant issues like heavy glare, blur, or poor lighting. Consider resubmitting for better results.
@@ -576,7 +636,7 @@ export default function GradingRubricPage() {
             DCM Optic™ uses specialized evaluation criteria optimized for each card type
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl shadow-md p-4 text-center">
               <div className="text-3xl mb-2">⚾</div>
               <p className="font-bold text-gray-900">Sports</p>
@@ -598,9 +658,24 @@ export default function GradingRubricPage() {
               <p className="text-xs text-gray-600">Disney Lorcana TCG</p>
             </div>
             <div className="bg-white rounded-xl shadow-md p-4 text-center">
+              <div className="text-3xl mb-2">🏴‍☠️</div>
+              <p className="font-bold text-gray-900">One Piece</p>
+              <p className="text-xs text-gray-600">All sets, parallels, alternate art</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4 text-center">
+              <div className="text-3xl mb-2">🐉</div>
+              <p className="font-bold text-gray-900">Yu-Gi-Oh!</p>
+              <p className="text-xs text-gray-600">All sets and rarities</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4 text-center">
+              <div className="text-3xl mb-2">🌌</div>
+              <p className="font-bold text-gray-900">Star Wars</p>
+              <p className="text-xs text-gray-600">Unlimited and Hyperspace printings</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4 text-center">
               <div className="text-3xl mb-2">🃏</div>
               <p className="font-bold text-gray-900">Other</p>
-              <p className="text-xs text-gray-600">Yu-Gi-Oh!, One Piece, and more</p>
+              <p className="text-xs text-gray-600">Any other collectible card game</p>
             </div>
           </div>
         </section>
@@ -615,7 +690,7 @@ export default function GradingRubricPage() {
               DCM Optic™ is our grading engine, built specifically for trading cards. It applies the same evaluation criteria PSA, BGS, and SGC use, but every deduction has to be backed by something visible in your photos. No assumptions, no guessing.
             </p>
             <p className="text-lg text-gray-700 mb-4">
-              With our revolutionary three-pass consensus system, every card receives not just one evaluation, but three independent analyses that are averaged and cross-validated. This delivers the most accurate and reliable grades possible from photo-based grading.
+              With our revolutionary three-pass consensus system, every card receives not just one evaluation, but three independent analyses whose median is taken and cross-validated. This delivers the most accurate and reliable grades possible from photo-based grading.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
               <div className="bg-white rounded-lg p-4 text-center">
@@ -627,8 +702,8 @@ export default function GradingRubricPage() {
                 <p className="text-sm text-gray-600">Component Scores</p>
               </div>
               <div className="bg-white rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-purple-600 mb-2">&lt;60s</p>
-                <p className="text-sm text-gray-600">Average Grade Time</p>
+                <p className="text-3xl font-bold text-purple-600 mb-2">~1 min</p>
+                <p className="text-sm text-gray-600">Typical Grade Time</p>
               </div>
               <div className="bg-white rounded-lg p-4 text-center">
                 <p className="text-3xl font-bold text-purple-600 mb-2">24/7</p>
@@ -664,7 +739,7 @@ export default function GradingRubricPage() {
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
             <h2 className="text-3xl font-bold mb-4">Ready to Grade Your Cards?</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
-              Experience the precision of DCM Optic™ three-pass grading technology. Get professional-grade assessments in under 60 seconds.
+              Experience the precision of DCM Optic™ three-pass grading technology. Get professional-grade assessments in about a minute.
             </p>
             <a
               href="/login"

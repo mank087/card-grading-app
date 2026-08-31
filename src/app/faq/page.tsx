@@ -38,7 +38,7 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         <p className="mb-3">
-          DCM Grading is a card grading service powered by DCM Optic™, our proprietary grading engine, that provides professional-quality condition assessments for trading cards. DCM Optic™ analyzes your card images and delivers accurate grades in under 60 seconds.
+          DCM Grading is a card grading service powered by DCM Optic™, our proprietary grading engine, that provides professional-quality condition assessments for trading cards. DCM Optic™ analyzes your card images and delivers accurate grades in about a minute.
         </p>
         <p>
           Unlike traditional grading services that can take <Link href="/fastest-card-grading" className="text-purple-600 hover:text-purple-800 underline">weeks or months</Link>, DCM provides instant results while maintaining the same rigorous <Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">standards</Link> used by professional grading companies.
@@ -56,7 +56,7 @@ const faqs: FAQItem[] = [
           Upload clear photos of the front and back of your card. DCM Optic™ examines corners, edges, surface, and centering on both sides.
         </p>
         <p className="mb-3">
-          Then it does it twice more. Our <strong>three-pass consensus system</strong> evaluates every card three independent times and averages the results. A defect has to show up in at least two of the three passes to affect your grade, which keeps false positives out and produces a more stable grade than any single pass would.
+          Then it does it twice more. Our <strong>three-pass consensus system</strong> evaluates every card three independent times and takes the median of the three passes, so one outlier pass can&apos;t drag the grade. On top of that, a magnified inspection re-examines each corner, edge, and surface region on its own crop, and those findings can lower a face.
         </p>
         <p>
           You get a full grade report in seconds, including component scores, marked defects, and a confidence rating tied to your photo quality.
@@ -70,7 +70,7 @@ const faqs: FAQItem[] = [
     question: 'Why should I use DCM instead of traditional grading services?',
     answer: (
       <>
-        <p className="mb-3"><strong>Speed:</strong> Results in under 60 seconds, not weeks or months.</p>
+        <p className="mb-3"><strong>Speed:</strong> Results in about a minute, not weeks or months.</p>
         <p className="mb-3"><strong>Cost:</strong> A fraction of what mail-away grading costs.</p>
         <p className="mb-3"><strong>Convenience:</strong> Grade from anywhere. No shipping, no insurance, no return label.</p>
         <p className="mb-3"><strong>Accuracy:</strong> Three-pass consensus produces consistent, repeatable grades.</p>
@@ -90,7 +90,10 @@ const faqs: FAQItem[] = [
           <li><strong>Pokémon:</strong> All sets including Japanese, Promos, Full Art, and vintage</li>
           <li><strong>Magic: The Gathering:</strong> All sets, foils, borderless, and special editions</li>
           <li><strong>Disney Lorcana:</strong> All sets and rarities</li>
-          <li><strong>Other TCGs:</strong> Yu-Gi-Oh!, One Piece, and other collectible card games</li>
+          <li><strong>One Piece:</strong> All sets, including parallels and alternate art</li>
+          <li><strong>Yu-Gi-Oh!:</strong> All sets and rarities</li>
+          <li><strong>Star Wars:</strong> Unlimited and Hyperspace printings</li>
+          <li><strong>Other:</strong> Any other collectible card game not listed above</li>
         </ul>
         <p>Our system automatically detects card type and applies specialized evaluation criteria optimized for each category.</p>
       </>
@@ -108,7 +111,10 @@ const faqs: FAQItem[] = [
           Three-pass consensus grading means every card is evaluated <strong>three complete, independent times</strong>. Each pass examines all corners, edges, surface, and centering as if seeing the card for the first time.
         </p>
         <p className="mb-3">
-          After the three passes, we average the results and apply a consensus rule: a defect has to be detected by at least 2 of 3 passes to count against your grade. This keeps phantom defects out and only real, verifiable issues affect your score.
+          After the three passes, we take the <strong>median</strong> of the three results rather than the average — deliberately, because the median is robust to a single outlier pass while an average is not.
+        </p>
+        <p className="mb-3">
+          A separate <strong>magnified inspection</strong> then runs over segmented crops of the card: each corner, edge, and surface region is sampled five times, and a finding has to be seen in at least two of those five samples before it counts. Corroborated findings can pull a face below the main result.
         </p>
         <p>
           It's the same approach top grading companies use when they put multiple human graders on a single card, just automated.
@@ -122,9 +128,9 @@ const faqs: FAQItem[] = [
     question: 'Why does three-pass grading improve accuracy?',
     answer: (
       <>
-        <p className="mb-3"><strong>Reduces variance:</strong> Averaging three independent evaluations gives you a more stable grade than any single pass.</p>
+        <p className="mb-3"><strong>Reduces variance:</strong> Taking the median of three independent evaluations gives you a more stable grade than any single pass.</p>
         <p className="mb-3"><strong>Catches misses:</strong> A defect that one pass missed will usually get picked up by the other two.</p>
-        <p className="mb-3"><strong>Filters phantom defects:</strong> Requiring two of three passes to agree keeps false positives out of your grade.</p>
+        <p className="mb-3"><strong>Resists outliers:</strong> A single pass that reads the card unusually harshly or unusually kindly sits at the edge of the three and is discarded by the median.</p>
         <p><strong>Tells you when to trust the grade:</strong> When all three passes agree closely, you can trust the result. When they diverge, the confidence score warns you.</p>
       </>
     ),
@@ -137,9 +143,9 @@ const faqs: FAQItem[] = [
       <>
         <p className="mb-3">The consistency score shows how closely the three evaluation passes agreed:</p>
         <ul className="list-disc list-inside space-y-2">
-          <li><strong>High consistency:</strong> All 3 passes within ±0.5 points. Trust the grade.</li>
-          <li><strong>Moderate consistency:</strong> Passes vary by 0.5-1.0 points. The grade is solid but there's some judgment-call territory.</li>
-          <li><strong>Low consistency:</strong> Passes vary by more than 1.0 point. Worth resubmitting with better photos.</li>
+          <li><strong>High consistency:</strong> All 3 passes landed on the same grade. Trust the result.</li>
+          <li><strong>Moderate consistency:</strong> The passes are within a point of each other. The grade is solid but there&apos;s some judgment-call territory.</li>
+          <li><strong>Low consistency:</strong> The passes spread by more than a point. Worth resubmitting with better photos.</li>
         </ul>
       </>
     ),
@@ -177,8 +183,8 @@ const faqs: FAQItem[] = [
           <li><strong>Edges:</strong> Whitening, chipping, factory cut quality</li>
           <li><strong>Surface:</strong> Scratches, print defects, stains, structural damage</li>
         </ul>
-        <p className="mb-3">Front and back are weighted 55%/45% respectively, with the front given more weight as it's the primary display side.</p>
-        <p><strong>Weakest Link Rule:</strong> Your final grade can't exceed your lowest component score, matching how PSA, BGS, and SGC assign final grades.</p>
+        <p className="mb-3">Each category&apos;s score is the <strong>lower of its two faces</strong> — a category is only as good as its worse side, so a chipped back edge sets the edges score even if the front edges are clean.</p>
+        <p><strong>Weakest Link Rule:</strong> Your final grade is the lowest of those four category scores, matching how PSA, BGS, and SGC assign final grades.</p>
       </>
     ),
     category: 'Grading Process',
@@ -225,10 +231,10 @@ const faqs: FAQItem[] = [
       <>
         <p className="mb-3">The confidence rating (A-D) indicates how well we can assess your card based on image quality:</p>
         <ul className="list-disc list-inside space-y-2">
-          <li><strong>Grade A (95-100% visibility):</strong> Crystal clear images, highest confidence, ±0.25 uncertainty</li>
-          <li><strong>Grade B (85-94% visibility):</strong> Clear images with minor issues, high confidence, ±0.5 uncertainty</li>
-          <li><strong>Grade C (70-84% visibility):</strong> Acceptable images with moderate issues, ±1.0 uncertainty</li>
-          <li><strong>Grade D (&lt;70% visibility):</strong> Significant issues, consider resubmitting, ±1.5 uncertainty</li>
+          <li><strong>Grade A:</strong> Crystal clear images, the whole card readable, highest confidence — uncertainty ±0</li>
+          <li><strong>Grade B:</strong> Clear images with minor issues, high confidence — uncertainty ±1</li>
+          <li><strong>Grade C:</strong> Acceptable images with moderate glare, softness, or obstruction — uncertainty ±2</li>
+          <li><strong>Grade D:</strong> Significant issues, consider resubmitting — uncertainty ±3</li>
         </ul>
       </>
     ),
@@ -317,7 +323,8 @@ const faqs: FAQItem[] = [
           <li><strong>Three-pass consensus:</strong> Reduces variance, catches single-pass errors.</li>
           <li><strong>Evidence-based grading:</strong> Every deduction is backed by an observable defect, not an assumption.</li>
           <li><strong><Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">PSA-aligned criteria</Link>:</strong> The same standards professional graders work from.</li>
-          <li><strong>Continuous improvement:</strong> The model is regularly retrained on new card sets and edge cases.</li>
+          <li><strong>Magnified inspection:</strong> Beyond the three passes, each corner, edge, and surface region is re-examined on its own magnified crop.</li>
+          <li><strong>A versioned standard:</strong> We don&apos;t retrain a model — we version the grading standard itself. It is currently at v9.23, and every change to the rules is published on our <Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">grading standard</Link> page.</li>
         </ul>
         <p className="mb-3">Accuracy is bounded by your photo quality. Grade A images (clear, well-lit, in focus) produce grades that align closely with what professional services would assign. Blurry or poorly-lit photos widen the uncertainty range.</p>
         <p>You can check how the grades actually land across every card we have graded in our <Link href="/pop" className="text-purple-600 hover:text-purple-800 underline">population report</Link>.</p>
@@ -366,12 +373,12 @@ const faqs: FAQItem[] = [
     question: 'Can DCM grade autographed cards?',
     answer: (
       <>
-        <p className="mb-3">Yes, but with important distinctions:</p>
+        <p className="mb-3">Yes. An autograph is never treated as a surface defect, and it never blocks a numeric grade.</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
-          <li><strong>Manufacturer-authenticated autographs:</strong> Cards with official autograph certification (hologram, printed authentication) are graded normally. The autograph is noted as a special feature.</li>
-          <li><strong>Unverified signatures:</strong> Cards with signatures that aren't manufacturer-authenticated receive an "N/A" grade because we cannot verify authenticity.</li>
+          <li><strong>Manufacturer-authenticated autographs:</strong> Cards with official autograph certification (hologram, printed authentication) are graded normally. The signature is a feature of the card, not damage.</li>
+          <li><strong>Unverified signatures:</strong> A card signed with no on-card claim of authenticity still receives a full numeric grade with all four subgrades. Surface is scored as if the ink were absent — we judge the stock and gloss around and beneath the strokes. The grade then carries the notation <strong>&quot;Altered - Unverified Autograph&quot;</strong> on the grade record and the label, so a buyer knows the signature has not been authenticated.</li>
         </ul>
-        <p>We look for authentication markers like holograms, "Certified Autograph Issue" text, and official autograph card numbering.</p>
+        <p>We look for authentication markers like holograms, &quot;Certified Autograph Issue&quot; text, and official autograph card numbering.</p>
       </>
     ),
     category: 'Special Cases',
@@ -381,15 +388,15 @@ const faqs: FAQItem[] = [
     question: 'What happens if my card has been altered?',
     answer: (
       <>
-        <p className="mb-3">Cards with post-production alterations receive an "N/A" (Not Authenticated / Altered) designation instead of a numeric grade. Alterations include:</p>
+        <p className="mb-3">Alterations that change the card itself receive an &quot;N/A&quot; (Not Authenticated / Altered) designation instead of a numeric grade:</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li>Trimmed edges or borders</li>
-          <li>Unverified autographs or markings</li>
-          <li>Handwritten additions (names, dates, prices)</li>
+          <li>Handwritten additions that are not signatures (names, dates, prices)</li>
           <li>Adhesive residue or sticker damage</li>
           <li>Color enhancement or restoration</li>
         </ul>
-        <p>We still provide a full analysis explaining what was detected and why the card cannot receive a numeric grade.</p>
+        <p className="mb-3">An <strong>autograph is the exception</strong>. A signed card is graded in full — all four subgrades, surface scored as if the ink were absent — and an autograph with no on-card claim of authenticity simply carries the notation &quot;Altered - Unverified Autograph&quot; alongside its numeric grade.</p>
+        <p>In every case we provide a full analysis explaining what was detected and how it affected the outcome.</p>
       </>
     ),
     category: 'Special Cases',
@@ -445,7 +452,7 @@ const faqs: FAQItem[] = [
     id: 'free-trial',
     question: 'Is there a free trial?',
     answer: (
-      <p>New accounts receive complimentary credits to try the service. This lets you experience DCM Grading before purchasing additional credits.</p>
+      <p>New accounts receive two free credits to try the service. This lets you experience DCM Grading before purchasing additional credits.</p>
     ),
     category: 'Pricing & Account',
   },
@@ -510,7 +517,7 @@ const faqs: FAQItem[] = [
     id: 'grade-time',
     question: 'How long does grading take?',
     answer: (
-      <p>Most cards are graded in 30-60 seconds. Complex cards with many features or special finishes may take slightly longer. You'll see a progress indicator while your card is being analyzed.</p>
+      <p>Most cards are graded in about a minute. Complex cards with many features or special finishes may take slightly longer. You&apos;ll see a progress indicator while your card is being analyzed.</p>
     ),
     category: 'Technical & Support',
   },

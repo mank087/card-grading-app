@@ -6,7 +6,7 @@ import { CardShow, getShowStatus, getDaysUntil, formatDateRange, getCurrentOrNex
 
 export const metadata: Metadata = {
   title: 'Card Shows 2026 | Grade Cards Instantly | DCM Grading',
-  description: 'Attending a card show in 2026? Grade your sports cards, Pokemon, and TCG cards instantly with DCM. Pre-screen before buying, verify seller claims, know what\'s worth submitting to PSA.',
+  description: 'Attending a card show in 2026? Grade your sports cards, Pokemon, and TCG cards on the spot with DCM — a real grade and a printable label in about a minute, right at the table.',
   openGraph: {
     title: 'Card Shows 2026 | DCM Grading',
     description: 'Grade your cards instantly at any card show. No shipping, no waiting.',
@@ -173,7 +173,7 @@ function FeaturedShow({ show }: { show: CardShow }) {
             </h2>
 
             <p className="text-xl text-gray-300 mb-6">
-              {show.subheadline || 'Grade your cards instantly with DCM. Pre-screen before buying, verify seller claims.'}
+              {show.subheadline || 'Grade your cards on the spot with DCM. A real grade and a printable label, right at the table.'}
             </p>
 
             <div className="flex flex-wrap gap-4 mb-6 text-gray-300">
@@ -259,7 +259,8 @@ export default async function CardShowsPage() {
               Card Shows 2026
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Grade your cards instantly at any show. Pre-screen before buying, verify seller claims, know what's worth submitting to PSA.
+              Grade your cards on the spot at any show — a real grade and a printable label in about a minute. Most of your
+              collection ends here. The top slice still goes out, and we&apos;ll tell you which.
             </p>
           </div>
 
@@ -342,7 +343,7 @@ export default async function CardShowsPage() {
                 </svg>
               </div>
               <h3 className="text-white font-semibold mb-2">Instant Results</h3>
-              <p className="text-gray-400 text-sm">Get grades in 60 seconds, right at the show</p>
+              <p className="text-gray-400 text-sm">Get grades in about a minute, right at the show</p>
             </div>
           </div>
         </div>

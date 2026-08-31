@@ -128,7 +128,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   <td align="center" style="padding: 40px 15px 35px 15px;">
                     <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; Don&rsquo;t Miss Out</p>
                     <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Free Credits Are<br><span style="color: #34d399;">Still Waiting</span></h1>
-                    <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Grade your first card in under 60 seconds.<br>No mailing. No waiting. Results in minutes.</p>
+                    <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Grade your first card in about a minute.<br>No mailing. No waiting. Results in minutes.</p>
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">DCM Optic&trade; multi-pass grading &bull; Detailed reports &bull; Market pricing</p>
 
               <!-- Hero CTA -->
@@ -206,7 +206,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                 <tr>
                   <td align="center">
                     <p style="color: #d1fae5; font-size: 13px; margin: 0; font-weight: 600; letter-spacing: 0.3px;">
-                      &#10003; 10-Point Scale &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Instant Results &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; From $0.50/Card &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Keep Your Cards
+                      &#10003; 10-Point Scale &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Instant Results &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; As Low As $0.50/Card with Card Lovers Annual &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#10003; Keep Your Cards
                     </p>
                   </td>
                 </tr>
@@ -318,7 +318,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                               </td>
                               <td valign="top">
                                 <p style="color: #ffffff; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">Results in Minutes, Not Weeks</p>
-                                <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Mail-away grading costs $20&ndash;$150+ and takes weeks. DCM delivers results in minutes from $0.50/card.</p>
+                                <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Mail-away grading costs $20&ndash;$150+ and takes weeks. DCM delivers results in about a minute, from $2.99 a card &ndash; or as low as $0.50 a card with Card Lovers Annual.</p>
                               </td>
                             </tr>
                           </table>
@@ -571,7 +571,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   <td align="center" class="pad-mobile" style="padding: 28px 30px;">
                     <p style="color: #ffffff; font-size: 22px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Don&rsquo;t Let Those Free Credits<br>Go to Waste!</p>
                     <p style="color: #d1fae5; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">
-                      Grade your first card in under 60 seconds.<br>Plus, save 10% on your first purchase with code <strong style="color: #ffffff;">Grade10</strong>.
+                      Grade your first card in about a minute.<br>Plus, save 10% on your first purchase with code <strong style="color: #ffffff;">Grade10</strong>.
                     </p>
                     <p style="color: #ffffff; font-size: 13px; margin: 0 0 20px 0; font-weight: 600;">First-time graders also get up to 5 bonus credits FREE!</p>
                     <!--[if mso]>

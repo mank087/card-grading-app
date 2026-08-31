@@ -86,7 +86,7 @@ const faqJsonLd = {
       name: 'How does AI card grading work?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'You upload clear photos of the front and back of your card. DCM Optic runs three independent computer-vision passes over the images, measuring centering, examining all four corners and all four edges, and scanning the full surface in a 9-zone grid. The three passes are averaged into a final whole-number grade from 1 to 10. The whole evaluation takes under 60 seconds.',
+        text: 'You upload clear photos of the front and back of your card. DCM Optic runs three independent computer-vision passes over the images, measuring centering, examining all four corners and all four edges, and scanning the full surface in a 9-zone grid. It takes the median of those three passes rather than the average, so a single outlier pass cannot drag the grade. A separate magnified pass then re-examines each corner, edge and surface region on its own crop, and those findings can lower a face. Each category scores as the lower of its two faces, and the final whole-number grade from 1 to 10 is the lowest of the four categories. The whole evaluation takes about a minute.',
       },
     },
     {
@@ -202,7 +202,7 @@ export default function AiCardGradingPage() {
               <h2 className="text-3xl font-bold text-gray-900">Three-Pass Consensus Grading</h2>
             </div>
             <p className="text-lg text-gray-700 mb-6">
-              Single-pass AI grading systems give you one opinion. DCM runs <strong>three complete, independent evaluations</strong> of every card and averages the result. It is the same technique top grading houses use when they put multiple human graders on a single submission, just automated.
+              Single-pass AI grading systems give you one opinion. DCM runs <strong>three complete, independent evaluations</strong> of every card and takes the median of the three, so one outlier pass can&apos;t drag the grade. It is the same technique top grading houses use when they put multiple human graders on a single submission, just automated.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -224,8 +224,8 @@ export default function AiCardGradingPage() {
             <div className="bg-white rounded-xl p-6 border border-blue-200">
               <h3 className="font-bold text-gray-900 mb-3">Why three passes beats one</h3>
               <ul className="space-y-2 text-gray-700 text-sm">
-                <li>• <strong>Reduces variance.</strong> Averaging three evaluations produces more consistent grades than any single pass can.</li>
-                <li>• <strong>Consensus-based defects.</strong> Only defects confirmed in two or more passes affect your final grade.</li>
+                <li>• <strong>Reduces variance.</strong> Taking the median of three evaluations produces more consistent grades than any single pass can.</li>
+                <li>• <strong>Corroborated findings.</strong> Structural damage, and magnified findings that would pull a category well below the main result, have to be corroborated before they count.</li>
                 <li>• <strong>Consistency score.</strong> When all three passes agree, your grade comes with a high-confidence flag.</li>
                 <li>• <strong>Mirrors how PSA, BGS, and SGC grade.</strong> Multiple-grader consensus, automated, and free of the day-to-day inconsistency that comes with rotating human graders.</li>
               </ul>

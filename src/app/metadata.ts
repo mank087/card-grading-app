@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 // Homepage metadata - exported and used in layout.tsx
 export const homeMetadata: Metadata = {
   title: 'DCM Grading - Instant Card Grading for Pokemon, Sports, MTG & More',
-  description: 'Professional card grading powered by DCM Optic™. Get instant, accurate grades for Pokemon, Sports Cards, Magic: The Gathering, Lorcana & One Piece. 30-point inspection, as low as $0.50 a card with Card Lovers Annual, with downloadable labels.',
+  description: 'Professional card grading powered by DCM Optic™. Get instant, accurate grades for Pokemon, Sports Cards, Magic: The Gathering, Lorcana & One Piece. Multi-point inspection, as low as $0.50 a card with Card Lovers Annual, with downloadable labels.',
   // Icons for Google Search, browsers, and mobile devices
   icons: {
     icon: [

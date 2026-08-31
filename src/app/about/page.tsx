@@ -243,7 +243,7 @@ export default function AboutPage() {
               <li>Settle the "what would this grade?" question the moment you pull the card</li>
             </ul>
             <p className="text-gray-700 mb-4">
-              DCM Optic™ is the system we built to do it. It evaluates centering, corners, edges, and surface condition the same way human graders do, then averages three independent passes for consistency. Results take under two minutes.
+              DCM Optic™ is the system we built to do it. It evaluates centering, corners, edges, and surface condition the same way human graders do, then takes the median of three independent passes for consistency, so one outlier pass can&apos;t drag the grade. Results take about a minute.
             </p>
           </div>
 

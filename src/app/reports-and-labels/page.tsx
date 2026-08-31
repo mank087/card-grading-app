@@ -348,17 +348,40 @@ export default function ReportsAndLabelsPage() {
               </div>
 
               <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
-                <h4 className="font-semibold text-violet-900 mb-2">Batch Labels</h4>
+                <h4 className="font-semibold text-violet-900 mb-2">Heritage Design</h4>
                 <p className="text-sm text-violet-700">
-                  Generate labels for multiple cards at once from your collection page using batch download.
+                  Our vintage-inspired label design, with a fold-over back that carries the four subgrades and the
+                  slab QR code. Available alongside the modern styles.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Batch Label Printing</h4>
+                <p className="text-sm text-violet-700">
+                  Select multiple cards from your collection page and print a full sheet of labels in one pass —
+                  no card-by-card downloads.
                 </p>
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 rounded-lg p-4">
+            <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-violet-800">
-                <strong>How to access:</strong> Open any graded card from your collection and look for the Label Studio
-                button in the Reports & Labels section. Customize, preview, and download — all in one place.
+                <strong>How to access:</strong> Open the{' '}
+                <Link href="/labels" className="font-semibold underline hover:text-violet-900">label wizard</Link>{' '}
+                to walk through label type, design, and card details step by step — or open any graded card from your
+                collection and use the Label Studio button in the Reports &amp; Labels section. The original studio is
+                still there at{' '}
+                <Link href="/labels/classic" className="font-semibold underline hover:text-violet-900">/labels/classic</Link>{' '}
+                if you prefer the all-controls-at-once view.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-700">
+                <strong>Need something to put them in?</strong> Slabs, magnetic one-touch holders, top loaders, and
+                label stock are all in the{' '}
+                <Link href="/shop" className="font-semibold text-violet-700 underline hover:text-violet-900">DCM shop</Link>,
+                sized to the labels this page produces.
               </p>
             </div>
           </div>
@@ -556,7 +579,7 @@ export default function ReportsAndLabelsPage() {
               </div>
               <h3 className="font-semibold mb-2">Grade Your Card</h3>
               <p className="text-gray-300 text-sm">
-                Upload your card images and receive your DCM Optic™ grade within minutes.
+                Upload your card images and receive your DCM Optic™ grade in about a minute.
               </p>
             </div>
 

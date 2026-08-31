@@ -239,7 +239,7 @@ export default function SportsGradingLanding() {
                 </span>
               </h1>
               <p className="text-base text-gray-300">
-                <span className="text-white font-semibold">No shipping. No waiting.</span> Results in 60 seconds.
+                <span className="text-white font-semibold">No shipping. No waiting.</span> Results in about a minute.
               </p>
               <p className="text-sm text-emerald-300/90 mt-2">
                 Set &amp; parallel verified against 2,951 sets, 1901&ndash;2026.
@@ -284,7 +284,7 @@ export default function SportsGradingLanding() {
                         <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span>30-point DCM Optic™ inspection</span>
+                        <span>Multi-point DCM Optic™ inspection</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-300 text-sm">
                         <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -308,7 +308,7 @@ export default function SportsGradingLanding() {
                         <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span>Results in under 60 seconds</span>
+                        <span>Results in about a minute</span>
                       </div>
                     </div>
 
@@ -455,7 +455,7 @@ export default function SportsGradingLanding() {
               </h1>
 
               <p className="text-xl text-gray-300 mb-3 max-w-xl">
-                <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
+                <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in about a minute.
               </p>
 
               <p className="text-base text-emerald-300/90 mb-6 max-w-xl">
@@ -529,7 +529,7 @@ export default function SportsGradingLanding() {
                       <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span>30-point DCM Optic™ inspection</span>
+                      <span>Multi-point DCM Optic™ inspection</span>
                     </div>
                     <div className="flex items-center gap-3 text-gray-300">
                       <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -553,7 +553,7 @@ export default function SportsGradingLanding() {
                       <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span>Results in under 60 seconds</span>
+                      <span>Results in about a minute</span>
                     </div>
                   </div>
 
@@ -734,7 +734,7 @@ export default function SportsGradingLanding() {
               </div>
               <div className="text-3xl font-bold text-white mb-1">Instant</div>
               <div className="text-emerald-400 font-semibold mb-2">Results</div>
-              <p className="text-gray-400 text-sm">Get your grade in under 60 seconds — no waiting weeks for a slab</p>
+              <p className="text-gray-400 text-sm">Get your grade in about a minute — no waiting weeks for a slab</p>
             </div>
 
             <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-2xl p-6 border border-emerald-700/30 text-center">
@@ -938,7 +938,7 @@ export default function SportsGradingLanding() {
               </div>
               <div className="text-emerald-400 font-bold text-sm mb-2">STEP 2</div>
               <h3 className="text-xl font-bold text-white mb-2">DCM Optic™ Analysis</h3>
-              <p className="text-gray-400">DCM Optic™, our grading engine, examines 30+ condition factors in under 60 seconds</p>
+              <p className="text-gray-400">DCM Optic™, our grading engine, scores centering, corners, edges and surface on both faces — three independent passes plus a magnified pass — in about a minute</p>
             </div>
 
             {/* Step 3 */}
@@ -1019,7 +1019,7 @@ export default function SportsGradingLanding() {
                   </div>
                   <div>
                     <h3 className="text-white font-semibold mb-1">Pro Grade Estimates</h3>
-                    <p className="text-gray-400 text-sm">See estimated PSA, BGS, SGC, and CSG grades before you submit</p>
+                    <p className="text-gray-400 text-sm">Your DCM grade, translated into estimated PSA, BGS, SGC, and CGC terms</p>
                   </div>
                 </div>
               </div>
@@ -1235,7 +1235,7 @@ export default function SportsGradingLanding() {
           <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 text-center mb-6">
             <p className="text-gray-300">
               See how your card&apos;s <span className="font-semibold text-emerald-400">grade affects its market value</span>. We pull
-              grade-adjusted pricing so you can tell whether a raw rookie is worth grading before you spend a cent.
+              grade-adjusted pricing on every card you grade, so a raw rookie and a graded one stop being the same number to you.
             </p>
           </div>
           <div className="rounded-2xl overflow-hidden border border-gray-700/50 bg-white">
@@ -1450,8 +1450,9 @@ export default function SportsGradingLanding() {
             Ready to Grade Your Collection?
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Stop wondering what your cards are worth. Get instant DCM Optic™ grades and know exactly which rookies and parallels are{' '}
-            <Link href="/psa-alternative" className="text-emerald-400 hover:text-emerald-300 underline">worth submitting to PSA</Link>.
+            Stop wondering what your cards are worth. Grade the box, get a real grade and a real label on every card.{' '}
+            Most of your collection ends here. The top slice still goes out — we&apos;ll{' '}
+            <Link href="/psa-alternative" className="text-emerald-400 hover:text-emerald-300 underline">tell you which</Link>.
           </p>
           {user ? (
             <Link
@@ -1542,7 +1543,7 @@ export default function SportsGradingLanding() {
         source="sports_landing"
         messages={[
           '2 free grades + bonus credits',
-          'Know which rookies are worth submitting',
+          'A real grade and label on every rookie',
           'Parallels verified against 2,951 sets',
           'As low as $0.50 a card with Card Lovers Annual — credits never expire',
         ]}

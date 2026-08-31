@@ -26,9 +26,8 @@ const MOCK_CATEGORIES = [
   { category: 'One Piece', count: 8, value: 670.00, percentage: 6.7 },
 ]
 const MOCK_GRADES = [
-  { grade: '10', count: 8 }, { grade: '9.5', count: 14 }, { grade: '9', count: 22 },
-  { grade: '8.5', count: 18 }, { grade: '8', count: 15 }, { grade: '7.5', count: 10 },
-  { grade: '7', count: 8 }, { grade: '6', count: 5 },
+  { grade: '10', count: 8 }, { grade: '9', count: 36 }, { grade: '8', count: 33 },
+  { grade: '7', count: 18 }, { grade: '6', count: 5 },
 ]
 const MOCK_VALUES = [
   { label: '$0-10', count: 18, min: 0.01, max: 10 }, { label: '$10-25', count: 24, min: 10, max: 25 },
@@ -464,11 +463,11 @@ export default function WhyDcmPage() {
                 <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">New — Now Live</span>
               </div>
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 leading-tight">
-                Now Available on the App Store
+                Now on the App Store and Google Play
               </h2>
               <p className="text-base sm:text-lg text-gray-200 mb-6">
                 Grade your collection from anywhere. The DCM Grading app brings full
-                DCM Optic™ grading to your iPhone or iPad — same accurate grades,
+                DCM Optic™ grading to iPhone, iPad, and Android — same accurate grades,
                 same instant reports, now in your pocket.
               </p>
               <ul className="space-y-2 mb-6 text-sm sm:text-base text-gray-200">
@@ -732,7 +731,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="See It in Action" subtitle="Watch the full grading process from upload to finished label in under 3 minutes" />
+          <SectionHeading title="See It in Action" subtitle="Watch the full grading process from upload to finished label — the walkthrough runs under 3 minutes" />
           <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200" style={{ aspectRatio: '16 / 9' }}>
             <iframe
               src="https://www.youtube-nocookie.com/embed/oSz9lfvaEK4?rel=0"
@@ -776,7 +775,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Multi-Pass Consensus Grading</h3>
-                  <p className="text-gray-400 text-xs mt-1">Every card is evaluated three independent times. Results are averaged and reconciled server-side to eliminate variance.</p>
+                  <p className="text-gray-400 text-xs mt-1">Every card is evaluated three independent times. The median of the three is taken server-side, so one outlier pass can&apos;t drag the grade.</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -794,7 +793,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Server-Verified Results</h3>
-                  <p className="text-gray-400 text-xs mt-1">Every grade is recalculated server-side with consensus boosting and standard rounding for accuracy and consistency.</p>
+                  <p className="text-gray-400 text-xs mt-1">Every grade is recalculated server-side by median consensus and standard rounding, never trusted from a single pass.</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -1284,7 +1283,7 @@ export default function WhyDcmPage() {
       <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Grade Your First Card?</h2>
-          <p className="text-purple-200 text-lg mb-8">Upload a photo, get your grade in minutes. Your first credit is on us.</p>
+          <p className="text-purple-200 text-lg mb-8">Upload a photo, get your grade in about a minute. Your first two credits are on us.</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-purple-300 mb-8">
             <span>No mailing required</span>
             <span>&middot;</span>

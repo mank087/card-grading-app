@@ -33,8 +33,8 @@ function readStandard(): string {
   );
 }
 
-// The standard carries its own version line ("**Version 1.0** · Effective
-// 26 August 2026 · Engine `DCM_Grading_v9.19`"). Schema dates are read from the
+// The standard carries its own version line ("**Version 1.1** · Effective
+// 31 August 2026 · Engine `DCM_Grading_v9.23`"). Schema dates are read from the
 // document itself so the page cannot claim a date the standard does not.
 const STANDARD_URL = 'https://dcmgrading.com/grading-standard';
 const ORG_ID = 'https://dcmgrading.com/#organization';

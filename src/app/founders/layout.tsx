@@ -1,19 +1,19 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Founders Package - Exclusive 150 Credits',
-  description: 'Become a DCM Founder: Get 150 grading credits, exclusive Founder star emblem on all labels, and lifetime recognition. Join our founding community of collectors.',
-  keywords: 'DCM Founders, founder package, exclusive card grading, founder emblem, founding member, collector community',
+  title: 'Founders (program closed) - see Card Lovers',
+  description: 'The DCM Founders program is closed to new members. Existing Founders keep their credits and Founder emblem. For an ongoing plan, see Card Lovers.',
+  robots: { index: false, follow: true },
   openGraph: {
-    title: 'Founders Package - Join DCM\'s Founding Community',
-    description: 'Get 150 grading credits + exclusive Founder emblem. Join our founding community of collectors.',
+    title: 'Founders (program closed) - DCM Grading',
+    description: 'The Founders program is closed to new members. See Card Lovers for our current plans.',
     type: 'website',
     siteName: 'DCM Grading',
   },
   twitter: {
     card: 'summary',
-    title: 'Founders Package - DCM Grading',
-    description: '150 credits + Founder emblem. Join DCM\'s founding community.',
+    title: 'Founders (program closed) - DCM Grading',
+    description: 'Closed to new members. See Card Lovers for our current plans.',
   },
 };
 

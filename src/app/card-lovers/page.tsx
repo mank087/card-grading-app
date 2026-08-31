@@ -394,7 +394,7 @@ export default function CardLoversPage() {
 
             {/* Discount stacking note */}
             <p className="text-gray-500 text-xs mt-4 text-center italic">
-              Note: Founder and Card Lover discounts do not stack. If you have both statuses, you&apos;ll receive one 20% discount on credit purchases.
+              Note: for existing Founders, Founder and Card Lover discounts do not stack. If you hold both statuses, you&apos;ll receive one 20% discount on credit purchases. The Founders program itself closed to new members in February 2026.
             </p>
           </div>
         </div>
@@ -457,7 +457,7 @@ export default function CardLoversPage() {
                       Need more credits? Get 20% off all credit package purchases while subscribed.
                     </p>
                     <p className="text-gray-500 text-xs mt-2 italic">
-                      Note: Founder and Card Lover discounts do not stack. If you have both statuses, you&apos;ll receive one 20% discount on credit purchases.
+                      Note: for existing Founders, Founder and Card Lover discounts do not stack. If you hold both statuses, you&apos;ll receive one 20% discount on credit purchases. The Founders program itself closed to new members in February 2026.
                     </p>
                   </div>
                 </div>
@@ -583,8 +583,8 @@ export default function CardLoversPage() {
                   a: "You keep all accumulated credits forever — they're paid for and owned by you. You'll lose access to the 20% discount, badge, and label emblem, but your credits remain in your account."
                 },
                 {
-                  q: "Can I be both a Founder and a Card Lover?",
-                  a: "Absolutely! You can have both status badges. In your account settings, you can choose which emblem appears on your labels or show both badges on your collection page."
+                  q: "I'm already a Founder — can I also be a Card Lover?",
+                  a: "Yes. The Founders program closed to new members in February 2026, but existing Founders keep their status, and you can hold both badges. In your account settings you can choose which emblem appears on your labels, or show both on your collection page."
                 },
                 {
                   q: "What are the loyalty bonuses?",

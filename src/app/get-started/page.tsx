@@ -30,7 +30,7 @@ export default function GetStartedPage() {
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
               Dynamic Collectibles Management (DCM) brings card grading powered by DCM Optic™ to collectors worldwide.
-              Get professional-grade analysis in under 60 seconds — no shipping, no waiting.
+              Get professional-grade analysis in about a minute — no shipping, no waiting.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -72,7 +72,7 @@ export default function GetStartedPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Instant Results</h3>
-                <p className="text-gray-600">Full grade in under 60 seconds. No mailing, no waiting weeks or months.</p>
+                <p className="text-gray-600">Full grade in about a minute. No mailing, no waiting weeks or months.</p>
               </div>
 
               <div className="text-center p-6 rounded-2xl bg-gray-50">
@@ -92,7 +92,7 @@ export default function GetStartedPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Affordable</h3>
-                <p className="text-gray-600"><Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">As low as $0.50 a card with Card Lovers Annual</Link>, or $2.99 for a single card. Know your card's grade before deciding to submit elsewhere.</p>
+                <p className="text-gray-600"><Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">As low as $0.50 a card with Card Lovers Annual</Link>, or $2.99 for a single card. Most of your collection ends here. The top slice still goes out — we&apos;ll tell you which.</p>
               </div>
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function GetStartedPage() {
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-3">DCM Optic™ Analysis</h3>
                     <p className="text-gray-600">
-                      Our DCM Optic™ engine examines 30+ condition factors in under 60 seconds.
+                      Our DCM Optic™ engine scores centering, corners, edges and surface on both faces in about a minute.
                       It evaluates centering, corners, edges, and surface quality with precision accuracy.
                     </p>
                   </div>
@@ -419,12 +419,15 @@ export default function GetStartedPage() {
                 <Link href="/card-grading" className="hover:text-purple-700 hover:underline">Other TCGs</Link>
               </h3>
               <p className="text-gray-600 text-sm mb-3">
-                Magic: The Gathering, Disney Lorcana, Yu-Gi-Oh!, One Piece, and other trading card games.
+                Magic: The Gathering, Disney Lorcana, One Piece, Yu-Gi-Oh!, Star Wars, and any other trading card game.
               </p>
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">MTG</span>
                 <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Lorcana</span>
+                <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">One Piece</span>
                 <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Yu-Gi-Oh!</span>
+                <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Star Wars</span>
+                <span className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Other</span>
               </div>
             </div>
           </div>
@@ -611,7 +614,7 @@ export default function GetStartedPage() {
               },
               {
                 q: "How accurate is DCM Optic™ grading?",
-                a: "DCM Optic™ analyzes 30+ condition factors, then averages three independent passes to keep the grade stable. Accuracy is bounded by your photo quality — clear, well-lit photos produce grades that align closely with what professional services would assign."
+                a: "DCM Optic™ scores centering, corners, edges and surface on both faces, then takes the median of three independent passes to keep the grade stable, so one outlier pass can't drag it. A magnified pass then re-examines each corner, edge and surface region on its own crop. Accuracy is bounded by your photo quality — clear, well-lit photos produce grades that align closely with what professional services would assign."
               },
               {
                 q: "Do I need to ship my cards?",
@@ -627,7 +630,7 @@ export default function GetStartedPage() {
               },
               {
                 q: "How long does grading take?",
-                a: "Most cards are graded in 30-60 seconds. Upload your photos and the full grade report is back almost instantly."
+                a: "Most cards are graded in about a minute. Upload your photos and the full grade report is back almost instantly."
               }
             ].map((faq, index) => (
               <div key={index} className="bg-white rounded-xl p-6 shadow-sm">
