@@ -211,6 +211,16 @@ function FooterInner({ currentYear }: { currentYear: number }) {
                 </Link>
               </li>
               <li>
+                <Link href="/card-grading-companies" className="text-gray-400 hover:text-white transition-colors">
+                  Compare Grading Companies
+                </Link>
+              </li>
+              <li>
+                <Link href="/ai-card-grading-accuracy" className="text-gray-400 hover:text-white transition-colors">
+                  AI Grading Accuracy
+                </Link>
+              </li>
+              <li>
                 <Link href="/blog" className="text-gray-400 hover:text-white transition-colors">
                   Blog
                 </Link>
