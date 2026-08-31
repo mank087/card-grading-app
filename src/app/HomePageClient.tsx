@@ -299,7 +299,11 @@ export default function Home() {
             <p className="text-lg text-gray-300 mb-6 max-w-xl">
               Every new account starts with 2 free credits, enough to grade two cards with full
               reports and labels included. When you buy your first pack, we top it up:
-              +1 bonus credit on Basic, +2 on Pro, +5 on Elite. Credits never expire.
+              +1 bonus credit on Basic, +2 on Pro, +5 on Elite. Credits never expire, and you can{' '}
+              <Link href="/cheapest-card-grading" className="text-purple-300 hover:text-purple-200 underline">
+                see how the cost compares
+              </Link>{' '}
+              to mail-away grading.
             </p>
 
             {/* App availability callout */}
@@ -387,7 +391,8 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">Why Choose DCM?</h2>
           <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            The complete solution for grading, managing, and showcasing your trading card collection
+            The complete solution for grading, managing, and showcasing your trading card collection —{' '}
+            <Link href="/why-dcm" className="text-purple-600 hover:text-purple-700 underline">see the full case</Link>.
           </p>
           <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
             {/* 1. Machine Learning Accuracy */}
@@ -398,7 +403,11 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Machine Learning</h3>
-              <p className="text-gray-600 text-sm">DCM Optic™, our grading engine, delivers consistent, detailed, and reliable condition assessments.</p>
+              <p className="text-gray-600 text-sm">
+                <Link href="/ai-card-grading" className="text-purple-600 hover:text-purple-700 underline">DCM Optic™, our grading engine</Link>,
+                delivers consistent, detailed, and{' '}
+                <Link href="/ai-card-grading-accuracy" className="text-purple-600 hover:text-purple-700 underline">reliable condition assessments</Link>.
+              </p>
             </div>
 
             {/* 2. Detailed Card Condition */}
@@ -442,7 +451,11 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Labels &amp; Reports</h3>
-              <p className="text-gray-600 text-sm">Download professional grading labels and analysis reports for display, online auctions, or in-person sales.</p>
+              <p className="text-gray-600 text-sm">
+                Download{' '}
+                <Link href="/reports-and-labels" className="text-purple-600 hover:text-purple-700 underline">professional grading labels and analysis reports</Link>{' '}
+                for display, online auctions, or in-person sales.
+              </p>
             </div>
           </div>
         </div>
@@ -473,9 +486,11 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">How we grade, in the open</h2>
           <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            Grading you can audit. Our standards, our data, and our limits are all public.
+            Grading you can audit.{' '}
+            <Link href="/grading-standard" className="text-purple-600 hover:text-purple-700 underline">Our standards</Link>,
+            our data, and our limits are all public.
           </p>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
             <Link href="/grading-rubric" className="block p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
               <h3 className="text-lg font-semibold mb-2 text-purple-700">Public grading rubric &rarr;</h3>
               <p className="text-gray-600 text-sm">
@@ -495,6 +510,13 @@ export default function Home() {
               <p className="text-gray-600 text-sm">
                 Photo-based grading has limits, and we document them: what DCM Optic™ can and
                 can&apos;t see, and when a physical grade is the better choice.
+              </p>
+            </Link>
+            <Link href="/card-grading-companies" className="block p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
+              <h3 className="text-lg font-semibold mb-2 text-purple-700">How DCM compares &rarr;</h3>
+              <p className="text-gray-600 text-sm">
+                DCM next to PSA, BGS, SGC, and CGC on price, turnaround, and what you actually get
+                back, so you can decide which grade a card is worth.
               </p>
             </Link>
           </div>

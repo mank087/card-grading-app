@@ -201,6 +201,11 @@ function FooterInner({ currentYear }: { currentYear: number }) {
                 </Link>
               </li>
               <li>
+                <Link href="/grade-your-first-card" className="text-gray-400 hover:text-white transition-colors">
+                  Grade Your First Card
+                </Link>
+              </li>
+              <li>
                 <Link href="/ai-card-grading" className="text-gray-400 hover:text-white transition-colors">
                   How DCM Optic™ Works
                 </Link>

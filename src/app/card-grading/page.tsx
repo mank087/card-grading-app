@@ -829,6 +829,11 @@ export default function CardGradingLanding() {
               <h2 className="text-3xl font-bold text-white mb-6 text-center lg:text-left">
                 Detailed Analysis You Can Trust
               </h2>
+              <p className="text-gray-400 mb-6 text-center lg:text-left">
+                Every score comes from the same{' '}
+                <Link href="/grading-standard" className="text-purple-400 hover:text-purple-300 underline">published grading standard</Link>,
+                applied the same way to every card.
+              </p>
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -889,9 +894,13 @@ export default function CardGradingLanding() {
       {/* Social Proof / Stats */}
       <section className="py-16 bg-gray-800">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl font-bold text-white text-center mb-4">
             Why Collectors Choose DCM
           </h2>
+          <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+            Every grade we have issued is aggregated in the public{' '}
+            <Link href="/pop" className="text-purple-400 hover:text-purple-300 underline">population report</Link>.
+          </p>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
@@ -922,7 +931,8 @@ export default function CardGradingLanding() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Choose the package that fits your collection. All plans include our full DCM Optic analysis.
+              Choose the package that fits your collection. All plans include our full DCM Optic analysis, at{' '}
+              <Link href="/cheapest-card-grading" className="text-purple-400 hover:text-purple-300 underline">a fraction of mail-away grading fees</Link>.
             </p>
             {/* Free Credit + Bonus Banner */}
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1314,7 +1324,8 @@ export default function CardGradingLanding() {
             Ready to Grade Your Collection?
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Stop wondering what your cards are worth. Get instant DCM Optic™ grades and know exactly which cards are worth submitting to PSA.
+            Stop wondering what your cards are worth. Get instant DCM Optic™ grades and know exactly which cards are{' '}
+            <Link href="/psa-alternative" className="text-purple-400 hover:text-purple-300 underline">worth submitting to PSA</Link>.
           </p>
           {user ? (
             <Link

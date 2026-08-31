@@ -208,7 +208,7 @@ export default function PsaAlternativePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
             >
               Grade Your First Card Free
@@ -246,8 +246,11 @@ export default function PsaAlternativePage() {
             </p>
             <p className="text-lg text-gray-700">
               DCM exists for the cards that do not clear that bar. It grades any card you own, from photos, right now,
-              with four subgrades and a defect log. And when a card does turn out to deserve a mail-in submission, you
-              have the evidence to decide before you pay for it.
+              with four subgrades and a defect log — within{' '}
+              <Link href="/grading-limitations" className="text-purple-700 underline">the limits a photo-based grade honestly has</Link>,
+              which we publish. And when a card does turn out to deserve a mail-in submission, you have the evidence to
+              decide before you pay for it, which is{' '}
+              <Link href="/why-dcm" className="text-purple-700 underline">the whole case for grading at home first</Link>.
             </p>
           </div>
         </section>
@@ -552,7 +555,7 @@ export default function PsaAlternativePage() {
               Sign up free and grade your first card on us. Two photos and about a minute is all it takes.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

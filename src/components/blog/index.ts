@@ -3,6 +3,7 @@ export { default as BlogPostCard } from './BlogPostCard';
 export { default as BlogPostContent } from './BlogPostContent';
 export { default as BlogPagination } from './BlogPagination';
 export { default as CategoryBadge } from './CategoryBadge';
+export { default as FurtherReading } from './FurtherReading';
 export { default as ReadingProgress } from './ReadingProgress';
 export { default as RelatedPosts } from './RelatedPosts';
 export { default as ShareButtons } from './ShareButtons';

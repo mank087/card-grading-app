@@ -275,7 +275,7 @@ export default function AiCardGradingAccuracyPage() {
         {/* Verifiability */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-6">Check it yourself</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-2">The rubric is published</h3>
               <p className="text-sm text-gray-700">
@@ -298,6 +298,15 @@ export default function AiCardGradingAccuracyPage() {
                 The full grade distribution across every public card graded on the platform is at{' '}
                 <Link href="/pop" className="text-purple-700 underline">/pop</Link>, broken out by category. If DCM
                 handed out 10s freely, that page would show it.
+              </p>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">The report shows its work</h3>
+              <p className="text-sm text-gray-700">
+                What comes back is documented at{' '}
+                <Link href="/reports-and-labels" className="text-purple-700 underline">/reports-and-labels</Link>:
+                the subgrades, the defect log and the confidence letter, so you can audit the grade rather than
+                accept it.
               </p>
             </div>
           </div>
@@ -341,6 +350,12 @@ export default function AiCardGradingAccuracyPage() {
               <Link href="/pop" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
                 Public pop report →
               </Link>
+              <Link href="/fastest-card-grading" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
+                Fastest card grading →
+              </Link>
+              <Link href="/cheapest-card-grading" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
+                Cheapest card grading →
+              </Link>
             </div>
           </div>
         </section>
@@ -354,7 +369,7 @@ export default function AiCardGradingAccuracyPage() {
               that tells you when the photos let it down.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

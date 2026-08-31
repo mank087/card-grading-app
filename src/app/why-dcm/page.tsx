@@ -102,7 +102,7 @@ const trackSignupClick = (location: string) => {
 // SECTION COMPONENTS
 // ============================================================================
 
-function SectionHeading({ title, subtitle, light = false }: { title: string; subtitle?: string; light?: boolean }) {
+function SectionHeading({ title, subtitle, light = false }: { title: string; subtitle?: React.ReactNode; light?: boolean }) {
   return (
     <div className="text-center mb-10 sm:mb-14">
       <h2 className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${light ? 'text-white' : 'text-gray-900'}`}>{title}</h2>
@@ -324,7 +324,8 @@ export default function WhyDcmPage() {
                 <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">In Your Hands</span>
               </h1>
               <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-xl mx-auto xl:mx-0 leading-relaxed">
-                Grade any trading card in seconds. Full reports, live market pricing, and custom slab labels, all without mailing your cards anywhere or waiting weeks for results.
+                Grade any trading card in seconds. Full reports, live market pricing, and custom slab labels, all without mailing your cards anywhere or{' '}
+                <Link href="/fastest-card-grading" className="text-emerald-400 hover:text-emerald-300 underline">waiting weeks for results</Link>.
               </p>
 
               {/* Trust signals */}
@@ -749,7 +750,11 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="The DCM Optic™ Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" light />
+          <SectionHeading
+            title="The DCM Optic™ Approach"
+            subtitle={<>A structured, repeatable <Link href="/grading-standard" className="text-emerald-400 hover:text-emerald-300 underline">grading methodology</Link> that gives you confidence in every grade</>}
+            light
+          />
 
           {/* Desktop: 3-column layout | Mobile: stacked */}
           <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-start">
@@ -1200,7 +1205,11 @@ export default function WhyDcmPage() {
                 each corner, edge, and surface region, and the consensus becomes your grade. The engine is
                 continuously calibrated against reference cards with known grades, and every report states
                 its own confidence range instead of pretending certainty. You also get estimated equivalents
-                on the PSA, BGS, SGC, and CGC scales so you can put the number in familiar terms.
+                on the{' '}
+                <Link href="/psa-alternative" className="text-purple-600 hover:text-purple-800 underline">PSA, BGS, SGC, and CGC scales</Link>{' '}
+                so you can put the number in familiar terms, or{' '}
+                <Link href="/card-grading-companies" className="text-purple-600 hover:text-purple-800 underline">see the full comparison</Link>{' '}
+                of what each service charges and how long it takes.
               </p>
             </div>
             <div>
@@ -1230,7 +1239,10 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Simple, Affordable Pricing" subtitle="Credits never expire. Buy what you need, grade when you're ready." />
+          <SectionHeading
+            title="Simple, Affordable Pricing"
+            subtitle={<>Credits never expire. Buy what you need, grade when you&apos;re ready, and <Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">see how the cost compares</Link>.</>}
+          />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
             {[
               { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: true },

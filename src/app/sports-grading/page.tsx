@@ -722,7 +722,7 @@ export default function SportsGradingLanding() {
               <p className="text-gray-400 text-sm">
                 {sportsGraded
                   ? 'Live count across every sport, updated continuously'
-                  : 'Live count from our population report'}
+                  : <>Live count from our <Link href="/pop" className="text-emerald-400 hover:text-emerald-300 underline">population report</Link></>}
               </p>
             </div>
 
@@ -980,6 +980,11 @@ export default function SportsGradingLanding() {
               <h2 className="text-3xl font-bold text-white mb-6 text-center lg:text-left">
                 Detailed Analysis You Can Trust
               </h2>
+              <p className="text-gray-400 mb-6 text-center lg:text-left">
+                Every score comes from the same{' '}
+                <Link href="/grading-standard" className="text-emerald-400 hover:text-emerald-300 underline">published grading standard</Link>,
+                applied the same way to every card.
+              </p>
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
                   <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1142,7 +1147,14 @@ export default function SportsGradingLanding() {
             {[
               {
                 q: 'Is a DCM grade the same as a PSA grade?',
-                a: 'No, and we do not claim it is. DCM is its own 10-point grade with four sub-grades, and every report includes estimated equivalents on the PSA, BGS, SGC and CGC scales so you know roughly where a card would land. Most collectors use DCM to decide which cards are worth paying to submit.',
+                a: (
+                  <>
+                    No, and we do not claim it is. DCM is its own 10-point grade with four sub-grades, and every report includes{' '}
+                    <Link href="/card-grading-companies" className="text-emerald-400 hover:text-emerald-300 underline">estimated equivalents on the PSA, BGS, SGC and CGC scales</Link>{' '}
+                    so you know roughly where a card would land. Most collectors use DCM to decide{' '}
+                    <Link href="/psa-alternative" className="text-emerald-400 hover:text-emerald-300 underline">which cards are worth paying to submit</Link>.
+                  </>
+                ),
               },
               {
                 q: 'Can you tell a base card from its parallel?',
@@ -1438,7 +1450,8 @@ export default function SportsGradingLanding() {
             Ready to Grade Your Collection?
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Stop wondering what your cards are worth. Get instant DCM Optic™ grades and know exactly which rookies and parallels are worth submitting to PSA.
+            Stop wondering what your cards are worth. Get instant DCM Optic™ grades and know exactly which rookies and parallels are{' '}
+            <Link href="/psa-alternative" className="text-emerald-400 hover:text-emerald-300 underline">worth submitting to PSA</Link>.
           </p>
           {user ? (
             <Link

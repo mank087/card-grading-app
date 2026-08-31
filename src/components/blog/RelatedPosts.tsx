@@ -7,41 +7,68 @@ import BlogPostCard from './BlogPostCard';
 interface RelatedPostsProps {
   currentPostId: string;
   categoryId?: string | null;
+  /** Category slug — /api/blog/posts filters by slug, not id. */
+  categorySlug?: string | null;
   tags?: string[];
 }
 
-export default function RelatedPosts({ currentPostId, categoryId, tags }: RelatedPostsProps) {
+export default function RelatedPosts({ currentPostId, categorySlug, tags }: RelatedPostsProps) {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Stable dependency: the array identity changes on every render otherwise.
+  const tagKey = (tags || []).join(',');
+
   useEffect(() => {
+    let cancelled = false;
+
+    const fetchPage = async (query: string): Promise<BlogPost[]> => {
+      const response = await fetch(`/api/blog/posts?${query}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.posts || []) as BlogPost[];
+    };
+
     const fetchRelatedPosts = async () => {
       try {
-        // Try to fetch posts from the same category first
-        const url = '/api/blog/posts?limit=3';
-        if (categoryId) {
-          // Need to get category slug first - for now just fetch recent posts
-          // This could be optimized with a dedicated related posts API endpoint
+        const collected: BlogPost[] = [];
+        const seen = new Set<string>([currentPostId]);
+
+        const add = (candidates: BlogPost[]) => {
+          for (const post of candidates) {
+            if (seen.has(post.id)) continue;
+            seen.add(post.id);
+            collected.push(post);
+            if (collected.length >= 3) return;
+          }
+        };
+
+        // Most topical first: same category, then a shared tag, then recent.
+        if (categorySlug) {
+          add(await fetchPage(`limit=4&category=${encodeURIComponent(categorySlug)}`));
+        }
+        const firstTag = (tags || [])[0];
+        if (collected.length < 3 && firstTag) {
+          add(await fetchPage(`limit=4&tag=${encodeURIComponent(firstTag)}`));
+        }
+        if (collected.length < 3) {
+          add(await fetchPage('limit=4'));
         }
 
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          // Filter out the current post
-          const filteredPosts = data.posts.filter(
-            (post: BlogPost) => post.id !== currentPostId
-          );
-          setPosts(filteredPosts.slice(0, 3));
-        }
+        if (!cancelled) setPosts(collected.slice(0, 3));
       } catch (error) {
         console.error('Error fetching related posts:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchRelatedPosts();
-  }, [currentPostId, categoryId, tags]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPostId, categorySlug, tagKey]);
 
   if (loading) {
     return (

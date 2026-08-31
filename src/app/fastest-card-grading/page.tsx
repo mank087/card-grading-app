@@ -204,10 +204,16 @@ export default function FastestCardGradingPage() {
           <div className="bg-blue-50 rounded-2xl p-8 border border-blue-200">
             <h2 className="text-2xl font-bold text-blue-900 mb-3">Speed is not the only axis</h2>
             <p className="text-blue-900 mb-3">
-              A 60-second grade and a sealed slab are different products. DCM returns a whole-number grade from 1 to
-              10, four subgrades, a written reason for every deduction, an image confidence letter and a printable
-              label for a holder you already own. It is not a sealed slab from a mail-in grader and it is not
-              registry-eligible.
+              A 60-second grade and a sealed slab are different products. DCM returns a{' '}
+              <Link href="/grading-standard" className="text-blue-700 underline hover:text-blue-900">whole-number grade from 1 to 10</Link>,
+              four subgrades, a written reason for every deduction, an image confidence letter and a{' '}
+              <Link href="/reports-and-labels" className="text-blue-700 underline hover:text-blue-900">printable label for a holder you already own</Link>.
+              It is not a sealed slab from a mail-in grader and it is not registry-eligible.
+            </p>
+            <p className="text-blue-900 mb-3">
+              What we do publish is the record: every grade DCM has issued is aggregated in the public{' '}
+              <Link href="/pop" className="text-blue-700 underline hover:text-blue-900">population report</Link>,
+              so you can see how often a 10 actually happens before you trust one.
             </p>
             <p className="text-blue-900 font-semibold">{HONEST_MIDDLE}</p>
           </div>
@@ -272,7 +278,7 @@ export default function FastestCardGradingPage() {
               Two free grades to start. Two photos, and the card never leaves your hands.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

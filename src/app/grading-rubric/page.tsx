@@ -21,9 +21,52 @@ export const metadata: Metadata = {
   },
 };
 
+const RUBRIC_URL = 'https://dcmgrading.com/grading-rubric';
+const ORG_ID = 'https://dcmgrading.com/#organization';
+
+// Kept in step with the standard's own version line in
+// docs/DCM_GRADING_STANDARD.md, which this page summarises.
+const RUBRIC_VERSION = '1.0';
+const RUBRIC_UPDATED_ISO = '2026-08-26';
+const RUBRIC_UPDATED_LABEL = 'August 26, 2026';
+
+const techArticleJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  '@id': `${RUBRIC_URL}#article`,
+  headline: 'DCM Grading Rubric: How DCM Grades Trading Cards',
+  name: 'DCM Grading Rubric',
+  description:
+    'How DCM grades a trading card: four subgrades for centering, corners, edges and surface, each scored on both faces, three independent evaluation passes settled by consensus, and a final whole-number grade equal to the lowest subgrade.',
+  inLanguage: 'en',
+  datePublished: RUBRIC_UPDATED_ISO,
+  dateModified: RUBRIC_UPDATED_ISO,
+  version: RUBRIC_VERSION,
+  url: RUBRIC_URL,
+  mainEntityOfPage: RUBRIC_URL,
+  author: { '@id': ORG_ID },
+  publisher: { '@id': ORG_ID },
+  about: [
+    { '@type': 'Thing', name: 'Trading card grading' },
+    { '@type': 'Thing', name: 'Card condition assessment' },
+    { '@type': 'Thing', name: 'Weakest-link grading' },
+    { '@type': 'Thing', name: 'Three-pass consensus grading' },
+  ],
+  citation: {
+    '@type': 'TechArticle',
+    name: 'The DCM Grading Standard',
+    url: 'https://dcmgrading.com/grading-standard',
+  },
+  isAccessibleForFree: true,
+};
+
 export default function GradingRubricPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(techArticleJsonLd) }}
+      />
       <FloatingCardsBackground />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero Section */}
@@ -33,6 +76,13 @@ export default function GradingRubricPage() {
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Precision grading powered by DCM Optic™ — our proprietary multi-point inspection system with three-pass consensus technology that delivers professional-grade assessments with unmatched accuracy
+          </p>
+          <p className="text-sm text-gray-500 mt-4">
+            Version {RUBRIC_VERSION} &middot; Updated {RUBRIC_UPDATED_LABEL} &middot; Published in
+            full at{' '}
+            <a href="/grading-standard" className="text-purple-600 hover:text-purple-800">
+              the DCM Grading Standard
+            </a>
           </p>
         </div>
 

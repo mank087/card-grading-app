@@ -228,7 +228,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Only include cards that are public and have been graded
   const { data: cards, error: cardsError } = await supabase
     .from('cards')
-    .select('id, category, created_at')
+    .select('id, category, created_at, serial')
     .eq('visibility', 'public')
     .order('created_at', { ascending: false });
 
@@ -250,6 +250,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     };
   });
+
+  // Verification pages: /verify/{serial} is the URL printed as a QR code on every
+  // slab, and it is the page that proves a grade is real. It keys on cards.serial
+  // (see src/app/verify/[serial]/page.tsx). Same query as above — no second scan.
+  const verifyPages: MetadataRoute.Sitemap = (cards || [])
+    .filter((card) => Boolean(card.serial))
+    .map((card) => ({
+      url: `${baseUrl}/verify/${card.serial}`,
+      lastModified: card.created_at ? new Date(card.created_at) : new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    }));
 
   // Fetch active card shows
   const { data: shows, error: showsError } = await supabase
@@ -306,5 +318,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }];
 
-  return [...staticPages, ...cardPages, ...showPages, ...blogIndexPage, ...blogPages, ...blogCategoryPages];
+  return [
+    ...staticPages,
+    ...cardPages,
+    ...verifyPages,
+    ...showPages,
+    ...blogIndexPage,
+    ...blogPages,
+    ...blogCategoryPages,
+  ];
 }

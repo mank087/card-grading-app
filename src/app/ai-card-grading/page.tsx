@@ -162,7 +162,7 @@ export default function AiCardGradingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
             >
               Grade Your First Card Free
@@ -381,11 +381,17 @@ export default function AiCardGradingPage() {
               </div>
             </div>
             <p className="text-lg opacity-95 mb-4">
-              Compare that to mail-in grading: in August 2026 the cheapest tiers open at the major services ran from $15 to about $80 per card before shipping and insurance, with published turnarounds from 15 to 100-plus business days. The sourced table is on the{' '}
+              Compare that to mail-in grading: in August 2026 the cheapest tiers open at the major services{' '}
+              <Link href="/cheapest-card-grading" className="underline font-semibold">ran from $15 to about $80 per card</Link>{' '}
+              before shipping and insurance, with{' '}
+              <Link href="/fastest-card-grading" className="underline font-semibold">published turnarounds from 15 to 100-plus business days</Link>.
+              The sourced table is on the{' '}
               <Link href="/card-grading-companies" className="underline font-semibold">
                 grading companies comparison
               </Link>
-              .
+              , and{' '}
+              <Link href="/psa-alternative" className="underline font-semibold">what a PSA alternative actually replaces</Link>{' '}
+              is set out separately.
             </p>
             <Link
               href="/credits"
@@ -448,7 +454,7 @@ export default function AiCardGradingPage() {
               Sign up free and grade your first card on us. No shipping, no waiting, no minimums.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

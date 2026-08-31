@@ -92,7 +92,7 @@ export default function GetStartedPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Affordable</h3>
-                <p className="text-gray-600">Starting at just $1 per card. Know your card's grade before deciding to submit elsewhere.</p>
+                <p className="text-gray-600"><Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">Starting at just $1 per card</Link>. Know your card's grade before deciding to submit elsewhere.</p>
               </div>
             </div>
           </div>
@@ -129,7 +129,8 @@ export default function GetStartedPage() {
                     <h3 className="text-xl font-bold text-gray-900 mb-3">Upload Your Card Photos</h3>
                     <p className="text-gray-600">
                       Take clear photos of your card's front and back using your phone or camera.
-                      Good lighting and a flat surface work best. Upload both images to start the grading process.
+                      Good lighting and a flat surface work best. Upload both images to start the grading process, or read the{' '}
+                      <Link href="/grade-your-first-card" className="text-purple-600 hover:text-purple-800 underline">full walkthrough</Link>.
                     </p>
                   </div>
                 </div>
@@ -197,7 +198,7 @@ export default function GetStartedPage() {
             What DCM Evaluates
           </h2>
           <p className="text-lg text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            DCM analyzes the same four key factors used by professional grading companies like PSA, BGS, and CGC.
+            DCM analyzes the <Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">same four key factors used by professional grading companies</Link> like <Link href="/card-grading-companies" className="text-purple-600 hover:text-purple-800 underline">PSA, BGS, and CGC</Link>.
           </p>
 
           <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
@@ -296,7 +297,9 @@ export default function GetStartedPage() {
           </h2>
           <p className="text-lg text-gray-400 text-center mb-12 max-w-2xl mx-auto">
             DCM uses a 10-point grading scale aligned with industry standards.
-            Each grade reflects the overall condition of your card.
+            Each grade reflects the overall condition of your card, and you can see how those grades
+            land across every card we have graded in our{' '}
+            <Link href="/pop" className="text-purple-300 hover:text-purple-200 underline">population report</Link>.
           </p>
 
           <div className="max-w-4xl mx-auto">
@@ -366,7 +369,9 @@ export default function GetStartedPage() {
                   className="object-contain"
                 />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Pokemon Cards</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                <Link href="/pokemon-grading" className="hover:text-purple-700 hover:underline">Pokemon Cards</Link>
+              </h3>
               <p className="text-gray-600 text-sm mb-3">
                 All Pokemon TCG cards including vintage WOTC, modern sets, Japanese cards, and special editions.
               </p>
@@ -387,7 +392,9 @@ export default function GetStartedPage() {
                   className="object-contain"
                 />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Sports Cards</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                <Link href="/sports-grading" className="hover:text-purple-700 hover:underline">Sports Cards</Link>
+              </h3>
               <p className="text-gray-600 text-sm mb-3">
                 NFL, NBA, MLB, NHL, UFC, WWE, Soccer, and more. All major brands supported.
               </p>
@@ -408,7 +415,9 @@ export default function GetStartedPage() {
                   className="object-contain"
                 />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Other TCGs</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                <Link href="/card-grading" className="hover:text-purple-700 hover:underline">Other TCGs</Link>
+              </h3>
               <p className="text-gray-600 text-sm mb-3">
                 Magic: The Gathering, Disney Lorcana, Yu-Gi-Oh!, One Piece, and other trading card games.
               </p>
@@ -523,7 +532,8 @@ export default function GetStartedPage() {
             Simple, Transparent Pricing
           </h2>
           <p className="text-lg text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            No subscriptions, no hidden fees. Pay only for what you use.
+            No subscriptions, no hidden fees. Pay only for what you use — here is{' '}
+            <Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">how the cost compares to mail-away grading</Link>.
           </p>
 
           <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
@@ -580,7 +590,12 @@ export default function GetStartedPage() {
             {[
               {
                 q: "Is DCM grading the same as PSA, BGS, or CGC grading?",
-                a: "DCM applies the same evaluation criteria as PSA, BGS, and SGC, but does it from your photos in seconds instead of taking weeks via mail. The grade you get is independent and not officially recognized by those companies, but the methodology is the same and many collectors use DCM grades alongside or in place of mail-away grading."
+                a: (
+                  <>
+                    DCM applies the same evaluation criteria as PSA, BGS, and SGC, but does it from your photos in seconds instead of taking weeks via mail. The grade you get is independent and not officially recognized by those companies, but the methodology is the same and many collectors use DCM grades{' '}
+                    <Link href="/psa-alternative" className="text-purple-600 hover:text-purple-800 underline">alongside or in place of mail-away grading</Link>.
+                  </>
+                )
               },
               {
                 q: "How accurate is DCM Optic™ grading?",

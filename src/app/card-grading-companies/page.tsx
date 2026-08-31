@@ -154,7 +154,7 @@ export default function CardGradingCompaniesPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
             >
               Grade Your First Card Free
@@ -319,7 +319,9 @@ export default function CardGradingCompaniesPage() {
               DCM is the only company in the table that does not ask you to ship anything. You photograph the front and
               back, DCM Optic runs <strong>three independent evaluation passes</strong> over the card, and the median
               of those passes becomes the grade. You get a whole-number grade from 1 to 10, four subgrades, a written
-              reason for every deduction, and an image confidence letter from A to D with an uncertainty range.
+              reason for every deduction, and an{' '}
+              <Link href="/reports-and-labels" className="text-purple-700 underline">image confidence letter from A to D</Link>{' '}
+              with an uncertainty range.
             </p>
             <p className="text-lg text-gray-700 mb-4">
               The rubric is published at <Link href="/grading-standard" className="text-purple-700 underline">/grading-standard</Link>{' '}
@@ -378,7 +380,7 @@ export default function CardGradingCompaniesPage() {
               Two free grades to start. Two photos, about a minute, and the card never leaves your hands.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

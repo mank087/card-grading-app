@@ -257,7 +257,8 @@ export default function CheapestCardGradingPage() {
           </div>
           <p className="text-sm text-gray-600 mt-4">
             Two free grades to start, no card-value minimum, and every grade includes four subgrades, a written reason
-            for every deduction, an image confidence letter from A to D and a printable label.{' '}
+            for every deduction, an image confidence letter from A to D and a printable label, all from{' '}
+            <Link href="/ai-card-grading" className="text-purple-700 underline">the same DCM Optic™ analysis</Link>.{' '}
             <Link href="/credits" className="text-purple-700 underline">
               Full pricing
             </Link>
@@ -272,7 +273,9 @@ export default function CheapestCardGradingPage() {
             <p className="text-blue-900 mb-3">
               The problem was never that grading is expensive. It is that grading <em>everything</em> is expensive, and
               you do not find out which cards were worth it until after you have paid. Grade the stack at home first,
-              then spend the mail-in fees on the cards that earned them.
+              then spend the mail-in fees on the cards that earned them — our{' '}
+              <Link href="/pop" className="text-blue-700 underline hover:text-blue-900">population report</Link>{' '}
+              shows how few cards in a typical stack come back at the top of the scale.
             </p>
             <p className="text-blue-900 font-semibold">{HONEST_MIDDLE}</p>
           </div>
@@ -337,7 +340,7 @@ export default function CheapestCardGradingPage() {
               Two free grades to start. $2.99 a card after that, and nothing to ship.
             </p>
             <Link
-              href="/login?mode=signup"
+              href="/get-started"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Grade Your First Card Free

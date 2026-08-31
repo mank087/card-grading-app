@@ -41,7 +41,7 @@ const faqs: FAQItem[] = [
           DCM Grading is a card grading service powered by DCM Optic™, our proprietary grading engine, that provides professional-quality condition assessments for trading cards. DCM Optic™ analyzes your card images and delivers accurate grades in under 60 seconds.
         </p>
         <p>
-          Unlike traditional grading services that can take weeks or months, DCM provides instant results while maintaining the same rigorous standards used by professional grading companies.
+          Unlike traditional grading services that can take <Link href="/fastest-card-grading" className="text-purple-600 hover:text-purple-800 underline">weeks or months</Link>, DCM provides instant results while maintaining the same rigorous <Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">standards</Link> used by professional grading companies.
         </p>
       </>
     ),
@@ -299,10 +299,10 @@ const faqs: FAQItem[] = [
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li>DCM grades are based on photo analysis, not physical inspection</li>
           <li>DCM is instant; traditional services take weeks/months</li>
-          <li>DCM costs a fraction of traditional grading fees</li>
+          <li>DCM <Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">costs a fraction</Link> of traditional grading fees</li>
           <li>DCM grades are professional condition assessments</li>
         </ul>
-        <p><strong>Important:</strong> DCM grades are an independent evaluation of your card&apos;s condition based on our proprietary standards. Many collectors use DCM for collection management, marketplace listings, and as an alternative to traditional mail-away grading.</p>
+        <p><strong>Important:</strong> DCM grades are an independent evaluation of your card&apos;s condition based on our proprietary standards. Many collectors use DCM for collection management, marketplace listings, and as an <Link href="/psa-alternative" className="text-purple-600 hover:text-purple-800 underline">alternative to traditional mail-away grading</Link> — <Link href="/card-grading-companies" className="text-purple-600 hover:text-purple-800 underline">see the full comparison</Link> if you are weighing the options.</p>
       </>
     ),
     category: 'Accuracy & Comparison',
@@ -316,10 +316,11 @@ const faqs: FAQItem[] = [
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li><strong>Three-pass consensus:</strong> Reduces variance, catches single-pass errors.</li>
           <li><strong>Evidence-based grading:</strong> Every deduction is backed by an observable defect, not an assumption.</li>
-          <li><strong>PSA-aligned criteria:</strong> The same standards professional graders work from.</li>
+          <li><strong><Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">PSA-aligned criteria</Link>:</strong> The same standards professional graders work from.</li>
           <li><strong>Continuous improvement:</strong> The model is regularly retrained on new card sets and edge cases.</li>
         </ul>
-        <p>Accuracy is bounded by your photo quality. Grade A images (clear, well-lit, in focus) produce grades that align closely with what professional services would assign. Blurry or poorly-lit photos widen the uncertainty range.</p>
+        <p className="mb-3">Accuracy is bounded by your photo quality. Grade A images (clear, well-lit, in focus) produce grades that align closely with what professional services would assign. Blurry or poorly-lit photos widen the uncertainty range.</p>
+        <p>You can check how the grades actually land across every card we have graded in our <Link href="/pop" className="text-purple-600 hover:text-purple-800 underline">population report</Link>.</p>
       </>
     ),
     category: 'Accuracy & Comparison',
@@ -579,7 +580,7 @@ export default function FAQPage() {
             Frequently Asked Questions
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Everything you need to know about DCM Grading, our three-pass consensus technology, and how to get the most accurate grades for your cards.
+            Everything you need to know about <Link href="/why-dcm" className="text-purple-600 hover:text-purple-800 underline">DCM Grading</Link>, our three-pass consensus technology, and how to get the most accurate grades for your cards.
           </p>
         </div>
 

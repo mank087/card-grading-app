@@ -12,6 +12,7 @@ import {
   TableOfContents,
   ShareButtons,
   RelatedPosts,
+  FurtherReading,
 } from '@/components/blog';
 
 export const revalidate = 60;
@@ -252,6 +253,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   </div>
                 )}
 
+                {/* Further reading — topical static pages, chosen from the post's tags */}
+                <FurtherReading
+                  tags={post.tags}
+                  categorySlug={post.category?.slug}
+                  categoryTitle={post.category?.name}
+                />
+
                 {/* Share */}
                 <div className="mt-8 pt-6 border-t border-gray-200">
                   <ShareButtons
@@ -274,6 +282,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <RelatedPosts
               currentPostId={post.id}
               categoryId={post.category_id}
+              categorySlug={post.category?.slug}
               tags={post.tags}
             />
           </div>
