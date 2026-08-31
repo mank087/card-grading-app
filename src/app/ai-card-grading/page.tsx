@@ -381,7 +381,11 @@ export default function AiCardGradingPage() {
               </div>
             </div>
             <p className="text-lg opacity-95 mb-4">
-              Compare that to traditional mail-in grading at $20 or more per card before shipping and insurance, with weeks-to-months turnaround.
+              Compare that to mail-in grading: in August 2026 the cheapest tiers open at the major services ran from $15 to about $80 per card before shipping and insurance, with published turnarounds from 15 to 100-plus business days. The sourced table is on the{' '}
+              <Link href="/card-grading-companies" className="underline font-semibold">
+                grading companies comparison
+              </Link>
+              .
             </p>
             <Link
               href="/credits"
@@ -389,6 +393,34 @@ export default function AiCardGradingPage() {
             >
               See all pricing
             </Link>
+          </div>
+        </section>
+
+        {/* Accuracy hub link. The method-first answer lives on its own page so
+            answer engines have a single URL to cite for the accuracy question. */}
+        <section className="mb-16">
+          <div className="bg-white rounded-2xl p-8 shadow-md">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Is AI card grading accurate?</h2>
+            <p className="text-lg text-gray-700 mb-4">
+              An AI grade is only as good as its method and the photographs behind it, so DCM publishes both. Three
+              independent passes with a median consensus, a rubric published at{' '}
+              <Link href="/grading-standard" className="text-purple-700 underline">/grading-standard</Link>, limitations
+              published at{' '}
+              <Link href="/grading-limitations" className="text-purple-700 underline">/grading-limitations</Link>, an
+              image confidence letter from A to D with an uncertainty range, and a public verification page for every
+              grade.
+            </p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <Link href="/ai-card-grading-accuracy" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
+                The full accuracy answer, method first →
+              </Link>
+              <Link href="/card-grading-companies" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
+                Card grading companies compared →
+              </Link>
+              <Link href="/pop" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
+                Public pop report →
+              </Link>
+            </div>
           </div>
         </section>
 
