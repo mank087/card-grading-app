@@ -17,6 +17,7 @@ import {
   checkEbayStatus, checkExistingListing, uploadImagesSequential, createListing,
   checkDisclaimer, acceptDisclaimer, getOAuthUrl, EbayApiError,
   SHIPPING_SERVICES,
+  DEFAULT_SHIPPING_SERVICE,
   FIXED_PRICE_DURATION_OPTIONS, AUCTION_DURATION_OPTIONS, ALL_DURATION_OPTIONS,
   type EbayConnectionStatus, type CreateListingRequest, type ImageUploadResult,
 } from '@/lib/ebayApi'
@@ -136,7 +137,7 @@ export default function EbayListScreen() {
   // Step 4: Shipping
   const [shipping, setShipping] = useState({
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
-    domesticService: 'USPSPriority',
+    domesticService: DEFAULT_SHIPPING_SERVICE,
     flatRate: '5.00',
     handlingDays: '1',
     postalCode: '',

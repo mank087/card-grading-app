@@ -295,14 +295,26 @@ export async function getOAuthUrl(): Promise<string> {
 // NOTE: title generation lives in lib/ebayTitleBuilder.ts (web-parity twin of
 // src/lib/ebay/titleBuilder.ts) — use buildEbayTitleFromCard(card) from there.
 
+// TWIN LIST: src/lib/ebay/tradingApi.ts DOMESTIC_SHIPPING_SERVICES — keep the
+// values/labels identical. These are eBay Trading API ShippingService tokens;
+// an invalid token is rejected at AddItem time (mobile previously shipped a
+// bogus 'USPSPriorityExpress'). USPSFirstClass is retired in favour of
+// USPSGroundAdvantage.
 export const SHIPPING_SERVICES = [
+  { value: 'USPSGroundAdvantage', label: 'USPS Ground Advantage' },
   { value: 'USPSPriority', label: 'USPS Priority Mail' },
-  { value: 'USPSFirstClass', label: 'USPS First Class' },
-  { value: 'USPSPriorityExpress', label: 'USPS Priority Express' },
+  { value: 'USPSPriorityMailExpress', label: 'USPS Priority Mail Express' },
   { value: 'UPSGround', label: 'UPS Ground' },
   { value: 'UPS3rdDay', label: 'UPS 3 Day Select' },
+  { value: 'UPS2ndDay', label: 'UPS 2nd Day Air' },
+  { value: 'UPSNextDay', label: 'UPS Next Day Air' },
   { value: 'FedExHomeDelivery', label: 'FedEx Home Delivery' },
+  { value: 'FedExGround', label: 'FedEx Ground' },
+  { value: 'FedEx2Day', label: 'FedEx 2Day' },
 ]
+
+/** Default domestic service (web parity: DEFAULT_DOMESTIC_SHIPPING_SERVICE). */
+export const DEFAULT_SHIPPING_SERVICE = 'USPSGroundAdvantage'
 
 // eBay requires GTC (Good 'Til Cancelled) for fixed-price listings — day-based
 // durations only apply to auctions (web parity: GTC only for Buy It Now).

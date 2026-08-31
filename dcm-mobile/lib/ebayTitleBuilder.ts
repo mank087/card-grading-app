@@ -9,8 +9,8 @@
  * Algorithm:
  * - Max 80 chars, segments joined with ' - '.
  * - Required segments: name, `DCM ${grade}`, condition (skipped if empty).
- * - Optional segments are added in PRIORITY order (setName, cardNumber,
- *   year, subset, serialNumbering) while the assembled title stays ≤ 80.
+ * - Optional segments are added in PRIORITY order (year, setName, cardNumber,
+ *   subset, serialNumbering) while the assembled title stays ≤ 80.
  * - Final DISPLAY order: name, subset, setName, cardNumber, year,
  *   serialNumbering, `DCM ${grade}`, condition.
  * - Dedupe: an optional is skipped when its lowercase-alphanumeric
@@ -39,8 +39,12 @@ export interface EbayTitleInput {
 
 type OptionalKey = 'setName' | 'cardNumber' | 'year' | 'subset' | 'serialNumbering'
 
-/** Order in which optionals compete for the remaining title budget. */
-const PRIORITY_ORDER: OptionalKey[] = ['setName', 'cardNumber', 'year', 'subset', 'serialNumbering']
+/**
+ * Order in which optionals compete for the remaining title budget.
+ * 'year' is FIRST so it always survives the 80-char truncation (buyers search
+ * by year); the dedupe check still drops it when the set name contains it.
+ */
+const PRIORITY_ORDER: OptionalKey[] = ['year', 'setName', 'cardNumber', 'subset', 'serialNumbering']
 
 /** Collapse whitespace runs and trim. */
 function clean(value?: string | number | null): string {
@@ -92,9 +96,20 @@ export function buildEbayTitle(input: EbayTitleInput): string {
     return [truncatedName, gradeSegment, condition].filter(Boolean).join(SEPARATOR)
   }
 
+  // The generic dedupe below only compares against ALREADY-included segments,
+  // so promoting 'year' to the front would let "2024" through before the set
+  // name "2024 Bowman Chrome" is considered. Pre-drop the year when a later,
+  // richer segment already carries it. (Web twin does the same.)
+  const yearIsRedundant =
+    !!optionals.year &&
+    [optionals.setName, optionals.subset, name].some(v =>
+      normalize(v).includes(normalize(optionals.year))
+    )
+
   // Greedily include optionals by priority while the title stays within budget.
   const included = new Set<OptionalKey>()
   for (const key of PRIORITY_ORDER) {
+    if (key === 'year' && yearIsRedundant) continue
     const value = optionals[key]
     if (!value) continue
     // Dedupe against everything already included (required + accepted optionals).

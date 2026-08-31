@@ -27,6 +27,8 @@ import {
   type ShippingDetails,
   type ReturnDetails,
   type PackageDimensions,
+  DEFAULT_DOMESTIC_SHIPPING_SERVICE,
+  normalizeDomesticService,
 } from '@/lib/ebay/tradingApi';
 import type { EbayListing } from '@/lib/ebay/types';
 
@@ -342,7 +344,7 @@ export async function POST(request: NextRequest) {
       itemSpecifics = [],
       // Shipping
       shippingType = 'CALCULATED',
-      domesticShippingService = 'USPSPriority',
+      domesticShippingService = DEFAULT_DOMESTIC_SHIPPING_SERVICE,
       flatRateAmount = 5.00,
       handlingDays = 1,
       postalCode = '10001',
@@ -517,7 +519,9 @@ export async function POST(request: NextRequest) {
     // Prepare shipping details
     const shippingDetails: ShippingDetails = {
       shippingType,
-      domesticShippingService,
+      // Saved defaults can still carry retired tokens (e.g. USPSFirstClass) —
+      // map them forward rather than sending eBay something it will reject.
+      domesticShippingService: normalizeDomesticService(domesticShippingService),
       flatRateCost: flatRateAmount,
       handlingDays,
       postalCode,

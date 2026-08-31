@@ -15,7 +15,7 @@ import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
-import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
+import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES, DEFAULT_DOMESTIC_SHIPPING_SERVICE, normalizeDomesticService } from '@/lib/ebay/tradingApi';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import {
@@ -169,7 +169,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [shippingForm, setShippingForm] = useState({
     // Domestic shipping
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
-    domesticShippingService: 'USPSPriority',
+    domesticShippingService: DEFAULT_DOMESTIC_SHIPPING_SERVICE,
     flatRateAmount: 5.00,
     handlingDays: 1,
     postalCode: '',
@@ -293,7 +293,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const defaultTitle = buildEbayTitle({
         name: primaryName,
         setName: setName || undefined,
+        subset: labelData.subset || cardInfo.subset || undefined,
         cardNumber: cardNumber ? `#${cardNumber}` : undefined,
+        year: labelData.year || cardInfo.year || undefined,
         serialNumbering: serialDenom || undefined,
         grade: Math.round(grade),
         condition: conditionLabel,
@@ -364,6 +366,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         if (activeDefaults?.shippingDefaults && typeof activeDefaults.shippingDefaults === 'object') {
           const saved = activeDefaults.shippingDefaults as Record<string, unknown>;
           const { bestOfferEnabled: savedBestOffer, ...savedShipping } = saved;
+          // A saved default can still carry a retired service token (e.g.
+          // USPSFirstClass); map it forward so the <select> has a real option.
+          if (typeof savedShipping.domesticShippingService === 'string') {
+            savedShipping.domesticShippingService = normalizeDomesticService(
+              savedShipping.domesticShippingService
+            );
+          }
           setShippingForm(prev => ({ ...prev, ...savedShipping }));
           if (typeof savedBestOffer === 'boolean') setBestOfferEnabled(savedBestOffer);
         }

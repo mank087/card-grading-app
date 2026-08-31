@@ -24,9 +24,12 @@ const EBAY_SITE_ID = {
 };
 
 // Common domestic shipping services
+// TWIN LIST: dcm-mobile/lib/ebayApi.ts SHIPPING_SERVICES — keep in sync.
+// USPSFirstClass was retired by eBay/USPS in favour of USPSGroundAdvantage;
+// saved defaults still carrying it are migrated by normalizeDomesticService.
 export const DOMESTIC_SHIPPING_SERVICES = [
+  { value: 'USPSGroundAdvantage', label: 'USPS Ground Advantage' },
   { value: 'USPSPriority', label: 'USPS Priority Mail' },
-  { value: 'USPSFirstClass', label: 'USPS First Class' },
   { value: 'USPSPriorityMailExpress', label: 'USPS Priority Mail Express' },
   { value: 'UPSGround', label: 'UPS Ground' },
   { value: 'UPS3rdDay', label: 'UPS 3 Day Select' },
@@ -47,6 +50,31 @@ export const INTERNATIONAL_SHIPPING_SERVICES = [
   { value: 'FedExInternationalEconomy', label: 'FedEx International Economy' },
   { value: 'FedExInternationalPriority', label: 'FedEx International Priority' },
 ];
+
+export const DEFAULT_DOMESTIC_SHIPPING_SERVICE = 'USPSGroundAdvantage';
+
+/**
+ * Retired shipping tokens that eBay no longer accepts, mapped to their
+ * replacement. Users can have any of these persisted in their saved listing
+ * defaults (listing_templates.shipping_defaults), so every path that reads a
+ * saved service must run it through normalizeDomesticService first.
+ */
+const RETIRED_DOMESTIC_SERVICES: Record<string, string> = {
+  USPSFirstClass: 'USPSGroundAdvantage',
+  USPSFirstClassService: 'USPSGroundAdvantage',
+  // Never a valid Trading API token — mobile drifted into using it.
+  USPSPriorityExpress: 'USPSPriorityMailExpress',
+};
+
+/** Map a possibly-retired saved service token to a currently valid one. */
+export function normalizeDomesticService(service: string | null | undefined): string {
+  if (!service) return DEFAULT_DOMESTIC_SHIPPING_SERVICE;
+  const mapped = RETIRED_DOMESTIC_SERVICES[service];
+  if (mapped) return mapped;
+  return DOMESTIC_SHIPPING_SERVICES.some(s => s.value === service)
+    ? service
+    : DEFAULT_DOMESTIC_SHIPPING_SERVICE;
+}
 
 // eBay Global Shipping Program location
 export const GSP_SHIP_TO_LOCATIONS = ['Worldwide'];

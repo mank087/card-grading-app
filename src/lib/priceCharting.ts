@@ -590,12 +590,18 @@ export async function searchSportsCardPrices(
 
   if (products.length > 0) {
     // Helper function to score how well a product matches the search criteria
-    // Returns -1 if it's a definite mismatch, 0+ for match quality (higher = better)
-    const scoreProductMatch = (product: any): number => {
+    // Returns score -1 if it's a definite mismatch, 0+ for match quality
+    // (higher = better). `sportBonus` reports how much of the score is the
+    // flat sport/category baseline (25 or 10) — the confidence thresholds
+    // below are computed NET of it, since that baseline is awarded to every
+    // in-category product and says nothing about match quality.
+    const scoreProductMatch = (product: any): { score: number; sportBonus: number } => {
       const productName = product['product-name']?.toLowerCase() || '';
       const consoleName = product['console-name']?.toLowerCase() || '';
       const genre = product['genre']?.toLowerCase() || '';
       let score = 0;
+      let sportBonus = 0;
+      const MISMATCH = { score: -1, sportBonus: 0 };
 
       // PLAYER NAME VALIDATION: The product name MUST contain the player's name (or significant parts of it)
       // This prevents cross-player matches (e.g., "Don Smith" matching "Don Mattingly")
@@ -629,7 +635,7 @@ export async function searchSportsCardPrices(
 
         if (matchingParts.length < requiredMatches) {
           console.log(`[SportsCardsPro] SKIP: Player mismatch - looking for "${params.playerName}" (normalized: "${normalizedPlayer}"), found "${productName}" (normalized: "${normalizedProduct}") - matched ${matchingParts.length}/${requiredMatches} parts`);
-          return -1;
+          return MISMATCH;
         }
         score += matchingParts.length * 5; // Player name matches
       }
@@ -645,9 +651,10 @@ export async function searchSportsCardPrices(
 
         if (!sportInConsole && !sportInGenre) {
           console.log(`[SportsCardsPro] SKIP: Sport mismatch - looking for "${sportLower}", found console="${consoleName}", genre="${genre}"`);
-          return -1;
+          return MISMATCH;
         }
-        score += 25; // Sport matches - high priority!
+        sportBonus = 25; // Sport matches - high priority!
+        score += sportBonus;
       } else if (params.sport?.toLowerCase() === 'sports') {
         // For generic "sports" category, just verify it's a sports card (not Pokemon, MTG, etc.)
         const isSportsCard = genre.includes('card') && (
@@ -660,9 +667,10 @@ export async function searchSportsCardPrices(
         );
         if (!isSportsCard) {
           console.log(`[SportsCardsPro] SKIP: Not a sports card - found console="${consoleName}", genre="${genre}"`);
-          return -1;
+          return MISMATCH;
         }
-        score += 10; // Generic sports category match
+        sportBonus = 10; // Generic sports category match
+        score += sportBonus;
       }
 
       // If we have a card number, the product MUST contain it
@@ -695,9 +703,29 @@ export async function searchSportsCardPrices(
 
         if (!exactMatch && !normalizedMatch && !flexMatch) {
           console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}" (or "${cleanCardNumNoZeros}", flex "${flexNum}"), found "${productName}"`);
-          return -1;
+          return MISMATCH;
         }
-        score += 10; // Card number matches
+
+        // The boundary check treats '-' as a boundary, so a bare search number
+        // like "16" also matches a letter-prefixed PRODUCT number ("PD-16",
+        // "GT-16") — which is a different card in a different (usually insert)
+        // set. Don't hard-reject: some sets prefix every number and the search
+        // number can legitimately arrive bare. Award reduced credit instead so
+        // a true bare "#16" outranks a prefixed near-miss.
+        const searchNumHasPrefix = /[a-z]/i.test(cleanCardNum);
+        let cardNumberPoints = 10;
+        if (!searchNumHasPrefix) {
+          const bare = cleanCardNumNoZeros || cleanCardNum;
+          const escBare = bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const prefixedOnly = new RegExp(`[a-z]{1,4}-${escBare}\\b`, 'i').test(productName);
+          // A genuinely bare occurrence: start of string, whitespace, '(' , '#' or '/'.
+          const bareOccurrence = new RegExp(`(^|[\\s(#/])#?${escBare}([^a-z0-9-]|$)`, 'i').test(productName);
+          if (prefixedOnly && !bareOccurrence) {
+            cardNumberPoints = 3;
+            console.log(`[SportsCardsPro] +3 (reduced) Card # match: searched bare "${bare}" but "${productName}" only has it as a letter-prefixed number`);
+          }
+        }
+        score += cardNumberPoints; // Card number matches
       }
 
       // If we have a set name, check for some overlap with console-name
@@ -714,11 +742,13 @@ export async function searchSportsCardPrices(
         // Require at least 1 matching word OR year match for basic relevance
         if (matchingWords.length === 0 && !yearInConsole) {
           console.log(`[SportsCardsPro] SKIP: Set mismatch - looking for "${searchSet}" (year: ${params.year}), found "${consoleName}"`);
-          return -1;
+          return MISMATCH;
         }
 
-        // Bonus points for set matches
-        score += matchingWords.length * 3;
+        // Bonus points for set matches. Weight 5 (not 3) so a genuine 2-word
+        // set match ("bowman chrome" = +10) outranks a wrong-set 1-word match
+        // plus a model-guessed year that happens to land (+5 +5).
+        score += matchingWords.length * 5;
         if (yearInConsole) score += 5;
       }
 
@@ -743,7 +773,7 @@ export async function searchSportsCardPrices(
             // Has a variant marker - this is a parallel, not a base card
             // Skip colored parallels when looking for base
             console.log(`[SportsCardsPro] SKIP: Looking for base card, found parallel "${productVariant}" in "${productName}"`);
-            return -1;
+            return MISMATCH;
           }
         } else if (productName.includes(variantLower)) {
           score += 20; // Parallel type matches - big bonus!
@@ -777,15 +807,15 @@ export async function searchSportsCardPrices(
         }
       }
 
-      return score;
+      return { score, sportBonus };
     };
 
     // Score all products and sort by best match
     const scoredProducts = products
-      .map(product => ({
-        product,
-        score: scoreProductMatch(product)
-      }))
+      .map(product => {
+        const { score, sportBonus } = scoreProductMatch(product);
+        return { product, score, sportBonus };
+      })
       .filter(p => p.score >= 0) // Remove definite mismatches
       .sort((a, b) => b.score - a.score); // Sort by score descending
 
@@ -799,7 +829,7 @@ export async function searchSportsCardPrices(
 
     // Iterate through scored products (best matches first) to find one with price data
     for (let i = 0; i < scoredProducts.length; i++) {
-      const { product, score } = scoredProducts[i];
+      const { product, score, sportBonus } = scoredProducts[i];
       console.log(`[SportsCardsPro] Checking product (score ${score}):`, product['product-name'], '-', product['console-name']);
 
       // Add delay between sequential API calls to avoid rate limiting
@@ -827,16 +857,22 @@ export async function searchSportsCardPrices(
 
           console.log('[SportsCardsPro] ✓ Found matching product with prices:', product['product-name']);
 
-          // Determine confidence based on match quality
+          // Determine confidence based on match quality, computed NET of the
+          // flat sport/category baseline (25 for a named sport, 10 for the
+          // generic "sports" category). That baseline is awarded to every
+          // in-category product, so including it pushed almost everything to
+          // "high" and broke the documented intent:
           // High (30+): matched parallel AND serial
           // Medium (15-29): matched parallel OR serial
           // Low (<15): only matched card number/set
+          const qualityScore = score - sportBonus;
           let confidence: 'high' | 'medium' | 'low' = 'low';
-          if (score >= 30) {
+          if (qualityScore >= 30) {
             confidence = 'high';
-          } else if (score >= 15) {
+          } else if (qualityScore >= 15) {
             confidence = 'medium';
           }
+          console.log(`[SportsCardsPro] Confidence ${confidence} (score ${score} - sport baseline ${sportBonus} = ${qualityScore})`);
 
           return {
             prices: normalized,

@@ -7,8 +7,8 @@
  * Rules:
  * - Required segments always present: name, `DCM ${grade}`, condition
  *   (condition skipped when empty).
- * - Optional segments are ADDED in priority order (setName, cardNumber,
- *   year, subset, serialNumbering) while the joined title stays <= 80 chars,
+ * - Optional segments are ADDED in priority order (year, setName, cardNumber,
+ *   subset, serialNumbering) while the joined title stays <= 80 chars,
  *   but EMITTED in display order (name, subset, setName, cardNumber, year,
  *   serialNumbering, grade, condition).
  * - Duplicate-ish optionals are skipped (lowercase alphanumeric
@@ -75,10 +75,13 @@ export function buildEbayTitle(input: EbayTitleInput): string {
   // Optional segments: try in PRIORITY order, emit in DISPLAY order.
   // serialNumbering has no explicit display slot in the spec — it sits after
   // year (matching the pre-builder web title layout).
+  // 'year' is FIRST: buyers search by year, so it must survive the 80-char
+  // truncation ahead of setName/cardNumber/subset/serial. The dedupe check
+  // below still drops it when the set name already contains the year.
   const optionalPriority: Array<keyof EbayTitleInput> = [
+    'year',
     'setName',
     'cardNumber',
-    'year',
     'subset',
     'serialNumbering',
   ];
@@ -92,6 +95,18 @@ export function buildEbayTitle(input: EbayTitleInput): string {
 
   const included: Partial<Record<keyof EbayTitleInput, string>> = {};
 
+  // The generic dedupe below only compares against ALREADY-included segments,
+  // so promoting 'year' to the front would let "2024" through before the set
+  // name "2024 Bowman Chrome" is considered. Pre-drop the year when a later,
+  // richer segment already carries it.
+  const yearValue = cleanSegment(input.year);
+  const yearIsRedundant =
+    !!yearValue &&
+    [input.setName, input.subset, input.name].some(v => {
+      const other = normalizeSegment(cleanSegment(v));
+      return other.includes(normalizeSegment(yearValue));
+    });
+
   const assemble = (): string[] => {
     const parts: string[] = [name];
     for (const key of displayOrder) {
@@ -103,6 +118,7 @@ export function buildEbayTitle(input: EbayTitleInput): string {
   };
 
   for (const key of optionalPriority) {
+    if (key === 'year' && yearIsRedundant) continue;
     const value = cleanSegment(input[key]);
     if (!value) continue;
 
