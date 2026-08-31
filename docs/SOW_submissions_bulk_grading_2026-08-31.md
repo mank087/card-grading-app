@@ -47,6 +47,13 @@
    plus the even-count and identity cross-checks remain the real protection.
 4. **Binder chosen at submission time** — pick existing or create inline, before anything is charged (cards
    still file into it one-by-one as they grade; that is a resilience detail, not a choice deferred to grading).
+5. **Hard credit gate at selection.** Immediately after cards are selected (and again at commit, server-side),
+   the required credit count is checked against the wallet. Insufficient balance **blocks the submission from
+   processing** — no partial start, no charge — and the user is told exactly two ways forward: *trim the
+   selection to what the wallet covers* (one-tap "keep the first N") or *buy credits first* (link to /credits;
+   the draft submission is preserved and resumes where they left off). The mid-run `waiting_for_credits` state
+   remains only as a backstop for balance changes from another device after commit; it is not the primary
+   mechanism.
 
 ## Remaining decisions (recommendations — confirm to start)
 
@@ -73,8 +80,9 @@ Entry point on the grading page ("Submit more than one card →" under the camer
 ### WS3 — Pairing & review grid (1.5 days)
 Convention detection (duplex-sequential / two-folder / filename-stem) — detected convention stated, user-changeable, never guessed silently. Order by filename, cross-checked against `File.lastModified`; a disagreement between the two signals is flagged. Contact-sheet grid showing front/back side by side per card, with the full control set (swap, rotate one/all, global swap-all, reorder, remove, replace). Hard stop on odd counts in sequential mode. Front/back identity cross-check (cheap model call per pair) flags disagreements.
 
-### WS4 — Preflight (1 day)
-The gate described above, tagged `capture_source: desktop_scanner`. Blank/misfeed exclusion, duplicate detection (perceptual hash vs the user's collection), per-pair pass/review/fail with reasons. Nothing failing preflight can be charged.
+### WS4 — Preflight & credit gate (1 day)
+The quality gate described above, tagged `capture_source: desktop_scanner`. Blank/misfeed exclusion, duplicate detection (perceptual hash vs the user's collection), per-pair pass/review/fail with reasons. Nothing failing preflight can be charged.
+**Credit gate (owner requirement):** after selection, required credits (= preflight-passing pairs) vs wallet balance is checked client-side for immediate feedback and **enforced server-side at commit** — insufficient balance blocks processing entirely with two offered paths: "keep the first N" (trim to balance) or "buy credits" (draft preserved, resume after purchase). Submission status `blocked_insufficient_credits` until resolved.
 
 ### WS5 — Queue & drain (2 days)
 Drain endpoint (claims N `queued` items, lease via `claimed_at`, grades via existing per-category pipelines); browser loop while the page is open; cron drains on schedule; `attempts` cap; rate-limit backoff + concurrency ceiling; **proper auth on the drain** (the model for fixing the other grading GETs). Charge per card at grade time via existing idempotent deduction; `waiting_for_credits` pause.
@@ -104,7 +112,7 @@ Load test the drain at cap size; spend alarm wired (one user can 4× the platfor
 2. A deliberately induced double-feed (odd file count) cannot proceed in sequential mode, and a mis-paired card is flagged by the identity cross-check.
 3. Killing the browser mid-run loses nothing; cron completes; reopening shows true state.
 4. No item is ever charged twice (retry storm test), and preflight-rejected pairs are never charged.
-5. Credits exhausted mid-run → clean `waiting_for_credits` pause + notification, resumes on top-up.
+5. A 20-card selection against a 2-credit wallet cannot commit: the submission is blocked with the trim-to-N and buy-credits paths offered, nothing is charged, and the draft survives a purchase round-trip. Credits exhausted mid-run (balance spent from another device after commit) → clean `waiting_for_credits` pause + notification, resumes on top-up.
 6. All submission cards default private; the drain endpoint rejects unauthenticated calls.
 7. Spend alarm fires in staging when a synthetic submission crosses the daily threshold.
 
