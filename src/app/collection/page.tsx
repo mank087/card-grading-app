@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -1605,6 +1605,24 @@ function CollectionPageContent() {
     : selectedBinderId
     ? (binderCards ?? []).filter(c => (c.ownership_status ?? 'owned') === ownershipView && !(orgMembership && c.org_id))
     : personalCards
+
+  // The card list handed to the batch label modals.
+  //
+  // This USED to be built inline in each modal's `selectedCards={...}` prop, so
+  // it was a brand-new array (of brand-new objects) on every render of this
+  // page. BatchAvery8167LabelModal resets its position map whenever
+  // `selectedCards` changes identity, so any unrelated re-render while the
+  // modal was open — the in-progress submission banner poll, the ?binder= init,
+  // a hover — wiped the assignments the user had just made. That is the
+  // "Fill page 1 adds the cards then they remove themselves" bug: the fill
+  // worked, and the next render undid it. Memoised here so the array's identity
+  // only changes when the selection or the underlying cards actually change.
+  const batchSelectedCards = useMemo(
+    () => (scope === 'store' ? storeCards : cards)
+      .filter(c => selectedCardIds.has(c.id))
+      .map(c => ({ ...c, front_image_url: c.front_url || undefined })),
+    [scope, storeCards, cards, selectedCardIds]
+  )
 
   // In store scope, only the member who graded a card may edit/sell/delete it.
   const canEditCard = (card: Card) => scope !== 'store' || card.user_id === storeUserId
@@ -3480,10 +3498,7 @@ function CollectionPageContent() {
       <BatchAveryLabelModal
         isOpen={isBatchLabelModalOpen}
         onClose={() => setIsBatchLabelModalOpen(false)}
-        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
-          ...c,
-          front_image_url: c.front_url || undefined
-        }))}
+        selectedCards={batchSelectedCards}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
         heritage={compactHeritage}
       />
@@ -3492,10 +3507,7 @@ function CollectionPageContent() {
       <BatchAvery8167LabelModal
         isOpen={isBatch8167ModalOpen}
         onClose={() => setIsBatch8167ModalOpen(false)}
-        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
-          ...c,
-          front_image_url: c.front_url || undefined
-        }))}
+        selectedCards={batchSelectedCards}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
         heritage={compactHeritage}
       />
@@ -3504,10 +3516,7 @@ function CollectionPageContent() {
       <BatchSlabLabelModal
         isOpen={isBatchSlabLabelModalOpen}
         onClose={() => setIsBatchSlabLabelModalOpen(false)}
-        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)).map(c => ({
-          ...c,
-          front_image_url: c.front_url || undefined
-        }))}
+        selectedCards={batchSelectedCards}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
         labelStyle={labelStyle}
         showFounderEmblem={isFounder && (!emblemsLoaded || selectedEmblems.length === 0 || selectedEmblems.includes('founder'))}

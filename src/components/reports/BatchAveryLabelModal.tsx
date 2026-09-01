@@ -133,13 +133,21 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     }
   }, [isOpen]);
 
-  // Reset state when modal opens with new cards
+  // Reset state when the modal opens with a DIFFERENT SET OF CARDS. Keyed on
+  // the card-id signature rather than the array identity — see the long note in
+  // BatchAvery8167LabelModal: an inline `selectedCards={...}` in the parent's
+  // JSX changes identity on every parent render, and this effect would then
+  // clear the user's position assignments out from under them.
+  const cardIdSignature = useMemo(
+    () => selectedCards.map((c) => c.id).join('|'),
+    [selectedCards]
+  );
   useEffect(() => {
     if (isOpen) {
       setPositionMap(new Map());
       setCurrentPage(0);
     }
-  }, [isOpen, selectedCards]);
+  }, [isOpen, cardIdSignature]);
 
   // Clean up preview URL on unmount
   useEffect(() => {

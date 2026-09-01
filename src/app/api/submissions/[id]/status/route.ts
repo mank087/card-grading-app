@@ -3,6 +3,7 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { isUuid } from '@/lib/uuid';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { getOwnedSubmission, getSubmissionItems, tallyItems } from '@/lib/submissions/service';
+import { isProcessing, settleSubmission } from '@/lib/submissions/settle';
 import { SUBMISSION_ERROR_STATUS } from '@/lib/submissions/types';
 
 /**
@@ -49,8 +50,71 @@ export async function GET(request: NextRequest, { params }: Params) {
     );
   }
 
-  const items = await getSubmissionItems(id);
+  let items = await getSubmissionItems(id);
   const supabase = supabaseServer();
+
+  // ---------------------------------------------------------------------
+  // Self-heal (round 2, Sep 1)
+  // ---------------------------------------------------------------------
+  // The bug: the owner navigated away mid-run. The last card finished grading,
+  // but nothing was left to notice — the item row stayed `dispatched`, the card
+  // was never filed into the binder, and the submission sat at `running`. In
+  // production the per-minute cron eventually reconciles it (up to a minute of
+  // dead air); locally no cron runs at all, so it never recovers.
+  //
+  // So the poll itself heals it. The guard is deliberately narrow: only a
+  // `running` submission with ZERO cards actually holding the grading lock —
+  // i.e. nothing is in flight, so there is genuinely nobody left to finish the
+  // job. `cards.grade_status` is the authoritative in-flight counter, and it is
+  // already loaded below for the grid, so this costs no extra query.
+  //
+  // Approach: `settleSubmission` is AWAITED, not fired and forgotten. A
+  // fire-and-forget shared call or an HTTP self-call is killed the moment the
+  // response returns on Vercel, which is precisely the "sometimes files,
+  // sometimes doesn't" behaviour this is meant to end. Settling is the cheap
+  // half of a drain tick — reconcile, file, complete — a handful of small
+  // queries with no dispatching, so awaiting it keeps the poll fast while
+  // making filing and completion guaranteed rather than best-effort. Starting
+  // NEW grades is still the drain's job, and the page kicks that separately
+  // every 30s; here we only requeue the work so that kick has something to do.
+  // ---------------------------------------------------------------------
+  const preCounts = tallyItems(items);
+  if (loaded.data.status === 'running' && preCounts.active > 0) {
+    const claimedCardIds = items
+      .filter((i) => (i.status === 'dispatched' || i.status === 'grading') && i.card_id)
+      .map((i) => i.card_id as string);
+
+    let actuallyInFlight = 0;
+    if (claimedCardIds.length) {
+      const { data: lockRows } = await supabase
+        .from('cards')
+        .select('id, grade_status')
+        .in('id', claimedCardIds);
+      actuallyInFlight = (lockRows ?? []).filter((r: any) => isProcessing(r.grade_status)).length;
+    }
+
+    if (actuallyInFlight === 0) {
+      try {
+        const settled = await settleSubmission(loaded.data, items);
+        items = settled.items;
+        if (settled.changed) {
+          console.log(
+            `${'[submissions] status self-heal'} ${id}: filed ${settled.filed}` +
+            `${settled.completed ? ', completed' : ''}`
+          );
+        }
+        if (settled.completed) {
+          // Reflect it in THIS response rather than making the client wait a
+          // poll — the page hands off to the binder on `complete`.
+          loaded.data.status = 'complete';
+          loaded.data.completed_at = loaded.data.completed_at || new Date().toISOString();
+        }
+      } catch (e: any) {
+        // Never let a heal attempt break the poll — the cron still covers it.
+        console.error(`[submissions] status self-heal failed for ${id}:`, e?.message);
+      }
+    }
+  }
 
   // One query for every card in the submission.
   const cardIds = items.map((item) => item.card_id).filter((v): v is string => !!v);

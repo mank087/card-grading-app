@@ -149,19 +149,35 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
     }
   }, [isOpen]);
 
-  // Reset state when modal opens with new cards. Fold-over has no position
-  // picker: every card auto-assigns sequentially so the assignedCount-gated
-  // preview/download buttons work unchanged.
+  // Reset state when the modal opens with a DIFFERENT SET OF CARDS.
+  //
+  // The dependency is the card-id signature, not the `selectedCards` array
+  // itself. Parents build that array inline in JSX, so its identity changes on
+  // every render of the parent even when the selection is untouched — and this
+  // effect then blew away the user's position assignments mid-session. That is
+  // what made "Fill page 1" look like it added the cards and then removed them:
+  // the fill landed, an unrelated parent re-render fired this effect, and the
+  // map was cleared. Keying on the ids expresses the actual intent ("new
+  // cards"), so no caller can reintroduce the bug by not memoising.
+  const cardIdSignature = useMemo(
+    () => selectedCards.map((c) => c.id).join('|'),
+    [selectedCards]
+  );
+  const selectedCardsRef = React.useRef(selectedCards);
+  selectedCardsRef.current = selectedCards;
+
+  // Fold-over has no position picker: every card auto-assigns sequentially so
+  // the assignedCount-gated preview/download buttons work unchanged.
   useEffect(() => {
     if (isOpen) {
       setPositionMap(
         isFoldOver
-          ? new Map(selectedCards.map((c, i) => [c.id, i]))
+          ? new Map(selectedCardsRef.current.map((c, i) => [c.id, i]))
           : new Map()
       );
       setCurrentPage(0);
     }
-  }, [isOpen, selectedCards, isFoldOver]);
+  }, [isOpen, cardIdSignature, isFoldOver]);
 
   // Clean up preview URL on unmount
   useEffect(() => {

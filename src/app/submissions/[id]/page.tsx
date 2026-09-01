@@ -368,6 +368,49 @@ export default function SubmissionStatusPage() {
               )}
             </div>
 
+            {/* Round 2 (Sep 1): the single-card grading screen explains what is
+                happening while you wait; the bulk screen showed a silent grid.
+                Same content, same tone as CardAnalysisAnimation — plus the
+                thing only bulk needs said: it is long, and leaving is safe. */}
+            {isRunning && (
+              <div className="bg-white rounded-xl shadow p-4 mb-6 space-y-4">
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-indigo-900">
+                    DCM Optic™ is grading this submission right now.
+                  </p>
+                  <p className="text-sm text-indigo-800 mt-1">
+                    Budget roughly a minute per card — several grade at the same time, so a
+                    big batch finishes faster than that suggests, but it is not instant.
+                  </p>
+                  <p className="text-sm text-indigo-800 mt-1">
+                    <strong>You can close this page.</strong> Grading keeps running on our
+                    servers, every card files into
+                    {submission?.binder_id ? ' your binder' : ' your collection'} automatically
+                    as it finishes, and we email you when the batch is done.
+                  </p>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-2">What DCM Optic examines</h2>
+                  <ul className="space-y-1.5 text-sm text-gray-700">
+                    <li className="flex gap-2"><span aria-hidden="true">📐</span><span><strong>Centering</strong> — border ratios measured left/right and top/bottom, on the front and the back.</span></li>
+                    <li className="flex gap-2"><span aria-hidden="true">📎</span><span><strong>Corners</strong> — all four corners of both faces, checked for wear, blunting and colour break.</span></li>
+                    <li className="flex gap-2"><span aria-hidden="true">📏</span><span><strong>Edges</strong> — every edge of both faces, for chipping, nicks and rough cuts.</span></li>
+                    <li className="flex gap-2"><span aria-hidden="true">✨</span><span><strong>Surface</strong> — print lines, scratches, dents, gloss and staining, front and back.</span></li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900 mb-2">How each card is graded</h2>
+                  <ul className="space-y-1.5 text-sm text-gray-700">
+                    <li className="flex gap-2"><span aria-hidden="true">🔬</span><span>Every card is graded <strong>three independent times</strong> and the results reconciled, so one odd read cannot decide your grade.</span></li>
+                    <li className="flex gap-2"><span aria-hidden="true">🔍</span><span>A <strong>magnified inspection pass</strong> then re-checks the corners, edges and surface up close on crops the full-card view is too small to resolve.</span></li>
+                    <li className="flex gap-2"><span aria-hidden="true">🧮</span><span>The final grade is the <strong>weakest of the sub-grades</strong> — the same weakest-link rule the graders use, applied consistently to every card in this batch.</span></li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
               {items.map((item) => {
                 const route = ROUTE_BY_CATEGORY[item.category] || '/other'

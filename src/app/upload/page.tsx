@@ -2176,20 +2176,6 @@ function UniversalUploadPageContent() {
           </div>
         </div>
 
-        {/* Bulk entry point — owner direction Aug 31: no branded surface, just a
-            link off the existing grading page after the type/subtype pick and
-            before the camera/photos options. */}
-        {!frontFile && !backFile && uploadMode === 'select' && (
-          <div className="text-center">
-            <Link
-              href={`/submissions/new?category=${encodeURIComponent(selectedType)}${subCategory ? `&sub_category=${encodeURIComponent(subCategory)}` : ''}`}
-              className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
-            >
-              Submit more than one card →
-            </Link>
-          </div>
-        )}
-
         {/* Upload Method Selector or File Upload - Show selector only when both images not uploaded */}
         {!frontFile && !backFile && showCameraOption && uploadMode === 'select' ? (
           <UploadMethodSelector
@@ -2372,6 +2358,20 @@ function UniversalUploadPageContent() {
           >
             Select Both Images to Continue
           </button>
+        )}
+
+        {/* Bulk entry point — owner direction Aug 31: no branded surface, just a
+            link off the existing grading page. Round 2 (Sep 1): it sits BELOW
+            the single-card submit button, so the primary action stays first. */}
+        {uploadMode === 'select' && (
+          <div className="text-center">
+            <Link
+              href={`/submissions/new?category=${encodeURIComponent(selectedType)}${subCategory ? `&sub_category=${encodeURIComponent(subCategory)}` : ''}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+            >
+              Submit more than one card →
+            </Link>
+          </div>
         )}
 
         {/* Footer */}

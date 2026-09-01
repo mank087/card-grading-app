@@ -413,6 +413,27 @@ export async function renderToploaderFront(i: HeritageCompactInputs, dpi: number
   const chipW = W * 0.185, chipH = H * 0.68
   drawChip(ctx, W - chipW - W * 0.022, (H - chipH) / 2, chipW, chipH, i.grade, i.chipTheme)
 
+  // Serial, restored to the FRONT (Sep 1). The space reduction that shrank this
+  // panel to 1.75x0.5 dropped it, which left the toploader front as the only
+  // Heritage panel with no serial on it at all — and the owner batch-printed a
+  // run and could not read a serial without flipping every label over. It goes
+  // in the bottom strip right of the wordmark, right-aligned to the text box's
+  // edge: that band (y 0.78H-1.0H, x ~0.22W-0.79W) is empty, and ending at
+  // 0.765W keeps it clear of the grade chip, whose left edge is 0.793W.
+  //
+  // H * 0.085 at 0.5" tall is ~3.06pt — the same size the BACK prints it at,
+  // and above the 2.5pt legibility floor. Same INK_SOFT as the back so the two
+  // faces match. 0.92 (not 0.91 as on the back) because the front has no
+  // condition line above it to crowd; the descenders still clear the trim.
+  // Sept 1: bumped from 0.085H/INK_SOFT — at 3.06pt in soft grey the printed
+  // serial did not survive the owner's printer. ~3.5pt in full ink does.
+  const serialText = `Serial: ${i.serial}`
+  ctx.font = `400 ${H * 0.098}px ${FONT}`
+  ctx.fillStyle = INK
+  ctx.textAlign = 'right'
+  ctx.fillText(serialText, tx + textBox, H * 0.92)
+  ctx.textAlign = 'left'
+
   return c
 }
 
@@ -444,8 +465,9 @@ export async function renderToploaderBack(i: HeritageCompactInputs, dpi: number)
   ctx.font = `700 ${condSize}px ${FONT}`
   trackedText(ctx, (i.condition || '').toUpperCase(), gx, H * 0.72, condSize * 0.2, 'center')
   // 0.91 keeps the serial's descenders inside a 0.5"-tall panel.
-  ctx.font = `400 ${H * 0.085}px ${FONT}`
-  ctx.fillStyle = INK_SOFT
+  // Sept 1: bumped from 0.085H/INK_SOFT — see the matching note on the front.
+  ctx.font = `400 ${H * 0.098}px ${FONT}`
+  ctx.fillStyle = INK
   ctx.fillText(`Serial: ${i.serial}`, gx, H * 0.91)
   ctx.textAlign = 'left'
 

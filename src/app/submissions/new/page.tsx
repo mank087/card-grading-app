@@ -37,6 +37,10 @@ import {
 const DRAFT_KEY = 'dcm_submission_draft_v1'
 const UPLOAD_CONCURRENCY = 4
 
+/** Sentinel for the binder dropdown's "make a new one" row. It lives only in
+ *  the <select>'s value; `selectedBinderId` never holds it. */
+const NEW_BINDER_OPTION = '__new_binder__'
+
 interface BinderOption {
   id: string
   name: string
@@ -204,6 +208,10 @@ function SubmissionsNewInner() {
   const [bindersAvailable, setBindersAvailable] = useState(true)
   const [selectedBinderId, setSelectedBinderId] = useState<string>('')
   const [newBinderName, setNewBinderName] = useState('')
+  /** True while "+ Create new binder…" is the dropdown's selection — the name
+   *  field and Create button only exist in that mode (round 2). Kept separate
+   *  from selectedBinderId so a sentinel value can never reach the API. */
+  const [creatingNewBinder, setCreatingNewBinder] = useState(false)
   const [creatingBinder, setCreatingBinder] = useState(false)
   const [binderError, setBinderError] = useState<string | null>(null)
 
@@ -667,6 +675,9 @@ function SubmissionsNewInner() {
       setBinders((prev) => [...prev, data.binder])
       setSelectedBinderId(data.binder.id)
       setNewBinderName('')
+      // The name field only exists while "+ Create new binder…" is picked;
+      // once the binder is real the dropdown shows it as a normal option.
+      setCreatingNewBinder(false)
       toast.success(`Created "${name}". Cards will file in as they grade.`)
       return data.binder.id as string
     } catch (e: any) {
@@ -1141,7 +1152,8 @@ function SubmissionsNewInner() {
                           const sideBlocking = result ? preflightBlocks(result) : false
                           const isDup = picked ? duplicateInfo.duplicateFileIds.has(picked.id) : false
                           return (
-                            <div key={side} className="relative aspect-[5/7] bg-gray-100 rounded overflow-hidden border border-gray-200">
+                            <div key={side}>
+                            <div className="relative aspect-[5/7] bg-gray-100 rounded overflow-hidden border border-gray-200">
                               {picked ? (
                                 <img
                                   src={URL.createObjectURL(picked.file)}
@@ -1177,6 +1189,10 @@ function SubmissionsNewInner() {
                                 </div>
                               )}
                             </div>
+                            {/* Round 2: name the side under each image so the
+                                pairing is readable without hovering. */}
+                            <p className="text-[10px] text-gray-500 text-center mt-0.5 capitalize">{side}</p>
+                            </div>
                           )
                         })}
                       </div>
@@ -1195,36 +1211,55 @@ function SubmissionsNewInner() {
               {stage === 'review' && bindersAvailable && (
                 <div className="border border-gray-200 rounded-lg p-3">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Binder (optional)</label>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <select
-                      value={selectedBinderId}
-                      onChange={(e) => setSelectedBinderId(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                    >
-                      <option value="">No binder — just my collection</option>
-                      {binders.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                    </select>
-                    <input
-                      value={newBinderName}
-                      onChange={(e) => { setNewBinderName(e.target.value); setBinderError(null) }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          if (newBinderName.trim() && !creatingBinder) void createBinder()
-                        }
-                      }}
-                      placeholder="New binder name"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 min-w-[10rem]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { void createBinder() }}
-                      disabled={!newBinderName.trim() || creatingBinder}
-                      className="px-3 py-2 text-sm font-semibold bg-white border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
-                    >
-                      {creatingBinder ? 'Creating…' : '+ Create'}
-                    </button>
-                  </div>
+                  {/* Round 2: one dropdown owns the choice. The name field is
+                      revealed by picking "+ Create new binder…" rather than
+                      sitting beside the select competing with it. */}
+                  <select
+                    value={creatingNewBinder ? NEW_BINDER_OPTION : selectedBinderId}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setBinderError(null)
+                      if (value === NEW_BINDER_OPTION) {
+                        setCreatingNewBinder(true)
+                        setSelectedBinderId('')
+                        return
+                      }
+                      setCreatingNewBinder(false)
+                      setNewBinderName('')
+                      setSelectedBinderId(value)
+                    }}
+                    className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="">No binder — just my collection</option>
+                    {binders.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                    <option value={NEW_BINDER_OPTION}>+ Create new binder…</option>
+                  </select>
+
+                  {creatingNewBinder && (
+                    <div className="flex flex-wrap gap-2 items-center mt-2">
+                      <input
+                        autoFocus
+                        value={newBinderName}
+                        onChange={(e) => { setNewBinderName(e.target.value); setBinderError(null) }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (newBinderName.trim() && !creatingBinder) void createBinder()
+                          }
+                        }}
+                        placeholder="New binder name"
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 min-w-[10rem]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { void createBinder() }}
+                        disabled={!newBinderName.trim() || creatingBinder}
+                        className="px-3 py-2 text-sm font-semibold bg-white border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        {creatingBinder ? 'Creating…' : '+ Create'}
+                      </button>
+                    </div>
+                  )}
                   {binderError && (
                     <p className="text-xs text-red-700 font-medium mt-1.5">{binderError}</p>
                   )}

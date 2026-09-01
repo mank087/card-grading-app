@@ -26,8 +26,14 @@ const CARD_COLUMNS = `
   conversational_condition_label, conversational_card_info,
   ownership_status, sold_at, sold_price, sold_channel,
   dcm_price_estimate, ebay_price_median, scryfall_price_usd, is_foil,
-  custom_label_data
+  custom_label_data, card_colors
 `;
+// card_colors is the per-card sampled palette the heritage slab bands are drawn
+// from. /api/cards/my-collection selects it, this route did not, so every card
+// opened inside a binder fell through resolveHeritageBandColors() to the DCM
+// brand purple while the same card in My Collection sampled correctly. It is a
+// small JSON blob (a handful of hex strings), not one of the multi-MB grading
+// columns this list exists to keep out.
 
 async function loadOwned(supabase: any, id: string, userId: string) {
   const { data } = await supabase
