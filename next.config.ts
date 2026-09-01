@@ -89,9 +89,15 @@ const nextConfig: NextConfig = {
         // Host standardization: the bare apex is canonical. Both hosts used to
         // serve 200s, which splits crawl budget and link equity between two
         // origins and makes every canonical/JSON-LD @id ambiguous.
-        source: '/:path*',
+        //
+        // /api is EXEMPT (Sept 1 incident): the mobile app's API base is
+        // https://www.dcmgrading.com, and a cross-host 308 strips the
+        // Authorization header — every authenticated mobile call 401'd
+        // ("not authorized" purchase failures, credits not issued). Pages
+        // redirect for SEO; API requests are served on either host.
+        source: '/:path((?!api/).*)',
         has: [{ type: 'host', value: 'www.dcmgrading.com' }],
-        destination: 'https://dcmgrading.com/:path*',
+        destination: 'https://dcmgrading.com/:path',
         permanent: true,
       },
     ]
