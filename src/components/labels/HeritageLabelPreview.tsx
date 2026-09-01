@@ -35,7 +35,7 @@ import {
   type HeritageGeometry,
 } from '@/lib/labelLab/heritageLayout'
 import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK } from '@/lib/labelPresets'
-import { designAspect, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { designAspect, orgTextCase, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 const FONT = 'Helvetica, Arial, "Noto Sans JP", sans-serif'
 
@@ -219,7 +219,14 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
   geom: HeritageGeometry; design?: OrgLabelDesign | null
 }) {
   const T = heritageTheme(true)
-  const fit = fitHeritageFront(data.primaryName || 'Card', data.contextLine || '', data.serial, geom)
+  // House type case (enterprise design only) is applied BEFORE fitting, so the
+  // fitter measures the capitals that will actually be drawn.
+  const fit = fitHeritageFront(
+    orgTextCase(design, data.primaryName || 'Card'),
+    orgTextCase(design, data.contextLine || ''),
+    data.serial,
+    geom,
+  )
   const { name, ctx } = fit
   const TX = geom.text
 
@@ -289,6 +296,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
   const grade = gradeString(data)
   const chip = resolveGradeChip(grade, true, design?.chip.theme ?? 'black')
   const condition = ((data.isAlteredAuthentic && data.grade === null ? 'Authentic' : data.condition) || chip.label).toUpperCase()
+  const serialY = PX.QR_Y + PX.QR_BOX + PX.QR_SERIAL_GAP
 
   const emblemFlags: Record<(typeof EMBLEM_ORDER)[number], boolean | undefined> = {
     founder: data.showFounderEmblem,
@@ -334,6 +342,14 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
         </>
       ) : null}
 
+      {/* Serial, directly under the QR. Drawn whether or not the QR resolved:
+          it is the human-readable half of the same identifier, and it is what
+          matches this back sticker to its front. */}
+      <text x={PX.QR_X + PX.QR_BOX / 2} y={serialY} textAnchor="middle" dominantBaseline="hanging"
+        fontFamily={FONT} fontSize={PX.QR_SERIAL_SIZE} fill={T.inkSoft} letterSpacing={PX.QR_SERIAL_TRACK}>
+        {data.serial}
+      </text>
+
       {/* Emblems — glyph on top, word rotated 90° CCW reading bottom-to-top,
           starting just below the glyph (heritageLayout EMBLEM_WORD_CENTER). */}
       {shownEmblems.map((id, slot) => {
@@ -373,7 +389,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
       {shownSubs.map(([label, v], i) => (
         <text key={label} x={PX.W - PX.SUBS_RIGHT} y={PX.SUBS_TOP + i * 56 + 24} textAnchor="end"
           fontFamily={FONT} fontSize={30} fill={T.inkSoft}>
-          {label}: {Math.round(v * 2) / 2}
+          {orgTextCase(design, label)}: {Math.round(v * 2) / 2}
         </text>
       ))}
     </>

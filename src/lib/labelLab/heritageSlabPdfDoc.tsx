@@ -13,7 +13,9 @@
  *           by grade (GRADE_CHIPS), DCM mark bottom-centre hugging the edge.
  *   back  — same band, QR carrying the DCM mark, emblems rotated 90deg CCW
  *           with the symbol on top, grade + condition centred, sub-grades
- *           right-aligned. No serial: the QR already encodes it.
+ *           right-aligned, and the serial in small type under the QR (the QR
+ *           encodes it, but only the printed number can be hand-matched to a
+ *           front sticker).
  *
  * Unlike the modern/traditional generators (which hardcode '#7c3aed'), the
  * grade chip colour resolves from GRADE_CHIPS / GRADE_10_FOIL_STOPS.
@@ -26,7 +28,7 @@ import React from 'react'
 // where — unlike ordinary Text — its fill can reference a gradient def.
 import { Document, Page, View, Text, Text as SvgText, Image, Svg, Path, Rect, G, Defs, LinearGradient, Stop, ClipPath, Font } from '@react-pdf/renderer'
 import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK, type GradeChip } from '@/lib/labelPresets'
-import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
+import { orgTextCase, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import { bandGeometry, BAND_STROKE_HEX, BAND_STROKE_OPACITY, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
 import { heritageTheme, heritageGeometry, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE, HERITAGE_PX, type HeritageGeometry } from './heritageLayout'
@@ -439,7 +441,14 @@ function LogoBlock({ i, showRules = true, fit, geom }: { i: HeritageInputs; show
 export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
   const T = heritageTheme(!!i.printHardened)
   const geom = heritageGeometry(i.design)
-  const fit = fitHeritageFront(i.primaryName, i.contextLine, i.serial, geom)
+  // House type case (enterprise design only) applied BEFORE fitting, so the
+  // fitter measures the capitals that will actually print.
+  const fit = fitHeritageFront(
+    orgTextCase(i.design, i.primaryName),
+    orgTextCase(i.design, i.contextLine),
+    i.serial,
+    geom,
+  )
   const { name, ctx } = fit
   const rulesOk = geom.logo.zone === 'bottom' && geom.logo.accentRules
     && heritageRulesFit(fit, heritageMarkBox(i.logoScale ?? 1, fit, geom))
@@ -547,7 +556,7 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
   const row = (label: string, v: number | null) =>
     v == null ? null : (
       <Text key={label} style={{ fontFamily: 'Helvetica', fontSize: u(30), color: T.inkSoft, textAlign: 'right', marginBottom: u(20) }}>
-        {label}: {v}
+        {orgTextCase(i.design, label)}: {v}
       </Text>
     )
   // The back is authored against the stock content rect (x 96..1400, full
@@ -578,6 +587,27 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
         </View>
       ) : null}
 
+      {/* Serial, directly under the QR box.
+          The QR encodes it, but a QR cannot be eyeball-sorted, and the slab
+          front and back are two separate stickers — printing the number here
+          is what lets a stack of backs be matched to its stack of fronts by
+          hand. 28px = 4.03pt at true size, just above the ~4pt floor where an
+          inkjet dithers small type. Drawn whether or not the QR resolved. */}
+      <View style={{
+        position: 'absolute',
+        left: u(HERITAGE_PX.QR_X),
+        top: u(HERITAGE_PX.QR_Y + HERITAGE_PX.QR_BOX + HERITAGE_PX.QR_SERIAL_GAP),
+        width: u(HERITAGE_PX.QR_BOX),
+        alignItems: 'center',
+      }}>
+        <Text style={{
+          fontFamily: 'Helvetica', fontSize: u(HERITAGE_PX.QR_SERIAL_SIZE),
+          color: T.inkSoft, letterSpacing: u(HERITAGE_PX.QR_SERIAL_TRACK),
+        }}>
+          {i.serial}
+        </Text>
+      </View>
+
       {(() => {
         // Shared layout: emblems compact leftward, the grade column centres
         // in the space between the left cluster and the sub-grades, and the
@@ -602,8 +632,7 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
               <Emblem key={id} id={id} left={u(L.emblemXs[idx])} />
             ))}
 
-            {/* Grade + condition, centred in the free span. No serial — the
-                QR encodes it. */}
+            {/* Grade + condition, centred in the free span. */}
             <View style={{ position: 'absolute', left: u(L.left), top: u(60), width: u(L.right - L.left), alignItems: 'center' }}>
               <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: u(150), color: T.ink, lineHeight: 1 }}>
                 {chip.grade === 0 ? 'A' : chip.grade}

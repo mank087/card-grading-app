@@ -304,6 +304,7 @@ export default function LabelPreviewPage() {
           pattern: sel.pattern,
           wordmarkDataUrl: await loadWordmarkDataUrl(),
           chipTheme: heritageLogosRef.current?.design?.chip.theme,
+          textTransform: heritageLogosRef.current?.design?.text.transform,
         });
         const fn =
           compactFormat === 'onetouch' ? (side === 'front' ? compact.renderOneTouchFront : compact.renderOneTouchBack)

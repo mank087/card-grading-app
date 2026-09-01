@@ -50,6 +50,7 @@ const sizeConfig = {
     subScoreSize: 'text-[8px]',
     founderStarSize: 'text-[12px]',
     founderTextSize: '7px',
+    serialFontSize: '6px',
   },
   md: {
     height: 'min-h-[95px]',
@@ -60,6 +61,7 @@ const sizeConfig = {
     subScoreSize: 'text-[9px]',
     founderStarSize: 'text-[14px]',
     founderTextSize: '8px',
+    serialFontSize: '7px',
   },
   lg: {
     height: 'min-h-[110px]',
@@ -70,6 +72,7 @@ const sizeConfig = {
     subScoreSize: 'text-[10px]',
     founderStarSize: 'text-[16px]',
     founderTextSize: '9px',
+    serialFontSize: '8px',
   },
 }
 
@@ -148,8 +151,12 @@ export function ModernBackLabel({
       <div className="relative flex items-center justify-between h-full w-full gap-2">
         {/* LEFT: QR Code with styled background + Founder badge */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* QR Code with modern styled background */}
+          {/* QR Code with modern styled background, serial printed directly
+              beneath it: the QR encodes the serial but cannot be read by eye,
+              and the slab front and back are separate stickers — the printed
+              number is what matches a stack of backs to its stack of fronts. */}
           {qrCodeUrl && (
+            <div className="flex flex-col items-center">
             <div
               className="p-1.5 rounded"
               style={{
@@ -173,6 +180,13 @@ export function ModernBackLabel({
                     excavate: true,
                   } : undefined}
                 />
+              </div>
+            </div>
+              <div
+                className="font-mono leading-none mt-0.5"
+                style={{ fontSize: config.serialFontSize, color: tx.sub }}
+              >
+                {serial}
               </div>
             </div>
           )}

@@ -6,7 +6,9 @@
  *
  * Two label types:
  * - FRONT: Horizontal layout with DCM color logo (left) + card name (center) + grade/condition (right)
- * - BACK: Centered QR code with subtle DCM logo watermark pattern
+ * - BACK: Centered QR code with subtle DCM logo watermark pattern, plus the
+ *   serial in 4.5pt beside the code so a stack of backs can be hand-matched
+ *   to its stack of fronts
  *
  * Uses the same FoldableLabelData interface for consistency with other reports.
  */
@@ -67,6 +69,13 @@ export interface ToploaderLabelData {
   conditionLabel: string;
   qrCodeUrl: string;
   cardName?: string; // Card/player name for identification
+  /**
+   * Printed in small type on the BACK label, beside the QR. Front and back are
+   * two separate 1.75" x 0.5" stickers here, and the QR — the only thing that
+   * carried the serial — cannot be sorted by eye, so a batch of backs had no
+   * way to be matched to its batch of fronts by hand.
+   */
+  serial?: string;
 }
 
 /**
@@ -289,7 +298,8 @@ async function drawBackLabel(
   x: number,
   y: number,
   qrCodeBase64: string,
-  colorLogoBase64?: string
+  colorLogoBase64?: string,
+  serial?: string
 ): Promise<void> {
   const labelW = LABEL_WIDTH;
   const labelH = LABEL_HEIGHT;
@@ -340,6 +350,20 @@ async function drawBackLabel(
 
   // Draw QR code centered (on top of watermark)
   doc.addImage(qrCodeBase64, 'PNG', qrX, qrY, qrSize, qrSize);
+
+  // Serial in the empty lane LEFT of the QR.
+  //
+  // Directly below the code is not an option on this format: the QR is 85% of
+  // a 36pt-tall label and centred, so only 2.7pt is left underneath — nothing
+  // legible fits there. The side lanes are ~45pt wide and carry only the 8%
+  // watermark, so the serial goes there at 4.5pt, vertically centred, where it
+  // sits well clear of the code's quiet zone.
+  if (serial) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.5);
+    doc.setTextColor(COLORS.textDark);
+    doc.text(serial, (x + 2 + qrX - 2) / 2, y + labelH / 2 + 1.5, { align: 'center' });
+  }
 }
 
 /**
@@ -373,7 +397,8 @@ export async function generateFrontLabel8167(
 export async function generateBackLabel8167(
   qrCodeUrl: string,
   positionIndex: number,
-  offsets?: CalibrationOffsets
+  offsets?: CalibrationOffsets,
+  serial?: string
 ): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -390,7 +415,7 @@ export async function generateBackLabel8167(
     loadLogoAsBase64().catch(() => undefined)
   ]);
 
-  await drawBackLabel(doc, x, y, qrCodeBase64, colorLogoBase64);
+  await drawBackLabel(doc, x, y, qrCodeBase64, colorLogoBase64, serial);
 
   return doc.output('blob');
 }
@@ -489,6 +514,7 @@ export async function generatePreviewSheet8167(): Promise<Blob> {
     conditionLabel: 'Mint',
     qrCodeUrl: 'https://dcmgrading.com/pokemon/sample',
     cardName: 'Sample Card',
+    serial: 'DCM000000',
   };
 
   // Generate sample QR code
@@ -511,7 +537,7 @@ export async function generatePreviewSheet8167(): Promise<Blob> {
   for (let row = 0; row < 5; row++) {
     const position = { row, column: 1 };
     const { x, y } = getLabelPosition(position);
-    await drawBackLabel(doc, x, y, qrCodeBase64, colorLogoBase64);
+    await drawBackLabel(doc, x, y, qrCodeBase64, colorLogoBase64, baseSampleData.serial);
   }
 
   // No title on the PDF - labels must align with Avery 8167 template
@@ -579,7 +605,7 @@ export async function generateToploaderLabelPair(
   // Draw back label with watermark
   const backPosition = indexToPosition8167(backPositionIndex);
   const { x: backX, y: backY } = getLabelPosition(backPosition, offsets);
-  await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64);
+  await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64, data.serial);
 
   return doc.output('blob');
 }
@@ -669,7 +695,7 @@ export async function generateToploaderLabelSheet(
     // Draw back label
     const backPosition = indexToPosition8167(backLabelIndex);
     const { x: backX, y: backY } = getLabelPosition(backPosition, offsets);
-    await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64);
+    await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64, data.serial);
   }
 
   return doc.output('blob');
@@ -739,7 +765,7 @@ export async function generateToploaderLabelSheetMultiPage(
     // Draw back label
     const backPosition = indexToPosition8167(backPositionIndex);
     const { x: backX, y: backY } = getLabelPosition(backPosition, offsets);
-    await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64);
+    await drawBackLabel(doc, backX, backY, qrCodeBase64, colorLogoBase64, data.serial);
   };
 
   if (globalPositions && globalPositions.length === cardsData.length) {

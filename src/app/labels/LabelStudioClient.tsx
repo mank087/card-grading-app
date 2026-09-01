@@ -859,6 +859,7 @@ function LabelGallery({
           conditionLabel: labelData.condition || selectedCard.conversational_condition_label,
           qrCodeUrl: `https://dcmgrading.com/verify/${selectedCard.serial}`,
           cardName: labelData.primaryName,
+          serial: labelData.serial,
         }
         let blob: Blob
         if (labelType.downloadType === 'foldover') {

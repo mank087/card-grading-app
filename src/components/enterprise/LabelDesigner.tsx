@@ -711,6 +711,13 @@ export default function LabelDesigner({
           <RangeControl {...rangeExtras} label="Text size" value={design.text.scale} min={DESIGN_LIMITS.textScale.min} max={DESIGN_LIMITS.textScale.max} step={DESIGN_LIMITS.textScale.step}
             onChange={v => onChange(patch(design, x => { x.text.scale = v }))} />
           <p className="text-[11px] text-gray-400 mt-1">A request, not a guarantee: long names still shrink to fit.</p>
+          <label className="flex items-center justify-between text-xs font-medium text-gray-600 mt-2.5">
+            ALL CAPS text
+            <input type="checkbox" checked={design.text.transform === 'uppercase'} disabled={disabled}
+              onChange={e => set(x => { x.text.transform = e.target.checked ? 'uppercase' : 'none' })}
+              className="accent-purple-600" />
+          </label>
+          <p className="text-[11px] text-gray-400 mt-1">Sets the card name, set line, condition and sub-grade labels in capitals. Nothing is rewritten — turn it off and the stored casing comes back.</p>
         </div>
 
         <div className={`${sectionCls('border')} ${heritage ? '' : 'opacity-50 pointer-events-none'}`} onClick={() => setSelection('border')}>

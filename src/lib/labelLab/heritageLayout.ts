@@ -29,6 +29,13 @@ export const HERITAGE_PX = {
   MARK_W: 260, MARK_H: 96, MARK_BOTTOM: 8, MARK_SCALE: 0.85, RULE_LEN: 112, RULE_GAP: 20,
   // Back
   QR_X: 132, QR_Y: 52, QR_BOX: 296, QR_IMG: 280, QR_LOGO_DISC: 70, QR_LOGO: 56,
+  // Serial, centred under the QR box. The QR encodes the serial but is not
+  // eyeball-sortable, and front/back are two separate stickers — printing the
+  // number here is what lets a stack of backs be matched to a stack of fronts
+  // by hand. 28px = 4.03pt at true size, just above the ~4pt floor where an
+  // inkjet starts dithering small type; the 8px gap keeps it off the QR's
+  // quiet zone and its descender-free box ends at 384 of the 400px height.
+  QR_SERIAL_GAP: 8, QR_SERIAL_SIZE: 28, QR_SERIAL_TRACK: 2,
   EMBLEM_XS: [458, 532, 606] as const, EMBLEM_TOP: 40, EMBLEM_SLOT: 56, EMBLEM_TRACK: 240,
   EMBLEM_GLYPH: 46, EMBLEM_WORD_CENTER: 180, EMBLEM_WORD_H: 34,
   GRADE_X: 700, GRADE_Y: 60, GRADE_W: 360,

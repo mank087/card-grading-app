@@ -10,6 +10,7 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import type { BandPattern } from '@/lib/labelLab/bandGeometry'
 import type { HeritageCompactInputs } from './heritageCompact'
 import type { GradeChipTheme } from '@/lib/labelPresets'
+import type { TextTransform } from '@/lib/labels/orgLabelDesign'
 
 function roundSub(v: any): number | null {
   const n = Number(v)
@@ -50,6 +51,8 @@ export function buildHeritageCompactInputs(
     showCardLoversEmblem?: boolean
     /** Enterprise Label Designer chip colourway (org cards only). */
     chipTheme?: GradeChipTheme
+    /** Enterprise Label Designer house type case (org cards only). */
+    textTransform?: TextTransform | null
   },
 ): HeritageCompactInputs {
   const d = getCardLabelData(card)
@@ -77,6 +80,7 @@ export function buildHeritageCompactInputs(
     showVipEmblem: opts.showVipEmblem,
     showCardLoversEmblem: opts.showCardLoversEmblem,
     chipTheme: opts.chipTheme,
+    textTransform: opts.textTransform ?? null,
   }
 }
 

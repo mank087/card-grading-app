@@ -375,6 +375,9 @@ const BK_QR_X = BK_PADDING + 12 * 0.24  // 7.2
 const BK_GRADE_PT = 88 * 0.24           // 21.12
 const BK_COND_PT = 24 * 0.24            // 5.76
 const BK_SUB_PT = 26 * 0.24             // 6.24
+// Serial under the QR. Smaller than the sub-grades — it is a matching aid, not
+// a headline — but still above the ~4pt floor where an inkjet dithers type.
+const BK_SERIAL_PT = 18 * 0.24          // 4.32
 const BK_SUB_LH = 36 * 0.24             // 8.64
 const BK_SUB_RIGHT_INSET = (18 + 30) * 0.24 // padding + cut-line inset = 11.52
 const BADGE_SYMBOL = 28 * 0.24          // 6.72
@@ -425,6 +428,13 @@ function BadgeColumn({
 export interface SlabBackInputs {
   grade: string
   condition: string
+  /**
+   * Printed in small type under the QR. The QR encodes it, but a QR cannot be
+   * eyeball-sorted and the slab front and back are two separate stickers —
+   * the printed number is what matches a stack of backs to its stack of
+   * fronts when a batch is being applied.
+   */
+  serial?: string | null
   qrCodeDataUrl?: string | null
   subgrades?: {
     centering?: number | null
@@ -486,24 +496,32 @@ export function CustomSlabBackBlock({
         }}
       >
         <View style={{ width: BK_QR_X }} />
-        {/* QR frame: dark themes get the purple glow frame, light themes a flat white pad */}
-        <View
-          style={{
-            padding: lightText ? 0.72 : 1.92,
-            backgroundColor: lightText ? qrFrameFill : '#FFFFFF',
-            borderWidth: lightText ? 0.5 : 0,
-            borderColor: '#8b5cf6',
-          }}
-        >
-          <View style={{ padding: lightText ? 0.72 : 0.48, backgroundColor: '#FFFFFF' }}>
-            {inputs.qrCodeDataUrl ? (
-              <Image src={inputs.qrCodeDataUrl} style={{ width: BK_QR_SIZE, height: BK_QR_SIZE }} />
-            ) : (
-              <View style={{ width: BK_QR_SIZE, height: BK_QR_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 4, color: '#9ca3af' }}>QR</Text>
-              </View>
-            )}
+        {/* QR frame: dark themes get the purple glow frame, light themes a flat
+            white pad. The serial rides directly underneath in the same column. */}
+        <View style={{ alignItems: 'center' }}>
+          <View
+            style={{
+              padding: lightText ? 0.72 : 1.92,
+              backgroundColor: lightText ? qrFrameFill : '#FFFFFF',
+              borderWidth: lightText ? 0.5 : 0,
+              borderColor: '#8b5cf6',
+            }}
+          >
+            <View style={{ padding: lightText ? 0.72 : 0.48, backgroundColor: '#FFFFFF' }}>
+              {inputs.qrCodeDataUrl ? (
+                <Image src={inputs.qrCodeDataUrl} style={{ width: BK_QR_SIZE, height: BK_QR_SIZE }} />
+              ) : (
+                <View style={{ width: BK_QR_SIZE, height: BK_QR_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 4, color: '#9ca3af' }}>QR</Text>
+                </View>
+              )}
+            </View>
           </View>
+          {inputs.serial ? (
+            <Text style={{ fontFamily: 'Helvetica', fontSize: BK_SERIAL_PT, color: subColor, marginTop: 0.9 }}>
+              {inputs.serial}
+            </Text>
+          ) : null}
         </View>
         <View style={{ width: lightText ? 6.72 : 4.8 }} />
         {inputs.showFounderEmblem ? (

@@ -451,8 +451,10 @@ function BackPage(inputs: SlabLabelInputs) {
         <LabelBackground theme={theme} dark1={dark1} dark2={dark2} idSuffix="b" />
 
         <View style={styles.contentRow}>
-          {/* Left: QR placeholder + emblems lane */}
-          <View style={[styles.logoSlot, { width: LOGO_SIZE + px(36) /* +36px for emblem strip */ }]}>
+          {/* Left: QR placeholder + serial + emblems lane. The serial rides
+              under the QR because the front and back are separate stickers and
+              a QR cannot be matched to one by eye. */}
+          <View style={[styles.logoSlot, { width: LOGO_SIZE + px(36) /* +36px for emblem strip */, alignItems: 'center' }]}>
             <View
               style={{
                 width: LOGO_SIZE,
@@ -481,6 +483,18 @@ function BackPage(inputs: SlabLabelInputs) {
                 </Text>
               )}
             </View>
+            {inputs.serial ? (
+              <Text
+                style={{
+                  fontFamily: 'Helvetica',
+                  fontSize: px(18),
+                  color: isModern ? 'rgba(255,255,255,0.75)' : '#4b5563',
+                  marginTop: px(4),
+                }}
+              >
+                {inputs.serial}
+              </Text>
+            ) : null}
           </View>
 
           {/* Center: grade + condition (matches front) */}

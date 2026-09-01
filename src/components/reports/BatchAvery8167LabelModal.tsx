@@ -302,6 +302,7 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
       conditionLabel: cleanLabelData.condition || 'N/A',
       qrCodeUrl: cardUrl,
       cardName: cleanLabelData.primaryName,
+      serial: cleanLabelData.serial,
     };
   };
 

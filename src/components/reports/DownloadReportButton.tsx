@@ -1159,6 +1159,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           conditionLabel: cleanLabelData.condition,
           qrCodeUrl: cardUrl,
           cardName: cleanLabelData.primaryName, // Card name for front label display
+          serial: cleanLabelData.serial,
         },
         frontPositionIndex,
         backPositionIndex,

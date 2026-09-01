@@ -1,82 +1,82 @@
 {
   "consumer-short": {
     "svgFront": "05f6050fc3cd71c4",
-    "svgBack": "5071615aa6aeef39",
-    "pdf": "d5dd0a6246bc876a"
+    "svgBack": "cf4cc73b99f989d0",
+    "pdf": "b677f92e9b594aed"
   },
   "consumer-ten": {
     "svgFront": "c303e181d834d701",
-    "svgBack": "a39a7e2fb97d672e",
-    "pdf": "e196adcb51a45c0c"
+    "svgBack": "0075841d53fc8b93",
+    "pdf": "046aa3d67b7dec3f"
   },
   "consumer-authentic": {
     "svgFront": "f92fa8f5f6dab5d5",
-    "svgBack": "8df29bd132e01ad1",
-    "pdf": "58bdb85786888bd9"
+    "svgBack": "ab6637084917aa25",
+    "pdf": "30b4cadf2331f460"
   },
   "org-scaled-logo": {
     "svgFront": "98b98e32bdb5a884",
-    "svgBack": "827cc093bcaab2f4",
-    "pdf": "f0289ec7b27d171d"
+    "svgBack": "175149a69a38db76",
+    "pdf": "6ca834e73a7601a6"
   },
   "grade-colors": {
     "svgFront": "aa9f3ca23239a5bd",
-    "svgBack": "4a1ce8f157875b82",
-    "pdf": "b6f48d11ecaccd78"
+    "svgBack": "37873b25808e8095",
+    "pdf": "2af2a45296a0f506"
   },
   "long-diamond": {
     "svgFront": "8608051a1eb3b7aa",
-    "svgBack": "301f1c12761305b5",
-    "pdf": "1ca02db62578f856"
+    "svgBack": "602e84543c6d37be",
+    "pdf": "d9d1b6c045a92bc4"
   },
   "long-mosaic": {
     "svgFront": "1eedfc5f1dacf429",
-    "svgBack": "84faf4918a4676b0",
-    "pdf": "2524bdefc847edf4"
+    "svgBack": "75642fb998cc9058",
+    "pdf": "8955d3e0abc57701"
   },
   "long-gradient": {
     "svgFront": "9ca5fa866c460d0a",
-    "svgBack": "5dbd42731cd1103f",
-    "pdf": "52d99a29e5ce8639"
+    "svgBack": "44bc66761b21ab54",
+    "pdf": "7167b8cdf11d1cdf"
   },
   "long-split": {
     "svgFront": "0029c5d653d1e919",
-    "svgBack": "11ddeecc624740d8",
-    "pdf": "72b8648709a6ef90"
+    "svgBack": "fb1960c14413bee5",
+    "pdf": "26fa0afae56c70c0"
   },
   "long-stripes": {
     "svgFront": "0d80a292262432f3",
-    "svgBack": "5cf35776b99e1736",
-    "pdf": "0c196acb2e9185bf"
+    "svgBack": "fe81b540e829def9",
+    "pdf": "89039000bc0900ef"
   },
   "long-chevron": {
     "svgFront": "c4c25c1cb6c6555b",
-    "svgBack": "cc090bf7d3156288",
-    "pdf": "40f2364bf3f45700"
+    "svgBack": "ef9f60e59fdcb54e",
+    "pdf": "ae143cec389b82e3"
   },
   "long-lightning": {
     "svgFront": "70a1916b5098184b",
-    "svgBack": "0d2aa172cb5c244f",
-    "pdf": "a09f1a412c5a0735"
+    "svgBack": "af2080e9f78893d8",
+    "pdf": "83f9e5faba7a09f3"
   },
   "long-shattered": {
     "svgFront": "5e35800d10548e51",
-    "svgBack": "bb6594bc222d682a",
-    "pdf": "6ede5b97f8c93c07"
+    "svgBack": "a28b5c692086b540",
+    "pdf": "31dc712ecf5e0d12"
   },
   "long-fractured": {
     "svgFront": "79bf605bb8a76c5f",
-    "svgBack": "e9b11e2db64a767e",
-    "pdf": "9f219af14ca72c3b"
+    "svgBack": "507703cdb8308a3f",
+    "pdf": "0c3bb1778cbe9aa4"
   },
   "long-scales": {
     "svgFront": "de83f98c1fb943f6",
-    "svgBack": "c9b8dd8deb8394aa",
-    "pdf": "326bf88fa658a205"
+    "svgBack": "246299f5e4759534",
+    "pdf": "1d43cd3e3efe298f"
   },
   "long-prism": {
     "svgFront": "78f568243a2ede7e",
-    "svgBack": "a132abc4c7161599",
-    "pdf": "719ec3bae6cf95ae"
+    "svgBack": "df8bce0b86840e29",
+    "pdf": "cc70420f27e775e4"
   }
 }

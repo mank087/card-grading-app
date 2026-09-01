@@ -104,6 +104,7 @@ function mapBackInputs(data: SlabLabelData): SlabBackInputs {
   return {
     grade: formatGrade(data.grade, data.isAlteredAuthentic),
     condition: data.isAlteredAuthentic && data.grade === null ? 'AUTHENTIC' : (data.condition || ''),
+    serial: data.serial || null,
     qrCodeDataUrl: data.qrCodeDataUrl || null,
     subgrades: data.subScores,
     showFounderEmblem: data.showFounderEmblem,

@@ -12,9 +12,11 @@
  *
  *   Toploader  (Avery 8167)  1.75" x 0.5", aspect 3.50 — the SAME aspect as
  *     Heritage but at 62.5% scale, which puts the context at 2.7pt and the
- *     serial at 3.1pt. So this is a REDUCTION: the divider and serial are
- *     dropped (the back's QR already encodes the serial), the name takes the
- *     reclaimed vertical, and the context shortens to set + year.
+ *     serial at 3.1pt. So this is a REDUCTION: the divider and the FRONT's
+ *     serial are dropped, the name takes the reclaimed vertical, and the
+ *     context shortens to set + year. The BACK still prints the serial under
+ *     its grade — front and back are separate stickers here, and the printed
+ *     number is the only way to match a stack of one to a stack of the other.
  *
  *   Toploader fold-over  folds on the label's CENTRE VERTICAL and each half
  *     is rotated 90 degrees by drawFoldOverLabel, so the READING area is
@@ -31,6 +33,7 @@
 import { bandGeometry, type BandPattern } from '@/lib/labelLab/bandGeometry'
 import { EMBLEMS, EMBLEM_ORDER } from '@/lib/labelLab/emblemShapes'
 import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK, type GradeChipTheme } from '@/lib/labelPresets'
+import { applyTextTransform, type TextTransform } from '@/lib/labels/orgLabelDesign'
 
 /** Print-hardened Heritage theme — these labels exist to be printed. */
 const FIELD = '#FFFFFF'
@@ -71,7 +74,16 @@ export interface HeritageCompactInputs {
    * choice they honour; absent = the stock black chip.
    */
   chipTheme?: GradeChipTheme
+  /**
+   * Enterprise Label Designer house type case (design.text.transform). Applied
+   * at render time to the name / context / condition / sub-grade labels;
+   * absent = draw the strings exactly as stored, which is every consumer card.
+   */
+  textTransform?: TextTransform | null
 }
+
+/** House type case for one string on a compact label. */
+const tc = (i: HeritageCompactInputs, s: string) => applyTextTransform(i.textTransform, s)
 
 // ---------------------------------------------------------------------------
 // Canvas helpers
@@ -279,16 +291,17 @@ export async function renderOneTouchFront(i: HeritageCompactInputs, dpi: number)
   const textBox = W * 0.671
 
   ctx.fillStyle = INK
-  ctx.fillText(fitText(ctx, i.primaryName, textBox, H * 0.20, H * 0.11), tx, H * 0.30)
+  ctx.fillText(fitText(ctx, tc(i, i.primaryName), textBox, H * 0.20, H * 0.11), tx, H * 0.30)
 
+  const contextLine = tc(i, i.contextLine)
   const ctxSize = H * 0.082
   ctx.font = `400 ${ctxSize}px ${FONT}`
   ctx.fillStyle = INK_SOFT
   let cs = ctxSize
-  while (cs > H * 0.055 && ctx.measureText(i.contextLine).width + i.contextLine.length * cs * 0.12 > textBox) {
+  while (cs > H * 0.055 && ctx.measureText(contextLine).width + contextLine.length * cs * 0.12 > textBox) {
     cs -= 0.3; ctx.font = `400 ${cs}px ${FONT}`
   }
-  trackedText(ctx, i.contextLine, tx, H * 0.455, cs * 0.12)
+  trackedText(ctx, contextLine, tx, H * 0.455, cs * 0.12)
 
   ctx.fillStyle = DIVIDER
   ctx.fillRect(tx, H * 0.53, textBox, Math.max(H * 0.016, 1))
@@ -327,6 +340,17 @@ export async function renderOneTouchBack(i: HeritageCompactInputs, dpi: number):
   ctx.fillStyle = '#fff'; ctx.fillRect(qrX - H * 0.02, qrY - H * 0.02, qrS + H * 0.04, qrS + H * 0.04)
   if (qr) ctx.drawImage(qr, qrX, qrY, qrS, qrS)
 
+  // Serial under the QR. The front and back of a One-Touch label are the two
+  // halves of one folded strip, but they are applied to opposite faces of the
+  // holder and the QR cannot be eyeball-sorted, so the number is printed here
+  // too. H*0.088 matches the front's serial size (~4pt at 0.625" tall) and the
+  // baseline at 0.97H clears the QR's white pad, which ends at 0.89H.
+  ctx.textAlign = 'center'
+  ctx.font = `400 ${H * 0.088}px ${FONT}`
+  ctx.fillStyle = INK_SOFT
+  ctx.fillText(i.serial, qrX + qrS / 2, H * 0.97)
+  ctx.textAlign = 'left'
+
   const em = shownEmblems(i)
   em.forEach((id, n) => drawEmblem(ctx, id, qrX + qrS + W * 0.035 + n * H * 0.20, H * 0.12, H * 0.15))
 
@@ -349,7 +373,7 @@ export async function renderOneTouchBack(i: HeritageCompactInputs, dpi: number):
   ctx.textAlign = 'right'
   ctx.fillStyle = INK_SOFT
   ctx.font = `400 ${H * 0.09}px ${FONT}`
-  shown.forEach(([k, v], n) => ctx.fillText(`${k}: ${Math.round(Number(v) * 2) / 2}`, W - W * 0.028, H * 0.24 + n * H * 0.20))
+  shown.forEach(([k, v], n) => ctx.fillText(`${tc(i, k)}: ${Math.round(Number(v) * 2) / 2}`, W - W * 0.028, H * 0.24 + n * H * 0.20))
   ctx.textAlign = 'left'
 
   return c
@@ -372,9 +396,9 @@ export async function renderToploaderFront(i: HeritageCompactInputs, dpi: number
   const textBox = W * 0.66
 
   ctx.fillStyle = INK
-  ctx.fillText(fitText(ctx, i.primaryName, textBox, H * 0.265, H * 0.15), tx, H * 0.46)
+  ctx.fillText(fitText(ctx, tc(i, i.primaryName), textBox, H * 0.265, H * 0.15), tx, H * 0.46)
 
-  const short = i.contextShort || i.contextLine
+  const short = tc(i, i.contextShort || i.contextLine)
   const ctxSize = H * 0.105
   ctx.font = `400 ${ctxSize}px ${FONT}`
   ctx.fillStyle = INK_SOFT

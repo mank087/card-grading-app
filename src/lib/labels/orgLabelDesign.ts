@@ -28,6 +28,7 @@ export type LogoZone = 'bottom' | 'left' | 'right'
 export type LogoVariant = 'color' | 'black' | 'white'
 export type ChipTheme = 'black' | 'white'
 export type BandColorSource = 'brand' | 'card' | 'custom'
+export type TextTransform = 'none' | 'uppercase'
 
 export interface OrgLabelDesign {
   v: 1
@@ -60,6 +61,16 @@ export interface OrgLabelDesign {
   text: {
     /** Multiplier on the maximum type sizes; the fitter still shrinks. */
     scale: number
+    /**
+     * House type case. 'uppercase' renders every human-readable string on the
+     * label in capitals — card name, context line, condition, sub-grade
+     * labels. Applied at RENDER time only: label_data is never rewritten, so
+     * turning the option off restores the stored casing exactly.
+     *
+     * ENTERPRISE ONLY, like the rest of this document. Consumer labels have
+     * no design and therefore no transform.
+     */
+    transform: TextTransform
   }
   border: {
     enabled: boolean
@@ -136,6 +147,7 @@ const BAND_POSITIONS: BandPosition[] = ['left', 'right', 'top', 'bottom']
 const LOGO_ZONES: LogoZone[] = ['bottom', 'left', 'right']
 const LOGO_VARIANTS: LogoVariant[] = ['color', 'black', 'white']
 const CHIP_THEMES: ChipTheme[] = ['black', 'white']
+const TEXT_TRANSFORMS: TextTransform[] = ['none', 'uppercase']
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
 /** The stock DCM Heritage layout — what every org renders until it edits. */
@@ -146,7 +158,7 @@ export function defaultOrgLabelDesign(): OrgLabelDesign {
     band: { position: 'left', pattern: 'diamond', colorSource: 'brand', colors: [], width: 1 },
     logo: { zone: 'bottom', variant: 'color', scale: 1, offset: { x: 0, y: 0 }, accentRules: true },
     chip: { theme: 'black', scale: 1, grade10Color: null },
-    text: { scale: 1 },
+    text: { scale: 1, transform: 'none' },
     border: { enabled: false, color: '#1C1B18', width: 0.02, inset: 0.05 },
     size: { preset: 'standard', widthIn: 2.8, heightIn: 0.8 },
   }
@@ -255,6 +267,7 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
     },
     text: {
       scale: num(text.scale, base.text.scale, DESIGN_LIMITS.textScale.min, DESIGN_LIMITS.textScale.max),
+      transform: oneOf(text.transform, TEXT_TRANSFORMS, base.text.transform),
     },
     border: {
       enabled: typeof border.enabled === 'boolean' ? border.enabled : base.border.enabled,
@@ -317,6 +330,27 @@ export function isStockLayout(d: OrgLabelDesign | null | undefined): boolean {
     d.text.scale === 1 &&
     d.border.enabled === false
   )
+}
+
+/**
+ * Apply the design's house type case to one string, at RENDER time.
+ *
+ * Every Heritage renderer runs its human-readable strings through this before
+ * fitting them — before, so the fitter measures the capitals it will actually
+ * draw (caps are ~12% wider in Helvetica-Bold, and boldFitFactor already
+ * accounts for the ratio). Nothing is written back to label_data: turning the
+ * option off returns the label to its stored casing with no backfill.
+ *
+ * Null/absent design (every consumer card) returns the string untouched, which
+ * is what keeps scripts/label-design-snapshot.ts green.
+ */
+export function orgTextCase(d: OrgLabelDesign | null | undefined, s: string): string {
+  return d?.text.transform === 'uppercase' ? s.toUpperCase() : s
+}
+
+/** The same transform for the compact renderers, which carry the flag alone. */
+export function applyTextTransform(t: TextTransform | null | undefined, s: string): string {
+  return t === 'uppercase' ? s.toUpperCase() : s
 }
 
 /** Deep-equal enough for undo stacks and dirty checks. */

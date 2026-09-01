@@ -487,6 +487,7 @@ export default function LabelExportPage() {
             pattern: (sp.get('heritagePattern') || sel?.pattern || 'diamond') as any,
             wordmarkDataUrl: await loadWordmarkDataUrl(),
             chipTheme: logos.design?.chip.theme,
+            textTransform: logos.design?.text.transform,
           })];
           const blob =
             type === 'onetouch' ? await sheets.generateHeritageOneTouchSheet(items, undefined, [position])
@@ -537,6 +538,7 @@ export default function LabelExportPage() {
             conditionLabel: labelData.condition || card.conversational_condition_label,
             qrCodeUrl: cardUrl,
             cardName: labelData.primaryName,
+            serial: labelData.serial,
           };
           // Org cards: store mark on the label + watermark; DCM otherwise.
           const orgToploaderLogo = logos.branding ? logos.mark : undefined;

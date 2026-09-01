@@ -319,6 +319,7 @@ function BatchLabelExportInner() {
             return buildHeritageCompactInputs(card, {
               qrDataUrl, bandColors, pattern, wordmarkDataUrl: wordmark,
               chipTheme: orgLogos?.design?.chip.theme,
+              textTransform: orgLogos?.design?.text.transform,
             });
           }));
         };
@@ -569,6 +570,7 @@ function BatchLabelExportInner() {
             grade,
             conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
+            serial: labelData.serial,
           }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
           // Org batches (all-same-org): store mark on labels + watermark.
@@ -610,6 +612,7 @@ function BatchLabelExportInner() {
             grade,
             conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
+            serial: labelData.serial,
           }));
           // generateFoldOverLabelSheet takes startPosition (single number) and
           // auto-fills the rest sequentially. Use the first position from the

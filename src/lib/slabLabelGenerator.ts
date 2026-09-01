@@ -569,6 +569,22 @@ async function renderBackLabelCanvas(
     }
   }
 
+  // ── Serial, centred under the QR ──
+  // The QR encodes it, but a QR cannot be eyeball-sorted and the slab front
+  // and back are two separate stickers — the printed number is what matches a
+  // stack of backs to its stack of fronts. The centred QR leaves a 33.6px band
+  // below itself; the 11px offset clears the modern glow frame (which extends
+  // 8px past the code) and 20px of type then ends 2px inside the band.
+  if (data.serial) {
+    const serialFontSize = 20;
+    ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.75)' : COLORS.textMedium;
+    ctx.font = `${serialFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(data.serial, qrX + qrSize / 2, qrY + qrSize + 11);
+    ctx.textAlign = 'left';
+  }
+
   // ── Badges (larger for print readability) ──
   let badgeXOffset = qrX + qrSize + (isModern ? 28 : 20);
 
