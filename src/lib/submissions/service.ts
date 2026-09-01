@@ -166,6 +166,47 @@ export async function availableGradingCredits(
   return { balance: personal + org, personal, org };
 }
 
+/**
+ * Credits already spoken for by the user's other in-flight submissions.
+ *
+ * The drain charges per card at dispatch, so a submission that has committed
+ * but not finished is holding a claim on credits that `availableGradingCredits`
+ * still counts as spendable. Without this, a user with 10 credits could commit
+ * two 10-card batches within the same couple of seconds — both gates would see
+ * 10 — and the second would only discover the problem mid-run, stalling at
+ * `blocked_insufficient_credits` with images uploaded and cards created.
+ *
+ * Counts items that have NOT yet been charged (queued + dispatched/grading;
+ * a dispatched item is charged, but counting it is the safe direction and the
+ * window is seconds). `excludeSubmissionId` is the submission being committed.
+ */
+export async function committedCreditHold(
+  userId: string,
+  excludeSubmissionId?: string
+): Promise<number> {
+  const supabase = supabaseServer();
+  const { data: running, error } = await supabase
+    .from('submissions')
+    .select('id')
+    .eq('user_id', userId)
+    .in('status', ['running', 'blocked_insufficient_credits']);
+  if (error || !running?.length) return 0;
+
+  const ids = running.map(r => r.id).filter(id => id !== excludeSubmissionId);
+  if (!ids.length) return 0;
+
+  const { count, error: itemErr } = await supabase
+    .from('submission_items')
+    .select('id', { count: 'exact', head: true })
+    .in('submission_id', ids)
+    .in('status', ['queued', 'dispatched', 'grading']);
+  if (itemErr) {
+    console.warn(`${LOG} credit-hold lookup failed for ${userId}:`, itemErr.message);
+    return 0; // never block on a failed lookup — the per-card charge still guards
+  }
+  return count ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
@@ -356,9 +397,17 @@ export async function commitSubmission(
   }
 
   // --- credit gate (owner requirement, enforced server-side) ------------
+  //
+  // Spendable = balance MINUS what the user's other in-flight submissions have
+  // already claimed but not yet charged. Otherwise two batches committed
+  // seconds apart both see the full balance, and the second one stalls
+  // mid-run instead of failing here, where the "Keep the first N / Buy
+  // credits" UI can actually help.
   const required = items.length;
   const { balance } = await availableGradingCredits(userId);
-  if (balance < required) {
+  const held = await committedCreditHold(userId, submissionId);
+  const spendable = Math.max(0, balance - held);
+  if (spendable < required) {
     const supabase = supabaseServer();
     await supabase
       .from('submissions')
@@ -366,10 +415,12 @@ export async function commitSubmission(
       .eq('id', submissionId);
     return fail({
       code: 'insufficient_credits',
-      message: `This submission needs ${required} credit${required === 1 ? '' : 's'} and you have ${balance}.`,
+      message: held > 0
+        ? `This submission needs ${required} credit${required === 1 ? '' : 's'}. You have ${balance}, but ${held} ${held === 1 ? 'is' : 'are'} reserved for a batch that is still grading.`
+        : `This submission needs ${required} credit${required === 1 ? '' : 's'} and you have ${balance}.`,
       required,
-      balance,
-      affordable: Math.max(0, balance),
+      balance: spendable,
+      affordable: spendable,
     });
   }
 
