@@ -205,6 +205,7 @@ function SubmissionsNewInner() {
   const [selectedBinderId, setSelectedBinderId] = useState<string>('')
   const [newBinderName, setNewBinderName] = useState('')
   const [creatingBinder, setCreatingBinder] = useState(false)
+  const [binderError, setBinderError] = useState<string | null>(null)
 
   const [restoredNotice, setRestoredNotice] = useState(false)
   const [trimmedTo, setTrimmedTo] = useState<number | null>(null)
@@ -254,7 +255,13 @@ function SubmissionsNewInner() {
     const session = getStoredSession()
     if (!session?.access_token) return
     fetch('/api/binders', { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) {
+          console.warn('[submissions/new] binder list failed:', r.status)
+          return null
+        }
+        return r.json()
+      })
       .then((data) => {
         if (!data) return
         setBindersAvailable(data.available !== false)
@@ -620,31 +627,53 @@ function SubmissionsNewInner() {
   // Binders
   // ---------------------------------------------------------------------
 
-  const createBinder = async () => {
+  /**
+   * Create the typed binder and select it. Returns its id, or null on failure.
+   *
+   * Two callers: the explicit "+ Create" button, and startGrading() — a name
+   * typed but never confirmed used to be dropped on the floor, which is how a
+   * submission reached the server with binder_id: null and no binder row
+   * anywhere. Failures are surfaced (toast + inline message) and reported to
+   * the caller so grading can stop rather than quietly lose the binder.
+   */
+  const createBinder = async (): Promise<string | null> => {
     const name = newBinderName.trim()
-    if (!name) return
+    if (!name) return null
     setCreatingBinder(true)
+    setBinderError(null)
     try {
       const session = getStoredSession()
+      if (!session?.access_token) {
+        const msg = 'Your session expired — sign in again to create a binder.'
+        setBinderError(msg)
+        toast.error(msg)
+        return null
+      }
       const res = await fetch('/api/binders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ name }),
       })
       const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.binder) {
-        toast.error(data?.error || 'Could not create the binder.')
-        return
+      if (!res.ok || !data?.binder?.id) {
+        const msg = data?.error || `Could not create the binder (${res.status}).`
+        setBinderError(msg)
+        toast.error(msg)
+        return null
       }
       setBinders((prev) => [...prev, data.binder])
       setSelectedBinderId(data.binder.id)
       setNewBinderName('')
       toast.success(`Created "${name}". Cards will file in as they grade.`)
+      return data.binder.id as string
     } catch (e: any) {
-      toast.error(e?.message || 'Could not create the binder.')
+      const msg = e?.message || 'Could not create the binder.'
+      setBinderError(msg)
+      toast.error(msg)
+      return null
     } finally {
       setCreatingBinder(false)
     }
@@ -752,6 +781,19 @@ function SubmissionsNewInner() {
       return
     }
 
+    // A binder name typed into the inline field but never confirmed with
+    // "+ Create" is honoured here rather than discarded. If the create fails we
+    // stop, so the user never loses the binder without being told.
+    let binderId: string | null = selectedBinderId || null
+    if (newBinderName.trim()) {
+      const created = await createBinder()
+      if (!created) {
+        setSubmitError('Could not create that binder, so grading did not start. Clear the binder name to grade without one, or try again.')
+        return
+      }
+      binderId = created
+    }
+
     setSubmitting(true)
     setSubmitError(null)
     setStage('uploading')
@@ -797,7 +839,7 @@ function SubmissionsNewInner() {
         body: JSON.stringify({
           category: config.category,
           sub_category: selectedType === 'Naruto' ? 'Naruto / Kayou' : (config.category === 'Other' ? subCategory : undefined),
-          binder_id: selectedBinderId || null,
+          binder_id: binderId,
           source: 'bulk_upload',
           items: itemsPayload,
         }),
@@ -1164,18 +1206,37 @@ function SubmissionsNewInner() {
                     </select>
                     <input
                       value={newBinderName}
-                      onChange={(e) => setNewBinderName(e.target.value)}
+                      onChange={(e) => { setNewBinderName(e.target.value); setBinderError(null) }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (newBinderName.trim() && !creatingBinder) void createBinder()
+                        }
+                      }}
                       placeholder="New binder name"
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 min-w-[10rem]"
                     />
                     <button
-                      onClick={createBinder}
+                      type="button"
+                      onClick={() => { void createBinder() }}
                       disabled={!newBinderName.trim() || creatingBinder}
                       className="px-3 py-2 text-sm font-semibold bg-white border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
                     >
                       {creatingBinder ? 'Creating…' : '+ Create'}
                     </button>
                   </div>
+                  {binderError && (
+                    <p className="text-xs text-red-700 font-medium mt-1.5">{binderError}</p>
+                  )}
+                  {newBinderName.trim() ? (
+                    <p className="text-xs text-indigo-700 mt-1.5">
+                      We&apos;ll create the binder &ldquo;{newBinderName.trim()}&rdquo; when you start grading — or hit + Create now.
+                    </p>
+                  ) : selectedBinderId ? (
+                    <p className="text-xs text-green-700 font-medium mt-1.5">
+                      Filing into &ldquo;{binders.find((b) => b.id === selectedBinderId)?.name ?? 'the selected binder'}&rdquo;.
+                    </p>
+                  ) : null}
                   <p className="text-xs text-gray-500 mt-1.5">Cards file into this binder one by one as they finish grading.</p>
                 </div>
               )}
@@ -1243,7 +1304,7 @@ function SubmissionsNewInner() {
         </div>
 
         <div className="mt-4 text-center">
-          <Link href="/submissions" className="text-sm text-gray-500 hover:text-gray-700">View past submissions →</Link>
+          <Link href="/collection" className="text-sm text-gray-500 hover:text-gray-700">My Collection →</Link>
         </div>
       </div>
     </div>

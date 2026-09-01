@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -482,6 +482,79 @@ function CollectionPageContent() {
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
+
+  // /collection?binder=<id> — the destination a finished bulk submission
+  // sends people to. Applied once the binder list has loaded so an id that
+  // isn't theirs (or was deleted) degrades to the normal collection instead
+  // of an empty binder view. Runs once per id: re-selecting "All" afterwards
+  // must not snap back.
+  const binderParam = searchParams?.get('binder') || null
+  const appliedBinderParamRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!binderParam) return
+    if (appliedBinderParamRef.current === binderParam) return
+    if (binderApi.loading) return
+    if (!binderApi.available) { appliedBinderParamRef.current = binderParam; return }
+    appliedBinderParamRef.current = binderParam
+    if (binderApi.binders.some(b => b.id === binderParam)) {
+      setSelectedBinderId(binderParam)
+    } else {
+      console.warn('[collection] ?binder= not found for this user:', binderParam)
+    }
+  }, [binderParam, binderApi.loading, binderApi.available, binderApi.binders])
+
+  // Re-entry point for a bulk batch. Bulk grading has no nav entry and no
+  // history page, so someone who closes the tab mid-batch would otherwise have
+  // no way back to the progress screen. One check on load — no interval; the
+  // progress page itself is what polls.
+  const [activeBatch, setActiveBatch] = useState<{ id: string; graded: number; total: number } | null>(null)
+  const [batchBannerDismissed, setBatchBannerDismissed] = useState(false)
+  useEffect(() => {
+    const session = getStoredSession()
+    if (!session?.access_token) return
+    const headers = { Authorization: `Bearer ${session.access_token}` }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/submissions?limit=10', { headers })
+        if (!res.ok) return
+        const json = await res.json()
+        const running = (json?.submissions ?? []).find((s: any) => s.status === 'running')
+        if (!running || cancelled) return
+        // The list rows carry no per-item tally; the status endpoint does.
+        let graded = 0
+        let total = running.card_count ?? 0
+        try {
+          const statusRes = await fetch(`/api/submissions/${running.id}/status`, { headers })
+          if (statusRes.ok) {
+            const statusJson = await statusRes.json()
+            if (statusJson?.counts) {
+              graded = statusJson.counts.graded ?? 0
+              total = statusJson.counts.total ?? total
+            }
+          }
+        } catch { /* counts are cosmetic — the link still works */ }
+        if (!cancelled) setActiveBatch({ id: running.id, graded, total })
+      } catch { /* banner is best-effort */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const batchBanner = activeBatch && !batchBannerDismissed ? (
+    <div className="w-full max-w-6xl mx-auto mb-4 flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+      <Link href={`/submissions/${activeBatch.id}`} className="font-medium hover:underline">
+        Batch grading in progress — {activeBatch.graded} of {activeBatch.total} graded →
+      </Link>
+      <button
+        type="button"
+        onClick={() => setBatchBannerDismissed(true)}
+        aria-label="Dismiss"
+        className="text-indigo-500 hover:text-indigo-800 text-lg leading-none px-1"
+      >
+        ×
+      </button>
+    </div>
+  ) : null
 
   // Fetch username for share button
   useEffect(() => {
@@ -2048,12 +2121,19 @@ function CollectionPageContent() {
   const totalAcrossViews =
     ownershipCounts.owned + ownershipCounts.sold
   if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId && !orgInfo) {
-    return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
+    // The banner matters most here: a first-ever batch means no cards yet.
+    return (
+      <div className="p-6">
+        {batchBanner}
+        <p className="text-center">You have not uploaded any cards yet.</p>
+      </div>
+    )
   }
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8">
       <div className="w-full max-w-6xl">
+        {batchBanner}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div>
             <div className="flex items-center gap-3">

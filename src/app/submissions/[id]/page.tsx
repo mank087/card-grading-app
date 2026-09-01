@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/useToast'
 const POLL_FAST_MS = 4000
 const POLL_SLOW_MS = 15000
 const SLOWDOWN_AFTER_MS = 10 * 60 * 1000
+const HANDOFF_DELAY_MS = 3000
 
 const TERMINAL_STATUSES = new Set(['complete', 'cancelled', 'failed'])
 
@@ -80,7 +81,6 @@ export default function SubmissionStatusPage() {
   const [data, setData] = useState<StatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
   const [retrying, setRetrying] = useState(false)
 
   const startedAtRef = useRef<number>(Date.now())
@@ -153,22 +153,27 @@ export default function SubmissionStatusPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId])
 
-  const cancel = async () => {
-    if (!submissionId) return
-    setCancelling(true)
-    try {
-      const res = await fetch(`/api/submissions/${submissionId}/cancel`, { method: 'POST', headers: authHeaders() })
-      const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.success) {
-        toast.error(json?.message || 'Could not cancel.')
-        return
-      }
-      toast.success('Cancelled. Anything already grading will still finish.')
-      fetchStatus()
-    } finally {
-      setCancelling(false)
-    }
-  }
+  // NOTE: the Cancel button was removed from this page (it read as "stop
+  // grading" mid-run). POST /api/submissions/[id]/cancel still exists and is
+  // unchanged — nothing on the web links to it now.
+
+  // Hand off when the batch finishes. This page is a transient grading screen,
+  // not a destination: once everything is graded, the binder (or the
+  // collection) is where the cards live. Held for HANDOFF_DELAY_MS so the
+  // summary is readable, and skipped entirely when something failed — that
+  // user needs the failure tiles and the Retry button, not a redirect.
+  const [handingOff, setHandingOff] = useState(false)
+  useEffect(() => {
+    const s = data?.submission
+    const c = data?.counts
+    if (!s || !c) return
+    if (s.status !== 'complete' || c.failed > 0) return
+    setHandingOff(true)
+    const t = setTimeout(() => {
+      router.push(s.binder_id ? `/collection?binder=${s.binder_id}` : '/collection')
+    }, HANDOFF_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [data, router])
 
   // POST /api/submissions/[id]/retry requeues every failed item (attempts=0,
   // error=null) and flips a stopped submission back to running; the drain
@@ -196,7 +201,7 @@ export default function SubmissionStatusPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <p className="text-gray-700 font-medium">This submission doesn&apos;t exist, or isn&apos;t yours.</p>
-          <Link href="/submissions" className="text-indigo-600 hover:text-indigo-800 text-sm mt-2 inline-block">Back to submissions</Link>
+          <Link href="/collection" className="text-indigo-600 hover:text-indigo-800 text-sm mt-2 inline-block">Back to my collection</Link>
         </div>
       </div>
     )
@@ -228,11 +233,41 @@ export default function SubmissionStatusPage() {
         @media (prefers-reduced-motion: reduce) {
           .dcm-submission-fade { animation: none; }
         }
+
+        /* In-progress tile: the front thumbnail exists from intake, so show it
+           dimmed and desaturated under a single shared scanning sweep, and let
+           it come up to full colour when the grade lands. */
+        .dcm-tile-pending-img {
+          opacity: 0.5;
+          filter: saturate(0.35);
+          transition: opacity 0.4s ease, filter 0.4s ease;
+        }
+        @keyframes dcm-scan {
+          0% { transform: translateY(-110%); }
+          100% { transform: translateY(210%); }
+        }
+        .dcm-scan-sweep {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 55%;
+          background: linear-gradient(180deg, rgba(99,102,241,0) 0%, rgba(129,140,248,0.55) 50%, rgba(99,102,241,0) 100%);
+          animation: dcm-scan 1.8s linear infinite;
+          pointer-events: none;
+        }
+        .dcm-scan-label { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+          .dcm-scan-sweep { display: none; }
+          .dcm-scan-label {
+            display: flex;
+            background: rgba(255,255,255,0.7);
+          }
+        }
       `}</style>
 
       <div className="max-w-5xl mx-auto">
         <div className="mb-6">
-          <Link href="/submissions" className="text-sm text-indigo-600 hover:text-indigo-800">← All submissions</Link>
+          <Link href="/collection" className="text-sm text-indigo-600 hover:text-indigo-800">← My Collection</Link>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
             {submission?.name?.trim() || `${submission?.category ?? ''} submission`}
           </h1>
@@ -270,15 +305,24 @@ export default function SubmissionStatusPage() {
                       {retrying ? 'Retrying…' : 'Retry failed'}
                     </button>
                   )}
-                  {isRunning && (
-                    <button
-                      onClick={cancel}
-                      disabled={cancelling}
-                      className="px-3 py-1.5 text-sm font-semibold bg-white border border-red-300 text-red-700 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {cancelling ? 'Cancelling…' : 'Cancel'}
-                    </button>
-                  )}
+                  {/* Same two actions as the single-card grading screen. No
+                      Cancel button: grading continues in the background and a
+                      Cancel next to a running queue reads as "stop grading".
+                      The cancel endpoint still exists. */}
+                  <Link
+                    href="/upload"
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-semibold transition-all shadow flex items-center justify-center gap-1.5 text-sm"
+                  >
+                    <span className="text-lg">📸</span>
+                    <span>Grade Another Card</span>
+                  </Link>
+                  <Link
+                    href="/collection"
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 text-sm"
+                  >
+                    <span className="text-lg">📚</span>
+                    <span>My Collection</span>
+                  </Link>
                 </div>
               </div>
 
@@ -296,7 +340,7 @@ export default function SubmissionStatusPage() {
 
               {submission?.binder_id && (
                 <p className="text-sm">
-                  <Link href="/collection" className="text-indigo-600 hover:text-indigo-800">View the destination binder →</Link>
+                  <Link href={`/collection?binder=${submission.binder_id}`} className="text-indigo-600 hover:text-indigo-800">View the destination binder →</Link>
                 </p>
               )}
 
@@ -304,20 +348,22 @@ export default function SubmissionStatusPage() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-green-800 font-medium">
                     Done — {counts?.graded ?? 0} graded{counts && counts.failed > 0 ? `, ${counts.failed} failed` : ''}.
-                  </p>
-                  <div className="flex gap-2">
-                    {submission?.binder_id && (
-                      <Link href="/collection" className="px-3 py-1.5 text-sm font-semibold bg-white border border-green-300 text-green-800 rounded-lg hover:bg-green-100">
-                        Open binder
-                      </Link>
+                    {handingOff && (
+                      <span className="block text-xs font-normal text-green-700 mt-0.5">
+                        Taking you to {submission?.binder_id ? 'your binder' : 'your collection'}…
+                      </span>
                     )}
-                    <Link
-                      href={`/label-export/batch?cardIds=${items.filter((i) => i.card_id).map((i) => i.card_id).join(',')}`}
-                      className="px-3 py-1.5 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700"
-                    >
-                      Print labels
-                    </Link>
-                  </div>
+                  </p>
+                  {/* "Print labels" pointed at /label-export/batch, which is the
+                      mobile WebView bridge and needs a token — it errored on
+                      web. With no binder, the My Collection button above is
+                      the only destination needed. */}
+                  <Link
+                    href={submission?.binder_id ? `/collection?binder=${submission.binder_id}` : '/collection'}
+                    className="px-3 py-1.5 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    {submission?.binder_id ? 'View Binder' : 'My Collection'}
+                  </Link>
                 </div>
               )}
             </div>
@@ -331,11 +377,23 @@ export default function SubmissionStatusPage() {
                 const tile = (
                   <div className={`relative aspect-[5/7] rounded-lg overflow-hidden border ${isFailed ? 'border-red-400' : 'border-gray-200'}`}>
                     {item.thumbnail_url ? (
-                      <img src={item.thumbnail_url} alt={`Card ${item.position + 1}`} className="w-full h-full object-cover dcm-submission-fade" />
+                      <img
+                        src={item.thumbnail_url}
+                        alt={`Card ${item.position + 1}`}
+                        className={`w-full h-full object-cover ${isPending ? 'dcm-tile-pending-img' : 'dcm-submission-fade'}`}
+                      />
                     ) : (
                       <div className={`w-full h-full ${isPending ? 'dcm-submission-shimmer' : 'bg-gray-100'} flex items-center justify-center text-[10px] text-gray-400`}>
                         {isFailed ? 'failed' : '#' + (item.position + 1)}
                       </div>
+                    )}
+                    {isPending && item.thumbnail_url && (
+                      <>
+                        <div className="dcm-scan-sweep" aria-hidden="true" />
+                        <div className="dcm-scan-label absolute inset-0 items-center justify-center text-[9px] font-semibold text-gray-700">
+                          Grading…
+                        </div>
+                      </>
                     )}
                     {isDone && item.grade != null && (
                       <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-center text-xs font-bold py-0.5">

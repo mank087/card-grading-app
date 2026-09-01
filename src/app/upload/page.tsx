@@ -2180,18 +2180,12 @@ function UniversalUploadPageContent() {
             link off the existing grading page after the type/subtype pick and
             before the camera/photos options. */}
         {!frontFile && !backFile && uploadMode === 'select' && (
-          <div className="text-center space-x-3">
+          <div className="text-center">
             <Link
               href={`/submissions/new?category=${encodeURIComponent(selectedType)}${subCategory ? `&sub_category=${encodeURIComponent(subCategory)}` : ''}`}
               className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
             >
               Submit more than one card →
-            </Link>
-            <Link
-              href="/submissions"
-              className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 underline underline-offset-2"
-            >
-              View past bulk submissions
             </Link>
           </div>
         )}

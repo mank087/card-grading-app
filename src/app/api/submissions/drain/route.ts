@@ -275,7 +275,11 @@ async function sendCompletionEmail(
     return;
   }
 
-  const link = `${siteUrl()}/submissions/${submission.id}`;
+  // The binder (or the collection) is the destination, not the transient
+  // progress page — there is no submissions history surface any more.
+  const link = submission.binder_id
+    ? `${siteUrl()}/collection?binder=${submission.binder_id}`
+    : `${siteUrl()}/collection`;
   const label = submission.name?.trim() || 'Your submission';
   const subject =
     failed > 0
@@ -292,7 +296,7 @@ async function sendCompletionEmail(
         <p><strong>${graded}</strong> card${graded === 1 ? '' : 's'} graded${
           failed > 0 ? ` &middot; <strong>${failed}</strong> need a retry` : ''
         }.</p>
-        <p><a href="${link}">See the results</a></p>
+        <p><a href="${link}">${submission.binder_id ? 'Open your binder' : 'See your cards'}</a></p>
       `,
     });
     if (error) console.error(`${LOG} completion email failed:`, error.message);
@@ -525,6 +529,21 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
   let claimed = 0;
   let dispatched = 0;
 
+  // Two phases, deliberately split.
+  //
+  // Phase A — claim + charge, SEQUENTIALLY. `deductCredit`'s personal-credit
+  // path is a read-modify-write on user_credits.balance (read balance, write
+  // balance - 1), so N parallel deductions all read the same starting balance
+  // and the last write wins: charges get lost, and the `balance < 1` guard
+  // can wave through more grades than the user can afford. These are two fast
+  // DB round-trips per item, so serialising them costs milliseconds.
+  //
+  // Phase B — dispatch, CONCURRENTLY. This is the slow part (each dispatch
+  // holds its abort window), and it is what the owner watched crawl through
+  // cards one at a time. Up to MAX_IN_FLIGHT grade in parallel.
+  const charged: typeof queued = [];
+  let blocked = false;
+
   for (const item of queued) {
     if (!(await claimItem(item.id))) continue; // another drain got there first
     claimed += 1;
@@ -540,7 +559,9 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
       if ((charge.error || '').toLowerCase().includes('insufficient')) {
         // Balance moved out from under a committed submission (spent from
         // another device). Park it — this is the backstop the SOW describes,
-        // not the primary gate, which ran at commit.
+        // not the primary gate, which ran at commit. Anything already charged
+        // in this tick still gets dispatched below: the credit is spent, so
+        // the card must grade.
         console.warn(`${LOG} ${submission.id} out of credits mid-run — blocking`);
         await releaseClaim(item.id);
         await supabaseServer()
@@ -548,38 +569,52 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
           .update({ status: 'blocked_insufficient_credits' })
           .eq('id', submission.id)
           .eq('status', 'running');
-        return {
-          submission_id: submission.id,
-          in_flight: inFlight,
-          claimed,
-          dispatched,
-          filed,
-          status: 'blocked_insufficient_credits',
-        };
+        blocked = true;
+        break;
       }
       await releaseClaim(item.id, charge.error || 'Could not charge this card');
       continue;
     }
 
-    const result = await dispatchGrade(
-      origin,
-      routeSlug,
-      item.card_id as string,
-      submission.user_id
-    );
+    charged.push(item);
+  }
 
-    if (!result.dispatched) {
-      // Never reached the route, so nothing is grading and nothing will
-      // release the lock. Requeue; the charge stays and is not re-taken.
-      await releaseClaim(item.id, result.error || 'Dispatch failed');
+  const outcomes = await Promise.allSettled(
+    charged.map(async (item) => {
+      const result = await dispatchGrade(
+        origin,
+        routeSlug,
+        item.card_id as string,
+        submission.user_id
+      );
+
+      if (!result.dispatched) {
+        // Never reached the route, so nothing is grading and nothing will
+        // release the lock. Requeue; the charge stays and is not re-taken.
+        await releaseClaim(item.id, result.error || 'Dispatch failed');
+        return false;
+      }
+
+      await setItemStatus(item.id, {
+        status: result.completed ? 'graded' : 'grading',
+        error: result.error ?? null,
+      });
+      return true;
+    })
+  );
+
+  for (let i = 0; i < outcomes.length; i++) {
+    const outcome = outcomes[i];
+    if (outcome.status === 'fulfilled') {
+      if (outcome.value) dispatched += 1;
       continue;
     }
-
-    dispatched += 1;
-    await setItemStatus(item.id, {
-      status: result.completed ? 'graded' : 'grading',
-      error: result.error ?? null,
-    });
+    // dispatchGrade swallows its own errors, so this is a bookkeeping failure
+    // (releaseClaim / setItemStatus threw). Leave the claim for reconcile.
+    console.error(
+      `${LOG} dispatch bookkeeping failed for item ${charged[i].id}:`,
+      outcome.reason?.message || outcome.reason
+    );
   }
 
   return {
@@ -588,7 +623,7 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
     claimed,
     dispatched,
     filed,
-    status: 'running',
+    status: blocked ? 'blocked_insufficient_credits' : 'running',
   };
 }
 
