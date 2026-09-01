@@ -134,6 +134,25 @@ export default function SubmissionStatusPage() {
     latestStatusRef.current = data?.submission?.status ?? null
   }, [data])
 
+  // Drain kick loop: while the submission is running and this page is open,
+  // kick the drain every 30s. In production the per-minute cron does this
+  // anyway ("fast while watching, completes while not") — locally there is no
+  // cron, so without this a submission stalls after the commit-time kick's
+  // first batch of 4. The drain is idempotent and lease-guarded, so an extra
+  // kick can never double-grade.
+  useEffect(() => {
+    if (!submissionId) return
+    const kick = () => {
+      if (latestStatusRef.current === 'running') {
+        fetch(`/api/submissions/drain?submission_id=${submissionId}`, { method: 'POST', headers: authHeaders() }).catch(() => null)
+      }
+    }
+    const interval = setInterval(kick, 30_000)
+    kick()
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissionId])
+
   const cancel = async () => {
     if (!submissionId) return
     setCancelling(true)
