@@ -21,7 +21,7 @@ import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { MAX_SAVED_LABEL_STYLES } from '@/lib/labelPresets'
-import { HERITAGE_BRAND_COLORS } from '@/lib/labelLab/heritageLayout'
+import { resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
 import { baseConfigForStyle, sheetsNeeded, SLAB_SIZES, type HolderType, type SlabSizeId } from './wizardTypes'
 import type { WizardTextEdits } from './useWizardData'
 import CardSwiper from './CardSwiper'
@@ -152,18 +152,10 @@ export function StepConfirm({
   /**
    * Heritage Compact config for the small-holder sheets. Band colours stay
    * null when the design samples each card, so every label gets its own
-   * palette — the same rule the slab Heritage batch uses.
+   * palette — the same rule the slab Heritage batch uses. The working config
+   * IS the selection here, so there is no style id to resolve against.
    */
-  const compactHeritage = useMemo(() => {
-    if (config.style !== 'heritage') return null
-    const custom = config.heritageBandColors?.filter(c => /^#[0-9a-fA-F]{6}$/.test(c))
-    const bandColors = custom && custom.length >= 2
-      ? custom
-      : config.heritageColorSource === 'brand'
-        ? HERITAGE_BRAND_COLORS
-        : null
-    return { pattern: config.heritagePattern || 'diamond', bandColors }
-  }, [config.style, config.heritageBandColors, config.heritageColorSource, config.heritagePattern])
+  const compactHeritage = useMemo(() => resolveCompactHeritage(null, config), [config])
 
   const setField = (field: keyof WizardTextEdits, value: string) => {
     if (!activeCard || !activeEdits) return
@@ -266,7 +258,7 @@ export function StepConfirm({
     const id = !isDirty ? styleId : savedDesignId
     if (!id) return
     await onSetDefault(id)
-    setDefaultMsg('Done — this design is now your default everywhere your slabs appear.')
+    setDefaultMsg('Done — this is now your default for slab labels and for One-Touch and Toploader labels.')
   }
 
   const canSetDefault = isAuthenticated && (!isDirty || savedDesignId !== null)
@@ -501,35 +493,28 @@ export function StepConfirm({
                     </ul>
                   </div>
                 )}
-                {/* The account default drives slab labels everywhere on the
-                    site — card details, My Collection, the mobile apps. Nothing
-                    outside this printing flow renders a One-Touch or Toploader
-                    label, so offering "set as default" there would promise a
-                    change the user would never see. Those designs still save
-                    and reload here; they just stay print-only. */}
-                {holder === 'slab' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSetDefault}
-                      disabled={!canSetDefault}
-                      className="w-full py-2 border border-gray-300 text-gray-800 rounded-lg text-sm font-semibold hover:border-purple-400 disabled:opacity-50"
-                    >
-                      Set as my default label style
-                    </button>
-                    {isDirty && !savedDesignId && (
-                      <p className="text-[11px] text-gray-400">
-                        You customized this style — save it as a design first, then it can become your default.
-                      </p>
-                    )}
-                    {defaultMsg && <p className="text-xs text-green-700">{defaultMsg}</p>}
-                  </>
-                ) : (
+                {/* One account-wide default, all three holders. Slab labels
+                    follow it everywhere on the site — card details, My
+                    Collection, the mobile apps — and the One-Touch and
+                    Toploader sheets now follow it too, so a Heritage default
+                    prints Heritage on the small holders without asking again. */}
+                <button
+                  type="button"
+                  onClick={handleSetDefault}
+                  disabled={!canSetDefault}
+                  className="w-full py-2 border border-gray-300 text-gray-800 rounded-lg text-sm font-semibold hover:border-purple-400 disabled:opacity-50"
+                >
+                  Set as my default label style
+                </button>
+                <p className="text-[11px] text-gray-400">
+                  Your default applies account-wide — slab labels and One-Touch / Toploader holder labels alike.
+                </p>
+                {isDirty && !savedDesignId && (
                   <p className="text-[11px] text-gray-400">
-                    Saved for printing {holder === 'onetouch' ? 'One-Touch' : 'Toploader'} labels. Your default
-                    label style covers slabs only, so this design stays with this print flow.
+                    You customized this style — save it as a design first, then it can become your default.
                   </p>
                 )}
+                {defaultMsg && <p className="text-xs text-green-700">{defaultMsg}</p>}
               </>
             )}
           </section>

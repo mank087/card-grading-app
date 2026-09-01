@@ -23,7 +23,7 @@ import CardActionSheet from '@/components/binders/CardActionSheet'
 import { useLongPress } from '@/components/binders/useLongPress'
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
@@ -437,6 +437,10 @@ function CollectionPageContent() {
   const { isOrgScope: labelScopeIsOrg } = useOrgContext()
   const { labelStyle, customStyles, activeConfig, colorOverrides, switchStyle } = useCustomLabelStyleWithOrg(labelScopeIsOrg ? 'org' : null)
   const heritageSel = resolveHeritageSelection(labelStyle, activeConfig)
+  // Same selection, reduced to what the One-Touch / Toploader sheets can use.
+  // Null unless the account style resolves to Heritage, which is exactly the
+  // condition under which those sheets should print Heritage.
+  const compactHeritage = resolveCompactHeritage(labelStyle, activeConfig)
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
   const [isRescanningPrices, setIsRescanningPrices] = useState(false)
@@ -3401,6 +3405,7 @@ function CollectionPageContent() {
           front_image_url: c.front_url || undefined
         }))}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+        heritage={compactHeritage}
       />
 
       {/* Batch Toploader Label Modal (Avery 8167) */}
@@ -3412,6 +3417,7 @@ function CollectionPageContent() {
           front_image_url: c.front_url || undefined
         }))}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+        heritage={compactHeritage}
       />
 
       {/* Batch Slab Insert Label Modal */}

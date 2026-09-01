@@ -67,7 +67,7 @@ import { pdf } from '@react-pdf/renderer';
 import { BatchCardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
 
 declare global {
   interface Window {
@@ -131,18 +131,18 @@ function BatchLabelExportInner() {
   const cardIdsParam = sp.get('cardIds') || '';
   const cardIds = cardIdsParam.split(',').map(s => s.trim()).filter(Boolean);
   const rawType = sp.get('type') || 'slab-modern';
-  // Heritage Compact on the small holders. Accepted two ways so callers can
-  // use whichever fits: an explicit `-heritage` type suffix (matching how the
-  // slab types name their style) or a separate &style=heritage. Neither is
-  // implied — a bare `onetouch` still prints Modern, so every existing caller
-  // keeps its current output.
+  // Heritage Compact on the small holders. The account's saved label style is
+  // the default: when it resolves to Heritage — the built-in id or a custom
+  // slot saved with style 'heritage' — a bare `onetouch`/`toploader`/`foldover`
+  // prints Heritage, matching what the same account sees on the card page and
+  // in My Collection. Two explicit opt-ins still force it for callers that send
+  // no labelStyle: a `-heritage` type suffix (matching how the slab types name
+  // their style) or &style=heritage. `&style=modern` forces Modern back.
   const styleParam = (sp.get('style') || '').toLowerCase();
   const COMPACT_HOLDERS = ['onetouch', 'toploader', 'toploader-foldover', 'foldover'];
   const suffixHeritage = rawType.endsWith('-heritage')
     && COMPACT_HOLDERS.includes(rawType.slice(0, -'-heritage'.length));
   const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
-  const wantsCompactHeritage = (suffixHeritage || styleParam === 'heritage')
-    && COMPACT_HOLDERS.includes(type);
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
@@ -274,7 +274,7 @@ function BatchLabelExportInner() {
          * Band colours stay null when the design does not pin a palette, which
          * lets each card sample its own artwork.
          */
-        const resolveCompactHeritage = () => {
+        const compactHeritageSettings = () => {
           let inlineCfg: any = null;
           if (inlineCustomConfigRaw) {
             try { inlineCfg = JSON.parse(atob(decodeURIComponent(inlineCustomConfigRaw))); } catch { /* fall through */ }
@@ -284,20 +284,33 @@ function BatchLabelExportInner() {
             || savedCustomStyles.find(st => st.id === userLabelStyle)?.config
             || null;
           const sel = inlineCfg
-            ? resolveHeritageSelection(labelStyleParam || userLabelStyle, { ...inlineCfg, style: 'heritage' })
-            : resolveHeritageSelection(userLabelStyle, savedCfg);
+            ? resolveCompactHeritage(labelStyleParam || userLabelStyle, { ...inlineCfg, style: 'heritage' })
+            : resolveCompactHeritage(userLabelStyle, savedCfg);
           const patternParam = sp.get('heritagePattern');
           return {
-            pattern: (patternParam || (sel.active ? sel.pattern : null) || 'diamond') as any,
-            bandColors: (sel.active ? sel.bandColors : null) ?? null,
+            pattern: (patternParam || sel?.pattern || 'diamond') as any,
+            bandColors: sel?.bandColors ?? null,
           };
         };
+
+        // The compact holders follow the account style unless the caller says
+        // otherwise. `&style=modern` is the explicit escape back to Modern.
+        const wantsCompactHeritage = COMPACT_HOLDERS.includes(type)
+          && styleParam !== 'modern'
+          && (
+            suffixHeritage
+            || styleParam === 'heritage'
+            || !!resolveCompactHeritage(
+              userLabelStyle,
+              savedCustomStyles.find(st => st.id === userLabelStyle)?.config || null,
+            )
+          );
 
         /** Per-card HeritageCompactInputs, with a high-EC QR and the wordmark. */
         const buildCompactItems = async () => {
           const { buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl } =
             await import('@/lib/labels/heritageCompactInputs');
-          const { pattern, bandColors } = resolveCompactHeritage();
+          const { pattern, bandColors } = compactHeritageSettings();
           const wordmark = await loadWordmarkDataUrl();
           return Promise.all(perCard.map(async ({ card }) => {
             const qrDataUrl = await compactQrDataUrl(

@@ -23,7 +23,7 @@ import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
 import { FoldOverLabelModal } from './FoldOverLabelModal';
 import { getCardLabelData } from '../../lib/useLabelData';
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
@@ -904,6 +904,56 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
+  /** Save a generated Blob under `filename` (the usual anchor dance). */
+  const saveBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Heritage on the small holders.
+   *
+   * The account-wide label style governs every print surface, so when it
+   * resolves to Heritage — the built-in id or a custom slot saved with
+   * style 'heritage' — the One-Touch and Toploader sheets render the compact
+   * Heritage panels. Returns null for any other style and the caller falls
+   * through to its existing Modern path untouched.
+   */
+  const buildCompactHeritageSheet = async (
+    kind: 'onetouch' | 'toploader' | 'foldover',
+    positions: number[],
+    offsets: { x: number; y: number },
+  ): Promise<Blob | null> => {
+    const selection = resolveCompactHeritage(labelStyle, customLabelConfig);
+    if (!selection) return null;
+    const [{ buildHeritageCompactInputs, loadWordmarkDataUrl, compactQrDataUrl }, sheets] = await Promise.all([
+      import('@/lib/labels/heritageCompactInputs'),
+      import('@/lib/labels/heritageCompactSheets'),
+    ]);
+    const logoSet = await loadLogosForCard(card.id).catch(() => null);
+    const url = cardQrUrl(card.id, card.serial, logoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
+    const items = [buildHeritageCompactInputs(card, {
+      qrDataUrl: await compactQrDataUrl(url),
+      // null = sample this card's own artwork, exactly as the batch sheets do.
+      bandColors: selection.bandColors,
+      pattern: selection.pattern,
+      wordmarkDataUrl: await loadWordmarkDataUrl(),
+      showFounderEmblem,
+      showVipEmblem,
+      showCardLoversEmblem,
+      chipTheme: logoSet?.design?.chip.theme,
+    })];
+    if (kind === 'onetouch') return sheets.generateHeritageOneTouchSheet(items, offsets, positions);
+    if (kind === 'foldover') return sheets.generateHeritageFoldOverSheet(items, offsets, positions[0] ?? 0);
+    return sheets.generateHeritageToploaderSheet(items, offsets, positions);
+  };
+
   /**
    * Handle Avery Label generation with selected position and calibration offsets
    */
@@ -916,6 +966,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Use unified label data generator (filters out "Unknown...", cleans values)
       const cleanLabelData = getCardLabelData(card);
+
+      const sanitizeName = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const heritageBlob = await buildCompactHeritageSheet('onetouch', [positionIndex], offsets);
+      if (heritageBlob) {
+        saveBlob(
+          heritageBlob,
+          `DCM-AveryLabel-Heritage-${sanitizeName(cleanLabelData.primaryName)}-${sanitizeName(cleanLabelData.serial)}.pdf`,
+        );
+        console.log('[AVERY LABEL] ✅ Heritage PDF generated successfully');
+        setIsAveryModalOpen(false);
+        return;
+      }
 
       // Get subgrades
       const weightedScores = card.conversational_weighted_sub_scores || {};
@@ -1066,6 +1128,25 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // Use unified label data generator
       const cleanLabelData = getCardLabelData(card);
 
+      const sanitizeName = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      // Heritage pairs front+back into ADJACENT slots of one row, so it takes a
+      // card position rather than two independent label positions; the picker's
+      // front choice decides which pair the card lands in.
+      const heritageBlob = await buildCompactHeritageSheet(
+        'toploader',
+        [Math.floor(frontPositionIndex / 2)],
+        offsets,
+      );
+      if (heritageBlob) {
+        saveBlob(
+          heritageBlob,
+          `DCM-Toploader-Labels-Heritage-${sanitizeName(cleanLabelData.primaryName)}-${sanitizeName(cleanLabelData.serial)}.pdf`,
+        );
+        console.log('[AVERY 8167] ✅ Heritage labels generated successfully');
+        setIsAvery8167ModalOpen(false);
+        return;
+      }
+
       // Generate QR code URL for the card (org cards: branded card page)
       const toploaderLogoSet = await loadLogosForCard(card.id).catch(() => null);
       const cardUrl = cardQrUrl(card.id, card.serial, toploaderLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
@@ -1130,6 +1211,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       setGeneratingType('foldover');
 
       const cleanLabelData = getCardLabelData(card);
+
+      const sanitizeName = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const heritageBlob = await buildCompactHeritageSheet('foldover', [positionIndex], offsets);
+      if (heritageBlob) {
+        saveBlob(
+          heritageBlob,
+          `DCM-FoldOver-Label-Heritage-${sanitizeName(cleanLabelData.primaryName)}-${sanitizeName(cleanLabelData.serial)}.pdf`,
+        );
+        setIsFoldOverModalOpen(false);
+        return;
+      }
+
       const foldOverLogoSet = await loadLogosForCard(card.id).catch(() => null);
       const cardUrl = cardQrUrl(card.id, card.serial, foldOverLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
 

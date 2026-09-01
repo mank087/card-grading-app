@@ -51,6 +51,35 @@ export function isTraditionalSelection(
   return labelStyle === 'traditional'
 }
 
+/**
+ * The subset of a Heritage selection the COMPACT holders can honour.
+ *
+ * The One-Touch (Avery 6871) and Toploader (Avery 8167) panels have no room
+ * for the designer's per-grade chip colours or layout moves — pattern and band
+ * palette are the whole of it. Returns null when the selection is not
+ * Heritage, so callers can write `const h = resolveCompactHeritage(...)` and
+ * branch on it directly.
+ *
+ * `bandColors: null` means "sample each card's own artwork" — pass it straight
+ * through to buildHeritageCompactInputs, which falls back per card.
+ */
+export interface CompactHeritageSelection {
+  pattern: BandPattern
+  bandColors: string[] | null
+}
+
+export function resolveCompactHeritage(
+  labelStyle: string | null | undefined,
+  activeConfig?: Pick<
+    CustomLabelConfig,
+    'style' | 'heritagePattern' | 'heritageColorSource' | 'heritageBandColors' | 'heritageGradeColors'
+  > | null,
+): CompactHeritageSelection | null {
+  const sel = resolveHeritageSelection(labelStyle, activeConfig)
+  if (!sel.active) return null
+  return { pattern: sel.pattern, bandColors: sel.bandColors }
+}
+
 export function resolveHeritageSelection(
   labelStyle: string | null | undefined,
   activeConfig?: Pick<

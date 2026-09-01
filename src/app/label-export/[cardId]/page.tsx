@@ -36,7 +36,7 @@ import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
 
 declare global {
   interface Window {
@@ -117,18 +117,20 @@ export default function LabelExportPage() {
   const token = sp.get('token') || '';
   const rawType = sp.get('type') || 'slab-modern';
   // Heritage Compact on the small holders — see the batch route for the full
-  // note. Accepted as a `-heritage` type suffix or &style=heritage; never
-  // implied, so a bare `onetouch`/`toploader` keeps printing Modern.
+  // note. The account's own label style now decides: when it resolves to
+  // Heritage, a bare `onetouch`/`toploader`/`foldover` prints Heritage. The
+  // explicit opt-ins (`-heritage` type suffix, &style=heritage) still force it
+  // for callers that send no labelStyle, and &style=modern forces Modern back.
   const styleParam = (sp.get('style') || '').toLowerCase();
   const COMPACT_HOLDERS = ['onetouch', 'toploader', 'foldover'];
   const suffixHeritage = rawType.endsWith('-heritage')
     && COMPACT_HOLDERS.includes(rawType.slice(0, -'-heritage'.length));
   const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
-  const wantsCompactHeritage = (suffixHeritage || styleParam === 'heritage')
-    && COMPACT_HOLDERS.includes(type);
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
-  // Any style id: 'modern' | 'traditional' | 'heritage' | 'custom-N'.
-  const labelStyleParam = sp.get('labelStyle') || 'modern';
+  // Any style id: 'modern' | 'traditional' | 'heritage' | 'custom-N'. Kept raw
+  // as well, so "not sent at all" can fall back to the account's saved style.
+  const labelStyleParamRaw = sp.get('labelStyle');
+  const labelStyleParam = labelStyleParamRaw || 'modern';
   // Inline custom config (base64-encoded JSON) — lets the mobile Label Studio
   // ship the user's IN-FLIGHT customizer config (colors, gradient angle,
   // geometric pattern, layout style, custom colors array, dimensions, border)
@@ -183,10 +185,11 @@ export default function LabelExportPage() {
         let showVipEmblem = false;
         let showCardLoversEmblem = false;
         let savedCustomStyles: Array<{ id: string; name: string; config: any }> = [];
+        let userLabelStyle = 'modern';
         try {
           const { data: creditsRow } = await supabase
             .from('user_credits')
-            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles')
+            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles, label_style')
             .single();
           if (creditsRow) {
             const emblems = resolveEmblemVisibility(creditsRow);
@@ -196,10 +199,27 @@ export default function LabelExportPage() {
             if (Array.isArray(creditsRow.custom_label_styles)) {
               savedCustomStyles = creditsRow.custom_label_styles as any[];
             }
+            if (typeof (creditsRow as any).label_style === 'string') {
+              userLabelStyle = (creditsRow as any).label_style;
+            }
           }
         } catch (e) {
           console.warn('[label-export] user_credits lookup failed (non-fatal):', e);
         }
+
+        // The compact holders follow the account style unless the caller says
+        // otherwise. `&style=modern` is the explicit escape back to Modern.
+        const compactStyleId = labelStyleParamRaw || userLabelStyle;
+        const wantsCompactHeritage = COMPACT_HOLDERS.includes(type)
+          && styleParam !== 'modern'
+          && (
+            suffixHeritage
+            || styleParam === 'heritage'
+            || !!resolveCompactHeritage(
+              compactStyleId,
+              savedCustomStyles.find(st => st.id === compactStyleId)?.config || null,
+            )
+          );
 
         // Org branding: store logos when the card was graded under an
         // enterprise org, DCM logos otherwise (per-asset fallback inside).
@@ -459,12 +479,12 @@ export default function LabelExportPage() {
           }
           const cfg = inlineCfg
             ? { ...inlineCfg, style: 'heritage' }
-            : savedCustomStyles.find(st => st.id === labelStyleParam)?.config || null;
-          const sel = resolveHeritageSelection(labelStyleParam, cfg);
+            : savedCustomStyles.find(st => st.id === compactStyleId)?.config || null;
+          const sel = resolveCompactHeritage(compactStyleId, cfg);
           const items = [buildHeritageCompactInputs(card, {
             qrDataUrl: await compactQrDataUrl(cardUrl),
-            bandColors: (sel.active ? sel.bandColors : null) ?? null,
-            pattern: (sp.get('heritagePattern') || (sel.active ? sel.pattern : null) || 'diamond') as any,
+            bandColors: sel?.bandColors ?? null,
+            pattern: (sp.get('heritagePattern') || sel?.pattern || 'diamond') as any,
             wordmarkDataUrl: await loadWordmarkDataUrl(),
             chipTheme: logos.design?.chip.theme,
           })];

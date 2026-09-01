@@ -112,6 +112,42 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, maxW: number, star
   return size
 }
 
+/**
+ * Fit like `fitFont`, then hand back the string that should actually be drawn.
+ *
+ * `fitFont` stops shrinking at its floor — below that an inkjet dithers the
+ * type into noise — so a very long card name still overflowed its box and ran
+ * into the grade chip. Past the floor, trim to the last WHOLE word that fits
+ * and mark the cut with an ellipsis; a name that is visibly shortened reads,
+ * a name that collides with the chip does not. Leaves ctx.font at the fitted
+ * size, so callers just fillText the returned string.
+ */
+function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxW: number,
+  start: number,
+  min: number,
+  weight = '700',
+): string {
+  fitFont(ctx, text, maxW, start, min, weight)
+  if (ctx.measureText(text).width <= maxW) return text
+  const ELL = '…'
+  const words = text.split(/\s+/).filter(Boolean)
+  for (let n = words.length - 1; n > 0; n--) {
+    const candidate = `${words.slice(0, n).join(' ')}${ELL}`
+    if (ctx.measureText(candidate).width <= maxW) return candidate
+  }
+  // One unbreakable word wider than the box — fall back to a character cut.
+  const chars = [...text]
+  while (chars.length > 1) {
+    chars.pop()
+    const candidate = `${chars.join('')}${ELL}`
+    if (ctx.measureText(candidate).width <= maxW) return candidate
+  }
+  return ELL
+}
+
 /** Draw letter-spaced text; returns the drawn width. */
 function trackedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, tracking: number, align: 'left' | 'center' = 'left') {
   const chars = [...text]
@@ -243,8 +279,7 @@ export async function renderOneTouchFront(i: HeritageCompactInputs, dpi: number)
   const textBox = W * 0.671
 
   ctx.fillStyle = INK
-  fitFont(ctx, i.primaryName, textBox, H * 0.20, H * 0.11)
-  ctx.fillText(i.primaryName, tx, H * 0.30)
+  ctx.fillText(fitText(ctx, i.primaryName, textBox, H * 0.20, H * 0.11), tx, H * 0.30)
 
   const ctxSize = H * 0.082
   ctx.font = `400 ${ctxSize}px ${FONT}`
@@ -337,8 +372,7 @@ export async function renderToploaderFront(i: HeritageCompactInputs, dpi: number
   const textBox = W * 0.66
 
   ctx.fillStyle = INK
-  fitFont(ctx, i.primaryName, textBox, H * 0.265, H * 0.15)
-  ctx.fillText(i.primaryName, tx, H * 0.46)
+  ctx.fillText(fitText(ctx, i.primaryName, textBox, H * 0.265, H * 0.15), tx, H * 0.46)
 
   const short = i.contextShort || i.contextLine
   const ctxSize = H * 0.105
@@ -504,5 +538,23 @@ export async function renderFoldOverSheet(i: HeritageCompactInputs, dpi: number)
   const half = Math.round(out.width / 2)
   ctx.drawImage(front, 0, 0, half, out.height)
   ctx.drawImage(back, half, 0, out.width - half, out.height)
+
+  // Bleed across the fold.
+  //
+  // Both halves carry their band on the edge that meets the seam, and until
+  // now they were butted with nothing between them: a rounded half, a JPEG
+  // seam or a fold a hair off centre showed a white hairline down the middle
+  // of the band. Extend each half's seam column a small margin PAST the fold
+  // line into its neighbour — ~2.5% of the label height, well inside the band
+  // on either side — so any slip lands on band colour, never on bare paper.
+  // Sampled one pixel IN from each seam edge — the outermost column can carry
+  // an antialiased sliver from the 90-degree rotation. Smoothing off so the
+  // stretched column stays a flat colour instead of fading at its edges.
+  const bleed = Math.max(2, Math.round(out.height * 0.025))
+  const smoothing = ctx.imageSmoothingEnabled
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(front, Math.max(0, front.width - 2), 0, 1, front.height, half, 0, bleed, out.height)
+  ctx.drawImage(back, Math.min(1, back.width - 1), 0, 1, back.height, half - bleed, 0, bleed, out.height)
+  ctx.imageSmoothingEnabled = smoothing
   return out
 }

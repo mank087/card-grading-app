@@ -28,6 +28,7 @@ import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
+import { resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
 import type { SavedCustomStyle } from '@/lib/labelPresets'
 
 interface Props {
@@ -3148,6 +3149,14 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
     [cards, batchSelectedIds]
   )
 
+  // The studio's working config drives the One-Touch / Toploader sheets too —
+  // null unless it resolves to Heritage, in which case those sheets print the
+  // Heritage panels instead of the Modern ones.
+  const compactHeritage = useMemo(
+    () => resolveCompactHeritage(null, customConfig),
+    [customConfig]
+  )
+
   // Store logos apply ONLY when the selected card was graded under the
   // member's own org. Personal cards (org_id null) and cards from any other
   // org keep DCM assets — previously the store logo was baked into whatever
@@ -3561,6 +3570,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
           selectedCards={batchSelectedCards}
           isOpen={isBatchAveryModalOpen}
           onClose={() => setIsBatchAveryModalOpen(false)}
+          heritage={compactHeritage}
         />
       )}
       {isBatchAvery8167ModalOpen && (
@@ -3568,6 +3578,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
           selectedCards={batchSelectedCards}
           isOpen={isBatchAvery8167ModalOpen}
           onClose={() => setIsBatchAvery8167ModalOpen(false)}
+          heritage={compactHeritage}
         />
       )}
     </div>
