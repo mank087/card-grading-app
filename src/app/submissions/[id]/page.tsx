@@ -9,6 +9,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
 import { useToast } from '@/hooks/useToast'
+import { useCredits } from '@/contexts/CreditsContext'
 
 const POLL_FAST_MS = 4000
 const POLL_SLOW_MS = 15000
@@ -76,6 +77,7 @@ export default function SubmissionStatusPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const toast = useToast()
+  const { refreshCredits } = useCredits()
   const submissionId = params?.id
 
   const [data, setData] = useState<StatusResponse | null>(null)
@@ -133,6 +135,17 @@ export default function SubmissionStatusPage() {
   useEffect(() => {
     latestStatusRef.current = data?.submission?.status ?? null
   }, [data])
+
+  // Keep the header's credit balance honest while a batch runs.
+  //
+  // The drain charges each card server-side as it dispatches, so nothing on
+  // the client knows a credit was spent — the intake page's refresh happens at
+  // commit, BEFORE the first charge. Without this the header sits at its
+  // pre-submission number for the whole run and bulk grading looks free.
+  const gradedCount = data?.counts?.done ?? 0
+  useEffect(() => {
+    if (gradedCount > 0) refreshCredits()
+  }, [gradedCount, refreshCredits])
 
   // Drain kick loop: while the submission is running and this page is open,
   // kick the drain every 30s. In production the per-minute cron does this
