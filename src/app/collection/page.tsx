@@ -2083,8 +2083,16 @@ function CollectionPageContent() {
 
       const result = await response.json().catch(() => ({}))
 
-      // Remove card from local state
+      // Remove card from local state.
+      //
+      // All three surfaces have to be told, not just `cards`: the binder view
+      // reads `binderCards` (its own fetch), and the binder chips' counts come
+      // from the binder list. Dropping only `cards` left a deleted card still
+      // rendered inside a binder with a stale count beside its name until the
+      // next navigation refetched them.
       setCards(prevCards => prevCards.filter(card => card.id !== cardId))
+      setBinderCards(prev => (prev ? prev.filter(card => card.id !== cardId) : prev))
+      binderApi.refresh().catch(() => {})
 
       // Soft-deleted cards can be put straight back. Offer it in the toast —
       // the moment right after deleting is when people realise their mistake.
@@ -2098,7 +2106,11 @@ function CollectionPageContent() {
             })
             if (!res.ok) throw new Error((await res.json()).error || 'Restore failed')
             toast.success("Card restored — it's private, make it public to share again.")
+            // refreshKey refetches cards + binderCards; the counts need the
+            // binder list refetched too (the binder_cards row survived the
+            // soft delete, so a restored card returns to its binder).
             setRefreshKey(k => k + 1)
+            binderApi.refresh().catch(() => {})
           } catch (e: any) {
             toast.error(e.message)
           }
