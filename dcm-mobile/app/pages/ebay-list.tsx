@@ -29,7 +29,7 @@ import { resolveCardValue } from '@/lib/resolveCardValue'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 type Step = 'connect' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error'
 

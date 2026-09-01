@@ -9,7 +9,7 @@ import { useCredits } from '@/contexts/CreditsContext'
 import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { supabase } from '@/lib/supabase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
 

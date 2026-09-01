@@ -16,7 +16,7 @@
 import { finishTransaction, getAvailablePurchases, type Product, type Purchase } from 'react-native-iap'
 import { supabase } from '@/lib/supabase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 /**
  * Canonical credit pack product IDs — must match what's configured in

@@ -409,7 +409,7 @@ export default function CardDetailScreen() {
   // fresh cards. Fresh numbers show on the next fetch/visit.
   useEffect(() => {
     if (!isUuid(id) || !session?.access_token) return
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     fetch(`${API_BASE}/api/cards/${id}/refresh-price`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${session.access_token}` },
@@ -503,7 +503,7 @@ export default function CardDetailScreen() {
     if (selectedProductId) (req.body as any).selectedProductId = selectedProductId
     if (!silent) setRefreshingPrice(true)
     try {
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
       const token = session?.access_token
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
@@ -536,7 +536,7 @@ export default function CardDetailScreen() {
     if (!card || !session?.access_token) return
     setClearingSelection(true)
     try {
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
       const res = await fetch(`${API_BASE}/api/pricing/dcm-select?cardId=${encodeURIComponent(card.id)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -648,7 +648,7 @@ export default function CardDetailScreen() {
   ) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) throw new Error('Not authenticated')
-    const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const res = await fetch(`${apiBase}${path}`, {
       method,
       headers: {
@@ -1135,7 +1135,7 @@ export default function CardDetailScreen() {
               <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
                 <WebView
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
+                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled
@@ -1251,7 +1251,7 @@ export default function CardDetailScreen() {
                       // conversational_card_info, and regenerates label_data.
                       const { data: { session } } = await supabase.auth.getSession()
                       if (!session?.access_token) throw new Error('Not authenticated')
-                      const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                      const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
                       const res = await fetch(`${apiBase}/api/cards/${card.id}/details`, {
                         method: 'PATCH',
                         headers: {
@@ -1335,7 +1335,7 @@ export default function CardDetailScreen() {
                     onPress={async () => {
                       setRevertingLabel(true)
                       try {
-                        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
                         const res = await fetch(`${API_BASE}/api/cards/${card.id}/custom-label`, {
                           method: 'DELETE',
                           headers: { Authorization: `Bearer ${session?.access_token}` },
@@ -1367,7 +1367,7 @@ export default function CardDetailScreen() {
                   onPress={async () => {
                     setSavingLabel(true)
                     try {
-                      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
                       const features = editLabelForm.features
                         .split(',')
                         .map(f => f.trim())

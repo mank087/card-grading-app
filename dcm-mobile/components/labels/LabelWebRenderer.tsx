@@ -110,7 +110,7 @@ export default function LabelWebRenderer({
   const reloadAttemptsRef = useRef(0)
   const [pageReady, setPageReady] = useState(false)
 
-  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
   const token = session?.access_token || ''
 
   // Initial URL — embeds config as base64 customConfig so the page can

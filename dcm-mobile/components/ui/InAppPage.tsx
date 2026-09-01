@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 
-const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 interface InAppPageProps {
   path: string

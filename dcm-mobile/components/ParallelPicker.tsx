@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 interface SearchResult {
   id: string

@@ -558,7 +558,7 @@ export default function CollectionScreen() {
       )
       return
     }
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const cardIds = Array.from(selectedIds).join(',')
     const params = new URLSearchParams()
     params.set('token', session.access_token)
@@ -1349,7 +1349,7 @@ export default function CollectionScreen() {
           setSellBusy(true)
           try {
             const { data: { session: sess } } = await supabase.auth.getSession()
-            const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+            const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
             const res = await fetch(`${API_BASE}/api/cards/${sellCard.id}/ownership`, {
               method: 'PATCH',
               headers: { Authorization: `Bearer ${sess?.access_token}`, 'Content-Type': 'application/json' },

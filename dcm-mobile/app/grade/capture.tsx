@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { StatusBar } from 'expo-status-bar'
 import { Colors } from '@/lib/constants'
 import { assessQuality, compressImage, hashImage, processCardCapture, computeGuideWidthFraction, QualityResult, CompressedImage } from '@/lib/imageUtils'
+import { measureSharpness } from '@/lib/blurCheck'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import { reportUploadEvent, beginCaptureAttempt } from '@/lib/uploadTelemetry'
@@ -100,6 +101,14 @@ export default function CaptureScreen() {
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  /**
+   * Pre-capture focus warning. True only when lib/blurCheck actually measured
+   * the image AND it came back below the calibrated threshold — a failed or
+   * skipped measurement leaves this false, so the flow is never gated on a
+   * check that could not run. Advisory: the footer still lets the user
+   * proceed, it just relabels the primary action.
+   */
+  const [previewIsSoft, setPreviewIsSoft] = useState(false)
 
   // Method (camera vs gallery) — pre-selected from the main grade screen, defaults to camera
   const [mode, setMode] = useState<'camera' | 'gallery'>(params.mode === 'gallery' ? 'gallery' : 'camera')
@@ -129,6 +138,7 @@ export default function CaptureScreen() {
   // uses processCardCapture directly in handleCapture.
   const processImage = async (rawUri: string, knownDims?: { width: number; height: number }) => {
     setIsProcessing(true)
+    setPreviewIsSoft(false)
     try {
       // Gallery images are NEVER auto-cropped. The center-band + card-aspect
       // crop in processCardCapture exists solely to compensate for the
@@ -156,8 +166,15 @@ export default function CaptureScreen() {
       const quality = assessQuality(compressed, compressed.width / compressed.height)
       const hash = await hashImage(compressed.uri)
 
+      // Focus check. Included for gallery picks as well as camera captures
+      // because it is the same one call on the same already-compressed file —
+      // a soft photo out of the library wastes a credit exactly like a soft
+      // one off the sensor. Null (measurement failed) means "no opinion".
+      const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
+
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
+      setPreviewIsSoft(sharpness?.isSoft === true)
       setCaptureSources(prev => ({ ...prev, [currentSide]: 'gallery' }))
       reportUploadEvent({
         event: 'capture_attempted',
@@ -307,6 +324,7 @@ export default function CaptureScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return
     setIsCapturing(true)
+    setPreviewIsSoft(false)
 
     try {
       // Give the lens time to settle before the shutter fires. This delay
@@ -365,8 +383,16 @@ export default function CaptureScreen() {
       // which could never match).
       const hash = await hashImage(compressed.uri)
 
+      // Focus check — runs while the "Processing…" state is still up, before
+      // the preview appears and therefore before the user can spend a credit.
+      // Measures the cropped file, so the card fills the frame and a sharp
+      // background cannot rescue a soft card. Null = measurement failed =
+      // treat as sharp; see lib/blurCheck.ts.
+      const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
+
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
+      setPreviewIsSoft(sharpness?.isSoft === true)
       setCaptureSources(prev => ({ ...prev, [currentSide]: 'camera' }))
       reportUploadEvent({
         event: 'capture_attempted',
@@ -414,6 +440,7 @@ export default function CaptureScreen() {
       setCurrentSide('back')
       setPreviewUri(null)
       setPreviewQuality(null)
+      setPreviewIsSoft(false)
     } else {
       // Back just captured — both sides done, go to review
       // Use previewUri for the back since state may not have flushed yet
@@ -451,6 +478,7 @@ export default function CaptureScreen() {
     reportUploadEvent({ event: 'retake_started', side: currentSide })
     setPreviewUri(null)
     setPreviewQuality(null)
+    setPreviewIsSoft(false)
     if (currentSide === 'front') {
       setFrontUri(null)
       setFrontCompressed(null)
@@ -527,6 +555,22 @@ export default function CaptureScreen() {
             control. The image + details now scroll; the action bar is a pinned
             footer that can never be clipped. */}
         <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
+          {/* Focus warning. Advisory and non-blocking by design: it appears
+              above the photo so it is read before the action bar, states the
+              consequence rather than issuing an order, and leaves both exits
+              open in the footer (Retake / Use anyway). Only shown when
+              lib/blurCheck actually measured the image and it fell below the
+              calibrated threshold — never on a measurement that failed. No
+              animation, matching the rest of this screen. */}
+          {previewIsSoft && (
+            <View style={styles.softBanner} accessibilityRole="alert">
+              <Ionicons name="alert-circle" size={18} color={Colors.amber[500]} />
+              <Text style={styles.softBannerText}>
+                This photo looks soft — a sharper photo usually means a more confident grade.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.previewImageContainer}>
             <Image source={{ uri: previewUri }} style={[styles.previewImage, previewImageStyle]} resizeMode="contain" />
           </View>
@@ -569,14 +613,27 @@ export default function CaptureScreen() {
             <Text style={styles.retakeText}>Retake</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.useButton, { backgroundColor: Colors.blue[500] }]}
+            style={[styles.useButton, { backgroundColor: previewIsSoft ? Colors.gray[600] : Colors.blue[500] }]}
             onPress={handleUseImage}
-            accessibilityLabel={currentSide === 'front' ? 'Use this front photo and continue to back' : 'Use this back photo and continue to review'}
+            accessibilityLabel={
+              previewIsSoft
+                ? `Use this soft ${currentSide} photo anyway`
+                : currentSide === 'front'
+                  ? 'Use this front photo and continue to back'
+                  : 'Use this back photo and continue to review'
+            }
             accessibilityRole="button"
           >
             <Ionicons name={isFront ? 'arrow-forward-circle' : 'checkmark-circle'} size={22} color={Colors.white} />
+            {/* When the photo measured soft, the primary action stops
+                presenting itself as the recommended path: it says what the
+                user is choosing, and Retake beside it becomes the obvious
+                alternative. It is still fully enabled — the check is a nudge,
+                not a gate. */}
             <Text style={styles.useText}>
-              {isFront ? 'Next: Back of Card ›' : 'Done — Review ›'}
+              {previewIsSoft
+                ? 'Use anyway ›'
+                : isFront ? 'Next: Back of Card ›' : 'Done — Review ›'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -955,6 +1012,23 @@ const styles = StyleSheet.create({
   // image vertically; a tall image + long suggestion list simply scrolls.
   previewScroll: { flex: 1, backgroundColor: Colors.gray[900] },
   previewScrollContent: { flexGrow: 1, justifyContent: 'center' },
+  // Focus warning banner. Amber, matching suggestionText — this screen already
+  // uses amber for "worth your attention" and red only for hard failures, and
+  // a soft photo is the former.
+  softBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.5)',
+    backgroundColor: 'rgba(245,158,11,0.12)',
+  },
+  softBannerText: { flex: 1, color: Colors.amber[500], fontSize: 13, lineHeight: 18, fontWeight: '600' },
   previewImageContainer: { justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[900], paddingVertical: 16 },
   previewImage: { width: '80%', aspectRatio: 0.714, borderRadius: 8 },
   qualityDetails: { padding: 16, backgroundColor: Colors.gray[800], gap: 6 },

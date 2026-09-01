@@ -17,7 +17,7 @@
 
 import { Platform } from 'react-native'
 
-const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com').replace(/\/$/, '')
+const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com').replace(/\/$/, '')
 
 const CLIENT_PLATFORM = Platform.OS === 'ios' ? 'ios_app'
   : Platform.OS === 'android' ? 'android_app'

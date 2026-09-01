@@ -58,7 +58,7 @@ export interface LabelColorOverrides {
   heritageGradeColors?: Record<string, string>
 }
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 const CACHE_KEY = 'dcm_label_style_cache'
 
 // Mirrors web resolveHeritageSelection (src/lib/labels/labelStyleResolution.ts):

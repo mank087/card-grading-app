@@ -86,7 +86,7 @@ export default function ProcessingScreen() {
   useEffect(() => {
     if (!params.cardId || !params.category) return
     const endpoint = CATEGORY_ROUTES[params.category] || 'other'
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const url = `${API_BASE}/api/${endpoint}/${params.cardId}`
     if (__DEV__) console.log('[Processing] Triggering grading API:', url)
     setTriggerFailed(false)

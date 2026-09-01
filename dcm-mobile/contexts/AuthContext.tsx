@@ -11,7 +11,7 @@ const SIGNUP_PLATFORM = Platform.OS === 'ios' ? 'ios_app'
   : Platform.OS === 'android' ? 'android_app'
   : 'web' // expo web fallback
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 // Best-effort OAuth attribution upgrade. Idempotent + safe — the server
 // only flips signup_source if the row is still 'web' AND the user was

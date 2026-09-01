@@ -391,6 +391,15 @@ function computeCardCrop(
  * evaluated and rejected as impractical (inflate implementation + MB-scale
  * base64 churn on the UI thread).
  *
+ * UPDATE (Sep 2026): sharpness IS now measured, in lib/blurCheck.ts — but
+ * deliberately not here. The rejected decoder idea above was costed on the
+ * FULL capture; downscaling natively to a 512px working copy first (what the
+ * web check does anyway) makes it a ~0.37MP decode. blurCheck is async and
+ * touches the filesystem, so it cannot fold into this synchronous function;
+ * the capture screen calls it alongside assessQuality. This function's
+ * contract is unchanged — resolution and framing only, still labelled
+ * "Resolution" rather than "Sharpness" in the UI.
+ *
  * So this function reports only what it can truly verify — dimensions,
  * megapixels, and card-like aspect ratio — and the capture UI labels it
  * as "Resolution", not "Sharpness". Blur/lighting are assessed

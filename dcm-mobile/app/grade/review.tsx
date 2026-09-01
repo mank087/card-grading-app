@@ -15,7 +15,7 @@ import { ConditionReportData, EMPTY_REPORT, SURFACE_LABELS, CORNER_LABELS, EDGE_
 import Button from '@/components/ui/Button'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 const OTHER_SUB_CATEGORIES = {
   'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Union Arena'],
@@ -222,7 +222,7 @@ export default function ReviewScreen() {
       // Deduct credit via API (same as web — handles tracking)
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
-        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
         await fetch(`${API_BASE}/api/stripe/deduct`, {
           method: 'POST',
           headers: {

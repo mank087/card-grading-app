@@ -3,7 +3,7 @@
  *
  * User enters their email → we call supabase.auth.resetPasswordForEmail
  * which sends them a one-time link. We tell Supabase to redirect that
- * link to the web's /reset-password page (https://www.dcmgrading.com/reset-password)
+ * link to the web's /reset-password page (https://dcmgrading.com/reset-password)
  * because email-client deep linking back into a custom URL scheme is
  * unreliable on Android Gmail / iOS Mail. The user completes the reset
  * on web, then comes back to the mobile app and signs in with their
@@ -22,7 +22,7 @@ import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
-const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 export default function ForgotPasswordScreen() {
   const router = useRouter()

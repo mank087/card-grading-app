@@ -51,7 +51,7 @@ export interface UploadTelemetryPayload {
   metadata?: Record<string, unknown>
 }
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 /** See the web helper: session-scoped, deliberately not durable. */
 let currentAttemptId: string | null = null

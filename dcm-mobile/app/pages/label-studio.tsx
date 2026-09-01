@@ -596,7 +596,7 @@ export default function LabelStudioScreen() {
     delete existing.year
     const hasRemaining = Object.values(existing).some(v => v != null && (!Array.isArray(v) || v.length > 0))
     try {
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
       const res = await fetch(`${API_BASE}/api/cards/${selectedCard.id}/custom-label`, {
         method: hasRemaining ? 'PUT' : 'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
@@ -636,7 +636,7 @@ export default function LabelStudioScreen() {
     setCardColors(null)
     if (!session?.access_token || !selectedCard.id) return
     let cancelled = false
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     fetch(`${API_BASE}/api/cards/${selectedCard.id}/extract-colors`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${session.access_token}` },
@@ -1107,7 +1107,7 @@ export default function LabelStudioScreen() {
     if (!selectedCard?.id || !session?.access_token) return
     setSavingLabelFields(true)
     try {
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
       // Diff against the AI-generated baseline (matches web): only edited
       // fields become overrides. Previously every field was saved wholesale,
       // freezing untouched values — so later data corrections never reached
@@ -1179,7 +1179,7 @@ export default function LabelStudioScreen() {
     if (exportType === 'slab-custom' && config.style === 'heritage') {
       exportType = 'slab-heritage'
     }
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const params = new URLSearchParams()
     params.set('token', session.access_token)
     params.set('type', exportType)
