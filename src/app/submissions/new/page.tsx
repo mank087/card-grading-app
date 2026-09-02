@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
+import { getStoredSession, getValidSession, getAuthenticatedClient } from '@/lib/directAuth'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -275,24 +275,46 @@ function SubmissionsNewInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    const session = getStoredSession()
-    if (!session?.access_token) return
-    fetch('/api/binders', { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then((r) => {
-        if (!r.ok) {
-          console.warn('[submissions/new] binder list failed:', r.status)
-          return null
-        }
-        return r.json()
-      })
-      .then((data) => {
-        if (!data) return
-        setBindersAvailable(data.available !== false)
-        setBinders((data.binders ?? []).filter((b: any) => !b.smart_filter))
-      })
-      .catch(() => setBindersAvailable(false))
+  // Binder list for the "file into a binder" picker.
+  //
+  // Uses getValidSession(), NOT getStoredSession(): the raw helper hands back
+  // whatever is in localStorage even when the access token has expired, and
+  // /api/binders answers an expired token with a 401. The old code logged that
+  // to the console and left `binders` empty while `bindersAvailable` stayed
+  // true, so the picker rendered with nothing in it and looked to the user
+  // like they had no binders. (Reported Sept 2 2026.)
+  //
+  // It also only ran once on mount and never retried, so a token that expired
+  // while the page sat open could never recover. loadBinders is now re-run when
+  // the user reaches the review stage, which is the first moment the picker is
+  // actually visible.
+  const [binderLoadFailed, setBinderLoadFailed] = useState(false)
+  const loadBinders = useCallback(async () => {
+    const session = await getValidSession()
+    if (!session?.access_token) { setBinderLoadFailed(true); return }
+    try {
+      const r = await fetch('/api/binders', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (!r.ok) {
+        console.warn('[submissions/new] binder list failed:', r.status)
+        setBinderLoadFailed(true)
+        return
+      }
+      const data = await r.json()
+      setBindersAvailable(data.available !== false)
+      setBinders((data.binders ?? []).filter((b: any) => !b.smart_filter))
+      setBinderLoadFailed(false)
+    } catch {
+      setBinderLoadFailed(true)
+    }
   }, [])
+
+  useEffect(() => { void loadBinders() }, [loadBinders])
+
+  // Reload on reaching review — the first moment the picker is on screen, and
+  // long enough after mount that a token which needed refreshing has one.
+  useEffect(() => {
+    if (stage === 'review') void loadBinders()
+  }, [stage, loadBinders])
 
   // ---------------------------------------------------------------------
   // File selection
@@ -1266,6 +1288,24 @@ function SubmissionsNewInner() {
                     {binders.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                     <option value={NEW_BINDER_OPTION}>+ Create new binder…</option>
                   </select>
+
+                  {/* An empty picker used to be indistinguishable from "you
+                      have no binders". Say which it is, and offer a retry —
+                      the usual cause is a request that failed, not an empty
+                      collection. */}
+                  {binderLoadFailed && (
+                    <p className="text-xs text-amber-700 font-medium mt-1.5">
+                      Couldn&apos;t load your binders just now.{' '}
+                      <button
+                        type="button"
+                        onClick={() => { void loadBinders() }}
+                        className="underline font-semibold"
+                      >
+                        Try again
+                      </button>
+                      {' '}— or grade without one and file the cards later.
+                    </p>
+                  )}
 
                   {creatingNewBinder && (
                     <div className="flex flex-wrap gap-2 items-center mt-2">

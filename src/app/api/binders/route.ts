@@ -52,17 +52,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to load binders' }, { status: 500 });
     }
 
-    // Counts. Manual binders count membership rows; smart binders count the
-    // cards their filter currently matches, so the number is never stale.
+    // Counts. Manual binders count membership rows whose card is still ALIVE;
+    // smart binders count the cards their filter currently matches, so the
+    // number is never stale.
+    //
+    // Two bugs used to live here, both reported Sept 2 2026 as "the binder
+    // shows the wrong number":
+    //
+    //  1. Counting binder_cards rows directly counted SOFT-DELETED cards. A
+    //     deleted card keeps its membership row (we never hard-delete a graded
+    //     card — the slab QR depends on the row), so a binder with 15 rows and
+    //     5 deleted cards displayed 15 while the binder itself listed 10. The
+    //     inner join to cards + is('cards.deleted_at', null) is what the smart
+    //     branch below has always done; the manual branch simply never did.
+    //
+    //  2. The old single `.in(manualIds)` select had no range, so PostgREST
+    //     silently capped it at 1,000 rows. Any user whose binders held more
+    //     than 1,000 cards between them got counts that were quietly too low.
+    //     head + count:'exact' has no such cap.
+    //
+    // One query per manual binder, run in parallel — the same shape the smart
+    // branch already uses.
     const manualIds = (binders ?? []).filter(b => !b.smart_filter).map(b => b.id);
     const counts = new Map<string, number>();
 
     if (manualIds.length) {
-      const { data: rows } = await supabase
-        .from('binder_cards')
-        .select('binder_id, card_id')
-        .in('binder_id', manualIds);
-      for (const r of rows ?? []) counts.set(r.binder_id, (counts.get(r.binder_id) ?? 0) + 1);
+      const results = await Promise.all(
+        manualIds.map(async id => {
+          const { count, error: countError } = await supabase
+            .from('binder_cards')
+            .select('card_id, cards!inner(id)', { count: 'exact', head: true })
+            .eq('binder_id', id)
+            .is('cards.deleted_at', null);
+          if (countError) console.error('[binders] count failed for', id, countError.message);
+          return [id, count ?? 0] as const;
+        })
+      );
+      for (const [id, n] of results) counts.set(id, n);
     }
 
     for (const b of binders ?? []) {

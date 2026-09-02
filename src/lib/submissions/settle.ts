@@ -281,12 +281,29 @@ export async function reconcile(
       continue;
     }
 
-    // grade_status null: the dispatch never took the lock (the route 404'd,
-    // the fetch never landed). Return it to the queue within its budget.
+    // grade_status null: the dispatch never took the lock (the route answered
+    // without grading, 404'd, or the fetch never landed). Return it to the
+    // queue within its budget.
     const attempts = item.attempts + 1;
     const retry = attempts < MAX_ITEM_ATTEMPTS;
     item.status = retry ? 'queued' : 'failed';
     item.attempts = attempts;
+
+    // Out of retries: refund, the same as the 'failed' and stuck-lease
+    // branches above. The credit was taken at dispatch and the card has no
+    // grade to show for it, so keeping it would charge for nothing. This
+    // branch was the one path out of reconcile that gave up WITHOUT
+    // refunding — found 2026-09-02, after a batch left two cards charged and
+    // permanently ungraded.
+    if (!retry) {
+      await recordGradingFailure({
+        cardId: card.id,
+        userId: card.user_id,
+        category: card.category || submission.category,
+        errorMessage: 'Grading never started (bulk submission drain)',
+      });
+    }
+
     await setItemStatus(item.id, {
       status: item.status,
       attempts,

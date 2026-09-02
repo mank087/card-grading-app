@@ -338,8 +338,29 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
         return false;
       }
 
+      // ALWAYS 'grading' — never 'graded' straight off the dispatch.
+      //
+      // This used to be `result.completed ? 'graded' : 'grading'`, where
+      // `completed` was set by nothing more than `res.ok`. A 200 from a
+      // category route is NOT proof that a grade was written: those routes
+      // have several early-return branches that answer 200 without grading
+      // anything. When that happened the item went terminal as 'graded',
+      // reconcile skipped it (terminal items are not revisited), the card kept
+      // a null grade_status forever, and completeSubmission fired the "your
+      // cards are graded" email over cards that had never been graded.
+      //
+      // Observed in production 2026-09-02 on submission c03e8631: 3 items all
+      // marked graded with attempts=0, 2 of the 3 cards with no grade at all,
+      // and the customer shown "A Authentic" on both.
+      //
+      // 'graded' is now only ever set by reconcile(), which reads the card row
+      // and promotes on card.grade_status === 'complete'. Its other branches
+      // are already right: null requeues within the attempt budget, 'failed'
+      // retries and refunds, and a lease past STUCK_GRADE_MS fails and refunds.
+      // The cost is that an item shows 'grading' until the next tick confirms
+      // it; the benefit is that "graded" always means a grade exists.
       await setItemStatus(item.id, {
-        status: result.completed ? 'graded' : 'grading',
+        status: 'grading',
         error: result.error ?? null,
       });
       return true;
