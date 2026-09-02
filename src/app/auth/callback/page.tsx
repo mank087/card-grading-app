@@ -147,6 +147,18 @@ export default function AuthCallbackPage() {
                 if ((window as any).rdt) {
                   (window as any).rdt('track', 'SignUp', { conversionId: signupId });
                 }
+                // Microsoft Advertising UET. Safe pre-consent: uetq is a plain
+                // array stub until the visitor accepts, so this queues and is
+                // never transmitted. Purchase conversions are destination-URL
+                // goals in the Bing UI (/credits/success, /card-lovers/success)
+                // and need no call site; signup has no distinct URL, so it is
+                // an event goal and has to be fired here.
+                if ((window as any).uetq) {
+                  (window as any).uetq.push('event', 'signup', {
+                    event_category: 'signup',
+                    event_label: `oauth_${provider}_${signupSource || 'direct'}`,
+                  });
+                }
                 console.log('[Auth Callback] Signup conversion events tracked:', provider)
               }
 
@@ -204,6 +216,9 @@ export default function AuthCallbackPage() {
                   }
                   if ((window as any).rdt) {
                     (window as any).rdt('track', 'SignUp', { conversionId: signupId });
+                  }
+                  if ((window as any).uetq) {
+                    (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: `oauth_${provider}` });
                   }
                 }
 

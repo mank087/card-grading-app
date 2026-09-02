@@ -3,10 +3,19 @@
 /**
  * Consent gate for marketing/analytics scripts (2026-07-17).
  *
- * DEFAULT-BLOCKED: Google Analytics/Ads, Meta Pixel, and Reddit Pixel load ONLY
- * after the visitor explicitly accepts. Until then, safe no-op stubs are
- * installed for fbq/rdt/gtag so existing event-tracking call sites throughout
- * the app never throw. "Essential only" (or no choice) = nothing loads.
+ * DEFAULT-BLOCKED: Google Analytics/Ads, Meta Pixel, Reddit Pixel and the
+ * Microsoft Advertising UET tag load ONLY after the visitor explicitly
+ * accepts. Until then, safe no-op stubs are installed for fbq/rdt/gtag/uetq so
+ * existing event-tracking call sites throughout the app never throw.
+ * "Essential only" (or no choice) = nothing loads.
+ *
+ * NOTE ON UET (added 2026-09-02, owner-directed): Microsoft's own install
+ * instructions say to paste bat.js into <head> on every page, and their
+ * Consent Mode pattern loads the script first and then restricts storage.
+ * That is deliberately NOT what we do — loading the vendor script at all
+ * opens the third-party connection this gate exists to prevent, so UET is
+ * injected from loadMarketingScripts() like every other tracker and never
+ * runs for essential-only or GPC visitors.
  *
  * Consent state persists in localStorage + a 1-year cookie (dcm_consent=v1:
  * granted|essential, with timestamp) — the cookie doubles as the audit record
@@ -74,11 +83,16 @@ function logConsent(choice: 'granted' | 'essential', source: 'banner' | 'gpc') {
   } catch { }
 }
 
-/** No-op stubs so fbq/rdt/gtag call sites never throw pre-consent. */
+/** No-op stubs so fbq/rdt/gtag/uetq call sites never throw pre-consent. */
 function installStubs() {
   const w = window as any
   if (typeof w.fbq !== 'function') { const noop: any = () => { }; noop.queue = []; noop.loaded = false; noop._dcmStub = true; w.fbq = noop }
   if (typeof w.rdt !== 'function') { const noop: any = () => { }; noop.callQueue = []; noop._dcmStub = true; w.rdt = noop }
+  // uetq is a plain array until bat.js replaces it with a UET instance, so an
+  // empty array IS the safe stub: pushes queue up and are never transmitted
+  // while the script is absent. Nothing to tear down on acceptance either —
+  // the loader below reads whatever queued and hands it to UET as o.q.
+  if (!Array.isArray(w.uetq)) w.uetq = []
   w.dataLayer = w.dataLayer || []
   if (typeof w.gtag !== 'function') { w.gtag = function gtag() { w.dataLayer.push(arguments) }; (w.gtag as any)._dcmStub = true }
   // Google Consent Mode v2: default DENIED before any Google script can load.
@@ -134,6 +148,28 @@ function loadMarketingScripts() {
   })(w, d, 'script', 'https://connect.facebook.net/en_US/fbevents.js')
   w.fbq('init', '2308558869571917')
   w.fbq('track', 'PageView')
+
+  // Microsoft Advertising UET (tag 343269844).
+  // enableAutoSpaTracking lets bat.js count Next.js client-side route changes
+  // as pageviews; without it only the first hard load would register.
+  ;(function (win: any, doc: Document, t: string, u: string, o: any) {
+    win[u] = win[u] || []
+    o.ts = new Date().getTime()
+    const n = doc.createElement(t) as HTMLScriptElement
+    n.src = 'https://bat.bing.net/bat.js?ti=' + o.ti
+    n.async = true
+    n.onload = function () {
+      // Hand the pre-load queue to the real UET instance, then replace it.
+      o.q = win[u]
+      win[u] = new win.UET(o)
+      win[u].push('pageLoad')
+    }
+    doc.head.appendChild(n)
+  })(w, d, 'script', 'uetq', { ti: '343269844', enableAutoSpaTracking: true })
+  // Redundant in practice (this only ever runs post-acceptance) but kept so the
+  // granted state is explicit in the tag's own record, mirroring gtag above.
+  w.uetq.push('consent', 'default', { ad_storage: 'denied' })
+  w.uetq.push('consent', 'update', { ad_storage: 'granted' })
 }
 
 export default function ConsentManager() {
