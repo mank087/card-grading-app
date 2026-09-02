@@ -74,6 +74,18 @@ function PurchaseSuccessContent() {
         console.log('[Meta Pixel] Purchase event tracked:', { tier, value, credits })
       }
 
+      // Track Microsoft Advertising (Bing) Purchase conversion.
+      // Safe pre-consent: uetq is a plain array stub until the visitor accepts,
+      // so this queues and is never transmitted. Guarded by the same value > 0
+      // check as the others — Bing's goal is revenue-based.
+      if ((window as any).uetq && value > 0) {
+        (window as any).uetq.push('event', 'purchase', {
+          revenue_value: value,
+          currency: 'USD',
+        })
+        console.log('[Microsoft UET] Purchase event tracked:', { tier, value, credits })
+      }
+
       hasTrackedPurchase.current = true
     }
 

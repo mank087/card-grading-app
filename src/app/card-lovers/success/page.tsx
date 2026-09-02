@@ -118,6 +118,16 @@ function CardLoversSuccessContent() {
         })
         console.log('[Reddit Pixel] Card Lovers Purchase event tracked')
       }
+
+      // Microsoft Advertising (Bing). Safe pre-consent: uetq is a plain array
+      // stub until the visitor accepts, so this queues and never transmits.
+      if ((window as any).uetq) {
+        (window as any).uetq.push('event', 'purchase', {
+          revenue_value: value,
+          currency: 'USD',
+        })
+        console.log('[Microsoft UET] Card Lovers Purchase event tracked')
+      }
     }
 
     setTracked(true)

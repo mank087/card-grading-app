@@ -72,6 +72,17 @@ function FounderSuccessContent() {
         console.log('[Meta Pixel] Founders Purchase event tracked')
       }
 
+      // Microsoft Advertising (Bing). Founders is a legacy package (ended Feb
+      // 2026) so this fires rarely, but it is kept in parity with the other
+      // pixels. Safe pre-consent: uetq is a plain array stub until acceptance.
+      if ((window as any).uetq) {
+        (window as any).uetq.push('event', 'purchase', {
+          revenue_value: 99,
+          currency: 'USD',
+        })
+        console.log('[Microsoft UET] Founders Purchase event tracked')
+      }
+
       hasTrackedPurchase.current = true
     }
 
