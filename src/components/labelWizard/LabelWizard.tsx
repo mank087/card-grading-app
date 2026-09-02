@@ -113,7 +113,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-2 mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Label Studio</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Label Studio: Custom Slab Labels for Your Cards</h1>
             <p className="text-sm text-gray-500">Design labels for up to {MAX_WIZARD_CARDS} cards in five quick steps.</p>
           </div>
           <Link

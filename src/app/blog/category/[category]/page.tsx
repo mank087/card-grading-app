@@ -62,12 +62,14 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
   if (!category) {
     return {
-      title: 'Category Not Found | DCM Grading Blog',
+      title: { absolute: 'Category Not Found | DCM Grading Blog' },
     };
   }
 
   return {
-    title: `${category.name} | DCM Grading Blog`,
+    // Already brand-suffixed; `absolute` stops the root layout's
+    // `%s | DCM Grading` template from appending a second suffix.
+    title: { absolute: `${category.name} | DCM Grading Blog` },
     description: category.description || `Read our latest ${category.name.toLowerCase()} articles on card grading and collecting.`,
     openGraph: {
       title: `${category.name} | DCM Grading Blog`,
@@ -76,6 +78,13 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     },
     alternates: {
       canonical: `https://dcmgrading.com/blog/category/${categorySlug}`,
+      // `alternates` replaces rather than merges, so the inherited RSS link has
+      // to be restated here alongside the canonical.
+      types: {
+        'application/rss+xml': [
+          { url: 'https://dcmgrading.com/rss.xml', title: 'DCM Grading Blog' },
+        ],
+      },
     },
   };
 }

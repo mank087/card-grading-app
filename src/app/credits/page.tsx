@@ -24,6 +24,31 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 // Pack pricing lives in @/lib/creditPackages so marketing surfaces (blog
 // embeds, landing pages) render the same numbers checkout charges.
 
+// The page's single <h1>. It used to vary with auth state and sat below an
+// early-return spinner, so a crawler (and any no-JS visitor) got a page with
+// no heading at all. One static heading, rendered in the loading shells too,
+// means every state has exactly one H1.
+function CreditsHeading() {
+  return (
+    <h1 className="text-4xl font-bold text-gray-900 mb-4">
+      Card Grading Credit Pricing
+    </h1>
+  )
+}
+
+function CreditsLoadingShell() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
+      <div className="py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto text-center">
+          <CreditsHeading />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 function CreditsPageContent() {
   const router = useRouter()
@@ -336,11 +361,7 @@ function CreditsPageContent() {
 
   // Show loading state while checking auth
   if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    )
+    return <CreditsLoadingShell />
   }
 
   return (
@@ -447,9 +468,7 @@ function CreditsPageContent() {
 
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              {!isAuthenticated ? 'Pricing' : (showWelcome ? 'Choose Your Credit Package' : 'Purchase Grading Credits')}
-            </h1>
+            <CreditsHeading />
             <p className="text-xl text-gray-600 mb-6">
               Get professional DCM Optic™ card grading in seconds
             </p>
@@ -991,11 +1010,7 @@ function CreditsPageContent() {
 
 export default function CreditsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    }>
+    <Suspense fallback={<CreditsLoadingShell />}>
       <CreditsPageContent />
     </Suspense>
   )

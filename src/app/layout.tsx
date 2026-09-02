@@ -64,6 +64,16 @@ const SITE_JSON_LD = {
       },
       description:
         'DCM Grading is an AI-powered trading card grading platform that grades trading cards from photos using DCM Optic™ and issues printable labels collectors apply to their own slabs.',
+      // Support is email-only: there is no published phone number, so
+      // `telephone` is deliberately omitted rather than invented. The address
+      // below is the one published on /contact, /faq, /privacy and /terms.
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: 'admin@dcmgrading.com',
+        url: 'https://dcmgrading.com/contact',
+        availableLanguage: ['English'],
+      },
       sameAs: [
         'https://www.facebook.com/dcmgrading',
         'https://www.instagram.com/dcm_grading/',

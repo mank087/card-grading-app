@@ -65,6 +65,7 @@ export default function ScrollingCardBackground({
   return (
     <div
       className="absolute inset-0 overflow-hidden pointer-events-none"
+      aria-hidden="true"
       style={{
         opacity: opacity / 100,
         filter: `blur(${blur}px)`
@@ -253,6 +254,14 @@ export default function ScrollingCardBackground({
         /* Pause on hover for accessibility */
         .scroll-row:hover {
           animation-play-state: paused;
+        }
+
+        /* Respect a reduced-motion preference: hold the rows still rather than
+           scrolling them forever. */
+        @media (prefers-reduced-motion: reduce) {
+          .scroll-row {
+            animation: none !important;
+          }
         }
       `}</style>
     </div>

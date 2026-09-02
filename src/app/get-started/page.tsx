@@ -8,7 +8,9 @@ export default function GetStartedPage() {
     <main className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white py-20">
-        <div className="absolute inset-0 opacity-10">
+        {/* Decorative card wash. aria-hidden so the empty-alt images leave the
+            accessibility tree entirely rather than lingering as unnamed nodes. */}
+        <div className="absolute inset-0 opacity-10" aria-hidden="true">
           <div className="absolute top-10 left-[10%] w-32 h-44 rotate-[-8deg]">
             <Image src="/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg" alt="" fill className="object-contain" />
           </div>

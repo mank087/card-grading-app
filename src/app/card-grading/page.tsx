@@ -179,7 +179,7 @@ export default function CardGradingLanding() {
 
         {/* Animated cards background - mix of all card types, hidden on mobile */}
         {/* All background images use loading="lazy" since they're decorative */}
-        <div className="absolute inset-0 opacity-15 hidden md:block">
+        <div className="absolute inset-0 opacity-15 hidden md:block" aria-hidden="true">
           {/* Left side cards - Pokemon */}
           <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
             <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
@@ -211,7 +211,7 @@ export default function CardGradingLanding() {
         </div>
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
-        <div className="absolute inset-0 opacity-10 md:hidden">
+        <div className="absolute inset-0 opacity-10 md:hidden" aria-hidden="true">
           <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
             <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-10deg]" loading="lazy" sizes="80px" />
           </div>
@@ -439,9 +439,13 @@ export default function CardGradingLanding() {
                 <Image src="/DCM Logo white.png" alt="DCM" width={50} height={50} />
               </div>
 
-              <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+              {/* Desktop twin of the mobile hero headline above. The mobile
+                  block holds the page's single <h1> (Google indexes the mobile
+                  render), so this duplicate is an <h2> to keep one H1 per page.
+                  Sizing classes are explicit, so it looks unchanged. */}
+              <h2 className="text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
                 Grade Any Card Instantly
-              </h1>
+              </h2>
 
               <p className="text-xl text-gray-300 mb-4 max-w-xl">
                 No shipping. No waiting. Get professional-grade analysis in about a minute.

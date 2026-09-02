@@ -53,15 +53,18 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
   if (!post) {
     return {
-      title: 'Post Not Found | DCM Grading Blog',
+      title: { absolute: 'Post Not Found | DCM Grading Blog' },
     };
   }
 
+  // Both branches already carry the brand, and stored meta_title values end in
+  // "| DCM Grading" too. `absolute` stops the root layout's `%s | DCM Grading`
+  // template from appending a second suffix.
   const title = post.meta_title || `${post.title} | DCM Grading Blog`;
   const description = post.meta_description || post.excerpt || post.subtitle || '';
 
   return {
-    title,
+    title: { absolute: title },
     description,
     keywords: post.tags?.join(', '),
     openGraph: {

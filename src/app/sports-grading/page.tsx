@@ -181,7 +181,7 @@ export default function SportsGradingLanding() {
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-teal-900 to-blue-900" />
 
         {/* Animated Sports cards background - spread out, hidden on mobile */}
-        <div className="absolute inset-0 opacity-15 hidden md:block">
+        <div className="absolute inset-0 opacity-15 hidden md:block" aria-hidden="true">
           {/* Left side cards */}
           <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
             <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[-12deg]" />
@@ -213,7 +213,7 @@ export default function SportsGradingLanding() {
         </div>
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
-        <div className="absolute inset-0 opacity-10 md:hidden">
+        <div className="absolute inset-0 opacity-10 md:hidden" aria-hidden="true">
           <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
             <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[-10deg]" />
           </div>
@@ -447,12 +447,15 @@ export default function SportsGradingLanding() {
                 <span className="text-white/80 text-sm font-medium tracking-wider uppercase">Sports Card Grading</span>
               </div>
 
-              <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+              {/* Desktop twin of the mobile hero headline above. The mobile
+                  block holds the page's single <h1>, so this duplicate is an
+                  <h2>. Sizing classes are explicit, so it looks unchanged. */}
+              <h2 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
                 Grade Your Sports Card
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
                   Instantly
                 </span>
-              </h1>
+              </h2>
 
               <p className="text-xl text-gray-300 mb-3 max-w-xl">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in about a minute.

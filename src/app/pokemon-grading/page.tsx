@@ -464,12 +464,16 @@ export default function PokemonGradingLanding() {
                 <span className="text-white/80 text-sm font-medium tracking-wider uppercase">Pokemon Card Grading</span>
               </div>
 
-              <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+              {/* Desktop twin of the mobile hero heading above. Only one of the
+                  two is ever visible, but both are in the DOM, so this one is an
+                  h2 to keep the page at a single h1. The mobile block keeps the
+                  h1 because that is the render Google indexes. */}
+              <h2 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
                 Grade Your Pokemon Card
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
                   Instantly
                 </span>
-              </h1>
+              </h2>
 
               <p className="text-xl text-gray-300 mb-3 max-w-xl">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in about a minute.

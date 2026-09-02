@@ -292,7 +292,7 @@ export default function WhyDcmPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.08),transparent_60%)]" />
 
         {/* Animated card backgrounds */}
-        <div className="absolute inset-0 opacity-[0.06] md:opacity-10">
+        <div className="absolute inset-0 opacity-[0.06] md:opacity-10" aria-hidden="true">
           <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
             <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
           </div>

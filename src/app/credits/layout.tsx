@@ -150,12 +150,21 @@ export default function CreditsLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
       />
 
-      {/* Server-rendered pricing summary. The interactive pricing below is a
-          client component, so this plain-HTML strip is what a crawler or an
-          answer engine reads without running JavaScript. Kept to a single
-          neutral band so it reads as page chrome above the hero. */}
-      <section className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      {children}
+
+      {/* Server-rendered pricing summary. The interactive pricing above is a
+          client component whose body does not render until it hydrates — a
+          crawler or answer engine fetching this page with no JavaScript sees
+          none of it. This plain-HTML strip is therefore the only machine-
+          readable copy of the price ladder on the page, which is why it lives
+          in the layout rather than in page.tsx.
+
+          It sits AFTER {children} so it reads as a closing summary rather than
+          a wall of text above the hero. It cannot be placed directly beneath
+          the Card Lovers card without moving it into the client page, which
+          would remove it from the server HTML and defeat its purpose. */}
+      <section className="bg-white border-t border-gray-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <h2 className="sr-only">DCM Grading pricing summary</h2>
           <p className="text-sm text-gray-600">
             <strong className="text-gray-900">DCM Grading pricing (USD):</strong>{' '}
@@ -167,8 +176,6 @@ export default function CreditsLayout({
           </p>
         </div>
       </section>
-
-      {children}
     </>
   );
 }
