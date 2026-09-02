@@ -85,6 +85,21 @@ export default function SubmissionStatusPage() {
   const [notFound, setNotFound] = useState(false)
   const [retrying, setRetrying] = useState(false)
 
+  // 🔒 Auth gate. The status API already enforces ownership, so another user's
+  // submission was never readable here — but a logged-out visitor still got the
+  // page shell and a silent 401 instead of being asked to sign in. ?redirect=
+  // carries them back to this submission afterwards.
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  useEffect(() => {
+    const session = getStoredSession()
+    if (!session?.user) {
+      setIsAuthenticated(false)
+      router.push(`/login?redirect=${encodeURIComponent(`/submissions/${submissionId ?? ''}`)}`)
+    } else {
+      setIsAuthenticated(true)
+    }
+  }, [router, submissionId])
+
   const startedAtRef = useRef<number>(Date.now())
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestStatusRef = useRef<string | null>(null)
@@ -110,7 +125,10 @@ export default function SubmissionStatusPage() {
 
   // Poll loop: single request per tick, 4s fast then 15s after 10 minutes,
   // stops entirely once the submission reaches a terminal state.
+  // Waits for the auth gate: polling before it resolves just fires 401s at the
+  // status route while the redirect to /login is already on its way.
   useEffect(() => {
+    if (isAuthenticated !== true) return
     let cancelled = false
 
     const tick = async () => {
@@ -130,7 +148,7 @@ export default function SubmissionStatusPage() {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId])
+  }, [submissionId, isAuthenticated])
 
   useEffect(() => {
     latestStatusRef.current = data?.submission?.status ?? null
@@ -225,6 +243,19 @@ export default function SubmissionStatusPage() {
   const items = data?.items ?? []
   const isRunning = submission?.status === 'running'
   const isTerminal = submission ? TERMINAL_STATUSES.has(submission.status) : false
+
+  // 🔒 Session not resolved yet, or the redirect to /login is in flight.
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+  if (isAuthenticated === false) return null
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">

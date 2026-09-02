@@ -189,6 +189,22 @@ function SubmissionsNewInner() {
   const toast = useToast()
   const { balance, isLoading: creditsLoading, refreshCredits } = useCredits()
 
+  // 🔒 Auth gate. Every fetch on this page already sends a bearer token and the
+  // API refuses without one, so nothing here leaked — but a logged-out visitor
+  // could still work through the whole intake UI and only discover the problem
+  // at commit. Same pattern as /upload, with ?redirect= so they land back here
+  // after signing in (honored by /login and by the OAuth callback).
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  useEffect(() => {
+    const session = getStoredSession()
+    if (!session?.user) {
+      setIsAuthenticated(false)
+      router.push(`/login?redirect=${encodeURIComponent('/submissions/new')}`)
+    } else {
+      setIsAuthenticated(true)
+    }
+  }, [router])
+
   const categoryParam = searchParams?.get('category') || ''
   const subCategoryParam = searchParams?.get('sub_category') || ''
 
@@ -943,6 +959,22 @@ function SubmissionsNewInner() {
   // ---------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------
+
+  // 🔒 Session not resolved yet — show nothing rather than a flash of the
+  // intake form to someone who is about to be redirected.
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 🔒 Redirect to /login is in flight.
+  if (isAuthenticated === false) return null
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
