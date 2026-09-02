@@ -230,15 +230,15 @@ export default function ConsentManager() {
           {gpcActive ? (
             <>
               Your browser is sending a Global Privacy Control signal, so optional tracking
-              (Google Analytics, Meta, Reddit) is turned off and will stay off. Essential
-              features like sign-in and checkout work normally. See our{' '}
+              (Google Analytics, Meta, Reddit, Microsoft Advertising) is turned off and will
+              stay off. Essential features like sign-in and checkout work normally. See our{' '}
               <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
             </>
           ) : (
             <>
               We use cookies and similar technologies for analytics and advertising. Optional tracking
-              (Google Analytics, Meta, Reddit) only runs if you allow it — essential features like
-              sign-in and checkout work either way. See our{' '}
+              (Google Analytics, Meta, Reddit, Microsoft Advertising) only runs if you allow it —
+              essential features like sign-in and checkout work either way. See our{' '}
               <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
             </>
           )}
