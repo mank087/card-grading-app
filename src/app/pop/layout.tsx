@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Population Report | DCM Grading',
+  // Root layout appends " | DCM Grading" via its title template.
+  title: 'Population Report',
   description:
     'Explore DCM Grading\'s population report — see every card graded by category, set, and individual card with grade distributions. Track grading volume and rarity across Pokemon, MTG, Sports, Lorcana, One Piece, and more.',
   openGraph: {

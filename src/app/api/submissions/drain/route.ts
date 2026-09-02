@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyAuth } from '@/lib/serverAuth';
 import { requireCron } from '@/lib/cronAuth';
+import { resolveSelfOrigin } from '@/lib/selfOrigin';
 import { deductCredit } from '@/lib/credits';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import {
@@ -68,23 +69,6 @@ function drainEnabled(): boolean {
   // Default ON. Only the explicit string 'false' disables it, so a missing or
   // typo'd env var cannot silently stop every submission on the platform.
   return (process.env.SUBMISSIONS_DRAIN_ENABLED || '').toLowerCase() !== 'false';
-}
-
-/**
- * Origin for the self-call. `request.nextUrl.origin` is what the existing
- * self-calling cron (api/cron/sync-costs) uses and it is the only value
- * guaranteed to reach *this* deployment — a preview or branch deploy must
- * call itself, not production. The env vars are the fallback for contexts
- * where the origin comes back empty.
- */
-function resolveOrigin(request: NextRequest): string {
-  const fromRequest = request.nextUrl?.origin;
-  if (fromRequest && /^https?:\/\//.test(fromRequest)) return fromRequest;
-  return (
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://dcmgrading.com'
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +393,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Drain disabled', disabled: true });
   }
 
-  const origin = resolveOrigin(request);
+  const origin = resolveSelfOrigin(request);
   const submissionId = new URL(request.url).searchParams.get('submission_id');
 
   const cron = requireCron(request, 'submissions/drain');

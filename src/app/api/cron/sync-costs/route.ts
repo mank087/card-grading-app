@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { resolveSelfOrigin } from '@/lib/selfOrigin'
 
 export const maxDuration = 180
 
@@ -114,7 +115,7 @@ async function run(request: NextRequest) {
     return unauthorized()
   }
 
-  const host = request.nextUrl.origin
+  const host = resolveSelfOrigin(request)
 
   const [openaiResult, stripeResult] = await Promise.all([
     runSubSync(host, '/api/admin/costs/openai/sync', cronSecret),

@@ -11,7 +11,8 @@ export async function generateMetadata({
   const name = meta?.displayName || getCategoryFromSlug(category);
 
   return {
-    title: `${name} Population Report | DCM Grading`,
+    // Root layout appends " | DCM Grading" via its title template.
+    title: `${name} Population Report`,
     description: `View every ${name} card graded by DCM — grade distributions, player stats, and grading volume. Explore the full ${name} population report.`,
     openGraph: {
       title: `${name} Population Report | DCM Grading`,
