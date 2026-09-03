@@ -4,6 +4,15 @@ import type { MarketplaceCard } from '../types';
 
 type SortKey = 'recent' | 'name' | 'grade' | 'value';
 
+/**
+ * How many rows are in the DOM at once. A collection of 2,000 cards used to
+ * render 2,000 list items — each with an image — on the first paint, which is
+ * seconds of jank before anyone can type in the search box. Search, filter,
+ * sort and Select all still run over the whole set; only the rendering is
+ * paged.
+ */
+const PAGE_SIZE = 60;
+
 interface Props {
   cards: MarketplaceCard[];
   onSelect: (card: MarketplaceCard) => void;
@@ -122,6 +131,12 @@ export default function CardPicker({
     return sorted;
   }, [localMatches, serverResults, q, categoryFilter, sort]);
 
+  // A new search or a re-sort is a new list, so the page count starts over —
+  // otherwise a search after scrolling deep renders hundreds of rows at once.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [q, categoryFilter, sort]);
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   // ------------------------------- selection -------------------------------
 
   const selected = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
@@ -129,7 +144,14 @@ export default function CardPicker({
   // what the user sees, so a range means what it looks like even after a
   // search or a re-sort.
   const anchorIndex = useRef<number | null>(null);
-  const [limitHit, setLimitHit] = useState(false);
+  const [limitHit, setLimitHit] = useState<string | null>(null);
+
+  const flashLimit = useCallback((message: string) => {
+    setLimitHit(message);
+    setTimeout(() => setLimitHit(null), 4000);
+  }, []);
+
+  const truncatedMessage = `Selected the first ${selectionLimit} — a batch holds ${selectionLimit} cards.`;
 
   const toggleAt = useCallback(
     (index: number, shiftKey: boolean) => {
@@ -141,37 +163,39 @@ export default function CardPicker({
 
       const from = shiftKey && anchorIndex.current !== null ? anchorIndex.current : index;
       const [lo, hi] = from <= index ? [from, index] : [index, from];
+      let truncated = false;
       for (let i = lo; i <= hi; i++) {
         const id = filtered[i]?.id;
         if (!id) continue;
-        if (turningOn) next.add(id);
-        else next.delete(id);
+        if (!turningOn) { next.delete(id); continue; }
+        // Take what fits rather than refusing the whole range: a shift-select
+        // over 300 rows used to do nothing at all.
+        if (next.size >= selectionLimit && !next.has(id)) { truncated = true; continue; }
+        next.add(id);
       }
       anchorIndex.current = index;
 
-      if (next.size > selectionLimit) {
-        setLimitHit(true);
-        setTimeout(() => setLimitHit(false), 4000);
-        return;
-      }
+      if (truncated) flashLimit(truncatedMessage);
       onSelectionChange(Array.from(next));
     },
-    [filtered, onSelectionChange, selectedIds, selectionLimit]
+    [filtered, flashLimit, onSelectionChange, selectedIds, selectionLimit, truncatedMessage]
   );
 
   const selectAllVisible = useCallback(() => {
     if (!onSelectionChange) return;
     const next = new Set(selectedIds ?? []);
+    let truncated = false;
     for (const card of filtered) {
-      if (next.size >= selectionLimit) break;
+      if (next.has(card.id)) continue;
+      // The old check added the whole filtered length to what was ALREADY
+      // selected, so re-pressing Select all counted the same cards twice and
+      // warned about a limit that had not been reached.
+      if (next.size >= selectionLimit) { truncated = true; break; }
       next.add(card.id);
     }
-    if (filtered.length + (selectedIds?.length ?? 0) > selectionLimit) {
-      setLimitHit(true);
-      setTimeout(() => setLimitHit(false), 4000);
-    }
+    if (truncated) flashLimit(truncatedMessage);
     onSelectionChange(Array.from(next));
-  }, [filtered, onSelectionChange, selectedIds, selectionLimit]);
+  }, [filtered, flashLimit, onSelectionChange, selectedIds, selectionLimit, truncatedMessage]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -242,7 +266,7 @@ export default function CardPicker({
 
       {selectionEnabled && limitHit && (
         <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
-          A batch holds at most {selectionLimit} cards. Publish this batch, then start another.
+          {limitHit} Publish this batch, then start another.
         </div>
       )}
 
@@ -257,7 +281,7 @@ export default function CardPicker({
         // 640px scroll trap is a known mobile anti-pattern. On lg screens
         // we cap it so the right-side explainer panel stays visible.
         <ul className="divide-y divide-gray-100 lg:max-h-[640px] lg:overflow-y-auto">
-          {filtered.map((card, index) => (
+          {visible.map((card, index) => (
             <li key={card.id} className={`flex items-center ${selected.has(card.id) ? 'bg-indigo-50' : ''}`}>
               {selectionEnabled && (
                 <label className="pl-3 py-3 flex items-center cursor-pointer">
@@ -304,6 +328,20 @@ export default function CardPicker({
               </button>
             </li>
           ))}
+          {visibleCount < filtered.length && (
+            <li className="p-3 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount(n => n + PAGE_SIZE)}
+                className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+              >
+                Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
+                <span className="text-gray-500 font-normal">
+                  {' '}({filtered.length - visibleCount} left)
+                </span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

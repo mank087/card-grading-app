@@ -20,6 +20,7 @@ import {
   ITEM_COLUMNS,
 } from '@/lib/ebay/bulkService';
 import { readinessPatch } from '@/lib/ebay/bulkReadiness';
+import { batchListingFormat, batchPostalCode } from '@/lib/ebay/bulkSettings';
 
 export const runtime = 'nodejs';
 
@@ -81,7 +82,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   for (let i = 0; i < rows.length; i += UPDATE_CHUNK) {
     await Promise.all(
       rows.slice(i, i + UPDATE_CHUNK).map(row => {
-        const { readiness, status } = readinessPatch({ ...row, status: 'draft' });
+        const { readiness, status } = readinessPatch(
+          { ...row, status: 'draft' },
+          batchListingFormat(batch.settings),
+          batchPostalCode(batch.settings)
+        );
         return supabase
           .from('ebay_bulk_items')
           .update({

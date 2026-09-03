@@ -33,7 +33,9 @@ import AppHeaderBar from '@/components/AppHeaderBar'
 import MobileTabBar from '@/components/MobileTabBar'
 import { useBulkBatch } from '@/hooks/useBulkBatch'
 import { useBulkPhotoPass } from '@/hooks/useBulkPhotoPass'
-import BulkSettingsSheet, { describePriceRule, describeShipping } from '@/components/bulk/BulkSettingsSheet'
+import BulkSettingsSheet, {
+  describePriceRule, describeShipping, describeListingFormat,
+} from '@/components/bulk/BulkSettingsSheet'
 import BulkItemSheet from '@/components/bulk/BulkItemSheet'
 import BulkPhotoPass from '@/components/bulk/BulkPhotoPass'
 import BulkProgressPanel, { type ProgressCounts, type BatchControl } from '@/components/bulk/BulkProgressPanel'
@@ -41,7 +43,7 @@ import SellerTermsGate from '@/components/bulk/SellerTermsGate'
 import OAuthModal from '@/components/marketplace/OAuthModal'
 import {
   deleteBatch, publishBatch, pauseBatch, resumeBatch, cancelBatch, retryItem,
-  getBulkLimits, BulkApiError, type NotReadyRow,
+  deleteItem, updateItem, getBulkLimits, BulkApiError, type NotReadyRow,
 } from '@/lib/ebayBulkApi'
 import { checkDisclaimer, getOAuthUrl } from '@/lib/ebayApi'
 import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
@@ -95,6 +97,17 @@ const RETRY_BATCH_STATUSES = new Set(['running', 'paused', 'complete', 'failed']
 /** How often a running batch is re-read. Same cadence as the web page. */
 const POLL_MS = 3000
 
+/**
+ * A running batch is published by the server, so a phone that briefly cannot
+ * reach us has NOT lost anything — one failed poll is not news. Three in a row
+ * (nine seconds of silence) is worth saying, in those terms.
+ */
+const POLL_FAIL_LIMIT = 3
+const POLL_ERROR_MESSAGE = "Can't reach DCM right now — listing continues on our servers."
+
+/** Draft-mode list filter. */
+type RowFilter = 'all' | 'needswork' | 'failed'
+
 function formatPrice(price: BulkItem['price']): string {
   const n = typeof price === 'string' ? Number(price) : price
   if (n == null || !Number.isFinite(n) || n <= 0) return 'No price'
@@ -104,11 +117,16 @@ function formatPrice(price: BulkItem['price']): string {
 export default function EbayBulkScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { batchId } = useLocalSearchParams<{ batchId?: string }>()
+  // `skipped` / `missing` ride along from the create call so the batch screen
+  // can account for the cards the seller picked but will not see here.
+  const { batchId, skipped, missing } = useLocalSearchParams<{
+    batchId?: string; skipped?: string; missing?: string
+  }>()
   const id = typeof batchId === 'string' ? batchId : undefined
 
   const {
-    batch, items, cards, listings, loading, error, notFound, refresh, setItem, setBatch,
+    batch, items, cards, listings, loading, refreshing, error, notFound,
+    refresh, setItem, setBatch,
   } = useBulkBatch(id)
 
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -128,6 +146,17 @@ export default function EbayBulkScreen() {
   const [limits, setLimits] = useState<BulkLimits | null>(null)
   const [controlBusy, setControlBusy] = useState<BatchControl | null>(null)
   const [retryAll, setRetryAll] = useState<{ done: number; total: number } | null>(null)
+  /** Set by Stop; the sequential retry loop reads it between cards. */
+  const stopRetryAll = useRef(false)
+  /** Which draft rows the list is showing. */
+  const [filter, setFilter] = useState<RowFilter>('all')
+  const [removingNotReady, setRemovingNotReady] = useState(false)
+  const [retryingPhotos, setRetryingPhotos] = useState(false)
+  /** Consecutive failed polls, and whether that has gone on long enough to say. */
+  const pollFailures = useRef(0)
+  const [pollError, setPollError] = useState(false)
+
+  const listRef = useRef<FlatList<BulkItem>>(null)
 
   // ─── Gates the server can raise mid-flow ─────────────────────────────────
   const [termsOpen, setTermsOpen] = useState(false)
@@ -186,6 +215,30 @@ export default function EbayBulkScreen() {
     [openItemId, items],
   )
 
+  /**
+   * The publish route refuses the whole batch unless every non-skipped row is
+   * ready, so these rows — not the ready ones — are what stands between the
+   * seller and eBay. They are the button, the filter and the bulk remove.
+   */
+  const notReadyItems = useMemo(
+    () => items.filter(i => i.status !== 'ready' && i.status !== 'skipped'),
+    [items],
+  )
+  const failedItems = useMemo(() => items.filter(i => i.status === 'failed'), [items])
+  const notReadyCount = notReadyItems.length
+
+  /** Rows whose slab art never rendered — the pass only picks up `pending`. */
+  const failedPhotoItems = useMemo(
+    () => items.filter(i => i.image_status === 'failed' && i.status !== 'skipped'),
+    [items],
+  )
+
+  const visibleItems = useMemo(() => {
+    if (!isDraft || filter === 'all') return items
+    if (filter === 'failed') return failedItems
+    return notReadyItems
+  }, [isDraft, filter, items, failedItems, notReadyItems])
+
   /* ───────────────────────────────────────────── polling + focus ───────── */
 
   /**
@@ -197,24 +250,40 @@ export default function EbayBulkScreen() {
    * ticks and re-reads the moment it comes forward — the drain does not need us
    * watching, and a phone in a pocket should not be making requests.
    */
+  const pollOnce = useCallback(async () => {
+    const ok = await refresh({ silent: true })
+    if (ok) {
+      pollFailures.current = 0
+      setPollError(false)
+    } else {
+      pollFailures.current += 1
+      if (pollFailures.current >= POLL_FAIL_LIMIT) setPollError(true)
+    }
+  }, [refresh])
+
   useEffect(() => {
     if (!id || status !== 'running') return
     const timer = setInterval(() => {
       if (AppState.currentState !== 'active') return
-      void refresh()
+      void pollOnce()
     }, POLL_MS)
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (next === 'active') void refresh()
+      if (next === 'active') void pollOnce()
     })
-    return () => { clearInterval(timer); sub.remove() }
-  }, [id, status, refresh])
+    return () => {
+      clearInterval(timer)
+      sub.remove()
+      pollFailures.current = 0
+      setPollError(false)
+    }
+  }, [id, status, pollOnce])
 
   // Coming back to this screen: re-read once. The mount effect covers the first
   // focus, so it is skipped.
   const firstFocus = useRef(true)
   useFocusEffect(useCallback(() => {
     if (firstFocus.current) { firstFocus.current = false; return }
-    void refresh()
+    void refresh({ silent: true })
   }, [refresh]))
 
   // The seller's remaining eBay allowance, read once. Advisory only — eBay's
@@ -226,6 +295,29 @@ export default function EbayBulkScreen() {
       .then(next => { if (!stale) setLimits(next) })
       .catch(() => { /* Unknown allowance is the normal case; say nothing. */ })
     return () => { stale = true }
+  }, [])
+
+  /**
+   * The create route quietly drops cards that already have a live eBay listing
+   * (and ids that aren't the seller's). Picking 40 and landing on 28 with no
+   * explanation reads as a bug, so the counts it returned are said once here.
+   */
+  useEffect(() => {
+    const skippedCount = Number(skipped) || 0
+    const missingCount = Number(missing) || 0
+    const parts: string[] = []
+    if (skippedCount > 0) {
+      parts.push(
+        `${skippedCount} card${skippedCount === 1 ? ' is' : 's are'} already listed on eBay and ` +
+        `${skippedCount === 1 ? 'was' : 'were'} skipped.`,
+      )
+    }
+    if (missingCount > 0) {
+      parts.push(`${missingCount} card${missingCount === 1 ? '' : 's'} could not be added.`)
+    }
+    if (parts.length > 0) showFlash(parts.join(' '))
+    // Once, on arrival — the params do not change while the screen is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /* ────────────────────────────────────────────────────── publishing ───── */
@@ -266,6 +358,9 @@ export default function EbayBulkScreen() {
     if (Array.isArray(body.notReady) && body.notReady.length > 0) {
       const rows = body.notReady as NotReadyRow[]
       setNotReadyIds(new Set(rows.map(r => r.itemId)))
+      // Point the list at exactly the rows the gate named — "tap a flagged row"
+      // is no help in a 100-card list where four of them are flagged.
+      setFilter('needswork')
       const issues = Array.from(new Set(rows.flatMap(r => r.issues ?? []))).slice(0, 3)
       setPublishNote(
         `${rows.length} card${rows.length === 1 ? " isn't" : "s aren't"} ready` +
@@ -291,7 +386,7 @@ export default function EbayBulkScreen() {
       setBatch(res.batch)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
       showFlash(`${res.queued} card${res.queued === 1 ? '' : 's'} queued for eBay.`)
-      void refresh()
+      void refresh({ silent: true })
     } catch (err) {
       handlePublishError(err)
     } finally {
@@ -301,10 +396,18 @@ export default function EbayBulkScreen() {
 
   const readyLabel = `${counts.ready} card${counts.ready === 1 ? '' : 's'}`
 
+  // An auction batch says how long the bidding runs, because that is the part
+  // of a publish there is no undoing.
+  const publishTitle = useMemo(() => {
+    if (batch?.settings?.listingFormat !== 'AUCTION') return `Publish ${readyLabel} to eBay?`
+    const days = String(batch.settings.duration ?? '').replace('DAYS_', '') || '7'
+    return `Publish ${readyLabel} as ${days}-day auctions?`
+  }, [batch?.settings, readyLabel])
+
   const handlePublishPress = useCallback(() => {
     Alert.alert(
-      `Publish ${readyLabel} to eBay?`,
-      "Every card has to be ready first — a card that isn't will hold the whole batch.",
+      publishTitle,
+      'Listing carries on after you close the app.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -329,7 +432,76 @@ export default function EbayBulkScreen() {
         },
       ],
     )
-  }, [readyLabel, doPublish])
+  }, [publishTitle, doPublish])
+
+  /**
+   * The honest version of the publish button while rows are outstanding: the
+   * route would refuse the batch, so the button does the thing that gets the
+   * seller closer instead — it shows them the rows.
+   */
+  const handleFixPress = useCallback(() => {
+    setFilter('needswork')
+    setPublishNote(null)
+    listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    Haptics.selectionAsync().catch(() => {})
+  }, [])
+
+  /** The other way out of a stuck batch: drop the rows rather than fix them. */
+  const handleRemoveNotReady = useCallback(() => {
+    if (!id || notReadyCount === 0 || removingNotReady) return
+    const targets = notReadyItems.map(i => i.id)
+    Alert.alert(
+      `Remove ${targets.length} card${targets.length === 1 ? '' : 's'} from this batch?`,
+      'They are taken out of this batch. The cards and their grades are untouched.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingNotReady(true)
+            setPublishNote(null)
+            let failures = 0
+            // Sequential for the same reason Retry all is: this is up to 100
+            // DELETEs and they are all ours to rate-limit.
+            for (const itemId of targets) {
+              try {
+                await deleteItem(id, itemId)
+              } catch {
+                failures += 1
+              }
+            }
+            setRemovingNotReady(false)
+            setFilter('all')
+            if (failures > 0) {
+              setBanner(`${failures} card${failures === 1 ? '' : 's'} could not be removed.`)
+            }
+            void refresh({ silent: true })
+          },
+        },
+      ],
+    )
+  }, [id, notReadyCount, notReadyItems, removingNotReady, refresh])
+
+  /**
+   * Batch-level photo retry. The pass only picks up rows marked `pending`, so
+   * each row is flipped back before it is handed over — the same two steps the
+   * row editor's own Retry photos does, once per failed card.
+   */
+  const handleRetryPhotosAll = useCallback(async () => {
+    if (!id || retryingPhotos || failedPhotoItems.length === 0) return
+    setRetryingPhotos(true)
+    for (const item of failedPhotoItems) {
+      try {
+        const res = await updateItem(id, item.id, { image_status: 'pending' })
+        setItem(item.id, res.item)
+        photoPass.enqueue(item.id)
+      } catch {
+        // A row that would not flip stays failed and keeps its own Retry.
+      }
+    }
+    setRetryingPhotos(false)
+  }, [id, retryingPhotos, failedPhotoItems, setItem, photoPass])
 
   /* ─────────────────────────────────────────────────── run controls ────── */
 
@@ -344,12 +516,12 @@ export default function EbayBulkScreen() {
         : await cancelBatch(id)
       setBatch(res.batch)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-      void refresh()
+      void refresh({ silent: true })
     } catch (err) {
       // A 409 means the batch moved under us (the drain finished it, another
       // device paused it) — show what the route said and re-read the truth.
       setPublishNote(err instanceof Error ? err.message : `Could not ${action} this batch.`)
-      void refresh()
+      void refresh({ silent: true })
     } finally {
       setControlBusy(null)
     }
@@ -441,17 +613,31 @@ export default function EbayBulkScreen() {
     const targets = items.filter(i => RETRYABLE_STATUSES.has(i.status))
     if (targets.length === 0 || retryAll) return
     setPublishNote(null)
+    stopRetryAll.current = false
     setRetryAll({ done: 0, total: targets.length })
     let lastMessage: string | null = null
+    let stoppedAt: number | null = null
     for (let i = 0; i < targets.length; i++) {
       const message = await retryOne(targets[i].id)
       if (message) lastMessage = message
       setRetryAll({ done: i + 1, total: targets.length })
+      // Checked after the card, not before it: a retry already on the wire is
+      // finished rather than abandoned half-published.
+      if (stopRetryAll.current) { stoppedAt = i + 1; break }
     }
+    stopRetryAll.current = false
     setRetryAll(null)
-    if (lastMessage) setPublishNote(lastMessage)
-    void refresh()
+    if (stoppedAt !== null) {
+      setPublishNote(`Stopped after ${stoppedAt} of ${targets.length} cards.`)
+    } else if (lastMessage) {
+      setPublishNote(lastMessage)
+    }
+    void refresh({ silent: true })
   }, [items, retryAll, retryOne, refresh])
+
+  const handleStopRetryAll = useCallback(() => {
+    stopRetryAll.current = true
+  }, [])
 
   /* ───────────────────────────────────────────────────────── draft UI ──── */
 
@@ -459,8 +645,8 @@ export default function EbayBulkScreen() {
     if (nextBatch) setBatch(nextBatch)
     // The route re-seeds title/price/description on every row whose *_edited
     // flag is false, so the list on screen is stale until it is re-read.
-    void refresh()
-    showFlash(`Settings saved · ${reseeded} row${reseeded === 1 ? '' : 's'} updated`)
+    void refresh({ silent: true })
+    showFlash(`Settings saved · ${reseeded} card${reseeded === 1 ? '' : 's'} updated`)
   }, [setBatch, refresh, showFlash])
 
   const handleDeleteBatch = useCallback(() => {
@@ -517,7 +703,11 @@ export default function EbayBulkScreen() {
         <AppHeaderBar showBack title="Bulk listing" />
         <View style={styles.centered}>
           <Ionicons name="alert-circle-outline" size={36} color={Colors.gray[400]} />
-          <Text style={styles.missingText}>{error}</Text>
+          {/* `error` is normally the route's own sentence; a 404 that arrived
+              before it was set would otherwise render nothing at all. */}
+          <Text style={styles.missingText}>
+            {error ?? "This batch isn't available anymore."}
+          </Text>
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => router.back()}
@@ -533,7 +723,11 @@ export default function EbayBulkScreen() {
   }
 
   const chip = BATCH_STATUS_STYLE[batch.status] ?? BATCH_STATUS_STYLE.draft
-  const publishDisabled = counts.ready === 0 || publishing || photoPass.running
+  /** Nothing is outstanding, so the button really can publish. */
+  const canAttemptPublish = notReadyCount === 0
+  const publishDisabled =
+    publishing || photoPass.running || removingNotReady ||
+    (canAttemptPublish && counts.ready === 0)
 
   return (
     <View style={styles.screen}>
@@ -562,7 +756,8 @@ export default function EbayBulkScreen() {
             {' · '}{counts.live} live · {counts.failed} failed
           </Text>
           <Text style={styles.headerDate}>
-            Price: {describePriceRule(batch.settings?.priceRule)} · Shipping: {describeShipping(batch.settings)}
+            {describeListingFormat(batch.settings)} · Price: {describePriceRule(batch.settings?.priceRule)}
+            {' · '}Shipping: {describeShipping(batch.settings)}
           </Text>
           <Text style={styles.headerDate}>
             Started {new Date(batch.created_at).toLocaleDateString()}
@@ -592,9 +787,14 @@ export default function EbayBulkScreen() {
           <Text style={styles.errorText}>{banner}</Text>
         </View>
       )}
-      {error && !notFound && (
+      {/* While the batch runs, a read failure is OUR problem, not the seller's:
+          the drain is on the server. One bad poll says nothing at all, and
+          three say it in terms that do not suggest the batch stopped. */}
+      {error && !notFound && (status !== 'running' || pollError) && (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>
+            {status === 'running' ? POLL_ERROR_MESSAGE : error}
+          </Text>
         </View>
       )}
       {publishNote && (
@@ -613,15 +813,50 @@ export default function EbayBulkScreen() {
         </View>
       )}
 
-      {isDraft && <BulkPhotoPass pass={photoPass} />}
+      {isDraft && (
+        <BulkPhotoPass
+          pass={photoPass}
+          failedPhotoCount={failedPhotoItems.length}
+          onRetryPhotos={() => { void handleRetryPhotosAll() }}
+          retryingPhotos={retryingPhotos}
+        />
+      )}
+
+      {/* Draft-mode filter strip. A zero chip is not a filter worth offering,
+          so only All is always there. */}
+      {isDraft && items.length > 0 && (
+        <View style={styles.filterRow}>
+          {([
+            ['all', 'All', items.length],
+            ['needswork', 'Needs work', notReadyCount],
+            ['failed', 'Failed', failedItems.length],
+          ] as const).map(([key, label, count]) => (
+            (key === 'all' || count > 0) && (
+              <TouchableOpacity
+                key={key}
+                style={[styles.filterChip, filter === key && styles.filterChipActive]}
+                onPress={() => setFilter(key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: filter === key }}
+                accessibilityLabel={`${label}, ${count} cards`}
+              >
+                <Text style={[styles.filterChipText, filter === key && styles.filterChipTextActive]}>
+                  {label} ({count})
+                </Text>
+              </TouchableOpacity>
+            )
+          ))}
+        </View>
+      )}
 
       <FlatList
-        data={items}
+        ref={listRef}
+        data={visibleItems}
         keyExtractor={item => item.id}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={{ paddingBottom: 12 + Math.max(insets.bottom, 4) }}
-        refreshing={false}
-        onRefresh={refresh}
+        refreshing={refreshing}
+        onRefresh={() => { void refresh() }}
         ListHeaderComponent={
           isDraft ? null : (
             <BulkProgressPanel
@@ -636,13 +871,21 @@ export default function EbayBulkScreen() {
               reconnecting={reconnecting}
               onRetryAll={() => { void handleRetryAll() }}
               retryAll={retryAll}
-              onBack={() => router.push('/(tabs)/instalist-marketplace' as any)}
+              onStopRetryAll={handleStopRetryAll}
+              // Replace, not push: this screen is where a publish ends, and
+              // pushing the tab on top of it left Back walking into a finished
+              // batch the seller had already said goodbye to.
+              onBack={() => router.replace('/(tabs)/instalist-marketplace' as any)}
             />
           )
         }
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Text style={styles.missingText}>This batch has no cards in it.</Text>
+            <Text style={styles.missingText}>
+              {isDraft && filter !== 'all' && items.length > 0
+                ? 'No cards match this filter.'
+                : 'This batch has no cards in it.'}
+            </Text>
           </View>
         }
         ListFooterComponent={
@@ -676,30 +919,62 @@ export default function EbayBulkScreen() {
       />
 
       {/* ─────────────────────────────────────────── publish bar ─────────── */}
+      {/* MobileTabBar below already pads the home indicator, so this bar does
+          not pad it a second time. */}
       {isDraft && (
-        <View style={[styles.publishBar, { paddingBottom: 12 + Math.max(insets.bottom, 4) }]}>
-          <View style={styles.publishTextCol}>
-            <Text style={styles.publishCount}>
-              {counts.ready} of {counts.total - counts.skipped} ready
-              {counts.skipped > 0 ? ` · ${counts.skipped} skipped` : ''}
-            </Text>
-            {allowanceNote && <Text style={styles.publishHint}>{allowanceNote}</Text>}
+        <View style={styles.publishBar}>
+          <View style={styles.publishTopRow}>
+            <View style={styles.publishTextCol}>
+              <Text style={styles.publishCount}>
+                {counts.ready} of {counts.total - counts.skipped} ready
+                {counts.skipped > 0 ? ` · ${counts.skipped} skipped` : ''}
+              </Text>
+              {allowanceNote && <Text style={styles.publishHint}>{allowanceNote}</Text>}
+            </View>
+            <TouchableOpacity
+              style={[styles.publishBtn, publishDisabled && styles.publishBtnDisabled]}
+              onPress={canAttemptPublish ? handlePublishPress : handleFixPress}
+              disabled={publishDisabled}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                canAttemptPublish
+                  ? `Publish ${readyLabel} to eBay`
+                  : `Show the ${notReadyCount} cards that are not ready`
+              }
+            >
+              {publishing
+                ? <ActivityIndicator size="small" color={Colors.white} />
+                : <Ionicons
+                    name={canAttemptPublish ? 'rocket' : 'construct'}
+                    size={18}
+                    color={Colors.white}
+                  />}
+              <Text style={styles.publishBtnText}>
+                {photoPass.running
+                  ? 'Preparing photos…'
+                  : canAttemptPublish
+                    ? `Publish ${readyLabel}`
+                    : `Fix ${notReadyCount} card${notReadyCount === 1 ? '' : 's'}`}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.publishBtn, publishDisabled && styles.publishBtnDisabled]}
-            onPress={handlePublishPress}
-            disabled={publishDisabled}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Publish ${readyLabel} to eBay`}
-          >
-            {publishing
-              ? <ActivityIndicator size="small" color={Colors.white} />
-              : <Ionicons name="rocket" size={18} color={Colors.white} />}
-            <Text style={styles.publishBtnText}>
-              {photoPass.running ? 'Preparing photos…' : `Publish ${readyLabel}`}
-            </Text>
-          </TouchableOpacity>
+          {/* The publish route is all-or-nothing, so a seller who does not want
+              to fix those rows needs the other way past them. */}
+          {!canAttemptPublish && !photoPass.running && (
+            <TouchableOpacity
+              style={styles.removeNotReadyBtn}
+              onPress={handleRemoveNotReady}
+              disabled={removingNotReady}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove the ${notReadyCount} cards that are not ready`}
+            >
+              {removingNotReady && <ActivityIndicator size="small" color={Colors.gray[500]} />}
+              <Text style={styles.removeNotReadyText}>
+                Remove the {notReadyCount} not-ready card{notReadyCount === 1 ? '' : 's'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -709,7 +984,7 @@ export default function EbayBulkScreen() {
           batch={batch}
           onClose={() => setSettingsOpen(false)}
           onSaved={handleSettingsSaved}
-          onConflict={message => { setBanner(message); void refresh() }}
+          onConflict={message => { setBanner(message); void refresh({ silent: true }) }}
         />
       )}
 
@@ -728,9 +1003,10 @@ export default function EbayBulkScreen() {
           // belongs to the review step, and the drain publishes whatever URLs
           // the row already carries.
           photosEditable={isDraft}
+          listingFormat={batch.settings?.listingFormat === 'AUCTION' ? 'AUCTION' : 'FIXED_PRICE'}
           onClose={() => setOpenItemId(null)}
           onItemChanged={handleItemChanged}
-          onItemRemoved={() => { setOpenItemId(null); void refresh() }}
+          onItemRemoved={() => { setOpenItemId(null); void refresh({ silent: true }) }}
           onEnqueuePhotos={photoPass.enqueue}
           onRetry={
             !isDraft && canRetry && RETRYABLE_STATUSES.has(openItem.status)
@@ -932,12 +1208,32 @@ const styles = StyleSheet.create({
   failedNote: { fontSize: 11, color: Colors.red[600], lineHeight: 15 },
   listingLink: { fontSize: 11, fontWeight: '700', color: Colors.purple[600] },
 
+  filterRow: {
+    flexDirection: 'row', gap: 6,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1, borderBottomColor: Colors.gray[200],
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+    borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white,
+  },
+  filterChipActive: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
+  filterChipText: { fontSize: 11, fontWeight: '700', color: Colors.gray[500] },
+  filterChipTextActive: { color: Colors.purple[700] },
+
   publishBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: Colors.white,
     borderTopWidth: 1, borderTopColor: Colors.gray[200],
-    paddingHorizontal: 12, paddingTop: 10,
+    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12,
+    gap: 8,
   },
+  publishTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  removeNotReadyBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 6,
+  },
+  removeNotReadyText: { fontSize: 12, fontWeight: '600', color: Colors.gray[600] },
   publishTextCol: { flex: 1, minWidth: 0, gap: 2 },
   publishCount: { fontSize: 12, fontWeight: '700', color: Colors.gray[900] },
   publishHint: { fontSize: 10, color: Colors.amber[700], lineHeight: 14 },

@@ -32,6 +32,7 @@ import {
 import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES, DEFAULT_DOMESTIC_SHIPPING_SERVICE, normalizeDomesticService } from '@/lib/ebay/tradingApi';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
+import { humanizeEnum } from '@/lib/ebay/listingLabels';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import {
   generateHtmlDescription,
@@ -110,6 +111,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const autoDescriptionRef = useRef<string>('');
   const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
   const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
+  const [defaultsError, setDefaultsError] = useState<string | null>(null);
 
   // Cross-org guard: org templates/branding only apply when the CALLER's org
   // is the same org that graded the card. A member of org A opening a card
@@ -127,16 +129,23 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     const session = getStoredSession();
     if (!session?.access_token) return;
     setSavingDefaults(which);
+    setDefaultsError(null);
     try {
       const res = await fetch('/api/ebay/listing-defaults', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ scope: defaultsScope, ...payload }),
       });
-      if (res.ok) {
-        setDefaultsSavedFlash(which === 'shipping' ? 'Shipping defaults saved' : 'Template saved');
-        setTimeout(() => setDefaultsSavedFlash(null), 2500);
+      // A silent failure here is the worst kind: the seller believes their
+      // defaults are saved and finds out on the next listing that they aren't.
+      if (!res.ok) {
+        setDefaultsError('Couldn’t save your defaults — try again.');
+        return;
       }
+      setDefaultsSavedFlash(which === 'shipping' ? 'Shipping defaults saved' : 'Template saved');
+      setTimeout(() => setDefaultsSavedFlash(null), 2500);
+    } catch {
+      setDefaultsError('Couldn’t save your defaults — try again.');
     } finally {
       setSavingDefaults(null);
     }
@@ -144,6 +153,25 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
   // Ref for scrollable content container
   const contentRef = useRef<HTMLDivElement>(null);
+  /** The dialog panel itself — the focus trap's boundary. */
+  const dialogRef = useRef<HTMLDivElement>(null);
+  /** The last ZIP we saved, so leaving the field twice is one write. */
+  const savedPostalCode = useRef<string | null>(null);
+
+  /**
+   * Remember the ships-from ZIP once it is a complete one. It is the same for
+   * every listing a seller makes and the one field they had to retype on each
+   * card — the shipping defaults already store it, nobody ever pressed Save.
+   */
+  const rememberPostalCode = () => {
+    const zip = shippingForm.postalCode;
+    if (zip.length !== 5 || savedPostalCode.current === zip) return;
+    savedPostalCode.current = zip;
+    void saveListingDefaults(
+      { shippingDefaults: { ...shippingForm, postalCode: zip, bestOfferEnabled } },
+      'shipping'
+    );
+  };
 
   // Image state
   const [imageUrls, setImageUrls] = useState<{
@@ -171,6 +199,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   // User-uploaded additional photos
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
   const additionalInputRef = useRef<HTMLInputElement>(null);
+  /** Shown when an upload picked more photos than eBay's 12 slots allow. */
+  const [imageCapNote, setImageCapNote] = useState<string | null>(null);
 
   // Ordered list of image references — mirrors the mobile flow. The user
   // reorders this list via arrow buttons; first SELECTED item becomes the
@@ -184,6 +214,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [description, setDescription] = useState('');
   const [showDescriptionCode, setShowDescriptionCode] = useState(false);
   const [price, setPrice] = useState('');
+  /** Where the pre-filled price came from — blank when nothing was seeded. */
+  const [seededPriceLabel, setSeededPriceLabel] = useState<string | null>(null);
   const [listingFormat, setListingFormat] = useState<'FIXED_PRICE' | 'AUCTION'>('FIXED_PRICE');
   const [bestOfferEnabled, setBestOfferEnabled] = useState(true); // Accept Offers enabled by default
   const [duration, setDuration] = useState('GTC');
@@ -248,6 +280,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     lists: policyLists,
     loading: policiesLoading,
     error: policiesError,
+    reload: reloadPolicies,
     addPolicy,
   } = usePolicyLists(sessionToken, isOpen && usePolicies);
 
@@ -304,6 +337,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
       setAdditionalImages([]);
       setImageOrder([]);
+      setImageCapNote(null);
       setListingResult(null);
       setExistingListing(null);
       setCheckingExistingListing(false);
@@ -318,14 +352,37 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // that org branding behind; clear them so they can never carry over.
       setActiveTemplate(null);
       setListingBranding(null);
+      // Policy ids and the grading-report attachment are per LISTING, and the
+      // block below only ever turns policies ON — without this reset, a card
+      // opened after a business-policy card carried that card's policy ids
+      // (and its uploaded report doc) into an unrelated listing.
+      setUsePolicies(false);
+      setPolicyForm({
+        shippingPolicyId: null,
+        returnPolicyId: null,
+        paymentPolicyId: null,
+        shippingPolicyName: null,
+        returnPolicyName: null,
+      });
+      setCreatingPolicy(null);
+      setIncludeGradingReport(true);
+      setGradingReportDocId(null);
+      setDefaultsError(null);
 
       // Seed the asking price from the shared value resolver — the same
       // number the collection/portfolio surfaces show for this card. Only
       // when we actually have a value; otherwise leave blank for the user.
       // Runs once per open/card (this effect), so it never clobbers a
       // price the user has typed mid-flow.
-      const { value: suggestedValue } = resolveCardValue(card);
+      const { value: suggestedValue, source: valueSource } = resolveCardValue(card);
       setPrice(suggestedValue > 0 ? suggestedValue.toFixed(2) : '');
+      setSeededPriceLabel(
+        suggestedValue > 0
+          ? valueSource === 'ebay-median'
+            ? 'Suggested from recent eBay sales'
+            : 'Suggested from your portfolio value'
+          : null
+      );
 
       // Default title + description + specifics: one pure assembly shared with
       // the bulk review list (see listingDraft.ts). The title uses the
@@ -516,6 +573,42 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       checkDisclaimerStatus();
     }
   }, [isOpen]);
+
+  // Esc closes — except mid-publish, where the listing request is in flight
+  // and closing loses the seller's only view of whether it landed. Same rule
+  // the header's close button already enforces.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && step !== 'publishing') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, step, onClose]);
+
+  /**
+   * Keep Tab inside the dialog. Deliberately simple — it cycles the focusable
+   * elements currently in the panel rather than tracking mutations, which is
+   * enough for a stepper whose contents change only between steps.
+   */
+  const trapFocus = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !dialogRef.current) return;
+    const focusable = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter(el => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    }
+  }, []);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -1349,11 +1442,18 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ebay-listing-modal-title"
+        onKeyDown={trapFocus}
+        className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">List on eBay</h2>
+            <h2 id="ebay-listing-modal-title" className="text-xl font-bold text-gray-900">List on eBay</h2>
             <p className="text-sm text-gray-500">{labelData.primaryName}</p>
           </div>
           <button
@@ -1412,7 +1512,19 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           {/* Error display */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
+              <p>{error}</p>
+              {/* A failed image render used to be terminal: the effect that
+                  kicks it off is guarded on `!imageBlobs.front`, which is
+                  still true after a failure, but the effect only fires on
+                  open. This is the way back. */}
+              {step === 'images' && !isLoading && !imageBlobs.front && (
+                <button
+                  onClick={() => generateImages()}
+                  className="mt-2 px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700"
+                >
+                  Try again
+                </button>
+              )}
             </div>
           )}
 
@@ -1574,7 +1686,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       Listing ID: {existingListing.listingId}
                     </p>
                     <p className="text-xs text-blue-600 mt-1">
-                      Status: {existingListing.status.charAt(0).toUpperCase() + existingListing.status.slice(1)}
+                      Status: {humanizeEnum(existingListing.status)}
                     </p>
                   </div>
                 </div>
@@ -1838,6 +1950,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       })()}
                     </span>
                   </div>
+                  {imageCapNote && (
+                    <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                      {imageCapNote}
+                    </div>
+                  )}
                   {/* Unified ordered grid — mirrors the mobile pattern. System
                       tiles (front/back/mini-report/raw front/raw back) and
                       user uploads share one running order, so the user can
@@ -1851,7 +1968,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     };
                     const mainIdx = imageOrder.findIndex(isItemSelected);
                     return (
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {imageOrder.map((item, idx) => {
                           const isFirst = idx === 0;
                           const isLast = idx === imageOrder.length - 1;
@@ -1939,7 +2056,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                                   type="button"
                                   disabled={isFirst}
                                   onClick={(e) => { e.stopPropagation(); moveImage(idx, -1); }}
-                                  className={`w-7 h-7 rounded flex items-center justify-center border ${
+                                  className={`w-10 h-10 rounded flex items-center justify-center border ${
                                     isFirst
                                       ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
                                       : 'border-purple-200 bg-white text-purple-600 hover:bg-purple-100'
@@ -1956,7 +2073,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                                   type="button"
                                   disabled={isLast}
                                   onClick={(e) => { e.stopPropagation(); moveImage(idx, 1); }}
-                                  className={`w-7 h-7 rounded flex items-center justify-center border ${
+                                  className={`w-10 h-10 rounded flex items-center justify-center border ${
                                     isLast
                                       ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
                                       : 'border-purple-200 bg-white text-purple-600 hover:bg-purple-100'
@@ -2016,6 +2133,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       const selectedAdditionalCount = additionalImages.filter(i => i.selected).length;
                       const remaining = Math.max(0, 12 - systemImageCount - selectedAdditionalCount);
                       const filesToAdd = files.slice(0, remaining);
+                      // Dropping the rest silently looked like the upload had
+                      // failed. eBay's cap is 12; say so.
+                      setImageCapNote(
+                        filesToAdd.length < files.length
+                          ? 'Up to 12 photos — the first 12 are used.'
+                          : null
+                      );
                       const newImages = filesToAdd.map(f => ({
                         id: crypto.randomUUID(),
                         blob: f,
@@ -2108,6 +2232,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       </details>
                       <div className="flex items-center gap-2">
                         {defaultsSavedFlash === 'Template saved' && <span className="text-xs text-green-600">Saved ✓</span>}
+                        {defaultsError && <span className="text-xs text-red-600">{defaultsError}</span>}
                         <button
                           type="button"
                           disabled={savingDefaults !== null}
@@ -2155,12 +2280,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="listing-price" className="block text-sm font-medium text-gray-700 mb-1">
                     {listingFormat === 'AUCTION' ? 'Starting Price (USD)' : 'Price (USD)'} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                     <input
+                      id="listing-price"
                       type="number"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
@@ -2169,11 +2295,17 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       step="0.01"
                     />
                   </div>
+                  {/* Where the pre-filled number came from: resolveCardValue,
+                      the same figure the collection and portfolio pages show. */}
+                  {seededPriceLabel && (
+                    <p className="mt-1 text-xs text-gray-500">{seededPriceLabel}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Listing Format</label>
+                  <label htmlFor="listing-format" className="block text-sm font-medium text-gray-700 mb-1">Listing Format</label>
                   <select
+                    id="listing-format"
                     value={listingFormat}
                     onChange={(e) => {
                       const newFormat = e.target.value as 'FIXED_PRICE' | 'AUCTION';
@@ -2212,9 +2344,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                <label htmlFor="listing-duration" className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
                 {listingFormat === 'AUCTION' ? (
                   <select
+                    id="listing-duration"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2487,9 +2620,27 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               {usePolicies && (
                 <div className="space-y-4">
                   {policiesLoading && <p className="text-sm text-gray-500">Loading your eBay policies…</p>}
+                  {/* Without a way out this was a dead end: three empty
+                      dropdowns and a publish eBay would refuse. Either retry
+                      the call, or fall back to the inline shipping form this
+                      listing can still be published with. */}
                   {policiesError && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                      {policiesError}
+                      <p>{policiesError}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={() => void reloadPolicies()}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700"
+                        >
+                          Retry loading policies
+                        </button>
+                        <button
+                          onClick={() => setUsePolicies(false)}
+                          className="text-xs font-semibold text-red-700 underline hover:no-underline"
+                        >
+                          Use per-listing shipping instead
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2552,11 +2703,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       shipping policy cannot quote a rate without them. */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-200">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
+                      <label htmlFor="listing-policy-zip" className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
                       <input
+                        id="listing-policy-zip"
                         type="text"
                         value={shippingForm.postalCode}
                         onChange={(e) => setShippingForm(f => ({ ...f, postalCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))}
+                        onBlur={rememberPostalCode}
                         placeholder="e.g. 90210"
                         className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         maxLength={5}
@@ -2566,8 +2719,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Package weight (oz)</label>
+                      <label htmlFor="listing-package-weight-oz" className="block text-sm font-medium text-gray-700 mb-1">Package weight (oz)</label>
                       <input
+                        id="listing-package-weight-oz"
                         type="number"
                         min="1"
                         value={shippingForm.packageWeightOz}
@@ -2597,7 +2751,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 {/* Shipping Type Selection - Calculated first */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost Type</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       { value: 'CALCULATED', label: 'Calculated', desc: 'Based on buyer location' },
                       { value: 'FREE', label: 'Free Shipping', desc: 'You cover shipping' },
@@ -2623,10 +2777,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 {/* Flat Rate Amount */}
                 {shippingForm.shippingType === 'FLAT_RATE' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Price</label>
+                    <label htmlFor="listing-shipping-price" className="block text-sm font-medium text-gray-700 mb-1">Shipping Price</label>
                     <div className="relative w-32">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                       <input
+                        id="listing-shipping-price"
                         type="number"
                         value={shippingForm.flatRateAmount}
                         onChange={(e) => setShippingForm(f => ({ ...f, flatRateAmount: parseFloat(e.target.value) || 0 }))}
@@ -2640,8 +2795,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                 {/* Shipping Service */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Service</label>
+                  <label htmlFor="listing-shipping-service" className="block text-sm font-medium text-gray-700 mb-1">Shipping Service</label>
                   <select
+                    id="listing-shipping-service"
                     value={shippingForm.domesticShippingService}
                     onChange={(e) => setShippingForm(f => ({ ...f, domesticShippingService: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2657,7 +2813,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   <h5 className="text-sm font-medium text-gray-700">Package Details</h5>
                   <p className="text-xs text-gray-500">Pre-filled for a small bubble mailer. Adjust if needed.</p>
 
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Weight (oz)</label>
                       <input
@@ -2703,11 +2859,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                 {/* Postal Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
+                  <label htmlFor="listing-ship-zip" className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
                   <input
+                    id="listing-ship-zip"
                     type="text"
                     value={shippingForm.postalCode}
                     onChange={(e) => setShippingForm(f => ({ ...f, postalCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))}
+                    onBlur={rememberPostalCode}
                     placeholder="e.g. 90210"
                     className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     maxLength={5}
@@ -2719,8 +2877,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                 {/* Handling Time */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Handling Time</label>
+                  <label htmlFor="listing-handling-time" className="block text-sm font-medium text-gray-700 mb-1">Handling Time</label>
                   <select
+                    id="listing-handling-time"
                     value={shippingForm.handlingDays}
                     onChange={(e) => setShippingForm(f => ({ ...f, handlingDays: parseInt(e.target.value) }))}
                     className="w-48 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2759,8 +2918,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   <div className="pl-4 space-y-3 border-l-2 border-purple-200">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Type</label>
+                        <label htmlFor="listing-shipping-type" className="block text-sm font-medium text-gray-700 mb-1">Shipping Type</label>
                         <select
+                          id="listing-shipping-type"
                           value={shippingForm.internationalShippingType}
                           onChange={(e) => setShippingForm(f => ({ ...f, internationalShippingType: e.target.value as any }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2772,10 +2932,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                       {shippingForm.internationalShippingType === 'FLAT_RATE' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">International Rate</label>
+                          <label htmlFor="listing-international-rate" className="block text-sm font-medium text-gray-700 mb-1">International Rate</label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                             <input
+                              id="listing-international-rate"
                               type="number"
                               value={shippingForm.internationalFlatRateCost}
                               onChange={(e) => setShippingForm(f => ({ ...f, internationalFlatRateCost: parseFloat(e.target.value) || 0 }))}
@@ -2789,8 +2950,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">International Service</label>
+                      <label htmlFor="listing-international-service" className="block text-sm font-medium text-gray-700 mb-1">International Service</label>
                       <select
+                        id="listing-international-service"
                         value={shippingForm.internationalShippingService}
                         onChange={(e) => setShippingForm(f => ({ ...f, internationalShippingService: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2802,8 +2964,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ship To</label>
+                      <label htmlFor="listing-ship-to" className="block text-sm font-medium text-gray-700 mb-1">Ship To</label>
                       <select
+                        id="listing-ship-to"
                         value={shippingForm.internationalShipToLocations[0] || 'Worldwide'}
                         onChange={(e) => setShippingForm(f => ({ ...f, internationalShipToLocations: [e.target.value] }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2849,8 +3012,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   {shippingForm.domesticReturnsAccepted && (
                     <div className="grid grid-cols-2 gap-4 pl-7">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
+                        <label htmlFor="listing-return-window" className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
                         <select
+                          id="listing-return-window"
                           value={shippingForm.domesticReturnPeriodDays}
                           onChange={(e) => setShippingForm(f => ({ ...f, domesticReturnPeriodDays: parseInt(e.target.value) }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2862,8 +3026,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
+                        <label htmlFor="listing-return-shipping" className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
                         <select
+                          id="listing-return-shipping"
                           value={shippingForm.domesticReturnShippingPaidBy}
                           onChange={(e) => setShippingForm(f => ({ ...f, domesticReturnShippingPaidBy: e.target.value as any }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2894,8 +3059,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     {shippingForm.internationalReturnsAccepted && (
                       <div className="grid grid-cols-2 gap-4 pl-7">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
+                          <label htmlFor="listing-return-window-2" className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
                           <select
+                            id="listing-return-window-2"
                             value={shippingForm.internationalReturnPeriodDays}
                             onChange={(e) => setShippingForm(f => ({ ...f, internationalReturnPeriodDays: parseInt(e.target.value) }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2907,8 +3073,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
+                          <label htmlFor="listing-return-shipping-2" className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
                           <select
+                            id="listing-return-shipping-2"
                             value={shippingForm.internationalReturnShippingPaidBy}
                             onChange={(e) => setShippingForm(f => ({ ...f, internationalReturnShippingPaidBy: e.target.value as any }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2935,6 +3102,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               {!usePolicies && (
                 <div className="flex items-center justify-end gap-2">
                   {defaultsSavedFlash === 'Shipping defaults saved' && <span className="text-xs text-green-600">Saved ✓</span>}
+                  {defaultsError && <span className="text-xs text-red-600">{defaultsError}</span>}
                   <button
                     type="button"
                     disabled={savingDefaults !== null}
@@ -3000,7 +3168,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                      duration === 'DAYS_5' ? '5 Days' :
                      duration === 'DAYS_7' ? '7 Days' :
                      duration === 'DAYS_10' ? '10 Days' :
-                     duration === 'DAYS_30' ? '30 Days' : duration}
+                     duration === 'DAYS_30' ? '30 Days' : humanizeEnum(duration)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -3244,28 +3412,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </svg>
                 <span>Connected as <span className="font-medium text-gray-900">{ebayUsername}</span></span>
               </div>
-              <button
-                onClick={async () => {
-                  if (!confirm('Are you sure you want to disconnect your eBay account?')) return;
-                  try {
-                    const session = getStoredSession();
-                    if (!session?.access_token) return;
-                    const response = await fetch('/api/ebay/disconnect', {
-                      method: 'POST',
-                      headers: { Authorization: `Bearer ${session.access_token}` },
-                    });
-                    if (response.ok) {
-                      setEbayConnectionStatus('not_connected');
-                      setEbayUsername(null);
-                    }
-                  } catch (error) {
-                    console.error('Failed to disconnect:', error);
-                  }
-                }}
-                className="text-sm text-gray-500 hover:text-red-600 transition-colors"
-              >
-                Disconnect
-              </button>
+              {/* Disconnecting is an ACCOUNT action, not a step in publishing
+                  one listing — it lives on the InstaList Settings tab now, a
+                  misclick away from nothing. */}
             </div>
           )}
 

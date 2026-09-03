@@ -1,12 +1,18 @@
 import { useCallback } from 'react';
 import type { MarketplaceListing } from '../types';
 import { useSortableRows, SortableTh } from './useSortableRows';
+import { humanizeEnum } from '@/lib/ebay/listingLabels';
 
 interface Props {
   listings: MarketplaceListing[];
 }
 
-type ActiveCol = 'card' | 'title' | 'price' | 'publishedAt' | 'url';
+type ActiveCol = 'card' | 'title' | 'price' | 'views' | 'publishedAt' | 'url';
+
+/** eBay's public item page for a listing id — where a seller edits a listing. */
+function editUrl(listingId: string | null): string | null {
+  return listingId ? `https://www.ebay.com/sl/sell/update?itemId=${listingId}` : null;
+}
 
 export default function MyListingsTab({ listings }: Props) {
   const getValue = useCallback((row: MarketplaceListing, key: ActiveCol) => {
@@ -14,13 +20,14 @@ export default function MyListingsTab({ listings }: Props) {
       case 'card': return row.cardName ?? '';
       case 'title': return row.title ?? '';
       case 'price': return row.price;
+      case 'views': return row.viewCount ?? 0;
       case 'publishedAt': return row.publishedAt ? new Date(row.publishedAt).getTime() : null;
       case 'url': return row.listingUrl ?? '';
       default: return null;
     }
   }, []);
 
-  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, ActiveCol>(
+  const { sortedRows, toggleSort, sortIndicator, ariaSort } = useSortableRows<MarketplaceListing, ActiveCol>(
     listings,
     getValue,
     'publishedAt',
@@ -60,19 +67,34 @@ export default function MyListingsTab({ listings }: Props) {
                   <span className="text-sm font-semibold text-gray-900">${safePrice(l.price)}</span>
                   <span className="text-xs text-gray-500">{formatDate(l.publishedAt)}</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">{l.listingFormat === 'AUCTION' ? 'Auction' : 'Fixed'} · {labelForDuration(l.duration)}</span>
-                  {l.listingUrl ? (
-                    <a
-                      href={l.listingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold"
-                    >
-                      Open
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a>
-                  ) : null}
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-gray-400">
+                    {l.listingFormat === 'AUCTION' ? 'Auction' : 'Fixed'} · {labelForDuration(l.duration)}
+                    {' · '}{l.viewCount ?? 0} views · {l.watchCount ?? 0} watching
+                  </span>
+                  <span className="flex items-center gap-3">
+                    {l.listingUrl ? (
+                      <a
+                        href={l.listingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold"
+                      >
+                        Open
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                    ) : null}
+                    {editUrl(l.listingId) ? (
+                      <a
+                        href={editUrl(l.listingId)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-500 hover:text-gray-800 font-semibold"
+                      >
+                        Edit on eBay &#8599;
+                      </a>
+                    ) : null}
+                  </span>
                 </div>
               </div>
             </div>
@@ -86,11 +108,12 @@ export default function MyListingsTab({ listings }: Props) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
-                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
-                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Price</SortableTh>
-                <SortableTh col="publishedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Published</SortableTh>
-                <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Price</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="views" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Views &middot; Watchers</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="publishedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Published</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -116,6 +139,11 @@ export default function MyListingsTab({ listings }: Props) {
                   <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                     ${safePrice(l.price)}
                   </td>
+                  {/* Views and watchers are populated by the eBay sync, so
+                      they are real numbers, not placeholders. */}
+                  <td className="px-4 py-3 text-sm text-right text-gray-700 whitespace-nowrap">
+                    {l.viewCount ?? 0} <span className="text-gray-400">&middot;</span> {l.watchCount ?? 0}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.publishedAt)}</td>
                   <td className="px-4 py-3 text-sm text-right">
                     {l.listingUrl ? (
@@ -130,6 +158,16 @@ export default function MyListingsTab({ listings }: Props) {
                       </a>
                     ) : (
                       <span className="text-gray-400">&mdash;</span>
+                    )}
+                    {editUrl(l.listingId) && (
+                      <a
+                        href={editUrl(l.listingId)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-gray-500 hover:text-gray-800 font-semibold mt-0.5"
+                      >
+                        Edit on eBay &#8599;
+                      </a>
                     )}
                   </td>
                 </tr>
@@ -147,15 +185,20 @@ function safePrice(n: number): string {
   return n.toFixed(2);
 }
 
+/**
+ * eBay's duration enums, in words. Anything unmapped is still an enum token
+ * ('Days_21', a future value) — turn it into something readable rather than
+ * printing eBay's identifier at the seller.
+ */
 function labelForDuration(d: string): string {
   switch (d) {
-    case 'Days_3': case 'DAYS_3': return '3d';
-    case 'Days_5': case 'DAYS_5': return '5d';
-    case 'Days_7': case 'DAYS_7': return '7d';
-    case 'Days_10': case 'DAYS_10': return '10d';
-    case 'Days_30': case 'DAYS_30': return '30d';
-    case 'GTC': return 'GTC';
-    default: return d || '';
+    case 'Days_3': case 'DAYS_3': return '3 days';
+    case 'Days_5': case 'DAYS_5': return '5 days';
+    case 'Days_7': case 'DAYS_7': return '7 days';
+    case 'Days_10': case 'DAYS_10': return '10 days';
+    case 'Days_30': case 'DAYS_30': return '30 days';
+    case 'GTC': return "Good 'Til Cancelled";
+    default: return humanizeEnum(d);
   }
 }
 

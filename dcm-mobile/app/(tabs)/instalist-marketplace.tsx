@@ -89,6 +89,13 @@ export default function InstalistMarketplaceTab() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   /** Bumped once a batch is started — tells the picker to leave selection mode. */
   const [selectionResetKey, setSelectionResetKey] = useState(0)
+  /**
+   * Picking cards for a batch collapses everything above the list. The
+   * connection row, stats, tab row and batches strip are all read-only here,
+   * and together with the action bar they left a phone a few hundred pixels
+   * for the one thing the seller is doing: scrolling their cards.
+   */
+  const [picking, setPicking] = useState(false)
   const [startingBatch, setStartingBatch] = useState(false)
   const [batchError, setBatchError] = useState<string | null>(null)
 
@@ -173,6 +180,14 @@ export default function InstalistMarketplaceTab() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageState]))
+
+  // The picker reports selection mode on its own transitions, but it cannot
+  // report one it never made: unmounted by a page-state change or a tab switch,
+  // it left this screen collapsed with no way back. Collapsing is a view state,
+  // so it is safe to drop whenever the picker is not on screen.
+  useEffect(() => {
+    if (pageState !== 'marketplace' || activeTab !== 'list') setPicking(false)
+  }, [pageState, activeTab])
 
   // ─── Default tab selection once marketplace is provisioned ────────────
   // Always default to "List a Card" — that's the action-oriented entry
@@ -277,8 +292,20 @@ export default function InstalistMarketplaceTab() {
     setBatchError(null)
   }, [])
 
+  /**
+   * MERGE, never replace: the picker hands over only the cards to add (already
+   * trimmed to the room left under the cap), so a hand-picked selection made
+   * under an earlier search survives "Select all" under the next one.
+   */
   const selectAllVisible = useCallback((ids: string[]) => {
-    setSelectedIds(new Set(ids))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (next.size >= MAX_BULK_ITEMS) break
+        next.add(id)
+      }
+      return next
+    })
     setBatchError(null)
   }, [])
 
@@ -298,7 +325,17 @@ export default function InstalistMarketplaceTab() {
       setSelectedIds(new Set())
       setSelectionResetKey(k => k + 1)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-      router.push({ pathname: '/pages/ebay-bulk', params: { batchId: result.batchId } })
+      // The route silently drops cards already listed on eBay (and ids that
+      // aren't the seller's). Carried through so the batch screen can say why
+      // it has fewer cards than were picked.
+      router.push({
+        pathname: '/pages/ebay-bulk',
+        params: {
+          batchId: result.batchId,
+          skipped: String(result.skippedCount ?? 0),
+          missing: String(result.missingCount ?? 0),
+        },
+      })
     } catch (err) {
       if (err instanceof BulkApiError) {
         // The routes author their own seller-facing copy; only the bare
@@ -371,7 +408,7 @@ export default function InstalistMarketplaceTab() {
       <IntroModal userId={user?.id} />
 
       {/* Connection chip + sync pill row */}
-      <View style={styles.subHeader}>
+      {!picking && <View style={styles.subHeader}>
         {ebayStatus?.connection?.ebay_username && (
           <View style={styles.connectedChip}>
             <View style={styles.connectedDot} />
@@ -384,15 +421,15 @@ export default function InstalistMarketplaceTab() {
         )}
         <View style={{ flex: 1 }} />
         <SyncStatusPill state={syncState} />
-      </View>
+      </View>}
 
       {/* Stats strip */}
-      <View style={styles.statsWrap}>
+      {!picking && <View style={styles.statsWrap}>
         <StatsStrip stats={stats} loading={refreshing && !stats} />
-      </View>
+      </View>}
 
       {/* Tab segmented control */}
-      <ScrollView
+      {!picking && <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.tabsRow}
@@ -426,13 +463,13 @@ export default function InstalistMarketplaceTab() {
             </TouchableOpacity>
           )
         })}
-      </ScrollView>
+      </ScrollView>}
 
       {/* Active tab content */}
       <View style={styles.tabContent}>
         {activeTab === 'list' && (
           <>
-            {bulkAvailable && <BulkBatchesStrip />}
+            {bulkAvailable && !picking && <BulkBatchesStrip />}
             <CardPicker
               cards={cards}
               truncated={cardsTruncated}
@@ -448,6 +485,7 @@ export default function InstalistMarketplaceTab() {
               onSelectAllVisible={selectAllVisible}
               onClearSelection={clearSelection}
               selectionResetKey={selectionResetKey}
+              onSelectionModeChange={setPicking}
             />
             {batchError && (
               <View style={styles.batchErrorBanner}>
@@ -455,7 +493,9 @@ export default function InstalistMarketplaceTab() {
               </View>
             )}
             {selectedIds.size > 0 && (
-              <View style={[styles.batchBar, { paddingBottom: 12 + Math.max(insets.bottom, 4) }]}>
+              // The Tabs bar below already pads the home indicator; padding it
+              // again here left a band of dead white under the button.
+              <View style={styles.batchBar}>
                 <TouchableOpacity
                   style={[styles.batchBtn, startingBatch && styles.batchBtnDisabled]}
                   onPress={startBatch}
@@ -559,7 +599,7 @@ const styles = StyleSheet.create({
   batchBar: {
     backgroundColor: Colors.white,
     borderTopWidth: 1, borderTopColor: Colors.gray[200],
-    paddingHorizontal: 12, paddingTop: 10,
+    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12,
   },
   batchBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

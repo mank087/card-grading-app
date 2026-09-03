@@ -39,7 +39,11 @@ interface Props {
   onToggleSelect?: (id: string) => void
   /** Hard cap; "Select all visible" fills up to it and never past it. */
   selectionLimit?: number
-  /** Called with the visible cards, in the order shown, up to the cap. */
+  /**
+   * Called with the cards to ADD, in the order shown, trimmed to the room left
+   * under the cap. The parent merges them into whatever is already selected —
+   * a "Select all" that threw away a hand-picked selection was the bug.
+   */
   onSelectAllVisible?: (ids: string[]) => void
   onClearSelection?: () => void
   /**
@@ -48,6 +52,13 @@ interface Props {
    * empty — clearing the last checkbox by hand keeps the mode on, as it should.
    */
   selectionResetKey?: number
+  /**
+   * Fires whenever the picker enters or leaves selection mode, so the parent
+   * can collapse everything above the list — with the app header, stats, tab
+   * row and action bar all on screen, a phone had a few hundred pixels left
+   * for the cards it was asking the seller to pick from.
+   */
+  onSelectionModeChange?: (selecting: boolean) => void
 }
 
 /** How long the "that's over the cap" notice stays up. */
@@ -61,7 +72,7 @@ const CAP_NOTICE_MS = 4000
 export default function CardPicker({
   cards, truncated, searchInFlight, onSelect, onRefresh, refreshing, onSearchQueryChange,
   selectable = false, selectedIds, onToggleSelect, selectionLimit = 100,
-  onSelectAllVisible, onClearSelection, selectionResetKey,
+  onSelectAllVisible, onClearSelection, selectionResetKey, onSelectionModeChange,
 }: Props) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
@@ -70,6 +81,8 @@ export default function CardPicker({
   // parent's, so the action bar and the batch POST read one source.
   const [selectionMode, setSelectionMode] = useState(false)
   const [capNotice, setCapNotice] = useState<string | null>(null)
+  /** "Selected (n)" — the list narrowed to what is already ticked. */
+  const [selectedOnly, setSelectedOnly] = useState(false)
 
   // Debounce the query → server fetch. 250ms feels snappy without
   // hammering the API. Cancel on every keystroke so we only fire the
@@ -91,6 +104,7 @@ export default function CardPicker({
     // a thin local re-filter so the picker stays instant while the
     // debounced fetch is in flight (no flicker of unfiltered cards).
     let result = cards
+    if (selectedOnly && selectedIds) result = result.filter(c => selectedIds.has(c.id))
     const q = query.trim().toLowerCase()
     if (q) {
       result = result.filter(c =>
@@ -109,15 +123,30 @@ export default function CardPicker({
       })
     }
     return sorted
-  }, [cards, query, sort])
+  }, [cards, query, sort, selectedOnly, selectedIds])
 
   const selectedCount = selectedIds?.size ?? 0
+
+  // Report mode changes (not the initial false) so the parent only reacts to
+  // a real transition.
+  const reportedMode = useRef(false)
+  useEffect(() => {
+    if (reportedMode.current === selectionMode) return
+    reportedMode.current = selectionMode
+    onSelectionModeChange?.(selectionMode)
+  }, [selectionMode, onSelectionModeChange])
+
+  const enterSelection = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {})
+    setSelectionMode(true)
+  }, [])
 
   // Leaving selection mode always clears — a hidden selection that resurfaces
   // on the next long-press is the classic multi-select trap.
   const exitSelection = useCallback(() => {
     setSelectionMode(false)
     setCapNotice(null)
+    setSelectedOnly(false)
     onClearSelection?.()
   }, [onClearSelection])
 
@@ -130,6 +159,7 @@ export default function CardPicker({
     if (firstResetKey.current) { firstResetKey.current = false; return }
     setSelectionMode(false)
     setCapNotice(null)
+    setSelectedOnly(false)
   }, [selectionResetKey])
 
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -160,14 +190,20 @@ export default function CardPicker({
   }, [selectable, selectionMode, selectedIds, onToggleSelect])
 
   const handleSelectAllVisible = useCallback(() => {
-    // Cap-aware, and in the order the seller is looking at — the first N of
-    // the current filter+sort, so "Select all" after sorting by value means
-    // "the N most valuable".
-    const ids = filtered.slice(0, selectionLimit).map(c => c.id)
-    if (filtered.length > selectionLimit) showCapNotice(BATCH_CAP_MESSAGE)
+    // Cap-aware, in the order the seller is looking at, and ADDITIVE: after
+    // searching for "Charizard" and ticking three, "Select all" on the next
+    // search has to keep those three. Only the room left under the cap is
+    // filled, so the parent never has to trim.
+    const room = Math.max(0, selectionLimit - selectedCount)
+    const fresh = filtered.filter(c => !selectedIds?.has(c.id)).map(c => c.id)
+    if (fresh.length > room) showCapNotice(BATCH_CAP_MESSAGE)
+    if (room === 0) return
     Haptics.selectionAsync().catch(() => {})
-    onSelectAllVisible?.(ids)
-  }, [filtered, selectionLimit, onSelectAllVisible, showCapNotice])
+    onSelectAllVisible?.(fresh.slice(0, room))
+  }, [filtered, selectedIds, selectedCount, selectionLimit, onSelectAllVisible, showCapNotice])
+
+  /** A search or the selected-only filter is on, so "all" means "all of these". */
+  const narrowed = query.trim().length > 0 || selectedOnly
 
   return (
     <View style={styles.container}>
@@ -176,39 +212,56 @@ export default function CardPicker({
           <TouchableOpacity
             onPress={exitSelection}
             style={styles.selectionAction}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Cancel selection"
             accessibilityRole="button"
           >
             <Ionicons name="close" size={20} color={Colors.gray[700]} />
           </TouchableOpacity>
+          {/* The cap is not a target, so it is not in the running count — it
+              shows up as BATCH_CAP_MESSAGE at the moment it actually bites. */}
           <Text style={styles.selectionCount} accessibilityLiveRegion="polite">
-            {selectedCount} of {selectionLimit} selected
+            {selectedCount} selected
           </Text>
+          {selectedCount > 0 && (
+            <TouchableOpacity
+              onPress={() => setSelectedOnly(v => !v)}
+              style={[styles.selectedChip, selectedOnly && styles.selectedChipActive]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={selectedOnly ? 'Show all cards' : 'Show only selected cards'}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedOnly }}
+            >
+              <Text style={[styles.selectedChipText, selectedOnly && styles.selectedChipTextActive]}>
+                Selected ({selectedCount})
+              </Text>
+            </TouchableOpacity>
+          )}
           <View style={{ flex: 1 }} />
-          <TouchableOpacity
-            onPress={handleSelectAllVisible}
-            style={styles.selectionAction}
-            accessibilityLabel="Select all visible cards"
-            accessibilityRole="button"
-          >
-            <Text style={styles.selectionActionText}>Select all visible</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { setCapNotice(null); onClearSelection?.() }}
-            style={styles.selectionAction}
-            accessibilityLabel="Clear selected cards"
-            accessibilityRole="button"
-          >
-            <Text style={styles.selectionActionText}>Clear</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setSelectionMode(false)}
-            style={styles.selectionAction}
-            accessibilityLabel="Done selecting"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.selectionActionText, styles.selectionActionDone]}>Done</Text>
-          </TouchableOpacity>
+          {!selectedOnly && (
+            <TouchableOpacity
+              onPress={handleSelectAllVisible}
+              style={styles.selectionAction}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Select all the cards shown"
+              accessibilityRole="button"
+            >
+              <Text style={styles.selectionActionText}>
+                {narrowed ? `Select all ${filtered.length} shown` : 'Select all'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {selectedCount > 0 && (
+            <TouchableOpacity
+              onPress={() => { setCapNotice(null); setSelectedOnly(false); onClearSelection?.() }}
+              style={styles.selectionAction}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Clear selected cards"
+              accessibilityRole="button"
+            >
+              <Text style={styles.selectionActionText}>Clear</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -222,10 +275,12 @@ export default function CardPicker({
       {truncated && (
         <View style={styles.truncatedBanner}>
           <Ionicons name="information-circle" size={14} color={Colors.amber[600]} />
+          {/* No numbers: the API says THAT the list was cut, never where. A
+              hard-coded "100+" or "2000" is a promise we cannot keep. */}
           <Text style={styles.truncatedText}>
             {query.trim()
-              ? `100+ matches. Refine your search to narrow it down.`
-              : `Showing your 2000 most recently graded cards. Use search to find older ones.`}
+              ? 'More matches than fit here. Refine your search to narrow it down.'
+              : 'Showing your most recent cards — search to find older ones.'}
           </Text>
         </View>
       )}
@@ -259,6 +314,21 @@ export default function CardPicker({
           <Ionicons name="swap-vertical" size={16} color={Colors.purple[600]} />
           <Text style={styles.sortButtonText}>Sort</Text>
         </TouchableOpacity>
+        {/* Multi-select used to live in the list header, where it scrolled away
+            with the first few cards and was never seen again. Long-press still
+            works for the sellers who found it. */}
+        {selectable && !selectionMode && (
+          <TouchableOpacity
+            style={styles.selectSeveralBtn}
+            onPress={enterSelection}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Select several cards to list together"
+            accessibilityRole="button"
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={Colors.purple[600]} />
+            <Text style={styles.sortButtonText}>Select several</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Sort bottom sheet — light-weight, no extra deps */}
@@ -305,10 +375,13 @@ export default function CardPicker({
           </View>
         }
         ListHeaderComponent={
-          <Text style={styles.resultCount}>
-            {filtered.length} {filtered.length === 1 ? 'card' : 'cards'} ready to list
-            {selectable && !selectionMode ? ' · hold to pick several' : ''}
-          </Text>
+          <View style={styles.resultRow}>
+            <Text style={styles.resultCount}>
+              {selectedOnly
+                ? `${filtered.length} selected`
+                : `${filtered.length} ${filtered.length === 1 ? 'card' : 'cards'} ready to list`}
+            </Text>
+          </View>
         }
         extraData={selectionMode ? selectedIds : null}
         renderItem={({ item }) => {
@@ -387,7 +460,6 @@ const styles = StyleSheet.create({
   },
   selectionAction: { paddingHorizontal: 6, paddingVertical: 4 },
   selectionActionText: { fontSize: 12, fontWeight: '700', color: Colors.purple[600] },
-  selectionActionDone: { color: Colors.gray[700] },
   selectionCount: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
   capNotice: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
@@ -417,10 +489,27 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 12,
   },
   sortButtonText: { fontSize: 13, fontWeight: '600', color: Colors.purple[700] },
+  resultRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
   resultCount: {
     fontSize: 11, fontWeight: '600', color: Colors.gray[500],
-    paddingHorizontal: 12, paddingVertical: 8, textTransform: 'uppercase', letterSpacing: 0.4,
+    textTransform: 'uppercase', letterSpacing: 0.4, flexShrink: 1,
   },
+  selectSeveralBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.white,
+    borderColor: Colors.purple[200], borderWidth: 1,
+    borderRadius: 10, paddingHorizontal: 10,
+  },
+  selectedChip: {
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8,
+    borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white,
+  },
+  selectedChipActive: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
+  selectedChipText: { fontSize: 11, fontWeight: '700', color: Colors.gray[500] },
+  selectedChipTextActive: { color: Colors.purple[700] },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12, paddingHorizontal: 12,

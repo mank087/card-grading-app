@@ -72,6 +72,7 @@ import { CardGradingReport, type ReportCardData } from '@/components/reports/Car
 // Collapsed anyway: one rule living in three places is free to drift, and two of
 // the three had already drifted.
 import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
+import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
 
 declare global {
   interface Window {
@@ -402,7 +403,10 @@ export default function EbayImagePrepPage() {
             backImageUrl: backJpeg,
             conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
             labelCondition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
-            gradeRange: card.conversational_grade_uncertainty || '±0.5',
+            // Derived from the confidence letter, like the web listing modal
+            // and the PDF reports. '±0.5' was not a value on the rubric's
+            // scale (A=±0, B=±1, C=±2, D=±3), and this image is public.
+            gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence),
             heritage: heritageSel.active
               ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: heritageSel.gradeColors }
               : undefined,

@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Modal, ScrollView, TextInput, TouchableOpacity, Image,
-  ActivityIndicator, Alert, StyleSheet,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -33,7 +33,7 @@ import {
 } from '@/lib/ebayBulkApi'
 import {
   EBAY_TITLE_MAX,
-  type BulkItem, type BulkItemSpecific, type BulkCard,
+  type BulkItem, type BulkItemSpecific, type BulkCard, type BulkBatchSettings,
 } from '@/lib/ebayBulkTypes'
 
 type Tab = 'details' | 'description' | 'specifics' | 'images'
@@ -62,6 +62,8 @@ interface Props {
    * Web parity with the drawer's `repair` mode.
    */
   photosEditable: boolean
+  /** The batch's format: an auction row's price is its opening bid. */
+  listingFormat: BulkBatchSettings['listingFormat']
   onClose: () => void
   /** A server-returned row — merge it into the list without a refetch. */
   onItemChanged: (item: BulkItem) => void
@@ -89,7 +91,7 @@ function sameSpecifics(a: BulkItemSpecific[], b: BulkItemSpecific[]): boolean {
 }
 
 export default function BulkItemSheet({
-  visible, batchId, item, card, editable, photosEditable,
+  visible, batchId, item, card, editable, photosEditable, listingFormat,
   onClose, onItemChanged, onItemRemoved, onEnqueuePhotos, onRetry,
 }: Props) {
   const insets = useSafeAreaInsets()
@@ -199,7 +201,7 @@ export default function BulkItemSheet({
   const handleRegenerate = useCallback(() => {
     Alert.alert(
       'Rebuild this listing?',
-      'The title, price, description and item specifics go back to what DCM generated. Anything you typed on this row is lost. Photos are untouched.',
+      'The title, price, description and item specifics go back to what DCM generated. Anything you typed on this card is lost. Photos are untouched.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -213,7 +215,7 @@ export default function BulkItemSheet({
               onItemChanged(res.item)
               setNote('Listing rebuilt from the card.')
             } catch (err) {
-              setError(err instanceof Error ? err.message : 'Could not rebuild this row.')
+              setError(err instanceof Error ? err.message : 'Could not rebuild this card.')
             } finally {
               setBusy(null)
             }
@@ -341,7 +343,12 @@ export default function BulkItemSheet({
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* The title, price, description and every specific are text fields, and
+          Save is pinned to the bottom — both have to stay above the keyboard. */}
+      <KeyboardAvoidingView
+        style={[styles.screen, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.header}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -428,7 +435,9 @@ export default function BulkItemSheet({
                 </View>
               )}
 
-              <Text style={styles.fieldLabel}>Price ($)</Text>
+              <Text style={styles.fieldLabel}>
+                {listingFormat === 'AUCTION' ? 'Starting price ($)' : 'Price ($)'}
+              </Text>
               <TextInput
                 style={styles.input}
                 value={price}
@@ -471,7 +480,7 @@ export default function BulkItemSheet({
           {tab === 'specifics' && (
             <View>
               {specifics.length === 0 && (
-                <Text style={styles.mutedText}>No item specifics on this row yet.</Text>
+                <Text style={styles.mutedText}>No item specifics on this card yet.</Text>
               )}
               {specifics.map((spec, index) => {
                 // eBay's MULTI-cardinality aspects (Player/Athlete, Features,
@@ -544,7 +553,7 @@ export default function BulkItemSheet({
                 </TouchableOpacity>
               )}
               {urls.length === 0 && item.image_status === 'ready' && (
-                <Text style={styles.mutedText}>No photos on this row — it cannot publish.</Text>
+                <Text style={styles.mutedText}>No photos on this card — it cannot publish.</Text>
               )}
 
               <View style={styles.photoGrid}>
@@ -556,10 +565,14 @@ export default function BulkItemSheet({
                     <Image source={{ uri: url }} style={styles.photoThumb} resizeMode="cover" />
                     {photosEditable && editable && (
                       <View style={styles.photoActions}>
+                        {/* The tiles are a third of the width, so the buttons
+                            are smaller than a fingertip; the slop is what makes
+                            them hittable. */}
                         <TouchableOpacity
                           disabled={index === 0}
                           onPress={() => moveUrl(index, -1)}
                           style={[styles.photoBtn, index === 0 && styles.photoBtnDisabled]}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           accessibilityLabel="Move photo earlier"
                         >
                           <Ionicons name="arrow-back" size={12} color={index === 0 ? Colors.gray[300] : Colors.purple[600]} />
@@ -568,6 +581,7 @@ export default function BulkItemSheet({
                           disabled={index === urls.length - 1}
                           onPress={() => moveUrl(index, 1)}
                           style={[styles.photoBtn, index === urls.length - 1 && styles.photoBtnDisabled]}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           accessibilityLabel="Move photo later"
                         >
                           <Ionicons name="arrow-forward" size={12} color={index === urls.length - 1 ? Colors.gray[300] : Colors.purple[600]} />
@@ -575,6 +589,7 @@ export default function BulkItemSheet({
                         <TouchableOpacity
                           onPress={() => setUrls(prev => prev.filter((_, i) => i !== index))}
                           style={styles.photoBtn}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           accessibilityLabel="Remove photo"
                         >
                           <Ionicons name="close" size={12} color={Colors.red[600]} />
@@ -670,7 +685,7 @@ export default function BulkItemSheet({
               : <Text style={styles.saveBtnText}>Save</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

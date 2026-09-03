@@ -48,9 +48,11 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
 
         if (response.ok) {
           const data = await response.json();
+          // /api/ebay/status nests the account under `connection`; the old
+          // `data.username` was always undefined.
           setEbayStatus({
             connected: data.connected,
-            username: data.username,
+            username: data.connection?.ebay_username ?? undefined,
             loading: false,
           });
         } else {

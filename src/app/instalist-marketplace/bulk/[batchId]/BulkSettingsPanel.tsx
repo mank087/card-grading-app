@@ -19,7 +19,12 @@ import {
   DOMESTIC_SHIPPING_SERVICES,
   INTERNATIONAL_SHIPPING_SERVICES,
 } from '@/lib/ebay/tradingApi';
-import type { BulkBatchSettings, BulkPriceRule } from '@/lib/ebay/bulkSettings';
+import {
+  BULK_AUCTION_DURATIONS,
+  DEFAULT_AUCTION_DURATION,
+  type BulkBatchSettings,
+  type BulkPriceRule,
+} from '@/lib/ebay/bulkSettings';
 import {
   usePolicyLists,
   PolicySelect,
@@ -60,7 +65,10 @@ export default function BulkSettingsPanel({
   itemCount,
   allowance,
 }: Props) {
-  const [open, setOpen] = useState(true);
+  // Collapsed on a revisit: a batch that already carries a saved ZIP has been
+  // through this panel once, and the reviewer came back for the rows, not the
+  // form. First visit (nothing saved yet) still opens on the settings.
+  const [open, setOpen] = useState(() => !settings.shipping.postalCode.trim());
   const ship = settings.shipping;
   const usePolicies = settings.policies.useBusinessPolicies;
   const [creatingPolicy, setCreatingPolicy] = useState<null | 'shipping' | 'returns'>(null);
@@ -74,6 +82,17 @@ export default function BulkSettingsPanel({
   const setShip = (patch: Partial<BulkBatchSettings['shipping']>) =>
     onChange({ ...settings, shipping: { ...ship, ...patch } });
   const setRule = (rule: BulkPriceRule) => onChange({ ...settings, priceRule: rule });
+  const isAuction = settings.listingFormat === 'AUCTION';
+  // A price on an auction row is the opening bid, not an asking price.
+  const priceWord = isAuction ? 'Starting price' : 'Asking price';
+  // Best Offer is not a thing eBay allows on an auction, and fixed price has
+  // exactly one duration — so each switch carries the other two fields with it.
+  const setFormat = (listingFormat: BulkBatchSettings['listingFormat']) =>
+    onChange(
+      listingFormat === 'AUCTION'
+        ? { ...settings, listingFormat, duration: DEFAULT_AUCTION_DURATION, bestOfferEnabled: false }
+        : { ...settings, listingFormat, duration: 'GTC' }
+    );
   const setPolicies = (patch: Partial<BulkBatchSettings['policies']>) =>
     onChange({ ...settings, policies: { ...settings.policies, ...patch } });
 
@@ -87,6 +106,29 @@ export default function BulkSettingsPanel({
           !(settings.priceRule.percent >= 1 && settings.priceRule.percent <= 1000)
         ? 'Percent must be between 1 and 1000.'
         : null;
+
+  // eBay refuses an AddItem with no ships-from location, so a blank ZIP is a
+  // batch-wide blocker, not a nicety — the same string readiness fails rows on.
+  const zipError = ship.postalCode.trim() ? null : 'Enter the ZIP you ship from.';
+
+  const zipField = (id: string) => (
+    <div>
+      <label className={labelClass} htmlFor={id}>
+        Ships from ZIP <span className="text-red-500">*</span>
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        value={ship.postalCode}
+        onChange={e => setShip({ postalCode: e.target.value })}
+        placeholder="Required"
+        aria-invalid={zipError !== null}
+        className={`${inputClass} max-w-[10rem]`}
+      />
+      {zipError && <p className="mt-1 text-xs text-red-600" role="alert">{zipError}</p>}
+    </div>
+  );
 
   return (
     <section className="bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -109,11 +151,71 @@ export default function BulkSettingsPanel({
         </button>
       </header>
 
+      {/* Outside the collapse: an allowance shortfall decides how much of this
+          batch eBay will actually take, and a collapsed panel would hide it. */}
+      {allowance !== null && allowance < itemCount && (
+        <div className="px-4 py-3 border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
+          eBay will only accept {allowance} of these {itemCount} right now. The other{' '}
+          {itemCount - allowance} will be held until your limit frees up.
+        </div>
+      )}
+
       {open && (
         <div className="p-4 space-y-5">
+          {/* ---------------------------------------------------- format -- */}
+          <div>
+            <p className={labelClass}>Format</p>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { value: 'FIXED_PRICE', label: 'Buy It Now' },
+                { value: 'AUCTION', label: 'Auction' },
+              ] as const).map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFormat(option.value)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
+                    settings.listingFormat === option.value
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {/* The Best Offer toggle below simply disappears on an auction,
+                which reads as a bug unless we say why. */}
+            {isAuction && (
+              <p className="mt-1.5 text-xs text-gray-500">
+                Best Offer isn&rsquo;t available on auctions.
+              </p>
+            )}
+            {isAuction && (
+              <div className="mt-2 max-w-[10rem]">
+                <label className={labelClass} htmlFor="bulk-duration">Duration</label>
+                <select
+                  id="bulk-duration"
+                  value={settings.duration}
+                  onChange={e =>
+                    onChange({
+                      ...settings,
+                      duration: e.target.value as BulkBatchSettings['duration'],
+                    })
+                  }
+                  className={inputClass}
+                >
+                  {BULK_AUCTION_DURATIONS.map(d => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* ------------------------------------------------ price rule -- */}
           <div>
-            <p className={labelClass}>Asking price</p>
+            <p className={labelClass}>{priceWord}</p>
             <div className="flex flex-wrap gap-2">
               {([
                 { mode: 'estimate', label: 'DCM estimate' },
@@ -161,7 +263,9 @@ export default function BulkSettingsPanel({
             )}
             {settings.priceRule.mode === 'fixed' && (
               <div className="mt-2 max-w-[10rem]">
-                <label className={labelClass} htmlFor="bulk-price-fixed">Price ($)</label>
+                <label className={labelClass} htmlFor="bulk-price-fixed">
+                  {isAuction ? 'Starting price ($)' : 'Price ($)'}
+                </label>
                 <input
                   id="bulk-price-fixed"
                   type="number"
@@ -246,18 +350,7 @@ export default function BulkSettingsPanel({
                   labelClass={labelClass}
                 />
               )}
-              <div>
-                <label className={labelClass} htmlFor="bulk-policy-zip">Ships from ZIP</label>
-                <input
-                  id="bulk-policy-zip"
-                  type="text"
-                  inputMode="numeric"
-                  value={ship.postalCode}
-                  onChange={e => setShip({ postalCode: e.target.value })}
-                  placeholder="Required"
-                  className={`${inputClass} max-w-[10rem]`}
-                />
-              </div>
+              {zipField('bulk-policy-zip')}
             </div>
           )}
 
@@ -316,18 +409,7 @@ export default function BulkSettingsPanel({
                 className={inputClass}
               />
             </div>
-            <div>
-              <label className={labelClass} htmlFor="bulk-ship-zip">Ships from ZIP</label>
-              <input
-                id="bulk-ship-zip"
-                type="text"
-                inputMode="numeric"
-                value={ship.postalCode}
-                onChange={e => setShip({ postalCode: e.target.value })}
-                placeholder="Required"
-                className={inputClass}
-              />
-            </div>
+            {zipField('bulk-ship-zip')}
           </div>
           )}
 
@@ -457,19 +539,28 @@ export default function BulkSettingsPanel({
           </div>
           )}
 
-          {/* -------------------------------------------------- format ---- */}
+          {/* -------------------------------------------- format summary -- */}
+          {/* eBay does not allow Best Offer on an auction, so the toggle is
+              gone rather than disabled — the same posture as the single-card
+              modal, which hides it too. */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={settings.bestOfferEnabled}
-                onChange={e => onChange({ ...settings, bestOfferEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              Accept offers (Best Offer)
-            </label>
+            {!isAuction && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={settings.bestOfferEnabled}
+                  onChange={e => onChange({ ...settings, bestOfferEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Accept offers (Best Offer)
+              </label>
+            )}
             <span className="text-xs text-gray-500">
-              Format: fixed price, Good &rsquo;Til Cancelled (eBay&rsquo;s only fixed-price duration)
+              {isAuction
+                ? `Format: auction, ${
+                    BULK_AUCTION_DURATIONS.find(d => d.value === settings.duration)?.label ?? '7 Days'
+                  } (no Best Offer on auctions)`
+                : 'Format: fixed price, Good ’Til Cancelled (eBay’s only fixed-price duration)'}
             </span>
           </div>
 
@@ -481,7 +572,7 @@ export default function BulkSettingsPanel({
               disabled={!dirty || applying || priceError !== null}
               className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
             >
-              {applying ? 'Applying…' : 'Apply to every row'}
+              {applying ? 'Applying…' : `Apply to all ${itemCount} card${itemCount === 1 ? '' : 's'}`}
             </button>
             {/* Policy defaults are account state, saved from the InstaList
                 settings tab, not from one batch. */}

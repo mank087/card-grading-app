@@ -11,13 +11,16 @@
  * one place in the flow where seller-authored HTML is put into the DOM.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeListingHtml } from '@/lib/ebay/listingDescription';
 import { EBAY_TITLE_MAX } from '@/lib/ebay/bulkReadiness';
 import type { BulkItem, BulkItemSpecific } from '../types';
 import type { MarketplaceCard } from '../../types';
 
 export type DrawerTab = 'details' | 'description' | 'specifics' | 'images';
+
+/** 40px tap targets on the photo reorder / remove controls. */
+const photoButtonClass = 'w-10 h-10 inline-flex items-center justify-center';
 
 interface Props {
   item: BulkItem;
@@ -38,6 +41,14 @@ interface Props {
    * the drain publishes whatever URLs the row already carries.
    */
   mode?: 'review' | 'repair';
+  /** Auction batches call the price what it is: the opening bid. */
+  listingFormat?: 'FIXED_PRICE' | 'AUCTION';
+  /**
+   * Repair mode on a failed row: save the edits and send the card to eBay
+   * again in one press. Saving and then hunting for the row's own Retry is two
+   * steps for what is always the same intent.
+   */
+  onSaveAndRetry?: (patch: Record<string, unknown>) => Promise<void>;
 }
 
 const REVIEW_TABS: { id: DrawerTab; label: string }[] = [
@@ -62,6 +73,8 @@ export default function BulkItemDrawer({
   saving,
   error,
   mode = 'review',
+  listingFormat = 'FIXED_PRICE',
+  onSaveAndRetry,
 }: Props) {
   const repair = mode === 'repair';
   const tabs = repair ? REPAIR_TABS : REVIEW_TABS;
@@ -88,6 +101,53 @@ export default function BulkItemDrawer({
 
   const safeHtml = useMemo(() => sanitizeListingHtml(html), [html]);
 
+  // Unsaved work, across every tab. It is what the discard guard asks about,
+  // and what decides whether Esc and a backdrop click close straight away.
+  const dirty =
+    html !== (item.description_html ?? '') ||
+    title !== (item.title ?? '') ||
+    price !== (item.price == null ? '' : String(item.price)) ||
+    JSON.stringify(specifics) !== JSON.stringify(item.item_specifics ?? []) ||
+    JSON.stringify(urls) !== JSON.stringify(item.image_urls ?? []);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Focus lands inside the drawer on mount: a panel that opens behind the
+  // keyboard's focus is invisible to anyone not using a mouse.
+  useEffect(() => { closeRef.current?.focus(); }, []);
+
+  const requestClose = () => {
+    if (dirty) setConfirmDiscard(true);
+    else onClose();
+  };
+
+  // Esc closes, or asks first when there is something to lose. Bound on the
+  // document because focus can be anywhere inside the drawer.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (dirty) setConfirmDiscard(true);
+      else onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [dirty, onClose]);
+
+  /** The patch the current tab saves. */
+  const patchForTab = (): Record<string, unknown> => {
+    if (tab === 'details') {
+      return { title: title.trim(), price: price === '' ? null : Number(price) };
+    }
+    if (tab === 'description') return { description_html: html };
+    if (tab === 'specifics') return { item_specifics: specifics };
+    return { image_urls: urls };
+  };
+
+  // `failed` is the only status where saving alone leaves the card no better
+  // off than it was, so that is the only place the retry button appears.
+  const canSaveAndRetry = repair && item.status === 'failed' && !!onSaveAndRetry;
+
   const moveUrl = (index: number, delta: number) => {
     const next = [...urls];
     const target = index + delta;
@@ -97,7 +157,14 @@ export default function BulkItemDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-black/40"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit this card"
+      // Backdrop only: a drag that started inside the panel must not close it.
+      onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }}
+    >
       <div className="w-full sm:max-w-2xl bg-white h-full flex flex-col shadow-xl">
         <header className="flex items-start justify-between gap-3 p-4 border-b border-gray-200">
           <div className="min-w-0">
@@ -107,7 +174,8 @@ export default function BulkItemDrawer({
             <p className="text-xs text-gray-500 truncate">{item.title}</p>
           </div>
           <button
-            onClick={onClose}
+            ref={closeRef}
+            onClick={requestClose}
             className="text-gray-400 hover:text-gray-700 text-xl leading-none flex-shrink-0"
             aria-label="Close"
           >
@@ -163,7 +231,7 @@ export default function BulkItemDrawer({
               </div>
               <div>
                 <label htmlFor="repair-price" className="block text-xs font-semibold text-gray-600 mb-1">
-                  Price
+                  {listingFormat === 'AUCTION' ? 'Starting price' : 'Price'}
                 </label>
                 <div className="flex items-center gap-1">
                   <span className="text-sm text-gray-500">$</span>
@@ -294,11 +362,11 @@ export default function BulkItemDrawer({
                       <span className="text-gray-500">{index === 0 ? 'Main' : index + 1}</span>
                       {!repair && (
                         <span className="flex gap-1">
-                          <button onClick={() => moveUrl(index, -1)} className="px-1 text-gray-500 hover:text-gray-900" aria-label="Move earlier">&uarr;</button>
-                          <button onClick={() => moveUrl(index, 1)} className="px-1 text-gray-500 hover:text-gray-900" aria-label="Move later">&darr;</button>
+                          <button onClick={() => moveUrl(index, -1)} className={`${photoButtonClass} text-gray-500 hover:text-gray-900`} aria-label="Move earlier">&uarr;</button>
+                          <button onClick={() => moveUrl(index, 1)} className={`${photoButtonClass} text-gray-500 hover:text-gray-900`} aria-label="Move later">&darr;</button>
                           <button
                             onClick={() => setUrls(urls.filter((_, i) => i !== index))}
-                            className="px-1 text-red-500 hover:text-red-700"
+                            className={`${photoButtonClass} text-red-500 hover:text-red-700`}
                             aria-label="Remove"
                           >
                             &times;
@@ -318,30 +386,41 @@ export default function BulkItemDrawer({
           )}
         </div>
 
-        <footer className="p-4 border-t border-gray-200 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="text-sm text-gray-600 hover:text-gray-900">
-            Cancel
-          </button>
-          {/* Photos are read-only after a run, so there is nothing to save. */}
-          {!(repair && tab === 'images') && (
-            <button
-              onClick={() => {
-                if (tab === 'details') {
-                  return onPatch({
-                    title: title.trim(),
-                    price: price === '' ? null : Number(price),
-                  });
-                }
-                if (tab === 'description') return onPatch({ description_html: html });
-                if (tab === 'specifics') return onPatch({ item_specifics: specifics });
-                return onPatch({ image_urls: urls });
-              }}
-              disabled={saving || (tab === 'details' && title.trim().length === 0)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+        <footer className="p-4 border-t border-gray-200 space-y-2">
+          {confirmDiscard && (
+            <div className="flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <span className="text-xs text-amber-900">Discard changes?</span>
+              <button
+                onClick={onClose}
+                className="px-2.5 py-1 bg-amber-600 text-white rounded-md text-xs font-semibold hover:bg-amber-700"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => setConfirmDiscard(false)}
+                className="text-xs text-gray-600 hover:text-gray-900"
+              >
+                Keep editing
+              </button>
+            </div>
           )}
+          <div className="flex items-center justify-end gap-3">
+            <button onClick={requestClose} className="text-sm text-gray-600 hover:text-gray-900">
+              Discard
+            </button>
+            {/* Photos are read-only after a run, so there is nothing to save. */}
+            {!(repair && tab === 'images') && (
+              <button
+                onClick={() =>
+                  canSaveAndRetry ? onSaveAndRetry!(patchForTab()) : onPatch(patchForTab())
+                }
+                disabled={saving || (tab === 'details' && title.trim().length === 0)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : canSaveAndRetry ? 'Save and retry' : 'Save'}
+              </button>
+            )}
+          </div>
         </footer>
       </div>
     </div>

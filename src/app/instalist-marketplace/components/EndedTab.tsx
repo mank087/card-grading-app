@@ -4,7 +4,8 @@ import { useSortableRows, SortableTh } from './useSortableRows';
 
 interface Props {
   listings: MarketplaceListing[];
-  onRelist: (cardId: string) => void;
+  /** The whole row: the parent may have to look the card up by name. */
+  onRelist: (listing: MarketplaceListing) => void;
 }
 
 type EndedCol = 'card' | 'title' | 'price' | 'endedAt';
@@ -25,7 +26,7 @@ export default function EndedTab({ listings, onRelist }: Props) {
     }
   }, []);
 
-  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, EndedCol>(
+  const { sortedRows, toggleSort, sortIndicator, ariaSort } = useSortableRows<MarketplaceListing, EndedCol>(
     listings,
     getValue,
     'endedAt',
@@ -64,7 +65,7 @@ export default function EndedTab({ listings, onRelist }: Props) {
                   <span className="text-xs text-gray-500">{formatDate(l.endedAt)}</span>
                 </div>
                 <button
-                  onClick={() => onRelist(l.cardId)}
+                  onClick={() => onRelist(l)}
                   className="mt-2 inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
                 >
                   Relist this card
@@ -81,10 +82,10 @@ export default function EndedTab({ listings, onRelist }: Props) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
-                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
-                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Last price</SortableTh>
-                <SortableTh col="endedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Ended</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Last price</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="endedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Ended</SortableTh>
                 <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
               </tr>
             </thead>
@@ -111,7 +112,7 @@ export default function EndedTab({ listings, onRelist }: Props) {
                   <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.endedAt)}</td>
                   <td className="px-4 py-3 text-sm text-right">
                     <button
-                      onClick={() => onRelist(l.cardId)}
+                      onClick={() => onRelist(l)}
                       className="text-indigo-600 hover:text-indigo-800 font-semibold text-sm"
                     >
                       Relist

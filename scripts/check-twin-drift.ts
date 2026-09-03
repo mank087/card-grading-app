@@ -289,6 +289,11 @@ const PAIRS: Pair[] = [
     b: { label: `${WEB_BULK_SETTINGS} DEFAULT_BULK_SETTINGS`, get: () => literalObjectEntries(WEB_BULK_SETTINGS, 'DEFAULT_BULK_SETTINGS') },
   },
   {
+    name: 'Bulk batch — auction durations',
+    a: { label: `${MOBILE_BULK} BULK_AUCTION_DURATIONS`, get: () => extractObjectValues(read(MOBILE_BULK), 'BULK_AUCTION_DURATIONS') },
+    b: { label: `${WEB_BULK_SETTINGS} BULK_AUCTION_DURATIONS`, get: () => extractObjectValues(read(WEB_BULK_SETTINGS), 'BULK_AUCTION_DURATIONS') },
+  },
+  {
     name: 'Bulk batch — paused-batch copy',
     a: { label: `${MOBILE_BULK} PAUSE_REASONS`, get: () => stringMapEntriesJoined(MOBILE_BULK, 'PAUSE_REASONS') },
     b: { label: `${WEB_BULK_PUBLISH} PAUSE_REASONS`, get: () => stringMapEntriesJoined(WEB_BULK_PUBLISH, 'PAUSE_REASONS') },

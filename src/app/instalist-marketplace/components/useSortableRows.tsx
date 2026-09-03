@@ -66,7 +66,11 @@ export function useSortableRows<R, K extends string>(
     );
   };
 
-  return { sortedRows, sortKey, sortDir, toggleSort, sortIndicator };
+  /** The `aria-sort` a header cell should carry, for screen readers. */
+  const ariaSort = (key: K): 'ascending' | 'descending' | 'none' =>
+    key !== sortKey ? 'none' : sortDir === 'asc' ? 'ascending' : 'descending';
+
+  return { sortedRows, sortKey, sortDir, toggleSort, sortIndicator, ariaSort };
 }
 
 /**
@@ -78,6 +82,7 @@ export function SortableTh<K extends string>({
   align = 'left',
   toggleSort,
   sortIndicator,
+  ariaSort,
   defaultDir = 'asc',
   children,
 }: {
@@ -85,13 +90,25 @@ export function SortableTh<K extends string>({
   align?: 'left' | 'right';
   toggleSort: (key: K, defaultDirForKey?: SortDir) => void;
   sortIndicator: (key: K) => React.ReactNode;
+  /** Optional so a caller that has not adopted the hook's helper still works. */
+  ariaSort?: (key: K) => 'ascending' | 'descending' | 'none';
   defaultDir?: SortDir;
   children: React.ReactNode;
 }) {
+  // A click-to-sort <th> is a button in everything but markup — so it says so,
+  // and answers Enter and Space the way a button does.
   return (
     <th
       onClick={() => toggleSort(col, defaultDir)}
-      className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
+      onKeyDown={e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        toggleSort(col, defaultDir);
+      }}
+      tabIndex={0}
+      role="button"
+      aria-sort={ariaSort?.(col)}
+      className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset ${align === 'right' ? 'text-right' : 'text-left'}`}
     >
       <span className="inline-flex items-center">
         {children}

@@ -17,12 +17,13 @@
  * back could only ever be a way to get them wrong.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, Modal, ScrollView, TextInput, TouchableOpacity, Switch,
-  ActivityIndicator, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 
@@ -32,6 +33,8 @@ import {
 } from '@/lib/ebayApi'
 import { updateBatchSettings, BulkApiError } from '@/lib/ebayBulkApi'
 import {
+  BULK_AUCTION_DURATIONS,
+  DEFAULT_AUCTION_DURATION,
   DEFAULT_BULK_SHIPPING,
   type BulkBatch, type BulkBatchSettings, type BulkShippingForm, type BulkPriceRule,
 } from '@/lib/ebayBulkTypes'
@@ -60,6 +63,8 @@ interface FormState {
   priceMode: PriceMode
   pricePercent: string
   priceAmount: string
+  listingFormat: BulkBatchSettings['listingFormat']
+  duration: BulkBatchSettings['duration']
   bestOfferEnabled: boolean
   shippingType: BulkShippingForm['shippingType']
   domesticService: string
@@ -82,11 +87,15 @@ interface FormState {
 function seedForm(settings: BulkBatchSettings): FormState {
   const s = settings.shipping ?? DEFAULT_BULK_SHIPPING
   const rule = settings.priceRule ?? { mode: 'estimate' as const }
+  const auction = settings.listingFormat === 'AUCTION'
   return {
     priceMode: rule.mode,
     pricePercent: rule.mode === 'estimate_pct' ? String(rule.percent) : '100',
     priceAmount: rule.mode === 'fixed' ? String(rule.amount) : '',
-    bestOfferEnabled: settings.bestOfferEnabled !== false,
+    listingFormat: auction ? 'AUCTION' : 'FIXED_PRICE',
+    // A batch written before auctions existed has no duration worth reading.
+    duration: auction ? settings.duration ?? DEFAULT_AUCTION_DURATION : 'GTC',
+    bestOfferEnabled: !auction && settings.bestOfferEnabled !== false,
     shippingType: s.shippingType ?? 'CALCULATED',
     // A retired token (USPSFirstClass) would leave no chip selected and read
     // as "no service chosen" — map it forward, exactly as the wizard does.
@@ -120,6 +129,13 @@ export function describePriceRule(rule: BulkPriceRule | undefined): string {
   }
 }
 
+/** "Auction · 7 days" / "Buy It Now". Twin: web describeListingFormat. */
+export function describeListingFormat(settings: BulkBatchSettings | undefined): string {
+  if (settings?.listingFormat !== 'AUCTION') return 'Buy It Now'
+  const label = BULK_AUCTION_DURATIONS.find(d => d.value === settings.duration)?.label ?? '7 Days'
+  return `Auction · ${label.toLowerCase()}`
+}
+
 export function describeShipping(settings: BulkBatchSettings | undefined): string {
   if (!settings) return 'calculated'
   if (settings.policies?.useBusinessPolicies) return 'your eBay business policies'
@@ -136,6 +152,13 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
   const [form, setForm] = useState<FormState>(() => seedForm(batch.settings))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Set when Save was pressed on an unusable ZIP — the field then says so. */
+  const [zipTouched, setZipTouched] = useState(false)
+
+  const scrollRef = useRef<ScrollView>(null)
+  const zipRef = useRef<TextInput>(null)
+  /** Where the ZIP field sits inside the scroll view, for the jump on save. */
+  const zipOffset = useRef(0)
 
   // Re-seed whenever the sheet is opened: the batch may have been re-fetched
   // (or another device may have changed it) since the last time it was shown.
@@ -143,6 +166,7 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
     if (visible) {
       setForm(seedForm(batch.settings))
       setError(null)
+      setZipTouched(false)
     }
     // batch.settings is the whole point of the re-seed; batch.updated_at moves
     // with it, so keying on the settings object is enough.
@@ -150,6 +174,25 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
 
   const set = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }))
+  }, [])
+
+  const isAuction = form.listingFormat === 'AUCTION'
+
+  /**
+   * Switching format carries the other two fields with it: fixed price has
+   * exactly one duration, and eBay does not allow Best Offer on an auction.
+   */
+  const setFormat = useCallback((listingFormat: BulkBatchSettings['listingFormat']) => {
+    setForm(prev =>
+      listingFormat === 'AUCTION'
+        ? {
+            ...prev,
+            listingFormat,
+            duration: prev.duration === 'GTC' ? DEFAULT_AUCTION_DURATION : prev.duration,
+            bestOfferEnabled: false,
+          }
+        : { ...prev, listingFormat, duration: 'GTC' }
+    )
   }, [])
 
   // eBay rejects a calculated rate without a ship-from ZIP, and the wizard
@@ -187,7 +230,20 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
   const canSave = zipValid && priceValid && !saving
 
   const handleSave = useCallback(async () => {
-    if (!canSave) return
+    if (saving) return
+    /**
+     * The button stays styled as disabled, but it is pressable: a greyed-out
+     * Save that answers nothing is the same "is this app broken?" the wizard's
+     * Next button was reported for. Pressing it takes the seller to the field
+     * that is stopping them.
+     */
+    if (!zipValid) {
+      setZipTouched(true)
+      scrollRef.current?.scrollTo({ y: Math.max(0, zipOffset.current - 12), animated: true })
+      zipRef.current?.focus()
+      return
+    }
+    if (!priceValid) return
     setSaving(true)
     setError(null)
 
@@ -223,6 +279,10 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
     try {
       const res = await updateBatchSettings(batch.id, {
         priceRule,
+        listingFormat: form.listingFormat,
+        duration: form.duration,
+        // Sent even for an auction, where the server forces it false anyway —
+        // the payload is what the sheet shows, not a subset of it.
         bestOfferEnabled: form.bestOfferEnabled,
         shipping: shipping as BulkShippingForm,
       })
@@ -242,13 +302,18 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
     } finally {
       setSaving(false)
     }
-  }, [canSave, form, usePolicies, priceRule, batch.id, onSaved, onConflict, onClose])
+  }, [saving, zipValid, priceValid, form, usePolicies, priceRule, batch.id, onSaved, onConflict, onClose])
 
   const policyNames = batch.settings?.policies
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      {/* Half of this sheet is numeric TextInputs and the Save button is pinned
+          to the bottom — without this the keyboard covers both. */}
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={[styles.sheet, { paddingBottom: 8 + Math.max(insets.bottom, 4) }]}>
           <View style={styles.handleRow}>
             <Text style={styles.sheetTitle}>Batch settings</Text>
@@ -269,9 +334,51 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
             </View>
           )}
 
-          <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+          <ScrollView ref={scrollRef} style={styles.scroll} keyboardShouldPersistTaps="handled">
+            {/* ── Format ────────────────────────────────────────────────── */}
+            <Text style={styles.sectionTitle}>Format</Text>
+            <View style={styles.segmentRow}>
+              {([
+                ['FIXED_PRICE', 'Buy It Now'],
+                ['AUCTION', 'Auction'],
+              ] as const).map(([value, label]) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[styles.segment, form.listingFormat === value && styles.segmentActive]}
+                  onPress={() => setFormat(value)}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.segmentText, form.listingFormat === value && styles.segmentTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {isAuction && (
+              <>
+                {/* The Best Offer toggle disappears on an auction; saying why
+                    beats leaving the seller to notice it went. */}
+                <Text style={styles.helperText}>Best Offer isn&apos;t available on auctions.</Text>
+                <Text style={styles.fieldLabel}>Duration</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {BULK_AUCTION_DURATIONS.map(d => (
+                    <TouchableOpacity
+                      key={d.value}
+                      style={[styles.chip, form.duration === d.value && styles.chipActive]}
+                      onPress={() => set('duration', d.value)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.chipText, form.duration === d.value && styles.chipTextActive]}>
+                        {d.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
             {/* ── Asking price ──────────────────────────────────────────── */}
-            <Text style={styles.sectionTitle}>Asking price</Text>
+            <Text style={styles.sectionTitle}>{isAuction ? 'Starting price' : 'Asking price'}</Text>
             <View style={styles.segmentRow}>
               {([
                 ['estimate', 'Estimate'],
@@ -309,7 +416,7 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
             )}
             {form.priceMode === 'fixed' && (
               <>
-                <Text style={styles.fieldLabel}>Price ($)</Text>
+                <Text style={styles.fieldLabel}>{isAuction ? 'Starting price ($)' : 'Price ($)'}</Text>
                 <TextInput
                   style={styles.input}
                   value={form.priceAmount}
@@ -323,17 +430,23 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
                 )}
               </>
             )}
-            <Text style={styles.helperText}>Rows where you typed your own price keep it.</Text>
+            <Text style={styles.helperText}>Cards where you typed your own price keep it.</Text>
 
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Accept offers (Best Offer)</Text>
-              <Switch
-                value={form.bestOfferEnabled}
-                onValueChange={v => set('bestOfferEnabled', v)}
-              />
-            </View>
+            {/* eBay does not allow Best Offer on an auction, so the toggle is
+                gone rather than disabled — as it is in the single-card wizard. */}
+            {!isAuction && (
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Accept offers (Best Offer)</Text>
+                <Switch
+                  value={form.bestOfferEnabled}
+                  onValueChange={v => set('bestOfferEnabled', v)}
+                />
+              </View>
+            )}
             <Text style={styles.helperText}>
-              Format: fixed price, Good &apos;Til Cancelled — eBay&apos;s only fixed-price duration.
+              {isAuction
+                ? 'Auction: bidding runs for the length above, then the highest bid wins.'
+                : "Format: fixed price, Good Til Cancelled — eBay's only fixed-price duration."}
             </Text>
 
             {/* ── Shipping ──────────────────────────────────────────────── */}
@@ -381,23 +494,39 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
                     </TouchableOpacity>
                   ))}
                 </View>
+                {form.shippingType === 'CALCULATED' && (
+                  <Text style={styles.helperText}>
+                    eBay quotes the buyer a rate from your package size and ZIP.
+                  </Text>
+                )}
 
                 <Text style={styles.fieldLabel}>Shipping Service</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {SHIPPING_SERVICES.map(s => (
-                      <TouchableOpacity
-                        key={s.value}
-                        style={[styles.chip, form.domesticService === s.value && styles.chipActive]}
-                        onPress={() => set('domesticService', s.value)}
-                      >
-                        <Text style={[styles.chipText, form.domesticService === s.value && styles.chipTextActive]}>
-                          {s.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+                {/* The chip row runs off the edge; the fade says so, since a
+                    row that ends flush at the screen edge reads as the end. */}
+                <View style={styles.chipScrollWrap}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.chipRow}>
+                      {SHIPPING_SERVICES.map(s => (
+                        <TouchableOpacity
+                          key={s.value}
+                          style={[styles.chip, form.domesticService === s.value && styles.chipActive]}
+                          onPress={() => set('domesticService', s.value)}
+                        >
+                          <Text style={[styles.chipText, form.domesticService === s.value && styles.chipTextActive]}>
+                            {s.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0)', Colors.white]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.chipFade}
+                  />
+                </View>
 
                 {form.shippingType === 'FLAT_RATE' && (
                   <>
@@ -413,19 +542,28 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
               </>
             )}
 
-            <Text style={styles.fieldLabel}>
-              Postal Code <Text style={{ color: Colors.red[600] }}>*</Text>
-            </Text>
-            <TextInput
-              style={[styles.input, form.postalCode.length > 0 && !zipValid && { borderColor: Colors.red[500] }]}
-              value={form.postalCode}
-              onChangeText={v => set('postalCode', v.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              maxLength={5}
-              placeholder="12345 (required)"
-              placeholderTextColor={Colors.gray[400]}
-            />
-            <Text style={styles.helperText}>Required by eBay for shipping calculations.</Text>
+            <View onLayout={e => { zipOffset.current = e.nativeEvent.layout.y }}>
+              <Text style={styles.fieldLabel}>
+                Postal Code <Text style={{ color: Colors.red[600] }}>*</Text>
+              </Text>
+              <TextInput
+                ref={zipRef}
+                style={[
+                  styles.input,
+                  (zipTouched || form.postalCode.length > 0) && !zipValid && { borderColor: Colors.red[500] },
+                ]}
+                value={form.postalCode}
+                onChangeText={v => { setZipTouched(false); set('postalCode', v.replace(/[^0-9]/g, '')) }}
+                keyboardType="number-pad"
+                maxLength={5}
+                placeholder="12345 (required)"
+                placeholderTextColor={Colors.gray[400]}
+              />
+              {zipTouched && !zipValid && (
+                <Text style={styles.fieldError}>Enter your 5-digit ship-from ZIP.</Text>
+              )}
+              <Text style={styles.helperText}>Required by eBay for shipping calculations.</Text>
+            </View>
 
             {/* Handling time is part of a shipping business policy. */}
             {!usePolicies && (
@@ -508,21 +646,30 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
                       ))}
                     </View>
                     <Text style={styles.fieldLabel}>International Service</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        {INTERNATIONAL_SHIPPING_SERVICES.map(s => (
-                          <TouchableOpacity
-                            key={s.value}
-                            style={[styles.chip, form.intlService === s.value && styles.chipActive]}
-                            onPress={() => set('intlService', s.value)}
-                          >
-                            <Text style={[styles.chipText, form.intlService === s.value && styles.chipTextActive]}>
-                              {s.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
+                    <View style={styles.chipScrollWrap}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={styles.chipRow}>
+                          {INTERNATIONAL_SHIPPING_SERVICES.map(s => (
+                            <TouchableOpacity
+                              key={s.value}
+                              style={[styles.chip, form.intlService === s.value && styles.chipActive]}
+                              onPress={() => set('intlService', s.value)}
+                            >
+                              <Text style={[styles.chipText, form.intlService === s.value && styles.chipTextActive]}>
+                                {s.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0)', Colors.white]}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={styles.chipFade}
+                      />
+                    </View>
                     {form.intlType === 'FLAT_RATE' && (
                       <>
                         <Text style={styles.fieldLabel}>International Cost ($)</Text>
@@ -566,7 +713,7 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
                             onPress={() => set('returnShipping', w)}
                           >
                             <Text style={[styles.segmentText, form.returnShipping === w && styles.segmentTextActive]}>
-                              {w}
+                              {w === 'BUYER' ? 'Buyer pays' : 'Seller pays'}
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -586,16 +733,16 @@ export default function BulkSettingsSheet({ visible, batch, onClose, onSaved, on
           <TouchableOpacity
             style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
             onPress={handleSave}
-            disabled={!canSave}
+            disabled={saving}
             accessibilityRole="button"
             accessibilityLabel="Save batch settings"
           >
             {saving
               ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.saveBtnText}>Apply to every row</Text>}
+              : <Text style={styles.saveBtnText}>Apply to every card</Text>}
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -636,6 +783,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
     borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white,
   },
+  chipScrollWrap: { position: 'relative', marginBottom: 8 },
+  chipRow: { flexDirection: 'row', gap: 6, paddingRight: 24 },
+  chipFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 24 },
   chipActive: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
   chipText: { fontSize: 11, fontWeight: '600', color: Colors.gray[500] },
   chipTextActive: { color: Colors.purple[700] },

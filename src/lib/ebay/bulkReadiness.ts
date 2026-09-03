@@ -48,7 +48,8 @@ export type ReadinessCode =
   | 'specifics_required'
   | 'images_pending'
   | 'images_failed'
-  | 'images_missing';
+  | 'images_missing'
+  | 'postal_code_missing';
 
 export interface ReadinessIssue {
   code: ReadinessCode;
@@ -106,6 +107,13 @@ export function computeBatchReadiness(settings: BatchReadinessInput): BatchReadi
     },
   ];
 }
+
+/**
+ * The batch's format, for the copy that differs between the two. Declared
+ * here rather than imported from bulkSettings so this module stays free of
+ * the settings module's shipping/pricing imports.
+ */
+export type ListingFormat = 'FIXED_PRICE' | 'AUCTION';
 
 /** The subset of an item row readiness depends on. */
 export interface ReadinessInput {
@@ -177,8 +185,22 @@ function toNumber(price: unknown): number | null {
  * created before a rule existed, or edited by an older client, still has to
  * fail the gate rather than reach `publishCardListing` and 400 mid-batch.
  */
-export function computeReadiness(item: ReadinessInput): ReadinessIssue[] {
+export function computeReadiness(
+  item: ReadinessInput,
+  listingFormat: ListingFormat = 'FIXED_PRICE',
+  postalCode?: string | null
+): ReadinessIssue[] {
   const issues: ReadinessIssue[] = [];
+
+  // Batch-level, but failed per row on purpose: eBay rejects an AddItem with
+  // no ships-from location, and the publish gate is all-or-nothing — a row
+  // that says "ready" while the batch cannot send it is the worse lie. The
+  // fix is one field in Batch settings, which the label names.
+  // `undefined` means the caller has no settings in hand (a bare recompute);
+  // only an explicitly empty ZIP fails.
+  if (postalCode !== undefined && !(postalCode ?? '').trim()) {
+    issues.push({ code: 'postal_code_missing', label: 'Add the ZIP you ship from' });
+  }
 
   const title = (item.title ?? '').trim();
   if (!title) {
@@ -200,7 +222,11 @@ export function computeReadiness(item: ReadinessInput): ReadinessIssue[] {
 
   const price = toNumber(item.price);
   if (price === null || price <= 0) {
-    issues.push({ code: 'price_missing', label: 'Needs a price' });
+    // Same gate either way — an auction's price column is its starting bid.
+    issues.push({
+      code: 'price_missing',
+      label: listingFormat === 'AUCTION' ? 'Needs a starting price' : 'Needs a price',
+    });
   }
 
   const description = (item.description_html ?? '').trim();
@@ -270,8 +296,10 @@ export function statusForReadiness(
 
 /** The `readiness` + `status` columns for one item, in one call. */
 export function readinessPatch(
-  item: ReadinessInput & { status?: string | null }
+  item: ReadinessInput & { status?: string | null },
+  listingFormat: ListingFormat = 'FIXED_PRICE',
+  postalCode?: string | null
 ): { readiness: ReadinessIssue[]; status: BulkItemStatus } {
-  const readiness = computeReadiness(item);
+  const readiness = computeReadiness(item, listingFormat, postalCode);
   return { readiness, status: statusForReadiness(item.status, readiness) };
 }

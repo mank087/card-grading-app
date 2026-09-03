@@ -211,12 +211,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!item.price_edited) next.price = nextPrice;
     if (!item.description_edited) next.description_html = nextDescription;
 
-    const { readiness, status } = readinessPatch({
-      ...item,
-      title: nextTitle,
-      price: nextPrice,
-      description_html: nextDescription,
-    });
+    const { readiness, status } = readinessPatch(
+      {
+        ...item,
+        title: nextTitle,
+        price: nextPrice,
+        description_html: nextDescription,
+      },
+      settings.listingFormat,
+      settings.shipping.postalCode
+    );
     next.readiness = readiness;
     next.status = status;
     updates.push({ id: item.id, patch: next });

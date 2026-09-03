@@ -83,7 +83,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   };
 
   if (isReadinessManaged(item.status)) {
-    const { readiness, status } = readinessPatch({ ...item, ...patch, status: item.status });
+    const { readiness, status } = readinessPatch(
+      { ...item, ...patch, status: item.status },
+      settings.listingFormat,
+      settings.shipping.postalCode
+    );
     patch.readiness = readiness;
     patch.status = status;
   }

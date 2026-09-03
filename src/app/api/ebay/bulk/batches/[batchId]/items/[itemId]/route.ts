@@ -28,6 +28,7 @@ import {
   isReadinessManaged,
   computeReadiness,
 } from '@/lib/ebay/bulkReadiness';
+import { batchListingFormat, batchPostalCode } from '@/lib/ebay/bulkSettings';
 import { containsBlockedGrader, findBlockedGrader, stripBlockedGraderSentences } from '@/lib/ebay/gradingCompanyBlocklist';
 import { containsLinkOrUrl, stripLinks } from '@/lib/ebay/listingDescription';
 
@@ -274,8 +275,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   // Readiness only governs rows the seller still owns: for a draft/ready row
   // it decides the status, exactly as it did before.
+  const listingFormat = batchListingFormat(batch.settings);
+  const postalCode = batchPostalCode(batch.settings);
   if (isReadinessManaged(item.status)) {
-    const { readiness, status } = readinessPatch({ ...(merged as any), status: item.status });
+    const { readiness, status } = readinessPatch(
+      { ...(merged as any), status: item.status },
+      listingFormat,
+      postalCode
+    );
     patch.readiness = readiness;
     patch.status = status;
   } else {
@@ -285,7 +292,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // the seller it was fixed when nothing has re-attempted it, and would put
     // a row into a state the drain does not pick up; Retry is the one thing
     // that moves it, and it recomputes readiness again for itself.
-    patch.readiness = computeReadiness(merged as any);
+    patch.readiness = computeReadiness(merged as any, listingFormat, postalCode);
   }
 
   const { data: updated, error } = await supabase

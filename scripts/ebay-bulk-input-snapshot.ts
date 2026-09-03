@@ -15,6 +15,8 @@
  *   2. a sports card with an enterprise grade label and flat-rate + returns
  *   3. a row whose specifics are half-empty and whose aspects carry metadata
  *   4. a batch running on the seller's eBay business policies
+ *   5. a card with no numeric grade, seeded through buildListingDraft
+ *   6. an AUCTION batch — format, duration, quantity 1 and no Best Offer
  */
 
 import {
@@ -278,6 +280,75 @@ fixtures.push({
   },
 });
 
+/**
+ * Fixture 6: the batch-wide auction format. A bulk auction has to reach eBay
+ * as a 7-day Chinese auction of exactly one item with Best Offer off — eBay
+ * rejects Best Offer on an auction, and a quantity above 1 is a fixed-price
+ * concept the drain must never carry over.
+ */
+const auctionBatch: BulkPublishBatch = {
+  id: BATCH_ID,
+  user_id: USER_ID,
+  settings: settings({ listingFormat: 'AUCTION', duration: 'DAYS_7', bestOfferEnabled: false }),
+};
+
+const auctionItem: BulkPublishItem = {
+  id: 'bbbbbbbb-0000-0000-0000-000000000006',
+  card_id: 'aaaaaaaa-0000-0000-0000-000000000006',
+  title: '1999 Pokemon Base Set Charizard 4/102 Holo Unlimited DCM 7',
+  // On an auction this is the starting bid, not an asking price.
+  price: 99,
+  description_html: '<div>…generated description…</div>',
+  item_specifics: [
+    { name: 'Graded', value: 'Yes', required: true },
+    { name: 'Grade', value: '7', required: true },
+  ],
+  image_urls: [
+    'https://example.supabase.co/storage/v1/object/public/ebay-listing-images/u/c6/front.jpg',
+  ],
+};
+
+const auctionCard = {
+  id: 'aaaaaaaa-0000-0000-0000-000000000006',
+  user_id: USER_ID,
+  card_name: 'Charizard',
+  category: 'Pokemon',
+  card_set: 'Base Set',
+  card_number: '4/102',
+  serial: 'DCM-2026-000606',
+  conversational_whole_grade: 7,
+  release_date: '1999-01-09',
+};
+
+fixtures.push({
+  label: '6. Auction · 7 days · starting price · Best Offer impossible',
+  batch: auctionBatch,
+  card: auctionCard,
+  item: auctionItem,
+});
+
+/** Assertions on fixture 6, alongside the printed payload. */
+function checkAuctionInput(): number {
+  const problems: string[] = [];
+  const input = buildPublishInputFromBulkItem(auctionItem, auctionBatch, auctionCard, { now: NOW });
+  const expected: Record<string, unknown> = {
+    listingFormat: 'AUCTION',
+    duration: 'DAYS_7',
+    bestOfferEnabled: false,
+    quantity: 1,
+    price: 99,
+  };
+  for (const [key, want] of Object.entries(expected)) {
+    const got = (input as Record<string, unknown>)[key];
+    if (got !== want) problems.push(`${key} should be ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+  }
+  console.log('='.repeat(78));
+  console.log(problems.length ? 'FAIL  auction publish input' : 'ok    auction publish input');
+  problems.forEach(p => console.log(`      ${p}`));
+  console.log('');
+  return problems.length;
+}
+
 /** Assertions on fixture 5 — printed with the snapshot, and they fail the run. */
 function checkNoGradeDraft(): number {
   const problems: string[] = [];
@@ -315,7 +386,7 @@ function main(): void {
     console.log('');
   }
 
-  if (checkNoGradeDraft() > 0) process.exit(1);
+  if (checkNoGradeDraft() + checkAuctionInput() > 0) process.exit(1);
 }
 
 main();

@@ -28,6 +28,7 @@ import {
   ITEM_COLUMNS,
 } from '@/lib/ebay/bulkService';
 import { readinessPatch } from '@/lib/ebay/bulkReadiness';
+import { batchListingFormat, batchPostalCode } from '@/lib/ebay/bulkSettings';
 import { findActiveOrPendingListing } from '@/lib/ebay/publishCardListing';
 
 export const runtime = 'nodejs';
@@ -118,7 +119,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // ---- readiness, recomputed as if this row had never been published ----
-  const { readiness, status } = readinessPatch({ ...item, status: 'draft' });
+  const { readiness, status } = readinessPatch(
+    { ...item, status: 'draft' },
+    batchListingFormat(batch.settings),
+    batchPostalCode(batch.settings)
+  );
   if (status !== 'ready') {
     // Kept as `failed`, with the reason on the row — NOT flipped to `draft`.
     //

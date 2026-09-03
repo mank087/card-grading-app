@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '@/lib/constants'
 import { listBatches } from '@/lib/ebayBulkApi'
 import { BATCH_STATUS_LABEL, type BulkBatchSummary } from '@/lib/ebayBulkTypes'
@@ -55,6 +56,8 @@ export default function BulkBatchesStrip() {
   return (
     <View style={styles.wrap}>
       <Text style={styles.heading}>Your batches</Text>
+      {/* Cards are 190pt wide, so the second one is always cut off — the fade
+          says "there is more here" rather than letting it read as a crop. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -100,16 +103,27 @@ export default function BulkBatchesStrip() {
           )
         })}
       </ScrollView>
+      {batches.length > 1 && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(255,255,255,0)', Colors.white]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.edgeFade}
+        />
+      )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   wrap: {
+    position: 'relative',
     backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.gray[200],
     paddingTop: 8, paddingBottom: 10,
   },
+  edgeFade: { position: 'absolute', right: 0, top: 24, bottom: 1, width: 24 },
   heading: {
     fontSize: 11, fontWeight: '700', color: Colors.gray[500],
     textTransform: 'uppercase', letterSpacing: 0.4,

@@ -21,6 +21,7 @@ import {
 } from '@/lib/ebay/bulkService';
 import { findActiveOrPendingListing } from '@/lib/ebay/publishCardListing';
 import { readinessPatch } from '@/lib/ebay/bulkReadiness';
+import { batchListingFormat, batchPostalCode } from '@/lib/ebay/bulkSettings';
 
 export const runtime = 'nodejs';
 
@@ -62,7 +63,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // Readiness is computed as if this row had never been skipped.
-  const { readiness, status } = readinessPatch({ ...item, status: 'draft' });
+  const { readiness, status } = readinessPatch(
+    { ...item, status: 'draft' },
+    batchListingFormat(batch.settings),
+    batchPostalCode(batch.settings)
+  );
   const { data: updated, error } = await supabase
     .from('ebay_bulk_items')
     .update({

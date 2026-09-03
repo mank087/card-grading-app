@@ -45,7 +45,7 @@ import {
 } from '@/lib/ebay/bulkPublish';
 import { settleBatch, loadBatchTally } from '@/lib/ebay/bulkCompletion';
 import { DRAFT_CARD_COLUMNS, type ServerClient } from '@/lib/ebay/bulkService';
-import type { BulkBatchSettings } from '@/lib/ebay/bulkSettings';
+import { batchListingFormat, batchPostalCode, type BulkBatchSettings } from '@/lib/ebay/bulkSettings';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -230,13 +230,19 @@ async function loadBatchStatus(
 async function releaseClaim(
   supabase: ServerClient,
   item: ClaimedItem,
-  batchStatus: string | null
+  batchStatus: string | null,
+  listingFormat: BulkBatchSettings['listingFormat'],
+  postalCode: string
 ): Promise<void> {
   if (batchStatus === 'paused') {
     await setItem(supabase, item.id, { status: 'queued', locked_at: null });
     return;
   }
-  const { readiness, status } = readinessPatch({ ...(item as any), status: 'draft' });
+  const { readiness, status } = readinessPatch(
+    { ...(item as any), status: 'draft' },
+    listingFormat,
+    postalCode
+  );
   await setItem(supabase, item.id, { status, readiness, locked_at: null });
 }
 
@@ -258,7 +264,9 @@ async function releaseClaim(
 async function claimItems(
   supabase: ServerClient,
   batchId: string,
-  limit: number
+  limit: number,
+  listingFormat: BulkBatchSettings['listingFormat'],
+  postalCode: string
 ): Promise<{ items: ClaimedItem[]; batchStatus: string | null }> {
   if (limit <= 0) return { items: [], batchStatus: 'running' };
   const { data: candidates } = await supabase
@@ -289,7 +297,9 @@ async function claimItems(
     console.warn(
       `${LOG} ${batchId} became ${batchStatus} mid-claim — releasing ${claimed.length} row(s)`
     );
-    for (const item of claimed) await releaseClaim(supabase, item, batchStatus);
+    for (const item of claimed) {
+      await releaseClaim(supabase, item, batchStatus, listingFormat, postalCode);
+    }
     return { items: [], batchStatus };
   }
   return { items: claimed, batchStatus };
@@ -540,7 +550,13 @@ async function tickBatch(
     }
 
     const wave = Math.min(MAX_IN_FLIGHT_PER_USER, budget.remaining);
-    const { items, batchStatus } = await claimItems(supabase, batch.id, wave);
+    const { items, batchStatus } = await claimItems(
+      supabase,
+      batch.id,
+      wave,
+      batchListingFormat(batch.settings),
+      batchPostalCode(batch.settings)
+    );
     if (batchStatus !== 'running') {
       // The claim helper already put its rows back where the batch's new
       // state wants them.

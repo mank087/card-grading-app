@@ -32,7 +32,11 @@ import { resolveListingFields } from '@/lib/ebay/listingFields';
 import { mergeAspectsIntoSpecifics, type EbayAspect } from '@/lib/ebay/listingDraft';
 import { EBAY_TITLE_MAX, specificsTally } from '@/lib/ebay/bulkReadiness';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
-import type { BulkBatchSettings } from '@/lib/ebay/bulkSettings';
+import {
+  describeListingFormat,
+  type BulkBatchSettings,
+  type BulkPriceRule,
+} from '@/lib/ebay/bulkSettings';
 import { PAUSE_REASONS } from '@/lib/ebay/bulkPublish';
 import BulkSettingsPanel from './BulkSettingsPanel';
 import BulkItemDrawer, { type DrawerTab } from './BulkItemDrawer';
@@ -57,6 +61,27 @@ const IMAGE_CONCURRENCY = 3;
  * it again if it is still listed.
  */
 const RETRYABLE_STATUSES: ReadonlySet<string> = new Set(['failed', 'blocked', 'skipped']);
+
+/** The bulk-action buttons, so the bar can name the one that is running. */
+type BulkActionKind = 'regenerate' | 'remove' | 'prefix' | 'suffix';
+
+/** The slices the draft filter strip offers. */
+type RowFilter = 'all' | 'needs' | 'ready' | 'skipped';
+
+/** Shared tap target for the review row's action links. */
+const rowActionClass = 'min-h-[40px] inline-flex items-center';
+
+/** "Applying 12 of 40…" — the running bulk button says how far it has got. */
+function bulkBusyLabel(busy: { done: number; total: number }): string {
+  return `Applying ${Math.min(busy.done + 1, busy.total)} of ${busy.total}…`;
+}
+
+const ROW_FILTER_LABEL: Record<RowFilter, string> = {
+  all: 'All',
+  needs: 'Needs work',
+  ready: 'Ready',
+  skipped: 'Skipped',
+};
 
 interface Props {
   batchId: string;
@@ -115,13 +140,23 @@ export default function BulkBatchClient({ batchId }: Props) {
   }, []);
 
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  /** Which bulk-action button is running, and how far through it is. */
+  const [bulkBusy, setBulkBusy] = useState<{ kind: BulkActionKind; done: number; total: number } | null>(null);
+  const [confirmBulkRemove, setConfirmBulkRemove] = useState(false);
+  /** Which slice of the draft list the filter strip is showing. */
+  const [rowFilter, setRowFilter] = useState<RowFilter>('all');
+  /** Two-step confirm on "remove the rows that still need something". */
+  const [confirmDropNotReady, setConfirmDropNotReady] = useState(false);
+  const [droppingNotReady, setDroppingNotReady] = useState(false);
   const [affixText, setAffixText] = useState('');
   const [affixNote, setAffixNote] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<{ itemId: string; tab: DrawerTab } | null>(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [publishNote, setPublishNote] = useState<string | null>(null);
+  /** Tone matters: "40 cards queued" is good news and must not wear the
+   *  same amber panel a failure does. */
+  const [publishNote, setPublishNote] = useState<{ text: string; tone: 'success' | 'warning' } | null>(null);
 
   const aspectCache = useRef<Map<string, EbayAspect[]>>(new Map());
 
@@ -208,14 +243,18 @@ export default function BulkBatchClient({ batchId }: Props) {
    * unmount. Reload-safe: rows already `ready` are never in the snapshot.
    */
   const runImagePrep = useCallback(
-    async (itemIds: string[]) => {
+    async (itemIds: string[], options?: { showProgress?: boolean }) => {
       if (!token) return;
       const todo = itemIds.filter(id => !prepInFlight.current.has(id));
       if (todo.length === 0) return;
       todo.forEach(id => prepInFlight.current.add(id));
 
+      // A one-row retry must not repaint the page-wide bar as "0 of 1": the
+      // load-time pass may still be running behind it, and its own row shows
+      // a spinner already.
+      const showProgress = options?.showProgress !== false;
       let done = 0;
-      setImageProgress({ done: 0, total: todo.length });
+      if (showProgress) setImageProgress({ done: 0, total: todo.length });
 
       await mapWithConcurrency(todo, IMAGE_CONCURRENCY, async itemId => {
         if (unmountedRef.current) return;
@@ -251,10 +290,10 @@ export default function BulkBatchClient({ batchId }: Props) {
         } finally {
           prepInFlight.current.delete(itemId);
           done++;
-          if (!unmountedRef.current) setImageProgress({ done, total: todo.length });
+          if (showProgress && !unmountedRef.current) setImageProgress({ done, total: todo.length });
         }
       });
-      if (!unmountedRef.current) setImageProgress(null);
+      if (showProgress && !unmountedRef.current) setImageProgress(null);
     },
     [activeConfig, labelStyle, patchItem, token]
   );
@@ -292,7 +331,10 @@ export default function BulkBatchClient({ batchId }: Props) {
         setError(json.error || 'Could not apply those settings.');
         return;
       }
+      const applied = itemsRef.current.filter(i => i.status !== 'skipped').length;
       await load(token);
+      setSavedFlash(`Applied to ${applied} card${applied === 1 ? '' : 's'}`);
+      setTimeout(() => setSavedFlash(null), 3000);
     } finally {
       setApplying(false);
     }
@@ -378,7 +420,7 @@ export default function BulkBatchClient({ batchId }: Props) {
       } catch {
         return;
       }
-      void runImagePrep([itemId]);
+      void runImagePrep([itemId], { showProgress: false });
     },
     [patchItem, runImagePrep]
   );
@@ -401,23 +443,33 @@ export default function BulkBatchClient({ batchId }: Props) {
       itemsRef.current = itemsRef.current.map(i => (i.id === itemId ? json.item : i));
       setItems(prev => prev.map(i => (i.id === itemId ? json.item : i)));
       if (json.changed && json.item.image_status === 'pending') {
-        void runImagePrep([itemId]);
+        void runImagePrep([itemId], { showProgress: false });
       }
     },
     [batchId, runImagePrep, token]
   );
 
   /** Sequential on purpose: a bulk action over 100 rows is 100 PATCHes and
-   *  firing them all at once is how you rate-limit your own API. */
+   *  firing them all at once is how you rate-limit your own API.
+   *
+   *  `kind` names which button is running so the bar can disable the rest and
+   *  count the one that is working — a 40-row pass takes long enough that a
+   *  silent bar reads as a dead click. */
   const forEachSelected = useCallback(
-    async (fn: (item: BulkItem) => Promise<void>) => {
+    async (kind: BulkActionKind, fn: (item: BulkItem) => Promise<void>) => {
       const chosen = items.filter(i => selectedRows.includes(i.id));
-      for (const item of chosen) {
-        try {
-          await fn(item);
-        } catch (err) {
-          console.error('[bulk] bulk action failed for', item.id, err);
+      setBulkBusy({ kind, done: 0, total: chosen.length });
+      try {
+        for (const item of chosen) {
+          try {
+            await fn(item);
+          } catch (err) {
+            console.error('[bulk] bulk action failed for', item.id, err);
+          }
+          setBulkBusy(prev => (prev ? { ...prev, done: prev.done + 1 } : prev));
         }
+      } finally {
+        setBulkBusy(null);
       }
     },
     [items, selectedRows]
@@ -434,7 +486,7 @@ export default function BulkBatchClient({ batchId }: Props) {
       const affix = rawText.trim();
       if (!affix) return;
       let skipped = 0;
-      await forEachSelected(async item => {
+      await forEachSelected(kind, async item => {
         const base = item.title ?? '';
         const next = kind === 'prefix' ? `${affix} ${base}` : `${base} ${affix}`;
         if (next.length > EBAY_TITLE_MAX) { skipped++; return; }
@@ -502,6 +554,45 @@ export default function BulkBatchClient({ batchId }: Props) {
   // Derived from the rows in hand, not batch.ready_count: the batch column is
   // only refreshed server-side, so it lags every inline edit on this page.
   const readyCount = useMemo(() => items.filter(i => i.status === 'ready').length, [items]);
+  /** Draft rows the all-or-nothing publish gate is waiting on. */
+  const notReady = useMemo(
+    () => items.filter(i => i.status !== 'skipped' && i.status !== 'ready'),
+    [items]
+  );
+
+  const filterCounts = useMemo(
+    () => ({
+      all: items.length,
+      needs: notReady.length,
+      ready: readyCount,
+      skipped: items.length - nonSkipped.length,
+    }),
+    [items.length, nonSkipped.length, notReady.length, readyCount]
+  );
+
+  const visibleRows = useMemo(() => {
+    if (rowFilter === 'needs') return notReady;
+    if (rowFilter === 'ready') return items.filter(i => i.status === 'ready');
+    if (rowFilter === 'skipped') return items.filter(i => i.status === 'skipped');
+    return items;
+  }, [items, notReady, rowFilter]);
+
+  /**
+   * Drop every row the gate is waiting on. The gate itself stays all-or-nothing
+   * — this is the other way out of it, for a seller who would rather list the
+   * 57 cards that are fine than hunt down the 3 that are not.
+   */
+  const dropNotReady = useCallback(async () => {
+    setDroppingNotReady(true);
+    try {
+      for (const item of notReady) {
+        await removeRow(item.id);
+      }
+    } finally {
+      setDroppingNotReady(false);
+      setConfirmDropNotReady(false);
+    }
+  }, [notReady, removeRow]);
 
   /** Progress-view tally. Derived from the rows, for the same reason. */
   const counts = useMemo(() => {
@@ -535,18 +626,23 @@ export default function BulkBatchClient({ batchId }: Props) {
       });
       const json = await res.json().catch(() => ({}));
       if (res.status === 501) {
-        setPublishNote(
-          json.message ||
-            'Publishing is not enabled yet. Your batch is saved and will publish once it ships.'
-        );
+        setPublishNote({
+          text:
+            json.message ||
+            'Publishing is not enabled yet. Your batch is saved and will publish once it ships.',
+          tone: 'warning',
+        });
         return;
       }
       if (!res.ok) {
-        setPublishNote(json.error || 'Could not start publishing.');
+        setPublishNote({ text: json.error || 'Could not start publishing.', tone: 'warning' });
         return;
       }
       await load(token);
-      setPublishNote(`${json.queued} card${json.queued === 1 ? '' : 's'} queued for eBay.`);
+      setPublishNote({
+        text: `${json.queued} card${json.queued === 1 ? '' : 's'} queued for eBay.`,
+        tone: 'success',
+      });
     } finally {
       setPublishing(false);
     }
@@ -585,7 +681,7 @@ export default function BulkBatchClient({ batchId }: Props) {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setPublishNote(json.error || `Could not ${action} this batch.`);
+          setPublishNote({ text: json.error || `Could not ${action} this batch.`, tone: 'warning' });
           return;
         }
         await load(token);
@@ -673,6 +769,12 @@ export default function BulkBatchClient({ batchId }: Props) {
   // Phase 1; everything else is the progress view, which is read-only over the
   // same rows plus the run controls.
   const isDraft = batch.status === 'draft';
+  // The SAVED format, not the panel's edit state: it is what the rows were
+  // seeded against, so the price column has to be named after it.
+  const isAuction = batch.settings?.listingFormat === 'AUCTION';
+  // The column HEADING follows the panel's current choice instead, so switching
+  // format renames the column at once rather than only after Apply.
+  const priceHeading = settings.listingFormat === 'AUCTION' ? 'Starting price' : 'Price';
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -692,6 +794,7 @@ export default function BulkBatchClient({ batchId }: Props) {
                   <> &middot; {items.length - nonSkipped.length} skipped</>
                 )}
                 {' '}&middot; {readyCount} ready
+                {' '}&middot; {describeListingFormat(batch.settings)}
               </p>
             ) : (
               <p className="text-sm text-gray-600 mt-1">
@@ -704,15 +807,55 @@ export default function BulkBatchClient({ batchId }: Props) {
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {isDraft ? (
-              <button
-                onClick={publish}
-                disabled={!allReady || publishing}
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {publishing
-                  ? 'Starting…'
-                  : `List ${nonSkipped.length} card${nonSkipped.length === 1 ? '' : 's'}`}
-              </button>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <button
+                  onClick={publish}
+                  disabled={!allReady || publishing}
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {publishing
+                    ? 'Starting…'
+                    : `List ${nonSkipped.length} card${nonSkipped.length === 1 ? '' : 's'}`}
+                </button>
+                {/* Why the button is off, and the one action that turns it on
+                    without opening every row. */}
+                {notReady.length > 0 && (
+                  confirmDropNotReady ? (
+                    <div className="flex flex-wrap items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <span className="text-sm text-red-800">
+                        Remove {notReady.length} card{notReady.length === 1 ? '' : 's'} from this batch?
+                      </span>
+                      <button
+                        onClick={dropNotReady}
+                        disabled={droppingNotReady}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {droppingNotReady ? 'Removing…' : 'Yes, remove'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDropNotReady(false)}
+                        disabled={droppingNotReady}
+                        className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 disabled:opacity-50"
+                      >
+                        Keep them
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-amber-800">
+                        {notReady.length} card{notReady.length === 1 ? '' : 's'} still need
+                        {notReady.length === 1 ? 's' : ''} something
+                      </span>
+                      <button
+                        onClick={() => setConfirmDropNotReady(true)}
+                        className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-50"
+                      >
+                        Remove the {notReady.length} not-ready card{notReady.length === 1 ? '' : 's'}
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
             ) : (
               <BatchControls
                 status={batch.status}
@@ -726,8 +869,14 @@ export default function BulkBatchClient({ batchId }: Props) {
         </div>
 
         {publishNote && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900">
-            {publishNote}
+          <div
+            className={`border rounded-lg px-4 py-3 text-sm ${
+              publishNote.tone === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}
+          >
+            {publishNote.text}
           </div>
         )}
 
@@ -736,6 +885,7 @@ export default function BulkBatchClient({ batchId }: Props) {
             batch={batch}
             counts={counts}
             token={token}
+            settings={batch.settings}
             onRetryAll={retryAllFailed}
             retryingAll={retryingAll}
           />
@@ -774,22 +924,53 @@ export default function BulkBatchClient({ batchId }: Props) {
 
         {/* --------------------------------------------- bulk actions -- */}
         {isDraft && selectedRows.length > 0 && (
-          <div className="bg-indigo-600 text-white rounded-lg px-4 py-3 space-y-2 text-sm">
+          // Sticky: the bar acts on a selection made anywhere in a 100-row
+          // list, so it has to still be on screen when the reviewer gets there.
+          <div className="sticky top-0 z-20 bg-indigo-600 text-white rounded-lg px-4 py-3 space-y-2 text-sm shadow-lg">
             <div className="flex flex-wrap items-center gap-3">
               <span className="font-semibold">{selectedRows.length} row{selectedRows.length === 1 ? '' : 's'}</span>
               <button
-                onClick={() => forEachSelected(item => regenerateRow(item.id))}
-                className="underline hover:no-underline"
+                onClick={() => forEachSelected('regenerate', item => regenerateRow(item.id))}
+                disabled={bulkBusy !== null}
+                className="underline hover:no-underline disabled:opacity-60 disabled:no-underline"
               >
-                Reset to generated
+                {bulkBusy?.kind === 'regenerate' ? bulkBusyLabel(bulkBusy) : 'Reset to generated'}
               </button>
+              {confirmBulkRemove ? (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>Remove {selectedRows.length} card{selectedRows.length === 1 ? '' : 's'} from this batch?</span>
+                  <button
+                    onClick={async () => {
+                      await forEachSelected('remove', item => removeRow(item.id));
+                      setConfirmBulkRemove(false);
+                    }}
+                    disabled={bulkBusy !== null}
+                    className="px-2.5 py-1 bg-white text-red-700 rounded-md font-semibold disabled:opacity-60"
+                  >
+                    {bulkBusy?.kind === 'remove' ? bulkBusyLabel(bulkBusy) : 'Yes, remove'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmBulkRemove(false)}
+                    disabled={bulkBusy !== null}
+                    className="opacity-90 hover:opacity-100 disabled:opacity-60"
+                  >
+                    Keep them
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmBulkRemove(true)}
+                  disabled={bulkBusy !== null}
+                  className="underline hover:no-underline disabled:opacity-60 disabled:no-underline"
+                >
+                  Remove
+                </button>
+              )}
               <button
-                onClick={() => forEachSelected(item => removeRow(item.id))}
-                className="underline hover:no-underline"
+                onClick={() => setSelectedRows([])}
+                disabled={bulkBusy !== null}
+                className="ml-auto opacity-80 hover:opacity-100 disabled:opacity-50"
               >
-                Remove
-              </button>
-              <button onClick={() => setSelectedRows([])} className="ml-auto opacity-80 hover:opacity-100">
                 Clear
               </button>
             </div>
@@ -805,17 +986,17 @@ export default function BulkBatchClient({ batchId }: Props) {
               />
               <button
                 onClick={() => applyTitleAffix('prefix', affixText)}
-                disabled={!affixText.trim()}
+                disabled={!affixText.trim() || bulkBusy !== null}
                 className="px-3 py-1.5 bg-white text-indigo-700 rounded-md font-semibold disabled:opacity-50"
               >
-                Add to front
+                {bulkBusy?.kind === 'prefix' ? bulkBusyLabel(bulkBusy) : 'Add to front'}
               </button>
               <button
                 onClick={() => applyTitleAffix('suffix', affixText)}
-                disabled={!affixText.trim()}
+                disabled={!affixText.trim() || bulkBusy !== null}
                 className="px-3 py-1.5 bg-white text-indigo-700 rounded-md font-semibold disabled:opacity-50"
               >
-                Add to end
+                {bulkBusy?.kind === 'suffix' ? bulkBusyLabel(bulkBusy) : 'Add to end'}
               </button>
             </div>
             {affixNote && <p className="text-xs text-indigo-100">{affixNote}</p>}
@@ -828,7 +1009,7 @@ export default function BulkBatchClient({ batchId }: Props) {
             <div className="hidden md:grid grid-cols-[4rem_1fr_8rem_12rem] gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500">
               <span>Card</span>
               <span>Title</span>
-              <span>Price</span>
+              <span>{priceHeading}</span>
               <span>Status</span>
             </div>
             <ul className="divide-y divide-gray-100">
@@ -852,16 +1033,44 @@ export default function BulkBatchClient({ batchId }: Props) {
         {/* ---------------------------------------------- review list -- */}
         {isDraft && (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Filter strip. "Needs work" is the one people actually want: it is
+              the list of rows standing between them and the publish button. */}
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-200">
+            {(['all', 'needs', 'ready', 'skipped'] as const)
+              .filter(key => key === 'all' || filterCounts[key] > 0)
+              .map(key => (
+                <button
+                  key={key}
+                  onClick={() => setRowFilter(key)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    rowFilter === key
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {ROW_FILTER_LABEL[key]} ({filterCounts[key]})
+                </button>
+              ))}
+          </div>
           <div className="hidden md:grid grid-cols-[2rem_4rem_1fr_9rem_12rem_6rem] gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <span />
+            <SelectAllCheckbox
+              rows={visibleRows}
+              selectedRows={selectedRows}
+              onChange={setSelectedRows}
+            />
             <span>Card</span>
             <span>Title</span>
-            <span>Price</span>
+            <span>{priceHeading}</span>
             <span>Details</span>
             <span>Status</span>
           </div>
           <ul className="divide-y divide-gray-100">
-            {items.map(item => (
+            {visibleRows.length === 0 && (
+              <li className="px-4 py-6 text-sm text-gray-500 text-center">
+                No rows in this view.
+              </li>
+            )}
+            {visibleRows.map(item => (
               <BulkRow
                 key={item.id}
                 item={item}
@@ -894,6 +1103,7 @@ export default function BulkBatchClient({ batchId }: Props) {
           item={drawerItem}
           card={cards.get(drawerItem.card_id)}
           mode={isDraft ? 'review' : 'repair'}
+          listingFormat={isAuction ? 'AUCTION' : 'FIXED_PRICE'}
           tab={drawer.tab}
           onTabChange={async tab => {
             if (tab === 'specifics') await ensureAspects(drawerItem);
@@ -922,6 +1132,25 @@ export default function BulkBatchClient({ batchId }: Props) {
               setDrawerSaving(false);
             }
           }}
+          // Save, then send the card back to eBay, then close — the whole
+          // point of opening a failed row.
+          onSaveAndRetry={async patch => {
+            setDrawerSaving(true);
+            setDrawerError(null);
+            try {
+              await patchItem(drawerItem.id, patch);
+              const problem = await retryItem(drawerItem.id);
+              if (problem) {
+                setDrawerError(problem);
+                return;
+              }
+              setDrawer(null);
+            } catch (err: any) {
+              setDrawerError(err?.message ?? 'Could not save that change.');
+            } finally {
+              setDrawerSaving(false);
+            }
+          }}
         />
       )}
     </main>
@@ -939,6 +1168,31 @@ const BATCH_HEADINGS: Record<string, string> = {
   failed: 'Batch finished',
   cancelled: 'Batch cancelled',
 };
+
+/** "DCM estimate" / "Estimate × 90%" / "$12.00 each" / "Priced per row". */
+function describePriceRule(rule: BulkPriceRule): string {
+  switch (rule.mode) {
+    case 'fixed': return `$${rule.amount.toFixed(2)} each`;
+    case 'estimate_pct': return `Estimate × ${rule.percent}%`;
+    case 'blank': return 'Priced per row';
+    default: return 'DCM estimate';
+  }
+}
+
+/** The shipping half of the summary: policy names, or the inline terms. */
+function describeShipping(settings: BulkBatchSettings): string {
+  if (settings.policies.useBusinessPolicies) {
+    return `Policy: ${settings.policies.shippingPolicyName ?? 'eBay business policies'}`;
+  }
+  const ship = settings.shipping;
+  const how =
+    ship.shippingType === 'FREE'
+      ? 'Free shipping'
+      : ship.shippingType === 'FLAT_RATE'
+        ? `Flat $${Number(ship.flatRateAmount).toFixed(2)}`
+        : 'Calculated shipping';
+  return ship.postalCode ? `${how} from ${ship.postalCode}` : how;
+}
 
 interface ProgressCounts {
   total: number;
@@ -1050,12 +1304,14 @@ function BatchProgress({
   batch,
   counts,
   token,
+  settings,
   onRetryAll,
   retryingAll,
 }: {
   batch: BulkBatch;
   counts: ProgressCounts;
   token: string | null;
+  settings: BulkBatchSettings | null;
   onRetryAll: () => void;
   retryingAll: boolean;
 }) {
@@ -1110,6 +1366,14 @@ function BatchProgress({
           {counts.blocked > 0 && <span className="text-amber-700">{counts.blocked} held</span>}
           {counts.skipped > 0 && <span>{counts.skipped} skipped</span>}
         </div>
+        {/* The panel is gone once a batch runs, and "what did I actually send?"
+            is the first question a finished run raises. */}
+        {settings && (
+          <p className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+            {describeListingFormat(settings)} &middot; {describePriceRule(settings.priceRule)}
+            {' '}&middot; {describeShipping(settings)}
+          </p>
+        )}
       </div>
 
       {/* ------------------------------------------- paused banners -- */}
@@ -1305,6 +1569,48 @@ function ProgressRow({
 /* Row                                                                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Header checkbox for the review list. Acts on the rows CURRENTLY VISIBLE, so
+ * "select all" under a filter means the filtered set — which is what it looks
+ * like — and never silently reaches rows the reviewer cannot see.
+ */
+function SelectAllCheckbox({
+  rows,
+  selectedRows,
+  onChange,
+}: {
+  rows: BulkItem[];
+  selectedRows: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const chosen = rows.filter(r => selectedRows.includes(r.id)).length;
+  const all = rows.length > 0 && chosen === rows.length;
+  // `indeterminate` is a DOM property, not an attribute — React cannot set it.
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = chosen > 0 && !all;
+  }, [chosen, all]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={all}
+      disabled={rows.length === 0}
+      onChange={() => {
+        const visible = rows.map(r => r.id);
+        onChange(
+          all
+            ? selectedRows.filter(id => !visible.includes(id))
+            : Array.from(new Set([...selectedRows, ...visible]))
+        );
+      }}
+      aria-label="Select every row in this view"
+      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+    />
+  );
+}
+
 function BulkRow({
   item,
   card,
@@ -1333,6 +1639,7 @@ function BulkRow({
   const [rowError, setRowError] = useState<string | null>(null);
   const [rechecking, setRechecking] = useState(false);
   const [retryingPhotos, setRetryingPhotos] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   useEffect(() => { setTitle(item.title ?? ''); }, [item.title]);
   useEffect(() => { setPrice(item.price == null ? '' : String(item.price)); }, [item.price]);
@@ -1343,6 +1650,9 @@ function BulkRow({
   const photos = item.image_urls?.length ?? 0;
   const thumbnail = item.image_urls?.[0] ?? card?.front_url ?? null;
   const isSkipped = item.status === 'skipped';
+  // Regenerating throws away hand-written copy, so a row that carries any asks
+  // first. An untouched row has nothing to lose and regenerates on one click.
+  const edited = item.title_edited || item.description_edited;
 
   const commit = async (patch: Record<string, unknown>) => {
     setRowError(null);
@@ -1400,15 +1710,34 @@ function BulkRow({
             className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50"
           />
           <button
-            onClick={onRegenerate}
+            onClick={() => (edited ? setConfirmRegenerate(true) : onRegenerate())}
             disabled={isSkipped}
             title="Regenerate title and description"
             aria-label="Regenerate"
-            className="mt-1 text-gray-400 hover:text-indigo-600 disabled:opacity-40"
+            className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 disabled:opacity-40"
           >
             &#8635;
           </button>
         </div>
+        {confirmRegenerate && (
+          <div className="mt-1 flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+            <span className="text-[11px] text-amber-900">
+              This replaces your edited title/description. Regenerate?
+            </span>
+            <button
+              onClick={() => { setConfirmRegenerate(false); onRegenerate(); }}
+              className="px-2 py-1 bg-amber-600 text-white rounded text-[11px] font-semibold hover:bg-amber-700"
+            >
+              Regenerate
+            </button>
+            <button
+              onClick={() => setConfirmRegenerate(false)}
+              className="text-[11px] text-gray-600 hover:text-gray-900"
+            >
+              Keep mine
+            </button>
+          </div>
+        )}
         <p className={`text-[11px] mt-0.5 ${title.length > EBAY_TITLE_MAX ? 'text-red-600' : 'text-gray-500'}`}>
           {title.length}/{EBAY_TITLE_MAX}
           {item.title_edited && <span className="ml-2 text-indigo-600">edited</span>}
@@ -1439,7 +1768,9 @@ function BulkRow({
         </p>
       </div>
 
-      <div className="mt-2 md:mt-0 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+      {/* 40px minimum on every one of these: they sit inches apart in a
+          100-row list and half of them are read on a phone. */}
+      <div className="mt-2 md:mt-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         {isSkipped && (
           <button
             onClick={async () => {
@@ -1447,19 +1778,28 @@ function BulkRow({
               try { await onRecheck(); } finally { setRechecking(false); }
             }}
             disabled={rechecking}
-            className="text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+            className={`${rowActionClass} text-indigo-600 hover:text-indigo-800 disabled:opacity-50`}
           >
             {rechecking ? 'Checking…' : 'Re-check'}
           </button>
         )}
-        <button onClick={() => onOpenDrawer('description')} className="text-indigo-600 hover:text-indigo-800">
+        <button
+          onClick={() => onOpenDrawer('description')}
+          className={`${rowActionClass} text-indigo-600 hover:text-indigo-800`}
+        >
           Preview description
         </button>
-        <button onClick={() => onOpenDrawer('specifics')} className="text-indigo-600 hover:text-indigo-800">
+        <button
+          onClick={() => onOpenDrawer('specifics')}
+          className={`${rowActionClass} text-indigo-600 hover:text-indigo-800`}
+        >
           {tally.requiredFilled}/{tally.requiredTotal} required
           {tally.recommendedTotal > 0 && ` · ${tally.recommendedFilled}/${tally.recommendedTotal} rec.`}
         </button>
-        <button onClick={() => onOpenDrawer('images')} className="text-indigo-600 hover:text-indigo-800">
+        <button
+          onClick={() => onOpenDrawer('images')}
+          className={`${rowActionClass} text-indigo-600 hover:text-indigo-800`}
+        >
           {photos} photo{photos === 1 ? '' : 's'}
         </button>
         {item.image_status === 'failed' && !isSkipped && (
@@ -1469,14 +1809,26 @@ function BulkRow({
               try { await onRetryPhotos(); } finally { setRetryingPhotos(false); }
             }}
             disabled={retryingPhotos}
-            className="text-amber-700 hover:text-amber-900 disabled:opacity-50"
+            className={`${rowActionClass} text-amber-700 hover:text-amber-900 disabled:opacity-50`}
           >
             {retryingPhotos ? 'Retrying…' : 'Retry photos'}
           </button>
         )}
-        <button onClick={onRemove} className="text-gray-400 hover:text-red-600">
+        {/* Remove is destructive, so it does not sit in the same run of blue
+            links as the four that just open a drawer. */}
+        <button
+          onClick={onRemove}
+          className={`${rowActionClass} ml-auto pl-3 border-l border-gray-200 text-gray-400 hover:text-red-600`}
+        >
           Remove
         </button>
+        {/* Every blocker, not just the first — the pill has room for one, and
+            "fix this row" needs the whole list. */}
+        {!isSkipped && (item.readiness?.length ?? 0) > 0 && (
+          <span className="w-full text-amber-700">
+            {item.readiness!.map(r => r.label).join(' · ')}
+          </span>
+        )}
         {rowError && <span className="w-full text-red-600">{rowError}</span>}
       </div>
 

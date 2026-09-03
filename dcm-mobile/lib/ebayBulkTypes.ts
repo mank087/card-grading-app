@@ -9,7 +9,7 @@
  *   - src/lib/ebay/bulkPublish.ts                   — PAUSE_REASONS copy
  *   - .../components/BulkBatchesStrip.tsx           — status chip labels
  * The value-carrying halves (DEFAULT_BULK_SHIPPING, DEFAULT_BULK_SETTINGS,
- * PAUSE_REASONS, BATCH_STATUS_LABEL) are registered in
+ * BULK_AUCTION_DURATIONS, PAUSE_REASONS, BATCH_STATUS_LABEL) are registered in
  * scripts/check-twin-drift.ts; run `npm run check:twin-drift` after editing
  * either side. The interfaces are not machine-checked — keep them in step by
  * hand.
@@ -109,11 +109,26 @@ export type BulkPriceRule =
   /** Leave every price blank for the seller to fill in per row. */
   | { mode: 'blank' }
 
+/** The auction lengths eBay accepts, batch-wide. Twin: BULK_AUCTION_DURATIONS. */
+export const BULK_AUCTION_DURATIONS = [
+  { value: 'DAYS_1', label: '1 Day' },
+  { value: 'DAYS_3', label: '3 Days' },
+  { value: 'DAYS_5', label: '5 Days' },
+  { value: 'DAYS_7', label: '7 Days' },
+  { value: 'DAYS_10', label: '10 Days' },
+] as const
+
+export type BulkAuctionDuration = (typeof BULK_AUCTION_DURATIONS)[number]['value']
+
+/** eBay's recommended auction length, and what a new auction batch starts on. */
+export const DEFAULT_AUCTION_DURATION: BulkAuctionDuration = 'DAYS_7'
+
 export interface BulkBatchSettings {
   shipping: BulkShippingForm
   bestOfferEnabled: boolean
-  listingFormat: 'FIXED_PRICE'
-  duration: 'GTC'
+  listingFormat: 'FIXED_PRICE' | 'AUCTION'
+  /** GTC for fixed price; one of the five day-lengths for an auction. */
+  duration: 'GTC' | BulkAuctionDuration
   priceRule: BulkPriceRule
   /**
    * Enterprise title label ("Kings Kards"); null = the built-in "DCM".

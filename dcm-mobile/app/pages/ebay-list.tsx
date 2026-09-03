@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Switch, Modal, Linking, Image,
+  KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -1150,6 +1151,12 @@ export default function EbayListScreen() {
       </View>
       <Text style={st.stepLabel}>{STEP_LABELS[step]}</Text>
 
+      {/* The step body and the Back/Next bar both have to stay above the
+          keyboard — the shipping step is nothing but numeric inputs. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView style={st.scroll} contentContainerStyle={st.scrollContent}>
 
         {/* ═══ STEP 1: Connect & Images ═══ */}
@@ -1689,7 +1696,7 @@ export default function EbayListScreen() {
                       <View style={st.segmentRow}>
                         {(['BUYER', 'SELLER'] as const).map(w => (
                           <TouchableOpacity key={w} style={[st.segment, shipping.returnShipping === w && st.segmentActive]} onPress={() => setShipping(p => ({ ...p, returnShipping: w }))}>
-                            <Text style={[st.segmentText, shipping.returnShipping === w && st.segmentTextActive]}>{w}</Text>
+                            <Text style={[st.segmentText, shipping.returnShipping === w && st.segmentTextActive]}>{w === 'BUYER' ? 'Buyer pays' : 'Seller pays'}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
@@ -1988,6 +1995,7 @@ export default function EbayListScreen() {
           )}
         </View>
       )}
+      </KeyboardAvoidingView>
       <MobileTabBar />
     </View>
   )

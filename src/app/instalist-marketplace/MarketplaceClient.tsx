@@ -81,6 +81,7 @@ export default function MarketplaceClient() {
 
   // Modal state
   const [modalCard, setModalCard] = useState<MarketplaceCard | null>(null);
+  const [relistError, setRelistError] = useState<string | null>(null);
 
   // Bulk listing (feature-flagged). The single-card modal path above is
   // untouched — this is a second way out of the same picker.
@@ -349,6 +350,42 @@ export default function MarketplaceClient() {
     }
   }, [accessToken, bulkSelection, router]);
 
+  /**
+   * Relist an ended listing's card.
+   *
+   * The picker's card list is capped at the 2,000 most recent, so a card that
+   * ended a listing months ago can be perfectly relistable and still not be in
+   * `cards` — the old lookup simply did nothing in that case, and the button
+   * looked broken. Fall back to the server search, and say so plainly when the
+   * card really is gone (sold, deleted, or listed again elsewhere).
+   */
+  const relistCard = useCallback(async (listing: MarketplaceListing) => {
+    setRelistError(null);
+    const local = cards.find(c => c.id === listing.cardId);
+    if (local) {
+      setActiveTab('list');
+      setModalCard(local);
+      return;
+    }
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) throw new Error('no session');
+      const res = await fetch(
+        `/api/ebay/eligible-cards?q=${encodeURIComponent(listing.cardName ?? '')}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+      const json = res.ok ? await res.json() : null;
+      const found: MarketplaceCard | undefined = (json?.cards ?? []).find(
+        (c: MarketplaceCard) => c.id === listing.cardId
+      );
+      if (!found) throw new Error('not eligible');
+      setActiveTab('list');
+      setModalCard(found);
+    } catch {
+      setRelistError('This card is no longer available to relist.');
+    }
+  }, [cards]);
+
   const handleListingPublished = useCallback(() => {
     setModalCard(null);
     refreshAll();
@@ -503,6 +540,11 @@ export default function MarketplaceClient() {
         {/* Stats strip */}
         <StatsStrip stats={stats} />
 
+        {/* Batches sit above the tabs, not inside one: a running batch is the
+            most time-sensitive thing on this page and the seller is as likely
+            to be on My Listings watching it land. */}
+        {bulkEnabled && <div className="mt-6"><BulkBatchesStrip token={accessToken} /></div>}
+
         {/* Tabs — scrollable on mobile so the row doesn't wrap awkwardly */}
         <div className="mt-6 border-b border-gray-200 overflow-x-auto">
           <nav className="-mb-px flex gap-4 sm:gap-6 min-w-max">
@@ -526,7 +568,6 @@ export default function MarketplaceClient() {
 
         {/* Tab content */}
         <div className="mt-6">
-          {activeTab === 'list' && bulkEnabled && <BulkBatchesStrip token={accessToken} />}
           {activeTab === 'list' && (
             <ListNewTab
               cards={cards}
@@ -549,22 +590,25 @@ export default function MarketplaceClient() {
             <SoldTab listings={listings.sold} />
           )}
           {activeTab === 'ended' && (
-            <EndedTab
-              listings={listings.ended}
-              onRelist={(cardId) => {
-                const card = cards.find(c => c.id === cardId);
-                if (card) {
-                  setActiveTab('list');
-                  setModalCard(card);
-                }
-              }}
-            />
+            <>
+              {relistError && (
+                <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900">
+                  {relistError}
+                </div>
+              )}
+              <EndedTab listings={listings.ended} onRelist={relistCard} />
+            </>
           )}
           {/* Seller-level listing settings. Only the eBay business-policy
               opt-in lives here today; it is an account-wide choice, so it
               belongs beside the listings rather than inside one listing's
               stepper. */}
-          {activeTab === 'settings' && <EbayPolicySettings />}
+          {activeTab === 'settings' && (
+            <div className="space-y-5">
+              <EbayPolicySettings />
+              <DisconnectPanel username={ebayUsername} onDisconnected={() => refreshAll()} />
+            </div>
+          )}
         </div>
 
         {/* Footer info section — keeps the value-prop visible to existing users */}
@@ -659,6 +703,94 @@ function SyncStatusPill({ syncState }: { syncState:
     <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full">
       Sync available again in {syncState.retryAfterSec}s
     </span>
+  );
+}
+
+/**
+ * Disconnect the eBay account. Moved out of the listing modal's footer, where
+ * it sat one misclick from the Publish button — this is account state, so it
+ * belongs on the Settings tab beside the other account-wide choice.
+ *
+ * Two-step inline, the same posture as EbayPolicySettings: never window.confirm.
+ */
+function DisconnectPanel({
+  username,
+  onDisconnected,
+}: {
+  username: string | null;
+  onDisconnected: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const disconnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) throw new Error('no session');
+      const res = await fetch('/api/ebay/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error('failed');
+      setConfirming(false);
+      onDisconnected();
+    } catch {
+      setError('Could not disconnect. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-xl">
+      <header className="p-4 border-b border-gray-200">
+        <h2 className="text-base font-bold text-gray-900">Your eBay connection</h2>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {username ? <>Connected as <strong>{username}</strong>.</> : 'Connected.'} Listings you
+          have already published stay on eBay either way.
+        </p>
+      </header>
+      <div className="p-4 space-y-3">
+        {confirming ? (
+          <div className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-3">
+            <p className="text-sm text-red-900">
+              Disconnect this eBay account? DCM stops syncing your listings and you will have to
+              sign in to eBay again before you can list anything else.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={disconnect}
+                disabled={busy}
+                className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy ? 'Disconnecting…' : 'Yes, disconnect'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirming(false); setError(null); }}
+                disabled={busy}
+                className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              >
+                Keep it connected
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="text-sm text-gray-600 hover:text-red-700 font-semibold"
+          >
+            Disconnect eBay
+          </button>
+        )}
+        {error && <p className="text-xs text-red-700">{error}</p>}
+      </div>
+    </section>
   );
 }
 

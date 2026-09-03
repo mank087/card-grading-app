@@ -65,6 +65,14 @@ export interface BulkPhotoPass {
   done: number
   /** Cards this pass will have attempted when the queue drains. */
   total: number
+  /** Cards still to go, including the one in flight. */
+  remaining: number
+  /**
+   * Rough time left, from the average per-card duration measured so far. Null
+   * until two cards have finished — one card's timing is not an average, and a
+   * wrong estimate is worse than none.
+   */
+  etaMs: number | null
   currentItemId: string | null
   /** Work is waiting but the screen is backgrounded / blurred / signed out. */
   paused: boolean
@@ -107,6 +115,8 @@ export function useBulkPhotoPass({
   const [focused, setFocused] = useState(false)
   /** The session was gone when a card was picked — the pass waits, it doesn't die. */
   const [noSession, setNoSession] = useState(false)
+  /** When the pass picked its first card — the clock the estimate is read off. */
+  const [startedAt, setStartedAt] = useState<number | null>(null)
 
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -241,6 +251,7 @@ export function useBulkPhotoPass({
         return
       }
       setNoSession(prev => (prev ? false : prev))
+      setStartedAt(prev => prev ?? Date.now())
       attemptRef.current += 1
       chunkRef.current = {}
       setCurrent({
@@ -372,7 +383,15 @@ export function useBulkPhotoPass({
   /* ---------------------------------------------------------- progress -- */
 
   const done = attempted.size
-  const total = done + queue.length + (current ? 1 : 0)
+  const remaining = queue.length + (current ? 1 : 0)
+  const total = done + remaining
+  // Wall-clock over cards finished, not a per-card stopwatch: the pass is
+  // paused whenever the screen is backgrounded, and the seller is being told
+  // how long to keep it open, not how long the renders take.
+  const etaMs =
+    startedAt !== null && done >= 2 && remaining > 0
+      ? Math.round(((Date.now() - startedAt) / done) * remaining)
+      : null
   // The label style resolving is the pass loading, not the pass paused — the
   // strip would otherwise flash "paused" for a beat every time it opens.
   const paused =
@@ -395,6 +414,8 @@ export function useBulkPhotoPass({
     running: current !== null,
     done,
     total,
+    remaining,
+    etaMs,
     currentItemId: current?.itemId ?? null,
     paused,
     pauseReason,

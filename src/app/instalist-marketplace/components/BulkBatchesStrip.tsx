@@ -37,18 +37,28 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function BulkBatchesStrip({ token }: { token: string | null }) {
   const [batches, setBatches] = useState<BulkBatchSummary[]>([]);
+  // A running batch publishes without this page: the counts here are stale the
+  // moment they land, so the strip refreshes while one is in flight and stops
+  // the moment nothing is (and while the tab is hidden — nobody is reading it).
+  const running = batches.some(b => b.status === 'running');
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    fetch('/api/ebay/bulk/batches?limit=5', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => (r.ok ? r.json() : null))
-      .then(json => {
-        if (!cancelled && Array.isArray(json?.batches)) setBatches(json.batches);
-      })
-      .catch(() => { /* convenience only */ });
-    return () => { cancelled = true; };
-  }, [token]);
+    const load = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetch('/api/ebay/bulk/batches?limit=5', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => (r.ok ? r.json() : null))
+        .then(json => {
+          if (!cancelled && Array.isArray(json?.batches)) setBatches(json.batches);
+        })
+        .catch(() => { /* convenience only */ });
+    };
+    load();
+    if (!running) return () => { cancelled = true; };
+    const id = window.setInterval(load, 10_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [token, running]);
 
   if (batches.length === 0) return null;
 

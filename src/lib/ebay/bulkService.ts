@@ -468,6 +468,10 @@ export function newItemRow(
     title_edited: false,
     description_edited: false,
   };
-  const { readiness, status } = readinessPatch({ ...base, status: 'draft' });
+  const { readiness, status } = readinessPatch(
+    { ...base, status: 'draft' },
+    ctx.settings.listingFormat,
+    ctx.settings.shipping.postalCode
+  );
   return { ...base, readiness, status };
 }

@@ -159,11 +159,23 @@ function HeroVariant({
               title="Pick a graded card"
               body="Choose from your collection. We show only cards that aren&rsquo;t already listed, so you never double-post."
             />
+            {/* Bulk is the reason most sellers are here and it was nowhere on
+                this page — the single-card flow reads as the only flow. */}
             <Step
               number="3"
               title="Review and publish"
               body="Auto-generated images, suggested title and price, ready-to-go shipping defaults. Edit anything, hit List on eBay."
             />
+          </div>
+
+          <div className="mt-8 max-w-3xl mx-auto text-center">
+            <h3 className="text-lg font-bold mb-2">Listing many cards at once</h3>
+            <p className="text-gray-400">
+              Tick several cards in the picker instead of one, and InstaList drafts every listing
+              in a batch. You review the whole batch on one page &mdash; set the price rule,
+              format and shipping across the board, fix anything that needs it row by row &mdash;
+              then publish them together. Up to 100 cards per batch.
+            </p>
           </div>
         </div>
       </section>

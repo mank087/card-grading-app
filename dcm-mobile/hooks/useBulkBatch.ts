@@ -28,10 +28,17 @@ export interface UseBulkBatch {
   /** Published listings keyed by `BulkItem.listing_row_id`. */
   listings: Map<string, BulkListingRef>
   loading: boolean
+  /** A re-read the seller asked for is in flight — drives the pull-to-refresh spinner. */
+  refreshing: boolean
   error: string | null
   /** True when the 404 was the feature gate / a missing batch, not a fetch failure. */
   notFound: boolean
-  refresh: () => Promise<void>
+  /**
+   * Re-read the batch. Resolves to false when the read failed, so a caller that
+   * polls can count consecutive failures rather than alarming on the first one.
+   * `silent` keeps the poll out of the pull-to-refresh spinner.
+   */
+  refresh: (opts?: { silent?: boolean }) => Promise<boolean>
   /** Merge a patch (usually a whole server row) into one item. */
   setItem: (itemId: string, patch: Partial<BulkItem>) => void
   setBatch: (patch: Partial<BulkBatch>) => void
@@ -43,6 +50,7 @@ export function useBulkBatch(batchId: string | undefined): UseBulkBatch {
   const [cards, setCards] = useState<Map<string, BulkCard>>(new Map())
   const [listings, setListings] = useState<Map<string, BulkListingRef>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
 
@@ -57,14 +65,15 @@ export function useBulkBatch(batchId: string | undefined): UseBulkBatch {
    */
   const seqRef = useRef(0)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { silent?: boolean }): Promise<boolean> => {
     if (!batchId) {
       setLoading(false)
       setNotFound(true)
       setError(BATCH_NOT_FOUND_MESSAGE)
-      return
+      return false
     }
     setError(null)
+    if (!opts?.silent) setRefreshing(true)
     const seq = ++seqRef.current
     const current = () => mounted.current && seqRef.current === seq
     try {
@@ -77,7 +86,7 @@ export function useBulkBatch(batchId: string | undefined): UseBulkBatch {
       // is true for an exactly-100-row batch whose next page is empty.
       for (;;) {
         const page = await getBatch(batchId, offset)
-        if (!current()) return
+        if (!current()) return false
         allItems.push(...page.items)
         for (const c of page.cards) allCards.set(c.id, c)
         for (const l of page.listings) allListings.set(l.id, l)
@@ -87,25 +96,32 @@ export function useBulkBatch(batchId: string | undefined): UseBulkBatch {
         }
         offset += page.items.length
       }
-      if (!current()) return
+      if (!current()) return false
       setItems(allItems)
       setCards(allCards)
       setListings(allListings)
       setNotFound(false)
+      return true
     } catch (err) {
-      if (!current()) return
+      if (!current()) return false
       if (isBulkUnavailable(err) || (err instanceof BulkApiError && err.status === 404)) {
         setNotFound(true)
         setError(BATCH_NOT_FOUND_MESSAGE)
       } else {
         setError(err instanceof Error ? err.message : 'Could not load this batch.')
       }
+      return false
     } finally {
-      if (current()) setLoading(false)
+      if (current()) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [batchId])
 
-  useEffect(() => { setLoading(true); refresh() }, [refresh])
+  // The first read has the full-screen spinner, so it stays out of the
+  // pull-to-refresh one.
+  useEffect(() => { setLoading(true); void refresh({ silent: true }) }, [refresh])
 
   const setItem = useCallback((itemId: string, patch: Partial<BulkItem>) => {
     setItems(prev => prev.map(i => (i.id === itemId ? { ...i, ...patch } : i)))
@@ -115,5 +131,8 @@ export function useBulkBatch(batchId: string | undefined): UseBulkBatch {
     setBatchState(prev => (prev ? { ...prev, ...patch } : prev))
   }, [])
 
-  return { batch, items, cards, listings, loading, error, notFound, refresh, setItem, setBatch }
+  return {
+    batch, items, cards, listings, loading, refreshing, error, notFound,
+    refresh, setItem, setBatch,
+  }
 }

@@ -22,7 +22,10 @@ export default function SoldTab({ listings }: Props) {
     switch (key) {
       case 'card': return row.cardName ?? '';
       case 'title': return row.title ?? '';
-      case 'price': return safeNumber(row.price) * Math.max(1, row.quantitySold);
+      // The column shows the UNIT sale price, so that is what it sorts by —
+      // multiplying by quantity here sorted a list by a number nothing on
+      // screen was showing. Quantity has its own column.
+      case 'price': return safeNumber(row.price);
       case 'qty': return row.quantitySold || 1;
       case 'soldAt': return row.soldAt ? new Date(row.soldAt).getTime() : null;
       case 'url': return row.listingUrl ?? '';
@@ -30,7 +33,7 @@ export default function SoldTab({ listings }: Props) {
     }
   }, []);
 
-  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, SoldCol>(
+  const { sortedRows, toggleSort, sortIndicator, ariaSort } = useSortableRows<MarketplaceListing, SoldCol>(
     listings,
     getValue,
     'soldAt',
@@ -97,12 +100,12 @@ export default function SoldTab({ listings }: Props) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
-                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
-                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sale price</SortableTh>
-                <SortableTh col="qty" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Qty sold</SortableTh>
-                <SortableTh col="soldAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sold</SortableTh>
-                <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sale price</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="qty" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Qty sold</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="soldAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sold</SortableTh>
+                <SortableTh ariaSort={ariaSort} col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

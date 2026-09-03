@@ -54,12 +54,31 @@ export type BulkPriceRule =
   /** Leave every price blank for the seller to fill in per row. */
   | { mode: 'blank' };
 
+/** The auction lengths eBay accepts, batch-wide. Twin: dcm-mobile AUCTION_DURATION_OPTIONS. */
+export const BULK_AUCTION_DURATIONS = [
+  { value: 'DAYS_1', label: '1 Day' },
+  { value: 'DAYS_3', label: '3 Days' },
+  { value: 'DAYS_5', label: '5 Days' },
+  { value: 'DAYS_7', label: '7 Days' },
+  { value: 'DAYS_10', label: '10 Days' },
+] as const;
+
+export type BulkAuctionDuration = (typeof BULK_AUCTION_DURATIONS)[number]['value'];
+
+const AUCTION_DURATION_VALUES = BULK_AUCTION_DURATIONS.map(d => d.value);
+
+/** eBay's recommended auction length, and what a new auction batch starts on. */
+export const DEFAULT_AUCTION_DURATION: BulkAuctionDuration = 'DAYS_7';
+
 export interface BulkBatchSettings {
   shipping: BulkShippingForm;
   bestOfferEnabled: boolean;
-  listingFormat: 'FIXED_PRICE';
-  /** Fixed price is always GTC on eBay; kept explicit for the publish payload. */
-  duration: 'GTC';
+  listingFormat: 'FIXED_PRICE' | 'AUCTION';
+  /**
+   * Fixed price is always GTC on eBay; an auction runs for one of the five
+   * day-lengths. Kept explicit either way for the publish payload.
+   */
+  duration: 'GTC' | BulkAuctionDuration;
   priceRule: BulkPriceRule;
   /** Enterprise title label ("Kings Kards"); null = the built-in "DCM". */
   gradeLabel: string | null;
@@ -108,6 +127,7 @@ export const DEFAULT_BULK_SHIPPING: BulkShippingForm = {
   internationalReturnShippingPaidBy: 'BUYER',
 };
 
+/** A new batch is a Buy It Now batch; Auction is opt-in from the panel. */
 export const DEFAULT_BULK_SETTINGS: BulkBatchSettings = {
   shipping: DEFAULT_BULK_SHIPPING,
   bestOfferEnabled: true,
@@ -242,12 +262,29 @@ export function normalizeBulkSettings(
   const str = (v: unknown, fallback: string | null) =>
     typeof v === 'string' && v.trim() ? v.trim().slice(0, 120) : fallback;
   const rawShipping = (r.shipping && typeof r.shipping === 'object' ? r.shipping : {}) as Record<string, unknown>;
+  const listingFormat = pickEnum<BulkBatchSettings['listingFormat']>(
+    r.listingFormat,
+    ['FIXED_PRICE', 'AUCTION'],
+    base.listingFormat
+  );
   return {
     shipping: normalizeBulkShipping({ ...base.shipping, ...rawShipping }),
-    bestOfferEnabled: pickBool(r.bestOfferEnabled, base.bestOfferEnabled),
-    // Phase 1 is fixed-price GTC only; auctions stay in the single-card modal.
-    listingFormat: 'FIXED_PRICE',
-    duration: 'GTC',
+    // eBay does not allow Best Offer on an auction — the single-card modal
+    // hides the toggle for the same reason.
+    bestOfferEnabled: listingFormat === 'AUCTION' ? false : pickBool(r.bestOfferEnabled, base.bestOfferEnabled),
+    listingFormat,
+    // Fixed price has exactly one duration; an auction has five, and a batch
+    // switching over from GTC lands on eBay's recommended 7 days.
+    duration:
+      listingFormat === 'AUCTION'
+        ? pickEnum<BulkBatchSettings['duration']>(
+            r.duration,
+            AUCTION_DURATION_VALUES,
+            AUCTION_DURATION_VALUES.includes(base.duration as BulkAuctionDuration)
+              ? base.duration
+              : DEFAULT_AUCTION_DURATION
+          )
+        : 'GTC',
     priceRule: normalizePriceRule(r.priceRule, base.priceRule),
     gradeLabel: base.gradeLabel,
     policies: {
@@ -297,6 +334,31 @@ export function withSellerPolicyDefaults(
     shippingPolicyName: on ? policies.shippingPolicyName : null,
     returnPolicyName: on ? policies.returnPolicyName : null,
   };
+}
+
+/**
+ * The format a stored batch row runs on, without re-normalizing the whole
+ * settings blob. Anything that is not an auction is a Buy It Now batch, which
+ * is also what every row written before auctions existed carries.
+ */
+export function batchListingFormat(settings: unknown): BulkBatchSettings['listingFormat'] {
+  return (settings as BulkBatchSettings | null)?.listingFormat === 'AUCTION' ? 'AUCTION' : 'FIXED_PRICE';
+}
+
+/**
+ * The ships-from ZIP a stored batch row carries, for readiness. Same posture
+ * as batchListingFormat: read off the raw blob, never re-normalized, and a
+ * batch saved before the field was required simply reads as blank.
+ */
+export function batchPostalCode(settings: unknown): string {
+  return (settings as BulkBatchSettings | null)?.shipping?.postalCode ?? '';
+}
+
+/** How the batch's format reads in the UI: "Auction · 7 days" / "Buy It Now". */
+export function describeListingFormat(settings: BulkBatchSettings | undefined | null): string {
+  if (settings?.listingFormat !== 'AUCTION') return 'Buy It Now';
+  const label = BULK_AUCTION_DURATIONS.find(d => d.value === settings.duration)?.label ?? '7 Days';
+  return `Auction · ${label.toLowerCase()}`;
 }
 
 /** Human label for the chosen domestic carrier service. */

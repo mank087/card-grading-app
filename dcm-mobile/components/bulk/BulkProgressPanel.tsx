@@ -52,6 +52,8 @@ interface Props {
   onRetryAll: () => void
   /** Progress of a sequential "Retry all" run, or null when none is running. */
   retryAll: { done: number; total: number } | null
+  /** Break the retry loop after the card it is on. */
+  onStopRetryAll: () => void
   onBack: () => void
 }
 
@@ -75,7 +77,7 @@ function retryLabel(counts: ProgressCounts): string {
 
 export default function BulkProgressPanel({
   batch, counts, busy, onPause, onResume, onCancel,
-  onAcceptTerms, onReconnect, reconnecting, onRetryAll, retryAll, onBack,
+  onAcceptTerms, onReconnect, reconnecting, onRetryAll, retryAll, onStopRetryAll, onBack,
 }: Props) {
   const tone = BATCH_TONE[batch.status] ?? BATCH_TONE.draft
   const pct = counts.total > 0 ? Math.round((counts.settled / counts.total) * 100) : 0
@@ -241,20 +243,36 @@ export default function BulkProgressPanel({
       )}
 
       {counts.retryable > 0 && batch.status !== 'cancelled' && (
-        <TouchableOpacity
-          style={[styles.retryAllBtn, busyAny && styles.btnDisabled]}
-          onPress={onRetryAll}
-          disabled={busyAny}
-          accessibilityRole="button"
-          accessibilityLabel={retryLabel(counts)}
-        >
-          {retryAll
-            ? <ActivityIndicator size="small" color={Colors.purple[700]} />
-            : <Ionicons name="refresh" size={14} color={Colors.purple[700]} />}
-          <Text style={styles.retryAllText}>
-            {retryAll ? `Retrying ${retryAll.done} of ${retryAll.total}…` : retryLabel(counts)}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.retryAllRow}>
+          <TouchableOpacity
+            style={[styles.retryAllBtn, busyAny && styles.btnDisabled]}
+            onPress={onRetryAll}
+            disabled={busyAny}
+            accessibilityRole="button"
+            accessibilityLabel={retryLabel(counts)}
+          >
+            {retryAll
+              ? <ActivityIndicator size="small" color={Colors.purple[700]} />
+              : <Ionicons name="refresh" size={14} color={Colors.purple[700]} />}
+            <Text style={styles.retryAllText}>
+              {retryAll ? `Retrying ${retryAll.done} of ${retryAll.total}…` : retryLabel(counts)}
+            </Text>
+          </TouchableOpacity>
+          {/* A run of 50 cards is minutes long; the seller gets a way out of it
+              that does not mean force-quitting the app. It finishes the card it
+              is on rather than abandoning a call mid-flight. */}
+          {retryAll && (
+            <TouchableOpacity
+              style={styles.retryStopBtn}
+              onPress={onStopRetryAll}
+              accessibilityRole="button"
+              accessibilityLabel="Stop retrying after this card"
+            >
+              <Ionicons name="stop" size={14} color={Colors.red[600]} />
+              <Text style={styles.retryStopText}>Stop</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   )
@@ -330,12 +348,20 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backBtnText: { fontSize: 12, fontWeight: '700', color: Colors.purple[600] },
 
+  retryAllRow: { flexDirection: 'row', gap: 8 },
   retryAllBtn: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: 10,
     borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50],
   },
   retryAllText: { fontSize: 12, fontWeight: '700', color: Colors.purple[700] },
+  retryStopBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingHorizontal: 14, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white,
+  },
+  retryStopText: { fontSize: 12, fontWeight: '700', color: Colors.red[600] },
 
   btnDisabled: { opacity: 0.4 },
 })
