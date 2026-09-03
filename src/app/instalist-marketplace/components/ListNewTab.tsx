@@ -8,13 +8,33 @@ interface Props {
   /** True while the eligible-cards payload is still downloading. */
   loading?: boolean;
   onSelectCard: (card: MarketplaceCard) => void;
+  /** Bulk listing (NEXT_PUBLIC_EBAY_BULK_ENABLED). Off = the tab as it was. */
+  bulkEnabled?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  onStartBatch?: () => void;
+  startingBatch?: boolean;
+  batchError?: string | null;
+  selectionLimit?: number;
 }
 
 /**
  * "List a Card" tab. Left rail = card picker, right area = explainer/empty state.
  * On select, parent opens the EbayListingModal — same modal the card-detail page uses.
  */
-export default function ListNewTab({ cards, truncated, loading, onSelectCard }: Props) {
+export default function ListNewTab({
+  cards,
+  truncated,
+  loading,
+  onSelectCard,
+  bulkEnabled = false,
+  selectedIds = [],
+  onSelectionChange,
+  onStartBatch,
+  startingBatch = false,
+  batchError = null,
+  selectionLimit = 100,
+}: Props) {
   if (cards.length === 0 && loading) {
     // The marketplace shell renders before the card list finishes loading —
     // don't flash the "all listed" empty state while we're still fetching.
@@ -59,7 +79,33 @@ export default function ListNewTab({ cards, truncated, loading, onSelectCard }: 
             Showing your 2000 most recently graded cards — search finds any card in your collection.
           </div>
         )}
-        <CardPicker cards={cards} onSelect={onSelectCard} />
+        {bulkEnabled && selectedIds.length > 0 && (
+          <div className="mb-3 sticky top-2 z-10 bg-indigo-600 text-white rounded-lg px-3 py-2.5 flex items-center justify-between gap-3 shadow">
+            <span className="text-sm font-semibold">
+              {selectedIds.length} selected
+            </span>
+            <button
+              onClick={onStartBatch}
+              disabled={startingBatch}
+              className="px-3 py-1.5 bg-white text-indigo-700 rounded-md text-sm font-bold hover:bg-indigo-50 disabled:opacity-60"
+            >
+              {startingBatch ? 'Preparing…' : `List ${selectedIds.length} card${selectedIds.length === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        )}
+        {bulkEnabled && batchError && (
+          <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+            {batchError}
+          </div>
+        )}
+        <CardPicker
+          cards={cards}
+          onSelect={onSelectCard}
+          selectionEnabled={bulkEnabled}
+          selectedIds={selectedIds}
+          onSelectionChange={onSelectionChange}
+          selectionLimit={selectionLimit}
+        />
       </div>
       <div className="lg:col-span-2">
         <div className="bg-white border border-gray-200 rounded-xl p-6">

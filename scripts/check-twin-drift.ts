@@ -112,18 +112,14 @@ const MOBILE_CONSTANTS = 'dcm-mobile/lib/constants.ts'
 const WEB_CONDITION = 'src/lib/conditionAssessment.ts'
 const MOBILE_RESOLVE = 'dcm-mobile/lib/resolveCardValue.ts'
 const WEB_RESOLVE = 'src/lib/pricing/resolveCardValue.ts'
-
-/**
- * Mobile's display order lives inside buildEbayTitle's assemble(), as a run of
- * `include.has('key') ? …` ternaries — read the keys in source order.
- */
-function mobileDisplayOrder(): string[] {
-  const src = stripComments(read(MOBILE_TITLE))
-  const assembleIdx = src.indexOf('const assemble')
-  if (assembleIdx === -1) return []
-  const block = balancedBlock(src, assembleIdx, '[')
-  return [...block.matchAll(/include\.has\(\s*['"]([^'"]+)['"]\s*\)/g)].map(m => m[1])
-}
+const MOBILE_FIELDS = 'dcm-mobile/lib/ebayListingFields.ts'
+const WEB_FIELDS = 'src/lib/ebay/listingFields.ts'
+const MOBILE_BLOCKLIST = 'dcm-mobile/lib/ebayGradingCompanyBlocklist.ts'
+const WEB_BLOCKLIST = 'src/lib/ebay/gradingCompanyBlocklist.ts'
+const MOBILE_BULK = 'dcm-mobile/lib/ebayBulkTypes.ts'
+const WEB_BULK_SETTINGS = 'src/lib/ebay/bulkSettings.ts'
+const WEB_BULK_PUBLISH = 'src/lib/ebay/bulkPublish.ts'
+const WEB_BULK_STRIP = 'src/app/instalist-marketplace/components/BulkBatchesStrip.tsx'
 
 /** Mobile ConditionLabels — `10: 'Gem Mint'` — as "grade=label", high to low. */
 function mobileConditionLadder(): string[] {
@@ -174,6 +170,48 @@ function normalizedResolveCore(rel: string): string[] {
   return parts
 }
 
+/**
+ * TITLE_TOKEN_TABLE is a nested object of per-category display/priority arrays.
+ * Every quoted string inside it, in source order, is the whole contract: same
+ * categories, same keys, same token order on both sides.
+ */
+function titleTokenTable(rel: string): string[] {
+  const block = declarationBlock(read(rel), 'TITLE_TOKEN_TABLE', '{')
+  return [...block.matchAll(/['"]([^'"]+)['"]/g)].map(m => m[1])
+}
+
+/** Object literal entries as "key=value" pairs, in source order. */
+function stringMapEntries(rel: string, name: string): string[] {
+  const block = declarationBlock(read(rel), name, '{')
+  return [...block.matchAll(/(\w+)\s*:\s*['"]([^'"]*)['"]/g)].map(m => `${m[1]}=${m[2]}`)
+}
+
+/**
+ * Like stringMapEntries, but joins a value written as adjacent concatenated
+ * literals (`'a ' + 'b'`) — long user-facing copy is wrapped that way, and
+ * comparing only its first fragment would miss drift in the rest.
+ */
+function stringMapEntriesJoined(rel: string, name: string): string[] {
+  const block = declarationBlock(read(rel), name, '{')
+  const re = /(\w+)\s*:\s*((?:['"][^'"]*['"]\s*\+\s*)*['"][^'"]*['"])/g
+  return [...block.matchAll(re)].map(m => {
+    const value = [...m[2].matchAll(/['"]([^'"]*)['"]/g)].map(x => x[1]).join('')
+    return `${m[1]}=${value}`
+  })
+}
+
+/**
+ * Every `key: <primitive literal>` in an object literal, nested keys included.
+ * Values that are identifiers or arrays are skipped on purpose: the two sides
+ * import the same shared constant under different local names, so comparing
+ * the reference would be noise (the referenced tables have their own pairs).
+ */
+function literalObjectEntries(rel: string, name: string): string[] {
+  const block = declarationBlock(read(rel), name, '{')
+  const re = /(\w+)\s*:\s*(?:(['"])([^'"]*)\2|(-?\d+(?:\.\d+)?)|(true|false))/g
+  return [...block.matchAll(re)].map(m => `${m[1]}=${m[3] ?? m[4] ?? m[5]}`)
+}
+
 const PAIRS: Pair[] = [
   {
     name: 'eBay domestic shipping services',
@@ -181,19 +219,84 @@ const PAIRS: Pair[] = [
     b: { label: `${WEB_TRADING_API} DOMESTIC_SHIPPING_SERVICES`, get: () => extractObjectValues(read(WEB_TRADING_API), 'DOMESTIC_SHIPPING_SERVICES') },
   },
   {
-    name: 'eBay title builder — optional priority order',
-    a: { label: `${MOBILE_TITLE} PRIORITY_ORDER`, get: () => extractStringArray(read(MOBILE_TITLE), 'PRIORITY_ORDER') },
-    b: { label: `${WEB_TITLE} optionalPriority`, get: () => extractStringArray(read(WEB_TITLE), 'optionalPriority') },
+    name: 'eBay international shipping services',
+    a: { label: `${MOBILE_EBAY_API} INTERNATIONAL_SHIPPING_SERVICES`, get: () => extractObjectValues(read(MOBILE_EBAY_API), 'INTERNATIONAL_SHIPPING_SERVICES') },
+    b: { label: `${WEB_TRADING_API} INTERNATIONAL_SHIPPING_SERVICES`, get: () => extractObjectValues(read(WEB_TRADING_API), 'INTERNATIONAL_SHIPPING_SERVICES') },
   },
   {
-    name: 'eBay title builder — display order',
-    a: { label: `${MOBILE_TITLE} assemble() order`, get: mobileDisplayOrder },
-    b: { label: `${WEB_TITLE} displayOrder`, get: () => extractStringArray(read(WEB_TITLE), 'displayOrder') },
+    name: 'eBay title builder — per-category token tables',
+    a: { label: `${MOBILE_TITLE} TITLE_TOKEN_TABLE`, get: () => titleTokenTable(MOBILE_TITLE) },
+    b: { label: `${WEB_TITLE} TITLE_TOKEN_TABLE`, get: () => titleTokenTable(WEB_TITLE) },
+  },
+  {
+    name: 'eBay title builder — category → token table map',
+    a: { label: `${MOBILE_TITLE} CATEGORY_TO_TABLE`, get: () => stringMapEntries(MOBILE_TITLE, 'CATEGORY_TO_TABLE') },
+    b: { label: `${WEB_TITLE} CATEGORY_TO_TABLE`, get: () => stringMapEntries(WEB_TITLE, 'CATEGORY_TO_TABLE') },
+  },
+  {
+    name: 'eBay title builder — literal (whole-word dedupe) tokens',
+    a: { label: `${MOBILE_TITLE} LITERAL_TOKENS`, get: () => extractStringArray(read(MOBILE_TITLE), 'LITERAL_TOKENS') },
+    b: { label: `${WEB_TITLE} LITERAL_TOKENS`, get: () => extractStringArray(read(WEB_TITLE), 'LITERAL_TOKENS') },
+  },
+  {
+    name: 'eBay title builder — raw-text dedupe tokens',
+    a: { label: `${MOBILE_TITLE} RAW_TOKENS`, get: () => extractStringArray(read(MOBILE_TITLE), 'RAW_TOKENS') },
+    b: { label: `${WEB_TITLE} RAW_TOKENS`, get: () => extractStringArray(read(WEB_TITLE), 'RAW_TOKENS') },
+  },
+  {
+    name: 'eBay listing fields — game words',
+    a: { label: `${MOBILE_FIELDS} GAME_WORDS`, get: () => stringMapEntries(MOBILE_FIELDS, 'GAME_WORDS') },
+    b: { label: `${WEB_FIELDS} GAME_WORDS`, get: () => stringMapEntries(WEB_FIELDS, 'GAME_WORDS') },
+  },
+  {
+    name: 'eBay listing fields — game manufacturers',
+    a: { label: `${MOBILE_FIELDS} GAME_MANUFACTURERS`, get: () => stringMapEntries(MOBILE_FIELDS, 'GAME_MANUFACTURERS') },
+    b: { label: `${WEB_FIELDS} GAME_MANUFACTURERS`, get: () => stringMapEntries(WEB_FIELDS, 'GAME_MANUFACTURERS') },
+  },
+  {
+    name: 'eBay listing fields — sport → league map',
+    a: { label: `${MOBILE_FIELDS} LEAGUE_BY_SPORT`, get: () => stringMapEntries(MOBILE_FIELDS, 'LEAGUE_BY_SPORT') },
+    b: { label: `${WEB_FIELDS} LEAGUE_BY_SPORT`, get: () => stringMapEntries(WEB_FIELDS, 'LEAGUE_BY_SPORT') },
+  },
+  {
+    name: 'eBay listing fields — "means none" values',
+    a: { label: `${MOBILE_FIELDS} EMPTY_VALUES`, get: () => extractStringArray(read(MOBILE_FIELDS), 'EMPTY_VALUES') },
+    b: { label: `${WEB_FIELDS} EMPTY_VALUES`, get: () => extractStringArray(read(WEB_FIELDS), 'EMPTY_VALUES') },
+  },
+  {
+    name: 'Rival grading company block list (unambiguous)',
+    a: { label: `${MOBILE_BLOCKLIST} BLOCKED_GRADERS_UNAMBIGUOUS`, get: () => extractStringArray(read(MOBILE_BLOCKLIST), 'BLOCKED_GRADERS_UNAMBIGUOUS') },
+    b: { label: `${WEB_BLOCKLIST} BLOCKED_GRADERS_UNAMBIGUOUS`, get: () => extractStringArray(read(WEB_BLOCKLIST), 'BLOCKED_GRADERS_UNAMBIGUOUS') },
+  },
+  {
+    name: 'Rival grading company block list (caps-only acronyms)',
+    a: { label: `${MOBILE_BLOCKLIST} BLOCKED_GRADERS_CAPS_ONLY`, get: () => extractStringArray(read(MOBILE_BLOCKLIST), 'BLOCKED_GRADERS_CAPS_ONLY') },
+    b: { label: `${WEB_BLOCKLIST} BLOCKED_GRADERS_CAPS_ONLY`, get: () => extractStringArray(read(WEB_BLOCKLIST), 'BLOCKED_GRADERS_CAPS_ONLY') },
   },
   {
     name: 'Grade → condition label ladder',
     a: { label: `${MOBILE_CONSTANTS} ConditionLabels`, get: mobileConditionLadder },
     b: { label: `${WEB_CONDITION} getConditionFromGrade`, get: webConditionLadder },
+  },
+  {
+    name: 'Bulk batch — default shipping form',
+    a: { label: `${MOBILE_BULK} DEFAULT_BULK_SHIPPING`, get: () => literalObjectEntries(MOBILE_BULK, 'DEFAULT_BULK_SHIPPING') },
+    b: { label: `${WEB_BULK_SETTINGS} DEFAULT_BULK_SHIPPING`, get: () => literalObjectEntries(WEB_BULK_SETTINGS, 'DEFAULT_BULK_SHIPPING') },
+  },
+  {
+    name: 'Bulk batch — default settings',
+    a: { label: `${MOBILE_BULK} DEFAULT_BULK_SETTINGS`, get: () => literalObjectEntries(MOBILE_BULK, 'DEFAULT_BULK_SETTINGS') },
+    b: { label: `${WEB_BULK_SETTINGS} DEFAULT_BULK_SETTINGS`, get: () => literalObjectEntries(WEB_BULK_SETTINGS, 'DEFAULT_BULK_SETTINGS') },
+  },
+  {
+    name: 'Bulk batch — paused-batch copy',
+    a: { label: `${MOBILE_BULK} PAUSE_REASONS`, get: () => stringMapEntriesJoined(MOBILE_BULK, 'PAUSE_REASONS') },
+    b: { label: `${WEB_BULK_PUBLISH} PAUSE_REASONS`, get: () => stringMapEntriesJoined(WEB_BULK_PUBLISH, 'PAUSE_REASONS') },
+  },
+  {
+    name: 'Bulk batch — status chip labels',
+    a: { label: `${MOBILE_BULK} BATCH_STATUS_LABEL`, get: () => stringMapEntries(MOBILE_BULK, 'BATCH_STATUS_LABEL') },
+    b: { label: `${WEB_BULK_STRIP} STATUS_LABEL`, get: () => stringMapEntries(WEB_BULK_STRIP, 'STATUS_LABEL') },
   },
   {
     name: 'resolveCardValue (verbatim copy)',

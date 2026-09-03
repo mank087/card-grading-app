@@ -11,15 +11,30 @@
  * Mobile listens to onMessage and uses these data URLs for previews + the
  * eBay /api/ebay/images upload step.
  *
+ * Query params: ?token= (required, the Supabase access token), ?labelStyle=
+ * (modern | traditional | heritage | custom-1..4, default modern), ?bridge=2
+ * (opt into the chunked protocol below), ?docs=0 (skip the Certificate of
+ * Analysis — its PDF render and its eBay upload — and report
+ * regulatoryDocumentId: null; used by the BULK photo pass, which never attaches
+ * documents). Unknown params are ignored, and both protocols stay backward
+ * compatible: old app bundles keep hitting this page.
+ *
  * Bridge protocols (selected by the ?bridge query param):
  * - bridge=2 (chunked): one { type: 'ebay-prep-image', key, dataUrl, index,
  *   total } message per image, then a final { type: 'ebay-prep-complete',
- *   description, itemSpecifics, categoryId, regulatoryDocumentId } message.
- *   Requested by new app builds — a single ~10 MB postMessage is copied
- *   whole across the RN bridge and can jank/OOM low-end Android devices.
+ *   title, description, itemSpecifics, categoryId, regulatoryDocumentId }
+ *   message. Requested by new app builds — a single ~10 MB postMessage is
+ *   copied whole across the RN bridge and can jank/OOM low-end Android
+ *   devices.
  * - legacy (no param): one { type: 'images-ready', images: {…5 data URLs},
- *   …metadata } message. Kept for old app builds that predate the chunked
- *   handler; they load this page without ?bridge.
+ *   …the same metadata } message. Kept for old app builds that predate the
+ *   chunked handler; they load this page without ?bridge.
+ * - on failure: { type: 'error', message }.
+ *
+ * `title` is additive (older bundles build their own title and ignore it);
+ * `itemSpecifics` rows keep their { name, value, required, editable } shape —
+ * the aspect rows merged in from eBay's Taxonomy API are the same shape, so a
+ * bundle that already renders `required` marks them without a change.
  */
 
 import { useEffect, useState } from 'react';
@@ -29,18 +44,20 @@ import { generateCardImages, generateRawCardImages, type CardImageData } from '@
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
-import {
-  generateHtmlDescription,
-  renderDescriptionTemplate,
-  type ListingDescriptionFields,
-  type ListingBranding,
-} from '@/lib/ebay/listingDescription';
+import { type ListingBranding } from '@/lib/ebay/listingDescription';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
-import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
+import { getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
+import { normalizeListingCategory } from '@/lib/ebay/listingFields';
+import {
+  buildListingDraft,
+  type EbayAspect,
+  type ListingDefaultsPayload,
+} from '@/lib/ebay/listingDraft';
+import { compressListingImage, DEFAULT_IMAGE_ORDER, type SystemImageKey } from '@/lib/ebay/prepareListingImages';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 // Canonical grade -> condition label, shared with labelDataGenerator.
@@ -120,6 +137,12 @@ export default function EbayImagePrepPage() {
     | 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
   // Chunked bridge protocol requested by new app builds (see header comment).
   const chunkedBridge = searchParams.get('bridge') === '2';
+  // ?docs=0 — skip the Certificate of Analysis entirely and report
+  // regulatoryDocumentId: null. The BULK drain does not attach documents to a
+  // listing, so for a 100-card batch the CoA is 100 PDF renders and 100 wasted
+  // eBay document uploads. Opt-IN by absence: no param means the old behaviour,
+  // so every app bundle already in the wild is unaffected.
+  const skipDocuments = searchParams.get('docs') === '0';
   const [status, setStatus] = useState('Initializing…');
   const [error, setError] = useState<string | null>(null);
 
@@ -248,86 +271,94 @@ export default function EbayImagePrepPage() {
 
         if (cancelled) return;
         setStatus('Encoding images…');
+        // Compress before encoding, exactly as the web upload path does
+        // (1600 px long side, <= 1 MB). Native used to post full-size canvas
+        // PNGs across the bridge and then straight to /api/ebay/images, so a
+        // mobile listing carried heavier photos than the same card listed on
+        // the web — and the base64 payload was several times larger.
+        const encode = async (blob: Blob) => blobToDataUrl(await compressListingImage(blob));
         const [frontUrl2, backUrl2, miniUrl, rawFrontUrl, rawBackUrl] = await Promise.all([
-          blobToDataUrl(front),
-          blobToDataUrl(back),
-          blobToDataUrl(miniReport),
-          blobToDataUrl(rawImages.front),
-          blobToDataUrl(rawImages.back),
+          encode(front),
+          encode(back),
+          encode(miniReport),
+          encode(rawImages.front),
+          encode(rawImages.back),
         ]);
 
         if (cancelled) return;
 
-        // eBay HTML description + pre-filled item specifics for web parity
+        // eBay title, HTML description + pre-filled item specifics.
+        //
+        // This used to be a parallel assembly that had already drifted from the
+        // web modal (no headline, a hardcoded 'DCM' keyword label, no eBay
+        // aspects). It now calls the same buildListingDraft the modal and the
+        // bulk drain seed from, so all three surfaces agree by construction.
         setStatus('Generating description and specifics…');
-        const cardCategoryRaw = (card.category || 'other').toString().toLowerCase().replace(/\s+/g, '');
-        // Fold sports sub-categories (Football, Baseball, ...) into 'sports'
-        // and recognize every supported card type — previously yugioh/
-        // starwars/sport-subcategory cards fell to 'other' and shipped
-        // Non-Sport item specifics on a Sports/CCG-category listing.
-        const SPORT_CATEGORIES = ['football', 'baseball', 'basketball', 'hockey', 'soccer', 'golf', 'tennis', 'wrestling', 'boxing', 'racing', 'ufc', 'mma'];
-        const cardTypeForSpecifics = ['pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other'].includes(cardCategoryRaw)
-          ? cardCategoryRaw
-          : SPORT_CATEGORIES.includes(cardCategoryRaw)
-            ? 'sports'
-            : 'other';
-        const descriptionFields: ListingDescriptionFields = {
-          primaryName: labelData.primaryName || '',
-          setName: labelData.setName || '',
-          cardNumber: labelData.cardNumber || '',
-          grade: Math.round(labelData.grade ?? 0),
-          conditionLabel: labelData.condition || '',
-          overview: card.conversational_final_grade_summary || card.conversational_summary || '',
-          // Whole numbers, matching the web modal (raw weighted scores can
-          // carry decimals).
-          subgrades: {
-            centering: Math.round(subScores.centering),
-            corners: Math.round(subScores.corners),
-            edges: Math.round(subScores.edges),
-            surface: Math.round(subScores.surface),
-          },
-          serial: card.org_serial_display || card.serial || 'N/A',
-        };
+        // The SHARED normalizer, not a local allow-list: this page's copy only
+        // stripped spaces, so 'Yu-Gi-Oh' stayed 'yu-gi-oh', missed the list and
+        // shipped Non-Sport item specifics on a CCG listing. normalizeListingCategory
+        // strips every non-alphanumeric and folds the sports sub-categories in.
+        const cardTypeForSpecifics = normalizeListingCategory(card.category);
         const listingBranding: ListingBranding | null = orgLogoSet?.branding
           ? { name: orgLogoSet.branding.name, brandColor: orgLogoSet.branding.brandColor || null }
           : null;
 
-        // Saved description template (web parity with EbayListingModal): the
-        // user's/store's template replaces the standard layout entirely. Mobile
-        // gets its description from this page, so without this the template was
-        // silently dropped on native. Auth: the same ?token access token the
-        // page already uses for Supabase and the CoA upload.
+        // Saved defaults (web parity with EbayListingModal): the user's/store's
+        // description template replaces the standard layout entirely, and the
+        // store's titleGradeLabel is the brand the description's keyword
+        // sentence and headline grade tail carry ("Kings Kards 9", not
+        // "DCM 9"). Mobile gets both from this page, so without the fetch the
+        // template was dropped and the label silently fell back to 'DCM'.
         //
-        // Cross-org guard mirrors the modal: the org template applies only when
-        // the CALLER's org is also the CARD's org, else personal. Best-effort —
-        // any failure falls through to the standard generated layout.
-        let savedTemplate: string | null = null;
-        try {
-          const defaultsRes = await fetch('/api/ebay/listing-defaults', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (defaultsRes.ok) {
-            const defaults = await defaultsRes.json();
-            const activeDefaults =
-              card.org_id && defaults?.orgId === card.org_id && defaults?.org
-                ? defaults.org
-                : defaults?.personal;
-            savedTemplate = activeDefaults?.descriptionTemplate || null;
-          }
-        } catch (err) {
-          console.warn('[eBay Image Prep] listing defaults fetch failed (non-fatal):', err);
-        }
-
-        const description = savedTemplate
-          ? renderDescriptionTemplate(savedTemplate, descriptionFields, listingBranding)
-          : generateHtmlDescription(descriptionFields, listingBranding);
-        const itemSpecifics = mapCardToItemSpecifics(card, cardTypeForSpecifics);
+        // Aspects: eBay's required + recommended aspects for the category, the
+        // same list the modal merges on its Specifics step. Required rows the
+        // card data cannot fill have to exist for the wizard to mark them with
+        // an asterisk — without them native shipped listings missing aspects
+        // eBay requires.
+        //
+        // Both are best-effort and run together; either failing leaves the
+        // standard layout / our own mapped specifics rather than no listing.
+        // Auth: the same ?token access token the page already uses for
+        // Supabase and the CoA upload.
         const categoryId = getCategoryForCardType(cardTypeForSpecifics);
+        const authHeaders = { Authorization: `Bearer ${token}` };
+        const [listingDefaults, aspects] = await Promise.all([
+          fetch('/api/ebay/listing-defaults', { headers: authHeaders })
+            .then(r => (r.ok ? (r.json() as Promise<ListingDefaultsPayload>) : null))
+            .catch(err => {
+              console.warn('[eBay Image Prep] listing defaults fetch failed (non-fatal):', err);
+              return null;
+            }),
+          fetch(`/api/ebay/aspects?category_id=${encodeURIComponent(categoryId)}`, { headers: authHeaders })
+            .then(async r => (r.ok ? ((await r.json()).aspects as EbayAspect[]) || null : null))
+            .catch(err => {
+              console.warn('[eBay Image Prep] aspects fetch failed (non-fatal):', err);
+              return null;
+            }),
+        ]);
+
+        if (cancelled) return;
+        const draft = buildListingDraft(card, {
+          cardType: cardTypeForSpecifics,
+          listingDefaults,
+          branding: listingBranding,
+          aspects,
+        });
+        // The title is built here only so the description can repeat it as its
+        // headline (and so the grade tail carries the store's label). The app
+        // still builds the title it shows from its own twin builder.
+        const { title, descriptionHtml: description, itemSpecifics } = draft;
 
         // Generate Certificate of Analysis (DCM grading report PDF) + upload to eBay
         // as a regulatory document. Best-effort — listing still works without it.
         let regulatoryDocumentId: string | null = null;
-        try {
+        if (skipDocuments) {
+          // ?docs=0 — the caller does not attach documents (the bulk drain
+          // doesn't), so neither the PDF render nor the eBay upload is worth
+          // doing. regulatoryDocumentId stays null, which is exactly what a
+          // failed CoA reports anyway, so nothing downstream changes.
+          console.log('[CoA] skipped (docs=0)');
+        } else try {
           setStatus('Generating Certificate of Analysis…');
           const cardInfo = card.conversational_card_info || {};
           const wScores = card.conversational_weighted_sub_scores || {};
@@ -406,7 +437,9 @@ export default function EbayImagePrepPage() {
             qrCodeDataUrl,
           };
 
-          const pdfDoc = pdf(<CardGradingReport cardData={reportCardData} />);
+          // marketplaceSafe: uploaded to eBay as a regulatory document, so it
+          // must not name another grading company anywhere.
+          const pdfDoc = pdf(<CardGradingReport cardData={reportCardData} marketplaceSafe />);
           const pdfBlob = await pdfDoc.toBlob();
 
           setStatus('Uploading certificate…');
@@ -431,7 +464,7 @@ export default function EbayImagePrepPage() {
         }
 
         setStatus('Done');
-        const images = {
+        const images: Record<SystemImageKey, string> = {
           front: frontUrl2,
           back: backUrl2,
           miniReport: miniUrl,
@@ -440,14 +473,20 @@ export default function EbayImagePrepPage() {
         };
         if (chunkedBridge) {
           // Chunked protocol (v2): one bridge message per image so no single
-          // postMessage carries all ~5 base64 PNGs at once, then a small
-          // completion message with the metadata.
-          const entries = Object.entries(images);
-          entries.forEach(([key, dataUrl], index) => {
-            postToRN({ type: 'ebay-prep-image', key, dataUrl, index, total: entries.length });
+          // postMessage carries all ~5 base64 images at once, then a small
+          // completion message with the metadata. Sent in the shared gallery
+          // order (labelled front first) rather than object-literal order —
+          // the app keys them by `key`, so this is purely so the chunk stream
+          // matches DEFAULT_IMAGE_ORDER.
+          const keys = DEFAULT_IMAGE_ORDER.filter(
+            (i): i is { kind: 'system'; key: SystemImageKey } => i.kind === 'system'
+          ).map(i => i.key);
+          keys.forEach((key, index) => {
+            postToRN({ type: 'ebay-prep-image', key, dataUrl: images[key], index, total: keys.length });
           });
           postToRN({
             type: 'ebay-prep-complete',
+            title,
             description,
             itemSpecifics,
             categoryId,
@@ -458,6 +497,7 @@ export default function EbayImagePrepPage() {
           postToRN({
             type: 'images-ready',
             images,
+            title,
             description,
             itemSpecifics,
             categoryId,
@@ -475,7 +515,7 @@ export default function EbayImagePrepPage() {
     return () => {
       cancelled = true;
     };
-  }, [cardId, token, labelStyleParam, chunkedBridge]);
+  }, [cardId, token, labelStyleParam, chunkedBridge, skipDocuments]);
 
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif', fontSize: 14, color: '#374151' }}>

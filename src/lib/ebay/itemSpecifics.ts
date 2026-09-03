@@ -5,6 +5,23 @@
  */
 
 import { getEbayCategoryForDcmCategory } from './constants';
+import {
+  resolveListingFields,
+  isMeaningfulValue,
+  detectCardLanguage,
+  getSerialNumbering,
+  getSerialDenominator,
+  hasAutograph,
+  extractYear,
+  detectSport,
+  detectLeague,
+  type ListingFields,
+} from './listingFields';
+
+// The value helpers used to live here. They now live in listingFields.ts, the
+// one place that reads a card row, and are re-exported so existing importers
+// (EbayListingModal, ebay-image-prep) don't have to care where they moved.
+export { detectCardLanguage, getSerialNumbering, getSerialDenominator };
 
 export interface ItemSpecific {
   name: string;
@@ -162,8 +179,9 @@ export function mapSportsCardToSpecifics(card: any): ItemSpecific[] {
   const cardInfo = card.conversational_card_info || {};
   const specifics: ItemSpecific[] = [];
 
-  // Sport (required)
-  const sport = detectSport(card.category || cardInfo.category);
+  // Sport (required). detectSport returns '' when it can't tell; eBay still
+  // needs a value here, and Multi-Sport is the honest one.
+  const sport = detectSport(card.sub_category || card.category || cardInfo.category) || 'Multi-Sport';
   specifics.push({
     name: 'Sport',
     value: sport,
@@ -560,7 +578,10 @@ export function mapMTGCardToSpecifics(card: any): ItemSpecific[] {
     }
   }
   if (cardInfo.foil || card.is_foil) features.push('Foil');
-  if (card.serial_numbering) features.push('Serial Numbered');
+  // Through the resolver, like every other mapper: the raw column carries the
+  // model's "N/A"/"none" spellings, which read as truthy and filed every MTG
+  // card under the Serial Numbered feature.
+  if (getSerialNumbering(card)) features.push('Serial Numbered');
 
   if (features.length > 0) {
     specifics.push({
@@ -925,155 +946,89 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
   // DCM has no eBay grader ID, so the recognized-value list requires "Other".
   specifics.push({ name: 'Professional Grader', value: 'Other', required: false, editable: true });
 
-  return specifics;
+  // eBay's RECOMMENDED aspects, filled from data we already hold. eBay states
+  // outright that complete required + recommended specifics get more
+  // visibility, and the buyer's left-rail filters (Parallel, Season, Team,
+  // Vintage, Finish) read aspects — nothing else.
+  const fields = resolveListingFields(card, cardType);
+  for (const [name, value] of Object.entries(recommendedAspectValues(fields))) {
+    if (!isMeaningfulValue(value)) continue;
+    if (specifics.some(s => s.name.toLowerCase() === name.toLowerCase())) continue;
+    specifics.push({ name, value, required: false, editable: true });
+  }
+
+  // Never send an empty / "N/A" / "Unknown" value. eBay treats a filled-but-
+  // meaningless aspect as answered and stops prompting the seller for the real
+  // one, so an absent aspect is strictly better than a hollow one.
+  return specifics.filter(s =>
+    Array.isArray(s.value)
+      ? s.value.filter(isMeaningfulValue).length > 0
+      : isMeaningfulValue(s.value)
+  ).map(s =>
+    Array.isArray(s.value) ? { ...s, value: s.value.filter(isMeaningfulValue) } : s
+  );
 }
 
-// Helper functions
-
 /**
- * Detect the language of a card for the eBay Language item specific.
+ * eBay's recommended aspects for graded trading cards, resolved from the card.
+ * Keyed by eBay's exact localized aspect name so the aspects merge in the
+ * listing modal can look values up by the name eBay returns.
  *
- * Prefers an explicit language field when present (same sources the card
- * detail pages use: conversational_card_info.language, card.card_language,
- * card.language). Otherwise falls back to script detection — Hiragana,
- * Katakana, or CJK ideographs in the card/set name mean Japanese. Defaults
- * to English.
+ * Values that don't apply come back empty and are dropped by the caller.
+ * "Professional Grader" is deliberately absent: it stays "Other" (DCM is not
+ * on eBay's recognized-grader list, and claiming another value is a policy
+ * violation).
  */
-export function detectCardLanguage(card: any): string {
-  const cardInfo = card.conversational_card_info || {};
-
-  const explicit = cardInfo.language || card.card_language || card.language;
-  if (typeof explicit === 'string' && explicit.trim()) {
-    return explicit.trim();
-  }
-
-  const textToCheck = [
-    card.card_name,
-    cardInfo.card_name,
-    cardInfo.set_name,
-    card.card_set,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  // Hiragana/Katakana (U+3040-U+30FF) or CJK ideographs (U+4E00-U+9FFF)
-  if (/[぀-ヿ一-鿿]/.test(textToCheck)) {
-    return 'Japanese';
-  }
-
-  return 'English';
-}
-
-/**
- * Get serial numbering from card data (e.g., "12/99", "/25", "1/1")
- */
-export function getSerialNumbering(card: any): string | null {
-  const cardInfo = card.conversational_card_info || {};
-
-  // Check various sources for serial numbering
-  const serialNum = cardInfo.serial_number ||
-                    cardInfo.serial_number_fraction ||
-                    card.serial_numbering ||
-                    null;
-
-  if (!serialNum) return null;
-
-  // Clean up the value
-  const cleaned = String(serialNum).trim();
-  if (!cleaned || cleaned.toLowerCase() === 'none' || cleaned.toLowerCase() === 'n/a') {
-    return null;
-  }
-
-  return cleaned;
-}
-
-/**
- * Extract the denominator from a serial number (e.g., "12/99" -> "/99", "/25" -> "/25")
- * Returns the format "/X" for use in titles
- */
-export function getSerialDenominator(serialNumber: string | null): string | null {
-  if (!serialNumber) return null;
-
-  // Match patterns like "12/99", "/99", "1/1", etc.
-  const match = serialNumber.match(/\/(\d+)/);
-  if (match) {
-    return `/${match[1]}`;
-  }
-
-  return null;
-}
-
-/**
- * Check if card has an autograph based on all possible data sources
- */
-function hasAutograph(card: any): boolean {
-  const cardInfo = card.conversational_card_info || {};
-
-  // Check conversational_card_info.autographed (can be true, 'Yes', 'yes', etc.)
-  if (cardInfo.autographed === true ||
-      cardInfo.autographed === 'Yes' ||
-      cardInfo.autographed === 'yes' ||
-      cardInfo.autographed === 'true') {
-    return true;
-  }
-
-  // Check card.autographed boolean
-  if (card.autographed === true) {
-    return true;
-  }
-
-  // Check card.autograph_type (should be something other than 'none', 'false', null, undefined)
-  if (card.autograph_type &&
-      card.autograph_type !== 'none' &&
-      card.autograph_type !== 'false' &&
-      card.autograph_type !== 'None' &&
-      card.autograph_type !== 'N/A') {
-    return true;
-  }
-
-  return false;
-}
-
-function extractYear(dateString: string): string {
-  if (!dateString) return '';
-
-  // Try to extract 4-digit year
-  const yearMatch = dateString.match(/\b(19|20)\d{2}\b/);
-  if (yearMatch) return yearMatch[0];
-
-  // If it looks like just a year already
-  if (/^\d{4}$/.test(dateString.trim())) return dateString.trim();
-
-  return dateString;
-}
-
-function detectSport(category: string): string {
-  if (!category) return 'Baseball'; // Default
-
-  const lowerCategory = category.toLowerCase();
-
-  if (lowerCategory.includes('baseball')) return 'Baseball';
-  if (lowerCategory.includes('football')) return 'Football';
-  if (lowerCategory.includes('basketball')) return 'Basketball';
-  if (lowerCategory.includes('hockey')) return 'Hockey';
-  if (lowerCategory.includes('soccer')) return 'Soccer';
-  if (lowerCategory.includes('wrestling')) return 'Wrestling';
-  if (lowerCategory.includes('golf')) return 'Golf';
-  if (lowerCategory.includes('tennis')) return 'Tennis';
-  if (lowerCategory.includes('racing') || lowerCategory.includes('nascar')) return 'Racing';
-  if (lowerCategory.includes('boxing') || lowerCategory.includes('ufc') || lowerCategory.includes('mma')) return 'Boxing';
-
-  return 'Multi-Sport';
-}
-
-function detectLeague(sport: string): string | null {
-  const leagueMap: Record<string, string> = {
-    'Baseball': 'MLB',
-    'Football': 'NFL',
-    'Basketball': 'NBA',
-    'Hockey': 'NHL',
-    'Soccer': 'MLS',
+export function recommendedAspectValues(fields: ListingFields): Record<string, string> {
+  return {
+    // eBay expects this exact value on a 2750-condition card.
+    'Card Condition': 'Graded',
+    'Parallel/Variety': fields.parallel,
+    'Season': fields.season,
+    'Team': fields.team,
+    'League': fields.league,
+    'Sport': fields.sport,
+    // "Signed By" names the SIGNER. On a v9.23 unverified-autograph card the
+    // signer is exactly what we could not establish, so filling in the card's
+    // subject would assert that the player signed it — omitted instead.
+    'Signed By': fields.autograph && !fields.designation ? fields.name : '',
+    'Autograph Format': fields.autograph ? fields.autographFormat : '',
+    // Policy: DCM grades the card, it does not authenticate signatures.
+    'Autograph Authentication': fields.autograph ? 'Not Authenticated' : '',
+    'Type': fields.category === 'sports' ? 'Sports Trading Card' : 'Trading Card',
+    // Original/Licensed Reprint is deliberately absent: we do not detect
+    // reprints, so sending "Original" on every card asserts something we have
+    // not established. Country/Region is asserted only for Japanese-language
+    // cards; everything else varies by print run and we do not know it.
+    'Country/Region of Manufacture': fields.countryOfManufacture,
+    'Vintage': fields.vintage ? 'Yes' : '',
+    'Finish': fields.finish,
+    'Card Type': fields.cardType,
+    'Language': fields.language,
+    'Manufacturer': fields.manufacturer,
+    'Set': fields.setName,
+    'Card Number': fields.cardNumber,
+    'Rarity': fields.rarity,
+    'Year Manufactured': fields.year,
+    'Character': fields.category === 'sports' ? '' : fields.name,
+    'Player/Athlete': fields.category === 'sports' ? fields.name : '',
+    'Insert Set': fields.subset,
+    'Era': fields.vintage ? 'Vintage' : 'Modern',
   };
-
-  return leagueMap[sport] || null;
 }
+
+/**
+ * Value to pre-fill for one of eBay's fetched aspect names, or '' when we hold
+ * nothing for it. Used where the listing modal merges the Taxonomy API's
+ * required + recommended list: those rows used to arrive blank for the seller
+ * to type, which is how Parallel/Variety ended up empty on almost every card.
+ */
+export function prefillAspectValue(aspectName: string, fields: ListingFields): string {
+  const table = recommendedAspectValues(fields);
+  const wanted = aspectName.trim().toLowerCase();
+  for (const [name, value] of Object.entries(table)) {
+    if (name.toLowerCase() === wanted) return isMeaningfulValue(value) ? value : '';
+  }
+  return '';
+}
+

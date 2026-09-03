@@ -21,6 +21,7 @@ import { getValidSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { DEFAULT_HOW_IT_WORKS, DEFAULT_FAQS, DEFAULT_ABOUT_TITLE, DEFAULT_ABOUT_BULLETS, HowItWorksStep, FaqEntry } from '@/lib/storefrontDefaults'
 import LabelDesigner from '@/components/enterprise/LabelDesigner'
+import ListingSettings from '@/components/enterprise/ListingSettings'
 import { designToLegacySlab, designEquals, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import { useUnsavedChangesGuard, UnsavedChangesDialog } from '@/hooks/useUnsavedChangesGuard'
 import { clearBrandingCache } from '@/lib/orgBranding'
@@ -436,6 +437,10 @@ function StoreSettingsContent() {
           />
         </div>
         <UnsavedChangesDialog open={guard.pending} onStay={guard.stay} onLeave={guard.leave} onSave={saveDesign} saving={busy} />
+
+        {/* eBay listing defaults (owners only — the component hides itself for
+            staff, since the API refuses org writes from anyone else). */}
+        <ListingSettings orgName={settings.name} brandColor={settings.brandColors[0]} />
 
         {/* Storefront details */}
         <div className="bg-white rounded-2xl shadow-md p-6 space-y-4">

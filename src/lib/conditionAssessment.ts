@@ -457,6 +457,28 @@ export function getConditionFromGrade(grade: number | null | undefined): string 
   return 'Poor';                           // Grade 1 = Poor (Tier B)
 }
 
+/**
+ * One-line meaning of a whole grade, verbatim from the published DCM Grading
+ * Standard (docs/DCM_GRADING_STANDARD.md §2). Used in eBay listings so the
+ * "What DCM 9 means" line and the public standard can never disagree.
+ */
+export function getGradeMeaning(grade: number | null | undefined): string {
+  if (grade === null || grade === undefined) return '';
+  switch (Math.round(grade)) {
+    case 10: return 'No confirmed handling defects. Minor manufacturing variance is acceptable.';
+    case 9: return 'One to three minor defects, visible only on close inspection.';
+    case 8: return 'One moderate defect, or several minor defects across categories.';
+    case 7: return 'Multiple moderate defects.';
+    case 6: return 'Widespread moderate wear, or one isolated heavy defect.';
+    case 5: return 'Heavy wear beginning to dominate.';
+    case 4: return 'Clear structural or heavy surface damage.';
+    case 3: return 'Heavy rounding, tearing, or severe whitening.';
+    case 2: return 'Severe damage or material loss.';
+    case 1: return 'Destroyed, missing pieces, or miscut beyond recognition.';
+    default: return '';
+  }
+}
+
 // v6.0: Map condition tier to label
 export function getConditionFromTier(tier: string): string {
   switch (tier) {

@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 import { Session, User } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
+import { resetBulkProbe } from '@/lib/ebayBulkApi'
 
 // Server-side handle_new_user() trigger reads this from raw_user_meta_data
 // and writes it to public.users.signup_source so the admin revenue/analytics
@@ -200,6 +201,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await clearAppCaches(user?.id)
+    // Bulk availability is probed once per session and cached in memory, so
+    // without this an account switch on a shared device inherits the previous
+    // seller's answer — bulk UI hidden for someone who has it, or offered to
+    // someone whose account 404s on the first tap.
+    resetBulkProbe()
     await supabase.auth.signOut()
   }
 

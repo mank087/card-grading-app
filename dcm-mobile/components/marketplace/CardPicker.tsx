@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image, StyleSheet,
   Modal,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
 import type { EligibleCard } from '@/lib/marketplaceApi'
+import { BATCH_CAP_MESSAGE } from '@/lib/ebayBulkTypes'
 
 type SortKey = 'recent' | 'name' | 'grade' | 'value'
 
@@ -27,7 +29,29 @@ interface Props {
   /** Fires after a 250ms debounce of the search input — parent runs the
    *  server fetch with `?q=`. Empty string clears the search. */
   onSearchQueryChange?: (q: string) => void
+
+  // ── Bulk selection (all optional; omitting them leaves the picker exactly
+  //    as it was — single tap opens the one-card wizard and nothing else).
+  /** Enables long-press-to-select. The PARENT owns the selection state so it
+   *  survives a re-render of this list and can drive its own action bar. */
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
+  /** Hard cap; "Select all visible" fills up to it and never past it. */
+  selectionLimit?: number
+  /** Called with the visible cards, in the order shown, up to the cap. */
+  onSelectAllVisible?: (ids: string[]) => void
+  onClearSelection?: () => void
+  /**
+   * Bump this when the parent has USED the selection (it started a batch) and
+   * the picker should drop out of selection mode. Not the same as the set going
+   * empty — clearing the last checkbox by hand keeps the mode on, as it should.
+   */
+  selectionResetKey?: number
 }
+
+/** How long the "that's over the cap" notice stays up. */
+const CAP_NOTICE_MS = 4000
 
 /**
  * Left-rail card grid on web; full-screen FlatList on mobile. Mirrors the
@@ -36,10 +60,16 @@ interface Props {
  */
 export default function CardPicker({
   cards, truncated, searchInFlight, onSelect, onRefresh, refreshing, onSearchQueryChange,
+  selectable = false, selectedIds, onToggleSelect, selectionLimit = 100,
+  onSelectAllVisible, onClearSelection, selectionResetKey,
 }: Props) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [showSortSheet, setShowSortSheet] = useState(false)
+  // Selection MODE is local (it's a view state); the selected SET is the
+  // parent's, so the action bar and the batch POST read one source.
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [capNotice, setCapNotice] = useState<string | null>(null)
 
   // Debounce the query → server fetch. 250ms feels snappy without
   // hammering the API. Cancel on every keystroke so we only fire the
@@ -81,8 +111,114 @@ export default function CardPicker({
     return sorted
   }, [cards, query, sort])
 
+  const selectedCount = selectedIds?.size ?? 0
+
+  // Leaving selection mode always clears — a hidden selection that resurfaces
+  // on the next long-press is the classic multi-select trap.
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false)
+    setCapNotice(null)
+    onClearSelection?.()
+  }, [onClearSelection])
+
+  // The batch screen is pushed on top of this one, so without this the picker
+  // is still sitting in selection mode — reading "0 of 100 selected" — when the
+  // seller comes back. Skips the first run so the prop's initial value (and its
+  // absence) changes nothing.
+  const firstResetKey = useRef(true)
+  useEffect(() => {
+    if (firstResetKey.current) { firstResetKey.current = false; return }
+    setSelectionMode(false)
+    setCapNotice(null)
+  }, [selectionResetKey])
+
+  const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showCapNotice = useCallback((message: string) => {
+    setCapNotice(message)
+    if (capTimer.current) clearTimeout(capTimer.current)
+    capTimer.current = setTimeout(() => setCapNotice(null), CAP_NOTICE_MS)
+  }, [])
+  useEffect(() => () => { if (capTimer.current) clearTimeout(capTimer.current) }, [])
+
+  const handleToggle = useCallback((id: string) => {
+    const alreadyOn = selectedIds?.has(id) ?? false
+    if (!alreadyOn && selectedCount >= selectionLimit) {
+      // Refuse rather than silently swap one card for another.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+      showCapNotice(BATCH_CAP_MESSAGE)
+      return
+    }
+    Haptics.selectionAsync().catch(() => {})
+    onToggleSelect?.(id)
+  }, [selectedIds, selectedCount, selectionLimit, onToggleSelect, showCapNotice])
+
+  const handleLongPress = useCallback((id: string) => {
+    if (!selectable) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+    if (!selectionMode) setSelectionMode(true)
+    if (!selectedIds?.has(id)) onToggleSelect?.(id)
+  }, [selectable, selectionMode, selectedIds, onToggleSelect])
+
+  const handleSelectAllVisible = useCallback(() => {
+    // Cap-aware, and in the order the seller is looking at — the first N of
+    // the current filter+sort, so "Select all" after sorting by value means
+    // "the N most valuable".
+    const ids = filtered.slice(0, selectionLimit).map(c => c.id)
+    if (filtered.length > selectionLimit) showCapNotice(BATCH_CAP_MESSAGE)
+    Haptics.selectionAsync().catch(() => {})
+    onSelectAllVisible?.(ids)
+  }, [filtered, selectionLimit, onSelectAllVisible, showCapNotice])
+
   return (
     <View style={styles.container}>
+      {selectable && selectionMode && (
+        <View style={styles.selectionBar}>
+          <TouchableOpacity
+            onPress={exitSelection}
+            style={styles.selectionAction}
+            accessibilityLabel="Cancel selection"
+            accessibilityRole="button"
+          >
+            <Ionicons name="close" size={20} color={Colors.gray[700]} />
+          </TouchableOpacity>
+          <Text style={styles.selectionCount} accessibilityLiveRegion="polite">
+            {selectedCount} of {selectionLimit} selected
+          </Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            onPress={handleSelectAllVisible}
+            style={styles.selectionAction}
+            accessibilityLabel="Select all visible cards"
+            accessibilityRole="button"
+          >
+            <Text style={styles.selectionActionText}>Select all visible</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setCapNotice(null); onClearSelection?.() }}
+            style={styles.selectionAction}
+            accessibilityLabel="Clear selected cards"
+            accessibilityRole="button"
+          >
+            <Text style={styles.selectionActionText}>Clear</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSelectionMode(false)}
+            style={styles.selectionAction}
+            accessibilityLabel="Done selecting"
+            accessibilityRole="button"
+          >
+            <Text style={[styles.selectionActionText, styles.selectionActionDone]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {capNotice && (
+        <View style={styles.capNotice}>
+          <Ionicons name="alert-circle" size={14} color={Colors.amber[600]} />
+          <Text style={styles.capNoticeText}>{capNotice}</Text>
+        </View>
+      )}
+
       {truncated && (
         <View style={styles.truncatedBanner}>
           <Ionicons name="information-circle" size={14} color={Colors.amber[600]} />
@@ -171,16 +307,33 @@ export default function CardPicker({
         ListHeaderComponent={
           <Text style={styles.resultCount}>
             {filtered.length} {filtered.length === 1 ? 'card' : 'cards'} ready to list
+            {selectable && !selectionMode ? ' · hold to pick several' : ''}
           </Text>
         }
-        renderItem={({ item }) => (
+        extraData={selectionMode ? selectedIds : null}
+        renderItem={({ item }) => {
+          const picking = selectable && selectionMode
+          const checked = selectedIds?.has(item.id) ?? false
+          return (
           <TouchableOpacity
-            style={styles.row}
-            onPress={() => onSelect(item)}
+            style={[styles.row, picking && checked && styles.rowChecked]}
+            onPress={() => (picking ? handleToggle(item.id) : onSelect(item))}
+            onLongPress={selectable ? () => handleLongPress(item.id) : undefined}
+            delayLongPress={350}
             activeOpacity={0.7}
-            accessibilityLabel={`List ${item.card_name}`}
-            accessibilityRole="button"
+            accessibilityLabel={picking
+              ? `${checked ? 'Deselect' : 'Select'} ${item.card_name}`
+              : `List ${item.card_name}`}
+            accessibilityRole={picking ? 'checkbox' : 'button'}
+            accessibilityState={picking ? { checked } : undefined}
           >
+            {picking && (
+              <Ionicons
+                name={checked ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={checked ? Colors.purple[600] : Colors.gray[400]}
+              />
+            )}
             <View style={styles.thumb}>
               {item.front_url ? (
                 <Image source={{ uri: item.front_url }} style={styles.thumbImg} resizeMode="cover" />
@@ -204,9 +357,10 @@ export default function CardPicker({
                 )}
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.gray[400]} />
+            {!picking && <Ionicons name="chevron-forward" size={18} color={Colors.gray[400]} />}
           </TouchableOpacity>
-        )}
+          )
+        }}
         refreshing={refreshing}
         onRefresh={onRefresh}
         contentContainerStyle={filtered.length === 0 ? styles.listEmpty : undefined}
@@ -225,6 +379,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 12, marginTop: 8,
   },
   truncatedText: { flex: 1, fontSize: 11, color: Colors.amber[600], lineHeight: 15 },
+  selectionBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1, borderBottomColor: Colors.gray[200],
+    paddingHorizontal: 8, paddingVertical: 8,
+  },
+  selectionAction: { paddingHorizontal: 6, paddingVertical: 4 },
+  selectionActionText: { fontSize: 12, fontWeight: '700', color: Colors.purple[600] },
+  selectionActionDone: { color: Colors.gray[700] },
+  selectionCount: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
+  capNotice: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: Colors.amber[50],
+    borderColor: Colors.amber[200], borderWidth: 1,
+    borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12,
+    marginHorizontal: 12, marginTop: 8,
+  },
+  capNoticeText: { flex: 1, fontSize: 11, color: Colors.amber[700], lineHeight: 15 },
   searchRow: {
     flexDirection: 'row', gap: 8,
     paddingHorizontal: 12, paddingVertical: 10,
@@ -254,6 +426,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 12,
     backgroundColor: Colors.white,
   },
+  rowChecked: { backgroundColor: Colors.purple[50] },
   thumb: {
     width: 48, height: 64, borderRadius: 6,
     backgroundColor: Colors.gray[100], overflow: 'hidden',

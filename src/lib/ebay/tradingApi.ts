@@ -144,6 +144,19 @@ export interface ListingDetails {
   certificationNumber?: string;
   // Regulatory documents (e.g., Certificate of Analysis)
   regulatoryDocumentIds?: string[];
+  /**
+   * eBay business policies. When present the item references the seller's
+   * saved policies through <SellerProfiles> and the INLINE shipping/returns
+   * blocks are omitted entirely — see buildSellerProfilesXml.
+   */
+  policies?: SellerProfileIds;
+}
+
+/** The three eBay business-policy ids an item can reference. */
+export interface SellerProfileIds {
+  shippingPolicyId: string;
+  returnPolicyId: string;
+  paymentPolicyId: string;
 }
 
 export interface AddItemResponse {
@@ -156,9 +169,50 @@ export interface AddItemResponse {
 }
 
 /**
+ * <SellerProfiles> — the item's pointer at the seller's saved business
+ * policies, and the reason the inline blocks disappear.
+ *
+ * The profile and the inline block are two ways of saying the same thing.
+ * eBay's documentation indicates the profile SUPERSEDES the corresponding
+ * inline fields, so every caller that passes `listing.policies` gets none of
+ * them: no ShippingDetails, no ReturnPolicy, no DispatchTimeMax (that is the
+ * shipping policy's handling time) and no <PaymentMethods> (the payment
+ * policy's). Sending a value that is going to be ignored is at best noise and
+ * at worst a schema complaint, and omitting it is unambiguous either way.
+ *
+ * NOT YET CONFIRMED against a live call: whether eBay hard-rejects an item
+ * carrying both, or merely warns and prefers the profile. The confirmation
+ * step is a sandbox VerifyAddFixedPriceItem with a profile plus an inline
+ * block — do that before this path carries real volume. Nothing below depends
+ * on the answer; omitting is correct under either behaviour.
+ *
+ * scripts/ebay-xml-snapshot.ts asserts the split in both directions so the
+ * two builders cannot drift apart.
+ *
+ * ShippingPackageDetails is deliberately still sent: it is an Item-level
+ * property of the parcel (weight and dimensions), not a shipping term, and a
+ * calculated shipping policy cannot quote a rate without it.
+ */
+function buildSellerProfilesXml(policies: SellerProfileIds | undefined): string {
+  if (!policies) return '';
+  return `
+    <SellerProfiles>
+      <SellerShippingProfile>
+        <ShippingProfileID>${escapeXml(policies.shippingPolicyId)}</ShippingProfileID>
+      </SellerShippingProfile>
+      <SellerReturnProfile>
+        <ReturnProfileID>${escapeXml(policies.returnPolicyId)}</ReturnProfileID>
+      </SellerReturnProfile>
+      <SellerPaymentProfile>
+        <PaymentProfileID>${escapeXml(policies.paymentPolicyId)}</PaymentProfileID>
+      </SellerPaymentProfile>
+    </SellerProfiles>`;
+}
+
+/**
  * Build XML for AddFixedPriceItem call
  */
-function buildAddFixedPriceItemXml(
+export function buildAddFixedPriceItemXml(
   listing: ListingDetails,
   shipping: ShippingDetails,
   returns: ReturnDetails
@@ -186,11 +240,26 @@ function buildAddFixedPriceItemXml(
   const weightLbs = Math.floor(shipping.packageDimensions.weightOz / 16);
   const weightOz = shipping.packageDimensions.weightOz % 16;
 
+  // A business-policy listing carries none of the inline terms.
+  const usePolicies = !!listing.policies;
+
+  const packageDetailsXml = `
+      <ShippingPackageDetails>
+        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
+        <WeightMinor unit="oz">${weightOz}</WeightMinor>
+        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
+        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
+        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
+      </ShippingPackageDetails>`;
+
   // Build shipping details XML based on type
   let shippingXml = '';
   let shippingPackageXml = '';
 
-  if (shipping.shippingType === 'FREE') {
+  if (usePolicies) {
+    // Parcel dimensions only — the policy owns cost, service and handling.
+    shippingPackageXml = packageDetailsXml;
+  } else if (shipping.shippingType === 'FREE') {
     shippingXml = `
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
@@ -230,18 +299,11 @@ function buildAddFixedPriceItemXml(
       </ShippingDetails>`;
 
     // Package details needed for calculated shipping
-    shippingPackageXml = `
-      <ShippingPackageDetails>
-        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
-        <WeightMinor unit="oz">${weightOz}</WeightMinor>
-        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
-        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
-        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
-      </ShippingPackageDetails>`;
+    shippingPackageXml = packageDetailsXml;
   }
 
   // Build return policy XML with domestic and international options
-  const returnPolicyXml = buildReturnPolicyXml(returns);
+  const returnPolicyXml = usePolicies ? '' : buildReturnPolicyXml(returns);
 
   // Build best offer XML if enabled
   const bestOfferXml = listing.bestOfferEnabled
@@ -282,9 +344,10 @@ function buildAddFixedPriceItemXml(
     }
   }
 
-  // Build ship to locations for international shipping
+  // Build ship to locations for international shipping (the shipping policy
+  // carries its own ship-to list, so this is inline-mode only)
   let shipToLocationsXml = '';
-  if (shipping.offerInternational && shipping.internationalShipToLocations?.length) {
+  if (!usePolicies && shipping.offerInternational && shipping.internationalShipToLocations?.length) {
     shipToLocationsXml = shipping.internationalShipToLocations
       .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
       .join('\n    ');
@@ -326,10 +389,10 @@ function buildAddFixedPriceItemXml(
     ${conditionDescriptorsXml}
     <Country>US</Country>
     <Currency>USD</Currency>
-    <DispatchTimeMax>${shipping.handlingDays}</DispatchTimeMax>
+    ${usePolicies ? '' : `<DispatchTimeMax>${shipping.handlingDays}</DispatchTimeMax>`}
     <ListingDuration>${listing.listingDuration}</ListingDuration>
     <ListingType>FixedPriceItem</ListingType>
-    <PaymentMethods>PayPal</PaymentMethods>
+    ${usePolicies ? '' : '<PaymentMethods>PayPal</PaymentMethods>'}
     <PictureDetails>
       ${pictureUrlsXml}
     </PictureDetails>
@@ -338,6 +401,7 @@ function buildAddFixedPriceItemXml(
       ${itemSpecificsXml}
     </ItemSpecifics>
     <SKU>${escapeXml(listing.sku)}</SKU>
+    ${buildSellerProfilesXml(listing.policies)}
     ${shippingXml}
     ${shippingPackageXml}
     ${returnPolicyXml}
@@ -555,7 +619,7 @@ export async function addFixedPriceItem(
 /**
  * Build XML for AddItem call (used for auction-style listings)
  */
-function buildAddItemXml(
+export function buildAddItemXml(
   listing: ListingDetails,
   shipping: ShippingDetails,
   returns: ReturnDetails
@@ -583,11 +647,25 @@ function buildAddItemXml(
   const weightLbs = Math.floor(shipping.packageDimensions.weightOz / 16);
   const weightOz = shipping.packageDimensions.weightOz % 16;
 
+  // A business-policy listing carries none of the inline terms.
+  const usePolicies = !!listing.policies;
+
+  const packageDetailsXml = `
+      <ShippingPackageDetails>
+        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
+        <WeightMinor unit="oz">${weightOz}</WeightMinor>
+        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
+        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
+        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
+      </ShippingPackageDetails>`;
+
   // Build shipping details XML based on type
   let shippingXml = '';
   let shippingPackageXml = '';
 
-  if (shipping.shippingType === 'FREE') {
+  if (usePolicies) {
+    shippingPackageXml = packageDetailsXml;
+  } else if (shipping.shippingType === 'FREE') {
     shippingXml = `
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
@@ -627,18 +705,11 @@ function buildAddItemXml(
       </ShippingDetails>`;
 
     // Package details needed for calculated shipping
-    shippingPackageXml = `
-      <ShippingPackageDetails>
-        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
-        <WeightMinor unit="oz">${weightOz}</WeightMinor>
-        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
-        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
-        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
-      </ShippingPackageDetails>`;
+    shippingPackageXml = packageDetailsXml;
   }
 
   // Build return policy XML
-  const returnPolicyXml = buildReturnPolicyXml(returns);
+  const returnPolicyXml = usePolicies ? '' : buildReturnPolicyXml(returns);
 
   // Build condition descriptors for graded cards
   let conditionDescriptorsXml = '';
@@ -662,9 +733,9 @@ function buildAddItemXml(
     }
   }
 
-  // Build ship to locations for international shipping
+  // Build ship to locations for international shipping (inline mode only)
   let shipToLocationsXml = '';
-  if (shipping.offerInternational && shipping.internationalShipToLocations?.length) {
+  if (!usePolicies && shipping.offerInternational && shipping.internationalShipToLocations?.length) {
     shipToLocationsXml = shipping.internationalShipToLocations
       .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
       .join('\n    ');
@@ -706,10 +777,10 @@ function buildAddItemXml(
     ${conditionDescriptorsXml}
     <Country>US</Country>
     <Currency>USD</Currency>
-    <DispatchTimeMax>${shipping.handlingDays}</DispatchTimeMax>
+    ${usePolicies ? '' : `<DispatchTimeMax>${shipping.handlingDays}</DispatchTimeMax>`}
     <ListingDuration>${listing.listingDuration}</ListingDuration>
     <ListingType>Chinese</ListingType>
-    <PaymentMethods>PayPal</PaymentMethods>
+    ${usePolicies ? '' : '<PaymentMethods>PayPal</PaymentMethods>'}
     <PictureDetails>
       ${pictureUrlsXml}
     </PictureDetails>
@@ -718,6 +789,7 @@ function buildAddItemXml(
       ${itemSpecificsXml}
     </ItemSpecifics>
     <SKU>${escapeXml(listing.sku)}</SKU>
+    ${buildSellerProfilesXml(listing.policies)}
     ${shippingXml}
     ${shippingPackageXml}
     ${returnPolicyXml}

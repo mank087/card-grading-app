@@ -2,18 +2,33 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { pdf } from '@react-pdf/renderer';
-import { generateCardImages, generateRawCardImages, CardImageData } from '@/lib/cardImageGenerator';
-import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
-import { FoldableLabelData, generateQRCodeWithLogo } from '@/lib/foldableLabelGenerator';
-import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
+import { generateQRCodeWithLogo } from '@/lib/foldableLabelGenerator';
+import { loadLogosForCard } from '@/lib/orgBranding';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { getStoredSession } from '@/lib/directAuth';
-import { resolveEmblemVisibility } from '@/lib/labelEmblems';
-import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
-import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
+import { type ItemSpecific } from '@/lib/ebay/itemSpecifics';
+import {
+  buildListingDraft,
+  mergeAspectsIntoSpecifics,
+  resolveActiveDefaults,
+  type ListingDefaultsPayload,
+} from '@/lib/ebay/listingDraft';
+import {
+  prepareListingImages,
+  uploadListingImages,
+  DEFAULT_IMAGE_ORDER,
+  SYSTEM_IMAGE_LABELS,
+  type OrderedImageItem,
+  type SystemImageKey,
+} from '@/lib/ebay/prepareListingImages';
+import {
+  resolveListingFields,
+  buildKeywordSentence,
+  isMeaningfulValue,
+} from '@/lib/ebay/listingFields';
 import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES, DEFAULT_DOMESTIC_SHIPPING_SERVICE, normalizeDomesticService } from '@/lib/ebay/tradingApi';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
@@ -22,6 +37,8 @@ import {
   generateHtmlDescription,
   renderDescriptionTemplate,
   sanitizeListingHtml,
+  buildShippingSummary,
+  buildPolicyShippingSummary,
   DESCRIPTION_MERGE_FIELDS,
   type ListingDescriptionFields,
   type ListingBranding,
@@ -38,6 +55,12 @@ import {
 // Collapsed anyway: one rule living in three places is free to drift, and two of
 // the three had already drifted.
 import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
+import {
+  usePolicyLists,
+  PolicySelect,
+  CreatePolicyForm,
+  type PolicyOption,
+} from '@/components/ebay/PolicyPickers';
 import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
 
 
@@ -55,6 +78,10 @@ interface EbayListingModalProps {
 
 type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
 
+// The default gallery order, the compression caps and the render/upload
+// pipeline itself now live in src/lib/ebay/prepareListingImages.ts so the bulk
+// review list can run the same pipeline for a whole batch.
+
 export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   isOpen,
   onClose,
@@ -69,14 +96,18 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Saved listing defaults/templates + resolved branding (enterprise cards)
-  const [listingDefaults, setListingDefaults] = useState<{
-    personal: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
-    org: { descriptionTemplate: string | null; shippingDefaults: Record<string, unknown> | null } | null;
-    orgRole: 'owner' | 'member' | null;
-    orgId: string | null;
-  } | null>(null);
+  const [listingDefaults, setListingDefaults] = useState<ListingDefaultsPayload | null>(null);
   const [listingBranding, setListingBranding] = useState<ListingBranding | null>(null);
   const [descriptionFields, setDescriptionFields] = useState<ListingDescriptionFields | null>(null);
+  /** Resolved saved template (org → personal), so regenerations keep using it. */
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  /**
+   * The last description WE generated. The shipping summary is part of the
+   * description but lives in a form the user edits later, so the description
+   * is regenerated on shipping changes — but only while it still matches this,
+   * i.e. only while the user hasn't hand-edited it.
+   */
+  const autoDescriptionRef = useRef<string>('');
   const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
   const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
 
@@ -146,9 +177,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   // gallery main image on eBay. System tiles (front/back/etc.) and custom
   // uploads share the same ordering — that's how the user controls which
   // image lands in position 1 vs 2 etc.
-  type OrderedImageItem =
-    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' }
-    | { kind: 'custom'; id: string };
   const [imageOrder, setImageOrder] = useState<OrderedImageItem[]>([]);
 
   // Listing details state
@@ -193,6 +221,35 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     internationalReturnPeriodDays: 30,
     internationalReturnShippingPaidBy: 'BUYER' as 'BUYER' | 'SELLER',
   });
+
+  // eBay business policies. Off unless the seller opted in on the InstaList
+  // settings tab, in which case the three ids REPLACE the inline shipping and
+  // returns fields above — eBay refuses a listing that carries both.
+  //
+  // The names ride alongside the ids only so the description's shipping
+  // paragraph can name the policy without a second eBay call.
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [usePolicies, setUsePolicies] = useState(false);
+  const [policyForm, setPolicyForm] = useState<{
+    shippingPolicyId: string | null;
+    returnPolicyId: string | null;
+    paymentPolicyId: string | null;
+    shippingPolicyName: string | null;
+    returnPolicyName: string | null;
+  }>({
+    shippingPolicyId: null,
+    returnPolicyId: null,
+    paymentPolicyId: null,
+    shippingPolicyName: null,
+    returnPolicyName: null,
+  });
+  const [creatingPolicy, setCreatingPolicy] = useState<null | 'shipping' | 'returns'>(null);
+  const {
+    lists: policyLists,
+    loading: policiesLoading,
+    error: policiesError,
+    addPolicy,
+  } = usePolicyLists(sessionToken, isOpen && usePolicies);
 
   // Grading report document state
   const [includeGradingReport, setIncludeGradingReport] = useState(true);
@@ -257,6 +314,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setDuration('GTC');
       setShowDescriptionCode(false);
       setAspectsLoaded(false);
+      // A previous open on a DIFFERENT card may have left an org template and
+      // that org branding behind; clear them so they can never carry over.
+      setActiveTemplate(null);
+      setListingBranding(null);
 
       // Seed the asking price from the shared value resolver — the same
       // number the collection/portfolio surfaces show for this card. Only
@@ -266,71 +327,32 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const { value: suggestedValue } = resolveCardValue(card);
       setPrice(suggestedValue > 0 ? suggestedValue.toFixed(2) : '');
 
-      // Generate default title: name - setName - card number - serial - DCM X - Condition Label
-      // buildEbayTitle keeps the grade/condition tail intact within eBay's
-      // 80-char limit (word-boundary name truncation, no blind substring cut)
-      // and dedupes optional segments. Title stays user-editable afterwards.
-      const labelData = getCardLabelData(card);
-      const grade = labelData.grade ?? 0;
-      const cardInfo = card.conversational_card_info || {};
-
-      // Get condition label
-      const conditionLabel = labelData.condition || getConditionLabel(grade);
-
-      // Primary subject (player/character/featured)
-      const primaryName = labelData.primaryName || card.featured || card.pokemon_featured || card.card_name || '';
-
-      // Set/Subset name
-      const setName = labelData.setName || cardInfo.set_name || card.card_set;
-
-      // Card number if available
-      const cardNumber = labelData.cardNumber || cardInfo.card_number || card.card_number;
-
-      // Serial numbering (e.g., "/99", "/25") - just the denominator
-      const serialNum = getSerialNumbering(card);
-      const serialDenom = getSerialDenominator(serialNum);
-
-      const defaultTitle = buildEbayTitle({
-        name: primaryName,
-        setName: setName || undefined,
-        subset: labelData.subset || cardInfo.subset || undefined,
-        cardNumber: cardNumber ? `#${cardNumber}` : undefined,
-        year: labelData.year || cardInfo.year || undefined,
-        serialNumbering: serialDenom || undefined,
-        grade: Math.round(grade),
-        condition: conditionLabel,
-      });
+      // Default title + description + specifics: one pure assembly shared with
+      // the bulk review list (see listingDraft.ts). The title uses the
+      // per-category token order fed by the shared field resolver, so the
+      // title, the item specifics and the description can never disagree about
+      // the card. Title stays user-editable afterwards.
+      //
+      // The org grade label and the saved template arrive with the listing
+      // defaults fetched below, so this seed is built WITHOUT them (built-in
+      // 'DCM', standard layout) and re-rendered once if the store set one.
+      const draft = buildListingDraft(card, { cardType });
+      const { titleInput, fields } = draft;
+      const defaultTitle = draft.title;
       setTitle(defaultTitle);
 
       // Description: branding (org name/color for enterprise cards) + any
       // saved template resolve asynchronously; standard DCM layout renders
       // immediately so the field is never blank.
-      const weightedScores = card.conversational_weighted_sub_scores || {};
-      const subScores = card.conversational_sub_scores || {};
-      const overview = card.conversational_final_grade_summary || card.conversational_summary || '';
-
-      const descriptionFields: ListingDescriptionFields = {
-        primaryName,
-        setName: setName || '',
-        cardNumber: cardNumber || '',
-        grade: Math.round(grade),
-        conditionLabel,
-        overview,
-        subgrades: {
-          centering: Math.round(weightedScores.centering ?? subScores.centering?.weighted ?? 0),
-          corners: Math.round(weightedScores.corners ?? subScores.corners?.weighted ?? 0),
-          edges: Math.round(weightedScores.edges ?? subScores.edges?.weighted ?? 0),
-          surface: Math.round(weightedScores.surface ?? subScores.surface?.weighted ?? 0),
-        },
-        serial: card.org_serial_display || card.serial || 'N/A',
-      };
-      setDescriptionFields(descriptionFields);
-      const seededDescription = generateHtmlDescription(descriptionFields, null);
+      setDescriptionFields(draft.descriptionFields);
+      const seededDescription = draft.descriptionHtml;
       setDescription(seededDescription);
+      autoDescriptionRef.current = seededDescription;
 
       let cancelled = false;
       (async () => {
         const session = getStoredSession();
+        setSessionToken(session?.access_token ?? null);
         const [logos, defaultsRes] = await Promise.all([
           card.org_id ? loadLogosForCard(card.id).catch(() => null) : Promise.resolve(null),
           session?.access_token
@@ -349,20 +371,31 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
         // Template resolution: org template only when the caller's org IS the
         // card's org; else personal.
-        const activeDefaults =
-          card.org_id && defaultsRes?.orgId === card.org_id && defaultsRes?.org
-            ? defaultsRes.org
-            : defaultsRes?.personal;
+        const activeDefaults = resolveActiveDefaults(card, defaultsRes as ListingDefaultsPayload | null);
         const template = activeDefaults?.descriptionTemplate || null;
-        // Only apply the resolved template/branding if the user hasn't edited
-        // the description since it was seeded — never clobber user edits.
-        setDescription(prev =>
-          prev === seededDescription
-            ? template
-              ? renderDescriptionTemplate(template, descriptionFields, branding)
-              : generateHtmlDescription(descriptionFields, branding)
-            : prev
-        );
+        setActiveTemplate(template);
+
+        // Grade label for titles: an enterprise store's brand name, resolved
+        // with the same org → personal → built-in precedence (and the same
+        // cross-org guard) as the template. Only re-render the title if the
+        // user hasn't touched it.
+        const gradeLabel = activeDefaults?.titleGradeLabel || null;
+        if (gradeLabel) {
+          const relabelled = buildEbayTitle({ ...titleInput, gradeLabel });
+          setTitle(prev => (prev === defaultTitle ? relabelled : prev));
+          setDescriptionFields(prev =>
+            prev
+              ? { ...prev, gradeLabel, keywords: buildKeywordSentence(fields, gradeLabel, fields.grade) }
+              : prev
+          );
+        }
+
+        // NOTE: this block deliberately does NOT render the description. The
+        // regeneration effect below owns that, keyed on the template, the
+        // branding, the title and the shipping form — when this block rendered
+        // it too, the shipping effect had already replaced the seeded HTML by
+        // the time the fetch resolved, so the "still the seeded text?" guard
+        // failed and the saved template never landed.
         if (activeDefaults?.shippingDefaults && typeof activeDefaults.shippingDefaults === 'object') {
           const saved = activeDefaults.shippingDefaults as Record<string, unknown>;
           const { bestOfferEnabled: savedBestOffer, ...savedShipping } = saved;
@@ -376,19 +409,92 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           setShippingForm(prev => ({ ...prev, ...savedShipping }));
           if (typeof savedBestOffer === 'boolean') setBestOfferEnabled(savedBestOffer);
         }
+
+        // Business policies. Read off the PERSONAL row, never `activeDefaults`
+        // — templates and grade labels resolve org-first because they describe
+        // the card, but a business policy describes the eBay ACCOUNT this
+        // listing is created on, and eBay connections are per user. A store
+        // member does NOT inherit the owner's policies: those ids do not exist
+        // on the member's account, so eBay would reject every listing.
+        const personalDefaults = (defaultsRes as ListingDefaultsPayload | null)?.personal;
+        if (personalDefaults?.useBusinessPolicies) {
+          setUsePolicies(true);
+          setPolicyForm(prev => ({
+            ...prev,
+            shippingPolicyId: personalDefaults.defaultShippingPolicyId ?? null,
+            returnPolicyId: personalDefaults.defaultReturnPolicyId ?? null,
+            paymentPolicyId: personalDefaults.defaultPaymentPolicyId ?? null,
+          }));
+        }
       })();
 
-      // Initialize item specifics based on card type
-      const ebayCategory = getCategoryForCardType(cardType);
-      setCategoryId(ebayCategory);
-
-      // Pre-fill item specifics from card data
-      const defaultSpecifics = mapCardToItemSpecifics(card, cardType);
-      setItemSpecifics(defaultSpecifics);
+      // Initialize item specifics + category from the same draft
+      setCategoryId(draft.categoryId);
+      setItemSpecifics(draft.itemSpecifics);
 
       return () => { cancelled = true; };
     }
   }, [isOpen, card, cardType]);
+
+  // Single owner of the generated description.
+  //
+  // Three inputs arrive AFTER the description is first seeded — the saved
+  // template and org branding (async fetch), the shipping form (saved defaults,
+  // then the user's edits), and the title (org grade label, then the user's
+  // edits) — so the description is re-rendered whenever any of them changes.
+  //
+  // autoDescriptionRef holds the last HTML we generated. Regeneration happens
+  // only while the field still matches it, so a description the user has
+  // hand-edited is never overwritten, and every auto-generated one is
+  // replaceable (comparing against the SEEDED text instead was the bug that
+  // stopped saved templates from ever applying).
+  useEffect(() => {
+    if (!isOpen || !descriptionFields) return;
+
+    const serviceLabel = DOMESTIC_SHIPPING_SERVICES.find(
+      s => s.value === shippingForm.domesticShippingService
+    )?.label;
+    // A business-policy listing cannot restate terms it no longer owns: the
+    // numbers live in the policy on eBay's side, and a description that
+    // disagrees with eBay's own shipping block is the failure mode. Name the
+    // policies and let eBay render the terms.
+    const shippingSummary = usePolicies
+      ? buildPolicyShippingSummary(policyForm.shippingPolicyName, policyForm.returnPolicyName)
+      : buildShippingSummary(shippingForm, serviceLabel);
+
+    // The headline repeats the FINAL title, including the org grade label and
+    // anything the seller typed into the title field.
+    const fieldsChanged =
+      shippingSummary !== descriptionFields.shippingSummary || title !== descriptionFields.title;
+    const nextFields = fieldsChanged ? { ...descriptionFields, shippingSummary, title } : descriptionFields;
+    if (fieldsChanged) setDescriptionFields(nextFields);
+
+    // Re-render unconditionally rather than only when the FIELDS changed: the
+    // template and the branding arrive without touching any field, and an
+    // early return on field equality would drop them on the floor.
+    setDescription(prev => {
+      if (prev !== autoDescriptionRef.current) return prev;
+      const next = activeTemplate
+        ? renderDescriptionTemplate(activeTemplate, nextFields, listingBranding)
+        : generateHtmlDescription(nextFields, listingBranding);
+      if (next === prev) return prev;
+      autoDescriptionRef.current = next;
+      return next;
+    });
+    // descriptionFields IS a dependency (it can arrive after this effect first
+    // runs); the equality guard above is what stops the write from looping.
+  }, [isOpen, title, shippingForm, usePolicies, policyForm, activeTemplate, listingBranding, descriptionFields]);
+
+  // Policy NAMES arrive with the list, after the ids come off the saved
+  // defaults. Backfilled here so the description can name the policy without
+  // the seller having to re-pick it from the dropdown.
+  useEffect(() => {
+    if (!usePolicies) return;
+    const shippingName = policyLists.shipping.find(p => p.id === policyForm.shippingPolicyId)?.name ?? null;
+    const returnName = policyLists.returns.find(p => p.id === policyForm.returnPolicyId)?.name ?? null;
+    if (shippingName === policyForm.shippingPolicyName && returnName === policyForm.returnPolicyName) return;
+    setPolicyForm(prev => ({ ...prev, shippingPolicyName: shippingName, returnPolicyName: returnName }));
+  }, [usePolicies, policyLists, policyForm]);
 
   // Generate images when modal opens
   useEffect(() => {
@@ -684,24 +790,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         const data = await response.json();
         const fetchedAspects = data.aspects || [];
 
-        // Get existing pre-filled specifics names (lowercase for comparison)
-        const existingNames = new Set(
-          itemSpecifics.map(s => s.name.toLowerCase())
-        );
-
-        // Add aspects that aren't already in our pre-filled list
-        const additionalSpecifics: ItemSpecific[] = [];
-        for (const aspect of fetchedAspects) {
-          const aspectName = aspect.localizedAspectName;
-          if (!existingNames.has(aspectName.toLowerCase())) {
-            additionalSpecifics.push({
-              name: aspectName,
-              value: '',
-              required: aspect.aspectConstraint?.aspectRequired || false,
-              editable: true,
-            });
-          }
-        }
+        // Add aspects that aren't already in our pre-filled list. These used to
+        // arrive BLANK for the seller to type, which is how Parallel/Variety
+        // ended up empty on nearly every card — fill anything the resolver
+        // holds a real value for, and leave the row editable.
+        const fields = resolveListingFields(card, cardType);
+        const additionalSpecifics = mergeAspectsIntoSpecifics(itemSpecifics, fetchedAspects, fields);
 
         // Merge: pre-filled first, then additional empty fields
         if (additionalSpecifics.length > 0) {
@@ -720,155 +814,22 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     setError(null);
 
     try {
-      const labelData = getCardLabelData(card);
-
-      // Get image URLs
-      let frontImageUrl = card.front_url;
-      let backImageUrl = card.back_url;
-
-      if (!frontImageUrl || !backImageUrl) {
-        if (!card.front_path || !card.back_path) {
-          throw new Error('Card images not found');
-        }
-
-        const authClient = getAuthenticatedClient();
-        const [frontUrl, backUrl] = await Promise.all([
-          authClient.storage.from('cards').createSignedUrl(card.front_path, 3600),
-          authClient.storage.from('cards').createSignedUrl(card.back_path, 3600),
-        ]);
-
-        if (!frontUrl.data?.signedUrl || !backUrl.data?.signedUrl) {
-          throw new Error('Failed to get card image URLs');
-        }
-
-        frontImageUrl = frontUrl.data.signedUrl;
-        backImageUrl = backUrl.data.signedUrl;
-      }
-
-      // Get subgrades
-      const weightedScores = card.conversational_weighted_sub_scores || {};
-      const subScoresData = card.conversational_sub_scores || {};
-      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
-
-      // Resolve badges from the profile — the prop chain only ever carried
-      // the founder flag, so VIP / Card Lover badges were missing from
-      // listing images.
-      // The badge lookup and the org branding load are independent of each
-      // other; run them together rather than back to back.
-      const t0 = performance.now();
-      let emblemFlags = { showFounderEmblem, showVipEmblem: false, showCardLoversEmblem: false };
-      const [, orgLogoSet] = await Promise.all([
-        (async () => {
-          try {
-            const sb = getAuthenticatedClient();
-            const { data: creditsRow } = await sb
-              .from('user_credits')
-              .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
-              .single();
-            if (creditsRow) emblemFlags = resolveEmblemVisibility(creditsRow);
-          } catch { /* keep prop fallback */ }
-        })(),
-        // Org branding: only org-graded cards have any. Every other card was
-        // paying for a round trip to /api/org/branding plus three logo fetches
-        // to be told it has no store, on the critical path of every listing.
-        card.org_id ? loadLogosForCard(card.id).catch(() => null) : Promise.resolve(null),
-      ]);
-      console.log(`[eBay Listing] prep (badges + branding): ${Math.round(performance.now() - t0)}ms`);
-      const qrTargetUrl = cardQrUrl(card.id, card.serial, orgLogoSet?.branding, `${window.location.origin}/${cardType}/${card.id}`);
-
-      // Generate card images (front & back with labels)
-      const cardImageData: CardImageData = {
-        cardName: labelData.primaryName,
-        contextLine: labelData.contextLine,
-        specialFeatures: labelData.featuresLine || undefined,
-        serial: labelData.serial,
-        englishName,
-        grade: labelData.grade ?? 0,
-        conditionLabel: labelData.condition,
-        cardUrl: qrTargetUrl,
-        frontImageUrl,
-        backImageUrl,
-        showFounderEmblem: emblemFlags.showFounderEmblem,
-        showVipEmblem: emblemFlags.showVipEmblem,
-        showCardLoversEmblem: emblemFlags.showCardLoversEmblem,
+      // The whole render pipeline (badges + org branding, label front/back,
+      // raw crops, QR, mini report) lives in prepareListingImages so the bulk
+      // review can run it per row. Behaviour here is unchanged.
+      const prepared = await prepareListingImages(card, {
+        cardType,
         labelStyle,
-        heritage: (() => {
-          const sel = resolveHeritageSelection(labelStyle, customLabelConfig);
-          return sel.active
-            ? { pattern: sel.pattern, bandColors: sel.bandColors ?? resolveHeritageBandColors(card?.card_colors), gradeColors: sel.gradeColors }
-            : undefined;
-        })(),
-        subScores: {
-          centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
-          corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,
-          edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
-          surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
-        },
-        logoOverrides: orgLogoSet?.branding
-          ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
-          : undefined,
-        orgDesign: orgLogoSet?.design ?? null,
-      };
-
-      // The QR only needs the card URL, so it does not have to wait behind the
-      // label rendering — the mini report is what depends on it.
-      const cardUrl = qrTargetUrl;
-      const t1 = performance.now();
-      const [{ front, back }, rawImages, qrCodeDataUrl] = await Promise.all([
-        generateCardImages(cardImageData),
-        generateRawCardImages(frontImageUrl, backImageUrl),
-        generateQRCodeWithLogo(cardUrl, orgLogoSet?.branding ? orgLogoSet.color : undefined)
-          .catch(() => generateQRCodeWithLogo(cardUrl)),
-      ]);
-      console.log(`[eBay Listing] card images + raw + QR: ${Math.round(performance.now() - t1)}ms (labelStyle=${labelStyle})`);
-      const logoDataUrl = orgLogoSet?.mark || undefined;
-
-      const miniReportData: FoldableLabelData = {
-        cardName: labelData.primaryName,
-        setName: labelData.setName || '',
-        cardNumber: labelData.cardNumber || undefined,
-        year: labelData.year || undefined,
-        specialFeatures: labelData.featuresLine || undefined,
-        serial: labelData.serial,
-        englishName,
-        grade: labelData.grade ?? 0,
-        conditionLabel: labelData.condition,
-        subgrades: {
-          centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
-          corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,
-          edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
-          surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
-        },
-        overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
-        qrCodeDataUrl,
-        cardUrl,
-        logoDataUrl,
-      };
-
-      const t2 = performance.now();
-      const miniReport = await generateMiniReportJpg(miniReportData);
-      console.log(
-        `[eBay Listing] mini report: ${Math.round(performance.now() - t2)}ms | total ${Math.round(performance.now() - t0)}ms`,
-      );
+        customLabelConfig,
+        showFounderEmblem,
+      });
 
       // Create preview URLs
-      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back });
-      setImageUrls({
-        front: URL.createObjectURL(front),
-        back: URL.createObjectURL(back),
-        miniReport: URL.createObjectURL(miniReport),
-        rawFront: URL.createObjectURL(rawImages.front),
-        rawBack: URL.createObjectURL(rawImages.back),
-      });
+      setImageBlobs(prepared.blobs);
+      setImageUrls(prepared.objectUrls);
       // Seed the ordered list once the system images are ready. Subsequent
       // user uploads append themselves via the additionalImages-sync effect.
-      setImageOrder(prev => prev.length > 0 ? prev : [
-        { kind: 'system', key: 'front' },
-        { kind: 'system', key: 'back' },
-        { kind: 'system', key: 'miniReport' },
-        { kind: 'system', key: 'rawFront' },
-        { kind: 'system', key: 'rawBack' },
-      ]);
+      setImageOrder(prev => prev.length > 0 ? prev : [...DEFAULT_IMAGE_ORDER]);
 
     } catch (err) {
       console.error('[eBay Listing] Failed to generate images:', err);
@@ -913,104 +874,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       throw new Error('Not logged in');
     }
 
-    // Convert blobs to base64
-    const toBase64 = (blob: Blob): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    };
-
-    // Compress any image blob to keep requests under payload limits
-    const compressBlob = (blob: Blob, maxKB: number = 600): Promise<Blob> => {
-      return new Promise((resolve) => {
-        if (blob.size <= maxKB * 1024) { resolve(blob); return; }
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1200;
-          let w = img.width, h = img.height;
-          if (w > maxDim || h > maxDim) {
-            const scale = maxDim / Math.max(w, h);
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
-          }
-          canvas.width = w;
-          canvas.height = h;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((result) => resolve(result || blob), 'image/jpeg', 0.82);
-        };
-        img.onerror = () => resolve(blob);
-        img.src = URL.createObjectURL(blob);
-      });
-    };
-
-    // Upload images individually to avoid exceeding request size limits
-    const uploadSingleImage = async (imageKey: string, blob: Blob): Promise<string | null> => {
-      const compressed = await compressBlob(blob);
-      const base64 = await toBase64(compressed);
-      const response = await fetch('/api/ebay/images', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session!.access_token}`,
-        },
-        body: JSON.stringify({
-          cardId: card.id,
-          images: { [imageKey]: base64 },
-        }),
-      });
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to upload ${imageKey}`);
-      }
-      const data = await response.json();
-      return data.urls[imageKey] || null;
-    };
-
-    const urls: string[] = [];
-
-    // Walk imageOrder so the gallery upload order matches the order the
-    // user arranged in the picker. First selected becomes eBay main image.
-    for (const item of imageOrder) {
-      if (item.kind === 'system') {
-        if (!selectedImages[item.key]) continue;
-        const blob = imageBlobs[item.key];
-        if (!blob) continue;
-        const url = await uploadSingleImage(item.key, blob);
-        if (url) urls.push(url);
-      } else {
-        const img = additionalImages.find(a => a.id === item.id);
-        if (!img || !img.selected) continue;
-        try {
-          const compressed = await compressBlob(img.blob);
-          const base64 = await toBase64(compressed);
-          const response = await fetch('/api/ebay/images', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session!.access_token}`,
-            },
-            body: JSON.stringify({
-              cardId: card.id,
-              additionalImages: [base64],
-            }),
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.urls.additional?.length) urls.push(...data.urls.additional);
-          } else {
-            console.error('[eBay Images] Failed to upload additional image:', await response.text());
-          }
-        } catch (err) {
-          console.error('[eBay Images] Error uploading additional image:', err);
-        }
-      }
-    }
-
-    return urls;
+    // Compression + per-image POST live in prepareListingImages so the bulk
+    // review can upload a whole batch the same way.
+    return uploadListingImages({
+      cardId: card.id,
+      accessToken: session.access_token,
+      order: imageOrder,
+      blobs: imageBlobs,
+      selected: selectedImages,
+      additionalImages,
+    });
   };
 
   /**
@@ -1179,7 +1052,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       console.log('[eBay Report] Generating PDF report...');
 
       // Generate PDF blob
-      const pdfDoc = await pdf(<CardGradingReport cardData={reportData} />);
+      // marketplaceSafe: this PDF is uploaded to eBay as a regulatory
+      // document, and a listing must never name another grading company.
+      const pdfDoc = await pdf(<CardGradingReport cardData={reportData} marketplaceSafe />);
       const pdfBlob = await pdfDoc.toBlob();
 
       console.log('[eBay Report] PDF generated, uploading to eBay...');
@@ -1280,9 +1155,19 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           // duration for Buy It Now even if stale state slipped through.
           duration: listingFormat === 'FIXED_PRICE' ? 'GTC' : duration,
           imageUrls: uploadedUrls,
+          // Empty AND meaningless values are dropped: eBay treats a filled
+          // "N/A"/"Unknown" aspect as answered and stops prompting for the
+          // real one, so an absent aspect is strictly better than a hollow one.
           itemSpecifics: itemSpecifics
-            .filter(spec => spec.name && spec.value && (Array.isArray(spec.value) ? spec.value.length > 0 : spec.value.trim()))
-            .map(spec => ({ name: spec.name, value: spec.value })),
+            .filter(spec => spec.name && (
+              Array.isArray(spec.value)
+                ? spec.value.some(isMeaningfulValue)
+                : isMeaningfulValue(spec.value)
+            ))
+            .map(spec => ({
+              name: spec.name,
+              value: Array.isArray(spec.value) ? spec.value.filter(isMeaningfulValue) : spec.value.trim(),
+            })),
           // Shipping options
           shippingType: shippingForm.shippingType,
           domesticShippingService: shippingForm.domesticShippingService,
@@ -1308,6 +1193,20 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           internationalReturnsAccepted: shippingForm.internationalReturnsAccepted,
           internationalReturnPeriodDays: shippingForm.internationalReturnPeriodDays,
           internationalReturnShippingPaidBy: shippingForm.internationalReturnShippingPaidBy,
+          // Business policies. Sent only for an opted-in seller — the server
+          // rejects them otherwise, and the inline fields above are what it
+          // uses instead. The inline fields are still sent either way: the
+          // publish path decides which side applies from the seller's stored
+          // opt-in, not from what this client believes.
+          ...(usePolicies
+            ? {
+                policies: {
+                  shippingPolicyId: policyForm.shippingPolicyId,
+                  returnPolicyId: policyForm.returnPolicyId,
+                  paymentPolicyId: policyForm.paymentPolicyId,
+                },
+              }
+            : {}),
           // Regulatory documents (Certificate of Analysis)
           regulatoryDocumentIds,
         }),
@@ -1316,8 +1215,18 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       if (!response.ok) {
         const data = await response.json();
         console.error('[eBay Listing] API error:', data);
+        // 412 bodies carry a machine code in `error` ('disclaimer_required')
+        // and the sentence in `message` — showing `error` raw put the code in
+        // front of the seller. Send them back to the disclaimer step, which
+        // this modal already renders, with the readable reason.
+        if (response.status === 412) {
+          setDisclaimerStatus('needs_acceptance');
+          throw new Error(
+            data.message || data.error || 'Please accept the InstaList seller disclaimer first.'
+          );
+        }
         // Include actionable guidance if provided by the API
-        let errorMessage = data.error || data.details || 'Failed to create listing';
+        let errorMessage = data.message || data.error || data.details || 'Failed to create listing';
         if (data.userAction) {
           errorMessage += '\n\n' + data.userAction;
         }
@@ -1374,9 +1283,24 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         setStep('shipping');
         break;
       case 'shipping':
+        // The ZIP is the item's location, not a shipping term, so eBay wants
+        // it whether the terms come from a policy or from the form above.
         if (!shippingForm.postalCode || shippingForm.postalCode.length < 5) {
           showValidationError('Please enter your ship-from ZIP code (in the Shipping section above) to continue');
           return;
+        }
+        if (usePolicies) {
+          const missing = [
+            !policyForm.shippingPolicyId && 'shipping',
+            !policyForm.returnPolicyId && 'return',
+            !policyForm.paymentPolicyId && 'payment',
+          ].filter(Boolean) as string[];
+          if (missing.length > 0) {
+            showValidationError(
+              `Choose a ${missing.join(', ')} policy — eBay needs all three when your account uses business policies.`
+            );
+            return;
+          }
         }
         setError(null);
         setStep('review');
@@ -1920,13 +1844,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       drag any image into position 1 (main) regardless of
                       which "bucket" it came from. */}
                   {(() => {
-                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack', string> = {
-                      front: 'Front',
-                      back: 'Back',
-                      miniReport: 'Report',
-                      rawFront: 'Front (Raw)',
-                      rawBack: 'Back (Raw)',
-                    };
+                    const SYSTEM_LABELS: Record<SystemImageKey, string> = SYSTEM_IMAGE_LABELS;
                     const isItemSelected = (item: OrderedImageItem): boolean => {
                       if (item.kind === 'system') return !!selectedImages[item.key];
                       return !!additionalImages.find(a => a.id === item.id)?.selected;
@@ -2555,10 +2473,119 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             <div className="space-y-5">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Shipping & Returns</h3>
-                <p className="text-sm text-gray-500">Configure shipping and return options for this listing.</p>
+                <p className="text-sm text-gray-500">
+                  {usePolicies
+                    ? 'This listing uses your saved eBay business policies.'
+                    : 'Configure shipping and return options for this listing.'}
+                </p>
               </div>
 
+              {/* Business policies — the whole inline form below is replaced by
+                  three dropdowns when the seller's account uses them. eBay
+                  refuses a listing that carries both, so this is either/or,
+                  never additive. */}
+              {usePolicies && (
+                <div className="space-y-4">
+                  {policiesLoading && <p className="text-sm text-gray-500">Loading your eBay policies…</p>}
+                  {policiesError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                      {policiesError}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <PolicySelect
+                      id="listing-shipping-policy"
+                      label="Shipping policy"
+                      options={policyLists.shipping}
+                      value={policyForm.shippingPolicyId}
+                      onChange={(id, name) =>
+                        setPolicyForm(f => ({ ...f, shippingPolicyId: id, shippingPolicyName: name }))
+                      }
+                      onCreate={() => setCreatingPolicy('shipping')}
+                      selectClass="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      labelClass="block text-sm font-medium text-gray-700 mb-1"
+                    />
+                    <PolicySelect
+                      id="listing-return-policy"
+                      label="Return policy"
+                      options={policyLists.returns}
+                      value={policyForm.returnPolicyId}
+                      onChange={(id, name) =>
+                        setPolicyForm(f => ({ ...f, returnPolicyId: id, returnPolicyName: name }))
+                      }
+                      onCreate={() => setCreatingPolicy('returns')}
+                      selectClass="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      labelClass="block text-sm font-medium text-gray-700 mb-1"
+                    />
+                    <PolicySelect
+                      id="listing-payment-policy"
+                      label="Payment policy"
+                      options={policyLists.payment}
+                      value={policyForm.paymentPolicyId}
+                      onChange={id => setPolicyForm(f => ({ ...f, paymentPolicyId: id }))}
+                      selectClass="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      labelClass="block text-sm font-medium text-gray-700 mb-1"
+                    />
+                  </div>
+
+                  {creatingPolicy && (
+                    <CreatePolicyForm
+                      kind={creatingPolicy}
+                      token={sessionToken}
+                      onCreated={(policy: PolicyOption) => {
+                        addPolicy(creatingPolicy, policy);
+                        setPolicyForm(f =>
+                          creatingPolicy === 'shipping'
+                            ? { ...f, shippingPolicyId: policy.id, shippingPolicyName: policy.name }
+                            : { ...f, returnPolicyId: policy.id, returnPolicyName: policy.name }
+                        );
+                        setCreatingPolicy(null);
+                      }}
+                      onCancel={() => setCreatingPolicy(null)}
+                      inputClass="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                      labelClass="block text-sm font-medium text-gray-700 mb-1"
+                    />
+                  )}
+
+                  {/* The ZIP is the item's LOCATION and the dimensions are the
+                      parcel's — neither is a shipping term, and a calculated
+                      shipping policy cannot quote a rate without them. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
+                      <input
+                        type="text"
+                        value={shippingForm.postalCode}
+                        onChange={(e) => setShippingForm(f => ({ ...f, postalCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))}
+                        placeholder="e.g. 90210"
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        maxLength={5}
+                      />
+                      {!shippingForm.postalCode && (
+                        <p className="text-xs text-amber-600 mt-1">Required — this is where the card ships from</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Package weight (oz)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={shippingForm.packageWeightOz}
+                        onChange={(e) => setShippingForm(f => ({ ...f, packageWeightOz: parseInt(e.target.value) || 0 }))}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+                    Shipping cost, carrier, handling time and returns all come from the policies
+                    above. Change them in eBay, or in InstaList settings, rather than per listing.
+                  </div>
+                </div>
+              )}
+
               {/* Domestic Shipping Section */}
+              {!usePolicies && (
               <div className="space-y-4">
                 <h4 className="font-medium text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2705,8 +2732,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </select>
                 </div>
               </div>
+              )}
 
               {/* International Shipping Section */}
+              {!usePolicies && (
               <div className="space-y-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-gray-900 flex items-center gap-2">
@@ -2791,8 +2820,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Returns Section */}
+              {!usePolicies && (
               <div className="space-y-4 pt-4 border-t border-gray-200">
                 <h4 className="font-medium text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2891,23 +2922,30 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
 
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                <strong>No account changes:</strong> These shipping and return options apply only to this listing and won&apos;t modify your eBay account settings.
-              </div>
+              {!usePolicies && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                  <strong>No account changes:</strong> These shipping and return options apply only to this listing and won&apos;t modify your eBay account settings.
+                </div>
+              )}
 
-              <div className="flex items-center justify-end gap-2">
-                {defaultsSavedFlash === 'Shipping defaults saved' && <span className="text-xs text-green-600">Saved ✓</span>}
-                <button
-                  type="button"
-                  disabled={savingDefaults !== null}
-                  onClick={() => saveListingDefaults({ shippingDefaults: { ...shippingForm, bestOfferEnabled } }, 'shipping')}
-                  className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
-                  title={defaultsScope === 'org' ? 'Applied to every listing your store creates' : 'Applied to every listing you create'}
-                >
-                  {savingDefaults === 'shipping' ? 'Saving...' : `Save as ${defaultsScope === 'org' ? 'store' : 'my'} shipping defaults`}
-                </button>
-              </div>
+              {/* Policy defaults are saved from the InstaList settings tab —
+                  they are account state, not per-listing state. */}
+              {!usePolicies && (
+                <div className="flex items-center justify-end gap-2">
+                  {defaultsSavedFlash === 'Shipping defaults saved' && <span className="text-xs text-green-600">Saved ✓</span>}
+                  <button
+                    type="button"
+                    disabled={savingDefaults !== null}
+                    onClick={() => saveListingDefaults({ shippingDefaults: { ...shippingForm, bestOfferEnabled } }, 'shipping')}
+                    className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
+                    title={defaultsScope === 'org' ? 'Applied to every listing your store creates' : 'Applied to every listing you create'}
+                  >
+                    {savingDefaults === 'shipping' ? 'Saving...' : `Save as ${defaultsScope === 'org' ? 'store' : 'my'} shipping defaults`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -3009,6 +3047,28 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               {/* Shipping & Returns Summary */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Shipping & Returns</h4>
+                {/* Business-policy listings own none of the numbers below —
+                    showing a stale inline form here would tell the seller
+                    something the listing is not going to say. */}
+                {usePolicies ? (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Shipping policy:</span>
+                      <span className="font-medium text-gray-900">{policyForm.shippingPolicyName || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Return policy:</span>
+                      <span className="font-medium text-gray-900">{policyForm.returnPolicyName || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Ship From:</span>
+                      <span className="font-medium text-gray-900">{shippingForm.postalCode}</span>
+                    </div>
+                    <p className="pt-2 border-t border-gray-200 text-xs text-gray-500">
+                      Cost, carrier, handling time and return terms come from these eBay policies.
+                    </p>
+                  </div>
+                ) : (
                 <div className="space-y-2 text-sm">
                   {/* Domestic Shipping */}
                   <div className="grid grid-cols-2 gap-2">
@@ -3066,6 +3126,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     )}
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Product Documents */}

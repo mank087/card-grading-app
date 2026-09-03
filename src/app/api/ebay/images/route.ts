@@ -31,6 +31,40 @@ function getAdminClient() {
 const EBAY_IMAGES_BUCKET = 'ebay-listing-images';
 
 /**
+ * The bucket is created once, ever — but this route ran listBuckets() on
+ * EVERY upload, which is five extra round trips per single-card listing and
+ * ~500 for a 100-card bulk batch. Memoised at module scope: the first call in
+ * a serverless instance does the check, the rest reuse the promise. A failed
+ * check is not cached, so a transient error still retries next request.
+ */
+let bucketReady: Promise<void> | null = null;
+
+function ensureImagesBucket(
+  supabase: ReturnType<typeof getAdminClient>
+): Promise<void> {
+  if (bucketReady) return bucketReady;
+  bucketReady = (async () => {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (buckets?.some(b => b.name === EBAY_IMAGES_BUCKET)) return;
+
+    const { error: createError } = await supabase.storage.createBucket(EBAY_IMAGES_BUCKET, {
+      public: true,
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      fileSizeLimit: 12 * 1024 * 1024, // 12MB (eBay limit)
+    });
+
+    if (createError && !createError.message.includes('already exists')) {
+      console.error('[eBay Images] Failed to create bucket:', createError);
+      throw new Error('Failed to initialize image storage');
+    }
+  })().catch(err => {
+    bucketReady = null; // don't cache a failure
+    throw err;
+  });
+  return bucketReady;
+}
+
+/**
  * System image slots → storage filename. SINGLE SOURCE OF TRUTH: the modal
  * uploads one slot per request, so a slot missing from this map fails the
  * "at least one image" guard and kills the whole submit. Add new slots here
@@ -171,24 +205,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure the bucket exists (create if not)
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some(b => b.name === EBAY_IMAGES_BUCKET);
-
-    if (!bucketExists) {
-      const { error: createError } = await supabase.storage.createBucket(EBAY_IMAGES_BUCKET, {
-        public: true,
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-        fileSizeLimit: 12 * 1024 * 1024, // 12MB (eBay limit)
-      });
-
-      if (createError && !createError.message.includes('already exists')) {
-        console.error('[eBay Images] Failed to create bucket:', createError);
-        return NextResponse.json(
-          { error: 'Failed to initialize image storage' },
-          { status: 500 }
-        );
-      }
+    // Ensure the bucket exists (create if not) — memoised, see above.
+    try {
+      await ensureImagesBucket(supabase);
+    } catch {
+      return NextResponse.json(
+        { error: 'Failed to initialize image storage' },
+        { status: 500 }
+      );
     }
 
     // Generate unique folder path for this card's listing images

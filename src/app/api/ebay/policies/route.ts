@@ -1,249 +1,173 @@
 /**
- * eBay Policies API
+ * The seller's eBay business policies.
  *
- * Fetches the user's eBay business policies (fulfillment, payment, return).
- * These are required when creating eBay listings.
+ * GET  /api/ebay/policies — { shipping: [{id,name,summary}], returns, payment }
+ *      straight off the seller's EBAY_US account. Read on demand by the
+ *      listing modal and the bulk settings panel when the seller has opted in.
+ * POST /api/ebay/policies — create ONE shipping or return policy from the
+ *      minimal inline form, and return it so the caller can select it without
+ *      a second round trip.
  *
- * GET /api/ebay/policies
- * Returns: { fulfillment: Policy[], payment: Policy[], return: Policy[] }
+ * Payment policies are list-only: under managed payments there is nothing a
+ * card seller meaningfully chooses, and every account already has a usable
+ * default. See createPolicy() for the reasoning.
+ *
+ * Auth is the bearer JWT every other InstaList route uses. The eBay call
+ * itself goes through the shared connection + refresh helpers, so an expired
+ * token reports the same 401 ("reconnect your account") the listing path does.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAuth } from '@/lib/serverAuth';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
-import { EBAY_API_URLS, MARKETPLACES } from '@/lib/ebay/constants';
+import { DOMESTIC_SHIPPING_SERVICES, DEFAULT_DOMESTIC_SHIPPING_SERVICE } from '@/lib/ebay/tradingApi';
+import {
+  fetchAllPolicies,
+  createPolicy,
+  PolicyApiError,
+  type CreatePolicyInput,
+} from '@/lib/ebay/businessPolicies';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+export const runtime = 'nodejs';
 
-function getAdminClient() {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
-}
-
-interface EbayPolicy {
-  policyId: string;
-  name: string;
-  description?: string;
-  marketplaceId?: string;
-}
-
-interface PoliciesResponse {
-  fulfillment: EbayPolicy[];
-  payment: EbayPolicy[];
-  return: EbayPolicy[];
-  cached?: boolean;
-}
+type ConnectResult =
+  | { ok: true; connection: NonNullable<Awaited<ReturnType<typeof getConnectionForUser>>> }
+  | { ok: false; response: NextResponse };
 
 /**
- * Make authenticated request to eBay API
+ * The connection + a fresh token, or the response to send instead. Same two
+ * codes (`no_connection`, `token_refresh_failed`) the publish path reports, so
+ * a client can handle "reconnect eBay" in one place.
  */
-async function ebayRequest(
-  endpoint: string,
-  accessToken: string,
-  sandbox: boolean = true
-): Promise<Response> {
-  const baseUrl = sandbox
-    ? EBAY_API_URLS.sandbox.api
-    : EBAY_API_URLS.production.api;
-
-  return fetch(`${baseUrl}${endpoint}`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
-}
-
-/**
- * Fetch policies of a specific type from eBay
- */
-async function fetchPolicies(
-  accessToken: string,
-  policyType: 'fulfillment' | 'payment' | 'return',
-  sandbox: boolean
-): Promise<EbayPolicy[]> {
-  const marketplaceId = MARKETPLACES.US;
-  const endpoint = `/sell/account/v1/${policyType}_policy?marketplace_id=${marketplaceId}`;
-
-  try {
-    const response = await ebayRequest(endpoint, accessToken, sandbox);
-
-    if (!response.ok) {
-      console.error(`[eBay Policies] Failed to fetch ${policyType} policies:`, response.status);
-      return [];
-    }
-
-    const data = await response.json();
-
-    // The response structure varies by policy type
-    // fulfillment: fulfillmentPolicies, payment: paymentPolicies, return: returnPolicies
-    const policyKey = `${policyType}Policies`;
-    const policies = data[policyKey] || [];
-
-    return policies.map((p: any) => ({
-      policyId: p[`${policyType}PolicyId`] || p.policyId,
-      name: p.name,
-      description: p.description,
-      marketplaceId: p.marketplaceId,
-    }));
-  } catch (error) {
-    console.error(`[eBay Policies] Error fetching ${policyType} policies:`, error);
-    return [];
+async function connect(userId: string): Promise<ConnectResult> {
+  let connection = await getConnectionForUser(userId);
+  if (!connection) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'no_connection', message: 'No eBay account connected' },
+        { status: 400 }
+      ),
+    };
   }
+  connection = await refreshTokenIfNeeded(connection);
+  if (!connection) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: 'token_refresh_failed',
+          message: 'Failed to refresh eBay authorization. Please reconnect your account.',
+        },
+        { status: 401 }
+      ),
+    };
+  }
+  return { ok: true, connection };
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (!auth.authenticated || !auth.user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  const conn = await connect(auth.user.id);
+  if (!conn.ok) return conn.response;
+
   try {
-    // Authenticate user
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const policies = await fetchAllPolicies(conn.connection.access_token, conn.connection.is_sandbox);
+    return NextResponse.json(policies);
+  } catch (err) {
+    if (err instanceof PolicyApiError) {
+      // 403 from the Account API is what an account outside the
+      // SELLING_POLICY_MANAGEMENT program gets — say so, rather than
+      // reporting "no policies" and sending the seller to create duplicates.
+      console.warn('[ebay/policies] eBay refused the policy list:', err.status, err.message);
       return NextResponse.json(
-        { error: 'Unauthorized. Please log in first.' },
-        { status: 401 }
+        { error: 'ebay_error', message: err.message },
+        { status: err.status === 403 ? 403 : 502 }
       );
     }
+    console.error('[ebay/policies] unexpected error:', err);
+    return NextResponse.json({ error: 'Failed to load your eBay policies' }, { status: 500 });
+  }
+}
 
-    const token = authHeader.slice(7);
-    const supabase = getAdminClient();
+const SERVICE_VALUES = new Set(DOMESTIC_SHIPPING_SERVICES.map(s => s.value));
+const RETURN_WINDOWS = new Set([14, 30, 60]);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired session' },
-        { status: 401 }
-      );
+/**
+ * Validate the create form. Returns the typed input or the message to show —
+ * everything the browser can send is re-checked here, because the Account API
+ * reports a bad field as a schema error nobody can act on.
+ */
+function parseCreateBody(body: any): CreatePolicyInput | { error: string } {
+  const name = typeof body?.name === 'string' ? body.name.replace(/\s+/g, ' ').trim() : '';
+  if (name.length < 3 || name.length > 64) {
+    return { error: 'Give the policy a name between 3 and 64 characters' };
+  }
+
+  if (body?.kind === 'shipping') {
+    const service =
+      typeof body.service === 'string' && SERVICE_VALUES.has(body.service)
+        ? body.service
+        : DEFAULT_DOMESTIC_SHIPPING_SERVICE;
+    const freeShipping = body.freeShipping === true;
+    const cost = Number(body.cost);
+    if (!freeShipping && (!Number.isFinite(cost) || cost < 0 || cost > 1000)) {
+      return { error: 'Shipping cost must be between $0 and $1000' };
     }
-
-    // Get eBay connection and refresh token if needed
-    let connection = await getConnectionForUser(user.id);
-    if (!connection) {
-      return NextResponse.json(
-        { error: 'No eBay account connected' },
-        { status: 400 }
-      );
+    const handlingDays = Number(body.handlingDays);
+    if (!Number.isInteger(handlingDays) || handlingDays < 0 || handlingDays > 30) {
+      return { error: 'Handling time must be a whole number of days between 0 and 30' };
     }
+    return { kind: 'shipping', name, service, cost: freeShipping ? 0 : cost, handlingDays, freeShipping };
+  }
 
-    // Refresh token if needed
-    connection = await refreshTokenIfNeeded(connection);
-    if (!connection) {
-      return NextResponse.json(
-        { error: 'Failed to refresh eBay authorization. Please reconnect your account.' },
-        { status: 401 }
-      );
+  if (body?.kind === 'returns') {
+    const returnsAccepted = body.returnsAccepted !== false;
+    const days = Number(body.days);
+    if (returnsAccepted && !RETURN_WINDOWS.has(days)) {
+      return { error: 'Return window must be 14, 30 or 60 days' };
     }
+    const paidBy = body.paidBy === 'SELLER' ? 'SELLER' : 'BUYER';
+    return { kind: 'returns', name, returnsAccepted, days: returnsAccepted ? days : 30, paidBy };
+  }
 
-    // Check URL param for forcing refresh
-    const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
+  return { error: 'kind must be "shipping" or "returns"' };
+}
 
-    // Check for cached policies (if not forcing refresh)
-    if (!forceRefresh) {
-      const { data: cachedPolicies } = await supabase
-        .from('ebay_user_policies')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('cached_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // 24 hour cache
+export async function POST(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (!auth.authenticated || !auth.user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
 
-      if (cachedPolicies && cachedPolicies.length > 0) {
-        const response: PoliciesResponse = {
-          fulfillment: [],
-          payment: [],
-          return: [],
-          cached: true,
-        };
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-        for (const policy of cachedPolicies) {
-          const item: EbayPolicy = {
-            policyId: policy.policy_id,
-            name: policy.name,
-            description: policy.description,
-          };
+  const parsed = parseCreateBody(body);
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
 
-          if (policy.policy_type === 'fulfillment') {
-            response.fulfillment.push(item);
-          } else if (policy.policy_type === 'payment') {
-            response.payment.push(item);
-          } else if (policy.policy_type === 'return') {
-            response.return.push(item);
-          }
-        }
+  const conn = await connect(auth.user.id);
+  if (!conn.ok) return conn.response;
 
-        // Only return cached if we have all policy types
-        if (response.fulfillment.length && response.payment.length && response.return.length) {
-          return NextResponse.json(response);
-        }
-      }
+  try {
+    const policy = await createPolicy(parsed, conn.connection.access_token, conn.connection.is_sandbox);
+    return NextResponse.json({ success: true, kind: parsed.kind, policy });
+  } catch (err) {
+    if (err instanceof PolicyApiError) {
+      console.warn('[ebay/policies] create refused:', err.status, err.message);
+      return NextResponse.json({ error: 'ebay_error', message: err.message }, { status: 400 });
     }
-
-    // Fetch fresh policies from eBay
-    console.log('[eBay Policies] Fetching fresh policies from eBay');
-
-    const [fulfillment, payment, returnPolicies] = await Promise.all([
-      fetchPolicies(connection.access_token, 'fulfillment', connection.is_sandbox),
-      fetchPolicies(connection.access_token, 'payment', connection.is_sandbox),
-      fetchPolicies(connection.access_token, 'return', connection.is_sandbox),
-    ]);
-
-    // Cache the policies
-    const now = new Date().toISOString();
-    const policiesToCache = [
-      ...fulfillment.map(p => ({
-        user_id: user.id,
-        policy_type: 'fulfillment' as const,
-        policy_id: p.policyId,
-        name: p.name,
-        description: p.description || null,
-        cached_at: now,
-      })),
-      ...payment.map(p => ({
-        user_id: user.id,
-        policy_type: 'payment' as const,
-        policy_id: p.policyId,
-        name: p.name,
-        description: p.description || null,
-        cached_at: now,
-      })),
-      ...returnPolicies.map(p => ({
-        user_id: user.id,
-        policy_type: 'return' as const,
-        policy_id: p.policyId,
-        name: p.name,
-        description: p.description || null,
-        cached_at: now,
-      })),
-    ];
-
-    if (policiesToCache.length > 0) {
-      // Delete old cached policies for this user
-      await supabase
-        .from('ebay_user_policies')
-        .delete()
-        .eq('user_id', user.id);
-
-      // Insert new policies
-      const { error: cacheError } = await supabase
-        .from('ebay_user_policies')
-        .insert(policiesToCache);
-
-      if (cacheError) {
-        console.error('[eBay Policies] Failed to cache policies:', cacheError);
-      }
-    }
-
-    const response: PoliciesResponse = {
-      fulfillment,
-      payment,
-      return: returnPolicies,
-      cached: false,
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error('[eBay Policies] Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    console.error('[ebay/policies] create failed:', err);
+    return NextResponse.json({ error: 'Failed to create the policy' }, { status: 500 });
   }
 }

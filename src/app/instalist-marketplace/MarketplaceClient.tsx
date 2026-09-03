@@ -2,14 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { bulkUiEnabled } from '@/lib/ebay/bulkFlags';
+import { MAX_BULK_ITEMS } from '@/lib/ebay/bulkReadiness';
 import { getStoredSession } from '@/lib/directAuth';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import StatsStrip from './components/StatsStrip';
 import ListNewTab from './components/ListNewTab';
+import BulkBatchesStrip from './components/BulkBatchesStrip';
 import MyListingsTab from './components/MyListingsTab';
 import SoldTab from './components/SoldTab';
 import EndedTab from './components/EndedTab';
+import EbayPolicySettings from '@/components/ebay/EbayPolicySettings';
 import MarketplaceInfo from './components/MarketplaceInfo';
 import type { MarketplaceCard, MarketplaceListing, MarketplaceStats } from './types';
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
@@ -29,7 +34,7 @@ const EbayListingModal = dynamic(
   }
 );
 
-type TabId = 'list' | 'active' | 'sold' | 'ended';
+type TabId = 'list' | 'active' | 'sold' | 'ended' | 'settings';
 
 // Map DCM category strings to the cardType the EbayListingModal expects.
 // The modal's cardType doubles as the card-detail route slug, so this defers to
@@ -76,6 +81,14 @@ export default function MarketplaceClient() {
 
   // Modal state
   const [modalCard, setModalCard] = useState<MarketplaceCard | null>(null);
+
+  // Bulk listing (feature-flagged). The single-card modal path above is
+  // untouched — this is a second way out of the same picker.
+  const router = useRouter();
+  const bulkEnabled = bulkUiEnabled();
+  const [bulkSelection, setBulkSelection] = useState<string[]>([]);
+  const [startingBatch, setStartingBatch] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   // Connect-flow state
   const [connecting, setConnecting] = useState(false);
@@ -298,6 +311,44 @@ export default function MarketplaceClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageState]);
 
+  const startBatch = useCallback(async () => {
+    if (!accessToken || bulkSelection.length === 0) return;
+    setStartingBatch(true);
+    setBatchError(null);
+    try {
+      const res = await fetch('/api/ebay/bulk/batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ cardIds: bulkSelection }),
+      });
+      if (res.status === 404) {
+        // Two different 404s: the feature flag being off (a bare 'Not found',
+        // deliberately indistinguishable from a route that does not exist) and
+        // a real reason, like none of the selected cards being yours. Show the
+        // reason when the body carries one.
+        const body = await res.json().catch(() => ({} as any));
+        const reason: unknown = body?.message ?? body?.error;
+        setBatchError(
+          typeof reason === 'string' && reason && reason !== 'Not found'
+            ? reason
+            : 'Bulk listing is not switched on for your account yet.'
+        );
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.batchId) {
+        setBatchError(json.error || 'Could not start the batch. Please try again.');
+        return;
+      }
+      setBulkSelection([]);
+      router.push(`/instalist-marketplace/bulk/${json.batchId}`);
+    } catch {
+      setBatchError('Could not start the batch. Please try again.');
+    } finally {
+      setStartingBatch(false);
+    }
+  }, [accessToken, bulkSelection, router]);
+
   const handleListingPublished = useCallback(() => {
     setModalCard(null);
     refreshAll();
@@ -467,17 +518,28 @@ export default function MarketplaceClient() {
             <TabButton active={activeTab === 'ended'} onClick={() => setActiveTab('ended')}>
               Ended <Count value={stats?.endedCount ?? 0} />
             </TabButton>
+            <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>
+              Settings
+            </TabButton>
           </nav>
         </div>
 
         {/* Tab content */}
         <div className="mt-6">
+          {activeTab === 'list' && bulkEnabled && <BulkBatchesStrip token={accessToken} />}
           {activeTab === 'list' && (
             <ListNewTab
               cards={cards}
               truncated={cardsTruncated}
               loading={!cardsLoaded}
               onSelectCard={setModalCard}
+              bulkEnabled={bulkEnabled}
+              selectedIds={bulkSelection}
+              onSelectionChange={setBulkSelection}
+              onStartBatch={startBatch}
+              startingBatch={startingBatch}
+              batchError={batchError}
+              selectionLimit={MAX_BULK_ITEMS}
             />
           )}
           {activeTab === 'active' && (
@@ -498,6 +560,11 @@ export default function MarketplaceClient() {
               }}
             />
           )}
+          {/* Seller-level listing settings. Only the eBay business-policy
+              opt-in lives here today; it is an account-wide choice, so it
+              belongs beside the listings rather than inside one listing's
+              stepper. */}
+          {activeTab === 'settings' && <EbayPolicySettings />}
         </div>
 
         {/* Footer info section — keeps the value-prop visible to existing users */}

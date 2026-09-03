@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
-  Modal, Alert, BackHandler, Platform,
+  Alert, BackHandler, Platform,
 } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { WebView, type WebViewNavigation } from 'react-native-webview'
+import { type WebViewNavigation } from 'react-native-webview'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 
@@ -17,6 +17,8 @@ import {
 } from '@/lib/marketplaceApi'
 import { checkEbayStatus, getOAuthUrl, type EbayConnectionStatus } from '@/lib/ebayApi'
 import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
+import { createBatch, probeBulkAvailable, BulkApiError } from '@/lib/ebayBulkApi'
+import { MAX_BULK_ITEMS } from '@/lib/ebayBulkTypes'
 
 import StatsStrip from '@/components/marketplace/StatsStrip'
 import SyncStatusPill, { type SyncState } from '@/components/marketplace/SyncStatusPill'
@@ -24,6 +26,8 @@ import InfoView from '@/components/marketplace/InfoView'
 import CardPicker from '@/components/marketplace/CardPicker'
 import ListingsTab from '@/components/marketplace/ListingsTab'
 import IntroModal from '@/components/marketplace/IntroModal'
+import BulkBatchesStrip from '@/components/marketplace/BulkBatchesStrip'
+import OAuthModal from '@/components/marketplace/OAuthModal'
 
 type PageState = 'loading' | 'guest' | 'no-cards' | 'connect' | 'marketplace' | 'error'
 type TabId = 'list' | 'active' | 'sold' | 'ended'
@@ -77,6 +81,17 @@ export default function InstalistMarketplaceTab() {
   const [syncState, setSyncState] = useState<SyncState>({ kind: 'idle' })
   const syncInFlight = useRef(false)
 
+  // ─── Bulk listing ─────────────────────────────────────────────────────
+  // There is no client feature flag on mobile, so availability is probed
+  // (a cheap batches list; 404 = the server flag is off). False simply hides
+  // every bulk affordance and leaves the single-card flow untouched.
+  const [bulkAvailable, setBulkAvailable] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  /** Bumped once a batch is started — tells the picker to leave selection mode. */
+  const [selectionResetKey, setSelectionResetKey] = useState(0)
+  const [startingBatch, setStartingBatch] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
+
   // ─── Hardware back on Android — only intercept for OAuth modal ────────
   // As a tab screen the default back behavior (exit app) is fine; we only
   // need to dismiss the OAuth modal cleanly when it's open.
@@ -119,7 +134,10 @@ export default function InstalistMarketplaceTab() {
         return
       }
 
-      // Fully provisioned — pull dashboard data
+      // Fully provisioned — pull dashboard data. The bulk probe rides along
+      // unawaited: it must never delay (or fail) the marketplace render.
+      probeBulkAvailable().then(setBulkAvailable).catch(() => setBulkAvailable(false))
+
       const [statsRes, listingsRes] = await Promise.all([
         fetchMarketplaceStats(),
         fetchMyListings(),
@@ -249,6 +267,56 @@ export default function InstalistMarketplaceTab() {
     router.push({ pathname: '/pages/ebay-list', params: { cardId: card.id } })
   }, [router])
 
+  // ─── Bulk selection + batch creation ──────────────────────────────────
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+    setBatchError(null)
+  }, [])
+
+  const selectAllVisible = useCallback((ids: string[]) => {
+    setSelectedIds(new Set(ids))
+    setBatchError(null)
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+    setBatchError(null)
+  }, [])
+
+  const startBatch = useCallback(async () => {
+    if (selectedIds.size === 0 || startingBatch) return
+    setStartingBatch(true)
+    setBatchError(null)
+    try {
+      // No settings: the server seeds the batch from the seller's saved
+      // listing defaults, which is what they'd expect to get anyway.
+      const result = await createBatch(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setSelectionResetKey(k => k + 1)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      router.push({ pathname: '/pages/ebay-bulk', params: { batchId: result.batchId } })
+    } catch (err) {
+      if (err instanceof BulkApiError) {
+        // The routes author their own seller-facing copy; only the bare
+        // feature-gate 404 ("Not found") needs translating into something a
+        // seller can act on.
+        setBatchError(
+          err.status === 404 && err.body?.error === 'Not found'
+            ? 'Bulk listing is not switched on for your account yet.'
+            : err.message,
+        )
+      } else {
+        setBatchError('Could not start the batch. Please try again.')
+      }
+    } finally {
+      setStartingBatch(false)
+    }
+  }, [selectedIds, startingBatch, router])
+
   const handleRelist = useCallback((cardId: string) => {
     router.push({ pathname: '/pages/ebay-list', params: { cardId } })
   }, [router])
@@ -363,15 +431,51 @@ export default function InstalistMarketplaceTab() {
       {/* Active tab content */}
       <View style={styles.tabContent}>
         {activeTab === 'list' && (
-          <CardPicker
-            cards={cards}
-            truncated={cardsTruncated}
-            searchInFlight={pickerSearchInFlight}
-            onSelect={handlePickCard}
-            onRefresh={refreshAll}
-            refreshing={refreshing}
-            onSearchQueryChange={handlePickerSearchQueryChange}
-          />
+          <>
+            {bulkAvailable && <BulkBatchesStrip />}
+            <CardPicker
+              cards={cards}
+              truncated={cardsTruncated}
+              searchInFlight={pickerSearchInFlight}
+              onSelect={handlePickCard}
+              onRefresh={refreshAll}
+              refreshing={refreshing}
+              onSearchQueryChange={handlePickerSearchQueryChange}
+              selectable={bulkAvailable}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelected}
+              selectionLimit={MAX_BULK_ITEMS}
+              onSelectAllVisible={selectAllVisible}
+              onClearSelection={clearSelection}
+              selectionResetKey={selectionResetKey}
+            />
+            {batchError && (
+              <View style={styles.batchErrorBanner}>
+                <Text style={styles.batchErrorText}>{batchError}</Text>
+              </View>
+            )}
+            {selectedIds.size > 0 && (
+              <View style={[styles.batchBar, { paddingBottom: 12 + Math.max(insets.bottom, 4) }]}>
+                <TouchableOpacity
+                  style={[styles.batchBtn, startingBatch && styles.batchBtnDisabled]}
+                  onPress={startBatch}
+                  disabled={startingBatch}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`List ${selectedIds.size} selected cards on eBay`}
+                >
+                  {startingBatch
+                    ? <ActivityIndicator size="small" color={Colors.white} />
+                    : <Ionicons name="pricetags" size={18} color={Colors.white} />}
+                  <Text style={styles.batchBtnText}>
+                    {startingBatch
+                      ? 'Preparing…'
+                      : `List ${selectedIds.size} card${selectedIds.size === 1 ? '' : 's'}`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
         {activeTab === 'active' && (
           <ListingsTab
@@ -400,41 +504,6 @@ export default function InstalistMarketplaceTab() {
         )}
       </View>
     </View>
-  )
-}
-
-// ───────────────────── OAuth modal (extracted) ─────────────────────
-
-function OAuthModal({
-  visible, url, insets, onClose, onNavStateChange,
-}: {
-  visible: boolean
-  url: string
-  insets: number
-  onClose: () => void
-  onNavStateChange: (n: WebViewNavigation) => void
-}) {
-  if (!url) return null
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.oauthHeader, { paddingTop: insets + 6 }]}>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
-          <Ionicons name="close" size={26} color={Colors.gray[700]} />
-        </TouchableOpacity>
-        <Text style={styles.oauthTitle}>Sign in to eBay</Text>
-        <View style={{ width: 26 }} />
-      </View>
-      <WebView
-        source={{ uri: url }}
-        onNavigationStateChange={onNavStateChange}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.oauthLoading}>
-            <ActivityIndicator size="large" color={Colors.purple[600]} />
-          </View>
-        )}
-      />
-    </Modal>
   )
 }
 
@@ -481,12 +550,22 @@ const styles = StyleSheet.create({
 
   tabContent: { flex: 1 },
 
-  oauthHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 12,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1, borderBottomColor: Colors.gray[200],
+  batchErrorBanner: {
+    backgroundColor: Colors.red[50],
+    borderTopWidth: 1, borderTopColor: Colors.red[100],
+    paddingHorizontal: 12, paddingVertical: 8,
   },
-  oauthTitle: { fontSize: 15, fontWeight: '700', color: Colors.gray[900] },
-  oauthLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  batchErrorText: { fontSize: 12, color: Colors.red[700], lineHeight: 17 },
+  batchBar: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1, borderTopColor: Colors.gray[200],
+    paddingHorizontal: 12, paddingTop: 10,
+  },
+  batchBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.purple[600],
+    borderRadius: 12, paddingVertical: 14,
+  },
+  batchBtnDisabled: { opacity: 0.6 },
+  batchBtnText: { fontSize: 15, fontWeight: '800', color: Colors.white },
 })

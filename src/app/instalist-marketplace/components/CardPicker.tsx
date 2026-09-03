@@ -7,6 +7,16 @@ type SortKey = 'recent' | 'name' | 'grade' | 'value';
 interface Props {
   cards: MarketplaceCard[];
   onSelect: (card: MarketplaceCard) => void;
+  /**
+   * Bulk listing (feature-flagged). When on, each row grows a checkbox and
+   * the parent renders a "List N cards" action bar. The single-card path is
+   * untouched: clicking the row body still opens the EbayListingModal.
+   */
+  selectionEnabled?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  /** Hard cap; ticking past it is refused rather than silently truncated. */
+  selectionLimit?: number;
 }
 
 /**
@@ -18,7 +28,14 @@ interface Props {
  * consumes), so we use card.card_name, card.conversational_whole_grade,
  * card.front_url, etc. directly.
  */
-export default function CardPicker({ cards, onSelect }: Props) {
+export default function CardPicker({
+  cards,
+  onSelect,
+  selectionEnabled = false,
+  selectedIds,
+  onSelectionChange,
+  selectionLimit = 100,
+}: Props) {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sort, setSort] = useState<SortKey>('recent');
@@ -105,6 +122,57 @@ export default function CardPicker({ cards, onSelect }: Props) {
     return sorted;
   }, [localMatches, serverResults, q, categoryFilter, sort]);
 
+  // ------------------------------- selection -------------------------------
+
+  const selected = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
+  // Anchor for shift-click ranges, in the CURRENTLY FILTERED order — which is
+  // what the user sees, so a range means what it looks like even after a
+  // search or a re-sort.
+  const anchorIndex = useRef<number | null>(null);
+  const [limitHit, setLimitHit] = useState(false);
+
+  const toggleAt = useCallback(
+    (index: number, shiftKey: boolean) => {
+      if (!onSelectionChange) return;
+      const next = new Set(selectedIds ?? []);
+      const card = filtered[index];
+      if (!card) return;
+      const turningOn = !next.has(card.id);
+
+      const from = shiftKey && anchorIndex.current !== null ? anchorIndex.current : index;
+      const [lo, hi] = from <= index ? [from, index] : [index, from];
+      for (let i = lo; i <= hi; i++) {
+        const id = filtered[i]?.id;
+        if (!id) continue;
+        if (turningOn) next.add(id);
+        else next.delete(id);
+      }
+      anchorIndex.current = index;
+
+      if (next.size > selectionLimit) {
+        setLimitHit(true);
+        setTimeout(() => setLimitHit(false), 4000);
+        return;
+      }
+      onSelectionChange(Array.from(next));
+    },
+    [filtered, onSelectionChange, selectedIds, selectionLimit]
+  );
+
+  const selectAllVisible = useCallback(() => {
+    if (!onSelectionChange) return;
+    const next = new Set(selectedIds ?? []);
+    for (const card of filtered) {
+      if (next.size >= selectionLimit) break;
+      next.add(card.id);
+    }
+    if (filtered.length + (selectedIds?.length ?? 0) > selectionLimit) {
+      setLimitHit(true);
+      setTimeout(() => setLimitHit(false), 4000);
+    }
+    onSelectionChange(Array.from(next));
+  }, [filtered, onSelectionChange, selectedIds, selectionLimit]);
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
       <div className="p-4 border-b border-gray-200 space-y-3">
@@ -143,12 +211,40 @@ export default function CardPicker({ cards, onSelect }: Props) {
         </div>
       </div>
 
-      <div className="p-3 text-xs text-gray-500 border-b border-gray-100">
-        {filtered.length} {filtered.length === 1 ? 'card' : 'cards'} ready to list
-        {serverSearching && (
-          <span className="ml-2 text-indigo-600">Searching your full collection&hellip;</span>
+      <div className="p-3 text-xs text-gray-500 border-b border-gray-100 flex items-center justify-between gap-2">
+        <span>
+          {filtered.length} {filtered.length === 1 ? 'card' : 'cards'} ready to list
+          {serverSearching && (
+            <span className="ml-2 text-indigo-600">Searching your full collection&hellip;</span>
+          )}
+        </span>
+        {selectionEnabled && filtered.length > 0 && (
+          <span className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={selectAllVisible}
+              className="text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              Select all
+            </button>
+            {selected.size > 0 && (
+              <button
+                type="button"
+                onClick={() => onSelectionChange?.([])}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Clear
+              </button>
+            )}
+          </span>
         )}
       </div>
+
+      {selectionEnabled && limitHit && (
+        <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+          A batch holds at most {selectionLimit} cards. Publish this batch, then start another.
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="p-8 text-center">
@@ -161,11 +257,23 @@ export default function CardPicker({ cards, onSelect }: Props) {
         // 640px scroll trap is a known mobile anti-pattern. On lg screens
         // we cap it so the right-side explainer panel stays visible.
         <ul className="divide-y divide-gray-100 lg:max-h-[640px] lg:overflow-y-auto">
-          {filtered.map(card => (
-            <li key={card.id}>
+          {filtered.map((card, index) => (
+            <li key={card.id} className={`flex items-center ${selected.has(card.id) ? 'bg-indigo-50' : ''}`}>
+              {selectionEnabled && (
+                <label className="pl-3 py-3 flex items-center cursor-pointer">
+                  <span className="sr-only">Select {card.card_name ?? 'card'}</span>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(card.id)}
+                    onChange={() => { /* handled on click so shift state is available */ }}
+                    onClick={e => toggleAt(index, (e as React.MouseEvent).shiftKey)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </label>
+              )}
               <button
                 onClick={() => onSelect(card)}
-                className="w-full flex items-center gap-3 p-3 hover:bg-indigo-50 text-left transition-colors"
+                className="flex-1 min-w-0 flex items-center gap-3 p-3 hover:bg-indigo-50 text-left transition-colors"
               >
                 <div className="flex-shrink-0 w-12 h-16 bg-gray-100 rounded overflow-hidden">
                   {card.front_url ? (

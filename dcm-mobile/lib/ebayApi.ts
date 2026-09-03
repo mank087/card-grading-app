@@ -250,7 +250,32 @@ export async function createListing(data: CreateListingRequest): Promise<CreateL
 export interface ListingDefaultsRow {
   descriptionTemplate: string | null
   shippingDefaults: Record<string, unknown> | null
+  /**
+   * Grade brand for the title tail — an enterprise store's name, so a Kings
+   * Kards slab titles as "… Kings Kards 9". null means the built-in "DCM".
+   */
+  titleGradeLabel?: string | null
+  /**
+   * Business policies (eBay Phase 3). PERSONAL SCOPE ONLY — see the guard in
+   * resolveActiveListingDefaults. A business policy lives on ONE eBay account
+   * and eBay connections are per user, so a store owner's policy ids do not
+   * exist on a member's account; sending them would fail every member listing.
+   * The server already nulls these on the org row (src/app/api/ebay/
+   * listing-defaults/route.ts); mobile strips them again on the way in.
+   */
+  useBusinessPolicies?: boolean
+  defaultShippingPolicyId?: string | null
+  defaultReturnPolicyId?: string | null
+  defaultPaymentPolicyId?: string | null
 }
+
+/** The business-policy keys that may never survive an org-scope resolve. */
+const ORG_FORBIDDEN_POLICY_FIELDS = {
+  useBusinessPolicies: false,
+  defaultShippingPolicyId: null,
+  defaultReturnPolicyId: null,
+  defaultPaymentPolicyId: null,
+} as const
 
 export interface ListingDefaultsResponse {
   personal: ListingDefaultsRow | null
@@ -279,14 +304,54 @@ export async function getListingDefaults(): Promise<ListingDefaultsResponse | nu
  * Pick the defaults row that applies to a card, mirroring the web modal's
  * cross-org guard: the org row applies only when the CALLER's org is also the
  * CARD's org; otherwise personal.
+ *
+ * Business-policy fields are ALWAYS stripped from the org row, never merged
+ * from personal into it. eBay business policies belong to a single eBay
+ * account and DCM's eBay connections are per user, so a store's saved policy
+ * ids are meaningless — and rejected — on a member's own account. Nothing on
+ * mobile consumes these fields yet; the guard exists so the first thing that
+ * does cannot get them from the wrong scope by accident.
  */
 export function resolveActiveListingDefaults(
   defaults: ListingDefaultsResponse | null,
   cardOrgId: string | null | undefined
 ): ListingDefaultsRow | null {
   if (!defaults) return null
-  if (cardOrgId && defaults.orgId === cardOrgId && defaults.org) return defaults.org
+  if (cardOrgId && defaults.orgId === cardOrgId && defaults.org) {
+    return { ...defaults.org, ...ORG_FORBIDDEN_POLICY_FIELDS }
+  }
   return defaults.personal ?? null
+}
+
+/**
+ * Save the caller's PERSONAL shipping defaults (PUT /api/ebay/listing-defaults).
+ *
+ * Personal scope only, and `scope` is sent explicitly rather than relying on
+ * the route's default: an org member's listing may READ the org row (see
+ * resolveActiveListingDefaults), but mobile must never write it — org defaults
+ * are the store owner's to set, on the web settings tab.
+ *
+ * The blob must use the WEB modal's key names (SHIPPING_VALIDATORS in
+ * src/app/api/ebay/listing-defaults/route.ts); unknown keys and invalid values
+ * are silently dropped server-side, and the saved blob REPLACES the previous
+ * one, so callers send the whole thing, not a patch.
+ */
+export async function saveListingDefaults(
+  payload: { shippingDefaults: Record<string, unknown> }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const headers = await getAuthHeaders()
+    const res = await fetch(`${API_BASE}/api/ebay/listing-defaults`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ scope: 'personal', ...payload }),
+    })
+    if (res.ok) return { ok: true }
+    const body = await res.json().catch(() => ({} as { error?: string }))
+    return { ok: false, message: body?.error || 'Could not save your defaults. Please try again.' }
+  } catch {
+    return { ok: false, message: 'Could not reach DCM. Check your connection and try again.' }
+  }
 }
 
 // TWIN: src/lib/ebay/tradingApi.ts RETIRED_DOMESTIC_SERVICES /
@@ -383,6 +448,20 @@ export const SHIPPING_SERVICES = [
 
 /** Default domestic service (web parity: DEFAULT_DOMESTIC_SHIPPING_SERVICE). */
 export const DEFAULT_SHIPPING_SERVICE = 'USPSGroundAdvantage'
+
+// TWIN LIST: src/lib/ebay/tradingApi.ts INTERNATIONAL_SHIPPING_SERVICES — same
+// rule as the domestic list above, these are Trading API tokens and an invalid
+// one is rejected at AddItem time. Used by the BULK batch settings sheet, which
+// exposes the international service the single-card wizard leaves implicit.
+export const INTERNATIONAL_SHIPPING_SERVICES = [
+  { value: 'USPSPriorityMailInternational', label: 'USPS Priority Mail International' },
+  { value: 'USPSFirstClassMailInternational', label: 'USPS First Class Mail International' },
+  { value: 'USPSPriorityMailExpressInternational', label: 'USPS Priority Mail Express International' },
+  { value: 'UPSWorldWideExpedited', label: 'UPS Worldwide Expedited' },
+  { value: 'UPSWorldWideExpress', label: 'UPS Worldwide Express' },
+  { value: 'FedExInternationalEconomy', label: 'FedEx International Economy' },
+  { value: 'FedExInternationalPriority', label: 'FedEx International Priority' },
+]
 
 // eBay requires GTC (Good 'Til Cancelled) for fixed-price listings — day-based
 // durations only apply to auctions (web parity: GTC only for Buy It Now).

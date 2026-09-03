@@ -18,12 +18,16 @@ import {
   checkDisclaimer, acceptDisclaimer, getOAuthUrl, EbayApiError,
   SHIPPING_SERVICES,
   DEFAULT_SHIPPING_SERVICE,
-  getListingDefaults, resolveActiveListingDefaults, normalizeShippingService,
+  getListingDefaults, saveListingDefaults, resolveActiveListingDefaults, normalizeShippingService,
   FIXED_PRICE_DURATION_OPTIONS, AUCTION_DURATION_OPTIONS, ALL_DURATION_OPTIONS,
   type EbayConnectionStatus, type CreateListingRequest, type ImageUploadResult,
 } from '@/lib/ebayApi'
 import { buildEbayTitleFromCard } from '@/lib/ebayTitleBuilder'
+import { findBlockedGrader } from '@/lib/ebayGradingCompanyBlocklist'
 import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
+import {
+  DISCLAIMER_SECTIONS, DISCLAIMER_VERSION_LINE, DISCLAIMER_INTRO, DISCLAIMER_CONSENT,
+} from '@/lib/ebayDisclaimer'
 import { resolveCardValue } from '@/lib/resolveCardValue'
 
 import MobileTabBar from '@/components/MobileTabBar'
@@ -32,6 +36,75 @@ import AppHeaderBar from '@/components/AppHeaderBar'
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 type Step = 'connect' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error'
+
+/**
+ * Columns this screen actually reads: the title/description field resolver
+ * (lib/ebayListingFields.ts), the price resolver, the org guard and the two
+ * image paths. Mirrors the web's DRAFT_CARD_COLUMNS in src/lib/ebay/
+ * bulkService.ts — and, like it, deliberately excludes every heavy blob
+ * (ai_grading, conversational_corners_edges_surface, …). `select('*')` used to
+ * drag hundreds of KB of grading JSON over the wire for four title tokens.
+ */
+const LISTING_CARD_COLUMNS = [
+  'id', 'user_id', 'card_name', 'category', 'sub_category', 'serial',
+  'front_path', 'back_path', 'org_id', 'org_serial_display',
+  'conversational_whole_grade', 'conversational_decimal_grade',
+  'conversational_condition_label', 'conversational_card_info',
+  'conversational_sub_scores', 'conversational_weighted_sub_scores',
+  'conversational_final_grade_summary', 'dvg_whole_grade', 'dvg_decimal_grade',
+  'dcm_price_estimate', 'dcm_cached_prices', 'ebay_price_median',
+  'scryfall_price_usd', 'scryfall_price_usd_foil',
+  'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
+  'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',
+  'autograph_type', 'memorabilia_type', 'rookie_card', 'first_print_rookie',
+  'holofoil', 'is_foil', 'foil_type', 'is_double_faced', 'mtg_rarity',
+  'is_enchanted', 'manufacturer', 'custom_label_data',
+].join(',')
+
+/** Height of the (script-free, self-scrolling) description preview box. */
+const DESCRIPTION_PREVIEW_HEIGHT = 420
+
+/** One eBay item specific. `required` is eBay's own aspect constraint. */
+type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
+
+/**
+ * Coerce whatever the prep-page bridge sent into ItemSpecific rows. The prep
+ * page is a separate deployment: a build may add fields (eBay's `required`
+ * aspect constraint), send them in a different shape, or send none at all, and
+ * none of that may crash the wizard.
+ */
+function normalizeItemSpecifics(raw: unknown): ItemSpecific[] {
+  if (!Array.isArray(raw)) return []
+  const out: ItemSpecific[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const name = typeof (entry as any).name === 'string' ? (entry as any).name.trim() : ''
+    if (!name) continue
+    const rawValue = (entry as any).value
+    const value: string | string[] = Array.isArray(rawValue)
+      ? rawValue.filter((v: unknown) => typeof v === 'string')
+      : typeof rawValue === 'string'
+        ? rawValue
+        : rawValue === null || rawValue === undefined
+          ? ''
+          : String(rawValue)
+    out.push({
+      name,
+      value,
+      required: (entry as any).required === true,
+      // Only an explicit false locks a row — an older page omits the flag.
+      editable: (entry as any).editable !== false,
+    })
+  }
+  return out
+}
+
+/** Required specifics eBay still needs a value for. Web twin: EbayListingModal's `missingRequired`. */
+function missingRequiredSpecifics(specs: ItemSpecific[]): ItemSpecific[] {
+  return specs.filter(s =>
+    s.required && (Array.isArray(s.value) ? s.value.length === 0 : !(s.value || '').trim())
+  )
+}
 
 const STEP_LABELS: Record<Step, string> = {
   connect: '1. Connect & Images',
@@ -44,42 +117,9 @@ const STEP_LABELS: Record<Step, string> = {
   error: 'Error',
 }
 
-// eBay listing Terms & Conditions — mirrors the web modal's disclaimer
-// (src/components/ebay/EbayListingModal.tsx). Last updated: January 2026 | v1.0
-const DISCLAIMER_SECTIONS: { heading: string; body: string }[] = [
-  {
-    heading: '1. DCM is Not a Party to Your eBay Transactions',
-    body: 'DCM Grading provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.',
-  },
-  {
-    heading: '2. No Liability for eBay Transactions',
-    body: 'DCM shall not be held liable for any disputes, claims, damages, losses, or issues arising from your eBay listings or sales, including but not limited to: buyer complaints, return requests, refund disputes, shipping issues, payment problems, listing violations, account suspensions, or any other matters related to your eBay activity.',
-  },
-  {
-    heading: '3. Grading Opinions',
-    body: 'DCM grades represent our professional assessment of card condition at the time of grading. Grades are opinions and are not guarantees of value, authenticity, or future market performance. Buyers may have different opinions regarding condition, and you are responsible for handling any disputes that may arise.',
-  },
-  {
-    heading: '4. Your Responsibilities',
-    body: 'You are solely responsible for: the accuracy of all listing information (titles, descriptions, prices, shipping terms); compliance with eBay’s terms of service, listing policies, and all applicable laws; handling all buyer communications, shipping, returns, and refunds; any fees, taxes, or costs associated with your eBay sales; and ensuring you have the legal right to sell the items you list.',
-  },
-  {
-    heading: '5. Indemnification',
-    body: 'You agree to indemnify, defend, and hold harmless DCM, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, costs, or expenses (including reasonable attorneys’ fees) arising from or related to your use of this eBay listing feature or any eBay transactions.',
-  },
-  {
-    heading: '6. eBay Account',
-    body: 'You are responsible for maintaining your eBay account in good standing. DCM is not responsible for any actions eBay may take against your account, including but not limited to listing removals, selling restrictions, or account suspensions.',
-  },
-  {
-    heading: '7. Service Availability',
-    body: 'DCM provides this listing feature "as is" and makes no guarantees regarding its availability, accuracy, or functionality. DCM may modify, suspend, or discontinue this feature at any time without notice.',
-  },
-  {
-    heading: '8. Governing Law',
-    body: 'These terms shall be governed by and construed in accordance with applicable laws. Any disputes shall be resolved through binding arbitration or in the courts of competent jurisdiction.',
-  },
-]
+// eBay listing Terms & Conditions live in lib/ebayDisclaimer.ts — the bulk
+// screen shows the identical gate, and two copies of the same eight legal
+// paragraphs is how they drift apart.
 
 export default function EbayListScreen() {
   const router = useRouter()
@@ -119,6 +159,11 @@ export default function EbayListScreen() {
 
   // Step 2: Details
   const [title, setTitle] = useState('')
+  // The last title THIS screen generated. A generated title may be replaced by
+  // a better one (the enterprise grade label, or the prep page's own build);
+  // a title the seller typed never is. Comparing against this ref is how we
+  // tell the two apart — web parity with EbayListingModal's defaultTitle check.
+  const autoTitleRef = useRef('')
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
   const [listingFormat, setListingFormat] = useState<'FIXED_PRICE' | 'AUCTION'>('FIXED_PRICE')
@@ -126,10 +171,10 @@ export default function EbayListScreen() {
   const [duration, setDuration] = useState('GTC')
   // Default to rendered preview — matches the web's UX
   const [showDescriptionPreview, setShowDescriptionPreview] = useState(true)
-  const [descriptionPreviewHeight, setDescriptionPreviewHeight] = useState(400)
+  // Fixed height: the preview WebView runs with JavaScript disabled (see the
+  // render below), so it can no longer measure and report its own content.
 
   // Step 3: Specifics
-  type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
   const [itemSpecifics, setItemSpecifics] = useState<ItemSpecific[]>([])
 
   // Certificate of Analysis (uploaded to eBay as a regulatory document by the prep WebView)
@@ -154,6 +199,32 @@ export default function EbayListScreen() {
     returnShipping: 'BUYER' as 'BUYER' | 'SELLER',
   })
 
+  // "Save as my defaults" (web parity: EbayListingModal's saveListingDefaults).
+  // savedShippingBlob is the PERSONAL saved blob as last read or written — it
+  // both carries forward the web-only keys mobile has no field for and backs
+  // the review step's "Saved as default" line.
+  const [savedShippingBlob, setSavedShippingBlob] = useState<Record<string, unknown> | null>(null)
+  const [savingDefaults, setSavingDefaults] = useState(false)
+  const [defaultsSavedFlash, setDefaultsSavedFlash] = useState(false)
+  // Timer behind the 4s "Saved" flash. Held in a ref so it can be cancelled if
+  // the screen unmounts (or the seller saves twice) — a setState against an
+  // unmounted screen is a leak and, on a fast second save, the first timer
+  // would clear the second flash early.
+  const savedFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (savedFlashTimerRef.current) clearTimeout(savedFlashTimerRef.current)
+  }, [])
+
+  // Seller opted into eBay business policies (PERSONAL row only — a policy
+  // belongs to one eBay account and connections are per user, so an org row's
+  // ids are meaningless here; resolveActiveListingDefaults strips them). When
+  // on, eBay refuses inline shipping/returns alongside the policies, so this
+  // screen collapses the shipping step to the two things a policy can't carry:
+  // the ship-from ZIP and the package size. The server applies the saved policy
+  // ids itself (publishCardListing's policyPrefs branch), so mobile sends no
+  // `policies` — it has no picker for them.
+  const [useBusinessPolicies, setUseBusinessPolicies] = useState(false)
+
   // Step 5: Result
   const [listingResult, setListingResult] = useState<any>(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -165,6 +236,13 @@ export default function EbayListScreen() {
   // True when the last publish failure was an eBay auth problem (401 /
   // "refresh eBay authorization") — shows a Reconnect CTA on the error step.
   const [isAuthError, setIsAuthError] = useState(false)
+  // Set when the last publish failure is one the seller fixes back on the
+  // Details step — the server's 400s for a blocked grading company in the
+  // title, a link/URL in the title, or a link/URL in the description. All
+  // three used to dead-end on the error screen with only "Try Again", which
+  // retries the exact payload that just failed. Carries the CTA label so the
+  // button names the field to go and fix.
+  const [errorEditTarget, setErrorEditTarget] = useState<{ label: string; step: Step } | null>(null)
   // Set when the Reconnect CTA opens the OAuth modal so a successful
   // reconnect returns the user straight to the review step.
   const returnToReviewAfterOAuth = useRef(false)
@@ -178,6 +256,24 @@ export default function EbayListScreen() {
   // legacy protocol (one giant 'images-ready' message) is still handled — a
   // new app binary can hit an old cached prep page.
   const chunkedImagesRef = useRef<Record<string, string>>({})
+
+  // Watchdog for the hidden prep WebView. It can load and then never post
+  // anything back (a wedged canvas, a page that threw before the bridge, a
+  // dead network mid-render), and the wizard sat on "Generating images…"
+  // forever with no way out. 90s is well past the slowest real run.
+  const PREP_TIMEOUT_MS = 90_000
+  const prepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Bumped by the Retry button: a new key remounts the hidden WebView, which
+  // re-runs the prep page from scratch (onLoadStart re-arms the watchdog).
+  const [prepAttempt, setPrepAttempt] = useState(0)
+  const clearPrepTimeout = useCallback(() => {
+    if (prepTimeoutRef.current) {
+      clearTimeout(prepTimeoutRef.current)
+      prepTimeoutRef.current = null
+    }
+  }, [])
+  // Unmount: never leave the timer running against a gone screen.
+  useEffect(() => clearPrepTimeout, [clearPrepTimeout])
 
   // Duplicate-listing pre-check — blocks the wizard when the card already
   // has an active/pending eBay listing (the server would 409 at publish).
@@ -193,10 +289,23 @@ export default function EbayListScreen() {
   useEffect(() => {
     if (!cardId) { setIsLoading(false); return }
     (async () => {
-      const { data } = await supabase.from('cards').select('*').eq('id', cardId).single()
+      // Narrow column list (see LISTING_CARD_COLUMNS). A deployment where the
+      // app ships ahead of the schema would 42703 on an unknown column — fall
+      // back to the old wide select rather than showing "Card not found".
+      // (Typed as any: the column list is a joined constant, so supabase-js
+      // can't infer a row shape from it.)
+      const narrow = await supabase.from('cards').select(LISTING_CARD_COLUMNS).eq('id', cardId).single()
+      let data: any = narrow.data
+      if (narrow.error && (narrow.error as any).code === '42703') {
+        console.warn('[ebay-list] narrow column list rejected, falling back:', narrow.error.message)
+        const wide = await supabase.from('cards').select('*').eq('id', cardId).single()
+        data = wide.data
+      }
       if (data) {
         setCard(data)
-        setTitle(buildEbayTitleFromCard(data))
+        const generated = buildEbayTitleFromCard(data)
+        autoTitleRef.current = generated
+        setTitle(generated)
         // Seed the price from the card's resolved market value (user-editable, seed once)
         const resolved = resolveCardValue(data)
         if (resolved.value > 0) setPrice(prev => prev || resolved.value.toFixed(2))
@@ -261,6 +370,29 @@ export default function EbayListScreen() {
     getListingDefaults().then(defaults => {
       if (stale) return
       const active = resolveActiveListingDefaults(defaults, card.org_id)
+
+      // Enterprise grade label for the title tail ("… Kings Kards 9"). Only
+      // re-render the title while it is still the generated one — never
+      // clobber a title the seller has edited.
+      if (active?.titleGradeLabel) {
+        const relabelled = buildEbayTitleFromCard(card, active.titleGradeLabel)
+        setTitle(prev => {
+          if (prev !== autoTitleRef.current) return prev
+          autoTitleRef.current = relabelled
+          return relabelled
+        })
+      }
+
+      // Remember the PERSONAL blob (never the org one — mobile only ever
+      // writes personal) so a save can carry forward the keys mobile has no
+      // field for, and the review step can tell "this is already my default".
+      const personalSaved = defaults?.personal?.shippingDefaults
+      setSavedShippingBlob(personalSaved && typeof personalSaved === 'object' ? personalSaved : null)
+
+      // Business policies: PERSONAL row only, never the org row — see the state
+      // declaration. `active` is deliberately not consulted here.
+      setUseBusinessPolicies(defaults?.personal?.useBusinessPolicies === true)
+
       const saved = active?.shippingDefaults
       if (!saved || typeof saved !== 'object') return
 
@@ -319,6 +451,149 @@ export default function EbayListScreen() {
     // is fine — it's set once per screen load.
   }, [session, card])
 
+  // ─── Save as my defaults ───
+  // The blob written back uses the WEB modal's key names and types (the server's
+  // SHIPPING_VALIDATORS), so the same row round-trips between platforms. Mobile's
+  // form is all strings with shorter names, hence the explicit mapping — the
+  // mirror image of the load-merge above, and the same mapping the publish
+  // payload does. Keys mobile has no field for (international shipping type,
+  // ship-to locations, international returns) are carried forward from the saved
+  // blob rather than dropped: a PUT REPLACES shipping_defaults, so anything not
+  // sent would silently erase what the seller set on the web.
+  const shippingDefaultsPayload = useMemo(() => {
+    // Package size + ship-from ZIP are the only fields the policies layout
+    // still shows, so they are the only ones it may overwrite. Everything else
+    // falls into `carriedForward` below and survives the PUT untouched —
+    // saving from the collapsed step must not erase the rate/returns defaults
+    // this seller set on the web before turning policies on.
+    const alwaysManaged: Record<string, unknown> = {
+      postalCode: shipping.postalCode,
+      packageWeightOz: parseInt(shipping.weightOz) || 4,
+      packageLengthIn: parseInt(shipping.lengthIn) || 10,
+      packageWidthIn: parseInt(shipping.widthIn) || 6,
+      packageDepthIn: parseInt(shipping.depthIn) || 1,
+    }
+    const managed: Record<string, unknown> = useBusinessPolicies
+      ? alwaysManaged
+      : {
+          shippingType: shipping.shippingType,
+          domesticShippingService: shipping.domesticService,
+          flatRateAmount: parseFloat(shipping.flatRate) || 5,
+          handlingDays: parseInt(shipping.handlingDays) || 1,
+          ...alwaysManaged,
+          offerInternational: shipping.offerInternational,
+          internationalShippingService: shipping.intlService,
+          internationalFlatRateCost: parseFloat(shipping.intlFlatRate) || 15,
+          domesticReturnsAccepted: shipping.returnsAccepted,
+          domesticReturnPeriodDays: parseInt(shipping.returnPeriod) || 30,
+          domesticReturnShippingPaidBy: shipping.returnShipping,
+          bestOfferEnabled,
+        }
+    const carriedForward: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(savedShippingBlob || {})) {
+      if (!(k in managed)) carriedForward[k] = v
+    }
+    return { managed, blob: { ...carriedForward, ...managed } }
+  }, [shipping, bestOfferEnabled, savedShippingBlob, useBusinessPolicies])
+
+  /**
+   * International keys the saved blob may hold that mobile has no field for.
+   * The web modal sets them; mobile only carries them forward on a SAVE (see
+   * shippingDefaultsPayload) and, until now, dropped them at publish — so a
+   * seller who configured "flat-rate international to Canada/UK, 30-day
+   * international returns paid by the buyer" on the web got eBay's stock
+   * calculated-worldwide/no-returns terms whenever they listed from the phone.
+   *
+   * Only the keys the server's CreateListingRequest actually accepts are
+   * lifted (src/lib/ebay/publishCardListing.ts), each validated to the shape
+   * that type declares — the blob is free-form JSON and a bad value would
+   * reach eBay's XML. Mobile's own fields (offerInternational, the service and
+   * the flat-rate cost) are NOT in here: those have UI, so they stay
+   * authoritative and this spread can never overwrite them.
+   */
+  const carriedForwardIntl = useMemo(() => {
+    const blob = savedShippingBlob
+    if (!blob) return null
+    const out: {
+      internationalShippingType?: 'FLAT_RATE' | 'CALCULATED'
+      internationalShipToLocations?: string[]
+      internationalReturnsAccepted?: boolean
+      internationalReturnPeriodDays?: number
+      internationalReturnShippingPaidBy?: 'BUYER' | 'SELLER'
+    } = {}
+    if (blob.internationalShippingType === 'FLAT_RATE' || blob.internationalShippingType === 'CALCULATED') {
+      out.internationalShippingType = blob.internationalShippingType
+    }
+    if (Array.isArray(blob.internationalShipToLocations)) {
+      const locations = blob.internationalShipToLocations.filter(
+        (l: unknown): l is string => typeof l === 'string' && l.trim().length > 0
+      )
+      if (locations.length > 0) out.internationalShipToLocations = locations
+    }
+    if (typeof blob.internationalReturnsAccepted === 'boolean') {
+      out.internationalReturnsAccepted = blob.internationalReturnsAccepted
+    }
+    if (typeof blob.internationalReturnPeriodDays === 'number' && Number.isFinite(blob.internationalReturnPeriodDays)) {
+      out.internationalReturnPeriodDays = blob.internationalReturnPeriodDays
+    }
+    if (blob.internationalReturnShippingPaidBy === 'BUYER' || blob.internationalReturnShippingPaidBy === 'SELLER') {
+      out.internationalReturnShippingPaidBy = blob.internationalReturnShippingPaidBy
+    }
+    return Object.keys(out).length > 0 ? out : null
+  }, [savedShippingBlob])
+
+  /**
+   * One line naming the carried-forward international terms, so the review step
+   * shows what will actually be sent rather than leaving the seller to assume
+   * mobile's visible fields are the whole story.
+   */
+  const carriedForwardIntlSummary = useMemo(() => {
+    if (!carriedForwardIntl) return null
+    const parts: string[] = []
+    if (carriedForwardIntl.internationalShipToLocations) {
+      parts.push(`Ships to ${carriedForwardIntl.internationalShipToLocations.join(', ')}`)
+    }
+    if (carriedForwardIntl.internationalShippingType) {
+      parts.push(carriedForwardIntl.internationalShippingType === 'FLAT_RATE' ? 'flat rate' : 'calculated')
+    }
+    if (carriedForwardIntl.internationalReturnsAccepted === true) {
+      const days = carriedForwardIntl.internationalReturnPeriodDays ?? 30
+      const paidBy = carriedForwardIntl.internationalReturnShippingPaidBy === 'SELLER' ? 'seller' : 'buyer'
+      parts.push(`${days}-day international returns, ${paidBy} pays return shipping`)
+    } else if (carriedForwardIntl.internationalReturnsAccepted === false) {
+      parts.push('no international returns')
+    }
+    if (parts.length === 0) return null
+    return `From your saved web defaults: ${parts.join(' · ')}`
+  }, [carriedForwardIntl])
+
+  // Review-step indicator: true when every field this screen owns already
+  // matches the saved blob (the carried-forward keys are equal by construction).
+  const shippingMatchesSavedDefaults = useMemo(() => {
+    if (!savedShippingBlob) return false
+    return Object.entries(shippingDefaultsPayload.managed).every(
+      ([k, v]) => savedShippingBlob[k] === v
+    )
+  }, [savedShippingBlob, shippingDefaultsPayload])
+
+  const handleSaveShippingDefaults = useCallback(async () => {
+    setSavingDefaults(true)
+    const blob = shippingDefaultsPayload.blob
+    const result = await saveListingDefaults({ shippingDefaults: blob })
+    setSavingDefaults(false)
+    if (result.ok) {
+      setSavedShippingBlob(blob)
+      setDefaultsSavedFlash(true)
+      if (savedFlashTimerRef.current) clearTimeout(savedFlashTimerRef.current)
+      savedFlashTimerRef.current = setTimeout(() => {
+        savedFlashTimerRef.current = null
+        setDefaultsSavedFlash(false)
+      }, 4000)
+    } else {
+      Alert.alert('Could not save defaults', result.message)
+    }
+  }, [shippingDefaultsPayload])
+
   // ─── Disclaimer status — checked once the eBay connection exists ───
   useEffect(() => {
     if (!ebayStatus?.connected) return
@@ -364,28 +639,91 @@ export default function EbayListScreen() {
   // ─── Prep WebView completion ───
   // Shared by both bridge protocols: applies the generated images + metadata
   // (description, item specifics, CoA document id) once everything arrived.
+  // Every field except the images is read DEFENSIVELY: an older cached prep
+  // page sends only { description, itemSpecifics, regulatoryDocumentId }, a
+  // newer one may also send `title` and specifics carrying eBay's `required`
+  // flag. Anything missing falls back to what this screen already computed.
   const applyPrepResult = useCallback((
     images: Record<string, string>,
-    meta: { description?: string; itemSpecifics?: any[]; regulatoryDocumentId?: string | null },
+    meta: {
+      description?: string
+      title?: string
+      itemSpecifics?: unknown
+      regulatoryDocumentId?: string | null
+    },
   ) => {
+    clearPrepTimeout()
     setImageUrls(images)
     setImagesReady(true)
     setImagesGenerating(false)
     if (meta.description) setDescription(prev => prev || meta.description!)
-    if (Array.isArray(meta.itemSpecifics)) setItemSpecifics(prev => (prev.length === 0 ? meta.itemSpecifics! : prev))
+
+    // The prep page builds its title from the same twin algorithm plus the
+    // seller's saved grade label, so prefer it — but only while the field is
+    // still exactly what we generated. A seller's own edit always wins.
+    if (typeof meta.title === 'string' && meta.title.trim()) {
+      // By CODE POINT: slicing a UTF-16 string at 80 can split a surrogate
+      // pair (an emoji, some CJK) and leave half a character in the title.
+      const prepTitle = Array.from(meta.title.trim()).slice(0, 80).join('')
+      setTitle(prev => {
+        if (prev !== autoTitleRef.current) return prev
+        autoTitleRef.current = prepTitle
+        return prepTitle
+      })
+    }
+
+    // Specifics: normalize whatever arrived, then MERGE rather than replace —
+    // a required row that arrives after the seller has typed into the step must
+    // not wipe their edits, and rows they filled must survive.
+    const incoming = normalizeItemSpecifics(meta.itemSpecifics)
+    if (incoming.length > 0) {
+      setItemSpecifics(prev => {
+        if (prev.length === 0) return incoming
+        const byName = new Map(prev.map(s => [s.name.toLowerCase(), s] as const))
+        const merged = prev.map(s => {
+          const match = incoming.find(i => i.name.toLowerCase() === s.name.toLowerCase())
+          if (!match) return s
+          // Keep the seller's value; adopt the newer required/editable metadata.
+          // An EMPTY existing value is not an edit worth protecting, though —
+          // a blank row the prep page can now fill (Parallel/Variety, Season)
+          // used to stay blank forever because the merge always won.
+          const existingIsEmpty = Array.isArray(s.value)
+            ? s.value.filter(v => typeof v === 'string' && v.trim()).length === 0
+            : !(typeof s.value === 'string' && s.value.trim())
+          const incomingHasValue = Array.isArray(match.value)
+            ? match.value.filter(v => typeof v === 'string' && v.trim()).length > 0
+            : !!(typeof match.value === 'string' && match.value.trim())
+          return {
+            ...s,
+            value: existingIsEmpty && incomingHasValue ? match.value : s.value,
+            required: match.required ?? s.required,
+            editable: match.editable ?? s.editable,
+          }
+        })
+        for (const spec of incoming) {
+          if (!byName.has(spec.name.toLowerCase())) merged.push(spec)
+        }
+        return merged
+      })
+    }
+
     if (meta.regulatoryDocumentId) setRegulatoryDocumentId(meta.regulatoryDocumentId)
-  }, [])
+  }, [clearPrepTimeout])
 
   // ─── Image order helpers ───
   // Initialize order once system images are ready
   useEffect(() => {
     if (imagesReady && imageOrder.length === 0) {
+      // Default gallery order — labelled front first (it becomes eBay's main
+      // photo, which drives click-through), then labelled back, the raw card,
+      // and the mini report last. Web twin: DEFAULT_IMAGE_ORDER in
+      // src/components/ebay/EbayListingModal.tsx. Reorderable below.
       setImageOrder([
         { kind: 'system', key: 'front' },
         { kind: 'system', key: 'back' },
-        { kind: 'system', key: 'miniReport' },
         { kind: 'system', key: 'rawFront' },
         { kind: 'system', key: 'rawBack' },
+        { kind: 'system', key: 'miniReport' },
       ])
     }
   }, [imagesReady, imageOrder.length])
@@ -479,13 +817,48 @@ export default function EbayListScreen() {
     }
   }, [])
 
+  // ─── Derived validation ───
+  // A rival grading company in the title is a 400 `blocked_grader_title` at
+  // publish (src/lib/ebay/publishCardListing.ts). The generated title can never
+  // contain one — the builder strips them — so this only ever fires on a title
+  // the seller edited. Catch it on the Details step instead of eight taps later.
+  const blockedGraderInTitle = useMemo(() => findBlockedGrader(title), [title])
+  // Counted by CODE POINT, like the slice above: eBay's 80 is characters, and
+  // an emoji is one character, not the two UTF-16 units `.length` reports.
+  const titleLength = useMemo(() => Array.from(title).length, [title])
+  // Required specifics with no value. These can arrive from the prep page AFTER
+  // the seller walked past the Specifics step, so Review re-checks (web parity).
+  const missingRequired = useMemo(() => missingRequiredSpecifics(itemSpecifics), [itemSpecifics])
+  /** Publish is blocked on anything the server would reject anyway. */
+  const canPublish = missingRequired.length === 0 && !blockedGraderInTitle && title.trim().length > 0
+
   // ─── Publish listing ───
   const handlePublish = useCallback(async () => {
     if (!card) return
     if (publishingRef.current) return
+    // Both of these are also enforced server-side (400 blocked_grader_title /
+    // eBay's own aspect validation). Stopping here saves a full image upload
+    // pass and names the fix instead of showing a raw API error.
+    if (blockedGraderInTitle) {
+      Alert.alert(
+        'Title names another grading company',
+        `eBay listings can't name "${blockedGraderInTitle}". Edit the title on the Listing Details step and try again.`,
+        [{ text: 'Edit Title', onPress: () => setStep('details') }, { text: 'Cancel', style: 'cancel' }],
+      )
+      return
+    }
+    if (missingRequired.length > 0) {
+      Alert.alert(
+        'Required fields missing',
+        `eBay needs a value for: ${missingRequired.map(s => s.name).join(', ')}`,
+        [{ text: 'Fill them in', onPress: () => setStep('specifics') }, { text: 'Cancel', style: 'cancel' }],
+      )
+      return
+    }
     publishingRef.current = true
     setIsPublishing(true)
     setIsAuthError(false)
+    setErrorEditTarget(null)
     setStep('publishing')
 
     try {
@@ -592,7 +965,14 @@ export default function EbayListScreen() {
         domesticReturnsAccepted: shipping.returnsAccepted,
         domesticReturnPeriodDays: parseInt(shipping.returnPeriod) || 30,
         domesticReturnShippingPaidBy: shipping.returnShipping,
+        // Default when nothing was carried forward. The spread below may
+        // replace it (and add the ship-to list / international return terms)
+        // from the seller's saved web defaults — only while international
+        // shipping is actually on, since the server ignores the whole block
+        // otherwise. No `policies` is ever sent: mobile has no policy picker,
+        // and the server applies the seller's saved ids for them.
         internationalReturnsAccepted: false,
+        ...(shipping.offerInternational && carriedForwardIntl ? carriedForwardIntl : {}),
         // Attach Certificate of Analysis as eBay regulatory document if generation+upload succeeded
         regulatoryDocumentIds: regulatoryDocumentId ? [regulatoryDocumentId] : undefined,
       }
@@ -622,25 +1002,50 @@ export default function EbayListScreen() {
       if (status === 401 || /refresh eBay authorization/i.test(message)) {
         setIsAuthError(true)
       }
-      setErrorMessage(message)
+      // The 400s a seller fixes by editing a field. The route returns the human
+      // sentence as `error` ("Title can't name another grading company
+      // (\"PSA\")…", "eBay doesn't allow web addresses… in a listing title."),
+      // so the message is already readable — what it lacks is a way back to the
+      // field. Matched on the sentence as well as the code because
+      // publishCardListing's simpleFailure bodies carry only `error`, not the
+      // PublishErrorCode.
+      const linkComplaint = /web addresses, links or email addresses/i.test(message)
+      if (status === 400 && (/blocked_grader_title/i.test(message) || /grading company/i.test(message))) {
+        setErrorEditTarget({ label: 'Edit Title', step: 'details' })
+      } else if (status === 400 && (/link_in_title/i.test(message) || (linkComplaint && /listing title/i.test(message)))) {
+        setErrorEditTarget({ label: 'Edit Title', step: 'details' })
+      } else if (status === 400 && (/link_in_description/i.test(message) || (linkComplaint && /listing description/i.test(message)))) {
+        setErrorEditTarget({ label: 'Edit Description', step: 'details' })
+      } else {
+        setErrorEditTarget(null)
+      }
+      setErrorMessage(
+        /blocked_grader_title/i.test(message) && !/grading company/i.test(message)
+          ? "eBay listings can't name another grading company. Edit the title and try again."
+          : /link_in_title/i.test(message) && !linkComplaint
+            ? "eBay doesn't allow web addresses, links or email addresses in a listing title. Remove it and try again."
+            : /link_in_description/i.test(message) && !linkComplaint
+              ? "eBay doesn't allow web addresses, links or email addresses in a listing description. Remove it and try again."
+              : message
+      )
       setStep('error')
     } finally {
       publishingRef.current = false
       setIsPublishing(false)
       setPublishProgress('')
     }
-  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping, regulatoryDocumentId, readAdditionalImageAsDataUrl])
+  }, [card, cardId, title, blockedGraderInTitle, missingRequired, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping, carriedForwardIntl, regulatoryDocumentId, readAdditionalImageAsDataUrl])
 
   // ─── Navigation helpers ───
   const canGoNext = useMemo(() => {
     switch (step) {
       case 'connect': return ebayStatus?.connected
-      case 'details': return title.trim().length > 0 && parseFloat(price) > 0
+      case 'details': return title.trim().length > 0 && title.length <= 80 && !blockedGraderInTitle && parseFloat(price) > 0
       case 'specifics': return true
       case 'shipping': return shipping.postalCode.length >= 5
       default: return false
     }
-  }, [step, ebayStatus, title, price, shipping.postalCode])
+  }, [step, ebayStatus, title, blockedGraderInTitle, price, shipping.postalCode])
 
   const nextStep = useCallback(() => {
     const order: Step[] = ['connect', 'details', 'specifics', 'shipping', 'review']
@@ -796,6 +1201,12 @@ export default function EbayListScreen() {
                   <View style={[st.imageGenStatus, { borderColor: Colors.red[500], backgroundColor: Colors.red[50] }]}>
                     <Ionicons name="warning" size={14} color={Colors.red[600]} />
                     <Text style={[st.imageGenStatusText, { color: Colors.red[600] }]} numberOfLines={3}>{imagesError}</Text>
+                    <TouchableOpacity
+                      onPress={() => { setImagesError(null); setPrepAttempt(n => n + 1) }}
+                      hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                    >
+                      <Text style={{ color: Colors.purple[600], fontWeight: '600' }}>Retry</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
                 {imagesReady && (() => {
@@ -910,6 +1321,7 @@ export default function EbayListScreen() {
         {ebayStatus?.connected && session?.access_token && cardId && !imagesReady && (
           <View pointerEvents="none" style={st.hiddenWebViewWrapper}>
             <WebView
+              key={`prep-${prepAttempt}`}
               source={{
                 // bridge=2 asks the prep page for the chunked protocol (one
                 // message per image). Old cached pages ignore the param and
@@ -918,7 +1330,17 @@ export default function EbayListScreen() {
               }}
               originWhitelist={['*']}
               javaScriptEnabled
-              onLoadStart={() => { setImagesGenerating(true); setImagesError(null); chunkedImagesRef.current = {} }}
+              onLoadStart={() => {
+                setImagesGenerating(true)
+                setImagesError(null)
+                chunkedImagesRef.current = {}
+                clearPrepTimeout()
+                prepTimeoutRef.current = setTimeout(() => {
+                  prepTimeoutRef.current = null
+                  setImagesError('Image generation timed out.')
+                  setImagesGenerating(false)
+                }, PREP_TIMEOUT_MS)
+              }}
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data)
@@ -935,12 +1357,14 @@ export default function EbayListScreen() {
                     // cached prep page).
                     applyPrepResult(msg.images, msg)
                   } else if (msg.type === 'error') {
+                    clearPrepTimeout()
                     setImagesError(msg.message || 'Failed to generate images')
                     setImagesGenerating(false)
                   }
                 } catch {}
               }}
               onError={(syntheticEvent) => {
+                clearPrepTimeout()
                 setImagesError(syntheticEvent.nativeEvent?.description || 'WebView load error')
                 setImagesGenerating(false)
               }}
@@ -954,8 +1378,26 @@ export default function EbayListScreen() {
             <Text style={st.sectionTitle}>Listing Details</Text>
 
             <Text style={st.fieldLabel}>Title (max 80 chars)</Text>
-            <TextInput style={st.input} value={title} onChangeText={t => setTitle(t.substring(0, 80))} maxLength={80} />
-            <Text style={st.charCount}>{title.length}/80</Text>
+            <TextInput
+              style={[st.input, !!blockedGraderInTitle && { borderColor: Colors.red[500] }]}
+              value={title}
+              onChangeText={t => setTitle(Array.from(t).slice(0, 80).join(''))}
+              maxLength={80}
+            />
+            <Text style={[st.charCount, titleLength >= 80 && { color: Colors.amber[600], fontWeight: '700' }]}>
+              {titleLength}/80
+            </Text>
+            {/* Client-side twin of the server's 400 blocked_grader_title gate. */}
+            {!!blockedGraderInTitle && (
+              <View style={st.titleErrorBox}>
+                <Ionicons name="alert-circle" size={14} color={Colors.red[600]} />
+                <Text style={st.titleErrorText}>
+                  eBay listings can&apos;t name another grading company. Remove &quot;{blockedGraderInTitle}&quot; from
+                  the title — a graded-card title naming a rival grader reads as a grade-equivalence claim and eBay
+                  pulls the listing.
+                </Text>
+              </View>
+            )}
 
             <Text style={st.fieldLabel}>Price ($)</Text>
             <TextInput style={st.input} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={Colors.gray[400]} />
@@ -1023,36 +1465,33 @@ export default function EbayListScreen() {
                 : 'Edit the HTML directly. Tap "Preview" to see how it will render on eBay.'}
             </Text>
             {description.length > 0 && showDescriptionPreview ? (
-              <View style={[st.descriptionPreviewBox, { height: descriptionPreviewHeight }]}>
+              <>
+              <View style={[st.descriptionPreviewBox, { height: DESCRIPTION_PREVIEW_HEIGHT }]}>
+                {/* SECURITY: this renders listing HTML that is editable in the
+                    field above and partly built from model output, inside an
+                    app that holds a live Supabase session. Scripts are OFF and
+                    the whitelist allows nothing but the inlined document, so a
+                    <script> or an onerror= in the description cannot run or
+                    navigate anywhere. That also costs the old JS height probe:
+                    the box is a fixed height the reader scrolls instead. */}
                 <WebView
-                  originWhitelist={['*']}
+                  originWhitelist={['about:blank']}
+                  javaScriptEnabled={false}
+                  domStorageEnabled={false}
+                  allowFileAccess={false}
+                  setSupportMultipleWindows={false}
+                  // Nothing may leave this box — no navigation, no popups.
+                  onShouldStartLoadWithRequest={(req) => req.url === 'about:blank' || req.url.startsWith('data:')}
                   source={{
-                    html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:8px;font-family:-apple-system,Roboto,sans-serif;background:#fff;}img{max-width:100%;height:auto;}</style></head><body>${description}<script>
-                      function postHeight(){
-                        var h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-                        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({type:'height',value:h}));
-                      }
-                      window.addEventListener('load', postHeight);
-                      window.addEventListener('resize', postHeight);
-                      // Re-measure after images load
-                      setTimeout(postHeight, 200);
-                      setTimeout(postHeight, 800);
-                    <\/script></body></html>`,
-                  }}
-                  onMessage={(e) => {
-                    try {
-                      const msg = JSON.parse(e.nativeEvent.data)
-                      if (msg.type === 'height' && typeof msg.value === 'number') {
-                        // +24px buffer to avoid clipping the last line
-                        const next = Math.ceil(msg.value) + 24
-                        setDescriptionPreviewHeight(prev => (Math.abs(prev - next) > 4 ? next : prev))
-                      }
-                    } catch {}
+                    html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:8px;font-family:-apple-system,Roboto,sans-serif;background:#fff;}img{max-width:100%;height:auto;}</style></head><body>${description}</body></html>`,
                   }}
                   style={{ flex: 1, backgroundColor: 'transparent' }}
-                  scrollEnabled={false}
+                  scrollEnabled
+                  nestedScrollEnabled
                 />
               </View>
+              <Text style={st.helperText}>Scroll inside the preview to see the whole description.</Text>
+              </>
             ) : (
               <TextInput
                 style={[st.input, { minHeight: 140, textAlignVertical: 'top' as const, fontSize: 10, fontFamily: 'SpaceMono' }]}
@@ -1073,6 +1512,19 @@ export default function EbayListScreen() {
             <Text style={{ fontSize: 11, color: Colors.gray[500], marginBottom: 12 }}>
               Pre-filled from your card data. Required fields are marked with *. Tap any field to edit.
             </Text>
+            {/* Readiness message — web parity with EbayListingModal's Review
+                banner. eBay's required aspects can arrive from the prep page
+                after this step first rendered, so name them out loud instead
+                of failing at publish. */}
+            {missingRequired.length > 0 && (
+              <View style={st.requiredBanner}>
+                <Ionicons name="alert-circle" size={16} color={Colors.amber[600]} />
+                <Text style={st.requiredBannerText}>
+                  eBay requires {missingRequired.length === 1 ? 'one more field' : `${missingRequired.length} more fields`} before
+                  this can be published: {missingRequired.map(s => s.name).join(', ')}
+                </Text>
+              </View>
+            )}
             {itemSpecifics.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 20 }}>
                 {imagesGenerating
@@ -1116,30 +1568,49 @@ export default function EbayListScreen() {
           <View style={st.section}>
             <Text style={st.sectionTitle}>Shipping</Text>
 
-            <Text style={st.fieldLabel}>Shipping Type</Text>
-            <View style={st.segmentRow}>
-              {(['FREE', 'FLAT_RATE', 'CALCULATED'] as const).map(t => (
-                <TouchableOpacity key={t} style={[st.segment, shipping.shippingType === t && st.segmentActive]} onPress={() => setShipping(p => ({ ...p, shippingType: t }))}>
-                  <Text style={[st.segmentText, shipping.shippingType === t && st.segmentTextActive]}>{t === 'FLAT_RATE' ? 'Flat Rate' : t === 'FREE' ? 'Free' : 'Calculated'}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={st.fieldLabel}>Shipping Service</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {SHIPPING_SERVICES.map(s => (
-                  <TouchableOpacity key={s.value} style={[st.chip, shipping.domesticService === s.value && st.chipActive]} onPress={() => setShipping(p => ({ ...p, domesticService: s.value }))}>
-                    <Text style={[st.chipText, shipping.domesticService === s.value && st.chipTextActive]}>{s.label}</Text>
-                  </TouchableOpacity>
-                ))}
+            {/* Business-policy sellers: eBay refuses inline shipping/returns
+                alongside the saved policies, so every rate, returns and
+                international input below is hidden and the server applies the
+                seller's policy ids. Only the ZIP and the package size are
+                still asked for — a policy carries neither. */}
+            {useBusinessPolicies && (
+              <View style={st.policyNoteBox}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={Colors.purple[700]} />
+                <Text style={st.policyNoteText}>
+                  Using your eBay business policies (set on the web). Your saved shipping, returns and payment
+                  policies apply to this listing — just confirm where it ships from and how big the package is.
+                </Text>
               </View>
-            </ScrollView>
+            )}
 
-            {shipping.shippingType === 'FLAT_RATE' && (
+            {!useBusinessPolicies && (
               <>
-                <Text style={st.fieldLabel}>Flat Rate ($)</Text>
-                <TextInput style={st.input} value={shipping.flatRate} onChangeText={v => setShipping(p => ({ ...p, flatRate: v }))} keyboardType="decimal-pad" />
+                <Text style={st.fieldLabel}>Shipping Type</Text>
+                <View style={st.segmentRow}>
+                  {(['FREE', 'FLAT_RATE', 'CALCULATED'] as const).map(t => (
+                    <TouchableOpacity key={t} style={[st.segment, shipping.shippingType === t && st.segmentActive]} onPress={() => setShipping(p => ({ ...p, shippingType: t }))}>
+                      <Text style={[st.segmentText, shipping.shippingType === t && st.segmentTextActive]}>{t === 'FLAT_RATE' ? 'Flat Rate' : t === 'FREE' ? 'Free' : 'Calculated'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={st.fieldLabel}>Shipping Service</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {SHIPPING_SERVICES.map(s => (
+                      <TouchableOpacity key={s.value} style={[st.chip, shipping.domesticService === s.value && st.chipActive]} onPress={() => setShipping(p => ({ ...p, domesticService: s.value }))}>
+                        <Text style={[st.chipText, shipping.domesticService === s.value && st.chipTextActive]}>{s.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                {shipping.shippingType === 'FLAT_RATE' && (
+                  <>
+                    <Text style={st.fieldLabel}>Flat Rate ($)</Text>
+                    <TextInput style={st.input} value={shipping.flatRate} onChangeText={v => setShipping(p => ({ ...p, flatRate: v }))} keyboardType="decimal-pad" />
+                  </>
+                )}
               </>
             )}
 
@@ -1160,8 +1631,13 @@ export default function EbayListScreen() {
             />
             <Text style={st.helperText}>Required by eBay for shipping calculations.</Text>
 
-            <Text style={st.fieldLabel}>Handling Days</Text>
-            <TextInput style={st.input} value={shipping.handlingDays} onChangeText={v => setShipping(p => ({ ...p, handlingDays: v }))} keyboardType="number-pad" />
+            {/* Handling time is part of a shipping business policy. */}
+            {!useBusinessPolicies && (
+              <>
+                <Text style={st.fieldLabel}>Handling Days</Text>
+                <TextInput style={st.input} value={shipping.handlingDays} onChangeText={v => setShipping(p => ({ ...p, handlingDays: v }))} keyboardType="number-pad" />
+              </>
+            )}
 
             <Text style={[st.sectionTitle, { marginTop: 16 }]}>Package Dimensions</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1185,33 +1661,70 @@ export default function EbayListScreen() {
               </View>
             </View>
 
-            <View style={[st.switchRow, { marginTop: 16 }]}>
-              <Text style={st.switchLabel}>Offer International Shipping</Text>
-              <Switch value={shipping.offerInternational} onValueChange={v => setShipping(p => ({ ...p, offerInternational: v }))} />
-            </View>
+            {!useBusinessPolicies && (
+              <>
+                <View style={[st.switchRow, { marginTop: 16 }]}>
+                  <Text style={st.switchLabel}>Offer International Shipping</Text>
+                  <Switch value={shipping.offerInternational} onValueChange={v => setShipping(p => ({ ...p, offerInternational: v }))} />
+                </View>
+                {/* Terms mobile has no field for but carries from the web —
+                    named here so the seller isn't surprised at review. */}
+                {shipping.offerInternational && !!carriedForwardIntlSummary && (
+                  <Text style={st.helperText}>{carriedForwardIntlSummary}</Text>
+                )}
 
-            <Text style={[st.sectionTitle, { marginTop: 16 }]}>Returns</Text>
-            <View style={st.switchRow}>
-              <Text style={st.switchLabel}>Accept Returns</Text>
-              <Switch value={shipping.returnsAccepted} onValueChange={v => setShipping(p => ({ ...p, returnsAccepted: v }))} />
-            </View>
-            {shipping.returnsAccepted && (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.fieldLabel}>Return Period (days)</Text>
-                  <TextInput style={st.input} value={shipping.returnPeriod} onChangeText={v => setShipping(p => ({ ...p, returnPeriod: v }))} keyboardType="number-pad" />
+                <Text style={[st.sectionTitle, { marginTop: 16 }]}>Returns</Text>
+                <View style={st.switchRow}>
+                  <Text style={st.switchLabel}>Accept Returns</Text>
+                  <Switch value={shipping.returnsAccepted} onValueChange={v => setShipping(p => ({ ...p, returnsAccepted: v }))} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.fieldLabel}>Return Shipping</Text>
-                  <View style={st.segmentRow}>
-                    {(['BUYER', 'SELLER'] as const).map(w => (
-                      <TouchableOpacity key={w} style={[st.segment, shipping.returnShipping === w && st.segmentActive]} onPress={() => setShipping(p => ({ ...p, returnShipping: w }))}>
-                        <Text style={[st.segmentText, shipping.returnShipping === w && st.segmentTextActive]}>{w}</Text>
-                      </TouchableOpacity>
-                    ))}
+                {shipping.returnsAccepted && (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.fieldLabel}>Return Period (days)</Text>
+                      <TextInput style={st.input} value={shipping.returnPeriod} onChangeText={v => setShipping(p => ({ ...p, returnPeriod: v }))} keyboardType="number-pad" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.fieldLabel}>Return Shipping</Text>
+                      <View style={st.segmentRow}>
+                        {(['BUYER', 'SELLER'] as const).map(w => (
+                          <TouchableOpacity key={w} style={[st.segment, shipping.returnShipping === w && st.segmentActive]} onPress={() => setShipping(p => ({ ...p, returnShipping: w }))}>
+                            <Text style={[st.segmentText, shipping.returnShipping === w && st.segmentTextActive]}>{w}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
+                )}
+              </>
+            )}
+
+            {/* Save as my defaults — web parity with the modal's
+                "Save as my shipping defaults". Personal scope only; the next
+                listing picks these up from the mount fetch above. Gated on a
+                usable ZIP for the same reason Next is: eBay rejects the rest. */}
+            <View style={st.saveDefaultsRow}>
+              <TouchableOpacity
+                style={[st.saveDefaultsBtn, (savingDefaults || shipping.postalCode.length < 5) && st.saveDefaultsBtnDisabled]}
+                disabled={savingDefaults || shipping.postalCode.length < 5}
+                onPress={handleSaveShippingDefaults}
+              >
+                {savingDefaults
+                  ? <ActivityIndicator size="small" color={Colors.purple[700]} />
+                  : <Ionicons name="bookmark-outline" size={14} color={shipping.postalCode.length < 5 ? Colors.gray[400] : Colors.purple[700]} />}
+                <Text style={[st.saveDefaultsBtnText, (savingDefaults || shipping.postalCode.length < 5) && st.saveDefaultsBtnTextDisabled]}>
+                  {savingDefaults ? 'Saving…' : 'Save as my defaults'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {useBusinessPolicies && (
+              <Text style={[st.helperText, { textAlign: 'right' }]}>
+                Saves your ship-from ZIP and package size only — your rate and returns terms come from your eBay
+                business policies.
+              </Text>
+            )}
+            {defaultsSavedFlash && (
+              <Text style={st.saveDefaultsFlash}>Saved — future listings start from these</Text>
             )}
           </View>
         )}
@@ -1220,6 +1733,40 @@ export default function EbayListScreen() {
         {step === 'review' && (
           <View style={st.section}>
             <Text style={st.sectionTitle}>Review Your Listing</Text>
+
+            {/* Missing required specifics — say it out loud and offer the way
+                back, exactly like the web modal's Review banner. */}
+            {missingRequired.length > 0 && (
+              <View style={st.requiredBanner}>
+                <Ionicons name="alert-circle" size={16} color={Colors.amber[600]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={st.requiredBannerText}>
+                    eBay requires {missingRequired.length === 1 ? 'one more field' : `${missingRequired.length} more fields`} before
+                    this can be published: {missingRequired.map(s => s.name).join(', ')}
+                  </Text>
+                  <TouchableOpacity style={st.requiredBannerBtn} onPress={() => setStep('specifics')}>
+                    <Text style={st.requiredBannerBtnText}>
+                      Go back and fill {missingRequired.length === 1 ? 'it' : 'them'} in
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* An edited title naming a rival grader is a 400 at publish. */}
+            {!!blockedGraderInTitle && (
+              <View style={st.titleErrorBox}>
+                <Ionicons name="alert-circle" size={14} color={Colors.red[600]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={st.titleErrorText}>
+                    The title names another grading company (&quot;{blockedGraderInTitle}&quot;). eBay won&apos;t accept it.
+                  </Text>
+                  <TouchableOpacity style={st.requiredBannerBtn} onPress={() => setStep('details')}>
+                    <Text style={st.requiredBannerBtnText}>Edit the title</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             <View style={st.reviewBox}>
               <Text style={st.reviewLabel}>Title</Text>
@@ -1238,9 +1785,25 @@ export default function EbayListScreen() {
               <Text style={st.reviewValue}>{ALL_DURATION_OPTIONS.find(d => d.value === duration)?.label || duration}</Text>
             </View>
             <View style={st.reviewBox}>
-              <Text style={st.reviewLabel}>Shipping</Text>
-              <Text style={st.reviewValue}>{shipping.shippingType === 'FREE' ? 'Free Shipping' : shipping.shippingType === 'FLAT_RATE' ? `Flat Rate $${shipping.flatRate}` : 'Calculated'}</Text>
+              <Text style={st.reviewLabel}>{useBusinessPolicies ? 'Shipping & returns' : 'Shipping'}</Text>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                {useBusinessPolicies ? (
+                  <Text style={st.reviewValue}>your eBay business policies</Text>
+                ) : (
+                  <Text style={st.reviewValue}>{shipping.shippingType === 'FREE' ? 'Free Shipping' : shipping.shippingType === 'FLAT_RATE' ? `Flat Rate $${shipping.flatRate}` : 'Calculated'}</Text>
+                )}
+                {shippingMatchesSavedDefaults && <Text style={st.reviewSubValue}>Saved as default</Text>}
+              </View>
             </View>
+            {/* International terms mobile has no field for but WILL send —
+                carried forward from the seller's saved web defaults. Hidden
+                under business policies: the policy supplies them instead. */}
+            {!useBusinessPolicies && shipping.offerInternational && !!carriedForwardIntlSummary && (
+              <View style={st.reviewBox}>
+                <Text style={st.reviewLabel}>International</Text>
+                <Text style={st.reviewValue}>{carriedForwardIntlSummary}</Text>
+              </View>
+            )}
             <View style={st.reviewBox}>
               <Text style={st.reviewLabel}>Images</Text>
               <Text style={st.reviewValue}>
@@ -1274,16 +1837,14 @@ export default function EbayListScreen() {
                   Please review and accept before listing on eBay.
                 </Text>
                 <ScrollView style={st.disclaimerScroll} nestedScrollEnabled>
-                  <Text style={st.disclaimerIntro}>
-                    By using DCM's eBay listing feature, you acknowledge and agree to the following:
-                  </Text>
+                  <Text style={st.disclaimerIntro}>{DISCLAIMER_INTRO}</Text>
                   {DISCLAIMER_SECTIONS.map(section => (
                     <View key={section.heading} style={{ marginBottom: 10 }}>
                       <Text style={st.disclaimerHeading}>{section.heading}</Text>
                       <Text style={st.disclaimerBody}>{section.body}</Text>
                     </View>
                   ))}
-                  <Text style={st.disclaimerVersion}>Last updated: January 2026 | Version 1.0</Text>
+                  <Text style={st.disclaimerVersion}>{DISCLAIMER_VERSION_LINE}</Text>
                 </ScrollView>
                 <TouchableOpacity
                   style={st.disclaimerCheckRow}
@@ -1295,9 +1856,7 @@ export default function EbayListScreen() {
                     size={22}
                     color={disclaimerChecked ? Colors.purple[600] : Colors.gray[400]}
                   />
-                  <Text style={st.disclaimerCheckText}>
-                    I have read and agree to the terms and conditions above. I understand that DCM is not responsible for any transactions that occur on eBay.
-                  </Text>
+                  <Text style={st.disclaimerCheckText}>{DISCLAIMER_CONSENT}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[st.primaryBtn, { marginTop: 12 }, (!disclaimerChecked || isAcceptingDisclaimer) && { opacity: 0.4 }]}
@@ -1314,7 +1873,11 @@ export default function EbayListScreen() {
             )}
 
             {disclaimerStatus === 'accepted' && (
-              <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={handlePublish} disabled={isPublishing}>
+              <TouchableOpacity
+                style={[st.primaryBtn, { marginTop: 16 }, (isPublishing || !canPublish) && { opacity: 0.4 }]}
+                onPress={handlePublish}
+                disabled={isPublishing || !canPublish}
+              >
                 {isPublishing ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -1361,6 +1924,15 @@ export default function EbayListScreen() {
             <Ionicons name="alert-circle" size={64} color={Colors.red[500]} />
             <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.red[600], marginTop: 12 }}>Listing Failed</Text>
             <Text style={{ fontSize: 12, color: Colors.gray[600], marginTop: 8, textAlign: 'center' }}>{errorMessage}</Text>
+            {errorEditTarget && (
+              <TouchableOpacity
+                style={[st.primaryBtn, { marginTop: 16 }]}
+                onPress={() => { const target = errorEditTarget; setErrorEditTarget(null); setStep(target.step) }}
+              >
+                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Text style={st.primaryBtnText}>{errorEditTarget.label}</Text>
+              </TouchableOpacity>
+            )}
             {isAuthError && (
               <TouchableOpacity
                 style={[st.primaryBtn, { marginTop: 16 }]}
@@ -1376,10 +1948,10 @@ export default function EbayListScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={isAuthError ? [st.navBtnBack, { marginTop: 12 }] : [st.primaryBtn, { marginTop: 16 }]}
+              style={(isAuthError || errorEditTarget) ? [st.navBtnBack, { marginTop: 12 }] : [st.primaryBtn, { marginTop: 16 }]}
               onPress={() => setStep('review')}
             >
-              <Text style={isAuthError ? st.navBtnBackText : st.primaryBtnText}>Try Again</Text>
+              <Text style={(isAuthError || errorEditTarget) ? st.navBtnBackText : st.primaryBtnText}>Try Again</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1394,7 +1966,9 @@ export default function EbayListScreen() {
           <Text style={st.navHintText}>
             {step === 'shipping'
               ? 'Enter your ship-from ZIP code above to continue'
-              : 'Enter a title and price to continue'}
+              : blockedGraderInTitle
+                ? `Remove "${blockedGraderInTitle}" from the title to continue`
+                : 'Enter a title and price to continue'}
           </Text>
         </View>
       )}
@@ -1493,6 +2067,27 @@ const st = StyleSheet.create({
   reviewBox: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
   reviewLabel: { fontSize: 12, color: Colors.gray[500], fontWeight: '600' },
   reviewValue: { fontSize: 12, color: Colors.gray[800], fontWeight: '500', flex: 1, textAlign: 'right' },
+  reviewSubValue: { fontSize: 10, color: Colors.purple[700], fontWeight: '600', marginTop: 2 },
+
+  // Save as my defaults (shipping step)
+  saveDefaultsRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
+  saveDefaultsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50] },
+  saveDefaultsBtnDisabled: { borderColor: Colors.gray[200], backgroundColor: Colors.gray[50] },
+  saveDefaultsBtnText: { fontSize: 12, fontWeight: '600', color: Colors.purple[700] },
+  saveDefaultsBtnTextDisabled: { color: Colors.gray[400] },
+  saveDefaultsFlash: { fontSize: 11, color: Colors.green[600], fontWeight: '600', textAlign: 'right', marginTop: 6 },
+
+  // Business-policy note (shipping step)
+  policyNoteBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200] },
+  policyNoteText: { fontSize: 11, color: Colors.purple[700], flex: 1, lineHeight: 15 },
+
+  // Blocked-grader title error + missing required specifics
+  titleErrorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.red[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.red[500] },
+  titleErrorText: { fontSize: 11, color: Colors.red[600], flex: 1, lineHeight: 15 },
+  requiredBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.amber[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.amber[500] },
+  requiredBannerText: { fontSize: 11, color: Colors.amber[600], flex: 1, lineHeight: 15 },
+  requiredBannerBtn: { marginTop: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.amber[500] },
+  requiredBannerBtnText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   // Warning banner (previous listing)
   warnBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.amber[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.amber[100], marginBottom: 12 },

@@ -13,7 +13,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint:ci": "eslint src/lib src/app/api",
-    "check:twin-drift": "npx tsx scripts/check-twin-drift.ts"
+    "check:twin-drift": "npx tsx scripts/check-twin-drift.ts",
+    "check:ebay-titles": "npx tsx scripts/ebay-title-snapshot.ts",
+    "check:ebay-xml": "npx tsx scripts/ebay-xml-snapshot.ts",
+    "check:ebay-bulk": "npx tsx scripts/ebay-bulk-input-snapshot.ts"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

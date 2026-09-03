@@ -150,6 +150,15 @@ export interface ReportCardData {
 
 interface CardGradingReportProps {
   cardData: ReportCardData;
+  /**
+   * Marketplace mode. The CoA is uploaded to eBay as a regulatory document,
+   * and an eBay listing must never name another grading company ANYWHERE —
+   * the same rule the title and description builders enforce. Set this and the
+   * report omits the "Estimated Professional Grading Equivalency" grid and the
+   * footer sentence that names PSA/BGS/SGC/CGC. The in-app and emailed CoA
+   * keeps both.
+   */
+  marketplaceSafe?: boolean;
 }
 
 interface BatchCardGradingReportProps {
@@ -164,7 +173,11 @@ interface BatchCardGradingReportProps {
  * owns the report (copyright + independence line) with DCM as the technology
  * provider; consumer reports keep the classic DCM footer unchanged.
  */
-const ReportFooter: React.FC<{ cardData: ReportCardData; styles: ReturnType<typeof makeReportStyles> }> = ({ cardData, styles }) => {
+const ReportFooter: React.FC<{
+  cardData: ReportCardData;
+  styles: ReturnType<typeof makeReportStyles>;
+  marketplaceSafe?: boolean;
+}> = ({ cardData, styles, marketplaceSafe }) => {
   const org = cardData.org;
   return (
     <View style={styles.footer}>
@@ -173,7 +186,9 @@ const ReportFooter: React.FC<{ cardData: ReportCardData; styles: ReturnType<type
       </Text>
       <Text style={styles.disclaimer}>
         {org ? `${org.name} Grading Report · Powered by DCM Optic™` : 'DCM Optic™ Report'}{'\n'}
-        Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company. Estimated equivalency to PSA, BGS, SGC, or CGC standards is for reference only. Official grading can only be guaranteed through direct submission to those respective companies.
+        {marketplaceSafe
+          ? 'Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company.'
+          : 'Grades provided in this report are estimates based on visual analysis and do not represent an official score from any grading company. Estimated equivalency to PSA, BGS, SGC, or CGC standards is for reference only. Official grading can only be guaranteed through direct submission to those respective companies.'}
       </Text>
       {org ? (
         <Text style={styles.disclaimer}>
@@ -253,7 +268,7 @@ const getSafeSubgrades = (cardData: ReportCardData) => {
   };
 };
 
-export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }) => {
+export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData, marketplaceSafe }) => {
   // Get safe subgrades with defaults
   const subgrades = getSafeSubgrades(cardData);
   // Org-branded reports theme every purple accent with the brand primary.
@@ -570,7 +585,8 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         </Text>
       </View>
 
-      {/* Professional Grades Comparison Section */}
+      {/* Professional Grades Comparison Section — dropped in marketplace mode */}
+      {!marketplaceSafe && (
       <View style={reportStyles.professionalGradesSection}>
         <Text style={reportStyles.professionalGradesSectionTitle}>Estimated Professional Grading Equivalency</Text>
         <View style={reportStyles.professionalGradesGrid}>
@@ -592,9 +608,10 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
           </View>
         </View>
       </View>
+      )}
 
       {/* Footer */}
-      <ReportFooter cardData={cardData} styles={reportStyles} />
+      <ReportFooter cardData={cardData} styles={reportStyles} marketplaceSafe={marketplaceSafe} />
     </Page>
   </Document>
   );
@@ -604,7 +621,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
  * Helper component that renders just the page content (without Document wrapper)
  * Used for batch report generation
  */
-const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardData }) => {
+const CardGradingReportPage: React.FC<{ cardData: ReportCardData; marketplaceSafe?: boolean }> = ({ cardData, marketplaceSafe }) => {
   // Get safe subgrades with defaults
   const subgrades = getSafeSubgrades(cardData);
   // Org-branded reports theme every purple accent with the brand primary.
@@ -881,7 +898,8 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
         </Text>
       </View>
 
-      {/* Professional Grades Comparison Section */}
+      {/* Professional Grades Comparison Section — dropped in marketplace mode */}
+      {!marketplaceSafe && (
       <View style={reportStyles.professionalGradesSection}>
         <Text style={reportStyles.professionalGradesSectionTitle}>Estimated Professional Grading Equivalency</Text>
         <View style={reportStyles.professionalGradesGrid}>
@@ -903,9 +921,10 @@ const CardGradingReportPage: React.FC<{ cardData: ReportCardData }> = ({ cardDat
           </View>
         </View>
       </View>
+      )}
 
       {/* Footer */}
-      <ReportFooter cardData={cardData} styles={reportStyles} />
+      <ReportFooter cardData={cardData} styles={reportStyles} marketplaceSafe={marketplaceSafe} />
     </Page>
   );
 };

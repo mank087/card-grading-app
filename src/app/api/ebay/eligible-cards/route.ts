@@ -35,6 +35,11 @@ const CARD_COLUMNS = [
   // Identity + picker display
   'id', 'card_name', 'category', 'sub_category', 'serial',
   'front_path', 'back_path', 'created_at',
+  // Enterprise: the modal reads card.org_id for branding + the cross-org
+  // template guard, and org_serial_display is the cert number on the listing.
+  // Both were missing here, so a store-graded card listed from the picker
+  // silently fell back to consumer branding and the DCM serial.
+  'org_id', 'org_serial_display',
   // Grading (labels, title, description, mini report, PDF report)
   'conversational_whole_grade', 'conversational_decimal_grade',
   'conversational_condition_label', 'conversational_grade_uncertainty',
