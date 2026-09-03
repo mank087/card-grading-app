@@ -112,6 +112,12 @@ function check(label: string, xml: string, mode: 'inline' | 'policies'): void {
   } else {
     expectPresent(label, xml, INLINE_ONLY);
     expectAbsent(label, xml, POLICY_ONLY);
+    // Item.ShipToLocations is a repeatable *string* in eBay's schema. Nesting
+    // <ShipToLocation> children inside one <ShipToLocations> element made
+    // every international listing fail with the opaque "SimpleDeserializer
+    // encountered a child element" error (found Sept 3, 2026).
+    expectPresent(label, xml, ['<ShipToLocations>Worldwide</ShipToLocations>']);
+    expectAbsent(label, xml, ['<ShipToLocations><ShipToLocation>', '<ShipToLocations>\n']);
   }
   const status = failures.some(f => f.label === label) ? 'FAIL' : 'ok';
   console.log(`  ${status.padEnd(4)} ${label} (${xml.length} bytes)`);

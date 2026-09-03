@@ -305,8 +305,10 @@ export function buildAddFixedPriceItemXml(
   // Build return policy XML with domestic and international options
   const returnPolicyXml = usePolicies ? '' : buildReturnPolicyXml(returns);
 
-  // Build best offer XML if enabled
-  const bestOfferXml = listing.bestOfferEnabled
+  // Build best offer XML if enabled. eBay rejects Best Offer on an auction, so
+  // the flag is dropped rather than passed on — the UIs hide the toggle for
+  // auctions, and this is the last place it could still slip through.
+  const bestOfferXml = listing.bestOfferEnabled && listing.listingFormat !== 'AUCTION'
     ? `<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>`
     : '';
 
@@ -344,14 +346,9 @@ export function buildAddFixedPriceItemXml(
     }
   }
 
-  // Build ship to locations for international shipping (the shipping policy
+  // Ship-to locations for international shipping (the shipping policy
   // carries its own ship-to list, so this is inline-mode only)
-  let shipToLocationsXml = '';
-  if (!usePolicies && shipping.offerInternational && shipping.internationalShipToLocations?.length) {
-    shipToLocationsXml = shipping.internationalShipToLocations
-      .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
-      .join('\n    ');
-  }
+  const shipToLocationsXml = usePolicies ? '' : buildShipToLocationsXml(shipping);
 
   // Build regulatory documents XML (Certificate of Analysis, etc.)
   let regulatoryXml = '';
@@ -407,7 +404,7 @@ export function buildAddFixedPriceItemXml(
     ${returnPolicyXml}
     ${bestOfferXml}
     ${regulatoryXml}
-    ${shipToLocationsXml ? `<ShipToLocations>${shipToLocationsXml}</ShipToLocations>` : ''}
+    ${shipToLocationsXml}
   </Item>
 </AddFixedPriceItemRequest>`;
 }
@@ -440,6 +437,25 @@ function buildInternationalShippingXml(shipping: ShippingDetails): string {
           ${intlLocations.map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`).join('\n          ')}
         </InternationalShippingServiceOption>`;
   }
+}
+
+/**
+ * Item-level ship-to list for an international listing.
+ *
+ * In eBay's schema `Item.ShipToLocations` is a *repeatable string*, not a
+ * container: one `<ShipToLocations>Worldwide</ShipToLocations>` per region.
+ * Wrapping `<ShipToLocation>` children inside a single `<ShipToLocations>`
+ * element (what this did from Jan until Sept 3) is rejected with the opaque
+ * "SimpleDeserializer encountered a child element, which is NOT expected",
+ * so every international listing failed at eBay.
+ */
+function buildShipToLocationsXml(shipping: ShippingDetails): string {
+  if (!shipping.offerInternational || !shipping.internationalShipToLocations?.length) {
+    return '';
+  }
+  return shipping.internationalShipToLocations
+    .map(loc => `<ShipToLocations>${escapeXml(loc)}</ShipToLocations>`)
+    .join('\n    ');
 }
 
 /**
@@ -613,7 +629,24 @@ export async function addFixedPriceItem(
 
   console.log('[Trading API] AddFixedPriceItem response:', xmlResponse.substring(0, 1000) + '...');
 
-  return parseAddItemResponse(xmlResponse);
+  const parsed = parseAddItemResponse(xmlResponse);
+  logFailedRequest('AddFixedPriceItem', xmlRequest, parsed);
+  return parsed;
+}
+
+/**
+ * On an eBay-side rejection, log the whole request (token placeholder only,
+ * description elided) so a schema error can be diagnosed from the logs. The
+ * 500-char preview above stops inside the description, which is never where
+ * the problem is.
+ */
+function logFailedRequest(call: string, xmlRequest: string, parsed: AddItemResponse): void {
+  if (parsed.success) return;
+  const withoutDescription = xmlRequest.replace(
+    /<Description><!\[CDATA\[[\s\S]*?\]\]><\/Description>/,
+    '<Description>[elided]</Description>',
+  );
+  console.error(`[Trading API] ${call} rejected; full request:`, withoutDescription.replace(/\s+/g, ' '));
 }
 
 /**
@@ -733,13 +766,8 @@ export function buildAddItemXml(
     }
   }
 
-  // Build ship to locations for international shipping (inline mode only)
-  let shipToLocationsXml = '';
-  if (!usePolicies && shipping.offerInternational && shipping.internationalShipToLocations?.length) {
-    shipToLocationsXml = shipping.internationalShipToLocations
-      .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
-      .join('\n    ');
-  }
+  // Ship-to locations for international shipping (inline mode only)
+  const shipToLocationsXml = usePolicies ? '' : buildShipToLocationsXml(shipping);
 
   // Build regulatory documents XML
   let regulatoryXml = '';
@@ -794,7 +822,7 @@ export function buildAddItemXml(
     ${shippingPackageXml}
     ${returnPolicyXml}
     ${regulatoryXml}
-    ${shipToLocationsXml ? `<ShipToLocations>${shipToLocationsXml}</ShipToLocations>` : ''}
+    ${shipToLocationsXml}
   </Item>
 </AddItemRequest>`;
 }
@@ -816,7 +844,9 @@ export async function addAuctionItem(
 
   console.log('[Trading API] AddItem (Auction) response:', xmlResponse.substring(0, 1000) + '...');
 
-  return parseAddItemResponse(xmlResponse);
+  const parsed = parseAddItemResponse(xmlResponse);
+  logFailedRequest('AddItem', xmlRequest, parsed);
+  return parsed;
 }
 
 /**
