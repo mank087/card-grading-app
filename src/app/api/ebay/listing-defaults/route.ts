@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/serverAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getOrgForUser } from '@/lib/organizations'
-import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi'
+import { cleanShippingDefaults } from '@/lib/ebay/shippingDefaults'
 import { containsBlockedGrader, findBlockedGrader } from '@/lib/ebay/gradingCompanyBlocklist'
 import { isMissingColumnError } from '@/lib/cards/ownership'
 import { POLICY_COLUMNS, prefsFromRow, cleanPolicyId } from '@/lib/ebay/businessPolicies'
@@ -102,50 +102,6 @@ function templateLinkError(template: string): string | null {
     return 'Templates cannot contain web addresses — eBay removes listings that carry them'
   }
   return null
-}
-
-// Mirrors EbayListingModal's shippingForm shape (+ bestOfferEnabled).
-// Per-key validators: return the cleaned value, or undefined to DROP the key
-// (invalid values are dropped, never 400'd — the client merges over its own
-// defaults so a dropped key just falls back).
-type ShippingValidator = (v: unknown) => unknown | undefined
-
-const enumOf = (values: readonly string[]): ShippingValidator => v =>
-  typeof v === 'string' && values.includes(v) ? v : undefined
-const boolVal: ShippingValidator = v => (typeof v === 'boolean' ? v : undefined)
-const numMin = (min: number, max = 1_000_000): ShippingValidator => v =>
-  typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
-const shortString = (maxLen: number): ShippingValidator => v =>
-  typeof v === 'string' ? v.slice(0, maxLen) : undefined
-
-const DOMESTIC_SERVICE_VALUES = DOMESTIC_SHIPPING_SERVICES.map(s => s.value)
-const INTERNATIONAL_SERVICE_VALUES = INTERNATIONAL_SHIPPING_SERVICES.map(s => s.value)
-
-const SHIPPING_VALIDATORS: Record<string, ShippingValidator> = {
-  shippingType: enumOf(['FREE', 'FLAT_RATE', 'CALCULATED']),
-  domesticShippingService: enumOf(DOMESTIC_SERVICE_VALUES),
-  flatRateAmount: numMin(0),
-  handlingDays: numMin(0, 30),
-  postalCode: shortString(20),
-  packageWeightOz: numMin(0),
-  packageLengthIn: numMin(0),
-  packageWidthIn: numMin(0),
-  packageDepthIn: numMin(0),
-  offerInternational: boolVal,
-  internationalShippingType: enumOf(['FLAT_RATE', 'CALCULATED']),
-  internationalShippingService: enumOf(INTERNATIONAL_SERVICE_VALUES),
-  internationalFlatRateCost: numMin(0),
-  internationalShipToLocations: v =>
-    Array.isArray(v) && v.every(x => typeof x === 'string')
-      ? v.slice(0, 40).map(x => x.slice(0, 100))
-      : undefined,
-  domesticReturnsAccepted: boolVal,
-  domesticReturnPeriodDays: numMin(0, 365),
-  domesticReturnShippingPaidBy: enumOf(['BUYER', 'SELLER']),
-  internationalReturnsAccepted: boolVal,
-  internationalReturnPeriodDays: numMin(0, 365),
-  internationalReturnShippingPaidBy: enumOf(['BUYER', 'SELLER']),
-  bestOfferEnabled: boolVal,
 }
 
 // Widest first. Each fallback drops the columns of one hand-applied migration
@@ -271,14 +227,9 @@ export async function PUT(request: NextRequest) {
     if (body.shippingDefaults === null) {
       updates.shipping_defaults = null
     } else if (typeof body.shippingDefaults === 'object' && !Array.isArray(body.shippingDefaults)) {
-      const clean: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(body.shippingDefaults)) {
-        const validate = SHIPPING_VALIDATORS[k]
-        if (!validate) continue // unknown key: drop
-        const cleaned = validate(v)
-        if (cleaned !== undefined) clean[k] = cleaned // invalid value: drop
-      }
-      updates.shipping_defaults = clean
+      // Shape mirrors EbayListingModal's shippingForm (+ bestOfferEnabled);
+      // unknown keys and invalid values are dropped, never 400'd.
+      updates.shipping_defaults = cleanShippingDefaults(body.shippingDefaults)
     } else {
       return NextResponse.json({ error: 'shippingDefaults must be an object' }, { status: 400 })
     }

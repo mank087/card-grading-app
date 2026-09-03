@@ -14,6 +14,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
 import { CURRENT_DISCLAIMER_VERSION } from '@/lib/ebay/disclaimerVersion';
+import { rememberShippingDefaults } from '@/lib/ebay/shippingDefaults';
 import {
   EBAY_CONDITIONS,
   DCM_GRADER_ID,
@@ -1005,6 +1006,44 @@ export async function publishCardListing(
       saveError
     );
     warning = `Your listing was created on eBay (item ${result.itemId}) but could not be recorded in DCM — please contact support so we can link it to your account.`;
+  }
+
+  // Remember the shipping terms this listing went out with as the seller's
+  // defaults, so the next card — on any surface, after any reload — comes up
+  // with them instead of the stock values. Inline terms only: a business-
+  // policy listing carried none. Never blocks the success response.
+  if (!policies) {
+    try {
+      await rememberShippingDefaults({
+        userId,
+        cardOrgId: card.org_id ?? null,
+        shipping: {
+          shippingType,
+          domesticShippingService,
+          flatRateAmount,
+          handlingDays,
+          postalCode,
+          packageWeightOz,
+          packageLengthIn,
+          packageWidthIn,
+          packageDepthIn,
+          offerInternational,
+          internationalShippingType,
+          internationalShippingService,
+          internationalFlatRateCost,
+          internationalShipToLocations,
+          domesticReturnsAccepted,
+          domesticReturnPeriodDays,
+          domesticReturnShippingPaidBy,
+          internationalReturnsAccepted,
+          internationalReturnPeriodDays,
+          internationalReturnShippingPaidBy,
+          bestOfferEnabled,
+        },
+      });
+    } catch (e) {
+      console.error('[eBay Listing] could not remember shipping defaults:', e);
+    }
   }
 
   const listing: ListingResponse = {
