@@ -597,9 +597,23 @@ export async function cancelSubmission(
     return fail({ code: 'internal', message: 'Could not cancel the submission' });
   }
 
+  // Wind-down: cards already dispatched keep grading in their own functions
+  // (and are already charged), so the submission is not finished yet. A
+  // cancelled submission with completed_at NULL means "stop starting new
+  // cards, but let the ones in flight land"; the drain and the status poll
+  // keep reconciling it until nothing is active, then stamp completed_at.
+  const { count: stillActive } = await supabase
+    .from('submission_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('submission_id', submissionId)
+    .in('status', ['dispatched', 'grading']);
+
   const { data: updated, error: updateError } = await supabase
     .from('submissions')
-    .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+    .update({
+      status: 'cancelled',
+      completed_at: (stillActive ?? 0) > 0 ? null : new Date().toISOString(),
+    })
     .eq('id', submissionId)
     .select(SUBMISSION_COLUMNS)
     .maybeSingle();
@@ -677,12 +691,23 @@ export async function retrySubmissionItems(
 }
 
 /** Submissions with outstanding work, for the drain's outer loop. */
+/**
+ * A cancelled submission whose in-flight cards have not all landed yet. It
+ * must keep being reconciled (never dispatched) until completed_at is set.
+ */
+export function isWindingDown(submission: Pick<SubmissionRow, 'status' | 'completed_at'>): boolean {
+  return submission.status === 'cancelled' && !submission.completed_at;
+}
+
+/** PostgREST filter matching everything the drain must still visit. */
+export const DRAIN_VISIT_FILTER = 'status.eq.running,and(status.eq.cancelled,completed_at.is.null)';
+
 export async function listRunningSubmissions(limit = 10): Promise<SubmissionRow[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('submissions')
     .select(SUBMISSION_COLUMNS)
-    .eq('status', 'running')
+    .or(DRAIN_VISIT_FILTER)
     .order('committed_at', { ascending: true })
     .limit(limit);
 

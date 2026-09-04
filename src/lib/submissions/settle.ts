@@ -195,6 +195,35 @@ export async function completeSubmission(
   await sendCompletionEmail(submission, counts.graded, counts.failed);
 }
 
+/**
+ * Close out a cancelled submission once its last in-flight card has landed.
+ * Files whatever graded into the binder, stamps completed_at, sends no email
+ * (the owner stopped it on purpose). Guarded on completed_at IS NULL so two
+ * settlers cannot both "finish" it.
+ */
+export async function finalizeCancelled(
+  submission: SubmissionRow,
+  items: SubmissionItemRow[]
+): Promise<boolean> {
+  const supabase = supabaseServer();
+  await fileIntoBinder(submission, items);
+  const { data, error } = await supabase
+    .from('submissions')
+    .update({ completed_at: new Date().toISOString() })
+    .eq('id', submission.id)
+    .eq('status', 'cancelled')
+    .is('completed_at', null)
+    .select('id');
+  if (error) {
+    console.error(`${LOG} cancel finalize failed for ${submission.id}:`, error.message);
+    return false;
+  }
+  if (!data || data.length === 0) return false;
+  const counts = tallyItems(items);
+  console.log(`${LOG} ${submission.id} stopped: ${counts.graded} graded, ${counts.skipped} skipped`);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Reconcile
 // ---------------------------------------------------------------------------
@@ -349,6 +378,8 @@ export async function settleSubmission(
   if (counts.active === 0 && submission.status === 'running') {
     await completeSubmission(submission, rows);
     completed = true;
+  } else if (counts.active === 0 && submission.status === 'cancelled' && !submission.completed_at) {
+    completed = await finalizeCancelled(submission, rows);
   }
 
   const after = rows.map((item) => item.status).join('|');

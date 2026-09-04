@@ -10,6 +10,8 @@ import {
   getSubmissionItems,
   listRunningSubmissions,
   tallyItems,
+  isWindingDown,
+  DRAIN_VISIT_FILTER,
 } from '@/lib/submissions/service';
 // Reconcile / file / complete live in settle.ts so the status poll can run the
 // same code without duplicating the refund-on-stuck rules. Claiming, charging
@@ -20,6 +22,7 @@ import {
   isProcessing,
   loadCardStates,
   reconcile,
+  finalizeCancelled,
   setItemStatus,
 } from '@/lib/submissions/settle';
 import {
@@ -182,6 +185,10 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
 
   // 2. Completion.
   if (counts.active === 0) {
+    if (submission.status === 'cancelled') {
+      await finalizeCancelled(submission, items);
+      return { submission_id: submission.id, in_flight: 0, claimed: 0, dispatched: 0, filed, status: 'cancelled' };
+    }
     await completeSubmission(submission, items);
     return {
       submission_id: submission.id,
@@ -190,6 +197,20 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
       dispatched: 0,
       filed,
       status: 'complete',
+    };
+  }
+
+  // 2b. Winding down: the owner pressed Stop. Reconcile and file (done above),
+  //     never claim or dispatch. Queued rows were already skipped by cancel.
+  if (submission.status === 'cancelled') {
+    return {
+      submission_id: submission.id,
+      in_flight: counts.dispatched + counts.grading,
+      claimed: 0,
+      dispatched: 0,
+      filed,
+      status: 'cancelling',
+      note: 'stopping after in-flight cards',
     };
   }
 
@@ -406,7 +427,7 @@ export async function POST(request: NextRequest) {
         .from('submissions')
         .select('id, user_id, name, category, sub_category, binder_id, status, source, card_count, routing_key, created_at, committed_at, completed_at')
         .eq('id', submissionId)
-        .eq('status', 'running')
+        .or(DRAIN_VISIT_FILTER)
         .maybeSingle();
       submissions = data ? [data as unknown as SubmissionRow] : [];
     } else {
@@ -429,7 +450,7 @@ export async function POST(request: NextRequest) {
     if (!loaded.ok) {
       return NextResponse.json({ success: false, error: 'Submission not found' }, { status: 404 });
     }
-    if (loaded.data.status !== 'running') {
+    if (loaded.data.status !== 'running' && !isWindingDown(loaded.data)) {
       return NextResponse.json({
         success: true,
         skipped: `submission is ${loaded.data.status}`,

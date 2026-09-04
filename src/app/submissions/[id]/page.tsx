@@ -84,6 +84,9 @@ export default function SubmissionStatusPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [retrying, setRetrying] = useState(false)
+  // Stop control: two-step confirm inline, then the request.
+  const [confirmStop, setConfirmStop] = useState(false)
+  const [stopping, setStopping] = useState(false)
 
   // 🔒 Auth gate. The status API already enforces ownership, so another user's
   // submission was never readable here — but a logged-out visitor still got the
@@ -103,6 +106,13 @@ export default function SubmissionStatusPage() {
   const startedAtRef = useRef<number>(Date.now())
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestStatusRef = useRef<string | null>(null)
+  // In-flight count from the last poll. A stopped submission stays
+  // `cancelled` while its last cards land, so status alone cannot say
+  // whether polling and drain kicks are still needed.
+  const latestActiveRef = useRef<number>(0)
+  const stillSettling = () =>
+    latestStatusRef.current === 'running' ||
+    (latestStatusRef.current === 'cancelled' && latestActiveRef.current > 0)
 
   const fetchStatus = useCallback(async () => {
     if (!submissionId) return
@@ -136,7 +146,7 @@ export default function SubmissionStatusPage() {
       await fetchStatus()
       if (cancelled) return
       const status = latestStatusRef.current
-      if (status && TERMINAL_STATUSES.has(status)) return // stop polling
+      if (status && TERMINAL_STATUSES.has(status) && !stillSettling()) return // stop polling
       const elapsed = Date.now() - startedAtRef.current
       const delay = elapsed > SLOWDOWN_AFTER_MS ? POLL_SLOW_MS : POLL_FAST_MS
       timerRef.current = setTimeout(tick, delay)
@@ -152,6 +162,7 @@ export default function SubmissionStatusPage() {
 
   useEffect(() => {
     latestStatusRef.current = data?.submission?.status ?? null
+    latestActiveRef.current = (data?.counts?.dispatched ?? 0) + (data?.counts?.grading ?? 0)
   }, [data])
 
   // Keep the header's credit balance honest while a batch runs.
@@ -174,7 +185,9 @@ export default function SubmissionStatusPage() {
   useEffect(() => {
     if (!submissionId) return
     const kick = () => {
-      if (latestStatusRef.current === 'running') {
+      // Also while stopping: the drain reconciles the in-flight cards and
+      // stamps the submission finished, it just never dispatches new ones.
+      if (stillSettling()) {
         fetch(`/api/submissions/drain?submission_id=${submissionId}`, { method: 'POST', headers: authHeaders() }).catch(() => null)
       }
     }
@@ -184,9 +197,30 @@ export default function SubmissionStatusPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId])
 
-  // NOTE: the Cancel button was removed from this page (it read as "stop
-  // grading" mid-run). POST /api/submissions/[id]/cancel still exists and is
-  // unchanged — nothing on the web links to it now.
+  // Stop grading (Sep 4). Queued cards are skipped and never charged; cards
+  // already in flight finish and are filed. The submission reads `cancelled`
+  // with completed_at NULL until the last in-flight card lands, and the poll
+  // loop above keeps running for exactly that window.
+  const stopGrading = async () => {
+    if (!submissionId || stopping) return
+    setStopping(true)
+    try {
+      const res = await fetch(`/api/submissions/${submissionId}/cancel`, { method: 'POST', headers: authHeaders() })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        toast.error(json?.message || 'Could not stop grading.')
+        return
+      }
+      const skipped = Number(json.cancelled_items ?? 0)
+      toast.success(skipped > 0 ? `Stopped. ${skipped} card${skipped === 1 ? '' : 's'} will not be graded or charged.` : 'Stopping after the cards already grading.')
+      setConfirmStop(false)
+      await fetchStatus()
+    } catch {
+      toast.error('Could not stop grading.')
+    } finally {
+      setStopping(false)
+    }
+  }
 
   // Hand off when the batch finishes. This page is a transient grading screen,
   // not a destination: once everything is graded, the binder (or the
@@ -243,6 +277,15 @@ export default function SubmissionStatusPage() {
   const items = data?.items ?? []
   const isRunning = submission?.status === 'running'
   const isTerminal = submission ? TERMINAL_STATUSES.has(submission.status) : false
+  const inFlight = (counts?.dispatched ?? 0) + (counts?.grading ?? 0)
+  const isStopping = submission?.status === 'cancelled' && inFlight > 0
+  const isStopped = submission?.status === 'cancelled' && inFlight === 0
+  // Stop is offered whenever there is still work that a stop would change:
+  // queued cards to skip, or in-flight cards to wait for.
+  const canStop =
+    !!submission &&
+    ['running', 'blocked_insufficient_credits', 'paused'].includes(submission.status) &&
+    ((counts?.queued ?? 0) > 0 || inFlight > 0)
 
   // 🔒 Session not resolved yet, or the redirect to /login is in flight.
   if (isAuthenticated === null) {
@@ -335,12 +378,13 @@ export default function SubmissionStatusPage() {
                     {counts && counts.failed > 0 ? ` · ${counts.failed} need retry` : ''}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Status: <span className="font-medium">{submission?.status}</span>
+                    Status: <span className="font-medium">{isStopping ? 'stopping' : isStopped ? 'stopped' : submission?.status}</span>
                     {isRunning && ' · grading continues if you close this page'}
+                    {isStopping && ` · finishing ${inFlight} card${inFlight === 1 ? '' : 's'} already grading`}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {counts && counts.failed > 0 && (
+                  {counts && counts.failed > 0 && submission?.status !== 'cancelled' && (
                     <button
                       onClick={retryFailed}
                       disabled={retrying}
@@ -501,6 +545,68 @@ export default function SubmissionStatusPage() {
                 )
               })}
             </div>
+
+            {/* Stop control — below the grid so it is a deliberate reach, not
+                something beside "Retry". Queued cards are never charged; the
+                ones already grading finish and file. */}
+            {canStop && (
+              <div className="mt-6 bg-white rounded-xl shadow p-4">
+                {!confirmStop ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-gray-600">
+                      Need to stop? Cards already grading will finish. The {counts?.queued ?? 0} still
+                      queued will not be graded or charged.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmStop(true)}
+                      className="px-4 py-2 text-sm font-semibold bg-white border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+                    >
+                      Stop grading
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-gray-800 font-medium">
+                      Stop after the {inFlight} card{inFlight === 1 ? '' : 's'} already grading?
+                      {(counts?.queued ?? 0) > 0 && ` ${counts?.queued} queued card${counts?.queued === 1 ? '' : 's'} will be skipped and not charged.`}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmStop(false)}
+                        disabled={stopping}
+                        className="px-4 py-2 text-sm font-semibold bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Keep grading
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopGrading}
+                        disabled={stopping}
+                        className="px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {stopping ? 'Stopping…' : 'Yes, stop'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isStopping && (
+              <div className="mt-6 bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
+                Stopping — finishing {inFlight} card{inFlight === 1 ? '' : 's'} already in progress.
+                {(counts?.skipped ?? 0) > 0 && ` ${counts?.skipped} card${counts?.skipped === 1 ? '' : 's'} skipped and not charged.`}
+              </div>
+            )}
+            {isStopped && (
+              <div className="mt-6 bg-gray-100 border border-gray-300 rounded-lg p-3 text-sm text-gray-800">
+                Stopped. {counts?.graded ?? 0} graded
+                {(counts?.failed ?? 0) > 0 && `, ${counts?.failed} failed`}
+                {(counts?.skipped ?? 0) > 0 && `, ${counts?.skipped} not graded (not charged)`}.
+              </div>
+            )}
           </>
         )}
       </div>

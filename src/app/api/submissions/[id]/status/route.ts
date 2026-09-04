@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { isUuid } from '@/lib/uuid';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { getOwnedSubmission, getSubmissionItems, tallyItems } from '@/lib/submissions/service';
+import { getOwnedSubmission, getSubmissionItems, tallyItems, isWindingDown } from '@/lib/submissions/service';
 import { isProcessing, settleSubmission } from '@/lib/submissions/settle';
 import { SUBMISSION_ERROR_STATUS } from '@/lib/submissions/types';
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   // every 30s; here we only requeue the work so that kick has something to do.
   // ---------------------------------------------------------------------
   const preCounts = tallyItems(items);
-  if (loaded.data.status === 'running' && preCounts.active > 0) {
+  if ((loaded.data.status === 'running' || isWindingDown(loaded.data)) && preCounts.active > 0) {
     const claimedCardIds = items
       .filter((i) => (i.status === 'dispatched' || i.status === 'grading') && i.card_id)
       .map((i) => i.card_id as string);
@@ -105,8 +105,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         }
         if (settled.completed) {
           // Reflect it in THIS response rather than making the client wait a
-          // poll — the page hands off to the binder on `complete`.
-          loaded.data.status = 'complete';
+          // poll — the page hands off to the binder on `complete`. A stopped
+          // submission stays `cancelled`; only its completed_at lands.
+          if (loaded.data.status === 'running') loaded.data.status = 'complete';
           loaded.data.completed_at = loaded.data.completed_at || new Date().toISOString();
         }
       } catch (e: any) {
