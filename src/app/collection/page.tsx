@@ -184,12 +184,14 @@ const getCardName = (card: Card) => {
 
 const getPlayerName = (card: Card) => {
   const cardInfo = getCardInfo(card);
-  // For sports cards AND Other cards: show player/character name first (primary subject)
-  // For TCG cards (MTG, Pokemon, Lorcana): show card name first
+  // Sports: the player is the card's identity, so it leads.
+  // Everything else, INCLUDING "Other" (Star Wars Galaxy, Marvel, GPK…): the
+  // printed card title leads and the character is only a fallback. This is
+  // the same rule labelDataGenerator's getOtherName/getStarWarsName use, so
+  // list view now names a card the way its grid tile and printed label do —
+  // "The Mandalorian's Escape", not "Din Djarin".
   const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
-  const isOtherCard = card.category === 'Other';
-  // Other cards prioritize player_or_character (person, character, or subject featured)
-  return (isSportsCard || isOtherCard)
+  return isSportsCard
     ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown')
     : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card');
 };
