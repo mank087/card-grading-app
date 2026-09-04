@@ -14,7 +14,11 @@ import { addCardsToBinder, applySmartFilter, isSmart, type SmartFilter } from '@
  * collection and in any other binder it belongs to.
  */
 
-const PAGE_SIZE = 60;
+// Neither the web collection page nor the native app follows nextCursor
+// today (the web page now does; the app will after its next OTA), so a page
+// has to hold a whole realistic binder. A 100-card submission is the common
+// large case; 300 keeps the keyset path for the rare bigger binder.
+const PAGE_SIZE = 300;
 
 /** Columns the collection grid actually renders. The cards table carries
  *  multi-MB grading blobs this view never reads. */
@@ -93,10 +97,18 @@ export async function GET(
     // ---- Manual binder: keyset page over (position, card_id) ----
     // Keyset, not offset: reordering shifts rows across page boundaries, so an
     // offset page would show duplicates or skip cards mid-scroll.
+    //
+    // Soft-deleted cards are excluded HERE, at the membership level, via the
+    // inner join — not after the page is cut. Their membership rows survive
+    // on purpose (a restore puts them back), but paging over them first and
+    // filtering second meant a binder whose first 60 rows were deleted cards
+    // (owner deleted a 100-card submission and re-ran it into the same
+    // binder) returned an empty first page and read as "empty".
     let memQ = supabase
       .from('binder_cards')
-      .select('card_id, position')
+      .select('card_id, position, cards!inner(id)')
       .eq('binder_id', id)
+      .is('cards.deleted_at', null)
       .order('position', { ascending: true })
       .order('card_id', { ascending: true })
       .limit(PAGE_SIZE);

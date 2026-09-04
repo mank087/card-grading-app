@@ -735,17 +735,34 @@ function CollectionPageContent() {
     const session = getStoredSession()
     if (!session?.access_token) return
     setBinderLoading(true)
-    fetch(`/api/binders/${selectedBinderId}/cards`, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` },
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error)
-        setBinderCards(data.cards || [])
-        setBinderReorderable(Boolean(data.reorderable))
-      })
-      .catch((e) => { toast.error(e.message); setBinderCards([]) })
-      .finally(() => setBinderLoading(false))
+    // The route is keyset-paged. Follow nextCursor until the binder is fully
+    // loaded (bounded so a runaway cursor cannot loop forever) — this view
+    // shows the whole binder, not its first page.
+    const headers = { 'Authorization': `Bearer ${session.access_token}` }
+    const MAX_PAGES = 20
+    ;(async () => {
+      try {
+        const all: Card[] = []
+        let reorderable = true
+        let cursor: { cursorPos: string; cursorId: string } | null = null
+        for (let page = 0; page < MAX_PAGES; page++) {
+          const qs: string = cursor ? `?cursorPos=${encodeURIComponent(cursor.cursorPos)}&cursorId=${encodeURIComponent(cursor.cursorId)}` : ''
+          const res: Response = await fetch(`/api/binders/${selectedBinderId}/cards${qs}`, { headers })
+          const data: any = await res.json()
+          if (data.error) throw new Error(data.error)
+          all.push(...(data.cards || []))
+          reorderable = Boolean(data.reorderable)
+          cursor = data.nextCursor ?? null
+          if (!cursor) break
+        }
+        setBinderCards(all)
+        setBinderReorderable(reorderable)
+      } catch (e: any) {
+        toast.error(e.message); setBinderCards([])
+      } finally {
+        setBinderLoading(false)
+      }
+    })()
   }, [selectedBinderId, refreshKey])
 
   /**
