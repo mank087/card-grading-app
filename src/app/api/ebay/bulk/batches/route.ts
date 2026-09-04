@@ -65,11 +65,17 @@ function parseCardIds(raw: unknown): string[] | { error: string } {
 }
 
 /**
- * GET /api/ebay/bulk/batches — the caller's recent batches.
+ * GET /api/ebay/bulk/batches — the caller's batches that still need them.
  *
  * Small and narrow on purpose: it exists so the List tab can show "you have a
  * batch running" and get the seller back to it. Counts come off the batch
  * columns the drain maintains, so this never touches the item rows.
+ *
+ * A batch is a drafting tool. Once it has finished and nothing failed, every
+ * card in it is an ordinary listing under "My Listings", so the batch drops
+ * out of the strip. Drafts, running and paused batches stay; so does a
+ * finished batch that still has failed rows, because retrying those happens
+ * on the batch page. Cancelled batches never show here.
  */
 export async function GET(request: NextRequest) {
   const guard = await guardBulkRoute(request);
@@ -86,6 +92,8 @@ export async function GET(request: NextRequest) {
       'created_at, updated_at, started_at, completed_at, last_error'
     )
     .eq('user_id', userId)
+    // Anything not terminal, plus finished batches that still have rows to retry.
+    .or('status.in.(draft,running,paused,failed),and(status.eq.complete,failed_count.gt.0)')
     .order('created_at', { ascending: false })
     .limit(limit);
 

@@ -8,6 +8,10 @@
  * the seller happened to still have open. Deliberately small: recent batches,
  * what state each is in, and a link.
  *
+ * Only batches that still need the seller: drafts, running, paused, and
+ * finished ones with rows to retry (the API filters; a batch whose cards all
+ * went live is just "My Listings" now).
+ *
  * Silent when the seller has never started one, and silent on any error — this
  * is a convenience strip, not something worth an error state on a page that
  * already has four tabs of its own.

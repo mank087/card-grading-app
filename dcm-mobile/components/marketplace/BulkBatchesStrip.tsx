@@ -6,6 +6,9 @@
  * whatever the seller left on screen. Native twin of the web
  * BulkBatchesStrip: recent batches, what state each is in, and a tap target.
  *
+ * Only batches that still need the seller (drafts, running, paused, finished
+ * with failures) — the API filters, so a fully live batch drops off here.
+ *
  * Silent when there are none and silent on any error — a convenience strip is
  * not worth an error state on a tab that already carries four of its own.
  */
