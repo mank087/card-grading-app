@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
@@ -74,17 +74,13 @@ export default function GradeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header with credit balance */}
+      {/* Title only — the logo and credit balance live in the shared
+          AppHeaderBar above (see (tabs)/_layout.tsx). */}
       <View style={styles.header}>
-        <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.headerTitle}>Grade Your Card</Text>
         <Text style={styles.headerSubtitle}>
           Upload photos of your card for professional DCM Optic™ grading
         </Text>
-        <View style={styles.creditBadge}>
-          <Ionicons name="diamond" size={14} color={Colors.purple[600]} />
-          <Text style={styles.creditBadgeText}>{balance} credits available</Text>
-        </View>
       </View>
 
       {/* Card Type — required dropdown. No default selection so users
@@ -226,12 +222,9 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 40 },
 
   // Header
-  header: { backgroundColor: Colors.white, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
-  logo: { width: 48, height: 48, marginBottom: 8 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: Colors.gray[900] },
+  header: { backgroundColor: Colors.white, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.gray[900] },
   headerSubtitle: { fontSize: 14, color: Colors.gray[500], marginTop: 4, textAlign: 'center' },
-  creditBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: Colors.purple[50], paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  creditBadgeText: { fontSize: 13, fontWeight: '600', color: Colors.purple[700] },
 
   // Sections
   section: { marginHorizontal: 16, marginTop: 20 },

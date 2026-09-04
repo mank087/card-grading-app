@@ -96,7 +96,10 @@ export default function AppHeaderBar({ showBack, onBack, title, showGrade }: App
           accessibilityRole="button"
         >
           <Ionicons name="diamond" size={13} color={creditColor} />
-          <Text style={[styles.creditBadgeText, { color: creditColor }]}>{balance}</Text>
+          <Text style={[styles.creditBadgeText, { color: creditColor }]}>
+            {balance}
+            <Text style={styles.creditBadgeUnit}> {balance === 1 ? 'credit' : 'credits'}</Text>
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 16,
   },
+  creditBadgeUnit: { fontWeight: '600', fontSize: 12 },
   creditBadgeText: {
     fontSize: 14,
     fontWeight: '800',

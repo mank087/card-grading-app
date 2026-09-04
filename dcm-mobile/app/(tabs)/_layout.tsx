@@ -32,7 +32,9 @@ export default function TabLayout() {
         name="grade"
         options={{
           title: 'Grade',
-          headerShown: false, // Grade tab has its own header with logo
+          // Same chrome as every other tab, minus the Grade CTA (you are
+          // already here). The screen's own title sits below this bar.
+          header: () => <AppHeaderBar />,
           tabBarIcon: ({ color, size }) => (
             <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
               <View style={{
@@ -91,14 +93,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Menu',
+          // "More" + ellipsis is the platform convention for the overflow
+          // tab; "Menu" + hamburger reads as a web pattern.
+          title: 'More',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="menu" size={size} color={color} />
+            <Ionicons name="ellipsis-horizontal-circle" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Shop is reachable via the Menu → Tools → Shop link, not the bottom nav */}
+      {/* Shop is reachable via More → Tools, not the bottom nav */}
       <Tabs.Screen name="shop" options={{ href: null }} />
 
       {/* Hide template screens */}

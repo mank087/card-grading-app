@@ -154,8 +154,14 @@ export default function AccountScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Profile Card */}
-      <View style={styles.profileCard}>
+      {/* Profile Card — tap for account settings */}
+      <TouchableOpacity
+        style={styles.profileCard}
+        onPress={() => nav('my-account')}
+        activeOpacity={0.85}
+        accessibilityLabel="My account settings"
+        accessibilityRole="button"
+      >
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -166,45 +172,29 @@ export default function AccountScreen() {
             <Text style={styles.profileEmail} numberOfLines={1}>{user?.email}</Text>
             <View style={styles.creditRow}>
               <Ionicons name="diamond" size={14} color={Colors.purple[600]} />
-              <Text style={styles.creditText}>{balance} credits</Text>
+              <Text style={styles.creditText}>{balance} credit{balance === 1 ? '' : 's'}</Text>
             </View>
           </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.purple[200]} />
         </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Welcome tour — visible at the top so users can revisit anytime
-          they want a refresher on what each tab does. */}
-      <MenuSection title="Getting Started">
-        <MenuItem
-          icon="play"
-          label="Replay Welcome Tour"
-          onPress={startWelcomeTour}
-          color={Colors.purple[600]}
-        />
-      </MenuSection>
-
-      {/* Grading */}
-      <MenuSection title="Grading">
-        <MenuItem icon="camera" label="Grade a Card" onPress={() => router.push('/(tabs)/grade')} />
-        <MenuItem icon="grid" label="My Collection" onPress={() => router.push('/(tabs)/collection')} />
+      {/* Tools — things the tabs do not already cover. Label Studio is a
+          tab, so it switches tabs rather than pushing a second copy of the
+          screen with different chrome. */}
+      <MenuSection title="Tools">
+        <MenuItem icon="pricetags" label="Label Studio" onPress={() => router.push('/(tabs)/labels')} />
         <MenuItem icon="trending-up" label="Pop Report" onPress={() => nav('pop-report')} />
         <MenuItem icon="star" label="Featured Cards" onPress={() => nav('featured')} />
-        <MenuItem icon="search" label="Search by Serial" onPress={() => nav('search')} />
+        <MenuItem icon="search" label="Find a Graded Card" onPress={() => nav('search')} />
+        <MenuItem icon="bag" label="Recommended Products" onPress={() => router.push('/(tabs)/shop')} />
       </MenuSection>
 
-      {/* Tools */}
-      <MenuSection title="Tools">
-        <MenuItem icon="pricetags" label="Label Studio" onPress={() => nav('label-studio')} />
-        <MenuItem icon="cash" label="Portfolio" onPress={() => nav('market-pricing')} color={Colors.green[600]} />
-        <MenuItem icon="storefront" label="InstaList Marketplace" onPress={() => router.push('/(tabs)/instalist-marketplace' as any)} color={Colors.purple[600]} />
-        <MenuItem icon="bag" label="Shop" onPress={() => router.push('/(tabs)/shop')} />
-      </MenuSection>
-
-      {/* Pricing & Plans */}
-      <MenuSection title="Pricing & Plans">
+      {/* Plans */}
+      <MenuSection title="Credits & Plans">
         <MenuItem
           icon="diamond"
-          label="Purchase Credits"
+          label="Buy Credits"
           onPress={() => nav('credits')}
           badge={`${balance}`}
           color={Colors.purple[600]}
@@ -212,7 +202,7 @@ export default function AccountScreen() {
         {showCardLoversMenuItem && (
           <MenuItem
             icon="heart"
-            label={Platform.OS === 'ios' && isCardLover ? 'Card Lovers Member' : 'Card Lovers Subscription'}
+            label={Platform.OS === 'ios' && isCardLover ? 'Card Lovers Member' : 'Card Lovers Membership'}
             onPress={() => nav('card-lovers')}
             color={Colors.purple[600]}
           />
@@ -222,34 +212,25 @@ export default function AccountScreen() {
         )}
       </MenuSection>
 
-      {/* Information */}
-      <MenuSection title="Information">
-        <MenuItem icon="book" label="Grading Rubric" onPress={() => nav('grading-rubric')} />
+      {/* Help */}
+      <MenuSection title="Help & Info">
+        <MenuItem icon="play" label="Welcome Tour" onPress={startWelcomeTour} />
+        <MenuItem icon="book" label="Grading Standards" onPress={() => nav('grading-rubric')} />
         <MenuItem icon="document-text" label="Reports & Labels" onPress={() => nav('reports-labels')} />
         <MenuItem icon="help-circle" label="FAQ" onPress={() => nav('faq')} />
-        <MenuItem icon="information-circle" label="About Us" onPress={() => nav('about')} />
-        <MenuItem icon="shield-checkmark" label="Why DCM?" onPress={() => nav('why-dcm')} />
-        <MenuItem icon="newspaper" label="Blog" onPress={() => nav('blog')} />
         <MenuItem icon="warning" label="Grading Limitations" onPress={() => nav('grading-limitations')} />
         <MenuItem icon="calendar" label="Card Shows" onPress={() => nav('card-shows')} />
+        <MenuItem icon="newspaper" label="Blog" onPress={() => nav('blog')} />
+        <MenuItem icon="shield-checkmark" label="Why DCM?" onPress={() => nav('why-dcm')} />
+        <MenuItem icon="information-circle" label="About Us" onPress={() => nav('about')} />
+        <MenuItem icon="mail" label="Contact Us" onPress={() => nav('contact')} />
       </MenuSection>
 
       {/* Account */}
       <MenuSection title="Account">
-        <MenuItem icon="person" label="My Account" onPress={() => nav('my-account')} />
-        <MenuItem icon="lock-closed" label="Change Password" onPress={() => nav('my-account')} />
-        <MenuItem icon="mail" label="Contact Us" onPress={() => nav('contact')} color={Colors.blue[600]} />
+        <MenuItem icon="person" label="My Account & Password" onPress={() => nav('my-account')} />
         <MenuItem icon="document" label="Terms & Conditions" onPress={() => nav('terms')} />
         <MenuItem icon="shield" label="Privacy Policy" onPress={() => nav('privacy')} />
-        {/* In-app account deletion — required by both App Store
-            (guideline 5.1.1(v)) and Play Store (effective May 2024) for
-            apps that offer account creation. */}
-        <MenuItem
-          icon="trash"
-          label="Delete My Account"
-          onPress={handleDeleteAccount}
-          color={Colors.red[600]}
-        />
       </MenuSection>
 
       {/* Sign Out */}
@@ -263,6 +244,19 @@ export default function AccountScreen() {
         >
           <Ionicons name="log-out" size={20} color={Colors.red[600]} />
           <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+        {/* In-app account deletion — required by both App Store
+            (guideline 5.1.1(v)) and Play Store (effective May 2024) for
+            apps that offer account creation. Kept in-app, but as a quiet
+            link under Sign Out rather than a row beside Contact Us. */}
+        <TouchableOpacity
+          style={styles.deleteLink}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+          accessibilityLabel="Delete my account"
+          accessibilityRole="button"
+        >
+          <Text style={styles.deleteLinkText}>Delete my account</Text>
         </TouchableOpacity>
       </View>
 
@@ -299,6 +293,8 @@ const styles = StyleSheet.create({
   signOutSection: { marginTop: 20, marginHorizontal: 12 },
   signOutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.red[50], borderRadius: 12, paddingVertical: 14, borderWidth: 1, borderColor: Colors.red[100] },
   signOutText: { fontSize: 15, fontWeight: '600', color: Colors.red[600] },
+  deleteLink: { alignItems: 'center', paddingVertical: 14 },
+  deleteLinkText: { fontSize: 13, color: Colors.gray[500], textDecorationLine: 'underline' },
   footer: { alignItems: 'center', paddingVertical: 24 },
   footerLogo: { width: 40, height: 40, marginBottom: 8, opacity: 0.4 },
   footerText: { fontSize: 12, color: Colors.gray[400] },

@@ -54,7 +54,7 @@ const TABS: TabDef[] = [
   // non-active state (you're already on a non-tab screen by definition).
   // It still mirrors the bottom of the (tabs) layout 1:1.
   { key: 'instalist-marketplace', href: '/(tabs)/instalist-marketplace', label: 'InstaList',  icon: (c, s) => <EbayWordmark color={c} size={s} focused={false} /> },
-  { key: 'account',               href: '/(tabs)/account',               label: 'Menu',       icon: (c, s) => <Ionicons name="menu"      size={s} color={c} /> },
+  { key: 'account',               href: '/(tabs)/account',               label: 'More',       icon: (c, s) => <Ionicons name="ellipsis-horizontal-circle" size={s} color={c} /> },
 ]
 
 export default function MobileTabBar() {
