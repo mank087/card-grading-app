@@ -10,6 +10,66 @@ import { useOrgContext } from "@/contexts/OrgContext";
 import AppStoreBadge from "@/components/AppStoreBadge";
 import GooglePlayBadge from "@/components/GooglePlayBadge";
 import { isStorefrontHost, isOrgPublicPath } from "@/lib/storefrontHost";
+import NavDropdown from "./NavDropdown";
+
+/**
+ * Logged-out information architecture. One list drives both the desktop row
+ * and the mobile menu so they cannot drift.
+ *
+ * Order is deliberate: what you can do (How It Works → the three product
+ * surfaces), then what it costs, then everything else. "How It Works" is the
+ * Get Started guide (photograph → grade → label); the scoring rubric that
+ * used to sit behind that label is now "Grading Standards" under Resources.
+ */
+const GUEST_PRIMARY = [
+  { href: '/get-started', label: 'How It Works' },
+  { href: '/instalist-marketplace', label: 'eBay InstaList' },
+  { href: '/market-pricing', label: 'Portfolio' },
+  { href: '/labels', label: 'Label Studio' },
+] as const;
+const GUEST_PRICING = [
+  { href: '/credits', label: 'Grading Credits', description: 'Pay per card, from 2 free grades' },
+  { href: '/card-lovers', label: 'Card Lovers Membership', description: 'Monthly or annual bundles for collectors' },
+  { href: '/vip', label: 'VIP Package', description: '150 grades at the lowest per-card price' },
+] as const;
+const GUEST_RESOURCES = [
+  { href: '/grading-rubric', label: 'Grading Standards' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/featured', label: 'Featured Cards' },
+  { href: '/pop', label: 'Pop Report' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/enterprise', label: 'Enterprise' },
+  { href: '/#get-the-app', label: 'Get the App' },
+] as const;
+
+/**
+ * Logged-in information architecture. Manage cards → check value → sell →
+ * label, then everything else. Label Studio is dropped for org members
+ * (their label design is locked to Brand Setup), which happens at render.
+ */
+const MEMBER_PRIMARY = [
+  { href: '/collection', label: 'Collection' },
+  { href: '/market-pricing', label: 'Portfolio' },
+  { href: '/instalist-marketplace', label: 'eBay InstaList' },
+  { href: '/labels', label: 'Label Studio' },
+] as const;
+/** The balance pill's menu: buying first, then the bundles. */
+const MEMBER_CREDITS = [
+  { href: '/credits', label: 'Buy credits', description: 'Single grades and packs' },
+  { href: '/card-lovers', label: 'Card Lovers Membership', description: 'Monthly or annual bundles' },
+  { href: '/vip', label: 'VIP Package', description: '150 grades at the lowest per-card price' },
+] as const;
+const MEMBER_RESOURCES = [
+  { href: '/get-started', label: 'How It Works' },
+  { href: '/grading-rubric', label: 'Grading Standards' },
+  { href: '/pop', label: 'Pop Report' },
+  { href: '/featured', label: 'Featured Cards' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/shop', label: 'Recommended Products' },
+  { href: '/enterprise', label: 'Enterprise' },
+  { href: '/#get-the-app', label: 'Get the App' },
+] as const;
 
 // Routes that render in a fullscreen modal/WebView from the mobile app —
 // they should not show the site nav. Mobile InAppPage already injects CSS
@@ -32,6 +92,7 @@ export default function Navigation() {
 }
 
 function NavigationInner() {
+  const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false); // Track if initial auth check is done
   const [searchSerial, setSearchSerial] = useState("");
@@ -124,8 +185,20 @@ function NavigationInner() {
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setGradeDropdownOpen(false);
+      setAccountDropdownOpen(false);
+      setOrgSwitcherOpen(false);
+      setSearchOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [gradeDropdownOpen, accountDropdownOpen, orgSwitcherOpen, mobileMenuOpen, searchOpen]);
 
   const handleLogout = () => {
@@ -237,163 +310,82 @@ function NavigationInner() {
 
           {/* ============ DESKTOP NAVIGATION ============ */}
           {/* Desktop nav shows at lg (≥1024px). Below that — including iPad
-              portrait (768-1023px) — we render the hamburger menu instead,
-              because the 9-link logged-out variant overflows the right edge
-              at md widths. */}
-          <div className="hidden lg:flex items-center flex-1 justify-between ml-8">
+              portrait (768-1023px) — we render the hamburger menu instead;
+              the 6-item logged-out row plus the auth buttons needs ~1000px. */}
+          <div className="hidden lg:flex items-center flex-1 justify-between ml-6 xl:ml-8">
 
             {/* Left Section - Navigation Links */}
             <div className="flex items-center space-x-1 min-h-[40px]">
               {!authChecked ? (
-                /* Skeleton placeholders to prevent CLS — match logged-out link count/widths */
+                /* Skeleton placeholders to prevent CLS — match the 6 logged-out items */
                 <>
-                  <div className="h-5 w-14 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
                   <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-10 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
                 </>
               ) : user ? (
                 <>
-                  {/* Logged In: Core nav links (3 items) */}
-                  <Link
-                    href="/collection"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                  >
-                    Collection
-                  </Link>
-                  <div className="relative group">
-                    <Link
-                      href="/credits"
-                      className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1"
-                    >
-                      Credits
-                      <svg className="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </Link>
-                    <div className="absolute top-full left-0 pt-1 w-44 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150">
-                    <div className="bg-white rounded-md shadow-lg border border-gray-200">
-                      <div className="py-1">
-                        <Link
-                          href="/card-lovers"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        >
-                          <span className="text-rose-500">♥</span> Card Lovers
-                        </Link>
-                        <Link
-                          href="/vip"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                        >
-                          <span className="text-indigo-500">◆</span> VIP Package
-                        </Link>
-                      </div>
-                    </div>
-                    </div>
-                  </div>
-                  <Link
-                    href="/market-pricing"
-                    className="text-gray-700 hover:text-emerald-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-emerald-500">$</span> Portfolio
-                    </span>
-                  </Link>
-                  {/* Bulk grading has no nav entry and no history surface: the
-                      binder / My Collection is the history. The only way in is
-                      the "Submit more than one card" link on /upload. */}
-                  {/* Enterprise members: label design is locked to the house
-                      style set in Brand Setup — Label Studio is consumer-only. */}
-                  {!isOrgScope && (
-                    <Link
-                      href="/labels"
-                      className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                    >
-                      Label Studio
-                    </Link>
-                  )}
-                  <Link
-                    href="/instalist-marketplace"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                  >
-                    eBay InstaList
-                  </Link>
+                  {/* Logged In — see MEMBER_* at the top of the file. Bulk
+                      grading has no nav entry: the binder / My Collection is
+                      the history, and the only way in is the "Submit more than
+                      one card" link on /upload. */}
+                  {MEMBER_PRIMARY.filter(item => !(isOrgScope && item.href === '/labels')).map(item => {
+                    const current = pathname === item.href || (pathname?.startsWith(item.href + '/') ?? false);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={current ? 'page' : undefined}
+                        className={`relative px-2.5 xl:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                          current ? 'text-purple-700' : 'text-gray-700 hover:text-purple-600'
+                        }`}
+                      >
+                        {item.label}
+                        {current && <span aria-hidden="true" className="absolute left-3 right-3 -bottom-[13px] h-0.5 bg-purple-600 rounded-full" />}
+                      </Link>
+                    );
+                  })}
+                  <NavDropdown label="Resources" items={[...MEMBER_RESOURCES]} />
                 </>
               ) : (
                 <>
-                  {/* Logged Out: Info Pages */}
-                  <Link
-                    href="/credits"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Pricing
-                  </Link>
-                  <Link
-                    href="/vip"
-                    className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-indigo-500">◆</span> VIP
-                    </span>
-                  </Link>
-                  <Link
-                    href="/card-lovers"
-                    className="text-gray-700 hover:text-rose-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-rose-500">♥</span> Card Lovers
-                    </span>
-                  </Link>
-                  <Link
-                    href="/grading-rubric"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    How It Works
-                  </Link>
-                  <Link
-                    href="/faq"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    FAQ
-                  </Link>
-                  <Link
-                    href="/blog"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Blog
-                  </Link>
-                  <Link
-                    href="/featured"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Featured
-                  </Link>
-                  <Link
-                    href="/labels"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Label Studio
-                  </Link>
-                  <Link
-                    href="/pop"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-blue-500">#</span> Pop Report
-                    </span>
-                  </Link>
+                  {/* Logged Out — see GUEST_* at the top of the file. */}
+                  {GUEST_PRIMARY.map(item => {
+                    const current = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={current ? 'page' : undefined}
+                        className={`relative px-2.5 xl:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                          current ? 'text-purple-700' : 'text-gray-700 hover:text-purple-600'
+                        }`}
+                      >
+                        {item.label}
+                        {current && <span aria-hidden="true" className="absolute left-3 right-3 -bottom-[13px] h-0.5 bg-purple-600 rounded-full" />}
+                      </Link>
+                    );
+                  })}
+                  <NavDropdown label="Pricing" items={[...GUEST_PRICING]} width="w-72" />
+                  <NavDropdown label="Resources" items={[...GUEST_RESOURCES]} />
                 </>
               )}
             </div>
 
             {/* Right Section - Actions */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 xl:space-x-3">
 
               {/* Search Icon Button */}
               <div className="relative search-container">
                 <button
                   onClick={() => setSearchOpen(!searchOpen)}
-                  className="text-gray-500 hover:text-purple-600 p-2 rounded-md transition-colors"
-                  aria-label="Search"
+                  className="text-gray-500 hover:text-purple-600 p-2 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                  aria-label="Find a graded card by serial number"
+                  aria-expanded={searchOpen}
+                  title="Find a graded card"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -403,13 +395,14 @@ function NavigationInner() {
                 {/* Search Dropdown */}
                 {searchOpen && (
                   <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Find a graded card</p>
                     <form onSubmit={handleSearch}>
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
                           value={searchSerial}
                           onChange={(e) => setSearchSerial(e.target.value)}
-                          placeholder="Search by serial number..."
+                          placeholder="DCM serial number"
                           className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                           autoFocus
                         />
@@ -554,28 +547,36 @@ function NavigationInner() {
                       )}
                     </div>
                   ) : (
-                    <Link
-                      href="/credits"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
+                    /* One credits control: the balance is the trigger and the
+                       menu holds buying + bundles. Replaces the old pair of a
+                       "Credits" nav link and a pill that both went to /credits. */
+                    <NavDropdown
+                      label="Credits"
+                      ariaLabel={`${balance} credits — buy credits or view memberships`}
+                      items={[...MEMBER_CREDITS]}
+                      width="w-72"
+                      align="right"
+                      triggerClassName={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
                         balance <= 1
                           ? 'bg-red-100 text-red-700 hover:bg-red-200'
                           : 'bg-green-100 text-green-700 hover:bg-green-200'
                       }`}
-                      title="View credits"
-                    >
-                      {creditsLoading ? (
+                      trigger={creditsLoading ? (
                         <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
                       ) : (
                         <>{balance} {balance === 1 ? 'Credit' : 'Credits'}</>
                       )}
-                    </Link>
+                    />
                   )}
 
                   {/* Logged In: Account Dropdown */}
                   <div className="relative account-dropdown">
                     <button
                       onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                      className="flex items-center gap-1 text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                      aria-expanded={accountDropdownOpen}
+                      aria-haspopup="true"
+                      aria-label="Account menu"
+                      className="flex items-center gap-1 text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -595,70 +596,12 @@ function NavigationInner() {
                           >
                             My Account
                           </Link>
-                          <hr className="my-1 border-gray-200" />
                           <Link
-                            href="/vip"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            <span className="text-indigo-500">◆</span> VIP Package
-                          </Link>
-                          <Link
-                            href="/card-lovers"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            <span className="text-rose-500">♥</span> Card Lovers
-                          </Link>
-                          <hr className="my-1 border-gray-200" />
-                          <Link
-                            href="/featured"
+                            href="/credits"
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                             onClick={() => setAccountDropdownOpen(false)}
                           >
-                            Featured Cards
-                          </Link>
-                          <Link
-                            href="/pop"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            <span className="text-blue-500">#</span> Pop Report
-                          </Link>
-                          <Link
-                            href="/blog"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            Blog
-                          </Link>
-                          <Link
-                            href="/grading-rubric"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            Grading Rubric
-                          </Link>
-                          <Link
-                            href="/faq"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            FAQ
-                          </Link>
-                          <Link
-                            href="/about"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            About Us
-                          </Link>
-                          <Link
-                            href="/enterprise"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            Enterprise
+                            Credits &amp; Memberships
                           </Link>
                           <hr className="my-1 border-gray-200" />
                           <button
@@ -668,7 +611,7 @@ function NavigationInner() {
                             }}
                             className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                           >
-                            Logout
+                            Log out
                           </button>
                         </div>
                       </div>
@@ -679,7 +622,9 @@ function NavigationInner() {
                   <div className="relative grade-dropdown">
                     <button
                       onClick={() => setGradeDropdownOpen(!gradeDropdownOpen)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-1 shadow-md"
+                      aria-expanded={gradeDropdownOpen}
+                      aria-haspopup="true"
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-1 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
                     style={isOrgScope && orgMembership?.brandColor ? { backgroundColor: orgMembership.brandColor } : undefined}
                     >
                       <span>Grade a Card</span>
@@ -700,9 +645,9 @@ function NavigationInner() {
                   {/* Logged Out: Login */}
                   <Link
                     href="/login?mode=login"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
                   >
-                    Login
+                    Log in
                   </Link>
 
                   {/* Logged Out: Sign Up - Primary CTA. "2 Cards" matches the
@@ -717,15 +662,8 @@ function NavigationInner() {
                 </>
               )}
 
-              {/* App store badges — took over from the retired LaunchBanner
-                  (July 2026) so app availability stays visible site-wide.
-                  2xl-only: below that the nav row wraps its links. Narrower
-                  desktops still get the badges in the homepage sections and
-                  the mobile menu. */}
-              <span className="hidden 2xl:flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
-                <AppStoreBadge variant="black" height={30} />
-                <GooglePlayBadge height={30} />
-              </span>
+              {/* App store badges left the header in Sept 2026 — the footer,
+                  homepage sections and the mobile menu carry them. */}
             </div>
           </div>
 
@@ -841,7 +779,7 @@ function NavigationInner() {
                     type="text"
                     value={searchSerial}
                     onChange={(e) => setSearchSerial(e.target.value)}
-                    placeholder="Search by serial number..."
+                    placeholder="DCM serial number"
                     className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <button
@@ -882,150 +820,53 @@ function NavigationInner() {
                     </div>
                   )}
 
-                  {/* Logged In Menu */}
-                  <Link
-                    href="/collection"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    My Collection
-                  </Link>
-                  <Link
-                    href="/credits"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Buy Credits
-                  </Link>
-                  <Link
-                    href="/vip"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-indigo-500">◆</span>
-                    VIP Package
-                  </Link>
-                  <Link
-                    href="/card-lovers"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-rose-600 hover:bg-rose-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-rose-500">♥</span>
-                    Card Lovers
-                  </Link>
-                  <Link
-                    href="/market-pricing"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-emerald-600 hover:bg-emerald-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-emerald-500 font-bold">$</span>
-                    Portfolio
-                  </Link>
-                  {/* No Bulk Grading entry — see the desktop nav note. */}
-                  {!isOrgScope && (
-                    <Link
-                      href="/labels"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                      Label Studio
-                    </Link>
-                  )}
-                  <Link
-                    href="/instalist-marketplace"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    {/* Storefront icon — matches the marketplace's brand cue */}
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V10m0 0V7a2 2 0 00-2-2H7a2 2 0 00-2 2v3m14 0H5m14 11H5V10m0 11h14M9 21V13a2 2 0 012-2h2a2 2 0 012 2v8" />
-                    </svg>
-                    eBay InstaList
-                  </Link>
-                  <Link
-                    href="/shop"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    Shop
-                  </Link>
+                  {/* Logged In Menu — same groups as the desktop row (MEMBER_*). */}
+                  {MEMBER_PRIMARY.filter(item => !(isOrgScope && item.href === '/labels')).map(item => {
+                    const current = pathname === item.href || (pathname?.startsWith(item.href + '/') ?? false);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        aria-current={current ? 'page' : undefined}
+                        className={`block px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                          current ? 'text-purple-700 bg-purple-50' : 'text-gray-700 hover:text-purple-600 hover:bg-purple-50'
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
                   <Link
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+                    className="block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
                     My Account
                   </Link>
-
-                  {/* Divider */}
-                  <div className="border-t border-gray-200 my-2"></div>
-                  <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Resources</p>
-
-                  <Link
-                    href="/grading-rubric"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    Grading Rubric
-                  </Link>
-                  <Link
-                    href="/faq"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    FAQ
-                  </Link>
-                  <Link
-                    href="/about"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    About Us
-                  </Link>
-                  <Link
-                    href="/enterprise"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    Enterprise
-                  </Link>
-                  <Link
-                    href="/blog"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    Blog
-                  </Link>
-                  <Link
-                    href="/featured"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    Featured Cards
-                  </Link>
-                  <Link
-                    href="/pop"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-md text-sm transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-blue-500 font-bold">#</span>
-                    Pop Report
-                  </Link>
+                  <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Credits</p>
+                  {MEMBER_CREDITS.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      {item.label}
+                      <span className="block text-xs text-gray-500">{item.description}</span>
+                    </Link>
+                  ))}
+                  <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Resources</p>
+                  {MEMBER_RESOURCES.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
 
                   {/* Logout */}
                   <div className="border-t border-gray-200 my-2"></div>
@@ -1039,126 +880,55 @@ function NavigationInner() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
-                    Logout
+                    Log out
                   </button>
                 </>
               ) : (
                 <>
-                  {/* Logged Out Menu */}
+                  {/* Logged Out Menu — same groups as the desktop row (GUEST_*). */}
                   <Link
                     href="/login?mode=login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+                    className="block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
-                    Login
+                    Log in
                   </Link>
-                  <Link
-                    href="/credits"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Pricing
-                  </Link>
-                  <Link
-                    href="/vip"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-indigo-500">◆</span>
-                    VIP Package
-                  </Link>
-                  <Link
-                    href="/card-lovers"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-rose-600 hover:bg-rose-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-rose-500">♥</span>
-                    Card Lovers
-                  </Link>
-                  <Link
-                    href="/grading-rubric"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    How It Works
-                  </Link>
-                  <Link
-                    href="/faq"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    FAQ
-                  </Link>
-                  <Link
-                    href="/about"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    About Us
-                  </Link>
-                  <Link
-                    href="/enterprise"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    Enterprise
-                  </Link>
-                  <Link
-                    href="/blog"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                    </svg>
-                    Blog
-                  </Link>
-                  <Link
-                    href="/featured"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                    Featured Cards
-                  </Link>
-                  <Link
-                    href="/labels"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    Label Studio
-                  </Link>
-                  <Link
-                    href="/pop"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="w-5 h-5 flex items-center justify-center text-blue-500 font-bold">#</span>
-                    Pop Report
-                  </Link>
+                  {GUEST_PRIMARY.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      aria-current={pathname === item.href ? 'page' : undefined}
+                      className={`block px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                        pathname === item.href ? 'text-purple-700 bg-purple-50' : 'text-gray-700 hover:text-purple-600 hover:bg-purple-50'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                  <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pricing</p>
+                  {GUEST_PRICING.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      {item.label}
+                      <span className="block text-xs text-gray-500">{item.description}</span>
+                    </Link>
+                  ))}
+                  <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Resources</p>
+                  {GUEST_RESOURCES.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
                 </>
               )}
 

@@ -20,10 +20,31 @@ function BackgroundGradingMonitor() {
 }
 
 // Scroll to top on route changes
+// Scroll to the top on every route change — unless the URL carries a hash,
+// in which case the anchor wins (e.g. the nav's "Get the App" → /#get-the-app).
+// The homepage is a client component, so the target may not exist on the
+// first frame; retry briefly rather than giving up.
 function ScrollToTop() {
   const pathname = usePathname()
   useEffect(() => {
-    window.scrollTo(0, 0)
+    const hash = window.location.hash
+    if (!hash) {
+      window.scrollTo(0, 0)
+      return
+    }
+    const id = decodeURIComponent(hash.slice(1))
+    let tries = 0
+    let timer: number | undefined
+    const tick = () => {
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView()
+        return
+      }
+      if (++tries < 20) timer = window.setTimeout(tick, 100)
+    }
+    tick()
+    return () => { if (timer !== undefined) window.clearTimeout(timer) }
   }, [pathname])
   return null
 }

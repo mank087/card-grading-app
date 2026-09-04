@@ -78,7 +78,7 @@ function HeroVariant({
                 />
                 <br />
                 <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  in seconds, not minutes.
+                  in seconds.
                 </span>
               </h1>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
