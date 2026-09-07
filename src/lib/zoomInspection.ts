@@ -16,6 +16,7 @@
  * scoring ladders — the zoom pass can only LOWER scores, never raise them.
  */
 
+import { normalizeCropRegionIds } from './normalizeCropRegionIds';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
@@ -933,7 +934,15 @@ export async function runZoomInspection(
       for (const choice of response.choices) {
         try {
           if (!choice?.message?.content) continue;
-          const raw = JSON.parse(choice.message.content);
+          // Sept 2026: models sometimes echo the prompt label ("REGION F-COR-TL")
+          // instead of the bare id, and the vote tally below matches on the
+          // exact id — those findings were silently dropped (1,226 of them
+          // across a 705-sample replay). Canonicalise exact "REGION "-prefixed
+          // ids; reject and report anything else rather than guess.
+          const parsed = JSON.parse(choice.message.content);
+          const { value: raw, aliases, rejected } = normalizeCropRegionIds(parsed, batch.map(r => r.id));
+          if (aliases.length > 0) console.log(`[ZOOM] canonicalised ${aliases.length} prefixed region id(s): ${aliases.map(a => `"${a.original}"`).join(', ')}`);
+          if (rejected.length > 0) console.warn(`[ZOOM] rejected ${rejected.length} unknown region id(s): ${rejected.map(r => JSON.stringify(r)).join(', ')}`);
           // v9.5 compact format: {"clean":[ids], "findings":[{id, card_area, defects}]}.
           // Normalize to the internal per-region list; tolerate the legacy
           // {"regions":[...]} shape so a format-drifting sample still parses.

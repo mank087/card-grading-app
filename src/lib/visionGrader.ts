@@ -49,7 +49,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.23';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.24'; // v9.24: zoom parser canonicalises "REGION "-prefixed crop ids (findings were silently dropped)
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
