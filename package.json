@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "check:grading-isolation": "node scripts/check-grading-isolation.cjs",
+    "prebuild": "npm run check:grading-isolation",
+    "prebuild:turbo": "npm run check:grading-isolation",
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
@@ -11,6 +14,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:grade-review": "vitest run src/lib/gradeReview src/app/api/cards/[id]/grade-review src/app/api/grade-reviews src/app/api/admin/grade-reviews",
     "typecheck": "tsc --noEmit",
     "lint:ci": "eslint src/lib src/app/api",
     "check:twin-drift": "npx tsx scripts/check-twin-drift.ts",
@@ -67,6 +71,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",

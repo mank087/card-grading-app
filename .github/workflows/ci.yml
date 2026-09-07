@@ -23,6 +23,9 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Keep experimental grading out of releases
+        run: node scripts/check-grading-isolation.cjs
+
       - name: Install
         run: npm ci
 
