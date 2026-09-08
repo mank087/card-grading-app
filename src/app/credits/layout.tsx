@@ -111,6 +111,16 @@ const pricingJsonLd = {
         name: `DCM Grading ${p.name}`,
         description: `${p.credits} card grades from DCM Optic. Each grade includes four subgrades, a written reason for every deduction, an image confidence letter and a printable label.`,
         brand: { '@type': 'Brand', name: 'DCM Grading' },
+        // Google validates each Product node in isolation and requires one of
+        // offers / review / aggregateRating on it (GSC "Merchant listings"
+        // error, first seen 2026-09-04). The parent Offer above is not enough.
+        offers: {
+          '@type': 'Offer',
+          price: p.price.toFixed(2),
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+          url: 'https://dcmgrading.com/credits',
+        },
       },
     })),
     ...CARD_LOVERS.map((m, i) => ({
