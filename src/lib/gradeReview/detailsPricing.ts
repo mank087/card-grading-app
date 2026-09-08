@@ -19,7 +19,10 @@ export async function refreshPricesAfterDetails(db: SupabaseClient, cardId: stri
   }
   try {
     const snap = await fetchCardPrice(forPricing);
-    if (snap) {
+    // A snapshot with no listings usually means the eBay search failed (rate
+    // limit, outage). Keep the previous comps rather than overwriting them
+    // with an empty result.
+    if (snap && snap.listing_count > 0 && snap.median_price != null) {
       await savePriceSnapshot(snap);
       const { error: saveError } = await db.from('cards').update({ ebay_price_lowest: snap.lowest_price, ebay_price_median: snap.median_price, ebay_price_average: snap.average_price, ebay_price_highest: snap.highest_price, ebay_price_listing_count: snap.listing_count, ebay_price_updated_at: new Date().toISOString() }).eq('id', cardId);
       if (saveError) errors.push(`ebay save: ${saveError.message}`); else ebayMedian = snap.median_price;
