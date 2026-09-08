@@ -15,7 +15,7 @@
  * anyone who opens devtools. The owner still sees both on the authenticated
  * collection endpoint, which is where the sold view reads them from.
  */
-const SENSITIVE_CARD_FIELDS = ['user_email', 'sold_price', 'sold_note'] as const
+const SENSITIVE_CARD_FIELDS = ['user_email', 'sold_price', 'sold_note', 'grade_review_policy_context'] as const
 
 export function stripSensitiveCardFields<T extends Record<string, any>>(card: T): T {
   if (!card || typeof card !== 'object') return card

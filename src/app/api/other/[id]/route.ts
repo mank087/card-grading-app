@@ -1,3 +1,4 @@
+import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
@@ -692,6 +693,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           conversational_final_grade_summary: correctedSummary,  // 🆕 v6.2: Fixed summary with correct grade
           conversational_condition_label: decimalGrade != null ? getConditionFromGrade(Math.round(decimalGrade)) : (finalGrade.condition_label || null), // v8.9: derive label from final grade
           conversational_prompt_version: DCM_PROMPT_VERSION,
+          ...gradeReviewCaptureFields(),
           conversational_evaluated_at: new Date(),
 
           // Sub-scores for colored circles display

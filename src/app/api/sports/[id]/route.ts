@@ -1,3 +1,4 @@
+import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
@@ -1165,6 +1166,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,  // 🆕 Front defects
       conversational_defects_back: conversationalGradingData?.transformedDefects?.back || null,  // 🆕 Back defects
       conversational_prompt_version: DCM_PROMPT_VERSION,
+      ...gradeReviewCaptureFields(),
       conversational_evaluated_at: new Date(),
 
       // 🆕 Professional grade estimates (PSA, BGS, SGC, etc.)

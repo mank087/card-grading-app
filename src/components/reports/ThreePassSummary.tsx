@@ -75,7 +75,7 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
   return (
     <div className="mt-8 pt-8 border-t-2 border-indigo-100">
       <h4 className="text-xl font-bold text-indigo-900 mb-4 pb-2 border-b border-indigo-200">
-        Three-Pass Evaluation Summary
+        {(gradingPasses as GradingPasses & { review_applied?: boolean }).review_applied ? 'Original Evaluations & Reviewed Result' : 'Three-Pass Evaluation Summary'}
       </h4>
       <p className="text-sm text-gray-600 mb-4">
         DCM Optic™ performs three independent evaluations of each card — each incorporating a magnified zoom inspection of the corners, edges, and surfaces — and takes the median as the consensus grade.
@@ -128,7 +128,7 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
             </tr>
             {/* Consensus Row */}
             <tr className="bg-indigo-50 font-semibold">
-              <td className="px-4 py-3 text-sm font-bold text-indigo-800">Consensus</td>
+              <td className="px-4 py-3 text-sm font-bold text-indigo-800">{(gradingPasses as GradingPasses & { review_applied?: boolean }).review_applied ? 'Reviewed result' : 'Consensus'}</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.centering)}</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.corners)}</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.edges)}</td>

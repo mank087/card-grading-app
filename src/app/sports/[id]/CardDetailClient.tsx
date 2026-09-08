@@ -38,6 +38,7 @@ import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import { GradeReviewButton } from '@/components/grade-review/GradeReviewButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 // EbayPriceLookup removed - sports cards now use DCM pricing from SportsCardsPro
 import { PriceChartingLookup } from '@/components/pricing/PriceChartingLookup';
@@ -3491,6 +3492,7 @@ export function SportsCardDetails() {
                     {/* Only show download button to card owner */}
                     {isOwner && <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
 
+
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-sm text-gray-600 font-medium">
@@ -6401,6 +6403,19 @@ export function SportsCardDetails() {
               Graded Date: <span className="font-semibold text-gray-800">{formatGradedDate(card.created_at)}</span>
             </p>
           </div>
+
+          {/* Manual grade review request (VIP / Card Lovers). Sits with the
+              other end-of-page owner actions rather than the label/report row. */}
+          {(() => {
+            const session = getStoredSession();
+            const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+            if (!isOwner) return null;
+            return (
+              <div className="mt-4 flex justify-center">
+                <GradeReviewButton cardId={card.id} ownerId={card.user_id} />
+              </div>
+            );
+          })()}
 
           <div className="mt-4 text-center">
             <button

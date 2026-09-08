@@ -30,6 +30,7 @@ import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClai
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
+import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -3287,6 +3288,11 @@ Provide detailed analysis as markdown with all required sections.`
         // v8.8: the condition label is DERIVED from the final grade — never the AI's prose.
         // (Production showed two grade-6 cards stored as "Excellent" and "Near Mint-Mint".)
         const canonicalConditionLabel = getConditionFromGrade(finalGrade);
+        if (process.env.GRADE_REVIEW_CAPTURE_ENABLED === 'true') {
+          jsonData.grade_review_scoring_context = captureCorrectionBasis(finalGrade, serverRounded,
+            [pass1, pass2, pass3].map(p => Math.min(p.corners, p.edges, p.surface)),
+            structuralDetected || Boolean(gradeCapNote), structuralDetected);
+        }
 
         // Override AI's final grade fields with server-calculated values
         if (jsonData.final_grade) {

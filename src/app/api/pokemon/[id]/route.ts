@@ -1,3 +1,4 @@
+import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
@@ -1539,6 +1540,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       slab_cert_number: conversationalGradingData?.professional_slab?.cert_number || (conversationalGradingData as any)?.slab_detection?.cert_number || null,
       slab_serial: conversationalGradingData?.professional_slab?.serial_number || (conversationalGradingData as any)?.slab_detection?.serial_number || null,
       conversational_prompt_version: DCM_PROMPT_VERSION,
+      ...gradeReviewCaptureFields(),
       conversational_evaluated_at: new Date(),
 
       // 🆕 Professional grade estimates (PSA, BGS, SGC, etc.)

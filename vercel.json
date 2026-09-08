@@ -31,6 +31,10 @@
     {
       "path": "/api/ebay/bulk/drain",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/grade-reviews/drain",
+      "schedule": "* * * * *"
     }
   ]
 }

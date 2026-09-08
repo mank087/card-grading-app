@@ -1,0 +1,12 @@
+import { afterEach,beforeEach,it,expect,vi } from 'vitest';
+import { NextRequest } from 'next/server';
+const mail=vi.hoisted(()=>vi.fn());
+vi.mock('@/lib/gradeReview/notifications',()=>({deliverReviewNotifications:mail}));
+import { POST } from './route';
+const request=(secret='test-secret')=>new NextRequest('http://localhost/api/grade-reviews/drain',{method:'POST',headers:{Authorization:`Bearer ${secret}`}});
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('CRON_SECRET','test-secret');});
+afterEach(()=>vi.unstubAllEnvs());
+it('requires the cron secret even locally',async()=>{vi.stubEnv('CRON_SECRET','');expect((await POST(request())).status).toBe(503);expect(mail).not.toHaveBeenCalled();});
+it('rejects an incorrect secret before sending email',async()=>{expect((await POST(request('wrong'))).status).toBe(401);expect(mail).not.toHaveBeenCalled();});
+it('dispatches notifications instead of automatic grading',async()=>{mail.mockResolvedValue({sent:1,failed:0});expect(await (await POST(request())).json()).toEqual({sent:1,failed:0});expect(mail).toHaveBeenCalledOnce();});
+it('reports delivery failures without leaking provider errors',async()=>{mail.mockRejectedValue(Error('private details'));const response=await POST(request());expect(response.status).toBe(503);expect(JSON.stringify(await response.json())).not.toContain('private details');});

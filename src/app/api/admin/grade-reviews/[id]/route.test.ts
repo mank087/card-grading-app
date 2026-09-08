@@ -1,0 +1,12 @@
+import { beforeEach,it,expect,vi } from 'vitest';
+import { NextRequest } from 'next/server';
+const mocks=vi.hoisted(()=>({admin:vi.fn(),db:vi.fn()}));
+vi.mock('@/lib/admin/adminAuth',()=>({verifyAdminSession:mocks.admin}));
+vi.mock('@/lib/supabaseServer',()=>({supabaseServer:mocks.db}));
+vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
+import {GET,POST} from './route';
+const context={params:Promise.resolve({id:'00000000-0000-4000-8000-000000000001'})};
+const request=(body:unknown={},origin='http://localhost')=>new NextRequest('http://localhost/api/admin/grade-reviews/id',{method:'POST',headers:{Cookie:'admin_token=test',Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+beforeEach(()=>{vi.clearAllMocks();mocks.admin.mockResolvedValue({id:'admin'});});
+it('requires a verified admin for reads and writes',async()=>{mocks.admin.mockResolvedValue(null);expect((await GET(request(),context)).status).toBe(401);expect((await POST(request(),context)).status).toBe(401);expect(mocks.db).not.toHaveBeenCalled();});
+it('rejects cross-origin submissions and forged administrator fields',async()=>{expect((await POST(request({},'https://example.test'),context)).status).toBe(403);expect((await POST(request({verdict:'confirm',notes:'The grade is supported.',admin_id:'forged'}),context)).status).toBe(400);expect(mocks.db).not.toHaveBeenCalled();});
