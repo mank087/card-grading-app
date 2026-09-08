@@ -57,6 +57,12 @@ export async function GET(request: NextRequest) {
     // Explicit column list — the cards table carries multi-MB grading blobs
     // this endpoint never reads. Split so the migration-window fallback can
     // drop the ownership columns without falling back to SELECT *.
+    // conversational_corners_edges_surface is ~8 KB/row and the collection page
+    // itself never reads it, but the cards it hands to BatchDownloadModal do:
+    // that modal builds the centering/corners/edges/surface prose of every batch
+    // PDF report from this blob (BatchDownloadModal.tsx, DownloadReportButton.tsx).
+    // Dropping it silently empties four sections of a paid report. NEVER put a
+    // comment inside the template string below: PostgREST parses it verbatim.
     const BASE_COLUMNS = `
         id, serial, org_id, org_serial, org_serial_display, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
         manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
@@ -64,13 +70,6 @@ export async function GET(request: NextRequest) {
         conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,
         conversational_card_info, conversational_condition_label, dvg_decimal_grade,
         conversational_weighted_sub_scores, conversational_sub_scores,
-        // ~8 KB/row and the collection page itself never reads it — but the
-        // cards it hands to BatchDownloadModal do: that modal builds the
-        // centering/corners/edges/surface prose of every batch PDF condition
-        // report straight out of this blob (src/components/reports/
-        // BatchDownloadModal.tsx:134-185, DownloadReportButton.tsx:97-152).
-        // Dropping it here silently empties four sections of a paid report, so
-        // it stays until those modals hydrate it per selected card on open.
         conversational_corners_edges_surface,
         conversational_final_grade_summary, conversational_grade_uncertainty, estimated_professional_grades,
         is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code,
