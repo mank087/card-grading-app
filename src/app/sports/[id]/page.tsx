@@ -1,7 +1,37 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isUuid } from '@/lib/uuid';
+import { getCardOgImageUrl, type CardMetadataRow } from '@/lib/seo/cardMetadataImage';
 import { SportsCardDetails } from './CardDetailClient';
+
+// Only the columns the title/description/keywords/OG tags actually read.
+// Avoids pulling the ~42 KB whole row (conversational_grading, ai_grading, etc.)
+// on every crawler hit. Keep in sync with the helpers below.
+const METADATA_COLUMNS = [
+  'id',
+  'visibility',
+  'front_path',
+  'label_data',
+  'conversational_card_info',
+  'conversational_sub_scores',
+  'conversational_condition_label',
+  'conversational_decimal_grade',
+  'dvg_decimal_grade',
+  'dvg_grading',
+  'featured',
+  'card_name',
+  'card_set',
+  'category',
+  'manufacturer_name',
+  'release_date',
+  'rookie_card',
+  'autograph_type',
+  'memorabilia_type',
+  'serial_numbering',
+  'slab_detected',
+  'slab_company',
+  'slab_grade',
+].join(', ');
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -443,11 +473,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = supabaseServer();
 
   // Fetch card data server-side
-  const { data: card, error } = await supabase
+  const { data: cardRow, error } = await supabase
     .from('cards')
-    .select('*')
+    .select(METADATA_COLUMNS)
     .eq('id', id)
     .single();
+
+  // Narrow-select results are typed loosely by supabase-js; helpers below expect the row shape.
+  const card = cardRow as CardMetadataRow | null;
 
   // Default metadata if card not found
   if (error || !card) {
@@ -478,7 +511,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   console.log('[METADATA] Generated title:', title);
   console.log('[METADATA] Generated description:', description);
 
-  const imageUrl = card.front_url;
+  // "cards" is a private bucket: sign the stored path, and only for public cards.
+  const imageUrl = await getCardOgImageUrl(card.front_path, card.visibility);
   const cardUrl = `https://dcmgrading.com/sports/${id}`;
   const isPrivate = card.visibility === 'private';
 

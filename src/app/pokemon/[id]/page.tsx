@@ -1,7 +1,33 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isUuid } from '@/lib/uuid';
+import { getCardOgImageUrl, type CardMetadataRow } from '@/lib/seo/cardMetadataImage';
 import { PokemonCardDetails } from './CardDetailClient';
+
+// Only the columns the title/description/keywords/OG tags actually read.
+// Avoids pulling the ~42 KB whole row on every crawler hit.
+const METADATA_COLUMNS = [
+  'id',
+  'visibility',
+  'front_path',
+  'label_data',
+  'conversational_card_info',
+  'conversational_sub_scores',
+  'conversational_condition_label',
+  'conversational_decimal_grade',
+  'featured',
+  'pokemon_featured',
+  'pokemon_type',
+  'card_name',
+  'card_set',
+  'card_number',
+  'rarity_tier',
+  'hp',
+  'manufacturer_name',
+  'release_date',
+  'first_print_rookie',
+  'serial_numbering',
+].join(', ');
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -333,11 +359,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = supabaseServer();
 
   // Fetch card data server-side
-  const { data: card, error } = await supabase
+  const { data: cardRow, error } = await supabase
     .from('cards')
-    .select('*')
+    .select(METADATA_COLUMNS)
     .eq('id', id)
     .single();
+
+  // Narrow-select results are typed loosely by supabase-js; helpers below expect the row shape.
+  const card = cardRow as CardMetadataRow | null;
 
   // Default metadata if card not found
   if (error || !card) {
@@ -352,7 +381,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   console.log('[METADATA] Pokemon card title:', title);
   console.log('[METADATA] Pokemon card description:', description);
 
-  const imageUrl = card.front_url;
+  // "cards" is a private bucket: sign the stored path, and only for public cards.
+  const imageUrl = await getCardOgImageUrl(card.front_path, card.visibility);
   const cardUrl = `https://dcmgrading.com/pokemon/${id}`;
   const isPrivate = card.visibility === 'private';
 

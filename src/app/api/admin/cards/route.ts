@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createClient } from '@supabase/supabase-js'
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
 
 // Initialize storage client for signed URLs
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -155,18 +156,15 @@ export async function GET(request: NextRequest) {
     const storageClient = createClient(supabaseUrl, supabaseServiceKey)
     const frontPaths = cards?.filter(c => c.front_path).map(c => c.front_path) || []
 
-    const signedUrlMap: Record<string, string> = {}
+    // The admin card table renders a ~48px row thumbnail, so front_url is the
+    // ≤480px thumb; front_full_url keeps the original for the row's detail link.
+    let signedUrlMap = new Map<string, SignedImagePair>()
     if (frontPaths.length > 0) {
-      // Generate signed URLs in batch (1 hour expiry)
-      const { data: signedUrls } = await storageClient.storage
-        .from('cards')
-        .createSignedUrls(frontPaths, 3600)
-
-      signedUrls?.forEach((item) => {
-        if (item.signedUrl && item.path) {
-          signedUrlMap[item.path] = item.signedUrl
-        }
-      })
+      try {
+        signedUrlMap = await createSignedImageMap(storageClient.storage, 'cards', frontPaths)
+      } catch (signErr) {
+        console.error('[admin/cards] Error creating signed URLs:', signErr)
+      }
     }
 
     // Enrich card data with user email, signed URL, and extract grade from JSON if needed
@@ -174,7 +172,8 @@ export async function GET(request: NextRequest) {
       const enrichedCard: any = {
         ...card,
         user_email: userMap[card.user_id] || 'Unknown',
-        front_url: card.front_path ? signedUrlMap[card.front_path] || null : null,
+        front_url: pickDisplayUrls(signedUrlMap, card.front_path).display,
+        front_full_url: pickDisplayUrls(signedUrlMap, card.front_path).full,
       }
 
       // If conversational_grading exists, parse it and extract grade if missing

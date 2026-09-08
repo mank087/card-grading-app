@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import FeaturedCardTile from '@/components/FeaturedCardTile'
@@ -43,35 +43,81 @@ function getGradeColor(grade: number): string {
   return 'text-gray-600'
 }
 
+/** Cards fetched per request. See PAGE_SIZE note in /api/cards/public-collection. */
+const PAGE_SIZE = 60
+
 export default function SharedCollectionClient({ username }: { username: string }) {
   const [cards, setCards] = useState<any[]>([])
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [stats, setStats] = useState<CollectionStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  useEffect(() => {
-    const fetchCollection = async () => {
-      try {
-        const res = await fetch(`/api/cards/public-collection?username=${encodeURIComponent(username)}`)
-        if (res.status === 404) {
-          setNotFound(true)
-          return
-        }
-        const data = await res.json()
-        setProfile(data.profile || null)
-        setCards(data.cards || [])
-        setStats(data.stats || null)
-      } catch (err) {
-        console.error('Error fetching shared collection:', err)
-      } finally {
-        setLoading(false)
+  // Guards the loader against the observer firing again mid-flight (which would
+  // request the same offset twice and duplicate rows).
+  const loadingRef = useRef(false)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  const loadPage = useCallback(async (offset: number) => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    if (offset > 0) setLoadingMore(true)
+    try {
+      const res = await fetch(
+        `/api/cards/public-collection?username=${encodeURIComponent(username)}` +
+        `&limit=${PAGE_SIZE}&offset=${offset}`
+      )
+      if (res.status === 404) {
+        setNotFound(true)
+        return
       }
+      const data = await res.json()
+      setProfile(data.profile || null)
+      // Stats are computed server-side over the WHOLE collection, so they stay
+      // correct no matter how many pages are loaded.
+      setStats(data.stats || null)
+      setHasMore(Boolean(data.hasMore))
+      setCards(prev => {
+        if (offset === 0) return data.cards || []
+        // De-dupe defensively: a card graded between two page requests shifts
+        // the created_at ordering and can push a row into two windows.
+        const seen = new Set(prev.map((c: any) => c.id))
+        return [...prev, ...((data.cards || []).filter((c: any) => !seen.has(c.id)))]
+      })
+    } catch (err) {
+      console.error('Error fetching shared collection:', err)
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+      setLoadingMore(false)
     }
-    fetchCollection()
   }, [username])
+
+  useEffect(() => {
+    setCards([])
+    setHasMore(false)
+    setLoading(true)
+    loadPage(0)
+  }, [username, loadPage])
+
+  // Auto-load the next page as the sentinel below the list comes into view.
+  // rootMargin starts the fetch before the user actually hits the bottom.
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !hasMore) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting && !loadingRef.current) loadPage(cards.length)
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, cards.length, loadPage])
 
   const filteredCards = selectedCategory === 'all'
     ? cards
@@ -191,7 +237,7 @@ export default function SharedCollectionClient({ username }: { username: string 
                         : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    All ({cards.length})
+                    All ({stats?.totalCards ?? cards.length})
                   </button>
                   {categories.map(([cat, count]) => (
                     <button
@@ -310,6 +356,25 @@ export default function SharedCollectionClient({ username }: { username: string 
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination footer. The sentinel auto-loads the next page as it
+                scrolls into view; the button is the fallback for anything
+                without IntersectionObserver (and for keyboard users who never
+                trigger a scroll). */}
+            {(hasMore || loadingMore) && (
+              <div ref={sentinelRef} className="mt-10 flex flex-col items-center gap-3">
+                <p className="text-sm text-gray-500">
+                  Showing {cards.length} of {stats?.totalCards ?? cards.length} cards
+                </p>
+                <button
+                  onClick={() => loadPage(cards.length)}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-lg bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more'}
+                </button>
               </div>
             )}
           </>

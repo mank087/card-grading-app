@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Organization } from '@/lib/organizations';
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 
 /** Storefront content blob shape (organizations.storefront jsonb). */
 export interface StorefrontContent {
@@ -52,7 +53,11 @@ export interface StorefrontData {
   logos: { color: string | null; white: string | null; black: string | null; mark: string | null };
   photoUrls: string[];
   /** 10 most recent public org-graded cards, only when show_recent_cards. */
-  recentCards: { card: Record<string, unknown>; frontUrl: string | null }[];
+  /**
+   * frontUrl is the display thumbnail (≤480px, falls back to the original when
+   * a card predates the thumbnail backfill); frontFullUrl is always the original.
+   */
+  recentCards: { card: Record<string, unknown>; frontUrl: string | null; frontFullUrl: string | null }[];
 }
 
 function service() {
@@ -119,14 +124,30 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
       .limit(10);
-    recentCards = await Promise.all(
-      ((cards as any[]) ?? []).map(async c => ({
+    // One batched signing call instead of a sequential createSignedUrl per card,
+    // and the strip renders thumbnails: frontUrl is the ≤480px thumb where one
+    // exists (falling back to the original), with frontFullUrl kept alongside for
+    // anything that needs real pixels.
+    const rows = ((cards as any[]) ?? []);
+    let imageMap = new Map<string, SignedImagePair>();
+    try {
+      imageMap = await createSignedImageMap(
+        s.storage,
+        'cards',
+        rows.map(c => c.front_path),
+        { expiresIn: SIGN_TTL }
+      );
+    } catch {
+      // The storefront must still render without its card strip images.
+    }
+    recentCards = rows.map(c => {
+      const front = pickDisplayUrls(imageMap, c.front_path);
+      return {
         card: c as Record<string, unknown>,
-        frontUrl: c.front_path
-          ? (await s.storage.from('cards').createSignedUrl(c.front_path, SIGN_TTL)).data?.signedUrl ?? null
-          : null,
-      }))
-    );
+        frontUrl: front.display,
+        frontFullUrl: front.full,
+      };
+    });
   }
 
   return {

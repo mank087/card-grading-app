@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { createSignedUrlMap } from '@/lib/signedUrlBatch';
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 import { isMissingColumnError } from '@/lib/cards/ownership';
 
 /**
@@ -187,20 +187,36 @@ export async function GET(request: NextRequest) {
     }
     // Chunked — Supabase rejects >1000 paths per request, and the 2000-card cap
     // here means up to 4000 paths (collections >500 cards used to get no images)
-    let urlMap = new Map<string, string>();
+    let urlMap = new Map<string, SignedImagePair>();
     if (allPaths.length > 0) {
       try {
-        urlMap = await createSignedUrlMap(supabase.storage, 'cards', allPaths, 60 * 60);
+        urlMap = await createSignedImageMap(supabase.storage, 'cards', allPaths);
       } catch (signErr) {
         console.error('[eligible-cards] Error creating signed URLs:', signErr);
       }
     }
 
-    const enriched = eligibleRows.map(c => ({
-      ...c,
-      front_url: c.front_path ? urlMap.get(c.front_path) ?? null : null,
-      back_url: c.back_path ? urlMap.get(c.back_path) ?? null : null,
-    }));
+    // front_url/back_url deliberately stay FULL RESOLUTION here. Unlike the
+    // other list endpoints, this payload feeds EbayListingModal's image
+    // pipeline (imageToBase64 → the photos uploaded to the eBay listing) as
+    // well as the CardPicker grid. Downgrading front_url to a 480px thumb would
+    // silently ship blurry photos onto live listings.
+    //
+    // front_thumb_url/back_thumb_url are the ≤480px versions for pure display.
+    // CardPicker's <img> is the one consumer that should switch to them — a
+    // one-line change in src/app/instalist-marketplace/components/CardPicker.tsx
+    // that this worker does not own.
+    const enriched = eligibleRows.map(c => {
+      const front = pickDisplayUrls(urlMap, c.front_path);
+      const back = pickDisplayUrls(urlMap, c.back_path);
+      return {
+        ...c,
+        front_url: front.full,
+        back_url: back.full,
+        front_thumb_url: front.display,
+        back_thumb_url: back.display,
+      };
+    });
 
     return NextResponse.json({
       cards: enriched,

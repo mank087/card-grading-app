@@ -6,6 +6,7 @@ import { isCacheStale } from '@/lib/pricing/batchPriceRefresh';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { isMissingColumnError } from '@/lib/cards/ownership';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 
 // DB stores: Pokemon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, Other, or
 // sport names (Football, Baseball, etc.) — categoryToRouteSlug handles them all.
@@ -166,19 +167,17 @@ export async function GET(request: NextRequest) {
     const sortedByValue = [...cardValues].sort((a, b) => b.value - a.value);
     const top10 = sortedByValue.slice(0, 10).filter(item => item.value > 0);
 
-    // Generate signed URLs only for top 10 thumbnails
-    let urlMap = new Map<string, string>();
+    // Generate signed URLs only for top 10 thumbnails — and they are genuinely
+    // thumbnails now (≤480px, ~35 KB) rather than the full ~800 KB original.
+    let urlMap = new Map<string, SignedImagePair>();
     if (top10.length > 0) {
       const frontPaths = top10.map(item => item.card.front_path as string).filter(Boolean);
       if (frontPaths.length > 0) {
-        const { data: signedUrls } = await supabase.storage
-          .from('cards')
-          .createSignedUrls(frontPaths, 60 * 60);
-        signedUrls?.forEach(item => {
-          if (item.path && item.signedUrl) {
-            urlMap.set(item.path, item.signedUrl);
-          }
-        });
+        try {
+          urlMap = await createSignedImageMap(supabase.storage, 'cards', frontPaths);
+        } catch (signErr) {
+          console.error('[market-pricing/portfolio] Error creating signed URLs:', signErr);
+        }
       }
     }
 
@@ -193,7 +192,8 @@ export async function GET(request: NextRequest) {
         return g > 0 ? getConditionFromGrade(g) : ((item.card.conversational_condition_label as string) || '');
       })(),
       value: Math.round(item.value * 100) / 100,
-      imageUrl: urlMap.get(item.card.front_path as string) || null,
+      imageUrl: pickDisplayUrls(urlMap, item.card.front_path as string).display,
+      imageFullUrl: pickDisplayUrls(urlMap, item.card.front_path as string).full,
       cardPath: getCardPath(item.card),
       cardSet: (item.card.card_set as string) || '',
       cardNumber: (item.card.card_number as string) || '',
@@ -227,6 +227,7 @@ export async function GET(request: NextRequest) {
       value: Math.round(item.currentValue * 100) / 100,
       gradingValue: Math.round(item.gradingValue * 100) / 100,
       imageUrl: null,
+      imageFullUrl: null,
       cardPath: getCardPath(item.card),
       cardSet: (item.card.card_set as string) || '',
       cardNumber: (item.card.card_number as string) || '',

@@ -27,6 +27,8 @@ import { ProcessedConditionReport } from '@/types/conditionReport';
 import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
+import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
+import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
@@ -1813,17 +1815,34 @@ export async function gradeCardConversational(
   // into runZoomInspection so there is still exactly ONE gate call per grade;
   // the cost is that its ~2-4s happens before the ensemble instead of in
   // parallel. Any failure falls back to exactly the pre-advisory behavior.
+  // EGRESS FIX: the originals used to be downloaded from the private "cards"
+  // bucket up to three times per grade — CV advisory here, the regioned zoom,
+  // and the structural verifier. They are now fetched at most ONCE per grading
+  // run and the buffers are handed to every consumer. Lazy, so a card that
+  // never reaches those passes still downloads nothing. Crops are unchanged:
+  // sharp .extract still cuts from these same bytes.
+  const loadOriginals = createCardOriginalsLoader(frontImageUrl, backImageUrl);
+  let thumbnailsRequested = false;
+  /** Free thumbnails: we already hold the bytes, so write the 480px previews
+   *  next to the originals. Fire-and-forget and non-throwing by construction —
+   *  ensureThumbnailsFromSignedUrls never rejects — so it cannot delay or fail
+   *  a paid grade. Runs while the ensemble call is still in flight. */
+  const requestThumbnails = (images: CardOriginals) => {
+    if (thumbnailsRequested) return;
+    thumbnailsRequested = true;
+    void ensureThumbnailsFromSignedUrls(frontImageUrl, backImageUrl, { front: images.front, back: images.back });
+  };
+
   let cvAdvisorySection = '';
   let advisoryGeometry: CardGeometry | undefined;
   let advisoryMeasurement: { front: CenteringMeasurement | null; back: CenteringMeasurement | null } | null = null;
   if (outputFormat === 'json' && process.env.CV_CENTERING_ADVISORY === '1') {
     try {
-      const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
-      if (frontRes.ok && backRes.ok) {
-        const [frontBuf, backBuf] = await Promise.all([
-          frontRes.arrayBuffer().then(b => Buffer.from(b)),
-          backRes.arrayBuffer().then(b => Buffer.from(b)),
-        ]);
+      const originals = await loadOriginals();
+      requestThumbnails(originals);
+      {
+        const frontBuf = originals.front;
+        const backBuf = originals.back;
         advisoryGeometry = await detectCardGeometry(frontBuf, backBuf, model);
         advisoryMeasurement = {
           front: advisoryGeometry.front ? await measureCentering(frontBuf, advisoryGeometry.front) : null,
@@ -1861,7 +1880,23 @@ export async function gradeCardConversational(
 
   const zoomPromise: Promise<ZoomResult> | null =
     outputFormat === 'json'
-      ? runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext, cardType })
+      ? loadOriginals()
+          .then((images) => {
+            requestThumbnails(images);
+            return runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext, cardType, images });
+          })
+          // A download failure used to be swallowed inside runZoomInspection and
+          // returned as an error ZoomResult. Preserve that: a rejecting
+          // zoomPromise would otherwise be caught by the ensemble retry loop and
+          // trigger a needless re-grade.
+          .catch((err: any) => ({
+            ok: false,
+            regionsInspected: 0,
+            defects: [],
+            faceCaps: {},
+            structuralFindings: [],
+            error: String(err?.message || err),
+          } as ZoomResult))
       : null;
 
   // Retry configuration for transient failures
@@ -2897,7 +2932,11 @@ Provide detailed analysis as markdown with all required sections.`
           // co-hallucinated a "crease" in a Pokemon back's printed swirl streaks
           // (grade 4 on a clean card, 9 on the re-shoot minutes later).
           const zoomFoundNoStructural = !!(zoom?.ok && zoom.structuralFindings.length === 0);
-          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model });
+          // Reuses the buffers this run already downloaded (see loadOriginals).
+          // A failed load falls back to undefined, and the verifier then fetches
+          // for itself — identical behavior to before the egress fix.
+          const verifierImages = await loadOriginals().catch(() => undefined);
+          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
           structuralVerified = verdict.confirmed;
           structuralVerifyReason = verdict.reason;
 

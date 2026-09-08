@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 
 export async function GET(request: NextRequest) {
   try {
@@ -82,14 +83,17 @@ export async function GET(request: NextRequest) {
     const paths = (rows ?? [])
       .map(r => (r as any).cards?.front_path)
       .filter((p): p is string => !!p);
-    const urlMap = new Map<string, string>();
+    // Up to 500 listings on one dashboard — at ~800 KB per original that was
+    // ~390 MB of egress for a full marketplace load. thumbnailUrl now resolves
+    // to the ≤480px thumb; cardFullImageUrl keeps the original for anything
+    // that needs it (relisting, image regeneration).
+    let urlMap = new Map<string, SignedImagePair>();
     if (paths.length > 0) {
-      const { data: signed } = await supabase.storage
-        .from('cards')
-        .createSignedUrls(paths, 60 * 60);
-      signed?.forEach(s => {
-        if (s.signedUrl && s.path) urlMap.set(s.path, s.signedUrl);
-      });
+      try {
+        urlMap = await createSignedImageMap(supabase.storage, 'cards', paths);
+      } catch (signError) {
+        console.error('[my-listings] signed URL error:', signError);
+      }
     }
 
     const normalized = (rows ?? []).map((r: any) => {
@@ -100,8 +104,10 @@ export async function GET(request: NextRequest) {
       const ebayThumb = Array.isArray(r.ebay_image_urls) && r.ebay_image_urls.length > 0
         ? r.ebay_image_urls[0]
         : null;
-      const thumbnailUrl = ebayThumb ?? urlMap.get(r.cards?.front_path) ?? null;
+      const cardImage = pickDisplayUrls(urlMap, r.cards?.front_path);
+      const thumbnailUrl = ebayThumb ?? cardImage.display;
       return {
+      cardFullImageUrl: cardImage.full,
       id: r.id,
       cardId: r.card_id,
       cardName: r.cards?.card_name ?? 'Unknown card',

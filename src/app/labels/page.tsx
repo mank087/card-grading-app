@@ -28,7 +28,7 @@ function LabelsPageInner() {
       if (session?.user) {
         setIsAuthenticated(true)
         try {
-          const res = await fetch('/api/cards/my-collection', {
+          const res = await fetch('/api/cards/my-collection?all=1', {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
           })
           if (res.ok) {

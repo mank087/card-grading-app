@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
 
 /**
  * GET /api/cards/latest-grades
@@ -57,35 +58,38 @@ export async function GET(request: Request) {
       return NextResponse.json({ cards: [] }, { status: 200 })
     }
 
-    // Create signed URLs for images
+    // Create signed URLs for images. front_url/back_url are the ≤480px
+    // thumbnails (this is a scrolling showcase strip, not a detail view); the
+    // originals stay available as *_full_url. Cards graded before the thumbnail
+    // backfill simply fall back to the original.
     const allPaths = cards.flatMap(card => [card.front_path, card.back_path].filter(Boolean))
 
-    const { data: signedUrls, error: signError } = await supabaseAdmin.storage
-      .from('cards')
-      .createSignedUrls(allPaths, 60 * 60) // 1 hour expiry
-
-    if (signError) {
+    let urlMap: Map<string, SignedImagePair>
+    try {
+      urlMap = await createSignedImageMap(supabaseAdmin.storage, 'cards', allPaths)
+    } catch (signError) {
       console.error('[Latest Grades] Signed URL error:', signError)
       return NextResponse.json({
-        cards: cards.map(card => ({ ...card, front_url: null, back_url: null }))
+        cards: cards.map(card => ({
+          ...card,
+          front_url: null,
+          back_url: null,
+          front_full_url: null,
+          back_full_url: null,
+        }))
       }, { status: 200 })
     }
 
-    // Build a map of path -> signedUrl for quick lookup
-    // Note: Client-side Next.js Image component handles optimization
-    const urlMap = new Map<string, string>()
-    signedUrls?.forEach(item => {
-      if (item.signedUrl) {
-        urlMap.set(item.path as string, item.signedUrl)
-      }
-    })
-
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
+      const front = pickDisplayUrls(urlMap, card.front_path)
+      const back = pickDisplayUrls(urlMap, card.back_path)
       const enrichedCard: any = {
         ...card,
-        front_url: card.front_path ? urlMap.get(card.front_path) || null : null,
-        back_url: card.back_path ? urlMap.get(card.back_path) || null : null
+        front_url: front.display,
+        back_url: back.display,
+        front_full_url: front.full,
+        back_full_url: back.full,
       }
 
       return enrichedCard

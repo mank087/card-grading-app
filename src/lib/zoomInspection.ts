@@ -24,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
+import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -143,6 +144,12 @@ export async function verifyStructuralClaim(
     requireUnanimous?: boolean;
     /** v9.12: must match the model grading the rest of this card. */
     model?: string;
+    /**
+     * Egress fix: the originals already downloaded by this grading run. When
+     * supplied, nothing is re-fetched from storage. Omit and this function
+     * downloads them itself, so callers that predate the change still work.
+     */
+    images?: CardOriginals;
   }
 ): Promise<{ ok: boolean; confirmed: boolean; reason: string; strongEvidence: boolean }> {
   try {
@@ -152,12 +159,13 @@ export async function verifyStructuralClaim(
     const lineClaims = findings.filter(f => ['crease', 'bend', 'fold', 'warp', 'tear'].includes(String(f.type || '').toLowerCase()));
     if (lineClaims.length === 0) return { ok: true, confirmed: true, reason: 'untyped structural damage — no verification available', strongEvidence: false };
 
-    const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
-    if (!frontRes.ok || !backRes.ok) return { ok: false, confirmed: true, reason: 'image fetch failed — cap stands (fail-safe)', strongEvidence: false };
-    const bufs: Record<string, Buffer> = {
-      front: Buffer.from(await frontRes.arrayBuffer()),
-      back: Buffer.from(await backRes.arrayBuffer()),
-    };
+    let bufs: Record<string, Buffer>;
+    try {
+      const originals = opts?.images ?? (await fetchCardOriginals(frontImageUrl, backImageUrl));
+      bufs = { front: originals.front, back: originals.back };
+    } catch {
+      return { ok: false, confirmed: true, reason: 'image fetch failed — cap stands (fail-safe)', strongEvidence: false };
+    }
 
     // Crop the claimed area(s) at native resolution (quadrant parsed from the
     // location text; whole face as fallback).
@@ -752,18 +760,25 @@ const SOFTENING_EVIDENCE_RX = /whiten|white\b|fiber|fibre|fuzz|fray|feather|chip
 export async function runZoomInspection(
   frontImageUrl: string,
   backImageUrl: string,
-  options?: { priorityNote?: string; model?: string; precomputedGeometry?: CardGeometry; cardType?: string }
+  options?: {
+    priorityNote?: string;
+    model?: string;
+    precomputedGeometry?: CardGeometry;
+    cardType?: string;
+    /**
+     * Egress fix: originals already downloaded by this grading run. When
+     * supplied, storage is not hit again. Optional — omit and this function
+     * downloads them itself exactly as before.
+     */
+    images?: CardOriginals;
+  }
 ): Promise<ZoomResult> {
   const empty: ZoomResult = { ok: false, regionsInspected: 0, defects: [], faceCaps: {}, structuralFindings: [] };
   const roundedCorners = hasFactoryRoundedCorners(options?.cardType);
   const cardTypeLabel = CARD_TYPE_LABEL[String(options?.cardType || '').toLowerCase()] || String(options?.cardType || 'trading card');
   try {
-    const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
-    if (!frontRes.ok || !backRes.ok) throw new Error(`image download failed (${frontRes.status}/${backRes.status})`);
-    const [frontBuf, backBuf] = await Promise.all([
-      frontRes.arrayBuffer().then(b => Buffer.from(b)),
-      backRes.arrayBuffer().then(b => Buffer.from(b)),
-    ]);
+    const { front: frontBuf, back: backBuf } =
+      options?.images ?? (await fetchCardOriginals(frontImageUrl, backImageUrl));
 
     // v9.4.1 KILL SWITCH: set ZOOM_DISABLED=1 (Vercel env) to skip the regioned zoom
     // entirely — grading falls back to the holistic ensemble, and the fallback is

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
 
 // Hardcoded sample card IDs for non-authenticated Label Studio visitors
 const SAMPLE_CARD_IDS = [
@@ -40,25 +41,27 @@ export async function GET() {
       return NextResponse.json({ cards: [] })
     }
 
-    // Generate signed URLs
+    // Generate signed URLs. These cards only ever populate on-screen label
+    // MOCKUPS on /labels, so front_url/back_url are the ≤480px thumbs;
+    // *_full_url keeps the originals for anything that goes to print.
     const allPaths = cards.flatMap(c => [c.front_path, c.back_path])
-    const { data: signedUrls } = await supabaseAdmin.storage
-      .from('cards')
-      .createSignedUrls(allPaths, 60 * 60)
-
-    const urlMap = new Map<string, string>()
-    signedUrls?.forEach(item => {
-      if (item.path && item.signedUrl) {
-        urlMap.set(item.path, item.signedUrl)
-      }
-    })
+    let urlMap = new Map<string, SignedImagePair>()
+    try {
+      urlMap = await createSignedImageMap(supabaseAdmin.storage, 'cards', allPaths)
+    } catch (signErr) {
+      console.error('[labels/sample-cards] Error creating signed URLs:', signErr)
+    }
 
     // Enrich cards — extract missing fields from conversational_grading JSON blob
     const cardsWithUrls = cards.map(card => {
+      const front = pickDisplayUrls(urlMap, card.front_path)
+      const back = pickDisplayUrls(urlMap, card.back_path)
       const enriched: any = {
         ...card,
-        front_url: urlMap.get(card.front_path) || null,
-        back_url: urlMap.get(card.back_path) || null,
+        front_url: front.display,
+        back_url: back.display,
+        front_full_url: front.full,
+        back_full_url: back.full,
       }
 
       if (card.conversational_grading) {

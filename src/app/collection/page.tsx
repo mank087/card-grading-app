@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -37,8 +37,16 @@ type Card = {
   conversational_weighted_sub_scores?: any
   front_path: string
   back_path: string
-  front_url?: string | null  // 🎯 Signed URL from API
-  back_url?: string | null   // 🎯 Signed URL from API
+  // Signed URLs from the API. front_url/back_url are the ≤480px THUMBNAILS
+  // (~35 KB) used for every on-screen tile; front_full_url/back_full_url are the
+  // full-resolution originals (~800 KB) and must be used by anything that
+  // prints, exports, or opens the image at size — labels, PDF reports, eBay
+  // listing images. Cards graded before the thumbnail backfill have no thumb,
+  // so *_url falls back to the original server-side.
+  front_url?: string | null
+  back_url?: string | null
+  front_full_url?: string | null
+  back_full_url?: string | null
   card_name?: string
   featured?: string  // 🎯 Player/character name
   category?: string
@@ -370,6 +378,9 @@ const getCardLink = (card: Card) => {
   return `/${categoryToRouteSlug(card.category)}/${card.id}`;
 };
 
+/** Cards requested per /api/cards/my-collection page. */
+const PAGE_SIZE = 60
+
 function CollectionPageContent() {
   const [cards, setCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(true)
@@ -663,54 +674,148 @@ function CollectionPageContent() {
     setDisplayLimit(20) // Reset display limit when filtering
   }, [selectedCategory, searchTerm, scope, graderFilter])
 
-  useEffect(() => {
-    const fetchCards = async () => {
-      setLoading(true)
+  // ---------------------------------------------------------------------
+  // Paged collection loading.
+  //
+  // This endpoint used to return EVERY card with a freshly signed, full
+  // resolution front AND back — ~1.1 GB of Supabase egress for one 778-card
+  // scroll, respent from scratch on every owned/sold tab switch (the CDN keys
+  // on the signature, so a new token is always a cache miss).
+  //
+  // Now: pages of 60, thumbnails for display, and a per-tab cache so switching
+  // tabs is free. Pages after the first are chained in the background rather
+  // than waiting on the scroll sentinel, because a large amount of this page —
+  // the Est. Value total, the category chip counts, sort, client-side search,
+  // CSV export, select-all — computes over the WHOLE array and would silently
+  // report page-1 numbers otherwise. First paint is now one page instead of the
+  // entire collection; the byte savings come from the thumbnails.
+  // ---------------------------------------------------------------------
+  const cacheKey = `${refreshKey}|${ownershipView}|${searchQuery || ''}`
+  const tabCacheRef = useRef<Map<string, { cards: Card[]; total: number; complete: boolean }>>(new Map())
+  // Holds the cacheKey of the request currently in flight (null when idle), so
+  // a second request for the SAME view is de-duped while a tab switch is still
+  // free to supersede one that is already running.
+  const loadingPageRef = useRef<string | null>(null)
+  // Read inside async callbacks to tell "still the view the user is looking at"
+  // from "they switched tabs while this was in flight".
+  const activeKeyRef = useRef(cacheKey)
+  activeKeyRef.current = cacheKey
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const [serverTotal, setServerTotal] = useState(0)
+  const [allPagesLoaded, setAllPagesLoaded] = useState(false)
+  const [loadingPage, setLoadingPage] = useState(false)
+
+  const fetchCardPage = useCallback(async (offset: number, key: string) => {
+    if (loadingPageRef.current === key) return
+    loadingPageRef.current = key
+    setLoadingPage(true)
+    try {
+      const session = getStoredSession()
+      if (!session || !session.user) {
+        setError('❌ You must be logged in to see your collection.')
+        return
+      }
+
+      const [, view, term] = key.split('|')
+      const params = new URLSearchParams({
+        status: view,
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      })
+      if (term) params.set('search', term)
+
+      const res = await fetch(`/api/cards/my-collection?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) throw new Error('Failed to load cards.')
+
+      const { cards: page, counts, ownershipApplied, total, hasMore } = await res.json()
+
+      // The user switched tabs while this was in flight — drop it rather than
+      // splicing another view's cards into the current one.
+      if (key !== activeKeyRef.current) return
+
+      if (counts) setOwnershipCounts(counts)
+      // false = migration not applied yet; hide the tabs rather than show
+      // three views that all return the same unfiltered list.
+      setOwnershipReady(ownershipApplied !== false)
+      setServerTotal(typeof total === 'number' ? total : (page?.length ?? 0))
+      setAllPagesLoaded(!hasMore)
       setError(null)
 
-      try {
-        // Check for stored session from direct auth
-        const session = getStoredSession()
-
-        if (!session || !session.user) {
-          setError('❌ You must be logged in to see your collection.')
-          setLoading(false)
-          return
-        }
-
-        const user = session.user
-
-        // Call server-side API that creates signed URLs (same approach as card detail pages)
-        // Pass the access token in Authorization header for secure authentication
-        const params = new URLSearchParams({ status: ownershipView })
-        if (searchQuery) params.set('search', searchQuery)
-        const url = `/api/cards/my-collection?${params.toString()}`
-        const res = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        })
-
-        if (!res.ok) {
-          throw new Error('Failed to load cards.')
-        }
-
-        const { cards, counts, ownershipApplied } = await res.json()
-        setCards(cards || [])
-        if (counts) setOwnershipCounts(counts)
-        // false = migration not applied yet; hide the tabs rather than show
-        // three views that all return the same unfiltered list.
-        setOwnershipReady(ownershipApplied !== false)
-      } catch (err) {
-        console.error(err)
+      setCards(prev => {
+        if (offset === 0) return page || []
+        // De-dupe: a grade landing between two page requests shifts the
+        // created_at window and can hand the same row back twice.
+        const seen = new Set(prev.map(c => c.id))
+        return [...prev, ...((page || []) as Card[]).filter(c => !seen.has(c.id))]
+      })
+    } catch (err) {
+      console.error(err)
+      if (offset === 0 && key === activeKeyRef.current) {
         setError('Failed to load cards. Please try again later.')
-      } finally {
-        setLoading(false)
       }
+    } finally {
+      if (loadingPageRef.current === key) {
+        loadingPageRef.current = null
+        setLoadingPage(false)
+      }
+      if (key === activeKeyRef.current) setLoading(false)
     }
+  }, [])
 
-    fetchCards()
-  }, [searchQuery, ownershipView, refreshKey])
+  // Tab / search / refresh change: serve from the per-tab cache when we have it
+  // (an owned↔sold switch then costs zero requests and zero egress), otherwise
+  // start at page 0.
+  useEffect(() => {
+    const cached = tabCacheRef.current.get(cacheKey)
+    if (cached) {
+      setCards(cached.cards)
+      setServerTotal(cached.total)
+      setAllPagesLoaded(cached.complete)
+      setLoading(false)
+      return
+    }
+    setCards([])
+    setServerTotal(0)
+    setAllPagesLoaded(false)
+    setLoading(true)
+    setError(null)
+    fetchCardPage(0, cacheKey)
+  }, [cacheKey, fetchCardPage])
+
+  // Keep the cache in step with the live array, so the in-place edits below
+  // (sell, delete, visibility toggle) are not undone by a tab round trip.
+  useEffect(() => {
+    tabCacheRef.current.set(cacheKey, { cards, total: serverTotal, complete: allPagesLoaded })
+  }, [cards, serverTotal, allPagesLoaded, cacheKey])
+
+  // Chain the remaining pages in the background once the first has painted.
+  useEffect(() => {
+    if (loading || allPagesLoaded || loadingPage || cards.length === 0) return
+    if (cards.length >= serverTotal) { setAllPagesLoaded(true); return }
+    const t = setTimeout(() => fetchCardPage(cards.length, cacheKey), 0)
+    return () => clearTimeout(t)
+  }, [loading, allPagesLoaded, loadingPage, cards.length, serverTotal, cacheKey, fetchCardPage])
+
+  // Scroll sentinel — reveals more of what is already loaded and pulls the next
+  // server page early when the background chain has not reached it yet.
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (!entries[0]?.isIntersecting) return
+        setDisplayLimit(prev => prev + 20)
+        if (scope === 'mine' && !allPagesLoaded && !loadingPageRef.current) {
+          fetchCardPage(cards.length, cacheKey)
+        }
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [allPagesLoaded, cards.length, cacheKey, fetchCardPage, scope])
 
   // Ask once whether eBay sales should move themselves into Sold. The endpoint
   // only says "ask" when the question hasn't been answered AND there are cards
@@ -1637,9 +1742,18 @@ function CollectionPageContent() {
   // worked, and the next render undid it. Memoised here so the array's identity
   // only changes when the selection or the underlying cards actually change.
   const batchSelectedCards = useMemo(
+    // These go to the batch LABEL modals, which render for print — they get the
+    // full-resolution original, never the 480px display thumbnail. front_url /
+    // back_url are overridden for the same reason: the label renderers read
+    // them directly.
     () => (scope === 'store' ? storeCards : cards)
       .filter(c => selectedCardIds.has(c.id))
-      .map(c => ({ ...c, front_image_url: c.front_url || undefined })),
+      .map(c => ({
+        ...c,
+        front_url: c.front_full_url ?? c.front_url,
+        back_url: c.back_full_url ?? c.back_url,
+        front_image_url: (c.front_full_url ?? c.front_url) || undefined,
+      })),
     [scope, storeCards, cards, selectedCardIds]
   )
 
@@ -1749,6 +1863,7 @@ function CollectionPageContent() {
   // Limit displayed cards for performance
   const displayedCards = filteredCards.slice(0, displayLimit)
   const hasMore = filteredCards.length > displayLimit
+
 
   // Store scope: client-side CSV of the currently filtered set.
   const exportStoreCsv = () => {
@@ -1963,10 +2078,43 @@ function CollectionPageContent() {
   const isAllSelected = displayedCards.length > 0 && displayedCards.every(card => selectedCardIds.has(card.id))
   const isSomeSelected = selectedCardIds.size > 0
 
-  // Load more handler
+  // Load more handler. Reveals another slice of what is loaded, and pulls the
+  // next server page when the client has caught up with it.
   const loadMore = () => {
     setDisplayLimit(prev => prev + 20)
+    if (scope === 'mine' && !allPagesLoaded && !loadingPageRef.current) {
+      fetchCardPage(cards.length, cacheKey)
+    }
   }
+
+  // Footer for both the grid and the list view (only one renders at a time, so
+  // they can share the sentinel ref). The IntersectionObserver above watches
+  // this node: scrolling near it reveals more rows and, if the background page
+  // chain has not got there yet, pulls the next server page early. The button
+  // is the manual fallback for anyone who never triggers a scroll.
+  //
+  // Store scope and binder views load their own arrays, so only the personal,
+  // un-binderd collection reports server paging progress — the rest keep the
+  // pre-existing "reveal 20 more" behaviour.
+  const paginatesFromServer = scope === 'mine' && !selectedBinderId
+  const collectionFooter = (hasMore || (paginatesFromServer && !allPagesLoaded)) ? (
+    <div ref={sentinelRef} className="mt-8 flex flex-col items-center gap-2">
+      <p className="text-xs text-gray-400">
+        {!paginatesFromServer || allPagesLoaded
+          ? `Showing ${Math.min(displayLimit, filteredCards.length)} of ${filteredCards.length}`
+          : `Loaded ${cards.length} of ${serverTotal} cards`}
+      </p>
+      <button
+        onClick={loadMore}
+        disabled={loadingPage && !hasMore}
+        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-60"
+      >
+        {hasMore
+          ? `Load More Cards (${filteredCards.length - displayLimit} remaining)`
+          : loadingPage ? 'Loading…' : 'Load More Cards'}
+      </button>
+    </div>
+  ) : null
 
   // Bulk delete handler
   const handleBulkDelete = async () => {
@@ -3002,17 +3150,8 @@ function CollectionPageContent() {
                 })}
               </SortableGrid>
 
-              {/* Load More Button */}
-              {hasMore && (
-                <div className="mt-8 text-center">
-                  <button
-                    onClick={loadMore}
-                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors"
-                  >
-                    Load More Cards ({filteredCards.length - displayLimit} remaining)
-                  </button>
-                </div>
-              )}
+              {/* Load More + auto-load sentinel */}
+              {collectionFooter}
               </>
             )}
           </>
@@ -3507,17 +3646,8 @@ function CollectionPageContent() {
                   </table>
                 </div>
 
-            {/* Load More Button for List View */}
-            {hasMore && (
-              <div className="mt-6 text-center">
-                <button
-                  onClick={loadMore}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors"
-                >
-                  Load More Cards ({filteredCards.length - displayLimit} remaining)
-                </button>
-              </div>
-            )}
+            {/* Load More + auto-load sentinel for List View */}
+            {collectionFooter}
           </div>
             )}
           </>
@@ -3559,7 +3689,15 @@ function CollectionPageContent() {
       <BatchDownloadModal
         isOpen={isBatchDownloadModalOpen}
         onClose={() => setIsBatchDownloadModalOpen(false)}
-        selectedCards={(scope === 'store' ? storeCards : cards).filter(c => selectedCardIds.has(c.id)) as any}
+        // PDF condition reports embed the card photos at print size, so they
+        // take the full-resolution originals rather than the display thumbnails.
+        selectedCards={(scope === 'store' ? storeCards : cards)
+          .filter(c => selectedCardIds.has(c.id))
+          .map(c => ({
+            ...c,
+            front_url: c.front_full_url ?? c.front_url,
+            back_url: c.back_full_url ?? c.back_url,
+          })) as any}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
 
@@ -4170,7 +4308,10 @@ function CardThumbnail({ url }: { url: string | null }) {
         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAQMEAQUAAAAAAAAAAAAAAQIDBAAFBhEhEhMiMUH/xAAVAQEBAAAAAAAAAAAAAAAAAAADBP/EABkRAAIDAQAAAAAAAAAAAAAAAAABAhEhMf/aAAwDAQACEQMRAD8AyTF8hv0O4W9q33S4wI1wjJkx0suq0tJWNdJPsb0djxSlVKlxCj0P/9k="
         onLoadingComplete={() => setIsLoading(false)}
         onError={handleError}
-        unoptimized={url.includes('supabase')} // Skip Next.js optimization for Supabase signed URLs
+        // Always unoptimized. These are already ≤480px thumbnails served from
+        // Supabase, so running them through the Vercel optimizer would fetch
+        // each image twice (origin → optimizer → browser) to save nothing.
+        unoptimized
       />
     </div>
   )

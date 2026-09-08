@@ -10,6 +10,7 @@
 // supabase/migrations/20260225_add_pop_report.sql. Nothing selects a JSON blob.
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 import {
   POP_CATEGORIES,
   getCategoryFromSlug,
@@ -150,21 +151,29 @@ export async function fetchPopCategories(): Promise<{
   return { categories, totals };
 }
 
-/** Batch-sign card thumbnails; one storage round trip instead of one per card. */
+/**
+ * Batch-sign card thumbnails; one storage round trip instead of one per card.
+ *
+ * These really are thumbnails now: the pop report renders a ~40px cell image,
+ * and this used to sign — and the browser used to download — the ~800 KB
+ * original for every row of a 50-row table. Falls back to the original for
+ * cards graded before the thumbnail backfill.
+ *
+ * The URLs are baked into the ISR HTML, so they must outlive the revalidate
+ * window: createSignedImageMap's 24h default replaces the old 1h expiry, which
+ * left stale pages rendering broken images.
+ */
 async function signThumbnails(paths: (string | null)[]): Promise<(string | null)[]> {
   const wanted = paths.filter((p): p is string => Boolean(p));
   if (wanted.length === 0) return paths.map(() => null);
 
-  const byPath = new Map<string, string>();
+  let byPath = new Map<string, SignedImagePair>();
   try {
-    const { data } = await supabaseAdmin.storage.from('cards').createSignedUrls(wanted, 3600);
-    for (const entry of data || []) {
-      if (entry.path && entry.signedUrl) byPath.set(entry.path, entry.signedUrl);
-    }
+    byPath = await createSignedImageMap(supabaseAdmin.storage, 'cards', wanted);
   } catch {
     // Thumbnails are decoration; a signing failure must not lose the table.
   }
-  return paths.map((p) => (p ? byPath.get(p) || null : null));
+  return paths.map((p) => pickDisplayUrls(byPath, p).display);
 }
 
 /**

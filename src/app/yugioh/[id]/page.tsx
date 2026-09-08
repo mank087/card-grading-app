@@ -1,7 +1,25 @@
 import { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isUuid } from '@/lib/uuid';
+import { getCardOgImageUrl, type CardMetadataRow } from '@/lib/seo/cardMetadataImage';
 import YugiohCardDetails from './CardDetailClient';
+
+// Only the columns the title/description/keywords/OG tags actually read.
+// Avoids pulling the ~42 KB whole row on every crawler hit.
+const METADATA_COLUMNS = [
+  'id',
+  'visibility',
+  'front_path',
+  'label_data',
+  'conversational_card_info',
+  'conversational_condition_label',
+  'conversational_decimal_grade',
+  'featured',
+  'card_name',
+  'card_number',
+  'card_set',
+  'release_date',
+].join(', ');
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -311,11 +329,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = supabaseServer();
 
   // Fetch card data server-side
-  const { data: card, error } = await supabase
+  const { data: cardRow, error } = await supabase
     .from('cards')
-    .select('*')
+    .select(METADATA_COLUMNS)
     .eq('id', id)
     .single();
+
+  // Narrow-select results are typed loosely by supabase-js; helpers below expect the row shape.
+  const card = cardRow as CardMetadataRow | null;
 
   // Default metadata if card not found
   if (error || !card) {
@@ -331,7 +352,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   console.log('[METADATA] Yu-Gi-Oh card title:', title);
   console.log('[METADATA] Yu-Gi-Oh card description:', description);
 
-  const imageUrl = card.front_url;
+  // "cards" is a private bucket: sign the stored path, and only for public cards.
+  const imageUrl = await getCardOgImageUrl(card.front_path, card.visibility);
   const cardUrl = `https://dcmgrading.com/yugioh/${id}`;
   const cardName = getFirstValidValue(
     card.card_name,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,36 +53,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ cards: [] }, { status: 200 })
     }
 
-    // 🚀 PERFORMANCE: Batch create signed URLs (fast, single request)
-    // Then modify URLs to use image transforms for egress optimization
+    // 🚀 PERFORMANCE: batch-sign thumbnails alongside the originals. This route
+    // feeds homepage/category showcases where the card renders at a few hundred
+    // pixels — shipping the ~800 KB original for each of up to 50 featured cards
+    // was tens of MB of Supabase egress per page view. front_url is now the
+    // ≤480px thumb (falling back to the original when a card predates the
+    // thumbnail backfill); front_full_url keeps the original for anything that
+    // needs real pixels.
     const allPaths = cards.flatMap(card => [card.front_path, card.back_path])
 
-    const { data: signedUrls, error: signError } = await supabaseAdmin.storage
-      .from('cards')
-      .createSignedUrls(allPaths, 60 * 60) // 1 hour expiry
-
-    if (signError) {
+    let urlMap: Map<string, SignedImagePair>
+    try {
+      urlMap = await createSignedImageMap(supabaseAdmin.storage, 'cards', allPaths)
+    } catch (signError) {
       console.error('Error creating signed URLs:', signError)
       return NextResponse.json({
-        cards: cards.map(card => ({ ...card, front_url: null, back_url: null }))
+        cards: cards.map(card => ({
+          ...card,
+          front_url: null,
+          back_url: null,
+          front_full_url: null,
+          back_full_url: null,
+        }))
       }, { status: 200 })
     }
 
-    // Build a map of path -> signedUrl for quick lookup
-    // Note: Client-side Next.js Image component handles optimization
-    const urlMap = new Map<string, string>()
-    signedUrls?.forEach(item => {
-      if (item.signedUrl && item.path) {
-        urlMap.set(item.path, item.signedUrl)
-      }
-    })
-
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
+      const front = pickDisplayUrls(urlMap, card.front_path)
+      const back = pickDisplayUrls(urlMap, card.back_path)
       const enrichedCard = {
         ...card,
-        front_url: urlMap.get(card.front_path) || null,
-        back_url: urlMap.get(card.back_path) || null
+        front_url: front.display,
+        back_url: back.display,
+        front_full_url: front.full,
+        back_full_url: back.full,
       };
 
       return enrichedCard;

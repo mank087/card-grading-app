@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from "@/lib/signedUrlBatch";
 
 /**
  * GET /api/cards/search?serial=XXX&sport=all&visibility=all
@@ -98,21 +99,17 @@ export async function GET(request: NextRequest) {
       console.log(`🔍 [Search API] First match: id=${cards[0].id}, serial=${cards[0].serial}, visibility=${cards[0].visibility}`);
     }
 
-    // Generate signed URLs for card images
+    // Generate signed URLs for card images. Search results are small result
+    // tiles, so front_url is the ≤480px thumbnail where one exists; front_full_url
+    // carries the original for anything that opens the image full size.
     const frontPaths = cards?.map(card => card.front_path).filter(Boolean) || [];
-    const urlMap = new Map<string, string>();
+    let urlMap = new Map<string, SignedImagePair>();
 
     if (frontPaths.length > 0) {
-      const { data: signedUrls } = await supabase.storage
-        .from('cards')
-        .createSignedUrls(frontPaths, 60 * 60); // 1 hour expiry
-
-      if (signedUrls) {
-        signedUrls.forEach((item) => {
-          if (item.signedUrl && item.path) {
-            urlMap.set(item.path, item.signedUrl);
-          }
-        });
+      try {
+        urlMap = await createSignedImageMap(supabase.storage, 'cards', frontPaths);
+      } catch (signError) {
+        console.error('[Search API] Error creating signed URLs:', signError);
       }
     }
 
@@ -130,7 +127,8 @@ export async function GET(request: NextRequest) {
         sport_type: enrichedCard.category,
         category: enrichedCard.category,
         visibility: enrichedCard.visibility,
-        front_url: enrichedCard.front_path ? urlMap.get(enrichedCard.front_path) || null : null,
+        front_url: pickDisplayUrls(urlMap, enrichedCard.front_path).display,
+        front_full_url: pickDisplayUrls(urlMap, enrichedCard.front_path).full,
         created_at: enrichedCard.created_at,
         // Friendly mapped names for backward compatibility
         player_name: playerOrCharacter,
