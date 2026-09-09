@@ -224,6 +224,8 @@ function BandArt({
 function Frame({ geom, i, id }: { geom: HeritageGeometry; i: HeritageInputs; id: string }) {
   const T = heritageTheme(!!i.printHardened)
   const b = geom.band
+  // Band off (designer 'none'): no art and no rule, only the optional border.
+  const bandOff = b.position === 'none'
   return (
     <>
       {geom.border ? (
@@ -233,10 +235,14 @@ function Frame({ geom, i, id }: { geom: HeritageGeometry; i: HeritageInputs; id:
           borderWidth: u(geom.border.width), borderColor: geom.border.color, borderStyle: 'solid',
         }} />
       ) : null}
-      <View style={{ position: 'absolute', top: u(b.y), left: u(b.x), width: u(b.w), height: u(b.h) }}>
-        <BandArt pattern={i.pattern} colors={i.bandColors} id={id} w={u(b.w)} h={u(b.h)} horizontal={b.horizontal} />
-      </View>
-      <View style={{ position: 'absolute', top: u(geom.rule.y), left: u(geom.rule.x), width: u(geom.rule.w), height: u(geom.rule.h), backgroundColor: T.rule }} />
+      {bandOff ? null : (
+        <>
+          <View style={{ position: 'absolute', top: u(b.y), left: u(b.x), width: u(b.w), height: u(b.h) }}>
+            <BandArt pattern={i.pattern} colors={i.bandColors} id={id} w={u(b.w)} h={u(b.h)} horizontal={b.horizontal} />
+          </View>
+          <View style={{ position: 'absolute', top: u(geom.rule.y), left: u(geom.rule.x), width: u(geom.rule.w), height: u(geom.rule.h), backgroundColor: T.rule }} />
+        </>
+      )}
     </>
   )
 }
@@ -478,9 +484,13 @@ export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip 
           </Text>
         ))}
         <View style={{ height: 0.9, backgroundColor: T.divider, marginTop: u(24), width: u(TX.w) }} />
-        <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(18) }}>
-          Serial: {i.serial}
-        </Text>
+        {/* The serial is the stack's last row unless the design moved it under
+            the grade chip, in which case the divider ends the stack. */}
+        {geom.serial ? null : (
+          <Text style={{ fontFamily: 'Helvetica', fontSize: u(34), color: T.inkSoft, letterSpacing: u(2), marginTop: u(18) }}>
+            Serial: {i.serial}
+          </Text>
+        )}
       </View>
 
       {/* Grade chip */}
@@ -492,6 +502,18 @@ export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip 
           inkOverride={i.gradeColors?.[String(chip.grade)] ?? (chip.grade === 10 ? i.design?.chip.grade10Color ?? undefined : undefined)}
         />
       </View>
+
+      {/* Serial under the chip (design option) — same small tracked style the
+          stack row used, centred on the chip's width. Bare number, matching
+          the back's serial under the QR: at this size the "Serial:" prefix
+          would not fit across a 240px chip. */}
+      {geom.serial ? (
+        <View style={{ position: 'absolute', left: u(geom.serial.x), top: u(geom.serial.y), width: u(geom.serial.w), alignItems: 'center' }}>
+          <Text style={{ fontFamily: 'Helvetica', fontSize: u(geom.serial.size), color: T.inkSoft, letterSpacing: u(geom.serial.tracking) }}>
+            {i.serial}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Mark, bottom-centre, hugging the edge */}
       <LogoBlock i={i} showRules={rulesOk} fit={fit} geom={geom} />

@@ -74,6 +74,12 @@ export interface HeritageGeometry {
   rule: Rect
   /** Outer minus band + rule: where text, chip and mark live. */
   content: Rect
+  /**
+   * The serial's own row under the grade chip — only when the design asks for
+   * text.serialPlacement === 'chip'. null (every stock label, every legacy
+   * design) means the serial is the last row of the text stack, as always.
+   */
+  serial: (Rect & { size: number; tracking: number }) | null
   text: { x: number; y: number; w: number; maxBottom: number; scale: number }
   chip: { x: number; y: number; w: number; h: number; r: number; bw: number; scale: number }
   logo: {
@@ -93,6 +99,27 @@ export interface HeritageGeometry {
 
 /** Mockup px per inch (1400 px = 2.8"). */
 export const HERITAGE_PX_PER_INCH = 500
+
+/**
+ * The chip-side serial row (text.serialPlacement === 'chip'): same 34px /
+ * 2px-tracked style as the stack serial it replaces, on its own line under the
+ * chip. GAP is the air between the chip's bottom edge and the row's top.
+ */
+export const HERITAGE_CHIP_SERIAL = { GAP: 14, SIZE: 34, TRACK: 2, LINE: 34 * 1.2 } as const
+
+/**
+ * Horizontal room a side logo column may take when the band is off, before the
+ * text column would drop under a readable width. The text box never goes below
+ * SIDE_TEXT_MIN, so a 2.2x emblem can grow into the freed band width and stop
+ * there rather than squeezing the card name.
+ */
+const SIDE_TEXT_MIN = 420
+
+function sideColumnRoom(content: Rect, chipX: number, zone: 'left' | 'right'): number {
+  return zone === 'left'
+    ? chipX - 40 - (content.x + 30) - 30 - SIDE_TEXT_MIN
+    : chipX - 30 - (content.x + 54) - 30 - SIDE_TEXT_MIN
+}
 
 export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeometry {
   const PX = HERITAGE_PX
@@ -116,6 +143,15 @@ export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeomet
   let rule: Rect
   let content: Rect
   switch (position) {
+    case 'none':
+      // No band and no rule: the content rect IS the outer box (which already
+      // has the border inset taken off it above). The band rect is kept as a
+      // zero-width stub at the outer origin so callers that read it still get
+      // a rect; every renderer skips drawing it on this position.
+      band = { x: outer.x, y: outer.y, w: 0, h: outer.h, position, horizontal: false }
+      rule = { x: outer.x, y: outer.y, w: 0, h: 0 }
+      content = { x: outer.x, y: outer.y, w: outer.w, h: outer.h }
+      break
     case 'right':
       band = { x: outer.x + outer.w - bandW, y: outer.y, w: bandW, h: outer.h, position, horizontal: false }
       rule = { x: band.x - R, y: outer.y, w: R, h: outer.h }
@@ -139,16 +175,45 @@ export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeomet
 
   // Chip: right-anchored, vertically centred with the stock 10px lift, capped
   // at the content height so a top/bottom band can never clip it.
+  // A chip-side serial claims a row under the chip, so the chip's own height
+  // budget shrinks by exactly that much — same chipCapH rule, one term longer.
+  const CS = HERITAGE_CHIP_SERIAL
+  const serialUnderChip = d?.text.serialPlacement === 'chip'
+  const serialReserve = serialUnderChip ? CS.GAP + CS.LINE : 0
   let cs = d?.chip.scale ?? 1
-  const chipCapH = content.h - 32
+  const chipCapH = content.h - 32 - serialReserve
   if (PX.CHIP_H * cs > chipCapH) cs = chipCapH / PX.CHIP_H
   const chipW = PX.CHIP_W * cs
   const chipH = PX.CHIP_H * cs
+  let chipY = content.y + (content.h - chipH) / 2 - 10 * (content.h / H)
+  if (serialUnderChip) {
+    // Nudge the chip UP only as far as the serial row needs, and never past
+    // the top margin — the cap above guarantees both bounds can be met.
+    chipY = Math.min(chipY, content.y + content.h - 8 - serialReserve - chipH)
+    chipY = Math.max(chipY, content.y + 16)
+  }
   const chip = {
     x: content.x + content.w - 30 - chipW,
-    y: content.y + (content.h - chipH) / 2 - 10 * (content.h / H),
+    y: chipY,
     w: chipW, h: chipH, r: PX.CHIP_R * cs, bw: PX.CHIP_BORDER * cs, scale: cs,
   }
+  // Centred on the CHIP, but the box is the widest one that stays symmetric
+  // inside the content rect — a serial longer than the 240px chip would
+  // otherwise wrap (PDF) or run off the die-cut (SVG).
+  const serialHalf = Math.min(
+    chip.x + chip.w / 2 - content.x,
+    content.x + content.w - (chip.x + chip.w / 2),
+  )
+  const serial: HeritageGeometry['serial'] = serialUnderChip
+    ? {
+        x: chip.x + chip.w / 2 - serialHalf,
+        y: chip.y + chip.h + CS.GAP,
+        w: serialHalf * 2,
+        h: CS.LINE,
+        size: CS.SIZE,
+        tracking: CS.TRACK,
+      }
+    : null
 
   // Logo zone.
   const zone: LogoZone = d?.logo.zone ?? 'bottom'
@@ -158,9 +223,20 @@ export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeomet
   let textX = content.x + 54
   let textRight = chip.x - 40
   if (zone === 'left' || zone === 'right') {
-    const side = Math.min(240 * logoScale, content.h - 48)
-    const colX = zone === 'left' ? content.x + 30 : chip.x - 30 - side
-    column = { x: colX, y: content.y + 24, w: side, h: content.h - 48 }
+    // Banded layouts keep the historic square column: side = 240 x scale,
+    // ceilinged by the content height. With the band OFF the column also gets
+    // the freed width, so it becomes a rect — taller (padding relaxes from 24
+    // to 12) and as wide as the scale asks for, stopping where the text column
+    // would fall under SIDE_TEXT_MIN. This is the ONLY branch that changed, and
+    // it is gated on position === 'none', so every banded design is untouched.
+    const bandOff = position === 'none'
+    const want = 240 * logoScale
+    const colH = bandOff ? content.h - 24 : content.h - 48
+    const colW = bandOff
+      ? Math.max(120, Math.min(want, sideColumnRoom(content, chip.x, zone)))
+      : Math.min(want, content.h - 48)
+    const colX = zone === 'left' ? content.x + 30 : chip.x - 30 - colW
+    column = { x: colX, y: content.y + (bandOff ? 12 : 24), w: colW, h: colH }
     if (zone === 'left') textX = column.x + column.w + 30
     else textRight = column.x - 30
   }
@@ -173,7 +249,7 @@ export function heritageGeometry(design?: OrgLabelDesign | null): HeritageGeomet
   }
 
   return {
-    W, H, outer, border, band, rule, content, text, chip,
+    W, H, outer, border, band, rule, content, serial, text, chip,
     logo: { zone, column, scale: logoScale, offset, accentRules: d?.logo.accentRules ?? true },
     // Stock: bars at y 341 with the left bar's zone starting at x 438.
     barTop: content.y + content.h - 59,
@@ -320,19 +396,27 @@ export function boldFitFactor(text: string): number {
   return 1.06 + 0.06 * (caps / letters)
 }
 
-/** Bottom of a fitted stack: block top, name + context rows, gap, divider (+margins), serial row. */
-function stackBottom(top: number, name: FitResult, ctx: FitResult): number {
+/**
+ * Bottom of a fitted stack: block top, name + context rows, gap, divider
+ * (+margins), and the serial row — unless the design moved the serial under
+ * the grade chip, in which case the divider is the last thing in the stack and
+ * the names get that row's height back.
+ */
+function stackBottom(top: number, name: FitResult, ctx: FitResult, withSerial = true): number {
   return (
     top +
     name.rows.length * name.size * 1.06 +
     Math.max(name.size * 0.28, 18) +
     ctx.rows.length * ctx.size * 1.2 +
-    (24 + 6) + (18 + 34 * 1.2)
+    (24 + 6) + (withSerial ? 18 + 34 * 1.2 : 0)
   )
 }
 
 export function fitHeritageFront(primaryName: string, contextLine: string, serial?: string, geom?: HeritageGeometry): HeritageFrontFit {
   const g = geom ?? heritageGeometry(null)
+  // A chip-side serial is not part of the stack at all: no serial row to
+  // measure, and nothing for the accent bars to collide with on the left.
+  const serialInStack = g.serial === null
   let nameMax = Math.round(84 * g.text.scale)
   let ctxMax = Math.round(30 * g.text.scale)
   let name = fitLines(primaryName, g.text.w / boldFitFactor(primaryName), nameMax, 30, 3)
@@ -341,7 +425,7 @@ export function fitHeritageFront(primaryName: string, contextLine: string, seria
   let ctx = fitLines((contextLine || '').toUpperCase(), g.text.w, ctxMax, 24, 3, heritageCtxTracking)
   // Approximate bottom of the stack: block top, name and context rows at their
   // line heights, gap, divider (+margins), serial row.
-  let textBottom = stackBottom(g.text.y, name, ctx)
+  let textBottom = stackBottom(g.text.y, name, ctx, serialInStack)
   // Designer layouts with a short content rect (top/bottom band, border):
   // step the maximum sizes down until the stack clears the floor. The stock
   // stack never reaches it, so consumers never enter this loop.
@@ -350,7 +434,7 @@ export function fitHeritageFront(primaryName: string, contextLine: string, seria
     ctxMax = Math.max(24, ctxMax - 1)
     name = fitLines(primaryName, g.text.w / boldFitFactor(primaryName), nameMax, 30, 3)
     ctx = fitLines((contextLine || '').toUpperCase(), g.text.w, ctxMax, 24, 3, heritageCtxTracking)
-    textBottom = stackBottom(g.text.y, name, ctx)
+    textBottom = stackBottom(g.text.y, name, ctx, serialInStack)
   }
   // The logo accent bars only collide with the serial line if BOTH hold: the
   // stack reaches down into the bar row (bars sit at y 341-347), AND the
@@ -359,12 +443,17 @@ export function fitHeritageFront(primaryName: string, contextLine: string, seria
   // even when the serial stopped 200px short of them.
   const BAR_TOP = g.barTop
   const BAR_LEFT = g.barLeft
-  const serialRight = g.text.x + widthOf(`Serial: ${serial ?? ''}`, 34, 2)
+  // With the serial under the chip there is no serial line on the left at all:
+  // the bars are unconditionally clear of it, and the mark has no short last
+  // row to rise beside — its relaxed ceiling collapses onto the strict one.
+  const serialRight = serialInStack
+    ? g.text.x + widthOf(`Serial: ${serial ?? ''}`, 34, 2)
+    : Number.NEGATIVE_INFINITY
   const vClear = textBottom + 6 <= BAR_TOP
-  const hClear = serial != null && serialRight + 16 <= BAR_LEFT
+  const hClear = serialInStack ? serial != null && serialRight + 16 <= BAR_LEFT : true
   // The serial row is the only text the mark can sit BESIDE (it is short and
   // left-aligned); everything above it spans the full text box.
-  const serialTop = textBottom - (18 + 34 * 1.2)
+  const serialTop = serialInStack ? textBottom - (18 + 34 * 1.2) : textBottom
   return { name, ctx, rulesOk: vClear || hClear, textBottom, serialRight, serialTop }
 }
 
@@ -420,6 +509,14 @@ export function heritageRulesFit(fit: HeritageFrontFit, box: HeritageMarkBox): b
  */
 export function heritageLogoScaleMax(geom: HeritageGeometry, fit: Pick<HeritageFrontFit, 'textBottom' | 'serialRight' | 'serialTop'>): number {
   if (geom.logo.column) {
+    // Band off: the column is width-bound, not height-bound, so the ceiling is
+    // however much horizontal room is left before the text column hits its
+    // floor — capped at the document's 2.2 limit.
+    if (geom.band.position === 'none') {
+      const zone = geom.logo.zone === 'right' ? 'right' : 'left'
+      const room = sideColumnRoom(geom.content, geom.chip.x, zone)
+      return Math.max(HERITAGE_LOGO_SCALE.min, Math.min(2.2, Math.round((room / 240) * 100) / 100))
+    }
     return Math.max(HERITAGE_LOGO_SCALE.min, Math.min(1.5, (geom.content.h - 48) / 240))
   }
   const baseH = HERITAGE_PX.MARK_H * HERITAGE_PX.MARK_SCALE
@@ -449,14 +546,19 @@ export function heritageMarkBox(
   // the column already reserved its width from the text box.
   if (g.logo.column) {
     const c = g.logo.column
-    const side = c.w
-    const travel = Math.max(0, (c.h - side) / 2)
-    const y = c.y + (c.h - side) / 2 + g.logo.offset.y * travel
+    // Banded columns are always at least as tall as they are wide, so this is
+    // the historic square (w === h === c.w). A band-off column can be WIDER
+    // than it is tall; the mark then fills the column and is capped by its
+    // height, which is what lets a 2.2x emblem exist on a 400px-tall label.
+    const w = c.w
+    const h = Math.min(c.h, c.w)
+    const travel = Math.max(0, (c.h - h) / 2)
+    const y = c.y + (c.h - h) / 2 + g.logo.offset.y * travel
     return {
-      x: c.x, y, w: side, h: side,
-      ruleY: y + side / 2 - 3,
+      x: c.x, y, w, h,
+      ruleY: y + h / 2 - 3,
       ruleLeft: Number.NEGATIVE_INFINITY, ruleRight: Number.POSITIVE_INFINITY, ruleLen: 0,
-      clamped: side < 240 * g.logo.scale - 0.5,
+      clamped: w < 240 * g.logo.scale - 0.5,
     }
   }
 

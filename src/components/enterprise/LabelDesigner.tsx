@@ -27,8 +27,8 @@ import {
 } from '@/lib/labelLab/heritageLayout'
 import { MODERN_LOGO_MAX_SCALE } from '@/lib/labels/logoScale'
 import {
-  DESIGN_LIMITS, LABEL_SIZE_PRESETS, defaultOrgLabelDesign, designEquals, normalizeOrgLabelDesign,
-  type OrgLabelDesign, type BandPosition, type LogoZone,
+  DESIGN_LIMITS, LABEL_SIZE_PRESETS, defaultOrgLabelDesign, designEquals, normalizeOrgLabelDesign, logoScaleLimits,
+  type OrgLabelDesign, type BandPosition, type LogoZone, type SerialPlacement,
 } from '@/lib/labels/orgLabelDesign'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 
@@ -243,7 +243,7 @@ export default function LabelDesigner({
         break
       }
       case 'logo-size': {
-        const lim = d.start.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
+        const lim = logoScaleLimits(d.start.logo.zone, d.start.band.position)
         // The handle stops where the element stops, like the slider.
         const max = Math.max(lim.min + 0.05, heritageLogoScaleMax(g, fit))
         next = patch(d.start, x => { x.logo.scale = round2(clamp(d.start.logo.scale + (dx + dy) / 260, lim.min, max)) })
@@ -330,8 +330,11 @@ export default function LabelDesigner({
   // Effective ceilings for THIS layout and sample: the geometry clamps the
   // logo (text ceiling / column height) and the chip (label height), so the
   // sliders stop exactly where the elements stop growing.
-  const logoLimit = design.logo.zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
-  const logoMax = heritage ? Math.max(logoLimit.min + 0.05, heritageLogoScaleMax(geom, fit)) : MODERN_LOGO_MAX_SCALE
+  // The side-column ceiling depends on the band: with the band off the column
+  // has its width to grow into, so the slider offers up to 2.2 instead of 1.5.
+  const logoLimit = logoScaleLimits(design.logo.zone, design.band.position)
+  const logoMax = heritage ? Math.max(logoLimit.min + 0.05, Math.min(logoLimit.max, heritageLogoScaleMax(geom, fit))) : MODERN_LOGO_MAX_SCALE
+  const bandOff = design.band.position === 'none'
   const chipMax = heritageChipScaleMax(geom, DESIGN_LIMITS.chipScale.max)
 
   return (
@@ -408,10 +411,12 @@ export default function LabelDesigner({
               onPointerCancel={endDrag}
               onPointerDown={() => setSelection(null)}
             >
-              {/* band */}
-              <rect x={geom.band.x} y={geom.band.y} width={geom.band.w} height={geom.band.h} fill="transparent"
-                stroke={outline('band')} strokeWidth={5} strokeDasharray="14 10" style={{ cursor: 'pointer' }}
-                onPointerDown={e => { e.stopPropagation(); setSelection('band') }} />
+              {/* band — nothing to hit or drag when it is switched off */}
+              {!bandOff && (
+                <rect x={geom.band.x} y={geom.band.y} width={geom.band.w} height={geom.band.h} fill="transparent"
+                  stroke={outline('band')} strokeWidth={5} strokeDasharray="14 10" style={{ cursor: 'pointer' }}
+                  onPointerDown={e => { e.stopPropagation(); setSelection('band') }} />
+              )}
               {/* border */}
               {geom.border && (
                 <rect x={geom.border.x} y={geom.border.y} width={geom.border.w} height={geom.border.h} fill="none"
@@ -440,7 +445,7 @@ export default function LabelDesigner({
               {sel('logo') && <Handle x={markBox.x + markBox.w + 6} y={markBox.y + markBox.h + 6} onDown={beginDrag('logo-size')} title="Drag to resize the logo" />}
               {sel('chip') && <Handle x={geom.chip.x + geom.chip.w + 6} y={geom.chip.y + geom.chip.h + 6} onDown={beginDrag('chip-size')} title="Drag to resize the grade chip" />}
               {sel('text') && <Handle x={textRect.x + textRect.w + 8} y={textRect.y + textRect.h + 8} onDown={beginDrag('text-size')} title="Drag to scale the text" />}
-              {sel('band') && (
+              {sel('band') && !bandOff && (
                 <>
                   <Handle x={bandInnerMid.x} y={bandInnerMid.y} cursor={bandInnerMid.cursor} onDown={beginDrag('band-width')} title="Drag to change the band width" />
                   {bandEdgeTargets.filter(t => t.pos !== design.band.position).map(t => (
@@ -564,21 +569,30 @@ export default function LabelDesigner({
               <label className={labelCls}>Edge</label>
               <select value={design.band.position} className={inputCls} disabled={disabled}
                 onChange={e => set(x => { x.band.position = e.target.value as BandPosition })}>
+                <option value="none">None (no band)</option>
                 <option value="left">Left</option>
                 <option value="right">Right</option>
                 <option value="top">Top</option>
                 <option value="bottom">Bottom</option>
               </select>
             </div>
-            <div>
-              <label className={labelCls}>Pattern</label>
-              <select value={design.band.pattern} className={inputCls} disabled={disabled}
-                onChange={e => set(x => { x.band.pattern = e.target.value as BandPattern })}>
-                {BAND_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+            {!bandOff && (
+              <div>
+                <label className={labelCls}>Pattern</label>
+                <select value={design.band.pattern} className={inputCls} disabled={disabled}
+                  onChange={e => set(x => { x.band.pattern = e.target.value as BandPattern })}>
+                  {BAND_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
-          <div className="mt-2">
+          {/* With the band off its pattern and colours are kept in the design
+              but have nothing to draw — switching the band back on restores
+              exactly the look the store had before. */}
+          {bandOff && (
+            <p className="text-[11px] text-gray-400 mt-2">Turn the band back on to edit its pattern and colours.</p>
+          )}
+          <div className={`mt-2 ${bandOff ? 'hidden' : ''}`}>
             <label className={labelCls}>Colors</label>
             <select value={design.band.colorSource} className={inputCls} disabled={disabled}
               onChange={e => set(x => {
@@ -611,7 +625,7 @@ export default function LabelDesigner({
               <p className="text-[11px] text-gray-400 mt-1">The band picks up each graded card&apos;s artwork colors. The preview shows your brand palette as a stand-in.</p>
             )}
           </div>
-          <div className="mt-2">
+          <div className={`mt-2 ${bandOff ? 'hidden' : ''}`}>
             <RangeControl {...rangeExtras} label="Band width" value={design.band.width} min={DESIGN_LIMITS.bandWidth.min} max={DESIGN_LIMITS.bandWidth.max} step={DESIGN_LIMITS.bandWidth.step}
               onChange={v => onChange(patch(design, x => { x.band.width = v }))} />
           </div>
@@ -636,8 +650,9 @@ export default function LabelDesigner({
                   const zone = e.target.value as LogoZone
                   x.logo.zone = zone
                   x.logo.offset = { x: 0, y: 0 }
-                  // Side columns run 0.7–1.5; a bottom-strip value above that clamps.
-                  if (zone !== 'bottom') x.logo.scale = Math.min(x.logo.scale, DESIGN_LIMITS.logoScaleSide.max)
+                  // Side columns run 0.7–1.5 (0.7–2.2 with the band off); a
+                  // bottom-strip value above the zone's ceiling clamps.
+                  x.logo.scale = Math.min(x.logo.scale, logoScaleLimits(zone, x.band.position).max)
                 })}>
                 <option value="bottom">Bottom centre (wordmark)</option>
                 <option value="left">Left column (emblem)</option>
@@ -711,6 +726,15 @@ export default function LabelDesigner({
           <RangeControl {...rangeExtras} label="Text size" value={design.text.scale} min={DESIGN_LIMITS.textScale.min} max={DESIGN_LIMITS.textScale.max} step={DESIGN_LIMITS.textScale.step}
             onChange={v => onChange(patch(design, x => { x.text.scale = v }))} />
           <p className="text-[11px] text-gray-400 mt-1">A request, not a guarantee: long names still shrink to fit.</p>
+          <div className="mt-2.5">
+            <label className={labelCls}>Serial number</label>
+            <select value={design.text.serialPlacement} className={inputCls} disabled={disabled || !heritage}
+              onChange={e => set(x => { x.text.serialPlacement = e.target.value as SerialPlacement })}>
+              <option value="stack">Under the card name</option>
+              <option value="chip">Under the grade chip</option>
+            </select>
+            <p className="text-[11px] text-gray-400 mt-1">Under the chip frees a line for the card name. The back always prints the serial under the QR code.</p>
+          </div>
           <label className="flex items-center justify-between text-xs font-medium text-gray-600 mt-2.5">
             ALL CAPS text
             <input type="checkbox" checked={design.text.transform === 'uppercase'} disabled={disabled}

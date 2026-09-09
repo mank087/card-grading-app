@@ -23,12 +23,28 @@
  */
 import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/bandGeometry'
 
-export type BandPosition = 'left' | 'right' | 'top' | 'bottom'
+/**
+ * Which edge the colour band occupies — or 'none', which removes it entirely
+ * and hands the whole label width to the content. 'none' keeps the pattern /
+ * colour / width fields intact so switching the band back on restores exactly
+ * the look the store had before.
+ */
+export type BandPosition = 'none' | 'left' | 'right' | 'top' | 'bottom'
 export type LogoZone = 'bottom' | 'left' | 'right'
 export type LogoVariant = 'color' | 'black' | 'white'
 export type ChipTheme = 'black' | 'white'
 export type BandColorSource = 'brand' | 'card' | 'custom'
 export type TextTransform = 'none' | 'uppercase'
+/**
+ * Where the front label prints the serial number.
+ *   'stack' — the historic place: the last row of the left-hand text stack,
+ *             under the divider ("Serial: DCM-000123").
+ *   'chip'  — centred under the grade chip on the right. The text stack then
+ *             ends at the divider and the card name gets that room back.
+ * The BACK is unaffected either way: it has always printed the serial under
+ * the QR, and that is what hand-matches a back sticker to its front.
+ */
+export type SerialPlacement = 'stack' | 'chip'
 
 export interface OrgLabelDesign {
   v: 1
@@ -71,6 +87,8 @@ export interface OrgLabelDesign {
      * no design and therefore no transform.
      */
     transform: TextTransform
+    /** Where the FRONT prints the serial. Absent in legacy documents = 'stack'. */
+    serialPlacement: SerialPlacement
   }
   border: {
     enabled: boolean
@@ -130,6 +148,13 @@ export const DESIGN_LIMITS = {
   bandWidth: { min: 0.6, max: 1.5, step: 0.05 },
   logoScaleBottom: { min: 0.7, max: 2, step: 0.05 },
   logoScaleSide: { min: 0.7, max: 1.5, step: 0.05 },
+  /**
+   * Side-column ceiling when the band is OFF. With no band the label gives the
+   * logo column the 96 mockup-px the band + rule used to take, so the emblem
+   * can grow well past the banded ceiling before heritageMarkBox clamps it
+   * against the text column. Only reachable with band.position === 'none'.
+   */
+  logoScaleSideWide: { min: 0.7, max: 2.2, step: 0.05 },
   logoOffset: { min: -1, max: 1, step: 0.05 },
   chipScale: { min: 0.8, max: 1.1, step: 0.02 },
   textScale: { min: 0.85, max: 1.15, step: 0.05 },
@@ -143,12 +168,27 @@ export const DESIGN_LIMITS = {
   customHeight: { min: 0.3, max: 4.0, step: 0.05 },
 } as const
 
-const BAND_POSITIONS: BandPosition[] = ['left', 'right', 'top', 'bottom']
+const BAND_POSITIONS: BandPosition[] = ['none', 'left', 'right', 'top', 'bottom']
 const LOGO_ZONES: LogoZone[] = ['bottom', 'left', 'right']
 const LOGO_VARIANTS: LogoVariant[] = ['color', 'black', 'white']
 const CHIP_THEMES: ChipTheme[] = ['black', 'white']
 const TEXT_TRANSFORMS: TextTransform[] = ['none', 'uppercase']
+const SERIAL_PLACEMENTS: SerialPlacement[] = ['stack', 'chip']
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
+/**
+ * The logo-scale range for a zone, given where the band sits. The side columns
+ * normally stop at 1.5; with the band off they reach 2.2, because the column
+ * has the band's width to grow into. The bottom strip is unaffected — it never
+ * competed with the band for space.
+ */
+export function logoScaleLimits(
+  zone: LogoZone,
+  bandPosition: BandPosition,
+): { min: number; max: number; step: number } {
+  if (zone === 'bottom') return DESIGN_LIMITS.logoScaleBottom
+  return bandPosition === 'none' ? DESIGN_LIMITS.logoScaleSideWide : DESIGN_LIMITS.logoScaleSide
+}
 
 /** The stock DCM Heritage layout — what every org renders until it edits. */
 export function defaultOrgLabelDesign(): OrgLabelDesign {
@@ -158,7 +198,7 @@ export function defaultOrgLabelDesign(): OrgLabelDesign {
     band: { position: 'left', pattern: 'diamond', colorSource: 'brand', colors: [], width: 1 },
     logo: { zone: 'bottom', variant: 'color', scale: 1, offset: { x: 0, y: 0 }, accentRules: true },
     chip: { theme: 'black', scale: 1, grade10Color: null },
-    text: { scale: 1, transform: 'none' },
+    text: { scale: 1, transform: 'none', serialPlacement: 'stack' },
     border: { enabled: false, color: '#1C1B18', width: 0.02, inset: 0.05 },
     size: { preset: 'standard', widthIn: 2.8, heightIn: 0.8 },
   }
@@ -236,7 +276,10 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
     : { preset: sizePreset.id, widthIn: sizePreset.widthIn, heightIn: sizePreset.heightIn }
 
   const zone = oneOf(logo.zone, LOGO_ZONES, base.logo.zone)
-  const scaleLimit = zone === 'bottom' ? DESIGN_LIMITS.logoScaleBottom : DESIGN_LIMITS.logoScaleSide
+  // Resolved first: the side-column scale ceiling depends on whether the band
+  // is on, so the position has to be known before the logo is clamped.
+  const bandPosition = oneOf(band.position, BAND_POSITIONS, base.band.position)
+  const scaleLimit = logoScaleLimits(zone, bandPosition)
   const colors = band.colors !== undefined ? hexList(band.colors) : base.band.colors
   const colorSource = oneOf(band.colorSource, ['brand', 'card', 'custom'] as const, base.band.colorSource)
 
@@ -244,7 +287,7 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
     v: 1,
     base: oneOf(r.base, ['heritage', 'modern'] as const, base.base),
     band: {
-      position: oneOf(band.position, BAND_POSITIONS, base.band.position),
+      position: bandPosition,
       pattern: oneOf(band.pattern, BAND_PATTERNS.map(p => p.id), base.band.pattern),
       colorSource: colorSource === 'custom' && colors.length === 0 ? 'brand' : colorSource,
       colors: colorSource === 'custom' ? colors : [],
@@ -268,6 +311,7 @@ export function normalizeOrgLabelDesign(raw: unknown, legacy?: LegacySlabKeys | 
     text: {
       scale: num(text.scale, base.text.scale, DESIGN_LIMITS.textScale.min, DESIGN_LIMITS.textScale.max),
       transform: oneOf(text.transform, TEXT_TRANSFORMS, base.text.transform),
+      serialPlacement: oneOf(text.serialPlacement, SERIAL_PLACEMENTS, base.text.serialPlacement),
     },
     border: {
       enabled: typeof border.enabled === 'boolean' ? border.enabled : base.border.enabled,
@@ -328,6 +372,7 @@ export function isStockLayout(d: OrgLabelDesign | null | undefined): boolean {
     d.chip.scale === 1 &&
     d.chip.grade10Color === null &&
     d.text.scale === 1 &&
+    d.text.serialPlacement === 'stack' &&
     d.border.enabled === false
   )
 }

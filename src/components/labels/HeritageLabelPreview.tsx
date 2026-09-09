@@ -94,6 +94,9 @@ function gradeString(data: SlabLabelData): string {
  * set of geometry. The stock left band has no transform wrapper at all.
  */
 function Band({ pattern, colors, idPrefix, band }: { pattern: BandPattern; colors: string[]; idPrefix: string; band: HeritageGeometry['band'] }) {
+  // 'none' draws nothing at all — the hook order below is unconditional, so
+  // the early return has to come after it.
+  const off = band.position === 'none'
   const thick = band.horizontal ? band.h : band.w
   const len = band.horizontal ? band.w : band.h
   const g = useMemo(() => bandGeometry(pattern, colors, thick, len), [pattern, colors, thick, len])
@@ -126,7 +129,14 @@ function Band({ pattern, colors, idPrefix, band }: { pattern: BandPattern; color
       </g>
     </>
   )
+  if (off) return null
   return stockPlacement ? art : <g transform={transform}>{art}</g>
+}
+
+/** The gold rule beside the band — absent when the band is. */
+function BandRule({ geom, fill }: { geom: HeritageGeometry; fill: string }) {
+  if (geom.band.position === 'none') return null
+  return <rect x={geom.rule.x} y={geom.rule.y} width={geom.rule.w} height={geom.rule.h} fill={fill} />
 }
 
 function GradeChip({ grade, hardened, idPrefix, gradeColors, geom, design }: {
@@ -248,7 +258,7 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
     <>
       <Border geom={geom} />
       <Band pattern={pattern} colors={bandColors} idPrefix={uid + "f"} band={geom.band} />
-      <rect x={geom.rule.x} y={geom.rule.y} width={geom.rule.w} height={geom.rule.h} fill={T.rule} />
+      <BandRule geom={geom} fill={T.rule} />
 
       {name.rows.map((row, i) => (
         <text key={`n${i}`} x={TX.x} y={nameYs[i]} dominantBaseline="hanging"
@@ -263,12 +273,23 @@ function FrontSide({ data, pattern, bandColors, blackLogoHref, uid, gradeColors,
         </text>
       ))}
       <rect x={TX.x} y={dividerY} width={TX.w} height={6} fill={T.divider} />
-      <text x={TX.x} y={serialY} dominantBaseline="hanging"
-        fontFamily={FONT} fontSize={34} fill={T.inkSoft} letterSpacing={2}>
-        Serial: {data.serial}
-      </text>
+      {/* Stack serial — omitted when the design prints it under the chip. */}
+      {geom.serial ? null : (
+        <text x={TX.x} y={serialY} dominantBaseline="hanging"
+          fontFamily={FONT} fontSize={34} fill={T.inkSoft} letterSpacing={2}>
+          Serial: {data.serial}
+        </text>
+      )}
 
       <GradeChip grade={gradeString(data)} hardened idPrefix={uid + "f"} gradeColors={gradeColors} geom={geom} design={design} />
+
+      {/* Serial centred under the chip (design option). */}
+      {geom.serial && (
+        <text x={geom.serial.x + geom.serial.w / 2} y={geom.serial.y} textAnchor="middle" dominantBaseline="hanging"
+          fontFamily={FONT} fontSize={geom.serial.size} fill={T.inkSoft} letterSpacing={geom.serial.tracking}>
+          {data.serial}
+        </text>
+      )}
 
       {rulesOk && (
         <>
@@ -406,7 +427,7 @@ function BackSide({ data, pattern, bandColors, colorLogoHref, uid, suppressImage
     <>
       <Border geom={geom} />
       <Band pattern={pattern} colors={bandColors} idPrefix={uid + "b"} band={geom.band} />
-      <rect x={geom.rule.x} y={geom.rule.y} width={geom.rule.w} height={geom.rule.h} fill={T.rule} />
+      <BandRule geom={geom} fill={T.rule} />
       {stockContent ? body : (
         <g transform={`translate(${c.x} ${c.y}) scale(${k}) translate(${-(PX.BAND_W + PX.RULE_W)} 0)`}>{body}</g>
       )}
