@@ -1,0 +1,165 @@
+[
+  {
+    "card_id": "4834a3fe-182f-4409-850a-e6751a35bfb2",
+    "note": "Graded as \"1957 #35\" with a fabricated (c) 1957 by the in-grading identification.",
+    "truth": {
+      "name": "Mickey Mantle",
+      "set": "Topps",
+      "year": "1960",
+      "number": "350"
+    }
+  },
+  {
+    "card_id": "5c33c1b9-c947-49fa-9588-bfe0afee3356",
+    "note": "Name printed in huge type on BOTH faces; stored as \"Cal Ripken Jr.\".",
+    "truth": {
+      "name": "Al Pilarcik",
+      "set": "Topps",
+      "year": "1959",
+      "number": "7"
+    }
+  },
+  {
+    "card_id": "8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Eddy Pineiro",
+      "set": "Donruss Football",
+      "year": "2025",
+      "number": "37"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "9d0596fe-e4e9-47be-be3b-377336f266f4",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Shaquille O’Neal",
+      "set": "Upper Deck Draft Trade Card",
+      "year": "1992",
+      "number": "1b"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "b98dc05b-db1d-4432-9095-84964d07eb49",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Michael Jordan",
+      "set": "Fleer",
+      "year": "1991",
+      "number": "29"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "848ddbc1-7327-47c5-96b4-ef5e5385ef4d",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Andre the Giant / Hulk Hogan",
+      "set": "Classic WWF WrestleMania III",
+      "year": "1990",
+      "number": "19"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "9e090db9-9b8e-40e9-bb80-be33bd7be82c",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Giratina",
+      "set": null,
+      "year": "2022",
+      "number": null
+    },
+    "category": "Pokemon",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "8fcb030c-b068-4947-8d3e-795022839729",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Aaron Rodgers",
+      "set": "Mosaic Football",
+      "year": "2025",
+      "number": "243"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "4cd40690-4c0a-4322-a700-c4349c97a86d",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Roberto Clemente",
+      "set": "Topps Chrome",
+      "year": "2015",
+      "number": "403"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "66b6a6f8-c6d5-4353-b6b4-3de3172badb2",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Jasson Domínguez",
+      "set": "Bowman Chrome",
+      "year": "2024",
+      "number": "ROY-6"
+    },
+    "category": "Sports",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "7f7b17dd-d022-4815-8835-6911e6f45a0f",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Xerosic",
+      "set": "Phantom Forces",
+      "year": "2014",
+      "number": "119"
+    },
+    "category": "Pokemon",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "ff322597-2764-4782-a10e-6ddf1d5841c4",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Gengar VMAX",
+      "set": "Fusion Strike",
+      "year": "2021",
+      "number": "27"
+    },
+    "category": "Pokemon",
+    "deleted": false,
+    "status": null
+  },
+  {
+    "card_id": "25ccdb29-64be-4c27-aed3-570646f42e6d",
+    "note": "calibration set (truth = stored identity, unverified): ",
+    "truth": {
+      "name": "Koby (EB04-044)",
+      "set": "Adventure on Kami's Island",
+      "year": null,
+      "number": "EB04-044"
+    },
+    "category": "One Piece",
+    "deleted": false,
+    "status": null
+  }
+]
