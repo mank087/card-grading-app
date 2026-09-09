@@ -38,7 +38,7 @@ export interface GradingObservation {
   grade: number | null
   conditionLabel: string | null
   category: string | null
-  /** Backend explicitly reported a failed grading run (`grading_status = 'error'`). */
+  /** Backend explicitly reported a failed grading run (cards.grade_status = 'failed'). */
   backendFailed: boolean
   /** Timestamp of the poll that produced this observation. */
   polledAt: number
@@ -126,9 +126,18 @@ async function tick() {
   try {
     const { data, error } = await supabase
       .from('cards')
-      .select('id, category, conversational_whole_grade, conversational_condition_label, conversational_grading, grading_status')
+      .select('id, category, conversational_whole_grade, conversational_condition_label, conversational_grading, grade_status')
       .in('id', ids)
-    if (error) return
+    if (error) {
+      // A failed poll must still heartbeat: subscribers advance the time-based
+      // stage ladder and the delayed/failed timers only when they hear from us.
+      // (Sept 9 2026: a bad column name here silently froze every Android
+      // grade at '0% queued' even though the backend finished.)
+      if (__DEV__) console.warn('[gradingJob] poll query error:', error.message)
+      const now = Date.now()
+      for (const cardId of ids) emit({ ...(latest.get(cardId) ?? emptyObservation(cardId)), polledAt: now })
+      return
+    }
 
     const now = Date.now()
     const byId = new Map<string, any>()
@@ -152,7 +161,8 @@ async function tick() {
         grade,
         conditionLabel: row.conversational_condition_label ?? null,
         category: row.category ?? null,
-        backendFailed: row.grading_status === 'error',
+        // cards.grade_status is 'complete' | 'failed' | ... (there is no grading_status column).
+        backendFailed: row.grade_status === 'failed' || row.grade_status === 'error',
         polledAt: now,
         confirmed: true,
       })
