@@ -34,10 +34,15 @@ import {
   GuidesLayer,
   LabelAt,
   gridPos,
-  LABELS_PER_PAGE,
   SINGLE_X,
   SINGLE_Y,
 } from '@/lib/labels/vectorSlabGenerator'
+import {
+  resolveSheetGeometry,
+  STANDARD_SLAB_GEOMETRY,
+  type SheetDensity,
+  type SheetGeometry,
+} from '@/lib/labels/sheetGeometry'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
 
@@ -475,23 +480,56 @@ async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern
   )
 }
 
-function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: HeritageDims }) {
+/**
+ * Sheet layout for a heritage batch.
+ *
+ * 'standard' keeps the historic behaviour to the point: the STANDARD 2.8" ×
+ * 0.8" 2×5 grid, with a smaller (Zion) label centred inside the standard cell.
+ * 'dense' lays the grid out from the label's REAL size — 2 × 10 with a 0.25"
+ * gap between rows and equal top/bottom margins (3/8" at 0.8", 0.575" at
+ * 0.76") — so no centring offset is needed.
+ */
+function batchGeometry(d: HeritageDims, density: SheetDensity): {
+  geometry: SheetGeometry; offX: number; offY: number
+} {
+  if (density === 'dense') {
+    return {
+      geometry: resolveSheetGeometry({ labelWIn: d.widthIn, labelHIn: d.heightIn, density: 'dense' }),
+      offX: 0,
+      offY: 0,
+    }
+  }
+  const std = isStdDims(d)
+  return {
+    geometry: STANDARD_SLAB_GEOMETRY,
+    offX: std ? 0 : (LABEL_W - d.widthIn * INCH) / 2,
+    offY: std ? 0 : (LABEL_H - d.heightIn * INCH) / 2,
+  }
+}
+
+function HeritageBatchDuplexDoc({
+  entries, d, density = 'standard',
+}: { entries: HeritageInputs[]; d: HeritageDims; density?: SheetDensity }) {
   const std = isStdDims(d)
   // Non-standard labels centre inside the standard grid cell — the cells are
   // page-symmetric, so long-edge-flip duplex mirroring stays exact.
-  const offX = std ? 0 : (LABEL_W - d.widthIn * INCH) / 2
-  const offY = std ? 0 : (LABEL_H - d.heightIn * INCH) / 2
-  const totalSheets = Math.ceil(entries.length / LABELS_PER_PAGE)
+  const { geometry, offX, offY } = batchGeometry(d, density)
+  // Non-standard sheets name their size; dense sheets also name the layout.
+  const dimsHeader = density === 'dense'
+    ? `${dimsLabel(d)} — Heritage · ${geometry.labelsPerPage} per sheet`
+    : `${dimsLabel(d)} — Heritage`
+  const perPage = geometry.labelsPerPage
+  const totalSheets = Math.ceil(entries.length / perPage)
   const pages: React.ReactElement[] = []
   for (let sheet = 0; sheet < totalSheets; sheet++) {
-    const slice = entries.slice(sheet * LABELS_PER_PAGE, (sheet + 1) * LABELS_PER_PAGE)
+    const slice = entries.slice(sheet * perPage, (sheet + 1) * perPage)
     pages.push(
       <Page key={`f-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
         {std
-          ? <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
-          : <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
+          ? <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" geometry={geometry} />
+          : <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={dimsHeader} geometry={geometry} />}
         {slice.map((inputs, i) => {
-          const { x, y } = gridPos(i, false)
+          const { x, y } = gridPos(i, false, geometry)
           const chip = heritageChip(inputs)
           return (
             <React.Fragment key={i}>
@@ -504,7 +542,7 @@ function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: 
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
-            const { x, y } = gridPos(i, false)
+            const { x, y } = gridPos(i, false, geometry)
             return std
               ? <FrontCutGuides key={i} x={x} y={y} color={GUIDE_COLOR} />
               : <DimsGuides key={i} x={x + offX} y={y + offY} d={d} />
@@ -515,10 +553,10 @@ function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: 
     pages.push(
       <Page key={`b-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
         {std
-          ? <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" />
-          : <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={`${dimsLabel(d)} — Heritage`} />}
+          ? <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" geometry={geometry} />
+          : <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={dimsHeader} geometry={geometry} />}
         {slice.map((inputs, i) => {
-          const { x, y } = gridPos(i, true)
+          const { x, y } = gridPos(i, true, geometry)
           const chip = heritageChip(inputs)
           return (
             <React.Fragment key={i}>
@@ -531,7 +569,7 @@ function HeritageBatchDuplexDoc({ entries, d }: { entries: HeritageInputs[]; d: 
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
-            const { x, y } = gridPos(i, true)
+            const { x, y } = gridPos(i, true, geometry)
             return std
               ? <CornerMarks key={i} x={x} y={y} color={GUIDE_COLOR} />
               : <DimsGuides key={i} x={x + offX} y={y + offY} d={d} cornersOnly />
@@ -587,15 +625,41 @@ function HeritageBatchFoldOverDoc({ entries, d }: { entries: HeritageInputs[]; d
   return <Document>{pages}</Document>
 }
 
-/** Batch duplex sheets (2×5 grid, mirrored backs). */
+/**
+ * Batch duplex document (node-safe — returns the react-pdf element, no Blob).
+ * `scripts/label-sheet-sample.ts` renders it with renderToBuffer.
+ */
+export async function buildBatchHeritageSlabLabelsDoc(
+  items: HeritageBatchItem[],
+  pattern: BandPattern,
+  gradeColors?: Record<string, string> | null,
+  dims?: HeritageDims,
+  density: SheetDensity = 'standard',
+): Promise<React.ReactElement> {
+  const entries = await buildBatchInputs(items, pattern, gradeColors)
+  return (
+    <HeritageBatchDuplexDoc
+      entries={entries}
+      d={resolveDims(dims ?? designDims(items[0]?.design))}
+      density={density}
+    />
+  )
+}
+
+/**
+ * Batch duplex sheets with mirrored backs. `density` 'standard' = the 2×5
+ * grid (10 per sheet, unchanged); 'dense' = 2×10 (20 per sheet) laid out from
+ * the label's real size — Zion Mag Pro 2.51" × 0.76" dense prints 20 up with
+ * 0.575" top and bottom margins.
+ */
 export async function generateBatchHeritageSlabLabelsVector(
   items: HeritageBatchItem[],
   pattern: BandPattern,
   gradeColors?: Record<string, string> | null,
   dims?: HeritageDims,
+  density: SheetDensity = 'standard',
 ): Promise<Blob> {
-  const entries = await buildBatchInputs(items, pattern, gradeColors)
-  return pdf(<HeritageBatchDuplexDoc entries={entries} d={resolveDims(dims ?? designDims(items[0]?.design))} /> as any).toBlob()
+  return pdf(await buildBatchHeritageSlabLabelsDoc(items, pattern, gradeColors, dims, density) as any).toBlob()
 }
 
 /** Batch fold-over sheets (single-sided). */

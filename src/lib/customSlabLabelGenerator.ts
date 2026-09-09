@@ -16,6 +16,13 @@ import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from '
 import type { SlabLabelData } from './slabLabelGenerator';
 import { modernLogoSize } from './labels/logoScale';
 import { resolveConfigTextPolarity, resolveGradeColor, resolveFontScale, type CustomLabelConfig } from './labelPresets';
+import {
+  resolveSheetGeometry,
+  labelPos,
+  STANDARD_SLAB_GEOMETRY,
+  type SheetDensity,
+  type SheetGeometry,
+} from './labels/sheetGeometry';
 
 // ============================================================================
 // HELPERS
@@ -1408,26 +1415,25 @@ const BATCH_GRID_START_X = (BATCH_PAGE_WIDTH - BATCH_GRID_WIDTH) / 2;
 const BATCH_GRID_START_Y = (BATCH_PAGE_HEIGHT - BATCH_GRID_HEIGHT) / 2;
 
 // Trim inset for cut guides
+/** Today's 10-per-sheet grid, as a SheetGeometry (identical numbers). */
+const BATCH_STANDARD_GEOMETRY = STANDARD_SLAB_GEOMETRY;
+
+// Trim inset for cut guides
 const BATCH_TRIM_INSET_IN = 0;
 const BATCH_TRIM_INSET_PT = BATCH_TRIM_INSET_IN * BATCH_INCH;
 const BATCH_CUT_WIDTH = BATCH_LABEL_WIDTH - BATCH_TRIM_INSET_PT * 2;
 const BATCH_CUT_HEIGHT = BATCH_LABEL_HEIGHT - BATCH_TRIM_INSET_PT * 2;
 
-function batchGetLabelPosition(index: number) {
-  const col = index % BATCH_COLS;
-  const row = Math.floor(index / BATCH_COLS);
-  const cellX = BATCH_GRID_START_X + col * BATCH_CELL_WIDTH;
-  const cellY = BATCH_GRID_START_Y + row * BATCH_CELL_HEIGHT;
-  return { labelX: cellX + BATCH_CUT_MARGIN, labelY: cellY + BATCH_CUT_MARGIN };
+// Sheet layout comes from labels/sheetGeometry (see BATCH_STANDARD_GEOMETRY);
+// the default argument reproduces the 2×5 constants above exactly.
+function batchGetLabelPosition(index: number, geometry: SheetGeometry = BATCH_STANDARD_GEOMETRY) {
+  const { x, y } = labelPos(geometry, index, false);
+  return { labelX: x, labelY: y };
 }
 
-function batchGetMirroredLabelPosition(index: number) {
-  const col = index % BATCH_COLS;
-  const row = Math.floor(index / BATCH_COLS);
-  const mirroredCol = BATCH_COLS - 1 - col;
-  const cellX = BATCH_GRID_START_X + mirroredCol * BATCH_CELL_WIDTH;
-  const cellY = BATCH_GRID_START_Y + row * BATCH_CELL_HEIGHT;
-  return { labelX: cellX + BATCH_CUT_MARGIN, labelY: cellY + BATCH_CUT_MARGIN };
+function batchGetMirroredLabelPosition(index: number, geometry: SheetGeometry = BATCH_STANDARD_GEOMETRY) {
+  const { x, y } = labelPos(geometry, index, true);
+  return { labelX: x, labelY: y };
 }
 
 function batchPlaceLabelImage(
@@ -1447,17 +1453,30 @@ function batchPlaceLabelImage(
   );
 }
 
-function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number, dims = '2.8" × 0.8"') {
+function batchDrawPageHeader(
+  doc: jsPDF,
+  pageType: 'front' | 'back',
+  pageNum: number,
+  totalPages: number,
+  dims = '2.8" × 0.8"',
+  geometry: SheetGeometry = BATCH_STANDARD_GEOMETRY,
+) {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#9ca3af');
-  const headerY = BATCH_GRID_START_Y - 12;
-  doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Custom Label \u2014 Page ${pageNum} of ${totalPages}`, BATCH_GRID_START_X, headerY);
+  // Dense sheets leave little paper above the first label — keep the header
+  // inside the page and name the layout ("20 per sheet") in the dims slot.
+  const isStandardSheet = geometry.density === 'standard';
+  const headerY = isStandardSheet
+    ? geometry.gridStartY - 12
+    : Math.max(13, geometry.firstLabelY - 12);
+  const dimsText = isStandardSheet ? dims : `${dims} — ${geometry.labelsPerPage} per sheet`;
+  doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Custom Label \u2014 Page ${pageNum} of ${totalPages}`, geometry.gridStartX, headerY);
   const instructions = pageType === 'front'
     ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
     : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
   doc.text(instructions, BATCH_PAGE_WIDTH / 2, headerY, { align: 'center' });
-  doc.text(`Label: ${dims}`, BATCH_PAGE_WIDTH - BATCH_GRID_START_X, headerY, { align: 'right' });
+  doc.text(`Label: ${dimsText}`, BATCH_PAGE_WIDTH - geometry.gridStartX, headerY, { align: 'right' });
 }
 
 /** Guide color from the config's resolved lightness — dark guides on light labels, white on dark (matches slabLabelGenerator). */
@@ -1524,7 +1543,9 @@ function batchDrawFrontCutGuides(
  */
 export async function generateBatchCustomSlabLabels(
   dataArray: SlabLabelData[],
-  config: CustomLabelConfig
+  config: CustomLabelConfig,
+  /** 'dense' = 20 labels per sheet (2×10). Default 'standard' = 10 (2×5). */
+  density: SheetDensity = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
@@ -1545,7 +1566,7 @@ export async function generateBatchCustomSlabLabels(
         console.log('[customSlabLabel] style needs text halo — using raster batch path');
       } else {
         console.log('[customSlabLabel] using vector batch path');
-        return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+        return await vector.generateBatchCustomSlabLabelsVector(dataArray, config, density);
       }
     } catch (err) {
       console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
@@ -1553,13 +1574,14 @@ export async function generateBatchCustomSlabLabels(
   } else {
     console.log(`[customSlabLabel] non-standard dims ${config.width}"×${config.height}" — using raster batch path`);
   }
-  return generateBatchCustomSlabLabelsRaster(dataArray, config);
+  return generateBatchCustomSlabLabelsRaster(dataArray, config, density);
 }
 
 /** The original raster batch path, kept as the vector fallback. */
 export async function generateBatchCustomSlabLabelsRaster(
   dataArray: SlabLabelData[],
-  config: CustomLabelConfig
+  config: CustomLabelConfig,
+  density: SheetDensity = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
@@ -1576,24 +1598,34 @@ export async function generateBatchCustomSlabLabelsRaster(
   // here, which printed Zion designs at standard size.)
   const labelWPt = config.width * BATCH_INCH;
   const labelHPt = config.height * BATCH_INCH;
-  const offX = (BATCH_LABEL_WIDTH - labelWPt) / 2;
-  const offY = (BATCH_LABEL_HEIGHT - labelHPt) / 2;
   const dims = `${config.width}" × ${config.height}"`;
 
+  // Standard density keeps the historic sheet exactly: the 2×5 grid of
+  // standard-size cells with a smaller (Zion) label centred inside each one.
+  // Dense density lays the grid out from the label's REAL size, so a Zion
+  // design prints 20 up at 2.51" × 0.76" with 0.575" top/bottom margins and
+  // needs no centring offset.
+  const geometry = density === 'dense'
+    ? resolveSheetGeometry({ labelWIn: config.width, labelHIn: config.height, density: 'dense' })
+    : BATCH_STANDARD_GEOMETRY;
+  const offX = density === 'dense' ? 0 : (BATCH_LABEL_WIDTH - labelWPt) / 2;
+  const offY = density === 'dense' ? 0 : (BATCH_LABEL_HEIGHT - labelHPt) / 2;
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-  const totalSheets = Math.ceil(dataArray.length / BATCH_LABELS_PER_PAGE);
+  const perPage = geometry.labelsPerPage;
+  const totalSheets = Math.ceil(dataArray.length / perPage);
 
   for (let sheet = 0; sheet < totalSheets; sheet++) {
-    const startIdx = sheet * BATCH_LABELS_PER_PAGE;
-    const endIdx = Math.min(startIdx + BATCH_LABELS_PER_PAGE, dataArray.length);
+    const startIdx = sheet * perPage;
+    const endIdx = Math.min(startIdx + perPage, dataArray.length);
 
     if (sheet > 0) doc.addPage('letter', 'portrait');
 
     // Front side
-    batchDrawPageHeader(doc, 'front', sheet + 1, totalSheets, dims);
+    batchDrawPageHeader(doc, 'front', sheet + 1, totalSheets, dims, geometry);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
-      const { labelX, labelY } = batchGetLabelPosition(gridIdx);
+      const { labelX, labelY } = batchGetLabelPosition(gridIdx, geometry);
       const frontCanvas = await renderFrontCanvas(dataArray[i], config, BATCH_DPI);
       const frontImg = frontCanvas.toDataURL('image/jpeg', 0.92);
       batchPlaceLabelImage(doc, frontImg, labelX + offX, labelY + offY, labelWPt, labelHPt);
@@ -1602,10 +1634,10 @@ export async function generateBatchCustomSlabLabelsRaster(
 
     // Back side (mirrored X for duplex)
     doc.addPage('letter', 'portrait');
-    batchDrawPageHeader(doc, 'back', sheet + 1, totalSheets, dims);
+    batchDrawPageHeader(doc, 'back', sheet + 1, totalSheets, dims, geometry);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
-      const { labelX, labelY } = batchGetMirroredLabelPosition(gridIdx);
+      const { labelX, labelY } = batchGetMirroredLabelPosition(gridIdx, geometry);
       const backCanvas = await renderBackCanvas(dataArray[i], config, BATCH_DPI);
       const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
       batchPlaceLabelImage(doc, backImg, labelX + offX, labelY + offY, labelWPt, labelHPt);

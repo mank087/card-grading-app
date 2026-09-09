@@ -1279,6 +1279,11 @@ export default function LabelStudioScreen() {
         params.set('positions', runIds.map((_, i) => opts.position! + i * step).join(','))
       }
     }
+    // Sheet density (10 vs 20 slab labels per duplex sheet) rides on the
+    // `density` param — `density=dense` (or `=20`) for the 20-up sheet,
+    // absent/anything else for today's 10-up. Nothing on this screen chooses
+    // one yet, so nothing is sent and the web page defaults to 10 per sheet;
+    // when the mobile picker lands it only has to set that one param.
     const url = runIds
       ? `${API_BASE}/label-export/batch?${params.toString()}`
       : `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`

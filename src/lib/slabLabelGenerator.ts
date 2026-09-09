@@ -23,6 +23,13 @@
 
 import { jsPDF } from 'jspdf';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
+import {
+  resolveSheetGeometry,
+  labelPos,
+  STANDARD_SLAB_GEOMETRY,
+  type SheetDensity,
+  type SheetGeometry,
+} from './labels/sheetGeometry';
 
 // ============================================================================
 // CONSTANTS
@@ -691,21 +698,17 @@ async function renderBackLabelCanvas(
 // PDF HELPERS
 // ============================================================================
 
-function getLabelPosition(index: number) {
-  const col = index % COLS;
-  const row = Math.floor(index / COLS);
-  const cellX = GRID_START_X + col * CELL_WIDTH;
-  const cellY = GRID_START_Y + row * CELL_HEIGHT;
-  return { cellX, cellY, labelX: cellX + CUT_MARGIN, labelY: cellY + CUT_MARGIN };
+// Sheet layout (grid, pitch, margins) comes from labels/sheetGeometry so the
+// raster fallback lays out exactly like the vector path at either density.
+// The default is the standard 2×5 sheet — identical to the constants above.
+function getLabelPosition(index: number, geometry: SheetGeometry = STANDARD_SLAB_GEOMETRY) {
+  const { x, y } = labelPos(geometry, index, false);
+  return { cellX: x - geometry.gapX / 2, cellY: y - geometry.gapY / 2, labelX: x, labelY: y };
 }
 
-function getMirroredLabelPosition(index: number) {
-  const col = index % COLS;
-  const row = Math.floor(index / COLS);
-  const mirroredCol = COLS - 1 - col;
-  const cellX = GRID_START_X + mirroredCol * CELL_WIDTH;
-  const cellY = GRID_START_Y + row * CELL_HEIGHT;
-  return { cellX, cellY, labelX: cellX + CUT_MARGIN, labelY: cellY + CUT_MARGIN };
+function getMirroredLabelPosition(index: number, geometry: SheetGeometry = STANDARD_SLAB_GEOMETRY) {
+  const { x, y } = labelPos(geometry, index, true);
+  return { cellX: x - geometry.gapX / 2, cellY: y - geometry.gapY / 2, labelX: x, labelY: y };
 }
 
 // Trim inset: cut guides are slightly inside the full label dimensions
@@ -778,19 +781,32 @@ function drawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number, style: '
   drawCornerMarks(doc, labelX, labelY, style);
 }
 
-function drawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number) {
+function drawPageHeader(
+  doc: jsPDF,
+  pageType: 'front' | 'back',
+  pageNum: number,
+  totalPages: number,
+  geometry: SheetGeometry = STANDARD_SLAB_GEOMETRY,
+) {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#9ca3af');
-  const headerY = GRID_START_Y - 12;
+  // Standard sheets keep the historic header line and position; dense sheets
+  // have only 3/8" of paper above the first label, so the header rides near
+  // the page edge and names the layout.
+  const isStandardSheet = geometry.density === 'standard';
+  const headerY = isStandardSheet
+    ? geometry.gridStartY - 12
+    : Math.max(13, geometry.firstLabelY - 12);
 
-  doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Page ${pageNum} of ${totalPages}`, GRID_START_X, headerY);
+  doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Page ${pageNum} of ${totalPages}`, geometry.gridStartX, headerY);
 
   const instructions = pageType === 'front'
     ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
     : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
   doc.text(instructions, PAGE_WIDTH / 2, headerY, { align: 'center' });
-  doc.text('Label: 2.8" \u00D7 0.8"', PAGE_WIDTH - GRID_START_X, headerY, { align: 'right' });
+  doc.text(isStandardSheet ? 'Label: 2.8" \u00D7 0.8"' : geometry.summary,
+    PAGE_WIDTH - geometry.gridStartX, headerY, { align: 'right' });
 }
 
 /**
@@ -870,23 +886,26 @@ export async function generateSlabLabelRaster(
 
 export async function generateBatchSlabLabels(
   dataArray: SlabLabelData[],
-  style: 'modern' | 'traditional'
+  style: 'modern' | 'traditional',
+  /** 'dense' = 20 labels per sheet (2×10). Default 'standard' = 10 (2×5). */
+  density: SheetDensity = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
   try {
     const vector = await import('./labels/vectorSlabGenerator');
-    return await vector.generateBatchSlabLabelsVector(dataArray, style);
+    return await vector.generateBatchSlabLabelsVector(dataArray, style, density);
   } catch (err) {
     console.warn('[slabLabel] vector batch failed, falling back to raster:', err);
-    return generateBatchSlabLabelsRaster(dataArray, style);
+    return generateBatchSlabLabelsRaster(dataArray, style, density);
   }
 }
 
 /** The original raster batch path, kept as the vector fallback. */
 export async function generateBatchSlabLabelsRaster(
   dataArray: SlabLabelData[],
-  style: 'modern' | 'traditional'
+  style: 'modern' | 'traditional',
+  density: SheetDensity = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
@@ -897,19 +916,25 @@ export async function generateBatchSlabLabelsRaster(
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  const totalSheets = Math.ceil(dataArray.length / LABELS_PER_PAGE);
+  const geometry = resolveSheetGeometry({
+    labelWIn: LABEL_WIDTH_IN,
+    labelHIn: LABEL_HEIGHT_IN,
+    density,
+  });
+  const perPage = geometry.labelsPerPage;
+  const totalSheets = Math.ceil(dataArray.length / perPage);
 
   for (let sheet = 0; sheet < totalSheets; sheet++) {
-    const startIdx = sheet * LABELS_PER_PAGE;
-    const endIdx = Math.min(startIdx + LABELS_PER_PAGE, dataArray.length);
+    const startIdx = sheet * perPage;
+    const endIdx = Math.min(startIdx + perPage, dataArray.length);
 
     if (sheet > 0) doc.addPage('letter', 'portrait');
 
     // Render and place front labels for this page (one at a time to avoid memory buildup)
-    drawPageHeader(doc, 'front', sheet + 1, totalSheets);
+    drawPageHeader(doc, 'front', sheet + 1, totalSheets, geometry);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
-      const { labelX, labelY } = getLabelPosition(gridIdx);
+      const { labelX, labelY } = getLabelPosition(gridIdx, geometry);
       const frontImg = await renderFrontLabelCanvas(dataArray[i], style);
       placeLabelImage(doc, frontImg, labelX, labelY);
       drawFrontCutGuides(doc, labelX, labelY, style);
@@ -917,10 +942,10 @@ export async function generateBatchSlabLabelsRaster(
 
     // Back side (new page, mirrored X) — render one at a time
     doc.addPage('letter', 'portrait');
-    drawPageHeader(doc, 'back', sheet + 1, totalSheets);
+    drawPageHeader(doc, 'back', sheet + 1, totalSheets, geometry);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
-      const { labelX, labelY } = getMirroredLabelPosition(gridIdx);
+      const { labelX, labelY } = getMirroredLabelPosition(gridIdx, geometry);
       const backImg = await renderBackLabelCanvas(dataArray[i], style);
       placeLabelImage(doc, backImg, labelX, labelY);
       drawCornerMarks(doc, labelX, labelY, style);

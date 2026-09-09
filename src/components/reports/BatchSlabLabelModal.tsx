@@ -9,6 +9,7 @@ import { getCardLabelData } from '../../lib/useLabelData';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
+import { resolveSheetGeometry, type SheetDensity } from '@/lib/labels/sheetGeometry';
 
 interface CardData {
   id: string;
@@ -67,6 +68,18 @@ interface BatchSlabLabelModalProps {
 
 const LABELS_PER_PAGE = getSlabLabelConfig().labelsPerPage;
 
+/** Remembered across sessions so a store that prints 20-up keeps printing 20-up. */
+const DENSITY_STORAGE_KEY = 'dcm.labelSheetDensity';
+
+function readStoredDensity(): SheetDensity {
+  if (typeof window === 'undefined') return 'standard';
+  try {
+    return window.localStorage.getItem(DENSITY_STORAGE_KEY) === 'dense' ? 'dense' : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
 export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   isOpen,
   onClose,
@@ -82,6 +95,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover'>('duplex');
+  // 10 or 20 labels per duplex sheet; fold-over owns its own layout.
+  const [density, setDensity] = useState<SheetDensity>('standard');
 
   // Use shared hook for style + custom styles
   const { labelStyle: hookLabelStyle, customStyles, activeConfig, switchStyle } = useCustomLabelStyle();
@@ -97,6 +112,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       setError(null);
       setProgress(0);
       setLocalStyle((labelStyleProp as LabelStyleId) || hookLabelStyle || 'modern');
+      setDensity(readStoredDensity());
     }
   }, [isOpen, labelStyleProp, hookLabelStyle]);
 
@@ -107,6 +123,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     if (localStyle === 'modern' || localStyle === 'traditional' || localStyle === 'heritage') return null;
     return customStyles.find(s => s.id === localStyle)?.config || null;
   }, [configOverride, localStyle, customStyles]);
+
+  const chooseDensity = (next: SheetDensity) => {
+    setDensity(next);
+    try { window.localStorage.setItem(DENSITY_STORAGE_KEY, next); } catch { /* private mode */ }
+  };
 
   const handleStyleSwitch = (id: LabelStyleId) => {
     setLocalStyle(id);
@@ -224,7 +245,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           : undefined;
         blob = printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims)
-          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims);
+          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims, density);
       } else {
         // Modern/custom dark labels render the whiteLogoDataUrl slot; the
         // on-screen previews show the Brand Setup mark there for org cards,
@@ -243,11 +264,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           }
         } else if (localActiveConfig) {
           // Custom style — use batch generator with same multi-up grid layout as standard
-          blob = await generateBatchCustomSlabLabels(printArray, localActiveConfig);
+          blob = await generateBatchCustomSlabLabels(printArray, localActiveConfig, density);
         } else {
           // Built-in style — use standard batch generator
           const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
-          blob = await generateBatchSlabLabels(printArray, builtInStyle);
+          blob = await generateBatchSlabLabels(printArray, builtInStyle, density);
         }
       }
 
@@ -275,13 +296,23 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, density, buildSlabLabelData, onClose]);
 
-  // Fold-over: ~10 labels per page (single-sided), Duplex: LABELS_PER_PAGE per sheet (front+back)
+  // Fold-over: ~10 labels per page (single-sided). Duplex: 10 per sheet at
+  // standard density, 20 when the user picks the dense sheet — for a
+  // non-standard slot (Zion) the count comes from that slot's real height.
   const FOLDOVER_ROWS_PER_PAGE = 10;
+  const duplexPerSheet = useMemo(() => {
+    if (density === 'standard') return LABELS_PER_PAGE;
+    return resolveSheetGeometry({
+      labelWIn: localActiveConfig?.width || 2.8,
+      labelHIn: localActiveConfig?.height || 0.8,
+      density: 'dense',
+    }).labelsPerPage;
+  }, [density, localActiveConfig]);
   const totalPages = printFormat === 'foldover'
     ? Math.ceil(selectedCards.length / FOLDOVER_ROWS_PER_PAGE)
-    : Math.ceil(selectedCards.length / LABELS_PER_PAGE);
+    : Math.ceil(selectedCards.length / duplexPerSheet);
   const totalSheets = totalPages;
 
   if (!isOpen) return null;
@@ -414,6 +445,38 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Labels per sheet — duplex only; fold-over owns its own layout */}
+        {printFormat === 'duplex' && (
+          <div className="px-6 py-3 border-t border-gray-100">
+            <p className="text-xs font-semibold text-gray-600 mb-2">Labels per Sheet</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => chooseDensity('standard')}
+                className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                  density === 'standard'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                    : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                }`}
+              >
+                10 per sheet
+              </button>
+              <button
+                onClick={() => chooseDensity('dense')}
+                className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                  density === 'dense'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                    : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                }`}
+              >
+                20 per sheet
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              20 per sheet prints closer to the page edge; test one sheet first.
+            </p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">

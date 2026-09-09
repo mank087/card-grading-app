@@ -24,6 +24,17 @@
  *                                                   unaffected.
  *   &heritagePattern=<id>                        — band pattern override
  *   &format=duplex|foldover                      — slab labels only
+ *   &density=dense|20                            — slab DUPLEX sheets only:
+ *                                                   20 labels per sheet
+ *                                                   (2 × 10) instead of the
+ *                                                   default 10 (2 × 5).
+ *                                                   Anything else, including
+ *                                                   absent, = 10 per sheet.
+ *                                                   Ignored for foldover and
+ *                                                   the compact Avery types.
+ *                                                   `density` is the agreed
+ *                                                   param name for the mobile
+ *                                                   app too.
  *   &positions=0,1,2,3                           — Avery sheet positions for
  *                                                   onetouch (6871) and
  *                                                   toploader/8167 — array of
@@ -68,6 +79,7 @@ import { BatchCardGradingReport, type ReportCardData } from '@/components/report
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
+import { parseSheetDensity } from '@/lib/labels/sheetGeometry';
 
 declare global {
   interface Window {
@@ -144,6 +156,11 @@ function BatchLabelExportInner() {
     && COMPACT_HOLDERS.includes(rawType.slice(0, -'-heritage'.length));
   const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
+  // Sheet density for the slab DUPLEX sheets: `density=dense` (or `=20`)
+  // prints 20 labels per sheet; anything else keeps today's 10. Fold-over and
+  // the Avery compact sheets own their own layouts and ignore it.
+  const densityParam = sp.get('density');
+  const density = parseSheetDensity(densityParam);
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
   const inlineCustomConfigRaw = sp.get('customConfig');
@@ -396,7 +413,7 @@ function BatchLabelExportInner() {
           })();
           const blob = format === 'foldover'
             ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern, gradeColors, heritageDims)
-            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors, heritageDims);
+            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors, heritageDims, density);
           blobs.push({
             name: `DCM-Slab-heritage-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -434,7 +451,7 @@ function BatchLabelExportInner() {
           }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverSlabLabels(slabPayloads, slabStyle)
-            : await generateBatchSlabLabels(slabPayloads, slabStyle);
+            : await generateBatchSlabLabels(slabPayloads, slabStyle, density);
           blobs.push({
             name: `DCM-Slab-${slabStyle}-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -482,7 +499,7 @@ function BatchLabelExportInner() {
           }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverCustomLabels(slabPayloads, config)
-            : await generateBatchCustomSlabLabels(slabPayloads, config);
+            : await generateBatchCustomSlabLabels(slabPayloads, config, density);
           blobs.push({
             name: `DCM-Slab-Custom-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -899,7 +916,7 @@ function BatchLabelExportInner() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, cardIdsParam, type, format, positionsParam, inlineCustomConfigRaw, labelStyleParam, downloadMode]);
+  }, [token, cardIdsParam, type, format, density, positionsParam, inlineCustomConfigRaw, labelStyleParam, downloadMode]);
 
   if (downloadMode) {
     return (

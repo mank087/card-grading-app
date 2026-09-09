@@ -37,6 +37,19 @@ import {
 } from '@/lib/labelDataGenerator'
 
 // ------- Page geometry (identical to slabLabelGenerator.ts) -------
+//
+// Sheet geometry (grid, cell pitch, margins) now lives in labels/sheetGeometry
+// so the 10-per-sheet and 20-per-sheet layouts share one implementation. The
+// constants below stay for the single-label and fold-over layouts, which the
+// density option does not touch.
+
+import {
+  resolveSheetGeometry,
+  labelPos,
+  STANDARD_SLAB_GEOMETRY,
+  type SheetGeometry,
+  type SheetDensity,
+} from '@/lib/labels/sheetGeometry'
 
 const INCH = 72
 const LABEL_W = 2.8 * INCH      // 201.6
@@ -45,24 +58,22 @@ const BLEED = 0.08 * INCH       // 5.76
 const CUT_MARGIN = 0.25 * INCH  // 18
 const PAGE_W = 8.5 * INCH       // 612
 const PAGE_H = 11 * INCH        // 792
-const COLS = 2
-const ROWS = 5
-export const LABELS_PER_PAGE = COLS * ROWS
-const CELL_W = LABEL_W + CUT_MARGIN * 2 // 237.6
-const CELL_H = LABEL_H + CUT_MARGIN * 2 // 93.6
-const GRID_START_X = (PAGE_W - COLS * CELL_W) / 2 // 68.4
-const GRID_START_Y = (PAGE_H - ROWS * CELL_H) / 2 // 162
+/** Standard sheet capacity (10). Dense sheets read geometry.labelsPerPage. */
+export const LABELS_PER_PAGE = STANDARD_SLAB_GEOMETRY.labelsPerPage
 const SINGLE_X = (PAGE_W - LABEL_W) / 2
 const SINGLE_Y = (PAGE_H - LABEL_H) / 2
 
-function gridPos(index: number, mirrored: boolean): { x: number; y: number } {
-  const col = index % COLS
-  const row = Math.floor(index / COLS)
-  const useCol = mirrored ? COLS - 1 - col : col
-  return {
-    x: GRID_START_X + useCol * CELL_W + CUT_MARGIN,
-    y: GRID_START_Y + row * CELL_H + CUT_MARGIN,
-  }
+/**
+ * Grid position of a label. `geometry` defaults to the standard 2.8" × 0.8"
+ * 2×5 sheet, so every existing caller (including heritageSlabGenerator) keeps
+ * the exact positions it always had.
+ */
+function gridPos(
+  index: number,
+  mirrored: boolean,
+  geometry: SheetGeometry = STANDARD_SLAB_GEOMETRY,
+): { x: number; y: number } {
+  return labelPos(geometry, index, mirrored)
 }
 
 // ------- Data mapping (CJK-safe, grade formatting — mirrors raster) -------
@@ -163,12 +174,14 @@ function PageHeader({
   totalPages,
   variant,
   dims,
+  geometry = STANDARD_SLAB_GEOMETRY,
 }: {
   pageType: 'front' | 'back'
   pageNum: number
   totalPages: number
   variant: 'standard' | 'custom'
   dims?: string
+  geometry?: SheetGeometry
 }) {
   if (variant === 'custom') {
     return (
@@ -176,20 +189,30 @@ function PageHeader({
         <Text style={{ fontSize: 7, color: '#9ca3af' }}>
           {pageType === 'front' ? 'FRONT' : 'BACK'} — Custom Label
         </Text>
-        <Text style={{ fontSize: 7, color: '#9ca3af' }}>{dims || '2.8" × 0.8"'}</Text>
+        <Text style={{ fontSize: 7, color: '#9ca3af' }}>{dims || geometry.summary}</Text>
       </View>
     )
   }
   const instructions = pageType === 'front'
     ? 'Print duplex (flip on long edge) • Cut along dotted lines'
     : 'BACK SIDE • Print duplex (flip on long edge)'
+  // Standard sheets keep their historic header position and wording so the
+  // 10-up PDF is byte-identical to what shipped before the density option.
+  // Dense sheets have only 3/8" of paper above the first label, so the header
+  // rides just under the page edge and carries the full geometry summary
+  // ("20 per sheet · …") — the owner needs to see which sheet they printed.
+  const isStandardSheet = geometry.density === 'standard'
+  const headerTop = isStandardSheet
+    ? geometry.gridStartY - 19
+    : Math.max(8, geometry.firstLabelY - 19)
+  const dimsText = isStandardSheet ? 'Label: 2.8" × 0.8"' : geometry.summary
   return (
     <View
       style={{
         position: 'absolute',
-        top: GRID_START_Y - 19,
-        left: GRID_START_X,
-        width: PAGE_W - GRID_START_X * 2,
+        top: headerTop,
+        left: geometry.gridStartX,
+        width: PAGE_W - geometry.gridStartX * 2,
         flexDirection: 'row',
         justifyContent: 'space-between',
       }}
@@ -198,18 +221,20 @@ function PageHeader({
         {pageType === 'front' ? 'FRONT' : 'BACK'} — Page {pageNum} of {totalPages}
       </Text>
       <Text style={{ fontSize: 7, color: '#9ca3af' }}>{instructions}</Text>
-      <Text style={{ fontSize: 7, color: '#9ca3af' }}>Label: 2.8" × 0.8"</Text>
+      <Text style={{ fontSize: 7, color: '#9ca3af' }}>{dimsText}</Text>
     </View>
   )
 }
 
-function CornerMarks({ x, y, color }: { x: number; y: number; color: string }) {
+function CornerMarks({
+  x, y, color, w = LABEL_W, h = LABEL_H,
+}: { x: number; y: number; color: string; w?: number; h?: number }) {
   const L = 8
   const lines: [number, number, number, number][] = [
     [x - L, y, x, y], [x, y - L, x, y],
-    [x + LABEL_W, y, x + LABEL_W + L, y], [x + LABEL_W, y - L, x + LABEL_W, y],
-    [x - L, y + LABEL_H, x, y + LABEL_H], [x, y + LABEL_H, x, y + LABEL_H + L],
-    [x + LABEL_W, y + LABEL_H, x + LABEL_W + L, y + LABEL_H], [x + LABEL_W, y + LABEL_H, x + LABEL_W, y + LABEL_H + L],
+    [x + w, y, x + w + L, y], [x + w, y - L, x + w, y],
+    [x - L, y + h, x, y + h], [x, y + h, x, y + h + L],
+    [x + w, y + h, x + w + L, y + h], [x + w, y + h, x + w, y + h + L],
   ]
   return (
     <>
@@ -232,24 +257,26 @@ function ScissorGlyph({ x, y, color }: { x: number; y: number; color: string }) 
   )
 }
 
-function FrontCutGuides({ x, y, color }: { x: number; y: number; color: string }) {
+function FrontCutGuides({
+  x, y, color, w = LABEL_W, h = LABEL_H,
+}: { x: number; y: number; color: string; w?: number; h?: number }) {
   return (
     <>
       <Rect
         x={x}
         y={y}
-        width={LABEL_W}
-        height={LABEL_H}
+        width={w}
+        height={h}
         fill="none"
         stroke={color}
         strokeWidth={0.5}
         strokeDasharray="3 3"
       />
       <ScissorGlyph x={x - 9} y={y + 2} color={color} />
-      <ScissorGlyph x={x + LABEL_W + 2} y={y + 2} color={color} />
-      <ScissorGlyph x={x - 9} y={y + LABEL_H + 2} color={color} />
-      <ScissorGlyph x={x + LABEL_W + 2} y={y + LABEL_H + 2} color={color} />
-      <CornerMarks x={x} y={y} color={color} />
+      <ScissorGlyph x={x + w + 2} y={y + 2} color={color} />
+      <ScissorGlyph x={x - 9} y={y + h + 2} color={color} />
+      <ScissorGlyph x={x + w + 2} y={y + h + 2} color={color} />
+      <CornerMarks x={x} y={y} color={color} w={w} h={h} />
     </>
   )
 }
@@ -266,9 +293,11 @@ function GuidesLayer({ children }: { children: React.ReactNode }) {
   )
 }
 
-function LabelAt({ x, y, children }: { x: number; y: number; children: React.ReactNode }) {
+function LabelAt({
+  x, y, children, w = LABEL_W, h = LABEL_H,
+}: { x: number; y: number; children: React.ReactNode; w?: number; h?: number }) {
   return (
-    <View style={{ position: 'absolute', left: x, top: y, width: LABEL_W, height: LABEL_H }}>
+    <View style={{ position: 'absolute', left: x, top: y, width: w, height: h }}>
       {children}
     </View>
   )
@@ -286,11 +315,14 @@ function SlabVectorDoc({
   spec,
   variant,
   guideColor,
+  geometry = STANDARD_SLAB_GEOMETRY,
 }: {
   entries: VectorEntry[]
   spec: LabStyleSpec
   variant: 'standard' | 'custom'
   guideColor: string
+  /** Sheet layout. Defaults to today's 10-per-sheet 2.8" × 0.8" grid. */
+  geometry?: SheetGeometry
 }) {
   // Single label: centered layout (symmetric — works with any duplex setting)
   if (entries.length === 1) {
@@ -319,45 +351,48 @@ function SlabVectorDoc({
     )
   }
 
-  // Batch: 2×5 grid, duplex pairs (front sheet then X-mirrored back sheet)
-  const totalSheets = Math.ceil(entries.length / LABELS_PER_PAGE)
+  // Batch: 2-column duplex pairs (front sheet then X-mirrored back sheet).
+  // 5 rows at standard density, 10 at dense — the mirrored back sheet reads
+  // the same geometry, so it mirrors with the real row count.
+  const perPage = geometry.labelsPerPage
+  const totalSheets = Math.ceil(entries.length / perPage)
   const pages: React.ReactElement[] = []
   for (let sheet = 0; sheet < totalSheets; sheet++) {
-    const slice = entries.slice(sheet * LABELS_PER_PAGE, (sheet + 1) * LABELS_PER_PAGE)
+    const slice = entries.slice(sheet * perPage, (sheet + 1) * perPage)
     pages.push(
       <Page key={`f-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant={variant} />
+        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant={variant} geometry={geometry} />
         {slice.map((e, i) => {
-          const { x, y } = gridPos(i, false)
+          const { x, y } = gridPos(i, false, geometry)
           return (
-            <LabelAt key={i} x={x} y={y}>
+            <LabelAt key={i} x={x} y={y} w={geometry.labelW} h={geometry.labelH}>
               <CustomSlabLabelBlock inputs={e.front} spec={spec} idSuffix={`f${sheet}-${i}`} bleedPt={BLEED} />
             </LabelAt>
           )
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
-            const { x, y } = gridPos(i, false)
-            return <FrontCutGuides key={i} x={x} y={y} color={guideColor} />
+            const { x, y } = gridPos(i, false, geometry)
+            return <FrontCutGuides key={i} x={x} y={y} color={guideColor} w={geometry.labelW} h={geometry.labelH} />
           })}
         </GuidesLayer>
       </Page>,
     )
     pages.push(
       <Page key={`b-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
-        <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant={variant} />
+        <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant={variant} geometry={geometry} />
         {slice.map((e, i) => {
-          const { x, y } = gridPos(i, true)
+          const { x, y } = gridPos(i, true, geometry)
           return (
-            <LabelAt key={i} x={x} y={y}>
+            <LabelAt key={i} x={x} y={y} w={geometry.labelW} h={geometry.labelH}>
               <CustomSlabBackBlock inputs={e.back} spec={spec} idSuffix={`b${sheet}-${i}`} bleedPt={BLEED} />
             </LabelAt>
           )
         })}
         <GuidesLayer>
           {slice.map((_, i) => {
-            const { x, y } = gridPos(i, true)
-            return <CornerMarks key={i} x={x} y={y} color={guideColor} />
+            const { x, y } = gridPos(i, true, geometry)
+            return <CornerMarks key={i} x={x} y={y} color={guideColor} w={geometry.labelW} h={geometry.labelH} />
           })}
         </GuidesLayer>
       </Page>,
@@ -537,17 +572,35 @@ export async function generateSlabLabelVector(
   )
 }
 
-/** Standard slab batch — 2×5 duplex sheets with mirrored backs. */
-export async function generateBatchSlabLabelsVector(
+/**
+ * Standard slab batch document (node-safe — returns the react-pdf element, no
+ * Blob). `scripts/label-sheet-sample.ts` renders it with renderToBuffer.
+ */
+export function buildBatchSlabLabelsDoc(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
-): Promise<Blob> {
+  density: SheetDensity = 'standard',
+): React.ReactElement {
   const spec = specForStyle(style)
   const guideColor = style === 'modern' ? '#ffffff' : '#000000'
   const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
-  return renderDocToBlob(
-    <SlabVectorDoc entries={entries} spec={spec} variant="standard" guideColor={guideColor} />,
+  const geometry = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density })
+  return (
+    <SlabVectorDoc entries={entries} spec={spec} variant="standard" guideColor={guideColor} geometry={geometry} />
   )
+}
+
+/**
+ * Standard slab batch — duplex sheets with mirrored backs.
+ * `density` 'standard' = 2×5 (10 per sheet, the default and unchanged),
+ * 'dense' = 2×10 (20 per sheet, 3/8" top and bottom margins).
+ */
+export async function generateBatchSlabLabelsVector(
+  dataArray: SlabLabelData[],
+  style: 'modern' | 'traditional',
+  density: SheetDensity = 'standard',
+): Promise<Blob> {
+  return renderDocToBlob(buildBatchSlabLabelsDoc(dataArray, style, density))
 }
 
 /**
@@ -570,15 +623,31 @@ export async function generateCustomSlabLabelVector(
   )
 }
 
+/**
+ * Custom-style slab batch document (node-safe). The vector batch is authored
+ * at the standard 2.8" × 0.8" slot; non-standard configs (Zion Mag Pro) still
+ * take the raster path in customSlabLabelGenerator, which renders at the
+ * config's true size — see the Aug 2026 customer report.
+ */
+export function buildBatchCustomSlabLabelsDoc(
+  dataArray: SlabLabelData[],
+  config: CustomLabelConfig,
+  density: SheetDensity = 'standard',
+): React.ReactElement {
+  const spec = specFromCustomConfig({ ...config, width: 2.8, height: 0.8 })
+  const guideColor = config.style === 'modern' ? '#ffffff' : '#000000'
+  const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
+  const geometry = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density })
+  return (
+    <SlabVectorDoc entries={entries} spec={spec} variant="custom" guideColor={guideColor} geometry={geometry} />
+  )
+}
+
 /** Custom-style slab batch (batch always uses standard dimensions). */
 export async function generateBatchCustomSlabLabelsVector(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
+  density: SheetDensity = 'standard',
 ): Promise<Blob> {
-  const spec = specFromCustomConfig({ ...config, width: 2.8, height: 0.8 })
-  const guideColor = config.style === 'modern' ? '#ffffff' : '#000000'
-  const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
-  return renderDocToBlob(
-    <SlabVectorDoc entries={entries} spec={spec} variant="custom" guideColor={guideColor} />,
-  )
+  return renderDocToBlob(buildBatchCustomSlabLabelsDoc(dataArray, config, density))
 }

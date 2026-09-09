@@ -753,6 +753,11 @@ export default function CollectionScreen() {
     // rendered +not-found ("the screen doesn't exist"). The in-app WebView
     // sidesteps that by loading the URL internally instead of asking the
     // OS to handle it externally.
+    // Sheet density (10 vs 20 slab labels per duplex sheet) rides on the
+    // `density` param — `density=dense` (or `=20`) for the 20-up sheet,
+    // absent/anything else for today's 10-up. No mobile control chooses one
+    // yet, so nothing is sent and the batch page defaults to 10 per sheet;
+    // the later mobile picker only has to set that one param.
     const urlNoDownload = `${API_BASE}/label-export/batch?${params.toString()}`
     const title = type === 'full-report' ? 'Full Reports'
       : type === 'mini-report-pdf' ? 'Mini-Reports (PDF)'
