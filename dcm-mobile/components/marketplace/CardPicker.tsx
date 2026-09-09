@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
+import GradeBadge from '@/components/grading/GradeBadge'
 import type { EligibleCard } from '@/lib/marketplaceApi'
 import { BATCH_CAP_MESSAGE } from '@/lib/ebayBulkTypes'
 
@@ -418,10 +419,9 @@ export default function CardPicker({
                 {item.category}{item.serial ? ` · #${item.serial}` : ''}
               </Text>
               <View style={styles.rowChipRow}>
+                {/* Shared interface chip — Heritage grade ladder, rainbow 10. */}
                 {item.conversational_whole_grade != null && (
-                  <View style={styles.gradeChip}>
-                    <Text style={styles.gradeChipText}>Grade {item.conversational_whole_grade}</Text>
-                  </View>
+                  <GradeBadge grade={item.conversational_whole_grade} size="sm" />
                 )}
                 {(item.ebay_price_median ?? item.dcm_price_estimate) != null && (
                   <Text style={styles.rowPrice}>
@@ -525,11 +525,6 @@ const styles = StyleSheet.create({
   rowName: { fontSize: 14, fontWeight: '700', color: Colors.gray[900] },
   rowMeta: { fontSize: 11, color: Colors.gray[500], marginTop: 2 },
   rowChipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  gradeChip: {
-    backgroundColor: Colors.green[50],
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-  },
-  gradeChipText: { fontSize: 10, fontWeight: '800', color: Colors.green[600] },
   rowPrice: { fontSize: 11, color: Colors.gray[600] },
   separator: { height: 1, backgroundColor: Colors.gray[100] },
   empty: { padding: 24, alignItems: 'center' },

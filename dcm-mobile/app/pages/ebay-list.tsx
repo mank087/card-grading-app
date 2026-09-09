@@ -30,6 +30,7 @@ import {
   DISCLAIMER_SECTIONS, DISCLAIMER_VERSION_LINE, DISCLAIMER_INTRO, DISCLAIMER_CONSENT,
 } from '@/lib/ebayDisclaimer'
 import { resolveCardValue } from '@/lib/resolveCardValue'
+import { bridgeTokenParam, authBridgeInjection } from '@/lib/webviewAuthBridge'
 
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
@@ -264,6 +265,9 @@ export default function EbayListScreen() {
   // forever with no way out. 90s is well past the slowest real run.
   const PREP_TIMEOUT_MS = 90_000
   const prepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Hidden ebay-image-prep bridge WebView — ref exists only for the
+  // out-of-band auth hand-off (see lib/webviewAuthBridge.ts).
+  const prepWebViewRef = useRef<WebView>(null)
   // Bumped by the Retry button: a new key remounts the hidden WebView, which
   // re-runs the prep page from scratch (onLoadStart re-arms the watchdog).
   const [prepAttempt, setPrepAttempt] = useState(0)
@@ -1329,14 +1333,22 @@ export default function EbayListScreen() {
           <View pointerEvents="none" style={st.hiddenWebViewWrapper}>
             <WebView
               key={`prep-${prepAttempt}`}
+              ref={prepWebViewRef}
               source={{
                 // bridge=2 asks the prep page for the chunked protocol (one
                 // message per image). Old cached pages ignore the param and
                 // send the legacy single 'images-ready' message instead.
-                uri: `${API_BASE}/ebay-image-prep/${cardId}?token=${encodeURIComponent(session.access_token)}&labelStyle=${labelStyle}&bridge=2`,
+                //
+                // Token hand-off goes through lib/webviewAuthBridge.ts —
+                // still `&token=` today, postMessage once the web accepts it.
+                uri: `${API_BASE}/ebay-image-prep/${cardId}?labelStyle=${labelStyle}&bridge=2${bridgeTokenParam(session.access_token)}`,
               }}
               originWhitelist={['*']}
               javaScriptEnabled
+              onLoadEnd={() => {
+                const js = authBridgeInjection(session.access_token)
+                if (js) prepWebViewRef.current?.injectJavaScript(js)
+              }}
               onLoadStart={() => {
                 setImagesGenerating(true)
                 setImagesError(null)

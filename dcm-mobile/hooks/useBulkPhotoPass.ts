@@ -29,6 +29,7 @@ import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { uploadImagesSequential } from '@/lib/ebayApi'
 import { updateItem } from '@/lib/ebayBulkApi'
 import type { BulkItem, BulkCard, BulkBatchStatus } from '@/lib/ebayBulkTypes'
+import { bridgeTokenParam, authBridgeInjection } from '@/lib/webviewAuthBridge'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
@@ -85,6 +86,8 @@ export interface BulkPhotoPass {
   /** Null when nothing should be mounted. */
   webViewKey: string | null
   sourceUri: string | null
+  /** Inject on `onLoadEnd`. Null unless the postMessage auth bridge is on. */
+  authInjection: string | null
   onLoadStart: () => void
   onMessage: (raw: string) => void
   onError: (description: string | undefined) => void
@@ -421,11 +424,18 @@ export function useBulkPhotoPass({
     pauseReason,
     enqueue,
     webViewKey: renderCard ? `bulk-prep-${renderCard.itemId}-${renderCard.attempt}` : null,
+    // Token hand-off goes through lib/webviewAuthBridge.ts — `&token=` in
+    // the URL today, postMessage once the web accepts `dcm-auth`.
     sourceUri: renderCard
       ? `${API_BASE}/ebay-image-prep/${renderCard.cardId}` +
-        `?token=${encodeURIComponent(renderCard.token)}` +
-        `&labelStyle=${labelStyle}&bridge=2&docs=0`
+        `?labelStyle=${labelStyle}&bridge=2&docs=0` +
+        bridgeTokenParam(renderCard.token)
       : null,
+    /**
+     * JS the host must `injectJavaScript()` on `onLoadEnd`, handing the prep
+     * page its session out-of-band. Null while USE_POSTMESSAGE_BRIDGE is off.
+     */
+    authInjection: renderCard ? authBridgeInjection(renderCard.token) : null,
     onLoadStart,
     onMessage,
     onError,

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Stack, useRouter, usePathname, Link } from 'expo-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Stack, useRouter, usePathname, useGlobalSearchParams, Link } from 'expo-router'
 import { View, Text, StyleSheet } from 'react-native'
 
 import InAppPage from '@/components/ui/InAppPage'
 import { Colors } from '@/lib/constants'
+import { resolveDeepLink } from '@/lib/deepLinks'
 
 /**
  * Smart catch-all for unmatched routes.
@@ -29,50 +30,47 @@ import { Colors } from '@/lib/constants'
  * expo-router resolution path.
  */
 
-// Card type segments mirrored from the website's URL scheme. Keep in sync
-// with src/app/(<cardType>)/[id]/page.tsx route folders on the web.
-const CARD_TYPE_PATHS = new Set([
-  'sports',
-  'pokemon',
-  'mtg',
-  'lorcana',
-  'onepiece',
-  'yugioh',
-  'starwars',
-  'other',
-])
-
 export default function NotFoundScreen() {
   const pathname = usePathname()
+  // usePathname() strips the query string. Universal links to /search,
+  // /pop and label previews are meaningless without it, so rebuild the
+  // query from the global search params and hand the whole thing to the
+  // shared resolver (lib/deepLinks.ts).
+  const params = useGlobalSearchParams()
   const router = useRouter()
   const [routed, setRouted] = useState(false)
 
+  const resolved = useMemo(() => {
+    const qs = Object.entries(params || {})
+      .filter(([, v]) => v != null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(Array.isArray(v) ? v[0] : String(v))}`)
+      .join('&')
+    return resolveDeepLink(`${pathname || '/'}${qs ? `?${qs}` : ''}`)
+  }, [pathname, params])
+
   useEffect(() => {
-    if (!pathname) return
-    // Match /<cardType>/<uuid> with the standard 36-char hyphenated UUID
-    // shape (or any hex-ish id 8+ chars long, to stay loose). The native
-    // /card/[id] screen handles every card type uniformly, so all of
-    // /sports/<id>, /pokemon/<id>, etc. funnel into the same screen.
-    const m = pathname.match(/^\/([a-z]+)\/([0-9a-f-]{8,})$/i)
-    if (m && CARD_TYPE_PATHS.has(m[1].toLowerCase())) {
-      router.replace(`/card/${m[2]}` as any)
+    // The native /card/[id] screen handles every card type uniformly, so
+    // /sports/<id>, /pokemon/<id>, etc. all funnel into the same screen.
+    if (resolved.kind === 'card' || resolved.kind === 'native-page') {
+      router.replace(resolved.href as any)
       setRouted(true)
     }
-  }, [pathname, router])
+  }, [resolved, router])
 
-  // While routing to /card/[id], show a blank background instead of the
-  // not-found UI so there's no visual flash before the redirect.
+  // While redirecting, show a blank background instead of the not-found UI
+  // so there's no visual flash before the redirect.
   if (routed) {
     return <View style={styles.blank} />
   }
 
   // Any other path — fall back to loading the web version inside the app.
   // Examples this catches: /blog, /blog/<slug>, /featured, /pop,
-  // /pop/sports, /why-dcm, /grading-rubric, /vip, /card-lovers,
-  // /collection/<username>, /labels/<id>, etc. The InAppPage WebView
-  // injects the user's session before page load so logged-in views work.
-  if (pathname && pathname !== '/' && pathname !== '/+not-found') {
-    return <InAppPage path={pathname} title="DCM Grading" />
+  // /pop/sports, /why-dcm, /grading-rubric, /collection/<username>,
+  // /labels/<id>, etc. The InAppPage WebView injects the user's session
+  // before page load so logged-in views work, and the query string is
+  // carried through.
+  if (resolved.kind === 'embedded-web') {
+    return <InAppPage path={resolved.href} title="DCM Grading" />
   }
 
   // True "nowhere to go" fallback — keep the original error UX.

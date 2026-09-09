@@ -22,7 +22,14 @@ export default function LoginScreen() {
   // register screen redirects here with ?existingEmail=… — pre-fill the
   // form and show an inline notice so the user can just enter their
   // password instead of re-typing the email.
-  const params = useLocalSearchParams<{ existingEmail?: string }>()
+  //
+  // `?redirect=<in-app href>` is also honored: AuthGate (app/_layout.tsx)
+  // records it as the pending destination and navigates there once the
+  // session resolves, for every sign-in method on this screen (password,
+  // Apple, Google, Facebook). It is also set automatically when a signed-out
+  // user opens a deep link, so a shared card link returns to that card
+  // after sign-in. See lib/deepLinks.ts.
+  const params = useLocalSearchParams<{ existingEmail?: string; redirect?: string }>()
   const [email, setEmail] = useState(params.existingEmail || '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

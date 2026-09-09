@@ -234,7 +234,13 @@ export async function createListing(data: CreateListingRequest): Promise<CreateL
   })
   const result = await res.json().catch(() => ({}))
   if (!res.ok && !result.success) {
-    throw new EbayApiError(result.error || result.userAction || 'Failed to create listing', res.status)
+    // Web parity with EbayListingModal: eBay's rejection sentence plus the
+    // 'what to do about it' line (e.g. error 640 'create a seller's account' +
+    // 'visit eBay > My eBay > Selling to finish seller setup'). Dropping the
+    // action left a customer (Sept 9 2026) with a dead-end 'account needs to
+    // be set up' alert while eBay itself was the blocker.
+    const message = [result.error, result.userAction].filter(Boolean).join('\n\n') || 'Failed to create listing'
+    throw new EbayApiError(message, res.status)
   }
   return result
 }

@@ -2,11 +2,12 @@ import { View, StyleSheet, ActivityIndicator, BackHandler } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useRouter, useSegments, useNavigation } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import { APP_USER_AGENT_SUFFIX, withEmbeddedParams } from '@/lib/embeddedWeb'
 
 const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
@@ -35,7 +36,8 @@ export default function InAppPage({ path, title }: InAppPageProps) {
   const [ready, setReady] = useState(false)
   const [canGoBack, setCanGoBack] = useState(false)
   const webViewRef = useRef<WebView>(null)
-  const url = `${WEB_URL}${path}`
+  // `app=1` tells the web side to render in embedded mode (see lib/embeddedWeb.ts).
+  const url = useMemo(() => withEmbeddedParams(`${WEB_URL}${path}`), [path])
 
   const handleBack = () => {
     // Inside the WebView, walk back through web nav history first; if the
@@ -108,37 +110,74 @@ export default function InAppPage({ path, title }: InAppPageProps) {
     true;
   ` : 'true;'
 
-  // After load: hide nav/footer/helpbot for clean in-app look.
+  // After load: hide *global* chrome (site nav/footer/helpbot) for a clean
+  // in-app look, without eating real page content.
+  //
+  // Two eras of web deployment are supported:
+  //
+  //  A) NEW web (sets `html[data-embedded="1"]` when it sees `?app=1` or the
+  //     `DCMGradingApp/<version>` user agent). It marks only global chrome
+  //     with `data-site-chrome`, so we hide exactly that. In-content
+  //     `<header>`s (Pricing/Reports intros) and section `<nav>`s
+  //     (Reports, Pop, Portfolio, Why DCM) survive.
+  //
+  //  B) OLD web (no `data-embedded`). We fall back to the historical blanket
+  //     `header, nav, footer` rule so already-shipped pages still look right.
+  //     This branch is the one that can eat content, which is exactly why it
+  //     is gated on the absence of the new contract.
   //
   // dcmgrading.com is a Next.js SPA — client-side routing tears down and
-  // re-mounts the nav/footer when the user follows a link inside the
-  // WebView. A one-shot hide doesn't survive route changes. We install a
-  // CSS rule (instant, applies before paint) plus a MutationObserver that
-  // re-runs the hide on every DOM mutation. The observer is mounted once
-  // and persists across SPA navigations because it lives on `window`.
+  // re-mounts chrome, and `data-embedded` may be stamped by a client effect
+  // *after* our first run. So the decision is re-evaluated on every DOM
+  // mutation (cheap: it is one dataset read) and the stylesheet text is
+  // rewritten only when the verdict actually changes. The observer is
+  // mounted once and persists across SPA navigations via `window`.
   const injectedAfterLoad = `
     (function() {
-      if (window.__dcmInAppHideInstalled) { return; }
+      if (window.__dcmInAppHideInstalled) {
+        // Re-entry after a full page load in the same WebView: make sure the
+        // rule still reflects the current document.
+        if (window.__dcmInAppApplyChrome) { window.__dcmInAppApplyChrome(); }
+        return;
+      }
       window.__dcmInAppHideInstalled = true;
 
-      // Inject a stylesheet — wins against most page styles and applies
-      // pre-paint, so users never see a flash of nav/footer.
-      var style = document.createElement('style');
-      style.id = '__dcm-in-app-hide';
-      style.textContent = [
-        'header, nav, footer { display: none !important; }',
+      var SHARED = [
         'main { padding-top: 16px !important; }',
+        // Explicitly-marked global chrome (new web contract).
+        '[data-site-chrome] { display: none !important; }',
         // HelpBot floating button (fixed bottom-right, high z-index)
         '.fixed.bottom-6.right-6 { display: none !important; }',
         '[class*="fixed"][class*="bottom-6"][class*="right-6"] { display: none !important; }',
         // Site-wide "Download the app" launch banner — redundant in-app.
         // Selector is set on src/components/LaunchBanner.tsx (web).
         '[data-dcm-launch-banner] { display: none !important; }',
-      ].join('\\n');
-      document.head.appendChild(style);
+      ];
+      // Legacy blanket rule. Applied ONLY when the page does not advertise
+      // the data-embedded contract.
+      var LEGACY = 'header, nav, footer { display: none !important; }';
+
+      var style = document.createElement('style');
+      style.id = '__dcm-in-app-hide';
+      (document.head || document.documentElement).appendChild(style);
+
+      var lastMode = null;
+      function applyChrome() {
+        var docEl = document.documentElement;
+        var embedded = docEl && docEl.getAttribute('data-embedded') === '1';
+        var mode = embedded ? 'marked' : 'legacy';
+        if (mode === lastMode) { return; }
+        lastMode = mode;
+        var rules = SHARED.slice();
+        if (!embedded) { rules.unshift(LEGACY); }
+        style.textContent = rules.join('\\n');
+      }
+      window.__dcmInAppApplyChrome = applyChrome;
+      applyChrome();
 
       // Belt-and-suspenders: anything HelpBot-shaped that escapes the
-      // class selectors gets hidden by computed-style sweep.
+      // class selectors gets hidden by computed-style sweep. Never sweeps
+      // non-fixed content, so it cannot hide page copy.
       function sweepFloating() {
         document.querySelectorAll('.fixed').forEach(function(el) {
           var s = window.getComputedStyle(el);
@@ -152,11 +191,19 @@ export default function InAppPage({ path, title }: InAppPageProps) {
       }
       sweepFloating();
 
-      // Watch for DOM changes (Next.js client-side route transitions
-      // swap out the page tree) and re-run the floating-element sweep.
-      // The CSS rule already handles header/nav/footer.
-      var obs = new MutationObserver(function() { sweepFloating(); });
-      obs.observe(document.body, { childList: true, subtree: true });
+      // Watch for DOM changes (Next.js client-side route transitions swap
+      // out the page tree, and the embedded flag can be stamped late) and
+      // re-run both the chrome decision and the floating-element sweep.
+      var obs = new MutationObserver(function() {
+        applyChrome();
+        sweepFloating();
+      });
+      obs.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-embedded'],
+      });
     })();
     true;
   `
@@ -187,6 +234,9 @@ export default function InAppPage({ path, title }: InAppPageProps) {
         ref={webViewRef}
         source={{ uri: url }}
         style={styles.webview}
+        // Appended to (not replacing) the platform's default WebView UA, so
+        // the web side can detect the app via `DCMGradingApp/<version>`.
+        applicationNameForUserAgent={APP_USER_AGENT_SUFFIX}
         onLoadEnd={() => setLoading(false)}
         // Re-inject on every navigation. injectedJavaScript only fires on
         // initial load on iOS; this catches any edge cases where the

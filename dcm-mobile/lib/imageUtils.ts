@@ -548,3 +548,25 @@ export async function uriToArrayBuffer(uri: string): Promise<ArrayBuffer> {
   const response = await fetch(uri)
   return response.arrayBuffer()
 }
+
+/**
+ * `folder/front.jpg` → `folder/front_thumb.jpg`. Any extension is accepted;
+ * thumbnails are always `.jpg` because the web always re-encodes as JPEG.
+ *
+ * TWIN of `thumbPath` in src/lib/images/cardThumbnails.ts — the mobile bundler
+ * can't reach across the project boundary, so this is a hand-maintained copy.
+ * Keep the two in lockstep; a mismatch means every collection tile silently
+ * falls back to the full-size original (1.6 MB instead of ~35 KB).
+ */
+export function thumbPath(originalPath: string): string {
+  const clean = String(originalPath || '').trim()
+  if (!clean) return ''
+  const slash = clean.lastIndexOf('/')
+  const dir = slash >= 0 ? clean.slice(0, slash + 1) : ''
+  const file = slash >= 0 ? clean.slice(slash + 1) : clean
+  const dot = file.lastIndexOf('.')
+  const stem = dot > 0 ? file.slice(0, dot) : file
+  // Idempotent: thumbPath(thumbPath(x)) === thumbPath(x).
+  const base = stem.endsWith('_thumb') ? stem : `${stem}_thumb`
+  return `${dir}${base}.jpg`
+}

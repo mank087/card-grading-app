@@ -9,6 +9,7 @@
  * Nothing is rendered at all once the queue drains.
  */
 
+import { useRef } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { WebView } from 'react-native-webview'
@@ -34,6 +35,9 @@ interface Props {
 export default function BulkPhotoPass({
   pass, failedPhotoCount = 0, onRetryPhotos, retryingPhotos = false,
 }: Props) {
+  // Declared before the early returns below — hook order must not depend on
+  // whether the strip renders. Used only for the out-of-band auth hand-off.
+  const prepRef = useRef<WebView>(null)
   const idle = !pass.running && !pass.paused
   // Once the pass drains the strip has one job left: offering the failed rows
   // a second run. With none of those there is nothing to say.
@@ -91,10 +95,15 @@ export default function BulkPhotoPass({
         <View pointerEvents="none" style={styles.hidden}>
           <WebView
             key={pass.webViewKey}
+            ref={prepRef}
             source={{ uri: pass.sourceUri }}
             originWhitelist={['*']}
             javaScriptEnabled
             onLoadStart={pass.onLoadStart}
+            // Out-of-band auth hand-off; no-op while the flag is off.
+            onLoadEnd={() => {
+              if (pass.authInjection) prepRef.current?.injectJavaScript(pass.authInjection)
+            }}
             onMessage={e => pass.onMessage(e.nativeEvent.data)}
             onError={e => pass.onError(e.nativeEvent?.description)}
           />

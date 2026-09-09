@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
-import { Stack, useRouter, useSegments } from 'expo-router'
+import { Stack, useRouter, useSegments, usePathname, useGlobalSearchParams } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useCallback, lazy, Suspense } from 'react'
 // Sentry — wrapped in try/catch because the native module is unavailable
@@ -26,6 +26,11 @@ import WelcomeTour from '@/components/onboarding/WelcomeTour'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
 import { supabase, hasActiveSession } from '@/lib/supabase'
+import {
+  setPendingRedirect,
+  consumePendingRedirect,
+  hydratePendingRedirect,
+} from '@/lib/deepLinks'
 // Lazy-load the welcome carousel — its module evaluates 27 require()d
 // PNGs (welcome card strips, slabs, label studio shots, eBay listings)
 // at module-load time. Static-importing here means every authenticated
@@ -108,17 +113,51 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const segments = useSegments()
   const router = useRouter()
+  const pathname = usePathname()
+  const globalParams = useGlobalSearchParams()
+
+  // Cold start after a link tap: a destination recorded on a previous run
+  // (process killed at the OAuth hand-off, say) is restored from disk.
+  useEffect(() => { void hydratePendingRedirect() }, [])
+
+  // Remember where a SIGNED-OUT user was trying to go, so signing in
+  // returns them there instead of dumping them on the collection tab.
+  // Covers universal links, App Links and QR codes on slab labels.
+  useEffect(() => {
+    if (isLoading || user) return
+    const inAuthGroup = segments[0] === '(auth)'
+    // An explicit `?redirect=` on the login screen wins — that is the
+    // caller telling us where the user should end up.
+    const explicit = inAuthGroup ? globalParams?.redirect : undefined
+    if (typeof explicit === 'string' && explicit) {
+      setPendingRedirect(explicit)
+      return
+    }
+    if (inAuthGroup) return
+    if (!pathname || pathname === '/') return
+    const qs = Object.entries(globalParams || {})
+      .filter(([k, v]) => k !== 'redirect' && v != null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(Array.isArray(v) ? v[0] : String(v))}`)
+      .join('&')
+    setPendingRedirect(`${pathname}${qs ? `?${qs}` : ''}`)
+  }, [isLoading, user, segments, pathname, globalParams])
 
   // Bounce authenticated users off the auth screens straight into the app.
-  // Match web's behavior: users with at least one graded card land on
-  // collection; brand-new users (or users who've never finished a grade)
-  // land on the grade tab so they're immediately prompted to grade.
+  // A remembered destination (deep link opened while signed out) wins;
+  // otherwise match web's behavior: users with at least one graded card
+  // land on collection, brand-new users land on the grade tab so they're
+  // immediately prompted to grade.
   useEffect(() => {
     if (isLoading) return
     const inAuthGroup = segments[0] === '(auth)'
     if (!user || !inAuthGroup) return
     let cancelled = false
     ;(async () => {
+      const returnTo = consumePendingRedirect()
+      if (returnTo) {
+        if (!cancelled) router.replace(returnTo as any)
+        return
+      }
       // cards denies anon (RLS) — skip the count query until the client has
       // its token attached; querying as anon fails with 42501. Fall back to
       // the grade tab, matching the no-graded-cards path.

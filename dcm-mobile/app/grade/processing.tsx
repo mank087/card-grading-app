@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
-import { supabase, hasActiveSession } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
+import { useGradingJob, refreshGradingJobs } from '@/lib/gradingJob'
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
@@ -16,25 +16,36 @@ const CATEGORY_ROUTES: Record<string, string> = {
   Lorcana: 'lorcana', 'One Piece': 'onepiece', 'Yu-Gi-Oh': 'yugioh', Other: 'other',
 }
 
+// These captions are TIME-DRIVEN illustration, not confirmed backend stages.
+// The wording is deliberately neutral ("inspecting…") so the screen never
+// claims a step finished that no poll has confirmed. Only the completed
+// state — which requires a confirmed grade — reads as done.
 const STEPS = [
-  { label: 'Detecting card boundaries', icon: 'scan-outline' },
-  { label: 'Measuring centering ratios', icon: 'resize-outline' },
-  { label: 'Evaluating corners & edges', icon: 'cube-outline' },
-  { label: 'Assessing surface condition', icon: 'layers-outline' },
-  { label: 'Generating final grade', icon: 'ribbon-outline' },
+  { label: 'Inspecting card boundaries', icon: 'scan-outline' },
+  { label: 'Inspecting centering', icon: 'resize-outline' },
+  { label: 'Inspecting corners & edges', icon: 'cube-outline' },
+  { label: 'Inspecting surface', icon: 'layers-outline' },
+  { label: 'Inspecting overall condition', icon: 'ribbon-outline' },
 ]
 
 export default function ProcessingScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ cardId: string; category: string; frontUri: string }>()
   const [currentStep, setCurrentStep] = useState(0)
-  const [isComplete, setIsComplete] = useState(false)
   const insets = useSafeAreaInsets()
-  const [grade, setGrade] = useState<number | null>(null)
   const scanAnim = useRef(new Animated.Value(0)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const scrollRef = useRef<ScrollView>(null)
+
+  // Shared job state — the same constants, poll interval and delayed/failed
+  // rules the global queue + PersistentStatusBar use (lib/gradingJob.ts).
+  // The anchor is fixed at first mount: this screen is entered right after
+  // the upload, so "now" is the submission time.
+  const uploadedAtRef = useRef(Date.now())
+  const { state: jobState, grade } = useGradingJob(params.cardId, uploadedAtRef.current)
+  const isComplete = jobState === 'completed'
+  const gradingError = jobState === 'failed'
+  const isDelayed = jobState === 'delayed'
 
   // Scanning animation
   useEffect(() => {
@@ -57,24 +68,26 @@ export default function ProcessingScreen() {
     return () => { scan.stop(); pulse.stop() }
   }, [])
 
-  // Step progression (visual only — advances every 15s)
+  // Step progression (visual only — advances every 15s). Illustrative, not a
+  // report of confirmed backend progress; see the STEPS comment above.
   useEffect(() => {
+    if (isComplete) return
     const timer = setInterval(() => {
-      setCurrentStep(prev => {
-        if (prev < STEPS.length - 1) return prev + 1
-        return prev
-      })
+      setCurrentStep(prev => (prev < STEPS.length - 1 ? prev + 1 : prev))
     }, 15000)
     return () => clearInterval(timer)
-  }, [])
+  }, [isComplete])
 
-  // Poll count + completion flag tracked via refs (not state) so that
-  // bumping them every 5s doesn't re-render the entire processing
-  // screen — the carousel, scan animation, and step list don't change
-  // between polls, only the dev console log does.
-  const pollCountRef = useRef(0)
-  const isCompleteRef = useRef(false)
-  const [gradingError, setGradingError] = useState(false)
+  // Success haptic fires once, when the shared job state first reports a
+  // confirmed grade.
+  const celebratedRef = useRef(false)
+  useEffect(() => {
+    if (!isComplete || celebratedRef.current) return
+    celebratedRef.current = true
+    setCurrentStep(STEPS.length - 1)
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+  }, [isComplete])
+
   // Tracks whether the trigger fetch failed (network OR non-OK status).
   // Polling continues in the background regardless — sometimes the backend
   // picks up the card via a separate worker — but we surface a banner so
@@ -101,85 +114,18 @@ export default function ProcessingScreen() {
       })
   }, [params.cardId, params.category, triggerNonce])
 
-  // Poll for grading completion. Effect deps deliberately exclude
-  // `isComplete` — when grade is found we clear the interval inline
-  // (line below), so we don't need React to tear down + re-mount the
-  // effect just to bail out. The 5-min timeout uses isCompleteRef
-  // (not state) to avoid the same stale-closure issue.
+  // Polling itself lives in lib/gradingJob.ts: one shared 5s interval and one
+  // batched Supabase query for every watcher in the app, paused while
+  // backgrounded and re-polled once on foreground. `useGradingJob` above
+  // subscribes this screen to it, so the full-screen view and the global
+  // status bar can no longer disagree about whether a job failed.
+  //
+  // Route params are strings — a null id arrives as the literal "null",
+  // which passes a truthy check but breaks the uuid query (22P02); the hook
+  // and the registry both guard on isUuid.
   useEffect(() => {
-    // Route params are strings — a null id arrives as the literal "null",
-    // which passes a truthy check but breaks the uuid query (22P02).
-    if (!isUuid(params.cardId)) return
-
-    if (__DEV__) console.log('[Processing] Starting poll for card:', params.cardId)
-
-    const markComplete = (g: number) => {
-      isCompleteRef.current = true
-      setIsComplete(true)
-      setGrade(g)
-      setCurrentStep(STEPS.length - 1)
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-
-    pollRef.current = setInterval(async () => {
-      if (isCompleteRef.current) return
-      try {
-        // cards denies anon (RLS) — skip ticks until the session token is
-        // attached, otherwise the poll fails with 42501 as anon.
-        if (!(await hasActiveSession())) return
-        pollCountRef.current += 1
-        const { data, error } = await supabase
-          .from('cards')
-          .select('conversational_whole_grade, conversational_condition_label, conversational_grading')
-          .eq('id', params.cardId)
-          .single()
-
-        if (error) {
-          if (__DEV__) console.log('[Processing] Poll error:', error.message)
-          return
-        }
-
-        // Check if grade is set
-        if (data?.conversational_whole_grade) {
-          if (__DEV__) console.log('[Processing] Grade found:', data.conversational_whole_grade)
-          markComplete(data.conversational_whole_grade)
-          return
-        }
-
-        // Check if grading data exists but grade column not set (extraction issue)
-        if (data?.conversational_grading && !data?.conversational_whole_grade) {
-          try {
-            const json = JSON.parse(data.conversational_grading)
-            const extractedGrade = json.final_grade?.whole_grade || json.grading_passes?.averaged_rounded?.final
-            if (extractedGrade) {
-              if (__DEV__) console.log('[Processing] Grade found in JSON but not in column:', extractedGrade)
-              markComplete(Math.round(extractedGrade))
-              return
-            }
-          } catch { /* JSON parse failed, continue polling */ }
-        }
-
-        if (__DEV__) console.log('[Processing] Poll #' + pollCountRef.current + ' — no grade yet')
-      } catch (err) {
-        if (__DEV__) console.log('[Processing] Poll exception:', err)
-      }
-    }, 5000)
-
-    // Timeout after 5 minutes — show error state. Reads from
-    // isCompleteRef so we always see the latest value (not the
-    // false captured at effect-mount time).
-    const timeout = setTimeout(() => {
-      if (!isCompleteRef.current) {
-        if (__DEV__) console.log('[Processing] Timeout reached — grading may have failed')
-        setGradingError(true)
-        if (pollRef.current) clearInterval(pollRef.current)
-      }
-    }, 300000)
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      clearTimeout(timeout)
+    if (__DEV__ && !isUuid(params.cardId)) {
+      console.log('[Processing] Not a uuid, no polling:', params.cardId)
     }
   }, [params.cardId])
 
@@ -276,8 +222,10 @@ export default function ProcessingScreen() {
                   status === 'done' && styles.stepIconDone,
                   status === 'active' && styles.stepIconActive,
                 ]}>
+                  {/* A checkmark would assert the backend finished this
+                      stage. Only show one once the grade is confirmed. */}
                   {status === 'done' ? (
-                    <Ionicons name="checkmark" size={14} color={Colors.white} />
+                    <Ionicons name={isComplete ? 'checkmark' : 'ellipse'} size={isComplete ? 14 : 8} color={Colors.white} />
                   ) : (
                     <Ionicons name={step.icon as any} size={14} color={status === 'active' ? Colors.white : Colors.gray[400]} />
                   )}
@@ -306,12 +254,29 @@ export default function ProcessingScreen() {
           <Text style={styles.warnText}>
             We couldn{'’'}t confirm the grading job started. Still checking in case it kicked off anyway.
           </Text>
-          <Button title="Retry" variant="secondary" size="sm" onPress={() => setTriggerNonce(n => n + 1)} />
+          <Button
+            title="Retry"
+            variant="secondary"
+            size="sm"
+            onPress={() => { setTriggerNonce(n => n + 1); refreshGradingJobs() }}
+          />
+        </View>
+      )}
+
+      {/* Delayed — still running, explicitly NOT a failure. Shown between the
+          5-minute delayed mark and the shared 10-minute timeout. */}
+      {!isComplete && isDelayed && (
+        <View style={styles.warnContainer}>
+          <Ionicons name="time-outline" size={20} color={Colors.amber[400]} />
+          <Text style={styles.warnText}>
+            This one is taking longer than usual — still running. You can leave this screen;
+            we{'’'}ll keep checking and it will appear in My Collection.
+          </Text>
         </View>
       )}
 
       {/* Timing info */}
-      {!isComplete && !gradingError && (
+      {!isComplete && !gradingError && !isDelayed && (
         <Text style={styles.timingText}>
           This typically takes 1-2 minutes. You can grade another card or view your collection while waiting.
         </Text>

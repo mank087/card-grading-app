@@ -61,12 +61,20 @@ export default function AccountScreen() {
   const { user, signOut } = useAuth()
   const { balance } = useCredits()
   const { start: startWelcomeTour } = useWelcomeTour()
-  const { isCardLover } = useUserEmblems()
+  const { isCardLover, loading: emblemsLoading } = useUserEmblems()
   // Apple App Store Reader-app compliance: iOS users cannot see a path
   // that promotes / leads to a non-IAP subscription purchase. Members
   // who already subscribed via web still get to see their member status;
   // non-members on iOS get no entry point.
-  const showCardLoversMenuItem = Platform.OS !== 'ios' || isCardLover
+  //
+  // Membership is only known once the emblems provider resolves — until
+  // then `isCardLover` is false because nothing loaded, not because the
+  // user is a non-member. Show neither the entry nor the note while
+  // unresolved, so a member never sees "not available" flash first.
+  const membershipResolved = !emblemsLoading
+  const isIos = Platform.OS === 'ios'
+  const showCardLoversMenuItem = !isIos || (membershipResolved && isCardLover)
+  const showIosMembershipNote = isIos && membershipResolved && !isCardLover
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -207,6 +215,13 @@ export default function AccountScreen() {
             color={Colors.purple[600]}
           />
         )}
+        {/* iOS: no Card Lovers plan card, no pricing, no steering. One
+            neutral availability line so the absence isn't mysterious. */}
+        {showIosMembershipNote && (
+          <Text style={styles.platformNote}>
+            Card Lovers membership is not available in this app.
+          </Text>
+        )}
         {Platform.OS !== 'ios' && (
           <MenuItem icon="ribbon" label="VIP Package" onPress={() => nav('vip')} color={Colors.amber[600]} />
         )}
@@ -271,6 +286,7 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
+  platformNote: { fontSize: 12, color: Colors.gray[500], paddingHorizontal: 16, paddingVertical: 12 },
   container: { flex: 1, backgroundColor: Colors.gray[50] },
   content: { paddingBottom: 40 },
   profileCard: { backgroundColor: Colors.purple[600], margin: 12, borderRadius: 16, padding: 20 },

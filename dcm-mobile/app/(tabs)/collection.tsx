@@ -17,12 +17,13 @@ import {
   removeCardsFromBinder, reorderBinderCard, getCardBinders,
   renameBinder, deleteBinder, type Binder,
 } from '@/lib/bindersApi'
-import GradeBadge from '@/components/ui/GradeBadge'
+import GradeBadge from '@/components/grading/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
 import { resolveHeritageBandColors } from '@/lib/heritage'
 import { supabase, hasActiveSession } from '@/lib/supabase'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { resolveCardValue } from '@/lib/resolveCardValue'
+import { thumbPath } from '@/lib/imageUtils'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
@@ -38,6 +39,12 @@ const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', '
 // entire sports collection in one place. Tapping a specific sport in
 // the sub-row then narrows further.
 const SPORTS_CATEGORIES = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'] as const
+/** Rows per page — matches the web collection's /api/cards/my-collection. */
+const PAGE_SIZE = 60
+
+/** Cached first page older than this is ignored (stale prices, stale grades). */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Date' },
   { value: 'conversational_whole_grade', label: 'Grade' },
@@ -97,6 +104,22 @@ export default function CollectionScreen() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // ---- Server-side pagination -----------------------------------------
+  // The collection used to be a single `.limit(1000)` fetch with all
+  // search/filter/sort done on the loaded array: a 1,001st card was
+  // invisible and unsearchable, and every cold start signed 1,000 image
+  // URLs to paint eight tiles. Now search, category, ownership and sort all
+  // run on the server and rows arrive 60 at a time.
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  /** Collection-wide count for the current filters (head query, no rows). */
+  const [totalCount, setTotalCount] = useState<number | null>(null)
+  /** Debounced copy of `search` — one query per pause, not per keystroke. */
+  const [searchTerm, setSearchTerm] = useState('')
+  /** Per-sport totals, counted server-side so they cover the whole collection. */
+  const [sportCounts, setSportCounts] = useState<{ sport: string; count: number }[]>([])
 
   // ---- Multi-select + batch printing ----------------------------------
   // Long-press a card to enter selection mode; then tap toggles selection.
@@ -196,8 +219,13 @@ export default function CollectionScreen() {
         if (!raw) return
         try {
           const parsed = JSON.parse(raw)
+          // Only the FIRST page is cached, and only for a day. A stale cache
+          // shows stale grades and stale prices, and a multi-thousand-card
+          // blob was never worth writing on every fetch.
+          const age = Date.now() - (parsed?.cachedAt ?? 0)
+          if (!Number.isFinite(age) || age > CACHE_TTL_MS) return
           if (parsed?.cards && Array.isArray(parsed.cards)) {
-            setCards(parsed.cards)
+            setCards(parsed.cards.slice(0, PAGE_SIZE))
             setIsLoading(false)
           }
         } catch { /* ignore corrupt cache */ }
@@ -205,74 +233,156 @@ export default function CollectionScreen() {
       .catch(err => { console.warn('[collection] cache hydrate failed:', err?.message) })
   }, [cacheKey])
 
-  const fetchCollection = useCallback(async () => {
+  // Debounce the search box so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const CARD_COLUMNS = `
+    id, serial, card_name, featured, category, sub_category, card_set,
+    card_number, release_date, manufacturer_name, visibility,
+    rookie_card, autographed, serial_numbering,
+    conversational_whole_grade, conversational_condition_label,
+    conversational_card_info, front_path, card_colors,
+    ebay_price_median, dcm_price_estimate,
+    dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
+    created_at
+  `
+
+  /**
+   * Apply the server-side scope: ownership, category / sub-sport, and the
+   * search term. Search runs as an `ilike` OR across the text columns the
+   * old client-side filter looked at, so it now covers the WHOLE collection
+   * instead of only the loaded page.
+   *
+   * `applyOwnership` off = pre-migration fallback so an app build that ships
+   * ahead of the schema still lists cards.
+   */
+  const applyScope = useCallback((q: any, applyOwnership: boolean) => {
+    const uid = session?.user?.id
+    if (!uid) return q
+    let out = q.eq('user_id', uid)
+    if (applyOwnership) out = out.eq('ownership_status', ownershipView).is('deleted_at', null)
+
+    if (category === 'Sports') {
+      out = subSport
+        ? out.eq('category', subSport)
+        : out.in('category', SPORTS_CATEGORIES as unknown as string[])
+    } else if (category !== 'All') {
+      out = out.eq('category', category)
+    }
+
+    const term = searchTerm
+    if (term) {
+      // PostgREST `or` needs commas escaped out of the value; keep it simple
+      // by stripping the characters that would break the filter grammar.
+      const safe = term.replace(/[,()*]/g, ' ').trim()
+      if (safe) {
+        const like = `%${safe}%`
+        out = out.or(
+          [
+            `card_name.ilike.${like}`,
+            `serial.ilike.${like}`,
+            `featured.ilike.${like}`,
+            `card_set.ilike.${like}`,
+            `card_number.ilike.${like}`,
+            `manufacturer_name.ilike.${like}`,
+            `category.ilike.${like}`,
+          ].join(','),
+        )
+      }
+    }
+    return out
+  }, [session?.user?.id, ownershipView, category, subSport, searchTerm])
+
+  /**
+   * Sign the thumbnail for each row. Convention: a sibling `front_thumb.jpg`
+   * next to `front_path`. `createSignedUrls` reports per-item errors for
+   * objects that don't exist, so rows without a thumb fall back to the
+   * full-size original (~1.6 MB → ~35 KB for the ones that have it).
+   */
+  const attachImageUrls = useCallback(async (rows: any[]) => {
+    const withPath = rows.filter(r => r.front_path)
+    if (withPath.length === 0) return rows
+
+    const thumbFor = (p: string) => thumbPath(p)
+    const thumbPaths = withPath.map(r => thumbFor(r.front_path))
+
+    const signed = new Map<string, string>()
+    const sign = async (paths: string[]) => {
+      if (paths.length === 0) return
+      const { data: urls, error } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
+      // A whole-batch failure used to leave every card with an empty
+      // placeholder and no trace — warn, and fall through with whatever
+      // did come back.
+      if (error) console.warn('[collection] createSignedUrls failed:', error.message)
+      urls?.forEach(u => { if (u.signedUrl && u.path && !(u as any).error) signed.set(u.path, u.signedUrl) })
+    }
+
+    await sign(thumbPaths)
+    // Only pay for a second signing round for the rows whose thumb is missing.
+    const missing = withPath
+      .filter(r => !signed.has(thumbFor(r.front_path)))
+      .map(r => r.front_path)
+    await sign(missing)
+
+    for (const r of withPath) {
+      r.front_url = signed.get(thumbFor(r.front_path)) || signed.get(r.front_path) || null
+    }
+    return rows
+  }, [])
+
+  /**
+   * Load one page. `pageIndex` 0 replaces the list; anything higher appends.
+   * Ordering, filtering and search are all server-side, so page N genuinely
+   * continues page N-1 for the whole collection.
+   */
+  const fetchPage = useCallback(async (pageIndex: number) => {
     if (!session?.user?.id) return
     // cards denies anon (RLS): skip until the client has its token attached,
     // otherwise the request goes out as anon and fails with 42501.
     if (!(await hasActiveSession())) return
-    setFetchError(null)
+    if (pageIndex === 0) setFetchError(null)
+
+    const from = pageIndex * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+
     try {
-      // Ownership filter: sold cards leave the collection (their grade page
-      // stays online for the buyer) and soft-deleted ones are hidden entirely.
-      // `applyOwnership` off = pre-migration fallback so an app build that
-      // ships ahead of the schema still lists cards.
-      const runQuery = (applyOwnership: boolean) => {
-        let q = supabase
-        .from('cards')
-        .select(`
-          id, serial, card_name, featured, category, sub_category, card_set,
-          card_number, release_date, manufacturer_name, visibility,
-          rookie_card, autographed, serial_numbering,
-          conversational_whole_grade, conversational_condition_label,
-          conversational_card_info, front_path, card_colors,
-          ebay_price_median, dcm_price_estimate,
-          dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
-          created_at
-        `)
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(1000)
-        if (applyOwnership) q = q.eq('ownership_status', ownershipView).is('deleted_at', null)
-        return q
-      }
+      const runQuery = (applyOwnership: boolean) =>
+        applyScope(supabase.from('cards').select(CARD_COLUMNS), applyOwnership)
+          .order(sortBy, { ascending: sortAsc, nullsFirst: false })
+          // Tie-break on id so a page boundary can't repeat or skip a row
+          // when several cards share the sort value (same day, same grade).
+          .order('id', { ascending: true })
+          .range(from, to)
 
       let { data, error } = await runQuery(true)
       if (error && (error as any).code === '42703') {
         console.warn('[collection] ownership columns missing — listing all cards')
         ;({ data, error } = await runQuery(false))
       }
-
       if (error) throw error
 
-      if (data && data.length > 0) {
-        const paths = data.map(c => c.front_path).filter(Boolean)
-        if (paths.length > 0) {
-          // Check both the destructured error AND the urls array — a network
-          // hiccup here used to silently leave every card with a null
-          // front_url and an empty placeholder. Warn so the issue shows up
-          // in Sentry, and fall through with whatever URLs we did get.
-          const { data: urls, error: signErr } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
-          if (signErr) {
-            console.warn('[collection] createSignedUrls failed:', signErr.message)
-          }
-          const urlMap = new Map<string, string>()
-          urls?.forEach(u => { if (u.signedUrl && u.path) urlMap.set(u.path, u.signedUrl) })
-          data.forEach((c: any) => { c.front_url = urlMap.get(c.front_path) || null })
-        }
-      }
+      const rows = (data || []) as any[]
+      await attachImageUrls(rows)
 
-      setCards(data || [])
+      setHasMore(rows.length === PAGE_SIZE)
+      setPage(pageIndex)
+      setCards(prev => {
+        if (pageIndex === 0) return rows as CardItem[]
+        // Defensive de-dup: a card graded between two page fetches shifts the
+        // window, and a repeated id would crash FlatList's keyExtractor.
+        const seen = new Set(prev.map(c => c.id))
+        return [...prev, ...rows.filter(r => !seen.has(r.id))] as CardItem[]
+      })
 
-      // Persist to AsyncStorage so the next cold start can render instantly
-      // from cache while the fresh fetch runs, and so we have something to
-      // show when the user is offline. Only cache the fields needed for
-      // list/grid rendering — front_url is a 1h-TTL signed URL anyway.
-      if (cacheKey && data) {
+      // Cache the FIRST page only, and only for the unfiltered default view —
+      // caching a filtered result would show the wrong cards on next launch.
+      const isDefaultView = pageIndex === 0 && !searchTerm && category === 'All' && ownershipView === 'owned'
+      if (cacheKey && isDefaultView) {
         try {
-          await AsyncStorage.setItem(cacheKey, JSON.stringify({
-            cards: data,
-            cachedAt: Date.now(),
-          }))
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({ cards: rows, cachedAt: Date.now() }))
         } catch { /* ignore quota errors */ }
       }
     } catch (err: any) {
@@ -280,16 +390,46 @@ export default function CollectionScreen() {
       // Surface the failure with a retry CTA instead of leaving the user
       // staring at a perpetual spinner or an empty "No cards" state when
       // the network is the actual problem.
-      setFetchError(err?.message || 'Could not load your collection.')
+      if (pageIndex === 0) setFetchError(err?.message || 'Could not load your collection.')
     } finally {
       setIsLoading(false)
       setRefreshing(false)
+      setLoadingMore(false)
     }
-  }, [session?.user?.id, ownershipView])
+  }, [session?.user?.id, applyScope, sortBy, sortAsc, attachImageUrls, cacheKey, searchTerm, category, ownershipView])
 
-  useEffect(() => { fetchCollection() }, [fetchCollection])
+  /** Collection-wide total for the current filters — head query, no rows. */
+  const refreshTotalCount = useCallback(async () => {
+    if (!session?.user?.id) return
+    if (!(await hasActiveSession())) return
+    try {
+      const run = (applyOwnership: boolean) =>
+        applyScope(supabase.from('cards').select('id', { count: 'exact', head: true }), applyOwnership)
+      let { count, error } = await run(true)
+      if (error && (error as any).code === '42703') ({ count, error } = await run(false))
+      if (!error) setTotalCount(count ?? 0)
+    } catch { /* the label just falls back to the loaded count */ }
+  }, [session?.user?.id, applyScope])
 
-  const onRefresh = () => { setRefreshing(true); fetchCollection(); refreshBinders() }
+  const fetchCollection = useCallback(() => { void fetchPage(0) }, [fetchPage])
+
+  // Any scope change (ownership tab, category, sub-sport, search, sort)
+  // restarts at page 0 with a fresh server query.
+  useEffect(() => { void fetchPage(0) }, [fetchPage])
+  useEffect(() => { void refreshTotalCount() }, [refreshTotalCount])
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || isLoading || selectedBinderId) return
+    setLoadingMore(true)
+    void fetchPage(page + 1)
+  }, [loadingMore, hasMore, isLoading, selectedBinderId, page, fetchPage])
+
+  const onRefresh = () => {
+    setRefreshing(true)
+    void fetchPage(0)
+    void refreshTotalCount()
+    refreshBinders()
+  }
 
   // ---- Binders --------------------------------------------------------
 
@@ -435,8 +575,18 @@ export default function CollectionScreen() {
     } finally { setSheetBusy(false) }
   }
 
-  // Filter + sort + search
+  // Filter + sort + search.
+  //
+  // For ALL CARDS this is now a pass-through: ownership, category, search and
+  // sort all ran on the server in fetchPage, so re-applying them here would
+  // only be able to remove rows the server already vetted.
+  //
+  // BINDERS still filter client-side: a binder is a bounded, user-ordered set
+  // fetched whole by the binders API, so paging it would break the ordering
+  // contract and there is nothing to gain.
   const filteredCards = useMemo(() => {
+    if (!selectedBinderId) return cards
+
     // Inside a binder the source is the binder's cards, already in the user's
     // order; everything downstream (category, search, sort) then works within
     // that scope exactly as it does for All Cards.
@@ -444,9 +594,8 @@ export default function CollectionScreen() {
     // The ownership tab has to be applied HERE for binders: the binder endpoint
     // returns every card regardless of owned/sold, and switching tabs only
     // refetches the main list — so inside a binder the Sold tab did nothing.
-    let result = selectedBinderId
-      ? (binderCards ?? []).filter(c => ((c as any).ownership_status ?? 'owned') === ownershipView)
-      : cards
+    let result: CardItem[] = (binderCards ?? [])
+      .filter(c => ((c as any).ownership_status ?? 'owned') === ownershipView)
 
     // Category filter. "Sports" expands across every sport-specific
     // category present in the user's collection; a sub-sport narrows
@@ -499,19 +648,36 @@ export default function CollectionScreen() {
   // when "Sports" is the active filter. Built off the unfiltered card
   // list so the counts reflect the whole collection, not the currently
   // narrowed view.
-  const sportsInCollection = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const c of cards) {
-      const cat = c.category || ''
-      if ((SPORTS_CATEGORIES as readonly string[]).includes(cat)) {
-        counts.set(cat, (counts.get(cat) || 0) + 1)
-      }
-    }
-    // Sort by count descending so the user's most-graded sport leads.
-    return Array.from(counts.entries())
-      .map(([sport, count]) => ({ sport, count }))
-      .sort((a, b) => b.count - a.count)
-  }, [cards])
+  // Counted on the SERVER (head queries, no rows) so the numbers cover the
+  // whole collection — counting the loaded page would show "Baseball 60"
+  // for a 900-card baseball collection.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!session?.user?.id) return
+      if (!(await hasActiveSession())) return
+      try {
+        const results = await Promise.all(
+          SPORTS_CATEGORIES.map(async sport => {
+            const run = (applyOwnership: boolean) => {
+              let q = supabase.from('cards').select('id', { count: 'exact', head: true })
+                .eq('user_id', session.user.id).eq('category', sport)
+              if (applyOwnership) q = q.eq('ownership_status', ownershipView).is('deleted_at', null)
+              return q
+            }
+            let { count, error } = await run(true)
+            if (error && (error as any).code === '42703') ({ count, error } = await run(false))
+            return { sport: sport as string, count: error ? 0 : (count ?? 0) }
+          }),
+        )
+        if (cancelled) return
+        setSportCounts(results.filter(r => r.count > 0).sort((a, b) => b.count - a.count))
+      } catch { /* the sub-row just renders without counts */ }
+    })()
+    return () => { cancelled = true }
+  }, [session?.user?.id, ownershipView])
+
+  const sportsInCollection = sportCounts
   const totalSportsCount = useMemo(
     () => sportsInCollection.reduce((sum, s) => sum + s.count, 0),
     [sportsInCollection],
@@ -612,14 +778,21 @@ export default function CollectionScreen() {
   // collection. Previously only dcm_price_estimate + ebay_price_median
   // were consulted, so cards priced via the legacy dcm_cached_prices
   // blob or Scryfall came up as $0 on mobile but >$0 on web.
+  //
+  // These are derived from the rows actually LOADED. With pagination that is
+  // no longer the whole collection, and an average grade or a portfolio total
+  // computed over the first 60 cards would read as a collection-wide figure
+  // while being wrong. So they are only shown once everything in scope is
+  // loaded (`complete`); until then the stats bar shows the count alone.
   const stats = useMemo(() => {
     const graded = cards.filter(c => c.conversational_whole_grade != null)
     const resolved = cards.map(c => ({ c, r: resolveCardValue(c) }))
     const withPrice = resolved.filter(({ r }) => r.source !== 'none')
     const totalValue = withPrice.reduce((sum, { r }) => sum + r.value, 0)
     const avgGrade = graded.length > 0 ? graded.reduce((sum, c) => sum + (c.conversational_whole_grade || 0), 0) / graded.length : 0
-    return { total: cards.length, graded: graded.length, totalValue, avgGrade, priced: withPrice.length }
-  }, [cards])
+    const complete = !!selectedBinderId || (!hasMore && (totalCount == null || cards.length >= totalCount))
+    return { total: cards.length, graded: graded.length, totalValue, avgGrade, priced: withPrice.length, complete }
+  }, [cards, hasMore, totalCount, selectedBinderId])
 
   // useCallback keeps these stable across re-renders so FlatList doesn't
   // see a new function reference on every parent render — matters for
@@ -938,9 +1111,17 @@ export default function CollectionScreen() {
 
       {/* Stats bar */}
       <View style={st.statsBar}>
-        <Text style={st.statsText}>{filteredCards.length} cards</Text>
-        {stats.avgGrade > 0 && <Text style={st.statsText}>Avg: {stats.avgGrade.toFixed(1)}</Text>}
-        {stats.totalValue > 0 && <Text style={[st.statsText, { color: Colors.green[600] }]}>${stats.totalValue.toFixed(2)}</Text>}
+        {/* "n of total" — the total is a server-side count for the current
+            filters, so it stays right past the first page. */}
+        <Text style={st.statsText}>
+          {selectedBinderId || totalCount == null || filteredCards.length >= totalCount
+            ? `${filteredCards.length} cards`
+            : `${filteredCards.length} of ${totalCount} cards`}
+        </Text>
+        {/* Averages and totals only once everything in scope is loaded —
+            see the note on `stats`. */}
+        {stats.complete && stats.avgGrade > 0 && <Text style={st.statsText}>Avg: {stats.avgGrade.toFixed(1)}</Text>}
+        {stats.complete && stats.totalValue > 0 && <Text style={[st.statsText, { color: Colors.green[600] }]}>${stats.totalValue.toFixed(2)}</Text>}
       </View>
 
       {/* Card List */}
@@ -965,6 +1146,32 @@ export default function CollectionScreen() {
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={8}
+        // Infinite scroll. onEndReached alone is unreliable on Android with
+        // tall grid rows, so the footer also carries an explicit Load more.
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          !selectedBinderId && (hasMore || loadingMore) ? (
+            <View style={st.footerMore}>
+              {loadingMore ? (
+                <ActivityIndicator color={Colors.purple[600]} />
+              ) : (
+                <TouchableOpacity
+                  onPress={loadMore}
+                  style={st.footerMoreBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    totalCount != null
+                      ? `Load more cards, ${cards.length} of ${totalCount} loaded`
+                      : 'Load more cards'
+                  }
+                >
+                  <Text style={st.footerMoreTxt}>Load more</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={st.empty}>
             <Ionicons name="albums-outline" size={72} color={Colors.gray[300]} />
@@ -1574,6 +1781,9 @@ const st = StyleSheet.create({
 
   // Stats
   statsBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.gray[50] },
+  footerMore: { paddingVertical: 16, alignItems: 'center' },
+  footerMoreBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.white },
+  footerMoreTxt: { fontSize: 13, fontWeight: '700', color: Colors.purple[700] },
   ownRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
   ownTab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.gray[100] },
   ownTabOn: { backgroundColor: Colors.purple[600] },

@@ -14,6 +14,7 @@
  */
 
 import { finishTransaction, getAvailablePurchases, type Product, type Purchase } from 'react-native-iap'
+import { getLocales } from 'expo-localization'
 import { supabase } from '@/lib/supabase'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
@@ -135,6 +136,55 @@ export function getProductNumericPrice(product: Product | undefined): number {
   if (typeof p === 'number') return p
   if (typeof p === 'string') return parseFloat(p) || 0
   return 0
+}
+
+/**
+ * ISO currency code the store is charging in (e.g. "USD", "EUR", "JPY").
+ * StoreKit/Play give the storefront's currency, which is NOT necessarily
+ * the currency our web pricing is denominated in.
+ */
+export function getProductCurrency(product: Product | undefined): string | null {
+  if (!product) return null
+  const p = product as any
+  const code = p.currency || p.currencyCodeIOS || p.currencyCode || p.priceCurrencyCode
+  return typeof code === 'string' && code.length === 3 ? code.toUpperCase() : null
+}
+
+/**
+ * Format an amount in the STORE's currency, with the device's locale
+ * conventions. Returns null when we don't know the currency — callers must
+ * then omit the figure rather than fall back to a "$" that could be wrong.
+ *
+ * This exists because the iOS credits screen used to print a localized
+ * StoreKit price next to a hardcoded "$x.xx / grade" from the web price
+ * list: a user on a non-USD storefront saw two different currencies side by
+ * side, one of them simply wrong.
+ */
+export function formatStoreAmount(amount: number, product: Product | undefined): string | null {
+  const currency = getProductCurrency(product)
+  if (!currency || !Number.isFinite(amount)) return null
+  try {
+    const locale = getLocales()[0]?.languageTag || 'en-US'
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      // Zero-decimal currencies (JPY, KRW) must not gain fake cents; Intl
+      // already knows the right minor-unit count per currency.
+    }).format(amount)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Localized cost per grade, derived from the ACTUAL store price divided by
+ * the credit count. Returns null when the store price or currency is
+ * unknown — show nothing rather than a mismatched figure.
+ */
+export function formatPricePerGrade(product: Product | undefined, credits: number): string | null {
+  const price = getProductNumericPrice(product)
+  if (!product || !credits || price <= 0) return null
+  return formatStoreAmount(price / credits, product)
 }
 
 /**

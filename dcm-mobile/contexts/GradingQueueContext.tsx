@@ -1,9 +1,13 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { isUuid } from '@/lib/uuid'
+import { GRADING_TIMEOUT_MS } from '@/lib/gradingJob'
 
 const STORAGE_KEY = 'dcm_grading_queue'
-const STALE_THRESHOLD_MS = 15 * 60 * 1000 // 15 min
+// Cold-start cleanup uses the SAME 10-minute rule as the live poller and the
+// processing screen (lib/gradingJob.ts) — previously this was 15 min while
+// the processing screen gave up at 5 min, so the two disagreed.
+const STALE_THRESHOLD_MS = GRADING_TIMEOUT_MS
 
 export type GradingStage =
   | 'uploading'
@@ -56,7 +60,9 @@ export function calculateStage(elapsed: number, knownProgress?: number): { stage
   if (elapsed < 50_000)       return { stage: 'grading',     progress: 35 + ((elapsed - 20_000) / 30_000) * 45, estimatedTimeRemaining: Math.max(10, Math.ceil((90_000 - elapsed) / 1_000)) }
   if (elapsed < 55_000)       return { stage: 'calculating', progress: 80 + ((elapsed - 50_000) / 5_000) * 15, estimatedTimeRemaining: Math.max(5, Math.ceil((90_000 - elapsed) / 1_000)) }
   if (elapsed < 90_000)       return { stage: 'saving',      progress: 95 + ((elapsed - 55_000) / 35_000) * 4, estimatedTimeRemaining: Math.max(1, Math.ceil((90_000 - elapsed) / 1_000)) }
-  if (elapsed < 600_000)      return { stage: 'slow',        progress: 99, estimatedTimeRemaining: null }
+  // 90s → 10 min: "slow". `delayed` (5 min) is where the UI stops promising
+  // a quick finish; failure is only the shared 10-minute timeout.
+  if (elapsed < GRADING_TIMEOUT_MS) return { stage: 'slow', progress: 99, estimatedTimeRemaining: null }
   return { stage: 'error',    progress: 0,                   estimatedTimeRemaining: null }
 }
 

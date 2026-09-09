@@ -46,13 +46,17 @@ import {
   CreditPack,
   IAP_PRODUCT_IDS,
   IAPProductId,
-  BASE_PRICE_PER_CREDIT,
   getPackByProductId,
   formatProductPrice,
   getProductNumericPrice,
+  formatPricePerGrade,
+  formatStoreAmount,
   verifyAndFinishPurchase,
   recoverUnfinishedPurchases,
 } from '@/lib/iap'
+
+/** The 1-credit pack — the baseline the "you save" comparison is made against. */
+const BASIC_PACK_PRODUCT_ID = 'dcm.credits.basic'
 
 const TIER_ACCENT: Record<
   CreditPack['colorKey'],
@@ -258,9 +262,18 @@ export default function CreditsScreen() {
           const accent = TIER_ACCENT[pack.colorKey]
           const isPurchasing = purchasing === pack.productId
           const numericPrice = getProductNumericPrice(storeProduct)
-          const savingsDollars =
-            pack.savingsPercent && numericPrice > 0
-              ? (BASE_PRICE_PER_CREDIT * pack.credits - numericPrice).toFixed(2)
+          // Cost per grade is derived from the ACTUAL localized store price
+          // (price / credits), formatted in the store's currency. It used to
+          // be a hardcoded USD figure printed next to a localized StoreKit
+          // price, so non-USD storefronts showed two currencies at once, one
+          // of them wrong. When the currency is unknown we show nothing.
+          const perGradeLocalized = formatPricePerGrade(storeProduct, pack.credits)
+          // Savings are computed store-price vs store-price (never against
+          // the USD web list), so the comparison uses equivalent inputs.
+          const basicUnit = getProductNumericPrice(productById.get(BASIC_PACK_PRODUCT_ID))
+          const savingsAmount =
+            pack.savingsPercent && numericPrice > 0 && basicUnit > 0
+              ? formatStoreAmount(basicUnit * pack.credits - numericPrice, storeProduct)
               : null
 
           return (
@@ -323,20 +336,25 @@ export default function CreditsScreen() {
                   </Text>
                 </View>
 
-                {/* Per-grade cost */}
-                <View style={st.perGradeBox}>
-                  <View style={st.perGradeRow}>
-                    <Text style={st.perGradeLabel}>Cost per grade</Text>
-                    <Text style={[st.perGradeValue, { color: accent.text }]}>
-                      ${pack.perGradeCost.toFixed(2)}
-                    </Text>
+                {/* Per-grade cost — omitted entirely when we can't express
+                    it in the same currency the store is charging. */}
+                {(perGradeLocalized || savingsAmount || !pack.savingsPercent) && (
+                  <View style={st.perGradeBox}>
+                    {perGradeLocalized && (
+                      <View style={st.perGradeRow}>
+                        <Text style={st.perGradeLabel}>Cost per grade</Text>
+                        <Text style={[st.perGradeValue, { color: accent.text }]}>
+                          {perGradeLocalized}
+                        </Text>
+                      </View>
+                    )}
+                    {savingsAmount ? (
+                      <Text style={st.perGradeSavings}>You save {savingsAmount} vs Basic</Text>
+                    ) : !pack.savingsPercent ? (
+                      <Text style={st.perGradeStandard}>Standard rate</Text>
+                    ) : null}
                   </View>
-                  {savingsDollars ? (
-                    <Text style={st.perGradeSavings}>You save ${savingsDollars} vs Basic</Text>
-                  ) : (
-                    <Text style={st.perGradeStandard}>Standard rate</Text>
-                  )}
-                </View>
+                )}
 
                 {/* CTA */}
                 <TouchableOpacity

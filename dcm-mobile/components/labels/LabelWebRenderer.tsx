@@ -23,6 +23,7 @@ import { View, StyleSheet } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
+import { bridgeTokenParam, authBridgeInjection } from '@/lib/webviewAuthBridge'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -139,8 +140,12 @@ export default function LabelWebRenderer({
   // switch) rebuilds this URL and reloads the WebView — with the initial side
   // baked in, the label came back showing the FRONT while the card image stayed
   // on the back.
+  //
+  // The access token is handed over via lib/webviewAuthBridge.ts. Today that
+  // still appends `&token=`; when the web accepts a `dcm-auth` postMessage
+  // the flag flips and no bearer token appears in this URL at all.
   const url = cardId && token && initialRef.current
-    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
+    ? `${API_BASE}/label-preview/${cardId}?type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}${bridgeTokenParam(token)}`
     : ''
 
   // Send config updates to the page (re-renders canvas without reload).
@@ -223,6 +228,11 @@ export default function LabelWebRenderer({
     readyRef.current = true
     reloadAttemptsRef.current = 0
     setPageReady(true)
+    // Out-of-band auth hand-off (no-op while USE_POSTMESSAGE_BRIDGE is off).
+    // Must run before pushConfigNow so the page has a session by the time it
+    // is asked to re-render.
+    const authJs = authBridgeInjection(token)
+    if (authJs) webViewRef.current?.injectJavaScript(authJs)
     // Push the live config straight away. The page renders once from the URL
     // params, and a `type` change (switching holder or style) reloads it — so
     // without this the only thing that ever corrected the side and colours was

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import InAppPage from '@/components/ui/InAppPage'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import LoadingScreen from '@/components/ui/LoadingScreen'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { Colors } from '@/lib/constants'
 
@@ -27,23 +28,31 @@ import { Colors } from '@/lib/constants'
  */
 export default function Page() {
   const router = useRouter()
-  const { isCardLover } = useUserEmblems()
+  const { isCardLover, loading } = useUserEmblems()
   const isIos = Platform.OS === 'ios'
+  // Membership is only KNOWN once the emblems provider has resolved. Before
+  // that, `isCardLover` is `false` because nothing has loaded yet — not
+  // because the user is a non-member. Redirecting on that unresolved value
+  // bounced real members straight back out of their own membership screen.
+  const resolved = !loading
 
   // iOS non-members get routed back to where they came from. Hook is
   // unconditional (no early-return above it) to keep hook order stable.
   useEffect(() => {
     if (!isIos) return
+    if (!resolved) return
     if (isCardLover) return
     const t = setTimeout(() => {
       if (router.canGoBack()) router.back()
       else router.replace('/(tabs)/account')
     }, 0)
     return () => clearTimeout(t)
-  }, [isIos, isCardLover, router])
+  }, [isIos, resolved, isCardLover, router])
 
   // Android keeps the full web checkout flow.
   if (!isIos) return <InAppPage path="/card-lovers" title="Card Lovers" />
+
+  if (!resolved) return <LoadingScreen message="Checking your membership…" />
 
   if (!isCardLover) return <View style={s.container} />
 

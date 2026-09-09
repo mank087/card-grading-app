@@ -34,7 +34,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors, GradeColors, ConfidenceColors, categoryToRouteSlug } from '@/lib/constants'
 import { formatDate } from '@/lib/locale'
 import { Card } from '@/lib/types'
-import GradeBadge from '@/components/ui/GradeBadge'
+import GradeBadge from '@/components/grading/GradeBadge'
 import SubgradeBar from '@/components/grading/SubgradeBar'
 import CollapsibleSection from '@/components/ui/CollapsibleSection'
 import SlabCard from '@/components/grading/SlabCard'
@@ -43,6 +43,7 @@ import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
 import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
+import { bridgeTokenParam, authBridgeInjection } from '@/lib/webviewAuthBridge'
 import { getDisplayName, getContextLine, getFeatures, getConditionFromGrade, getLabelSerial, checkAlteredAuthentic } from '@/lib/labelData'
 import { resolveCardValue } from '@/lib/resolveCardValue'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
@@ -254,6 +255,9 @@ export default function CardDetailScreen() {
   const [slabOptionsOpen, setSlabOptionsOpen] = useState(false)
   const [reportSheetOpen, setReportSheetOpen] = useState(false)
   const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number; position2?: number; labelStyle?: string } | null>(null)
+  // Ref for the hidden label-export bridge WebView — only used to hand it
+  // the auth token out-of-band (see lib/webviewAuthBridge.ts).
+  const exportWebViewRef = useRef<WebView>(null)
   const [positionPicker, setPositionPicker] = useState<{ type: string; title: string; sheet: AverySheet } | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string>('')
@@ -1134,12 +1138,21 @@ export default function CardDetailScreen() {
             {exportTask && session?.access_token && card?.id && !exportError && exportFiles.length === 0 && (
               <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
                 <WebView
+                  ref={exportWebViewRef}
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
+                    // Token hand-off goes through lib/webviewAuthBridge.ts.
+                    // Today that still means `&token=` in the URL; when the
+                    // web accepts `dcm-auth` postMessage the flag flips and
+                    // this URL carries no bearer token at all.
+                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'}/label-export/${card.id}?type=${exportTask.type}${bridgeTokenParam(session.access_token)}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled
                   onLoadStart={() => setExportStatus('Loading export page…')}
+                  onLoadEnd={() => {
+                    const js = authBridgeInjection(session.access_token)
+                    if (js) exportWebViewRef.current?.injectJavaScript(js)
+                  }}
                   onMessage={async (e) => {
                     try {
                       const msg = JSON.parse(e.nativeEvent.data)
@@ -1461,7 +1474,7 @@ export default function CardDetailScreen() {
 
       {/* ══════ GRADE + SUBGRADES ══════ */}
       <View ref={tourRefs['grade-score']} collapsable={false} style={s.gradeArea}>
-        <GradeBadge grade={grade} size="lg" showLabel />
+        <GradeBadge grade={grade} size="lg" showLabel isAuthentic={checkAlteredAuthentic(card as any)} />
         <View style={s.gradeMetaRow}>
           <Text style={s.metaText}>Uncertainty: {resolveUncertainty(card.conversational_grade_uncertainty, confidence)}</Text>
           <Text style={s.metaText}>Confidence Score: {confidence}</Text>
