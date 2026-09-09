@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth, resendSignupConfirmation } from '../../lib/directAuth'
+import { readPurchaseIntent, purchaseIntentReturnUrl } from '@/lib/purchaseIntent'
 import { ActionButton, Notice } from '@/components/design/Primitives'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 
@@ -146,14 +147,20 @@ function LoginPageContent() {
           const now = Date.now()
           const isNewUser = (now - createdAt) < 60000
 
-          // New users go to the grade-your-first-card onboarding page, the
-          // same destination the OAuth/email-confirm callback uses (unless a
-          // custom redirect was provided, in which case respect that — the
-          // calling page knows where it wants them).
-          if (redirectParam) {
+          // A new user who came in from a pricing CTA goes back to the plan
+          // they picked, so the purchase they started is not lost by the
+          // signup detour. Otherwise new users go to the grade-your-first-card
+          // onboarding page, the same destination the OAuth/email-confirm
+          // callback uses (unless a custom redirect was provided, in which
+          // case respect that — the calling page knows where it wants them).
+          const intent = isNewUser ? readPurchaseIntent() : null
+          if (isNewUser && intent) {
+            // Same flag the auth callback sets, so the welcome modal shows.
+            localStorage.setItem('dcm_show_welcome_promo', 'true')
+            router.push(purchaseIntentReturnUrl(intent))
+          } else if (redirectParam) {
             router.push(redirectParam)
           } else if (isNewUser) {
-            // Same flag the auth callback sets, so the welcome modal shows.
             localStorage.setItem('dcm_show_welcome_promo', 'true')
             router.push('/grade-your-first-card')
           } else {

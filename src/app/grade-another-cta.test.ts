@@ -63,6 +63,26 @@ describe('grade another card CTA', () => {
     })
   }
 
+  for (const file of CARD_DETAIL_CLIENTS) {
+    it(`${file} shows the post-result offer and owner-gates the banner`, () => {
+      const src = read(file)
+      // The panel itself.
+      expect(src).toContain("from '@/components/conversion/PostResultOffer'")
+      expect(src).toContain('<PostResultOffer')
+      // One eligibility rule, shared with the banner and the congrats modal.
+      expect(src).toContain('usePostResultOfferEligible')
+      expect(src).toContain('postResultOfferEligible')
+      // The banner needs to know whose balance it is reporting, and to stay
+      // quiet while credits are still loading.
+      expect(src).toContain('<LowCreditsBottomBanner')
+      expect(src).toMatch(/<LowCreditsBottomBanner[\s\S]{0,240}ownerId=/)
+      expect(src).toMatch(/<LowCreditsBottomBanner[\s\S]{0,240}loading=/)
+      // Neither the banner nor the balance-0 modal may fire alongside the panel.
+      expect(src).toContain('{!postResultOfferEligible && (')
+      expect(src).toContain('balance === 0 && !postResultOfferEligible')
+    })
+  }
+
   it('the first grade congrats modal is owner-gated everywhere', () => {
     for (const file of CARD_DETAIL_CLIENTS) {
       const src = read(file)

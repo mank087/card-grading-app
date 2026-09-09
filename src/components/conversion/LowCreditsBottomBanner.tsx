@@ -2,20 +2,57 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { getStoredSession } from '@/lib/directAuth'
 
 interface LowCreditsBottomBannerProps {
-  balance: number
+  /** Credit balance. Undefined or null means "not known yet". */
+  balance: number | null | undefined
   isFirstPurchase?: boolean
+  /** True while the balance is still being fetched. Suppresses the banner. */
+  loading?: boolean
+  /**
+   * Owner of the card being viewed. When provided, the banner only shows to
+   * that person. A visitor looking at someone else's public card is not the
+   * one who is out of credits.
+   */
+  ownerId?: string | null
 }
 
 const BANNER_DISMISSED_KEY = 'dcm_low_credits_banner_dismissed'
 const BANNER_DISMISS_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
-export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: LowCreditsBottomBannerProps) {
+export function LowCreditsBottomBanner({
+  balance,
+  isFirstPurchase = false,
+  loading = false,
+  ownerId,
+}: LowCreditsBottomBannerProps) {
   const [isDismissed, setIsDismissed] = useState(true) // Start hidden to prevent flash
+  // Signed-out visitors were being told they had 0 credits, because the
+  // context reports 0 for everyone who is not signed in. Resolved on the
+  // client so server rendering never assumes a session.
+  const [isEligible, setIsEligible] = useState(false)
   const paywallFiredRef = useRef(false)
 
   useEffect(() => {
+    const session = getStoredSession()
+    const userId = session?.user?.id
+    if (!userId) {
+      setIsEligible(false)
+      return
+    }
+    // When the caller knows whose card this is, only the owner sees it.
+    setIsEligible(!ownerId || ownerId === userId)
+  }, [ownerId])
+
+  // A loaded balance is an actual number. Undefined, null or NaN means the
+  // fetch has not landed yet and we must not claim the balance is zero.
+  const balanceLoaded = !loading && typeof balance === 'number' && Number.isFinite(balance)
+  const isOutOfCredits = balanceLoaded && balance === 0
+  const shouldShow = isEligible && isOutOfCredits
+
+  useEffect(() => {
+    if (!shouldShow) return
     // Check if banner was dismissed recently
     const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
     if (dismissedAt) {
@@ -27,16 +64,13 @@ export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: Low
         return
       }
     }
-    // Show banner if balance is 0
-    if (balance === 0) {
-      setIsDismissed(false)
-    }
-  }, [balance])
+    setIsDismissed(false)
+  }, [shouldShow])
 
   // Fire paywall_seen once per page lifetime when the banner actually renders.
   // Tracked here (not just upload page) so we capture all 0-credit views across the app.
   useEffect(() => {
-    if (isDismissed || balance > 0) return
+    if (isDismissed || !shouldShow) return
     if (paywallFiredRef.current) return
     paywallFiredRef.current = true
     if (typeof window !== 'undefined') {
@@ -54,15 +88,15 @@ export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: Low
       }
       console.log('[LowCreditsBottomBanner] paywall_seen event tracked')
     }
-  }, [isDismissed, balance, isFirstPurchase])
+  }, [isDismissed, shouldShow, isFirstPurchase])
 
   const handleDismiss = () => {
     localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())
     setIsDismissed(true)
   }
 
-  // Don't show if dismissed or has credits
-  if (isDismissed || balance > 0) return null
+  // Don't show if dismissed, signed out, not the owner, still loading, or in credit
+  if (isDismissed || !shouldShow) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 animate-slideUpBanner">

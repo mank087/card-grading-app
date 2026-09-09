@@ -58,6 +58,7 @@ import { getCardLabelData } from '@/lib/useLabelData';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
+import { PostResultOffer, usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
@@ -1528,6 +1529,14 @@ export function MTGCardDetails() {
   const { balance, deductLocalCredit, isFirstPurchase, isLoading: creditsLoading } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
+  // One rule decides the post-result offer, the low-credits banner and the
+  // balance-0 congrats modal, so a person who just ran out of credits gets one
+  // ask on this page instead of three.
+  const postResultOfferEligible = usePostResultOfferEligible({
+    ownerId: card?.user_id ?? null,
+    gradeComplete: !loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0,
+    orgId: (card as { org_id?: string | null } | null)?.org_id ?? null,
+  });
   const [error, setError] = useState<string | null>(null);
   const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
   const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
@@ -1790,7 +1799,9 @@ export function MTGCardDetails() {
 
   // 🎉 Show first grade conversion modal when card loads and balance is 0
   useEffect(() => {
-    if (card && !loading && balance === 0) {
+    // The post-result offer replaces this modal when it is showing. Two paywalls
+    // for the same empty balance is one too many.
+    if (card && !loading && balance === 0 && !postResultOfferEligible) {
       // Owner only. Someone viewing another collector's card is not the person
       // whose free grade just ran out, so the nudge does not belong to them.
       const session = getStoredSession();
@@ -1798,7 +1809,7 @@ export function MTGCardDetails() {
         setShowFirstGradeModal(true);
       }
     }
-  }, [card, loading, balance]);
+  }, [card, loading, balance, postResultOfferEligible]);
 
   // 📊 Track grade_card_complete when a graded card is viewed
   useEffect(() => {
@@ -6411,6 +6422,14 @@ export function MTGCardDetails() {
             );
           })()}
 
+          {/* Post-result offer. Owner only, balance 0, never purchased. Sits in
+              the flow under "Grade another card" rather than floating over it. */}
+          <PostResultOffer
+            ownerId={card?.user_id ?? null}
+            gradeComplete={!loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0}
+            orgId={(card as { org_id?: string | null } | null)?.org_id ?? null}
+          />
+
           {/* Manual grade review request (VIP / Card Lovers). Sits with the
               other end-of-page owner actions rather than the label/report row. */}
           {(() => {
@@ -6612,10 +6631,14 @@ export function MTGCardDetails() {
       />
 
       {/* Low Credits Bottom Banner */}
-      <LowCreditsBottomBanner
-        balance={balance}
-        isFirstPurchase={isFirstPurchase}
-      />
+      {!postResultOfferEligible && (
+        <LowCreditsBottomBanner
+          balance={balance}
+          isFirstPurchase={isFirstPurchase}
+          ownerId={card?.user_id ?? null}
+          loading={creditsLoading}
+        />
+      )}
 
       {/* Edit Card Label Modal */}
       {card && (

@@ -41,12 +41,18 @@ export async function GET(request: NextRequest) {
       totalPurchased: number;
       totalUsed: number;
       firstPurchaseBonusAvailable: boolean;
+      isCardLover: boolean;
+      isVip: boolean;
       transactions?: Awaited<ReturnType<typeof getTransactionHistory>>;
     } = {
       balance: credits.balance,
       totalPurchased: credits.total_purchased,
       totalUsed: credits.total_used,
       firstPurchaseBonusAvailable: !credits.first_purchase_bonus_claimed,
+      // Membership flags ride along so client surfaces can tell a member from a
+      // never-paid account without a second round trip.
+      isCardLover: Boolean(credits.is_card_lover),
+      isVip: Boolean(credits.is_vip),
     };
 
     // Include transaction history if requested

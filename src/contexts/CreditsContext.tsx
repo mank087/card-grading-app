@@ -7,6 +7,10 @@ interface CreditsContextType {
   balance: number
   isLoading: boolean
   isFirstPurchase: boolean
+  /** Lifetime credits bought. 0 means the account has never paid. */
+  totalPurchased: number
+  isCardLover: boolean
+  isVip: boolean
   refreshCredits: () => Promise<void>
   deductLocalCredit: () => void
 }
@@ -17,12 +21,20 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const [balance, setBalance] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isFirstPurchase, setIsFirstPurchase] = useState(true)
+  // Same /api/stripe/credits response, no second fetch. Conversion surfaces need
+  // to know whether this account has ever paid before they nudge it.
+  const [totalPurchased, setTotalPurchased] = useState<number>(0)
+  const [isCardLover, setIsCardLover] = useState(false)
+  const [isVip, setIsVip] = useState(false)
 
   const refreshCredits = useCallback(async () => {
     try {
       const session = getStoredSession()
       if (!session?.access_token) {
         setBalance(0)
+        setTotalPurchased(0)
+        setIsCardLover(false)
+        setIsVip(false)
         setIsLoading(false)
         return
       }
@@ -37,6 +49,9 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json()
         setBalance(data.balance)
         setIsFirstPurchase(data.firstPurchaseBonusAvailable)
+        setTotalPurchased(typeof data.totalPurchased === 'number' ? data.totalPurchased : 0)
+        setIsCardLover(Boolean(data.isCardLover))
+        setIsVip(Boolean(data.isVip))
       } else {
         // If 401, user might not be logged in
         setBalance(0)
@@ -94,6 +109,9 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
         balance,
         isLoading,
         isFirstPurchase,
+        totalPurchased,
+        isCardLover,
+        isVip,
         refreshCredits,
         deductLocalCredit,
       }}

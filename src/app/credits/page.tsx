@@ -6,7 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import PricingExperience from '@/components/marketing/PricingExperience'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession, getValidSession } from '@/lib/directAuth'
-import { type PricingTier } from '@/lib/creditPackages'
+import { CARD_LOVERS_PLANS, VIP_PACKAGE, type PricingTier } from '@/lib/creditPackages'
+import {
+  clearPurchaseIntent,
+  purchaseIntentReturnUrl,
+  readPromoFromUrl,
+  readPurchaseIntent,
+  savePurchaseIntent,
+  type PurchaseIntent,
+} from '@/lib/purchaseIntent'
 
 
 // Pack pricing lives in @/lib/creditPackages so marketing surfaces (blog
@@ -27,10 +35,14 @@ function CreditsPageContent() {
   const [isFounder, setIsFounder] = useState(false)
   const [cardLoversSelectedPlan, setCardLoversSelectedPlan] = useState<'monthly' | 'annual'>('annual')
   const [isCardLover, setIsCardLover] = useState(false)
+  const [resumed, setResumed] = useState(false)
+  const [highlightPack, setHighlightPack] = useState<'basic' | 'pro' | 'elite' | 'vip' | null>(null)
+  const [promoCode, setPromoCode] = useState<'GRADE10' | 'GRADE20' | null>(null)
 
   // Check for canceled payment and welcome parameter
   const canceled = searchParams.get('canceled')
   const welcome = searchParams.get('welcome')
+  const resume = searchParams.get('resume')
 
   // Reset loading state when page is restored from bfcache (e.g. returning from Stripe)
   useEffect(() => {
@@ -117,11 +129,54 @@ function CreditsPageContent() {
     }
   }, [welcome, router])
 
+  // Promo codes only ever arrive from the post-grade email series, and only
+  // GRADE10/GRADE20 are real. Anything else reads as null.
+  useEffect(() => {
+    setPromoCode(readPromoFromUrl(window.location.search))
+  }, [])
+
+  // Coming back from signup with a saved choice. Preselect it and scroll to it.
+  // We never start checkout on the user's behalf — they press the button.
+  useEffect(() => {
+    if (resume !== '1' || isAuthenticated !== true) return
+    const intent = readPurchaseIntent()
+    if (!intent) return
+
+    if (intent.product === 'card_lovers' && intent.plan) {
+      setCardLoversSelectedPlan(intent.plan)
+    } else if (intent.product === 'pack' && intent.pack) {
+      setHighlightPack(intent.pack)
+    }
+    setResumed(true)
+    clearPurchaseIntent()
+
+    const targetId = intent.product === 'card_lovers' ? 'plan-card-lovers' : `plan-${intent.pack || 'pro'}`
+    // One frame so the preselected card is rendered before we scroll to it.
+    const timer = window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [resume, isAuthenticated])
+
+  // A signed-out visitor who picked something has already made the decision.
+  // Park it, then send them to signup and bring them back to the same choice.
+  const sendToSignup = (intent: PurchaseIntent) => {
+    const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
+    savePurchaseIntent({ ...intent, ...(refCode ? { ref: refCode } : {}), at: Date.now() })
+    const returnUrl = purchaseIntentReturnUrl(intent)
+    try {
+      localStorage.setItem('auth_redirect', returnUrl)
+    } catch {
+      // Storage is unavailable. The redirect param below still works.
+    }
+    router.push(`/login?mode=signup&redirect=${encodeURIComponent(returnUrl)}`)
+  }
+
 
   const handlePurchase = async (tier: PricingTier) => {
-    // If not authenticated, redirect to signup
+    // If not authenticated, save the choice and redirect to signup
     if (!isAuthenticated) {
-      router.push('/login?mode=signup&redirect=/credits')
+      sendToSignup({ product: 'pack', pack: tier.id, returnTo: '/credits', at: Date.now() })
       return
     }
 
@@ -196,9 +251,9 @@ function CreditsPageContent() {
   }
 
   const handleVipPurchase = async () => {
-    // If not authenticated, redirect to signup
+    // If not authenticated, save the choice and redirect to signup
     if (!isAuthenticated) {
-      router.push('/login?mode=signup&redirect=/credits')
+      sendToSignup({ product: 'pack', pack: 'vip', returnTo: '/credits', at: Date.now() })
       return
     }
 
@@ -209,11 +264,11 @@ function CreditsPageContent() {
     if (typeof window !== 'undefined' && window.gtag) {
       window.gtag('event', 'begin_checkout', {
         currency: 'USD',
-        value: 99,
+        value: VIP_PACKAGE.price,
         items: [{
           item_id: 'vip',
           item_name: 'VIP Package',
-          price: 99,
+          price: VIP_PACKAGE.price,
           quantity: 1
         }]
       })
@@ -222,11 +277,11 @@ function CreditsPageContent() {
     // Track Meta/Facebook InitiateCheckout event
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
-        value: 99,
+        value: VIP_PACKAGE.price,
         currency: 'USD',
         content_type: 'product',
         content_ids: ['vip'],
-        num_items: 150
+        num_items: VIP_PACKAGE.credits
       })
     }
 
@@ -270,7 +325,7 @@ function CreditsPageContent() {
   // Handle Card Lovers subscription
   const handleCardLoversSubscribe = async () => {
     if (!isAuthenticated) {
-      router.push('/login?mode=signup&redirect=/credits')
+      sendToSignup({ product: 'card_lovers', plan: cardLoversSelectedPlan, returnTo: '/credits', at: Date.now() })
       return
     }
 
@@ -292,10 +347,15 @@ function CreditsPageContent() {
         window.fbq('track', 'InitiateCheckout', {
           content_type: 'subscription',
           content_ids: [`card_lovers_${cardLoversSelectedPlan}`],
-          value: cardLoversSelectedPlan === 'monthly' ? 49.99 : 449,
+          value: CARD_LOVERS_PLANS[cardLoversSelectedPlan].price,
           currency: 'USD',
         })
       }
+
+      // /card-lovers has always forwarded the referral code here; /credits did
+      // not, so an affiliate lost the commission when the same person subscribed
+      // from the pricing page.
+      const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
 
       const response = await fetch('/api/stripe/subscribe', {
         method: 'POST',
@@ -303,7 +363,7 @@ function CreditsPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan: cardLoversSelectedPlan }),
+        body: JSON.stringify({ plan: cardLoversSelectedPlan, ref_code: refCode || undefined }),
       })
 
       if (!response.ok) {
@@ -330,6 +390,7 @@ function CreditsPageContent() {
     firstPurchase={isFirstPurchase} founder={isFounder} cardLover={isCardLover}
     welcome={showWelcome} error={error} purchaseLoading={purchaseLoading}
     selectedPlan={cardLoversSelectedPlan} onPlanChange={setCardLoversSelectedPlan}
+    resumed={resumed} highlightPack={highlightPack} promoCode={promoCode}
     onPurchase={handlePurchase} onVipPurchase={handleVipPurchase}
     onSubscribe={handleCardLoversSubscribe} onDismissWelcome={() => setShowWelcome(false)}
   />

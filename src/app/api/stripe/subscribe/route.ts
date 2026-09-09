@@ -143,6 +143,12 @@ export async function POST(request: NextRequest) {
       mode: 'subscription',
       customer: stripeCustomerId,
       payment_method_types: ['card'],
+      // Marketing (welcome email, follow-up email, first-grade modal, pricing)
+      // promises code Grade10 works on Card Lovers too. Without this the
+      // subscription Checkout Session has no promo code field at all, so the
+      // promise could not be honoured. The coupon is never attached
+      // server-side: the customer types the code and Stripe validates it.
+      allow_promotion_codes: true,
       line_items: [
         {
           price: subscriptionPlan.priceId,

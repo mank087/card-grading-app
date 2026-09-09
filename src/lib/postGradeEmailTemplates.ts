@@ -470,7 +470,7 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 10px;"><tr>
             <td align="center" class="pad-mobile" style="padding: 28px 30px;">
               <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Lock in 20% off</p>
-              <p style="color: #e8dafa; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">Code <strong style="color: #d8b4fe;">GRADE20</strong> applies automatically at the link below.</p>
+              <p style="color: #e8dafa; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">Enter code <strong style="color: #d8b4fe;">GRADE20</strong> at checkout to take 20% off.</p>
               <p style="color: #e8dafa; font-size: 12px; margin: 0 0 18px 0; font-weight: 700;">Single-use &middot; First purchase only &middot; Eligibility confirmed at checkout</p>
               <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#d8b4fe" fillcolor="#d8b4fe"><w:anchorlock/><center style="color:#14233b;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Redeem 20% Off Now &rarr;</center></v:roundrect><![endif]-->
               <!--[if !mso]><!-->

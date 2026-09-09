@@ -8,6 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession, getValidSession } from '@/lib/directAuth'
+import { savePurchaseIntent, purchaseIntentReturnUrl, type PurchaseIntent } from '@/lib/purchaseIntent'
 
 // Global types for tracking pixels are declared elsewhere
 
@@ -78,7 +79,14 @@ export default function CardLoversPage() {
 
   const handleSubscribe = async (plan: 'monthly' | 'annual') => {
     if (!isAuthenticated) {
-      router.push('/login?mode=signup&redirect=/card-lovers')
+      // Park the chosen plan so signup brings them back to it. /credits owns
+      // the ?resume=1 handler and preselects the membership plan there.
+      const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
+      const intent: PurchaseIntent = { product: 'card_lovers', plan, returnTo: '/credits', at: Date.now(), ...(refCode ? { ref: refCode } : {}) }
+      savePurchaseIntent(intent)
+      const returnUrl = purchaseIntentReturnUrl(intent)
+      try { localStorage.setItem('auth_redirect', returnUrl) } catch {}
+      router.push(`/login?mode=signup&redirect=${encodeURIComponent(returnUrl)}`)
       return
     }
 

@@ -2,6 +2,7 @@
 // This works around the "Invalid value" fetch error in the Supabase library
 
 import { createClient, Session } from '@supabase/supabase-js'
+import { readPurchaseIntent, encodePurchaseIntentParam } from './purchaseIntent'
 
 // Get credentials from environment variables - NO HARDCODED FALLBACKS
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -89,12 +90,30 @@ export async function signInWithPassword(email: string, password: string): Promi
   }
 }
 
+/**
+ * Where Supabase should send the user after they click the confirmation link.
+ *
+ * The confirmation email is often opened in a different browser (phone inbox,
+ * webmail on a laptop), where localStorage is empty. So if the visitor picked a
+ * plan before signing up we carry a compact, allowlisted `intent` param on the
+ * callback URL and the callback page rebuilds the intent from it.
+ */
+export function signupEmailRedirectTo(): string {
+  const base = typeof window !== 'undefined'
+    ? `${window.location.origin}/auth/callback`
+    : 'https://dcmgrading.com/auth/callback'
+
+  const intent = readPurchaseIntent()
+  if (!intent) return base
+  const param = encodePurchaseIntentParam(intent)
+  if (!param) return base
+  return `${base}?intent=${encodeURIComponent(param)}`
+}
+
 export async function signUp(email: string, password: string): Promise<AuthResponse> {
   try {
     // Use Supabase client for signup to properly handle emailRedirectTo
-    const redirectTo = typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'https://dcmgrading.com/auth/callback'
+    const redirectTo = signupEmailRedirectTo()
 
     const { data, error } = await supabaseClient.auth.signUp({
       email,
@@ -466,9 +485,7 @@ export function getAuthenticatedClient() {
 // Re-send the signup confirmation email (same redirect target as signUp)
 export async function resendSignupConfirmation(email: string): Promise<{ error?: string }> {
   try {
-    const redirectTo = typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'https://dcmgrading.com/auth/callback'
+    const redirectTo = signupEmailRedirectTo()
 
     const { error } = await supabaseClient.auth.resend({
       type: 'signup',

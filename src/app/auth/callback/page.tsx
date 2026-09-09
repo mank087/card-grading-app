@@ -2,6 +2,28 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getOAuthSession, getStoredSession } from '@/lib/directAuth'
+import {
+  readPurchaseIntent,
+  savePurchaseIntent,
+  decodePurchaseIntentParam,
+  purchaseIntentReturnUrl,
+} from '@/lib/purchaseIntent'
+
+/**
+ * A brand-new user normally lands on onboarding. If they came in from a
+ * pricing CTA we send them back to the plan they picked instead, so the
+ * purchase they started is not lost by the signup detour. The intent is left
+ * in localStorage on purpose: the pricing page consumes it on ?resume=1.
+ */
+function newUserDestination(): string {
+  const intent = readPurchaseIntent()
+  if (intent) {
+    const url = purchaseIntentReturnUrl(intent)
+    console.log('[Auth Callback] New user with purchase intent, resuming at', url)
+    return url
+  }
+  return '/grade-your-first-card'
+}
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -27,6 +49,22 @@ export default function AuthCallbackPage() {
 
         // Show debug info on page temporarily
         setDebugInfo(`URL: ${fullUrl.substring(0, 100)}...`)
+
+        // Confirmation links are often opened in a different browser, where
+        // localStorage is empty. signupEmailRedirectTo() puts a compact,
+        // allowlisted `intent` on the callback URL so the plan the visitor
+        // picked survives that hop. Only used when nothing is stored locally.
+        try {
+          if (!readPurchaseIntent()) {
+            const fromUrl = decodePurchaseIntentParam(new URLSearchParams(search).get('intent'))
+            if (fromUrl) {
+              savePurchaseIntent(fromUrl)
+              console.log('[Auth Callback] Purchase intent rebuilt from URL:', fromUrl.product)
+            }
+          }
+        } catch (intentErr) {
+          console.warn('[Auth Callback] Could not read purchase intent:', intentErr)
+        }
 
         // Check if we have tokens in the URL hash OR search params (Supabase can use either)
         const hasHash = hash && hash.length > 1
@@ -179,7 +217,7 @@ export default function AuthCallbackPage() {
               // Flag this user as a brand-new signup so the welcome promo modal shows on the next page
               localStorage.setItem('dcm_show_welcome_promo', 'true')
 
-              router.replace('/grade-your-first-card')
+              router.replace(newUserDestination())
             } else if (customRedirect) {
               console.log('[Auth Callback] Existing user with custom redirect:', customRedirect)
               router.replace(customRedirect)
@@ -239,7 +277,7 @@ export default function AuthCallbackPage() {
                 // Flag this user as a brand-new signup so the welcome promo modal shows on the next page
                 localStorage.setItem('dcm_show_welcome_promo', 'true')
 
-                router.replace('/grade-your-first-card')
+                router.replace(newUserDestination())
               } else if (customRedirect) {
                 router.replace(customRedirect)
               } else {
