@@ -76,6 +76,27 @@ export function normalizeDomesticService(service: string | null | undefined): st
     : DEFAULT_DOMESTIC_SHIPPING_SERVICE;
 }
 
+/**
+ * Internal service value -> the token the Trading API actually accepts.
+ *
+ * eBay's US catalogue (GeteBayDetails ShippingServiceDetails, checked live
+ * Sept 9 2026 at compatibility level 1451) has NO USPSGroundAdvantage selling
+ * token: the service eBay *describes* as "USPS Ground Advantage" is USPSParcel
+ * (id 8, ValidForSellingFlow=true). Sending the internal value on
+ * the wire was rejected with error 37 "Input data for tag <Item.ShippingDetails>
+ * is invalid" on every listing since Aug 31, and the USPSPriority safety-net
+ * retry in publishCardListing quietly shipped Priority instead. Keep
+ * USPSGroundAdvantage as the stored/UI value (mobile twin list, saved
+ * defaults) and translate only here.
+ */
+const TRADING_SERVICE_TOKENS: Record<string, string> = {
+  USPSGroundAdvantage: 'USPSParcel',
+};
+
+export function toTradingServiceToken(service: string): string {
+  return TRADING_SERVICE_TOKENS[service] ?? service;
+}
+
 // eBay Global Shipping Program location
 export const GSP_SHIP_TO_LOCATIONS = ['Worldwide'];
 
@@ -264,7 +285,7 @@ export function buildAddFixedPriceItemXml(
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServiceCost currencyID="USD">0.00</ShippingServiceCost>
           <FreeShipping>true</FreeShipping>
           <ShippingServicePriority>1</ShippingServicePriority>
@@ -276,7 +297,7 @@ export function buildAddFixedPriceItemXml(
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServiceCost currencyID="USD">${(shipping.flatRateCost || 0).toFixed(2)}</ShippingServiceCost>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
@@ -288,7 +309,7 @@ export function buildAddFixedPriceItemXml(
       <ShippingDetails>
         <ShippingType>Calculated</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
         ${buildInternationalShippingXml(shipping)}
@@ -703,7 +724,7 @@ export function buildAddItemXml(
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServiceCost currencyID="USD">0.00</ShippingServiceCost>
           <FreeShipping>true</FreeShipping>
           <ShippingServicePriority>1</ShippingServicePriority>
@@ -715,7 +736,7 @@ export function buildAddItemXml(
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServiceCost currencyID="USD">${(shipping.flatRateCost || 0).toFixed(2)}</ShippingServiceCost>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
@@ -727,7 +748,7 @@ export function buildAddItemXml(
       <ShippingDetails>
         <ShippingType>Calculated</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingService>${toTradingServiceToken(shipping.domesticShippingService)}</ShippingService>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
         ${buildInternationalShippingXml(shipping)}
