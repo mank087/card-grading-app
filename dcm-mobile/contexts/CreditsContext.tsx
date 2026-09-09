@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
+import { AppState, type AppStateStatus } from 'react-native'
 import { useAuth } from './AuthContext'
 import { supabase } from '@/lib/supabase'
 
@@ -49,6 +50,17 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh()
+  }, [refresh])
+
+  // Android buys credits on the web /credits page inside a WebView and iOS
+  // can complete a purchase while the app is backgrounded; neither path
+  // tells this context anything. Re-read the balance whenever the app comes
+  // back to the foreground so the header badge and the grade flow catch up.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') refresh()
+    })
+    return () => sub.remove()
   }, [refresh])
 
   const value = useMemo(

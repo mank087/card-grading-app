@@ -20,7 +20,7 @@
  * dcmgrading.com — Stripe checkout unchanged.
  */
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -77,9 +77,17 @@ export default function CreditsScreen() {
   const [purchasing, setPurchasing] = useState<IAPProductId | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
+  // Ask to Buy / deferred purchases never fire onPurchaseSuccess or
+  // onPurchaseError, so without this every Buy button stayed disabled
+  // until the app restarted. Re-enable after two minutes and tell the user.
+  const pendingWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearWatchdog = useCallback(() => {
+    if (pendingWatchdog.current) { clearTimeout(pendingWatchdog.current); pendingWatchdog.current = null }
+  }, [])
 
   const handlePurchaseSuccess = useCallback(
     async (purchase: Purchase) => {
+      clearWatchdog()
       setVerifying(true)
       try {
         const creditsGranted = await verifyAndFinishPurchase(purchase)
@@ -98,11 +106,12 @@ export default function CreditsScreen() {
         setVerifying(false)
       }
     },
-    [refreshCredits],
+    [refreshCredits, clearWatchdog],
   )
 
   const handlePurchaseError = useCallback((err: PurchaseError) => {
     console.warn('[Credits] Purchase error:', err.code, err.message)
+    clearWatchdog()
     setPurchasing(null)
     if (err.code === ErrorCode.UserCancelled) {
       // User dismissed the native sheet — no error UI.
@@ -191,16 +200,25 @@ export default function CreditsScreen() {
           type: 'in-app',
         })
         // Result arrives via onPurchaseSuccess / onPurchaseError.
+        clearWatchdog()
+        pendingWatchdog.current = setTimeout(() => {
+          pendingWatchdog.current = null
+          setPurchasing(current => (current === pack.productId ? null : current))
+          setErrorMessage('This purchase is waiting for approval. Your credits will be added automatically once it is approved.')
+        }, 120_000)
       } catch (err: any) {
         console.error('[Credits] requestPurchase threw:', err)
+        clearWatchdog()
         setPurchasing(null)
         if (err?.code !== ErrorCode.UserCancelled) {
           setErrorMessage(err?.message || 'Could not start the purchase.')
         }
       }
     },
-    [user, connected, requestPurchase],
+    [user, connected, requestPurchase, clearWatchdog],
   )
+
+  useEffect(() => clearWatchdog, [clearWatchdog])
 
   const openTerms = () => router.push('/pages/terms' as any)
   const openPrivacy = () => router.push('/pages/privacy' as any)
