@@ -196,7 +196,11 @@ describe('createSignedImageMap memo', () => {
 
   it('re-signs once the 20-minute bucket rolls over', async () => {
     const { storage, calls } = fakeStorage();
-    const start = Date.now();
+    // Anchor to the start of a 20-minute slot so '+60s' is always inside it.
+    // With raw Date.now() this failed in CI whenever the run started within a
+    // minute of a :00/:20/:40 boundary (Sep 9 2026, 20:59 UTC).
+    const SLOT_MS = 20 * 60_000;
+    const start = Math.floor(Date.now() / SLOT_MS) * SLOT_MS + 1_000;
     vi.spyOn(Date, 'now').mockReturnValue(start);
     await createSignedImageMap(storage, 'cards', ['u/1/front.jpg']);
     expect(calls).toHaveLength(1);
