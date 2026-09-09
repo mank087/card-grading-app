@@ -32,6 +32,7 @@ import { supabase } from '@/lib/supabase'
 import { isUuid } from '@/lib/uuid'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors, GradeColors, ConfidenceColors, categoryToRouteSlug } from '@/lib/constants'
+import { useCredits } from '@/contexts/CreditsContext'
 import { formatDate } from '@/lib/locale'
 import { Card } from '@/lib/types'
 import GradeBadge from '@/components/grading/GradeBadge'
@@ -88,6 +89,7 @@ function resolveUncertainty(
 }
 
 export default function CardDetailScreen() {
+  const { balance: creditBalance, isLoading: creditsLoading } = useCredits()
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -3015,6 +3017,32 @@ export default function CardDetailScreen() {
           </View>
         )}
 
+        {/* ══════ GRADE ANOTHER ══════ */}
+        {/* The happy path used to end at the delete button. Owners who just
+            got their first grade back had no next step, so most stopped with
+            a free credit still on the account. */}
+        {isOwner && (
+          <View style={s.gradeAnotherBlock}>
+            <TouchableOpacity
+              style={s.gradeAnotherBtn}
+              onPress={() => router.push(creditsLoading || creditBalance > 0 ? '/(tabs)/grade' : ('/pages/credits' as any))}
+              accessibilityRole="button"
+              accessibilityLabel={!creditsLoading && creditBalance === 0 ? 'Get credits to grade more' : 'Grade another card'}
+            >
+              <Ionicons name="camera" size={18} color="#fff" />
+              <Text style={s.gradeAnotherBtnText}>
+                {!creditsLoading && creditBalance === 0 ? 'Get credits to grade more' : 'Grade another card'}
+              </Text>
+            </TouchableOpacity>
+            {!creditsLoading && (
+              <Text style={s.gradeAnotherNote}>
+                {creditBalance === 0
+                  ? 'Your free grades are used up.'
+                  : `You have ${creditBalance} credit${creditBalance === 1 ? '' : 's'} left.`}
+              </Text>
+            )}
+          </View>
+        )}
         {/* ══════ OWNERSHIP ══════ */}
         {isOwner && card.ownership_status !== 'sold' && (
           <TouchableOpacity style={s.soldBtn} onPress={handleMarkSold}>
@@ -3315,6 +3343,10 @@ const s = StyleSheet.create({
   evidenceLink: { fontSize: 11, color: Colors.blue[500], textDecorationLine: 'underline', marginTop: 3 },
 
   // Delete
+  gradeAnotherBlock: { marginTop: 24, alignItems: 'center' },
+  gradeAnotherBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.purple[600] },
+  gradeAnotherBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  gradeAnotherNote: { fontSize: 12, color: Colors.gray[500], marginTop: 8 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.red[100], backgroundColor: Colors.red[50] },
   deleteBtnText: { fontSize: 14, fontWeight: '600', color: Colors.red[600] },
   soldBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' },

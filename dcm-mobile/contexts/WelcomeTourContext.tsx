@@ -39,6 +39,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, R
 import { useRouter } from 'expo-router'
 import { useAuth } from './AuthContext'
 import { supabase, hasActiveSession } from '@/lib/supabase'
+import { api } from '@/lib/api'
 import {
   TOUR_SCREEN_ORDER,
   TOUR_SCREEN_ROUTE,
@@ -138,36 +139,33 @@ export function WelcomeTourProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [user, eligibilityChecked])
 
-  /** Write welcome_tour_completed=true server-side. Best-effort; failures don't
-   *  block UI — the tour is already dismissed locally. */
-  const markCompletedRemote = useCallback(async () => {
+  /** Write welcome_tour_completed server-side. Best-effort; failures don't
+   *  block UI — the tour is already dismissed locally.
+   *  Goes through /api/account/welcome-tour: user_credits only grants SELECT
+   *  to users under RLS, so the old direct .update() matched zero rows and
+   *  no account ever had the flag set (tour re-ran on every reinstall). */
+  const writeCompletedFlag = useCallback(async (completed: boolean) => {
     if (!user) return
     try {
-      await supabase
-        .from('user_credits')
-        .update({ welcome_tour_completed: true })
-        .eq('user_id', user.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await api.post('/api/account/welcome-tour', { completed }, session.access_token)
     } catch (e) {
-      if (__DEV__) console.warn('[WelcomeTour] mark completed failed:', e)
+      if (__DEV__) console.warn('[WelcomeTour] flag write failed:', e)
     }
   }, [user])
+
+  const markCompletedRemote = useCallback(() => writeCompletedFlag(true), [writeCompletedFlag])
 
   /** Reset completion flag + start tour. Used by Account → Replay. */
   const start = useCallback(async () => {
     if (!user) return
-    try {
-      await supabase
-        .from('user_credits')
-        .update({ welcome_tour_completed: false })
-        .eq('user_id', user.id)
-    } catch (e) {
-      if (__DEV__) console.warn('[WelcomeTour] reset flag failed:', e)
-    }
+    await writeCompletedFlag(false)
     setActive(true)
     setCurrentScreen('welcome')
     setCurrentStep(0)
     router.push(TOUR_SCREEN_ROUTE.welcome as any)
-  }, [user, router])
+  }, [user, router, writeCompletedFlag])
 
   const goToScreen = useCallback((screen: TourScreenId) => {
     setCurrentScreen(screen)
