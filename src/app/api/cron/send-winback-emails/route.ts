@@ -35,10 +35,14 @@ export async function GET(request: NextRequest) {
 
     console.log('[WinbackCron] Starting daily winback scan...');
 
+    // Second audience, independent of the winback flow below: signups that
+    // never graded and still hold their free credits get one reminder.
+    const reminders = await queueFreeCreditsReminders(DAILY_CAP);
+
     const eligibleUsers = await findEligibleUsers(DAILY_CAP);
     if (eligibleUsers.length === 0) {
       console.log('[WinbackCron] No eligible users today');
-      return NextResponse.json({ success: true, processed: 0 });
+      return NextResponse.json({ success: true, processed: 0, reminders });
     }
 
     console.log(`[WinbackCron] Found ${eligibleUsers.length} eligible users`);
@@ -87,11 +91,118 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[WinbackCron] Done: ${granted} credits granted, ${queued} emails queued, ${failed} failed`);
-    return NextResponse.json({ success: true, granted, queued, failed });
+    return NextResponse.json({ success: true, granted, queued, failed, reminders });
   } catch (error: any) {
     console.error('[WinbackCron] Job failed:', error);
     return NextResponse.json({ error: 'Cron failed', message: error.message }, { status: 500 });
   }
+}
+
+/** Reminder window: signed up 7 to 30 days ago. */
+const REMINDER_MIN_DAYS = 7;
+const REMINDER_MAX_DAYS = 30;
+
+/**
+ * Queue one 'free_credits_reminder' email for accounts that:
+ *  - signed up between 7 and 30 days ago
+ *  - have zero cards (never graded)
+ *  - never purchased (total_purchased = 0) and still hold >= 1 credit
+ *  - are subscribed to marketing emails
+ *  - have not been sent or queued this reminder before
+ * No credit grant: their signup credits are untouched. The send cron
+ * re-checks grade/purchase state at send time.
+ */
+async function queueFreeCreditsReminders(limit: number): Promise<{ queued: number; skipped: number }> {
+  const stats = { queued: 0, skipped: 0 };
+  try {
+    const newest = new Date();
+    newest.setDate(newest.getDate() - REMINDER_MIN_DAYS);
+    const oldest = new Date();
+    oldest.setDate(oldest.getDate() - REMINDER_MAX_DAYS);
+
+    const { data: signups, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email')
+      .gte('created_at', oldest.toISOString())
+      .lte('created_at', newest.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(1500);
+    if (error || !signups) {
+      console.error('[WinbackCron] Reminder candidate fetch failed:', error);
+      return stats;
+    }
+
+    for (const u of signups) {
+      if (stats.queued >= limit) break;
+
+      const { count: cardCount } = await supabaseAdmin
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', u.id);
+      if ((cardCount ?? 0) > 0) continue;
+
+      const { data: credits } = await supabaseAdmin
+        .from('user_credits')
+        .select('balance, total_purchased')
+        .eq('user_id', u.id)
+        .maybeSingle();
+      if (!credits || (credits.total_purchased ?? 0) > 0 || (credits.balance ?? 0) < 1) continue;
+
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('marketing_emails_enabled')
+        .eq('id', u.id)
+        .maybeSingle();
+      if (profile && profile.marketing_emails_enabled === false) continue;
+
+      const { data: priorSend } = await supabaseAdmin
+        .from('email_log')
+        .select('id')
+        .eq('user_id', u.id)
+        .eq('email_type', 'free_credits_reminder')
+        .limit(1)
+        .maybeSingle();
+      if (priorSend) continue;
+
+      const { data: priorSchedule } = await supabaseAdmin
+        .from('email_schedule')
+        .select('id')
+        .eq('user_id', u.id)
+        .eq('email_type', 'free_credits_reminder')
+        .limit(1)
+        .maybeSingle();
+      if (priorSchedule) continue;
+
+      let userEmail: string | null = u.email ?? null;
+      if (!userEmail) {
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(u.id);
+        userEmail = authUser?.user?.email ?? null;
+      }
+      if (!userEmail) continue;
+
+      const { error: insertErr } = await supabaseAdmin
+        .from('email_schedule')
+        .insert({
+          user_id: u.id,
+          user_email: userEmail,
+          email_type: 'free_credits_reminder',
+          scheduled_for: new Date().toISOString(),
+          status: 'pending',
+        });
+      if (insertErr) {
+        if (insertErr.code !== '23505') {
+          console.error(`[WinbackCron] Reminder queue failed for ${userEmail}:`, insertErr);
+          stats.skipped++;
+        }
+        continue;
+      }
+      stats.queued++;
+    }
+    console.log(`[WinbackCron] Free-credit reminders: ${stats.queued} queued, ${stats.skipped} failed`);
+  } catch (err) {
+    console.error('[WinbackCron] Reminder pass failed:', err);
+  }
+  return stats;
 }
 
 /**

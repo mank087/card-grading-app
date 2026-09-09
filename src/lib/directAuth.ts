@@ -463,6 +463,29 @@ export function getAuthenticatedClient() {
   )
 }
 
+// Re-send the signup confirmation email (same redirect target as signUp)
+export async function resendSignupConfirmation(email: string): Promise<{ error?: string }> {
+  try {
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : 'https://dcmgrading.com/auth/callback'
+
+    const { error } = await supabaseClient.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: redirectTo }
+    })
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return {}
+  } catch (err: any) {
+    return { error: err.message || 'Failed to resend confirmation email' }
+  }
+}
+
 // Send password reset email
 export async function resetPasswordForEmail(email: string): Promise<{ error?: string }> {
   try {

@@ -3,7 +3,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
+import { signInWithPassword, signUp, getStoredSession, signInWithOAuth, resendSignupConfirmation } from '../../lib/directAuth'
+import { ActionButton, Notice } from '@/components/design/Primitives'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 
 // Declare rdt, gtag, and fbq for TypeScript
@@ -26,6 +27,11 @@ function LoginPageContent() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showExistingAccountError, setShowExistingAccountError] = useState(false)
+  // After a successful email signup we swap the form for an in-page
+  // "check your inbox" panel rather than firing a native alert().
+  const [confirmationSentTo, setConfirmationSentTo] = useState('')
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [resendError, setResendError] = useState('')
 
   // Default to signup mode, unless mode=login is specified in URL
   const modeParam = searchParams.get('mode')
@@ -126,7 +132,9 @@ function LoginPageContent() {
               console.log('[Meta Pixel] CompleteRegistration event tracked')
             }
           }
-          alert('Account created! Check your email for the confirmation link.')
+          setConfirmationSentTo(email)
+          setResendState('idle')
+          setResendError('')
         }
       } else {
         const result = await signInWithPassword(email, password)
@@ -138,13 +146,16 @@ function LoginPageContent() {
           const now = Date.now()
           const isNewUser = (now - createdAt) < 60000
 
-          // New users go to credits page for onboarding (unless a custom
-          // redirect was provided, in which case respect that — the calling
-          // page knows where it wants them).
+          // New users go to the grade-your-first-card onboarding page, the
+          // same destination the OAuth/email-confirm callback uses (unless a
+          // custom redirect was provided, in which case respect that — the
+          // calling page knows where it wants them).
           if (redirectParam) {
             router.push(redirectParam)
           } else if (isNewUser) {
-            router.push('/credits?welcome=true')
+            // Same flag the auth callback sets, so the welcome modal shows.
+            localStorage.setItem('dcm_show_welcome_promo', 'true')
+            router.push('/grade-your-first-card')
           } else {
             router.push('/collection')
           }
@@ -156,6 +167,26 @@ function LoginPageContent() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!confirmationSentTo) return
+    setResendState('sending')
+    setResendError('')
+    const { error } = await resendSignupConfirmation(confirmationSentTo)
+    if (error) {
+      setResendState('error')
+      setResendError(error)
+    } else {
+      setResendState('sent')
+    }
+  }
+
+  const handleUseDifferentEmail = () => {
+    setConfirmationSentTo('')
+    setResendState('idle')
+    setResendError('')
+    setPassword('')
   }
 
   const handleOAuthSignIn = async (provider: 'google' | 'facebook' | 'apple') => {
@@ -196,6 +227,45 @@ function LoginPageContent() {
             <Image src="/DCM-logo.png" alt="DCM" width={44} height={44} className="object-contain" />
             <span>DCM Grading</span>
           </Link>
+          {confirmationSentTo ? (
+            <>
+              <div className="dcm-auth-heading">
+                <p className="dcm-eyebrow">One more step</p>
+                <h1>Check your inbox</h1>
+                <p>We sent a confirmation link to <strong>{confirmationSentTo}</strong>.</p>
+              </div>
+
+              <div className="dcm-auth-form-card">
+                <p className="text-sm" style={{ color: 'var(--dcm-muted)', lineHeight: 1.7 }}>
+                  The link takes you straight to your 2 free credits, so you can grade your first card right away.
+                </p>
+                <p className="text-sm mt-4" style={{ color: 'var(--dcm-muted)', lineHeight: 1.7 }}>
+                  Nothing yet? Check your spam folder, then send it again.
+                </p>
+
+                {resendState === 'sent' && (
+                  <div className="mt-4">
+                    <Notice tone="success">Confirmation email sent again to {confirmationSentTo}.</Notice>
+                  </div>
+                )}
+                {resendState === 'error' && (
+                  <div className="mt-4">
+                    <Notice tone="error">{resendError || 'We could not resend that email. Please try again.'}</Notice>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center gap-4">
+                  <ActionButton variant="text" onClick={handleResendConfirmation} disabled={resendState === 'sending'}>
+                    {resendState === 'sending' ? 'Sending...' : 'Resend confirmation email'}
+                  </ActionButton>
+                  <ActionButton variant="text" onClick={handleUseDifferentEmail}>
+                    Use a different email
+                  </ActionButton>
+                </div>
+              </div>
+            </>
+          ) : (
+          <>
           <div className="dcm-auth-heading">
             <p className="dcm-eyebrow">{isSignUp ? 'Start your collection' : 'Your collection awaits'}</p>
             <h1>{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
@@ -358,6 +428,8 @@ function LoginPageContent() {
               </Link>
             </div>
           </div>
+          </>
+          )}
 
           {/* Terms Notice */}
           <p className="mt-6 text-center text-xs text-gray-500">

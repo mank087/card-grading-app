@@ -7,7 +7,10 @@ export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('Completing authentication...')
+  // Dev-only diagnostic. Users were being shown the raw callback URL on this
+  // screen, so it is never rendered in production builds.
   const [debugInfo, setDebugInfo] = useState<string>('')
+  const showDebugInfo = process.env.NODE_ENV !== 'production'
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -270,7 +273,7 @@ export default function AuthCallbackPage() {
           <div className="text-red-500 text-5xl mb-4">!</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Authentication Failed</h1>
           <p className="text-gray-600 mb-4">{error}</p>
-          {debugInfo && (
+          {showDebugInfo && debugInfo && (
             <p className="text-xs text-gray-400 mb-4 break-all">{debugInfo}</p>
           )}
           <p className="text-sm text-gray-500">Redirecting to login page...</p>
@@ -284,7 +287,7 @@ export default function AuthCallbackPage() {
       <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-700 font-medium">{status}</p>
-        {debugInfo && (
+        {showDebugInfo && debugInfo && (
           <p className="text-xs text-gray-400 mt-4 break-all">{debugInfo}</p>
         )}
       </div>

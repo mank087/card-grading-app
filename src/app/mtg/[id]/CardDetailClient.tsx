@@ -45,6 +45,7 @@ import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses, SideDefects } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { GradeReviewButton } from '@/components/grade-review/GradeReviewButton';
+import { ActionLink } from '@/components/design/Primitives';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import SectionDefects from '@/components/reports/SectionDefects';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -1524,7 +1525,7 @@ export function MTGCardDetails() {
   const cardId = params?.id;
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
-  const { balance, deductLocalCredit, isFirstPurchase } = useCredits();
+  const { balance, deductLocalCredit, isFirstPurchase, isLoading: creditsLoading } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1790,9 +1791,10 @@ export function MTGCardDetails() {
   // 🎉 Show first grade conversion modal when card loads and balance is 0
   useEffect(() => {
     if (card && !loading && balance === 0) {
-      // Check if user is logged in (owns the card or is authenticated)
+      // Owner only. Someone viewing another collector's card is not the person
+      // whose free grade just ran out, so the nudge does not belong to them.
       const session = getStoredSession();
-      if (session?.user?.id) {
+      if (session?.user?.id && card.user_id && session.user.id === card.user_id) {
         setShowFirstGradeModal(true);
       }
     }
@@ -6384,6 +6386,30 @@ export function MTGCardDetails() {
               Graded Date: <span className="font-semibold text-gray-800">{formatGradedDate(card.created_at)}</span>
             </p>
           </div>
+
+          {/* Grade another card. Owner only. The happy path used to end here with
+              no next step, so most first-time graders stopped after one card. */}
+          {(() => {
+            const session = getStoredSession();
+            const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+            if (!isOwner) return null;
+            const outOfCredits = !creditsLoading && balance === 0;
+            const href = outOfCredits ? '/credits' : '/upload?category=MTG';
+            const label = outOfCredits ? 'Get credits to grade more' : 'Grade another card';
+            const note = creditsLoading
+              ? null
+              : outOfCredits
+                ? 'Your free grades are used up.'
+                : `You have ${balance} credit${balance === 1 ? '' : 's'} left.`;
+            return (
+              <div className="mt-6 pt-4 border-t border-[var(--dcm-border)] text-center">
+                <ActionLink href={href} variant="primary">{label}</ActionLink>
+                {note && (
+                  <p className="mt-2 text-sm text-[var(--dcm-muted)]">{note}</p>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Manual grade review request (VIP / Card Lovers). Sits with the
               other end-of-page owner actions rather than the label/report row. */}

@@ -20,7 +20,12 @@ import {
   hasPurchased,
   ScheduledEmail
 } from '@/lib/emailScheduler';
-import { getFollowUp24hEmailHtml, getFollowUp24hEmailSubject } from '@/lib/emailTemplates';
+import {
+  getFollowUp24hEmailHtml,
+  getFollowUp24hEmailSubject,
+  getFreeCreditsReminderEmailHtml,
+  getFreeCreditsReminderEmailSubject,
+} from '@/lib/emailTemplates';
 import {
   getFirstGradeEducationHtml,
   getFirstGradeEducationSubject,
@@ -155,6 +160,18 @@ async function processScheduledEmail(
       subject = getFollowUp24hEmailSubject();
       html = getFollowUp24hEmailHtml(unsubscribeUrl);
       break;
+    case 'free_credits_reminder': {
+      // Queued for never-graded signups by the daily winback cron. Re-check at
+      // send time: if they graded or bought since queueing, the email is wrong.
+      const graded = await fetchUserFirstGradedCard(email.user_id);
+      if (graded || (await hasPurchased(email.user_id))) {
+        await markEmailSkipped(email.id, 'User graded or purchased before send');
+        return 'skipped';
+      }
+      subject = getFreeCreditsReminderEmailSubject();
+      html = getFreeCreditsReminderEmailHtml(unsubscribeUrl);
+      break;
+    }
     case 'first_grade_education': {
       const cardData = await fetchUserFirstGradedCard(email.user_id);
       if (!cardData) {

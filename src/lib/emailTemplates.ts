@@ -645,3 +645,130 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
 </html>
   `.trim();
 }
+
+/**
+ * Free-credits reminder (day 7+)
+ * Sent once to accounts that signed up, never graded a card and still hold
+ * their free credits. About 30% of signups never grade; the 24h follow-up was
+ * the only touch they received before this. Short and single-purpose: one
+ * button to /upload, one photo tip, the app badges. No promo code, no pricing
+ * table. Queued by /api/cron/send-winback-emails, sent by
+ * /api/cron/send-scheduled-emails.
+ */
+export function getFreeCreditsReminderEmailSubject(): string {
+  return 'Your 2 free grades are still here';
+}
+
+export function getFreeCreditsReminderEmailHtml(unsubscribeUrl: string): string {
+  const utm = 'utm_source=email&utm_medium=email&utm_campaign=free_credits_reminder';
+  return `
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Your 2 free grades are still here</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; max-width: 100% !important; }
+      .pad-mobile { padding-left: 20px !important; padding-right: 20px !important; }
+      .cta-wrap, .cta-wrap td, .cta-wrap a { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
+    }
+  </style>
+</head>
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
+  <div style="display: none; max-height: 0; overflow: hidden;">
+    Two free grades are waiting on your account. Grading a card takes about a minute.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+  </div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
+    <tr>
+      <td align="center" style="padding: 20px 10px 40px 10px;">
+        <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; margin: 0 auto;">
+
+          <tr>
+            <td bgcolor="#14233b" style="padding: 14px 24px;">
+              <a href="https://dcmgrading.com/?${utm}&utm_content=nav-logo" style="text-decoration: none;">
+                <img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;">
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="pad-mobile" bgcolor="#14233b" align="center" style="padding: 32px 40px 36px 40px;">
+              <p style="color: #d5a3ff; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">Still on your account</p>
+              <h1 style="color: #ffffff; font-size: 28px; line-height: 1.25; font-weight: 800; margin: 0 0 12px 0;">Your 2 free grades are still here.</h1>
+              <p style="color: #b9c2d3; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">You signed up but have not graded a card yet. It takes about a minute: two photos, then a full report with four subgrades and a market price.</p>
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?${utm}&utm_content=hero-cta" style="height:50px;v-text-anchor:middle;width:260px;" arcsize="16%" strokecolor="#7624b5" fillcolor="#7624b5">
+              <w:anchorlock/>
+              <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade your first card</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;">
+                <tr>
+                  <td align="center" bgcolor="#7624b5" style="border-radius: 8px;">
+                    <a href="https://dcmgrading.com/upload?${utm}&utm_content=hero-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 14px 36px; font-weight: 700; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade your first card</a>
+                  </td>
+                </tr>
+              </table>
+              <!--<![endif]-->
+              <p style="color: #7f8a9d; font-size: 12px; margin: 14px 0 0 0;">No card on file. Your credits do not expire.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="pad-mobile" style="padding: 30px 40px 8px 40px;">
+              <p style="color: #7624b5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0;">One tip before you start</p>
+              <p style="color: #1f2937; font-size: 16px; font-weight: 700; margin: 0 0 6px 0;">Good photos make a fair grade.</p>
+              <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0;">Lay the card flat on a plain, dark background in daylight or under a bright lamp. Fill the frame, keep the phone parallel to the card, and shoot the front and the back. That is all the report needs.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="pad-mobile" style="padding: 22px 40px 30px 40px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #dfe3eb; border-radius: 10px;">
+                <tr>
+                  <td align="center" style="padding: 20px 20px 16px 20px;">
+                    <p style="color: #14233b; font-size: 15px; font-weight: 700; margin: 0 0 4px 0;">Easier from your phone</p>
+                    <p style="color: #6b7280; font-size: 13px; line-height: 1.5; margin: 0 0 14px 0;">Same account, same free credits. The app guides each photo.</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="badge-stack" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" valign="middle" style="padding: 0 6px;">
+                          <a href="https://apps.apple.com/us/app/dcm-grading/id6768663163?${utm}&utm_content=badge-apple" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/Download_on_the_App_Store_Badge_US-UK_RGB_blk.png" alt="Download on the App Store" width="140" height="47" style="display: block; width: 140px; height: 47px;"></a>
+                        </td>
+                        <td align="center" valign="middle" style="padding: 0 6px;">
+                          <a href="https://play.google.com/store/apps/details?id=com.dcmgrading.app&${utm}&utm_content=badge-google" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/GetItOnGooglePlay_Badge_Web_color_English.png" alt="Get it on Google Play" width="140" height="42" style="display: block; width: 140px; height: 42px;"></a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td bgcolor="#f6f5f8" style="padding: 22px 40px; border-top: 1px solid #e5e7eb;">
+              <p style="text-align: center; color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #7624b5; text-decoration: none;">admin@dcmgrading.com</a></p>
+              <p style="text-align: center; color: #9ca3af; font-size: 12px; margin: 0 0 8px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
+              <p style="text-align: center; color: #9ca3af; font-size: 12px; margin: 0 0 8px 0;"><a href="${emailUrl(unsubscribeUrl)}" style="color: #596579; text-decoration: underline;">Unsubscribe</a> from marketing emails</p>
+              <p style="text-align: center; color: #596579; font-size: 12px; margin: 0;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}

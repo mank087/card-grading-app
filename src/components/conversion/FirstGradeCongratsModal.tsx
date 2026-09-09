@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { ActionButton, ActionLink } from '@/components/design/Primitives'
 
 interface FirstGradeCongratsModalProps {
   isFirstPurchase: boolean
@@ -86,106 +86,153 @@ export function FirstGradeCongratsModal({
 
   if (!isVisible) return null
 
-  const headerTitle = variant === 'signup' ? 'Welcome to DCM!' : 'Nice First Grade!'
-  const headerSubtitle = variant === 'signup'
-    ? 'Here\u2019s a special offer to get you started'
-    : 'Here\u2019s a thank-you gift for grading your first card'
+  const isSignup = variant === 'signup'
+  const headerTitle = isSignup ? 'Welcome to DCM Grading' : 'Nice first grade'
+  const headerSubtitle = isSignup
+    ? 'Your 2 free credits are ready to use.'
+    : 'Here’s a thank-you gift for grading your first card.'
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto animate-fadeIn">
+    <div className="dcm-brand fixed inset-0 z-50 overflow-y-auto animate-fadeIn" style={{ background: 'rgba(20, 35, 59, 0.6)' }}>
       <div className="flex items-center justify-center min-h-full p-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-slideUp">
-          {/* Celebration Header */}
-          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-6 text-center relative overflow-hidden">
-            {/* Confetti decoration */}
-            <div className="absolute inset-0 opacity-20">
-              <div className="absolute top-2 left-4 w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-              <div className="absolute top-6 right-8 w-3 h-3 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
-              <div className="absolute bottom-4 left-12 w-2 h-2 bg-green-300 rounded-full animate-bounce" style={{ animationDelay: '0.5s' }} />
-              <div className="absolute top-8 left-1/3 w-2 h-2 bg-blue-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="absolute bottom-6 right-12 w-3 h-3 bg-orange-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-            </div>
-
-            <div className="text-4xl mb-2">🎉</div>
-            <h2 className="text-2xl font-bold text-white mb-1">{headerTitle}</h2>
-            <p className="text-purple-100 text-sm">{headerSubtitle}</p>
+        <div
+          className="w-full max-w-md max-h-[90vh] overflow-y-auto animate-slideUp"
+          style={{
+            background: 'var(--dcm-surface, #ffffff)',
+            border: '1px solid var(--dcm-border, #dfe3eb)',
+            borderTop: '4px solid var(--dcm-purple, #9810fa)',
+            borderRadius: '14px',
+            boxShadow: '0 18px 50px rgba(20, 35, 59, 0.18)',
+          }}
+        >
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid var(--dcm-border, #dfe3eb)' }}>
+            <p className="dcm-eyebrow" style={{ marginBottom: '8px' }}>
+              {isSignup ? 'Account created' : 'First grade complete'}
+            </p>
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--dcm-ink, #14233b)', letterSpacing: '-0.02em' }}>
+              {headerTitle}
+            </h2>
+            <p className="text-sm mt-2" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.6 }}>
+              {headerSubtitle}
+            </p>
           </div>
 
-          {/* Promo Body */}
           <div className="p-6">
-            <div className="text-center mb-5">
-              <p className="text-gray-700 text-base mb-1">
-                Get <span className="font-bold text-purple-700">10% off</span> your first credit purchase
-              </p>
-              <p className="text-gray-500 text-xs">
-                Works on all credit packs and Card Lovers subscriptions
-              </p>
-            </div>
-
-            {/* Promo Code Box */}
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-dashed border-purple-300 rounded-xl p-5 mb-5">
-              <p className="text-xs text-purple-600 font-semibold uppercase tracking-wider text-center mb-2">Your Promo Code</p>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-3xl font-extrabold text-purple-800 tracking-widest font-mono">
-                  {PROMO_CODE}
-                </span>
-                <button
-                  onClick={handleCopyCode}
-                  className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
-                  title="Copy promo code"
-                >
-                  {copied ? '✓ Copied!' : 'Copy'}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Apply this code at checkout to save 10%
-              </p>
-            </div>
-
-            {/* First-time grader bonus credits note */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
-              <div className="flex items-start gap-2">
-                <span className="text-lg flex-shrink-0">🎁</span>
-                <p className="text-xs text-amber-800 leading-relaxed">
-                  <span className="font-bold">Plus, first-time graders get bonus credits!</span> Stack
-                  up to <span className="font-bold">5 free credits</span> on top of your 10% discount when
-                  you make your first purchase.
+            {isSignup ? (
+              <>
+                <p className="text-sm mb-5" style={{ color: 'var(--dcm-ink, #14233b)', lineHeight: 1.7 }}>
+                  Upload photos of a card&rsquo;s front and back and you will have a full grade report in about a
+                  minute. No mailing, and your card never leaves your desk.
                 </p>
-              </div>
-            </div>
 
-            {/* Quick value props */}
-            <div className="space-y-2 mb-5">
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <span className="text-green-500 flex-shrink-0">✓</span>
-                <span>Detailed grade reports with sub-grades</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <span className="text-green-500 flex-shrink-0">✓</span>
-                <span>Real-time market pricing</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <span className="text-green-500 flex-shrink-0">✓</span>
-                <span>Custom slab labels &amp; eBay InstaList</span>
-              </div>
-            </div>
+                <ul className="space-y-2 mb-6 text-sm" style={{ color: 'var(--dcm-ink, #14233b)' }}>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Centering, corners, edges, and surface subgrades</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Market pricing for the grade you get</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Custom slab labels and eBay InstaList</span>
+                  </li>
+                </ul>
 
-            {/* CTA Buttons */}
-            <div className="space-y-3">
-              <Link
-                href="/credits"
-                onClick={handleDismiss}
-                className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 text-center shadow-lg shadow-purple-200 hover:shadow-xl hover:shadow-purple-300"
-              >
-                Redeem 10% Off Now
-              </Link>
-              <button
-                onClick={handleStartTour}
-                className="block w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-3 px-6 rounded-xl transition-all duration-200 text-center"
-              >
-                {variant === 'signup' ? 'Maybe Later' : 'Take a Quick Tour'}
-              </button>
-            </div>
+                <div className="flex flex-col gap-2">
+                  <ActionLink href="/upload" variant="primary" onClick={handleDismiss} className="w-full">
+                    Use my 2 free credits
+                  </ActionLink>
+                  <ActionButton variant="text" onClick={handleStartTour} className="w-full">
+                    Maybe later
+                  </ActionButton>
+                </div>
+
+                <p className="text-xs mt-5" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.7 }}>
+                  When you&rsquo;re ready for more, code{' '}
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title="Copy promo code"
+                    className="font-mono font-semibold"
+                    style={{ color: 'var(--dcm-purple-text, #7624b5)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                  >
+                    {PROMO_CODE}
+                  </button>{' '}
+                  saves 10%. {copied ? 'Copied.' : ''}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm mb-5" style={{ color: 'var(--dcm-ink, #14233b)', lineHeight: 1.7 }}>
+                  Take <strong style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>10% off</strong> your first credit
+                  purchase. It works on every credit pack and on Card Lovers.
+                </p>
+
+                {/* Promo code */}
+                <div
+                  className="p-5 mb-5"
+                  style={{
+                    background: '#f7f2fd',
+                    border: '1px dashed var(--dcm-purple, #9810fa)',
+                    borderRadius: '10px',
+                  }}
+                >
+                  <p
+                    className="dcm-eyebrow text-center"
+                    style={{ marginBottom: '10px' }}
+                  >
+                    Your promo code
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <span
+                      className="text-3xl font-extrabold tracking-widest font-mono"
+                      style={{ color: 'var(--dcm-purple-text, #7624b5)' }}
+                    >
+                      {PROMO_CODE}
+                    </span>
+                    <ActionButton variant="secondary" onClick={handleCopyCode} title="Copy promo code">
+                      {copied ? 'Copied' : 'Copy'}
+                    </ActionButton>
+                  </div>
+                  <p className="text-xs text-center mt-3" style={{ color: 'var(--dcm-muted, #596579)' }}>
+                    Apply it at checkout to save 10%.
+                  </p>
+                </div>
+
+                {isFirstPurchase && (
+                  <p className="text-xs mb-5" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.7 }}>
+                    First-time graders also stack up to 5 bonus credits on top of the discount.
+                  </p>
+                )}
+
+                <ul className="space-y-2 mb-6 text-sm" style={{ color: 'var(--dcm-ink, #14233b)' }}>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Detailed grade reports with subgrades</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Real-time market pricing</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Custom slab labels and eBay InstaList</span>
+                  </li>
+                </ul>
+
+                <div className="flex flex-col gap-2">
+                  <ActionLink href="/credits" variant="primary" onClick={handleDismiss} className="w-full">
+                    Redeem 10% off
+                  </ActionLink>
+                  <ActionButton variant="text" onClick={handleStartTour} className="w-full">
+                    Take a quick tour
+                  </ActionButton>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
