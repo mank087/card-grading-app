@@ -853,7 +853,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       applyYearGuard(conversationalGradingData.card_info, `yugioh/${cardId}`);
       // Same evidence rule for the card number — a wrong one is printed on the
       // slab label and looks authoritative. See src/lib/cardNumberGuard.ts.
-      applyCardNumberGuard(conversationalGradingData.card_info, `yugioh/${cardId}`);
+      applyCardNumberGuard(conversationalGradingData.card_info, `yugioh/${cardId}`, { category: 'Yu-Gi-Oh' });
     }
 
     // DATABASE LOOKUP: Cross-reference AI identification with internal Yu-Gi-Oh database

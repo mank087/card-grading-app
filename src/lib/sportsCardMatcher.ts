@@ -77,6 +77,13 @@ export interface LocalSportsMatchResult {
   matchedSet: SportsSetRow | null;
   defaultedToBase: boolean;           // true when parallel was ambiguous and we chose base
   variantNotFound: boolean;           // AI named a parallel that doesn't exist in the family
+  /**
+   * True only when the match was reached through card-number EQUALITY. False
+   * when the number query found nothing and the player-name fallback supplied
+   * the rows — in which case product.card_number is the DB's number for some
+   * other card by the same player and must not be adopted as this card's.
+   */
+  numberMatched: boolean;
   notes: string[];
 }
 
@@ -329,7 +336,8 @@ export async function matchSportsCardLocal(params: LocalSportsMatchParams): Prom
   const notes: string[] = [];
   const none: LocalSportsMatchResult = {
     tier: 'none', confidence: 'none', product: null, family: [],
-    matchedSet: null, defaultedToBase: false, variantNotFound: false, notes,
+    matchedSet: null, defaultedToBase: false, variantNotFound: false,
+    numberMatched: false, notes,
   };
 
   if (!params.playerName) {
@@ -347,6 +355,8 @@ export async function matchSportsCardLocal(params: LocalSportsMatchParams): Prom
 
   // Primary: exact card-number equality within candidate sets
   let rows: SportsProductRow[] = [];
+  /** Set once the number query itself produced the rows we go on to use. */
+  let numberMatched = false;
   if (cardNumber) {
     const { data, error } = await supabaseServer()
       .from('sports_card_products')
@@ -356,6 +366,7 @@ export async function matchSportsCardLocal(params: LocalSportsMatchParams): Prom
       .limit(500);
     if (error) notes.push(`products query failed: ${error.message}`);
     rows = (data as SportsProductRow[]) || [];
+    numberMatched = rows.length > 0;
   }
 
   // Fallback: player-name search within candidate sets (no/wrong number)
@@ -400,11 +411,13 @@ export async function matchSportsCardLocal(params: LocalSportsMatchParams): Prom
   const [chosenUid, familyRows] = rankedSets[0];
   const matchedSet = sets.find(s => s.uid === chosenUid) || null;
 
-  // Family = same card number within the chosen set. When we matched via the
-  // player fallback the rows may span several numbers — group by the modal
-  // number to avoid mixing different cards.
+  // Family = same card number within the chosen set. Regroup whenever the
+  // NUMBER did not do the matching — not just when no number was supplied. The
+  // player fallback returns every card that player has in the set, and letting
+  // those different numbers share one "family" is how a fallback resolved to a
+  // single, arbitrary card number (the 1959 Pilarcik class of miss).
   let family = familyRows;
-  if (!cardNumber) {
+  if (!numberMatched) {
     const byNumber = new Map<string, SportsProductRow[]>();
     for (const r of familyRows) {
       const key = r.card_number || '?';
@@ -421,11 +434,14 @@ export async function matchSportsCardLocal(params: LocalSportsMatchParams): Prom
   const setScore = setScoreByUid.get(chosenUid) || 0;
   let confidence = picked.confidence;
   if (params.setName && setScore < 6 && confidence === 'high') confidence = 'medium';
-  if (!cardNumber && confidence === 'high') confidence = 'medium'; // number never confirmed
+  // The number was never confirmed — either none was supplied, or the one that
+  // was supplied found nothing and the player fallback carried the match.
+  if (!numberMatched && confidence === 'high') confidence = 'medium';
 
   return {
     tier: picked.tier,
     confidence,
+    numberMatched,
     product: picked.product,
     family: family.sort((a, b) => (a.variant_text || '').localeCompare(b.variant_text || '')),
     matchedSet,

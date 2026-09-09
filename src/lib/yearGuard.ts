@@ -25,7 +25,21 @@ const TRUSTED_YEAR_SOURCES = new Set([
   'printed_date',
   'set_logo',
   'season_indicator',
+  // Sep 2026: not read off the card at all — resolved from the SportsCardsPro
+  // checklist by src/lib/identification/sportsChecklist.ts. It is stronger
+  // evidence than a model transcription, not weaker: it is the one year source
+  // here that does not come from the model. It carries no year_text_seen (there
+  // is no card text to quote), so it is exempted from the transcription check
+  // below — see CHECKLIST_SOURCE.
+  'checklist',
 ]);
+
+/**
+ * A year resolved from an external checklist rather than read off the card.
+ * Exempt from the "must appear in year_text_seen" rule, because the whole point
+ * of it is that the card's own text could not be trusted.
+ */
+const CHECKLIST_SOURCE = 'checklist';
 
 /** Explicit "I could not read it" marker. */
 const NOT_VISIBLE = 'not_visible';
@@ -230,6 +244,15 @@ export function checkYearEvidence(cardInfo: any): YearGuardResult {
       year: null,
       reason: `year_source="${source}" is not a legible-text source`,
     };
+  }
+
+  // A checklist year is corroborated externally; there is no card text to quote
+  // and no transcription to cross-check it against.
+  // The stat table is another MODEL reading; the checklist is not. Where they
+  // disagree the checklist wins, so the cross-check is skipped here rather than
+  // allowed to "correct" the one independently-sourced year we have.
+  if (source === CHECKLIST_SOURCE) {
+    return { ...base, outcome: 'kept', year: originalYear, reason: null };
   }
 
   // Claimed a real source but transcribed nothing → it wasn't read, it was recalled.

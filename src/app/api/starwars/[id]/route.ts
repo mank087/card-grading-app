@@ -843,7 +843,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
       applyYearGuard(conversationalGradingData.card_info, `starwars/${cardId}`);
       // Same evidence rule for the card number — a wrong one is printed on the
       // slab label and looks authoritative. See src/lib/cardNumberGuard.ts.
-      applyCardNumberGuard(conversationalGradingData.card_info, `starwars/${cardId}`);
+      applyCardNumberGuard(conversationalGradingData.card_info, `starwars/${cardId}`, { category: 'Star Wars' });
     }
 
     // DATABASE LOOKUP: Cross-reference AI identification with internal Star Wars database

@@ -658,8 +658,13 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         if (jsonData.card_info) {
           const guard = applyYearGuard(jsonData.card_info, `other/${cardId}`);
           // Same evidence rule for the card number — see cardNumberGuard.ts.
-          applyCardNumberGuard(jsonData.card_info, `other/${cardId}`);
-          if (guard.outcome.startsWith('dropped_')) {
+          // "Other" covers the TCGs, so the sports print-run heuristic must NOT
+          // fire here: "125/198" is set numbering on these cards.
+          const numberGuard = applyCardNumberGuard(jsonData.card_info, `other/${cardId}`, { category: 'Other' });
+          // Re-serialize when EITHER guard changed something. Previously only a
+          // dropped YEAR triggered this, so a rejected card number stayed in the
+          // stored report string and resurfaced from there into labels/reports.
+          if (guard.outcome.startsWith('dropped_') || numberGuard.outcome.startsWith('dropped_')) {
             conversationalGradingResult = JSON.stringify(jsonData);
           }
         }

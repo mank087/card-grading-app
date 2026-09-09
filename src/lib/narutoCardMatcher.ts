@@ -173,7 +173,13 @@ export async function lookupNarutoCard(aiInfo: {
         .eq('rarity_code', rarity)
         .eq('slot_number', parseInt(slot, 10))
         .limit(2);
-      if (bySlot && bySlot.length === 1) {
+      // Same name cross-check the other number strategies apply. Decomposition
+      // is the LOOSEST of them (it throws away the tier suffix and any typo in
+      // it), so accepting a single row here without confirming the character is
+      // exactly how a number misread turns into the wrong card.
+      if (bySlot && bySlot.length === 1 && !nameAgrees(bySlot[0])) {
+        rejectNumberHit(bySlot[0], 'set/rarity/slot decomposition');
+      } else if (bySlot && bySlot.length === 1) {
         warnings.push(`Matched by set/rarity/slot decomposition of "${rawNumber}"`);
         return {
           card: bySlot[0] as NarutoCard,

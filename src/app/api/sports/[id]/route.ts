@@ -31,6 +31,7 @@ import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
 // v9.11: discard any year the model could not actually read off the card
 import { applyYearGuard } from "@/lib/yearGuard";
 import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
+import { resolveSportsChecklist } from "@/lib/identification/sportsChecklist";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -919,16 +920,75 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     // set candidates, it is just not trustworthy enough to PRINT.
     let aiYearHint: string | null = null;
     let yearGuardOutcome: string | null = null;
+
+    // 🗂️ SPORTS CHECKLIST YEAR (Sep 2026) — runs BEFORE the year guard.
+    // On vintage sports the model's year is the least reliable field it emits
+    // (a 1960 Topps Mantle came back 1957; repeat runs of one card spread
+    // 1958-1961). Player + set + number identifies the card in the
+    // SportsCardsPro checklist, and the checklist's set name carries the real
+    // year. Non-fatal and time-boxed: any failure leaves the model's year alone.
+    if (conversationalGradingData?.card_info) {
+      const ci = conversationalGradingData.card_info;
+      const checklist = await resolveSportsChecklist({
+        playerName: ci.player_or_character || ci.featured || ci.card_name,
+        setName: ci.set_name || ci.card_set,
+        cardNumber: ci.card_number_raw || ci.card_number,
+        modelYear: ci.year || null,
+      });
+      console.log(`[SportsChecklist] ${cardId}: ${checklist.confidence} — ${checklist.note}`);
+
+      if (checklist.confidence === 'high' && checklist.year && checklist.year !== ci.year) {
+        console.log(`[SportsChecklist] ${cardId}: year "${ci.year ?? 'none'}" → "${checklist.year}" from checklist`);
+        ci.year = checklist.year;
+        ci.year_source = 'checklist';
+        // No card text backs this year — it did not come off the card at all.
+        // yearGuard exempts source=checklist from the transcription check.
+        ci.year_text_seen = null;
+      }
+
+      if (checklist.productName && !checklist.playerAgrees) {
+        // The checklist found a card at this set/number and it is somebody
+        // else. That could be a misread number OR a misread name, so we do NOT
+        // rename here — we flag it and let review decide.
+        ci.identification_confidence = 'low';
+      }
+
+      if (checklist.productName || checklist.confidence !== 'none') {
+        ci.identification_check = {
+          ...(ci.identification_check || {}),
+          checklist: {
+            productName: checklist.productName,
+            setName: checklist.setName,
+            year: checklist.year,
+            confidence: checklist.confidence,
+            player_agrees: checklist.playerAgrees,
+            note: checklist.note,
+          },
+        };
+      }
+    }
+
     if (conversationalGradingData?.card_info) {
       const guard = applyYearGuard(conversationalGradingData.card_info, `sports/${cardId}`);
       // Same evidence rule for the card number. Sports is where this failed:
       // a "Scoring Kings" insert printed "8 OF 12" was labelled 101.
       // See src/lib/cardNumberGuard.ts.
-      applyCardNumberGuard(conversationalGradingData.card_info, `sports/${cardId}`);
+      const numberGuard = applyCardNumberGuard(
+        conversationalGradingData.card_info,
+        `sports/${cardId}`,
+        { category: card.category },
+      );
       aiYearHint = guard.originalYear;
       yearGuardOutcome = guard.outcome;
 
-      if (guard.outcome.startsWith('dropped_') || guard.outcome === 'corrected_stat_mismatch') {
+      // Re-serialize when EITHER guard changed something. The number guard was
+      // previously excluded from this condition, so a rejected card number
+      // survived in the raw report string and could resurface from there.
+      if (
+        guard.outcome.startsWith('dropped_') ||
+        guard.outcome === 'corrected_stat_mismatch' ||
+        numberGuard.outcome.startsWith('dropped_')
+      ) {
         // conversationalGradingData.card_info is a live reference into the
         // parsed report, but the RAW report string and the legacy
         // gradingResult["Card Information"] block were parsed separately —
@@ -942,12 +1002,17 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             if (raw?.card_info) {
               raw.card_info.year = guard.year;
               raw.card_info._year_guard = conversationalGradingData.card_info._year_guard;
+              raw.card_info.card_number = numberGuard.cardNumber;
+              raw.card_info._card_number_guard = conversationalGradingData.card_info._card_number_guard;
               conversationalGradingResult = JSON.stringify(raw);
             }
           } catch { /* markdown-format report: nothing to patch */ }
         }
         if (gradingResult && (gradingResult as any)["Card Information"]) {
           (gradingResult as any)["Card Information"].year = guard.year;
+          if (numberGuard.outcome.startsWith('dropped_')) {
+            (gradingResult as any)["Card Information"].card_number = null;
+          }
         }
       }
     }
@@ -1003,13 +1068,51 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
               tier: matchResult.tier,
               confidence: matchResult.confidence,
               defaulted_to_base: matchResult.defaultedToBase,
-              variant_not_found: matchResult.variantNotFound
+              variant_not_found: matchResult.variantNotFound,
+              number_matched: matchResult.numberMatched
             };
 
-            // Family-level facts (adopted for BOTH exact and family tiers):
-            // set name, year, card number — confirmed by the DB match.
-            if (displaySetName) cardInfo.set_name = displaySetName;
-            if (product.card_number) cardInfo.card_number = product.card_number;
+            // 🛡️ Sep 2026 ADOPTION RULES
+            // A 'low' confidence match is a guess with a product row attached;
+            // it may be recorded for audit but must never overwrite what the
+            // card itself said. (The 1959 Pilarcik miss came out of a weak
+            // match rewriting the identity wholesale.)
+            const mayAdopt = matchResult.confidence !== 'low';
+
+            // CARD NUMBER: only when the DB found the row BY that number, or
+            // when the model supplied none at all. Otherwise product.card_number
+            // is some other card by the same player, reached via the player-name
+            // fallback — adopting it renames the card.
+            const modelSuppliedNumber = !!(cardInfo.card_number_raw || cardInfo.card_number);
+            if (mayAdopt && product.card_number && (matchResult.numberMatched || !modelSuppliedNumber)) {
+              cardInfo.card_number = product.card_number;
+            } else if (product.card_number && product.card_number !== cardInfo.card_number) {
+              databaseMatch.card_number_not_adopted = {
+                db_card_number: product.card_number,
+                reason: !mayAdopt
+                  ? 'low-confidence match'
+                  : 'matched via player-name fallback, not by card number',
+              };
+              console.log(`[SportsValidation] 🛡️ DB card number ${product.card_number} NOT adopted — ${databaseMatch.card_number_not_adopted.reason}`);
+            }
+
+            // SET NAME: 'exact' is pinned to one product, so its set is the
+            // card's set. A 'family' match only agrees on the player, so require
+            // the set's year to agree with the year read off the card (or the
+            // card to have shown no year at all).
+            const setYearAgrees =
+              matchedSet?.year == null ||
+              !cardInfo.year ||
+              String(matchedSet.year) === String(cardInfo.year).match(/\d{4}/)?.[0];
+            if (displaySetName && mayAdopt && (matchResult.tier === 'exact' || setYearAgrees)) {
+              cardInfo.set_name = displaySetName;
+            } else if (displaySetName) {
+              databaseMatch.set_name_not_adopted = {
+                db_set_name: displaySetName,
+                reason: !mayAdopt ? 'low-confidence match' : 'family match whose set year disagrees with the card',
+              };
+              console.log(`[SportsValidation] 🛡️ DB set "${displaySetName}" NOT adopted — ${databaseMatch.set_name_not_adopted.reason}`);
+            }
 
             // 🛡️ v9.11 YEAR ADOPTION RULE
             // The DB set year may only CANONICALIZE a year the card itself
@@ -1019,8 +1122,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             // year is a coin flip across every printing of that product line —
             // exactly the "wrong date" customers were reporting. Leave it blank.
             if (matchedSet?.year != null) {
-              if (cardInfo.year) {
+              if (cardInfo.year && mayAdopt) {
                 cardInfo.year = String(matchedSet.year);
+              } else if (!mayAdopt) {
+                databaseMatch.year_not_adopted = { db_year: matchedSet.year, reason: 'low-confidence match' };
               } else {
                 databaseMatch.year_not_adopted = {
                   db_year: matchedSet.year,
@@ -1034,7 +1139,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             // player_or_character stays AI-primary (DB player names differ
             // only in punctuation/initials — keep the AI reading)
 
-            if (matchResult.tier === 'exact') {
+            if (matchResult.tier === 'exact' && mayAdopt) {
               // Parallel pinned to a single product: adopt variant + serial
               cardInfo.parallel_type = product.variant_text; // null for base
               cardInfo.serial_numbering = product.serial_denominator

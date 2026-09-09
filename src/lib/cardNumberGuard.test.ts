@@ -64,17 +64,85 @@ describe('cardNumberGuard', () => {
   });
 
   describe('serial numbering is not a card number', () => {
-    it('drops 45/299 — a print run, which belongs in serial_number', () => {
+    it('drops 45/299 on a sports card — a print run, which belongs in serial_number', () => {
       const r = checkCardNumberEvidence(info({
         card_number: '45/299', card_number_text_seen: '45/299', card_number_source: 'front_number',
-      }));
+      }), { category: 'Baseball' });
       expect(r.outcome).toBe('dropped_serial');
     });
 
     it('keeps "8 OF 12" — a small denominator is a set size, not a print run', () => {
       expect(checkCardNumberEvidence(info({
         card_number: '8 OF 12', card_number_text_seen: '8 OF 12', card_number_source: 'insert_numbering',
+      }), { category: 'Baseball' }).outcome).toBe('kept');
+    });
+
+    // The rule was category-blind until Sep 2026 and was blanking real TCG set
+    // numbers, where the denominator IS the set size and runs to the hundreds.
+    it.each(['Pokemon', 'Other', 'Lorcana', 'One Piece'])(
+      'keeps "125/198" for %s — set numbering, not a print run',
+      (category) => {
+        expect(checkCardNumberEvidence(info({
+          card_number: '125/198', card_number_text_seen: '125/198', card_number_source: 'front_number',
+        }), { category }).outcome).toBe('kept');
+      }
+    );
+
+    it('drops "125/198" for Sports, where that shape really is a print run', () => {
+      expect(checkCardNumberEvidence(info({
+        card_number: '125/198', card_number_text_seen: '125/198', card_number_source: 'front_number',
+      }), { category: 'Sports' }).outcome).toBe('dropped_serial');
+    });
+
+    it('does not apply the print-run rule when no category is supplied', () => {
+      expect(checkCardNumberEvidence(info({
+        card_number: '45/299', card_number_text_seen: '45/299', card_number_source: 'front_number',
       })).outcome).toBe('kept');
+    });
+  });
+
+  describe('format-aware comparison (the 1960 Mantle / 1959 Pilarcik misses)', () => {
+    const seen = (num: string, text: string, source = 'front_number') =>
+      checkCardNumberEvidence({
+        card_number: num, card_number_text_seen: text, card_number_source: source,
+      });
+
+    it('rejects card number 1 against a quote of "101"', () => {
+      // Substring containment used to accept this.
+      expect(seen('1', '101').outcome).toBe('dropped_mismatch');
+    });
+
+    it('accepts 7 against "#7"', () => {
+      expect(seen('7', '#7').outcome).toBe('kept');
+    });
+
+    it('rejects 7 against "1957" — a copyright year is not a card number', () => {
+      expect(seen('7', '1957').outcome).toBe('dropped_mismatch');
+    });
+
+    it('rejects 35 against "1957" — the Mantle miss', () => {
+      expect(seen('35', '1957').outcome).toBe('dropped_mismatch');
+    });
+
+    it('accepts "RC-25" against "RC 25"', () => {
+      expect(seen('RC-25', 'RC 25').outcome).toBe('kept');
+    });
+
+    it('accepts "4" against "4/102"', () => {
+      expect(seen('4', '4/102').outcome).toBe('kept');
+    });
+
+    it('accepts "350" against "No. 350"', () => {
+      expect(seen('350', 'No. 350').outcome).toBe('kept');
+    });
+
+    it.each([
+      ['350', '© 1960 T.C.G. PRINTED IN U.S.A. No. 350'],
+      ['SV049', 'SV049/SV122'],
+      ['OP01-001', 'OP01-001'],
+      ['12', 'CARD 12 OF 60'],
+    ])('accepts %s read from %s', (num, text) => {
+      expect(seen(num, text).outcome).toBe('kept');
     });
   });
 

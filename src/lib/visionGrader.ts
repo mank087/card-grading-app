@@ -38,6 +38,8 @@ import { logOpenAIUsage } from './apiUsageLogger';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
+import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
+import { reconcileIdentity } from './identification/reconcile';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -1833,6 +1835,31 @@ export async function gradeCardConversational(
     void ensureThumbnailsFromSignedUrls(frontImageUrl, backImageUrl, { front: images.front, back: images.back });
   };
 
+  // ── INDEPENDENT IDENTIFICATION PASS (see src/lib/identification/) ─────────
+  // Identity is currently a by-product of the median-pick completion of a
+  // ~4,000-line grading call, and in that much context a famous-player prior
+  // beats the printed text ("Cal Ripken Jr." for a card reading AL PILARCIK).
+  // A short, single-purpose call on the SAME 480px thumbnails got the player
+  // right 8/8 in a Sep 2026 experiment, for ~200-500 input tokens.
+  //
+  // Fired the moment the originals resolve — the same instant as the free
+  // thumbnails — so it overlaps the ensemble call and costs ~zero wall clock.
+  // It is NEVER awaited before the grading call, and identifyCardFromImages
+  // never rejects, so this cannot delay or fail a paid grade.
+  let identificationPromise: Promise<IdentificationResult | null> | null = null;
+  const startIdentification = (images: CardOriginals) => {
+    if (identificationPromise) return;
+    if (process.env.IDENTIFICATION_PASS_ENABLED === '0') return; // kill switch; default ON
+    identificationPromise = identifyCardFromImages(
+      { front: images.front, back: images.back },
+      { category: categoryHint || cardType }
+    );
+  };
+  /** Read through a function: TS narrows a `let` assigned only inside a closure
+   *  down to `null` at every use site, which would type the awaited value as
+   *  `never`. A function body reads the declared type. */
+  const pendingIdentification = (): Promise<IdentificationResult | null> | null => identificationPromise;
+
   let cvAdvisorySection = '';
   let advisoryGeometry: CardGeometry | undefined;
   let advisoryMeasurement: { front: CenteringMeasurement | null; back: CenteringMeasurement | null } | null = null;
@@ -1840,6 +1867,7 @@ export async function gradeCardConversational(
     try {
       const originals = await loadOriginals();
       requestThumbnails(originals);
+      startIdentification(originals);
       {
         const frontBuf = originals.front;
         const backBuf = originals.back;
@@ -1883,6 +1911,7 @@ export async function gradeCardConversational(
       ? loadOriginals()
           .then((images) => {
             requestThumbnails(images);
+            startIdentification(images);
             return runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext, cardType, images });
           })
           // A download failure used to be swallowed inside runZoomInspection and
@@ -2132,6 +2161,39 @@ Provide detailed analysis as markdown with all required sections.`
       }
       const jsonData: any = base.j;
       console.log(`[CONVERSATIONAL JSON] Ensemble finals: [${scored.map(x => x.final).join(', ')}] → base=${base.final}${structuralDetectors.length ? ` (structural detections: ${structuralDetectors.length})` : ''}`);
+
+      // ── IDENTITY RECONCILIATION ────────────────────────────────────────
+      // The median-pick has just decided which completion donates card_info,
+      // so this is the first moment there IS a single identity to check — and
+      // it must happen before the year/number guards and the category lookups
+      // downstream consume it, or they would verify the wrong card.
+      //
+      // Once per grading run, not per completion: the promise was started when
+      // the originals resolved and is already settled by the time we get here
+      // (it runs ~1-6s against a call that takes ~30s+), so the await is
+      // effectively free. A null result — failure, timeout, kill switch, or a
+      // card whose originals never downloaded — leaves the grading identity
+      // exactly as it was.
+      const identifyPending = pendingIdentification();
+      if (identifyPending && jsonData?.card_info && typeof jsonData.card_info === 'object') {
+        try {
+          const independent = await identifyPending;
+          const rec = reconcileIdentity(jsonData.card_info, independent, categoryHint || cardType);
+          jsonData.card_info = rec.cardInfo;
+          console.log(
+            `[identify] name=${rec.conflicts.includes('name') ? 'conflict' : 'agree'} ` +
+            `number=${rec.conflicts.includes('number') ? 'conflict' : 'agree'} ` +
+            `confidence=${rec.confidence} ms=${independent?.ms ?? 0}`
+          );
+          if (rec.changed) {
+            console.log(`[identify] card_info corrected from the independent read: ${JSON.stringify({ card_name: rec.cardInfo.card_name, card_number: rec.cardInfo.card_number })}`);
+          }
+        } catch (err: any) {
+          // Belt and braces: identifyCardFromImages does not reject and
+          // reconcileIdentity is pure, but a grade must never die here.
+          console.warn(`[identify] reconciliation skipped: ${err?.message || err}`);
+        }
+      }
 
       // Compact per-completion defect list for the synthesized pass records (keeps the
       // stored/display shape informative with REAL per-evaluation content).

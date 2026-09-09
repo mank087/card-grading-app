@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!enabled && process.env.GRADE_REVIEW_HISTORY_ENABLED !== 'true') return json({ enabled: false, eligible: false, gradeRunId: null, review: null });
     const db = supabaseServer();
     const { data: card, error } = await db.from('cards')
-      .select('user_id, deleted_at, ownership_status, grade_status, conversational_whole_grade, conversational_grading, front_path, back_path')
+      .select('user_id, deleted_at, ownership_status, grade_status, conversational_whole_grade, conversational_grading, front_path, back_path, conversational_card_info')
       .eq('id', id).maybeSingle();
     if (error) throw error;
     if (!card || !ownsReviewCard(card, auth.userId)) return json({ error: 'Card not found.' }, 404);
@@ -61,7 +61,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { data: credits, error: creditsError } = await db.from('user_credits').select('is_vip,is_card_lover,card_lover_current_period_end').eq('user_id',auth.userId).maybeSingle();
     if(creditsError) throw creditsError;
     const membershipEligible=hasManualReviewAccess(credits);
-    return json({ enabled, membershipEligible, eligible: enabled && membershipEligible && !review && canRequestReview(card, auth.userId, run.grader_user_id), gradeRunId: run.id, review: publicReview(review, (run.snapshot as Record<string, unknown> | null)?.report) });
+    const canRequest = enabled && !review && canRequestReview(card, auth.userId, run.grader_user_id);
+    const info = (() => { const v = (card as Record<string, unknown>).conversational_card_info; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } })() as Record<string, unknown> | null;
+    const rawConfidence = info?.identification_confidence;
+    const identificationConfidence = rawConfidence === 'high' || rawConfidence === 'medium' || rawConfidence === 'low' ? rawConfidence : null;
+    return json({ enabled, membershipEligible, eligible: canRequest && membershipEligible, detailsEligible: canRequest, identificationConfidence, gradeRunId: run.id, review: publicReview(review, (run.snapshot as Record<string, unknown> | null)?.report) });
   } catch {
     return json({ error: 'Unable to load grade review information. Please try again.' }, 503);
   }

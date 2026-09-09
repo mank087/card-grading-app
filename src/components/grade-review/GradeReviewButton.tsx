@@ -14,9 +14,13 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
   const [note, setNote] = useState('');
   const [reviewGrade, setReviewGrade] = useState(true);
   const [disputeDetails, setDisputeDetails] = useState(false);
+  // Details-only disputes are open to every owner; the grade dispute keeps the membership gate.
+  const gradeAllowed = Boolean(state?.eligible);
+  const detailsAllowed = Boolean(state?.detailsEligible);
+  const lowConfidence = state?.identificationConfidence === 'low' && !state?.review;
   const [claim, setClaim] = useState<Record<string, string>>({ card_name: '', set_name: '', year: '', card_number: '', other: '' });
   const claimFilled = Object.values(claim).some(v => v.trim());
-  const canSubmit = reviewGrade || (disputeDetails && claimFilled);
+  const canSubmit = (reviewGrade && gradeAllowed) || (disputeDetails && claimFilled);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const inFlight = useRef(false);
@@ -125,14 +129,26 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
   }
 
   if (!state || (!state.enabled && !state.review)) return null;
+  const openRequest = () => {
+    setError('');
+    // Non-members can only dispute details; low-confidence cards start on the details form.
+    if (!gradeAllowed || lowConfidence) { setReviewGrade(gradeAllowed && !lowConfidence); setDisputeDetails(true); }
+    setOpen(true);
+  };
   return (
     <div className="text-center max-w-xs">
-      <button ref={trigger} type="button" disabled={!state.eligible && !state.review} onClick={() => { setError(''); setOpen(true); }}
+      {lowConfidence && (
+        <div role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-left text-sm text-amber-900">
+          <p className="font-semibold">We may have misread this card&rsquo;s details.</p>
+          <p className="mt-1">If the name, set, year or card number is wrong, tell us and we will correct it and refresh the market value at no charge.</p>
+        </div>
+      )}
+      <button ref={trigger} type="button" disabled={!gradeAllowed && !detailsAllowed && !state.review} onClick={openRequest}
         className="rounded-lg border border-purple-300 bg-white px-4 py-2 text-sm font-semibold text-purple-800 hover:bg-purple-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 focus-visible:outline-2 focus-visible:outline-purple-600">
-        {state.review ? 'View Review' : 'Request Grade Review'}
+        {state.review ? 'View Review' : lowConfidence ? 'Fix Card Details' : gradeAllowed ? 'Request Grade Review' : 'Fix Card Details'}
       </button>
       <p className="mt-2 text-xs text-gray-600">
-        {state.review ? `${reviewStatusLabels[state.review.status]} · ${new Date(state.review.requested_at).toLocaleDateString()}` : state.membershipEligible === false ? 'Available to VIP purchasers and active Card Lovers members.' : state.eligible ? 'One complimentary manual review included with this grade.' : 'Available on grades completed after the review program launched. Re-grade this card to become eligible.'}
+        {state.review ? `${reviewStatusLabels[state.review.status]} · ${new Date(state.review.requested_at).toLocaleDateString()}` : gradeAllowed ? 'One complimentary manual review included with this grade.' : detailsAllowed ? 'Card-detail corrections are free for every owner. Grade reviews are available to VIP purchasers and active Card Lovers members.' : 'Available on grades completed after the review program launched. Re-grade this card to become eligible.'}
       </p>
       <p className="mt-1 text-xs text-gray-600">Manual reviews can take up to two business days.</p>
       <dialog ref={dialog} aria-labelledby={`grade-review-title-${cardId}`}
@@ -194,7 +210,7 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
             <p className="text-sm text-gray-600">Our team reviews your original photos and grading report. Manual reviews can take up to two business days. We’ll email you when your card has been evaluated.</p>
             <fieldset disabled={busy} className="space-y-3">
               <legend className="mb-2 text-sm font-semibold">What would you like reviewed?</legend>
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={reviewGrade} onChange={e => setReviewGrade(e.target.checked)} className="mt-1" /><span><span className="font-medium">The grade</span><br /><span className="text-gray-600">All four subgrades on both sides are re-checked.</span></span></label>
+              <label className={`flex items-start gap-2 text-sm ${gradeAllowed ? '' : 'opacity-60'}`}><input type="checkbox" checked={reviewGrade && gradeAllowed} disabled={!gradeAllowed} onChange={e => setReviewGrade(e.target.checked)} className="mt-1" /><span><span className="font-medium">The grade</span><br /><span className="text-gray-600">{gradeAllowed ? 'All four subgrades on both sides are re-checked.' : 'Grade reviews are available to VIP purchasers and active Card Lovers members.'}</span></span></label>
               <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={disputeDetails} onChange={e => setDisputeDetails(e.target.checked)} className="mt-1" /><span><span className="font-medium">The card details</span><br /><span className="text-gray-600">Wrong name, set, year or card number. Corrections also refresh the market value.</span></span></label>
               {disputeDetails && (
                 <div className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-2">

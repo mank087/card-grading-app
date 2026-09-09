@@ -1,0 +1,12 @@
+[
+  {
+    "card_id": "4834a3fe-182f-4409-850a-e6751a35bfb2",
+    "note": "Graded as \"1957 #35\" with a fabricated (c) 1957 by the in-grading identification.",
+    "truth": { "name": "Mickey Mantle", "set": "Topps", "year": "1960", "number": "350" }
+  },
+  {
+    "card_id": "5c33c1b9-c947-49fa-9588-bfe0afee3356",
+    "note": "Name printed in huge type on BOTH faces; stored as \"Cal Ripken Jr.\".",
+    "truth": { "name": "Al Pilarcik", "set": "Topps", "year": "1959", "number": "7" }
+  }
+]

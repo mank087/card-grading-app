@@ -58,6 +58,10 @@ export interface ReviewState {
   enabled: boolean;
   eligible: boolean;
   membershipEligible?: boolean;
+  /** Details-only disputes are free for every owner (identification errors are ours). */
+  detailsEligible?: boolean;
+  /** From the grader's card_info; 'low' means the independent read disagreed with the grading read. */
+  identificationConfidence?: 'high' | 'medium' | 'low' | null;
   gradeRunId: string | null;
   review: ReviewSummary | null;
 }

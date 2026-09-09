@@ -75,6 +75,109 @@ function normalize(s: string): string {
 }
 
 /**
+ * Split quoted card text into comparable tokens.
+ *
+ * Sep 2026: the old check was `normalize(textSeen).includes(normalize(number))`,
+ * a SUBSTRING test, and that is how a 1960 Topps Mantle #350 came back as 1957
+ * #35 — "35" is a substring of "1957", so the guard waved it through. Likewise
+ * card number "1" verified itself against a quote of "101", and "7" against
+ * "1957". Substring containment is not evidence; whole-token equality is.
+ *
+ * Hyphens and slashes stay inside the token so structured codes ("RC-25",
+ * "OP01-001") and fraction numbering ("4/102") survive intact; everything else
+ * (commas, brackets, quotes, whitespace) is a boundary.
+ */
+function tokenize(text: string): string[] {
+  return String(text)
+    .split(/[^A-Za-z0-9#/.°\-]+/)
+    .filter(Boolean);
+}
+
+/** Drop a leading "#", "No.", "NO", "N°" numbering marker from a token. */
+function stripNumberPrefix(token: string): string {
+  let t = token.replace(/^#+/, '');
+  // Only strip a "No."-style prefix when digits actually follow it, so a word
+  // that merely starts with those letters is left alone.
+  t = t.replace(/^(?:N[O°]\.?|NUM\.?)(?=\d)/i, '');
+  return t;
+}
+
+/** Parse "N/M" or "N OF M" into its two numbers, else null. */
+function parseFraction(value: string): { n: string; m: string } | null {
+  const m = String(value).match(/^\s*(\d+)\s*(?:\/|\bOF\b)\s*(\d+)\s*$/i);
+  return m ? { n: m[1], m: m[2] } : null;
+}
+
+/**
+ * Does the normalized card number appear as a WHOLE token in the quoted text?
+ * See tokenize() for why substring containment is not good enough.
+ */
+function numberAppearsInText(original: string, textSeen: string): boolean {
+  const want = normalize(original);
+  if (!want) return false;
+
+  const tokens = tokenize(textSeen).map(stripNumberPrefix).filter(Boolean);
+
+  const norms: string[] = [];
+  for (const token of tokens) {
+    const n = normalize(token);
+    if (n) norms.push(n);
+    // A slash between two non-numeric codes is a separator, not a fraction:
+    // "SV049/SV122" is card SV049 of the SV122-card subset. A numeric "4/102"
+    // is left whole so the denominator can never satisfy the number on its own.
+    if (token.includes('/') && !parseFraction(token)) {
+      for (const part of token.split('/')) {
+        const p = normalize(part);
+        if (p) norms.push(p);
+      }
+    }
+  }
+
+  // 1. Whole-token equality: "350" in "No. 350", "7" in "#7".
+  if (norms.includes(want)) return true;
+
+  // 2. Numerator of a fraction token: "4" in "4/102", "8" in "8 OF 12".
+  for (const token of tokens) {
+    const frac = parseFraction(token);
+    if (frac && normalize(frac.n) === want) return true;
+  }
+
+  // 3. "N OF M" written with spaces: tokens ["8", "OF", "12"].
+  for (let i = 0; i + 2 < tokens.length; i++) {
+    if (/^OF$/i.test(tokens[i + 1]) && /^\d+$/.test(tokens[i]) && /^\d+$/.test(tokens[i + 2])) {
+      if (normalize(tokens[i]) === want) return true;
+    }
+  }
+
+  // 4. The card number is ITSELF a fraction ("8 OF 12", "125/198"): the same
+  //    pair must appear in the quote, in either notation.
+  const wantFrac = parseFraction(original);
+  if (wantFrac) {
+    for (const token of tokens) {
+      const frac = parseFraction(token);
+      if (frac && frac.n === String(Number(wantFrac.n)) && frac.m === String(Number(wantFrac.m))) return true;
+      if (frac && frac.n === wantFrac.n && frac.m === wantFrac.m) return true;
+    }
+    for (let i = 0; i + 2 < tokens.length; i++) {
+      if (/^OF$/i.test(tokens[i + 1]) && tokens[i] === wantFrac.n && tokens[i + 2] === wantFrac.m) return true;
+    }
+  }
+
+  // 5. A structured alphanumeric code the transcription split on whitespace:
+  //    "RC-25" quoted as "RC 25". Restricted to codes carrying BOTH letters and
+  //    digits so joining tokens can never resurrect the numeric substring bug
+  //    ("35" must not match "3" + "5").
+  if (/[A-Z]/.test(want) && /[0-9]/.test(want)) {
+    for (let i = 0; i + 1 < norms.length; i++) {
+      if (norms[i] + norms[i + 1] === want) return true;
+      if (i + 2 < norms.length && norms[i] + norms[i + 1] + norms[i + 2] === want) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * A denominator this large is a PRINT RUN, not a set size.
  *
  * "8 OF 12" is card 8 of a 12-card insert. "45/299" is copy 45 of 299 printed,
@@ -82,21 +185,55 @@ function normalize(s: string): string {
  * practice: insert sets run to a few dozen at most, print runs are quoted in
  * the high dozens upward. The sports delta previously taught "45/299" AS a card
  * number, which is where some of this confusion came from.
+ *
+ * THIS IS A SPORTS-ONLY RULE. On a TCG, "125/198" / "4/102" / "218/197" is set
+ * numbering printed on the card face — the denominator is the SET SIZE and is
+ * routinely in the hundreds. Applying the print-run heuristic there blanked
+ * legitimate Pokemon/Lorcana/One Piece numbers, so the rule is now gated on
+ * category (see isSportsCategory).
  */
 const SERIAL_DENOMINATOR_MIN = 75;
 
+/**
+ * Sports categories, duplicated from isSportsCardCategory() in
+ * src/lib/pricing/dcmPriceTracker.ts. That module imports supabaseServer and
+ * the whole pricing stack; this guard is a leaf used by route handlers and
+ * unit tests, so the seven-string list is copied rather than dragging a
+ * server-only dependency graph in behind it. Keep the two in sync.
+ */
+const SPORTS_CATEGORIES = new Set([
+  'football', 'baseball', 'basketball', 'hockey', 'soccer', 'wrestling', 'sports',
+]);
+
+function isSportsCategory(category: string | null | undefined): boolean {
+  return typeof category === 'string' && SPORTS_CATEGORIES.has(category.trim().toLowerCase());
+}
+
 /** True when the value looks like serial numbering rather than a card number. */
 function looksLikeSerial(value: string): boolean {
-  const m = String(value).match(/^\s*(\d+)\s*(?:\/|\bOF\b)\s*(\d+)\s*$/i);
-  if (!m) return false;
-  return Number(m[2]) >= SERIAL_DENOMINATOR_MIN;
+  const frac = parseFraction(value);
+  if (!frac) return false;
+  return Number(frac.m) >= SERIAL_DENOMINATOR_MIN;
+}
+
+export interface CardNumberGuardOptions {
+  /**
+   * The card's category, e.g. "Baseball" or "Pokemon". Gates the print-run
+   * heuristic: only sports categories treat "45/299" as serial numbering.
+   * When omitted the heuristic is NOT applied (safer default — a TCG set
+   * number surviving beats a real number being blanked).
+   */
+  category?: string | null;
 }
 
 /**
  * Verify a proposed card number against the evidence the model quoted.
  * Pure — does not mutate. See applyCardNumberGuard for the enforcing wrapper.
  */
-export function checkCardNumberEvidence(cardInfo: any): CardNumberGuardResult {
+export function checkCardNumberEvidence(
+  cardInfo: any,
+  options: CardNumberGuardOptions = {},
+): CardNumberGuardResult {
   const original = cardInfo?.card_number == null || cardInfo.card_number === ''
     ? null
     : String(cardInfo.card_number).trim();
@@ -118,8 +255,9 @@ export function checkCardNumberEvidence(cardInfo: any): CardNumberGuardResult {
       reason: 'card_number_source is not_visible' };
   }
 
-  // Serial numbering misfiled as a card number.
-  if (looksLikeSerial(original)) {
+  // Serial numbering misfiled as a card number. Sports only — on a TCG the
+  // same shape ("125/198") is the printed set number.
+  if (isSportsCategory(options.category) && looksLikeSerial(original)) {
     return { ...base, outcome: 'dropped_serial', cardNumber: null,
       reason: `"${original}" is print-run numbering, not a card number` };
   }
@@ -152,13 +290,12 @@ export function checkCardNumberEvidence(cardInfo: any): CardNumberGuardResult {
       reason: `source insert_numbering but transcribed text ${JSON.stringify(textSeen)} has no "N OF M" marking` };
   }
 
-  // THE ACTUAL CHECK: the number must appear in the characters quoted.
-  // "101" against a quote of "8 OF 12" fails here, which is the whole point.
-  const seen = normalize(textSeen);
-  const want = normalize(original);
-  if (!want || !seen.includes(want)) {
+  // THE ACTUAL CHECK: the number must appear as a WHOLE TOKEN in the quoted
+  // characters. "101" against a quote of "8 OF 12" fails here, which is the
+  // whole point — and so, since Sep 2026, does "35" against "1957".
+  if (!numberAppearsInText(original, textSeen)) {
     return { ...base, outcome: 'dropped_mismatch', cardNumber: null,
-      reason: `"${original}" does not appear in transcribed text ${JSON.stringify(textSeen)}` };
+      reason: `"${original}" does not appear as a whole token in transcribed text ${JSON.stringify(textSeen)}` };
   }
 
   // KNOWN LIMITATION — read this before trusting the guard too far.
@@ -191,7 +328,11 @@ export function checkCardNumberEvidence(cardInfo: any): CardNumberGuardResult {
  *
  * @param label short context string for the log line, e.g. "sports/abc123"
  */
-export function applyCardNumberGuard(cardInfo: any, label = 'card'): CardNumberGuardResult {
+export function applyCardNumberGuard(
+  cardInfo: any,
+  label = 'card',
+  options: CardNumberGuardOptions = {},
+): CardNumberGuardResult {
   if (!cardInfo || typeof cardInfo !== 'object') {
     return {
       outcome: 'already_null',
@@ -203,7 +344,7 @@ export function applyCardNumberGuard(cardInfo: any, label = 'card'): CardNumberG
     };
   }
 
-  const result = checkCardNumberEvidence(cardInfo);
+  const result = checkCardNumberEvidence(cardInfo, options);
 
   if (result.outcome.startsWith('dropped_')) {
     console.warn(
