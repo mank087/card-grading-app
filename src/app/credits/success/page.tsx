@@ -101,9 +101,19 @@ function PurchaseSuccessContent() {
       }
     }
 
-    // Small delay to ensure webhook has processed
-    const timer = setTimeout(loadCredits, 2000)
-    return () => clearTimeout(timer)
+    // The webhook usually lands within a second or two, but not always. Poll
+    // a few times so the page does not settle on a stale balance.
+    let attempts = 0
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const tick = async () => {
+      if (cancelled) return
+      attempts += 1
+      await loadCredits()
+      if (!cancelled && attempts < 5) timer = setTimeout(tick, 1500)
+    }
+    timer = setTimeout(tick, 1500)
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [refreshCredits])
 
   return (

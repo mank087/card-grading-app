@@ -299,7 +299,9 @@ function CreditsPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ tier: 'vip' }),
+        // ref_code was missing here, so VIP, the largest one-time ticket,
+        // never paid affiliate commission.
+        body: JSON.stringify({ tier: 'vip', ref_code: (typeof window !== 'undefined' && localStorage.getItem('dcm_ref_code')) || undefined }),
       })
 
       if (!response.ok) {

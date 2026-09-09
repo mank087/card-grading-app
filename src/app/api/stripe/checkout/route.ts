@@ -162,7 +162,10 @@ export async function POST(request: NextRequest) {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       mode: 'payment',
-      allow_promotion_codes: true, // Enable promo code input on checkout page
+      // Promo codes are typed at Stripe. Members already get their 20% via the
+      // discounted price_data below; letting a code stack on top would give
+      // 36% off, so the field is only offered at list price.
+      allow_promotion_codes: discountRate === 0,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: sessionMetadata,

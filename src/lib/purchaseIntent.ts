@@ -151,7 +151,9 @@ export function decodePurchaseIntentParam(
 
   if (product === 'card_lovers') {
     return normalizePurchaseIntent(
-      { product: 'card_lovers', plan: detail, returnTo: '/card-lovers', at: now },
+      // /credits owns the ?resume=1 handler and preselects the membership plan
+      // there; /card-lovers has none, so an email-confirm return must not go there.
+      { product: 'card_lovers', plan: detail, returnTo: '/credits', at: now },
       now
     )
   }

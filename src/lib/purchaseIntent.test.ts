@@ -152,13 +152,13 @@ describe('intent url param', () => {
 
   it('decodes to a fresh intent with the right return path', () => {
     expect(decodePurchaseIntentParam('card_lovers:annual')).toMatchObject({
-      product: 'card_lovers', plan: 'annual', returnTo: '/card-lovers',
+      product: 'card_lovers', plan: 'annual', returnTo: '/credits',
     })
     expect(decodePurchaseIntentParam('pack:vip')).toMatchObject({
       product: 'pack', pack: 'vip', returnTo: '/credits',
     })
     expect(decodePurchaseIntentParam('card_lovers')).toMatchObject({
-      product: 'card_lovers', returnTo: '/card-lovers',
+      product: 'card_lovers', returnTo: '/credits',
     })
   })
 

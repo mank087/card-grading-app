@@ -310,7 +310,12 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       bonusAmount: result.bonusAmount,
     });
   } else {
+    // Throwing turns this into a 500 so Stripe retries the event. Returning
+    // 200 here (the old behaviour) left a paid, uncredited customer with no
+    // retry. The stripe_session_id check above keeps a retry from double
+    // crediting once the grant does succeed.
     console.error('Failed to add credits:', { userId, result });
+    throw new Error('Credit grant failed for session ' + session.id);
   }
 
   // Affiliate attribution for one-time purchases
@@ -401,6 +406,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     });
   } else {
     console.error('Failed to activate Card Lovers subscription:', result.error);
+    throw new Error('Card Lovers activation failed for session ' + session.id + ': ' + (result.error ?? 'unknown'));
   }
 
   // Affiliate attribution for subscription (first invoice only)
