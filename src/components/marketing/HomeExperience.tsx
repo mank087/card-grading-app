@@ -6,7 +6,7 @@ import { getStoredSession, AUTH_STATE_CHANGE_EVENT } from '@/lib/directAuth'
 import AppStoreBadge from '@/components/AppStoreBadge'
 import GooglePlayBadge from '@/components/GooglePlayBadge'
 import { ActionLink, Icon, SectionHeading, type IconName } from '@/components/design/Primitives'
-import { CardShowcase } from '@/components/design/CardShowcase'
+import { HomeHeroVideo } from './HomeHeroVideo'
 import { showcaseHref } from '@/components/design/featuredCard'
 import { useShowcaseCards } from '@/components/design/useShowcaseCards'
 import { HeritageCard } from '@/components/design/HeritageCard'
@@ -26,6 +26,7 @@ const features: { title: string; copy: string; href: string; action: string; ico
 ]
 
 export default function HomeExperience() {
+  const [filmOpen, setFilmOpen] = useState(false)
   const [member, setMember] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const cards = useShowcaseCards()
@@ -55,8 +56,9 @@ export default function HomeExperience() {
         <h1>Professional card grading.<br /><span>Instant results.</span></h1>
         <p className="dcm-lead">Snap two photos. DCM Optic™ returns a grade, condition report, market value, and printable label in about a minute. Your cards stay with you.</p>
         <div className="dcm-actions"><ActionLink href={gradeHref}>{gradeLabel}<Icon name="arrow" /></ActionLink><ActionLink href="/get-started" variant="secondary">How It Works</ActionLink></div>
+        <button type="button" className="dcm-home-watch-link" onClick={() => setFilmOpen(true)} aria-haspopup="dialog" aria-label="Watch DCM in action, 44 seconds with music"><span aria-hidden="true">▶</span> Watch DCM in action <span>· 44 sec</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></svg></button>
         <p className="dcm-fineprint">{!authChecked ? 'Your cards, reports, and labels in one place.' : member ? 'Your collection, reports, and labels are ready when you are.' : 'Free account. No credit card required.'}</p>
-      </div><GradingShowreel cards={cards.slice(0,5)} />
+      </div><HomeHeroVideo open={filmOpen} onClose={() => setFilmOpen(false)} />
     </div></section>
     <div className="dcm-trust"><div className="dcm-container dcm-trust-grid">
       <Link href="/pop"><strong>{total === null ? 'Public' : total.toLocaleString('en-US')}</strong>{total === null ? 'population report' : 'cards graded'}</Link>
@@ -69,10 +71,10 @@ export default function HomeExperience() {
       <div className="dcm-three-grid">{steps.map((step, i) => <article className="dcm-step" key={step.title}><div className="dcm-step-top"><Icon name={step.icon} /><span>0{i + 1}</span></div><h3>{step.title}</h3><p>{step.copy}</p></article>)}</div>
       <div className="mt-6"><ActionLink href="/get-started" variant="text">See How It Works <Icon name="arrow" /></ActionLink></div>
     </div></section>
-    <section className="dcm-section dcm-surface"><div className="dcm-container dcm-split">
+    <section className="dcm-section dcm-surface"><div className="dcm-container dcm-home-evidence">
       <div><SectionHeading eyebrow="The evidence behind the grade" title="A number is just the beginning.">Explore the centering, corners, edges, and surface behind your card’s result. Each report brings your card images and grading details together.</SectionHeading>
         <ActionLink href={sample ? showcaseHref(sample) : '/featured'}>Explore a Real Report <Icon name="arrow" /></ActionLink><p className="dcm-fineprint">DCM grades reflect our published standard. <Link href="/grading-limitations">Understand photo-based grading.</Link></p>
-      </div><CardShowcase card={sample} detailed />
+      </div><GradingShowreel cards={cards.slice(0,5)} />
     </div></section>
     <section className="dcm-section"><div className="dcm-container">
       <SectionHeading eyebrow="More than a grade" title="Everything your collection can become.">Grade it. Organize it. Show it. Sell it. Keep the next step close.</SectionHeading>
