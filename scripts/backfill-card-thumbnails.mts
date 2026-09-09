@@ -5,6 +5,8 @@
  *   npx tsx scripts/backfill-card-thumbnails.mts --dry-run
  *   npx tsx scripts/backfill-card-thumbnails.mts --limit 300
  *   npx tsx scripts/backfill-card-thumbnails.mts --user <uuid> --since 2026-08-01
+ *   npx tsx scripts/backfill-card-thumbnails.mts --offset 1300 --limit 500   (resume)
+ *   npx tsx scripts/backfill-card-thumbnails.mts --before 2026-07-29T23:48:57Z --limit 3000   (keyset resume; deep --offset hit a statement timeout)
  *
  * PRODUCTION SAFETY (repo rule: never hammer the DB):
  *  - pages of 100 rows, only the 6 columns needed — never bulk-selects the
@@ -33,6 +35,10 @@ const DRY_RUN = argv.includes('--dry-run');
 const LIMIT = Math.max(1, Number(flag('limit') ?? 300));
 const USER = flag('user') || null;
 const SINCE = flag('since') || null;
+/** Keyset resume: only cards created BEFORE this ISO timestamp (avoids deep OFFSET statement timeouts). */
+const BEFORE = flag('before') || null;
+/** Skip the newest N eligible cards (resume a run that was interrupted). */
+const START_OFFSET = Math.max(0, Number(flag('offset') ?? 0));
 const PAGE_SIZE = 100;
 const SLEEP_MS = 150;
 
@@ -127,7 +133,7 @@ async function main() {
     `${USER ? ` user=${USER}` : ''}${SINCE ? ` since=${SINCE}` : ''}`
   );
 
-  let offset = 0;
+  let offset = START_OFFSET;
   let fatal: Error | null = null;
 
   outer: while (stats.scanned < LIMIT) {
@@ -142,6 +148,7 @@ async function main() {
       .range(offset, offset + take - 1);
     if (USER) query = query.eq('user_id', USER);
     if (SINCE) query = query.gte('created_at', SINCE);
+    if (BEFORE) query = query.lt('created_at', BEFORE);
 
     const { data: rows, error } = await query;
     if (error) {
