@@ -7,15 +7,22 @@ Allow: /
 # Block authenticated/private areas
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 
 # Block utility pages
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # ---------------------------------------------------------------------------
 # AI / answer-engine crawlers
@@ -30,117 +37,180 @@ User-agent: GPTBot
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # OpenAI — ChatGPT search index
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # OpenAI — user-initiated ChatGPT browsing
 User-agent: ChatGPT-User
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Anthropic — Claude crawler
 User-agent: ClaudeBot
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Anthropic — Claude user-initiated fetch
 User-agent: Claude-Web
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Anthropic — legacy agent token
 User-agent: anthropic-ai
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Perplexity
 User-agent: PerplexityBot
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Google — Gemini / Vertex AI grounding (separate from Googlebot)
 User-agent: Google-Extended
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Meta AI
 User-agent: meta-externalagent
 Allow: /
 Disallow: /api/
 Disallow: /account
-Disallow: /collection
-Disallow: /upload/
-Disallow: /admin/
-Disallow: /auth/
+Disallow: /collection$
+Disallow: /collection?
+Disallow: /upload
+Disallow: /admin
+Disallow: /auth
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
+Disallow: /dev/
+Disallow: /store/
+Disallow: /submissions
+Disallow: /label-export/
+Disallow: /label-preview/
+Disallow: /ebay-image-prep/
 
 # Allow search engines to find our sitemap
 Sitemap: https://dcmgrading.com/sitemap.xml

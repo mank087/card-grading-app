@@ -1,3 +1,4 @@
+import { emailPlainText } from '@/lib/emailMarkup';
 import { Resend } from 'resend';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { recordGradingFailure } from '@/lib/gradingFailure';
@@ -149,17 +150,20 @@ async function sendCompletionEmail(
       : `${label}: ${graded} card${graded === 1 ? '' : 's'} graded`;
 
   try {
-    const { error } = await resend.emails.send({
-      from: 'DCM Grading <admin@dcmgrading.com>',
-      to: [to],
-      subject,
-      html: `
+    const html = `
         <p>${label} is finished.</p>
         <p><strong>${graded}</strong> card${graded === 1 ? '' : 's'} graded${
           failed > 0 ? ` &middot; <strong>${failed}</strong> need a retry` : ''
         }.</p>
         <p><a href="${link}">${submission.binder_id ? 'Open your binder' : 'See your cards'}</a></p>
-      `,
+      `;
+    const { error } = await resend.emails.send({
+      from: 'DCM Grading <admin@dcmgrading.com>',
+      to: [to],
+      subject,
+      html,
+      // Plain-text alternative derived from the HTML, as the lifecycle templates do.
+      text: emailPlainText(html),
     });
     if (error) console.error(`${LOG} completion email failed:`, error.message);
   } catch (e: any) {

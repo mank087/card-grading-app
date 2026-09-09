@@ -1,3 +1,4 @@
+import { cleanMetaText } from '@/lib/seo/completeMetadata'
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getStorefront } from './data';
@@ -19,8 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const canonical = `https://dcmgrading.com/enterprise/${slug}`;
   return {
     // Org pages carry the ORG's identity — no DCM title template or branding.
-    title: { absolute: `${sf.org.name} — Professional Card Grading` },
-    description,
+    title: { absolute: `${sf.org.name}: Professional Card Grading` },
+    description: cleanMetaText(description),
     keywords: [sf.org.name, 'card grading', 'graded cards', 'trading card grading', 'card shop'],
     // Full override — icon, shortcut, AND apple — so no DCM icon variant from
     // the root metadata survives the merge on org pages.
@@ -32,14 +33,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     alternates: { canonical },
     robots: { index: true, follow: true },
     openGraph: {
-      title: `${sf.org.name} — Professional Card Grading`,
-      description,
+      title: `${sf.org.name}: Professional Card Grading`,
+      description: cleanMetaText(description),
       url: canonical,
       siteName: sf.org.name,
       type: 'website',
       images: sf.logos.color ? [{ url: sf.logos.color, width: 1200, height: 1200, alt: `${sf.org.name} logo` }] : undefined,
     },
-    twitter: { card: 'summary', title: `${sf.org.name} — Professional Card Grading`, description },
+    twitter: { card: 'summary', title: `${sf.org.name}: Professional Card Grading`, description: cleanMetaText(description) },
   };
 }
 

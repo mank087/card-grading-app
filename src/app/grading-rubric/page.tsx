@@ -1,11 +1,12 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'Grading Rubric - How We Grade Cards',
-  description: 'Understand DCM\'s professional grading standards. Our multi-point inspection with three-pass consensus technology evaluates centering, corners, edges, and surface condition for accurate card grades.',
+  description: "Explore DCM’s grading rubric for centering, corners, edges and surface. Understand how visible condition findings determine your card’s grade.",
   keywords: 'card grading rubric, grading standards, PSA grading scale, BGS grading, card condition, centering, corners, edges, surface, DCM Optic, three-pass grading, how cards are graded',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
     title: 'Grading Rubric - How DCM Grades Cards',
     description: 'Learn how DCM grades trading cards with our comprehensive multi-point inspection and three-pass consensus technology.',
     type: 'website',
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://dcmgrading.com/grading-rubric',
   },
-};
+});
 
 const RUBRIC_URL = 'https://dcmgrading.com/grading-rubric';
 const ORG_ID = 'https://dcmgrading.com/#organization';
@@ -62,15 +63,14 @@ const techArticleJsonLd = {
 
 export default function GradingRubricPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(techArticleJsonLd) }}
       />
-      <FloatingCardsBackground />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero Section */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-16 dcm-editorial-heading">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             DCM Grading Rubric
           </h1>
@@ -101,7 +101,7 @@ export default function GradingRubricPage() {
 
         {/* Three-Pass Technology Highlight */}
         <section className="mb-16">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 border border-blue-200">
+          <div className="rounded-2xl p-8 border border-blue-200 dcm-editorial-soft">
             <div className="flex items-center mb-6">
               <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mr-4">
                 <span className="text-white text-2xl font-bold">3×</span>
@@ -473,7 +473,7 @@ export default function GradingRubricPage() {
               </div>
 
               {/* 7 - Blue */}
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4 border-blue-500 dcm-editorial-soft">
                 <div className="text-3xl font-bold text-blue-700 w-16">7</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint</p>
@@ -482,7 +482,7 @@ export default function GradingRubricPage() {
               </div>
 
               {/* 6 - Purple */}
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500">
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4 border-purple-500 dcm-editorial-soft">
                 <div className="text-3xl font-bold text-purple-800 w-16">6</div>
                 <div>
                   <p className="font-bold text-gray-900">Excellent-Mint</p>
@@ -491,7 +491,7 @@ export default function GradingRubricPage() {
               </div>
 
               {/* 5-1 - Gray */}
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border-l-4 border-gray-500">
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4 border-gray-500 dcm-editorial-soft">
                 <div className="text-2xl font-bold text-gray-800 w-16">5-1</div>
                 <div>
                   <p className="font-bold text-gray-900">Excellent to Poor</p>
@@ -523,7 +523,7 @@ export default function GradingRubricPage() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Image Confidence Levels</h3>
                 <div className="space-y-3">
-                  <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
+                  <div className="p-4 rounded-lg border-l-4 border-green-500 dcm-editorial-soft">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-green-800">A</span>
                       <span className="text-sm font-semibold text-green-700">Fully readable</span>
@@ -533,7 +533,7 @@ export default function GradingRubricPage() {
                     </p>
                   </div>
 
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
+                  <div className="p-4 rounded-lg border-l-4 border-blue-500 dcm-editorial-soft">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-blue-800">B</span>
                       <span className="text-sm font-semibold text-blue-700">Minor limitations</span>
@@ -543,7 +543,7 @@ export default function GradingRubricPage() {
                     </p>
                   </div>
 
-                  <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-l-4 border-yellow-500">
+                  <div className="p-4 rounded-lg border-l-4 border-yellow-500 dcm-editorial-soft">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-yellow-800">C</span>
                       <span className="text-sm font-semibold text-yellow-700">Moderate limitations</span>
@@ -553,7 +553,7 @@ export default function GradingRubricPage() {
                     </p>
                   </div>
 
-                  <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border-l-4 border-red-500">
+                  <div className="p-4 rounded-lg border-l-4 border-red-500 dcm-editorial-soft">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl font-bold text-red-800">D</span>
                       <span className="text-sm font-semibold text-red-700">Severe limitations</span>
@@ -682,7 +682,7 @@ export default function GradingRubricPage() {
 
         {/* Technology */}
         <section className="mb-16">
-          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-8 border border-purple-200">
+          <div className="rounded-2xl p-8 border border-purple-200 dcm-editorial-soft">
             <h2 className="text-3xl font-bold text-gray-900 mb-6">
               Powered by DCM Optic™
             </h2>
@@ -724,7 +724,7 @@ export default function GradingRubricPage() {
             </p>
             <a
               href="/faq"
-              className="inline-flex items-center px-6 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors dcm-editorial-primary"
             >
               View FAQ
               <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -736,14 +736,14 @@ export default function GradingRubricPage() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Ready to Grade Your Cards?</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Experience the precision of DCM Optic™ three-pass grading technology. Get professional-grade assessments in about a minute.
             </p>
             <a
               href="/login"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Create an Account
             </a>

@@ -34,7 +34,7 @@ export default function GradeYourFirstCardPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
+    <div className="dcm-brand dcm-editorial min-h-screen dcm-editorial-soft">
       {showWelcomePromo && (
         <FirstGradeCongratsModal
           isFirstPurchase={true}
@@ -43,24 +43,24 @@ export default function GradeYourFirstCardPage() {
         />
       )}
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+      <div className="text-white dcm-editorial-dark">
         <div className="max-w-5xl mx-auto px-4 py-12 sm:py-16">
-          <div className="text-center">
+          <div className="text-center dcm-editorial-heading">
             <h1 className="text-3xl sm:text-4xl font-bold mb-4">
-              Welcome to DCM Grading!
+              Grade Your First Card
             </h1>
             <p className="text-xl text-white/90 mb-6 max-w-2xl mx-auto">
-              You have <span className="font-bold text-yellow-300">2 free credits</span> to grade your first cards.
+              New accounts include <span className="font-bold text-yellow-300">2 free credits</span> to grade your first cards.
               Here&apos;s everything you need to know to get started.
             </p>
 
             {/* CTA Button */}
-            <div className="relative inline-block mb-6">
+            <div className="relative inline-block mb-6 sm:mr-4">
               {/* Animated glow ring */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 via-white to-yellow-400 rounded-xl blur opacity-75 animate-pulse"></div>
+              <div className="hidden"></div>
               <Link
                 href="/upload"
-                className="relative inline-flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 font-bold py-4 px-10 rounded-xl text-lg hover:from-yellow-300 hover:to-yellow-400 transition-all shadow-xl hover:shadow-2xl hover:scale-105 transform"
+                className="relative inline-flex items-center justify-center gap-3 text-gray-900 font-bold py-4 px-10 rounded-xl text-lg transition-all shadow-xl hover:shadow-2xl hover:scale-105 transform dcm-editorial-primary"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -90,12 +90,13 @@ export default function GradeYourFirstCardPage() {
       </div>
 
       {/* Step Navigation */}
-      <div className="sticky top-0 z-20 bg-white shadow-md">
+      <div className="sticky top-16 z-20 bg-white shadow-md">
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex justify-center gap-2 sm:gap-4 py-4 overflow-x-auto">
             {steps.map((step) => (
               <button
                 key={step.number}
+                aria-current={activeStep === step.number ? 'step' : undefined}
                 onClick={() => {
                   setActiveStep(step.number)
                   document.getElementById(`step-${step.number}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -199,7 +200,7 @@ export default function GradeYourFirstCardPage() {
           </div>
 
           {/* Card Types */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-100">
+          <div className="rounded-2xl p-6 border border-purple-100 dcm-editorial-soft">
             <h4 className="font-bold text-gray-900 mb-4">Supported Card Types</h4>
             <div className="flex flex-wrap gap-3">
               {['Pokemon', 'Magic: The Gathering', 'Sports Cards', 'Disney Lorcana', 'Other TCGs'].map((type) => (
@@ -352,7 +353,7 @@ export default function GradeYourFirstCardPage() {
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* No Defects */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
+            <div className="rounded-2xl p-6 border border-green-200 dcm-editorial-soft">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,7 +375,7 @@ export default function GradeYourFirstCardPage() {
             </div>
 
             {/* With Defects */}
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border border-orange-200">
+            <div className="rounded-2xl p-6 border border-orange-200 dcm-editorial-soft">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -490,7 +491,7 @@ export default function GradeYourFirstCardPage() {
           </div>
 
           {/* What You Get */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200">
+          <div className="rounded-2xl p-6 border border-purple-200 dcm-editorial-soft">
             <h4 className="font-bold text-gray-900 mb-4 text-lg">What&apos;s Included in Every Grade</h4>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex items-start gap-3">
@@ -581,7 +582,7 @@ export default function GradeYourFirstCardPage() {
 
         {/* CTA Section */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 sm:p-12 text-white">
+          <div className="rounded-2xl p-8 sm:p-12 text-white dcm-editorial-dark">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">Ready to Grade Your First Card?</h2>
             <p className="text-lg text-white/90 mb-8 max-w-xl mx-auto">
               You have 2 free credits waiting. Select your card type and start grading in seconds!
@@ -589,7 +590,7 @@ export default function GradeYourFirstCardPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/upload"
-                className="inline-flex items-center justify-center gap-2 bg-white text-purple-600 font-bold py-4 px-8 rounded-xl text-lg hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl"
+                className="inline-flex items-center justify-center gap-2 bg-white text-purple-600 font-bold py-4 px-8 rounded-xl text-lg hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl dcm-editorial-secondary"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

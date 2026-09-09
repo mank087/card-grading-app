@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
-import HeroGradingAnimation from './HeroGradingAnimation'
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
 import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
 import EbayListingMonitor from '@/components/EbayListingMonitor'
@@ -195,41 +195,21 @@ export default function PokemonGradingLanding() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-campaign min-h-screen bg-gray-900">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900" />
+        <div className="absolute inset-0 dcm-editorial-dark" />
 
         {/* Animated Special Illustration Rare backdrop — pulled from our own
             Pokemon card database (pokemon_cards.image_large). These are the
             chase cards the audience actually searches for, and using real
             catalog art ties the hero to the database story below. Hosts are
             already whitelisted in next.config remotePatterns. */}
-        <div className="absolute inset-0 opacity-[0.18] hidden md:block">
-          {SIR_BACKDROP.map((c, i) => (
-            <div key={c.src} className={`absolute ${c.pos} ${c.size} ${c.anim} ${c.hide || ''}`}>
-              <Image
-                src={c.src}
-                alt=""
-                fill
-                sizes="120px"
-                className={`object-contain ${c.rot}`}
-                priority={i < 2}
-              />
-            </div>
-          ))}
-        </div>
+        {/* Heritage card above provides the hero imagery. */}
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
-        <div className="absolute inset-0 opacity-[0.12] md:hidden">
-          <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
-            <Image src={SIR_BACKDROP[0].src} alt="" fill sizes="80px" className="object-contain rotate-[-10deg]" />
-          </div>
-          <div className="absolute top-24 right-[8%] w-[72px] h-26 animate-float-medium">
-            <Image src={SIR_BACKDROP[2].src} alt="" fill sizes="72px" className="object-contain rotate-[8deg]" />
-          </div>
-        </div>
+        {/* Heritage card above provides the hero imagery. */}
 
         <div className="relative z-10 container mx-auto px-4 py-8 md:py-24">
           {/* Mobile: Animation First */}
@@ -258,13 +238,7 @@ export default function PokemonGradingLanding() {
             {/* Animation centered on mobile */}
             <div className="flex justify-center mb-6">
               <div className="w-full max-w-[300px]">
-                <HeroGradingAnimation
-                  rawCardImage="/Pokemon/Mega-charizard-x-ex-dcm-10.png"
-                  cardName="Mega Charizard X EX"
-                  cardDetails="Phantasmal Flames • #125/94 • 2025"
-                  cardNumber="899391"
-                  grade={10}
-                />
+                <ReferenceCardShowcase page="ai-card-grading" category="Pokemon" />
               </div>
             </div>
 
@@ -278,14 +252,14 @@ export default function PokemonGradingLanding() {
                 <Link
                   href="/credits"
                   onClick={() => trackSignupClick('hero_mobile_logged_in')}
-                  className="block w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all text-center shadow-lg shadow-orange-500/30"
+                  className="block w-full text-gray-900 font-bold text-lg px-8 py-4 rounded-xl transition-all text-center shadow-lg shadow-orange-500/30 dcm-editorial-primary"
                 >
                   Get Credits & Start Grading
                 </Link>
               ) : (
                 <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden">
                   {/* Header */}
-                  <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                  <div className="px-6 py-4 dcm-editorial-dark">
                     <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
                     <p className="text-purple-200 text-sm text-center">Create your account</p>
                   </div>
@@ -327,8 +301,8 @@ export default function PokemonGradingLanding() {
 
                     {/* Free credit highlight */}
                     <div className="relative mb-5">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
-                      <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                      {/* Heritage card above provides the hero imagery. */}
+                      <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center dcm-campaign-offer">
                         <div className="flex items-center justify-center gap-2">
                           <span className="text-2xl">🎁</span>
                           <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
@@ -426,7 +400,7 @@ export default function PokemonGradingLanding() {
                       <button
                         type="submit"
                         disabled={emailLoading || isSigningUp}
-                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-white font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed dcm-editorial-primary"
                       >
                         {emailLoading ? 'Creating Account...' : 'Create Account'}
                       </button>
@@ -448,13 +422,7 @@ export default function PokemonGradingLanding() {
           <div className="hidden xl:flex flex-row items-center gap-6">
             {/* Left: Grading Animation */}
             <div className="flex-shrink-0 w-[340px]">
-              <HeroGradingAnimation
-                rawCardImage="/Pokemon/Mega-charizard-x-ex-dcm-10.png"
-                cardName="Mega Charizard X EX"
-                cardDetails="Phantasmal Flames • #125/94 • 2025"
-                cardNumber="899391"
-                grade={10}
-              />
+              <ReferenceCardShowcase page="ai-card-grading" category="Pokemon" />
             </div>
 
             {/* Center: Hero Content */}
@@ -538,7 +506,7 @@ export default function PokemonGradingLanding() {
             <div className="w-full max-w-md">
               <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                <div className="px-6 py-4 dcm-editorial-dark">
                   <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
                   <p className="text-purple-200 text-sm text-center">Create your account</p>
                 </div>
@@ -580,8 +548,8 @@ export default function PokemonGradingLanding() {
 
                   {/* Free credit highlight */}
                   <div className="relative mb-6">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
-                    <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                    {/* Heritage card above provides the hero imagery. */}
+                    <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center dcm-campaign-offer">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-2xl">🎁</span>
                         <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
@@ -599,7 +567,7 @@ export default function PokemonGradingLanding() {
                     <Link
                       href="/credits"
                       onClick={() => trackSignupClick('signup_card_logged_in')}
-                      className="block w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all text-center shadow-lg shadow-orange-500/30"
+                      className="block w-full text-gray-900 font-bold text-lg px-6 py-4 rounded-xl transition-all text-center shadow-lg shadow-orange-500/30 dcm-editorial-primary"
                     >
                       Get Credits & Start Grading
                     </Link>
@@ -694,7 +662,7 @@ export default function PokemonGradingLanding() {
                         <button
                           type="submit"
                           disabled={emailLoading || isSigningUp}
-                          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full text-white font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed dcm-editorial-primary"
                         >
                           {emailLoading ? 'Creating Account...' : 'Create Account'}
                         </button>
@@ -721,7 +689,7 @@ export default function PokemonGradingLanding() {
       {/* pokemon_sets); do NOT replace these with rounded marketing        */}
       {/* figures — a paid landing page is the worst place for a soft claim */}
       {/* ================================================================ */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-950">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-full px-4 py-1.5 mb-4">
@@ -924,7 +892,7 @@ export default function PokemonGradingLanding() {
       </section>
 
       {/* Example Report Section */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-800">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4">
           {/* Mobile: Stack vertically, Desktop: 3 columns */}
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-6">
@@ -1202,7 +1170,7 @@ export default function PokemonGradingLanding() {
       {/* ================================================================ */}
       {/* LABEL STUDIO                                                      */}
       {/* ================================================================ */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900">
+      <section className="py-16 sm:py-20 dcm-editorial-dark">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <SectionHeading
             title="Your Label, Your Way"
@@ -1291,7 +1259,7 @@ export default function PokemonGradingLanding() {
               {user ? (
                 <Link
                   href="/instalist-marketplace"
-                  className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                  className="inline-block text-white px-7 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 dcm-editorial-primary"
                 >
                   Open InstaList
                 </Link>
@@ -1299,7 +1267,7 @@ export default function PokemonGradingLanding() {
                 <Link
                   href="/login?mode=signup"
                   onClick={() => trackSignupClick('instalist_section')}
-                  className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
+                  className="inline-block text-white px-7 py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 dcm-editorial-primary"
                 >
                   Start with 2 Free Grades
                 </Link>
@@ -1351,14 +1319,14 @@ export default function PokemonGradingLanding() {
             <Link
               href={user ? '/credits' : '/login?mode=signup&redirect=/credits'}
               onClick={() => !user && trackSignupClick('pricing_section')}
-              className="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-bold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25"
+              className="inline-block text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/25 dcm-editorial-primary"
             >
               {user ? 'Buy Credits' : 'Start with 2 Free Grades'}
             </Link>
             <p className="text-gray-500 text-sm mt-3">2 free credits at signup &middot; no subscription required</p>
           </div>
 
-          <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
+          <div className="rounded-2xl p-6 sm:p-8 text-center text-white dcm-editorial-dark">
             <h3 className="font-bold text-xl mb-2">&hearts; Card Lovers Subscription</h3>
             <p className="text-rose-100 mb-5 max-w-2xl mx-auto">
               For serious collectors. 70+ credits a month, 20% off all purchases, portfolio tracking,
@@ -1401,7 +1369,7 @@ export default function PokemonGradingLanding() {
 
 
       {/* Final CTA */}
-      <section className="py-16 bg-gradient-to-r from-purple-900 to-indigo-900">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Grade Your Collection?
@@ -1415,7 +1383,7 @@ export default function PokemonGradingLanding() {
             <Link
               href="/credits"
               onClick={() => trackSignupClick('footer_cta')}
-              className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg shadow-orange-500/30"
+              className="inline-block text-gray-900 font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg shadow-orange-500/30 dcm-editorial-primary"
             >
               Get Credits & Start Grading
             </Link>
@@ -1454,7 +1422,7 @@ export default function PokemonGradingLanding() {
               </button>
               <Link
                 href="/login?mode=signup"
-                className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg"
+                className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg dcm-editorial-primary"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1502,7 +1470,7 @@ export default function PokemonGradingLanding() {
           '2 free grades + bonus credits',
           'A real grade and label on every Charizard',
           'Card ID verified against 322 Pokémon sets',
-          'As low as $0.50 a card with Card Lovers Annual — credits never expire',
+          'As low as $0.50 a card with Card Lovers Annual. Credits never expire',
         ]}
       />
     </main>

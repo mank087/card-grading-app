@@ -1,9 +1,10 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { blogPageNumber, blogPagePath } from '@/lib/seo/blogPagination';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost, BlogCategory } from '@/types/blog';
-import FloatingCardsBackground from '../../../ui/FloatingCardsBackground';
 import { BlogPostCard, BlogPagination, CategoryBadge } from '@/components/blog';
 
 export const revalidate = 60;
@@ -56,8 +57,9 @@ async function getAllCategories() {
   return (data || []) as BlogCategory[];
 }
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CategoryPageProps): Promise<Metadata> {
   const { category: categorySlug } = await params;
+  const page = blogPageNumber((await searchParams).page);
   const category = await getCategory(categorySlug);
 
   if (!category) {
@@ -66,18 +68,18 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     };
   }
 
-  return {
+  return completeMetadata({
     // Already brand-suffixed; `absolute` stops the root layout's
     // `%s | DCM Grading` template from appending a second suffix.
-    title: { absolute: `${category.name} | DCM Grading Blog` },
+    title: { absolute: `${category.name}${page > 1 ? ` - Page ${page}` : ''} | DCM Grading Blog` },
     description: category.description || `Read our latest ${category.name.toLowerCase()} articles on card grading and collecting.`,
     openGraph: {
-      title: `${category.name} | DCM Grading Blog`,
+      title: `${category.name}${page > 1 ? ` - Page ${page}` : ''} | DCM Grading Blog`,
       description: category.description || `Read our latest ${category.name.toLowerCase()} articles.`,
       type: 'website',
     },
     alternates: {
-      canonical: `https://dcmgrading.com/blog/category/${categorySlug}`,
+      canonical: `https://dcmgrading.com${blogPagePath(`/blog/category/${categorySlug}`, page)}`,
       // `alternates` replaces rather than merges, so the inherited RSS link has
       // to be restated here alongside the canonical.
       types: {
@@ -86,13 +88,13 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
         ],
       },
     },
-  };
+  });
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { category: categorySlug } = await params;
   const { page: pageParam } = await searchParams;
-  const page = parseInt(pageParam || '1');
+  const page = blogPageNumber(pageParam);
 
   const category = await getCategory(categorySlug);
 
@@ -105,13 +107,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     getAllCategories(),
   ]);
 
+  if (page > 1 && posts.length === 0) notFound();
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+        <div role="navigation" aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-gray-500 mb-8">
           <Link href="/" className="hover:text-purple-600 transition-colors">
             Home
           </Link>
@@ -121,10 +124,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           </Link>
           <span>/</span>
           <span className="text-gray-900">{category.name}</span>
-        </nav>
+        </div>
 
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="mb-12 dcm-blog-hero">
           <div className="mb-4">
             <CategoryBadge category={category} size="lg" clickable={false} />
           </div>
@@ -142,9 +145,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         </div>
 
         {/* Category Filters */}
-        <div className="flex flex-wrap justify-center gap-3 mb-10">
+        <div className="dcm-blog-filters flex flex-wrap gap-3 mb-10">
           <Link
             href="/blog"
+            aria-current={!categorySlug ? 'page' : undefined}
             className="px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors"
           >
             All Posts
@@ -153,6 +157,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
             <Link
               key={cat.id}
               href={`/blog/category/${cat.slug}`}
+              aria-current={cat.slug === categorySlug ? 'page' : undefined}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 cat.slug === categorySlug
                   ? 'bg-purple-600 text-white'
@@ -186,7 +191,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
             </p>
             <Link
               href="/blog"
-              className="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              className="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors dcm-editorial-primary"
             >
               View All Posts
             </Link>
@@ -210,14 +215,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         )}
 
         {/* Newsletter CTA */}
-        <div className="mt-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-center text-white">
+        <div className="mt-16 rounded-2xl shadow-xl p-8 text-center text-white dcm-editorial-dark">
           <h2 className="text-2xl font-bold mb-3">Stay Updated</h2>
           <p className="text-lg opacity-90 mb-6 max-w-xl mx-auto">
             Get the latest {category.name.toLowerCase()} and more delivered to your inbox.
           </p>
           <Link
             href="/login?mode=signup"
-            className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg"
+            className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
           >
             Sign Up for Free
           </Link>

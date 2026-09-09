@@ -1,6 +1,8 @@
 "use client";
 
 // Force rebuild to pick up card text changes
+import ReportSectionNav from '@/components/design/ReportSectionNav';
+import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
 
 // Declare gtag for TypeScript
@@ -2806,7 +2808,8 @@ export function MTGCardDetails() {
   const structuredData = generateStructuredData(card, dvgGrading, currentUrl);
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="dcm-report-page container mx-auto p-6 max-w-7xl" style={{ '--dcm-report-foil': reportFoil } as React.CSSProperties}>
+      <ReportSectionNav />
       {/* Structured Data (JSON-LD) for SEO */}
       <Script
         id="structured-data"
@@ -3260,7 +3263,7 @@ export function MTGCardDetails() {
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
             <div className="space-y-6">
               {/* Header / Grade Summary */}
-              <div id="tour-grade-score" className={`${
+              <div id="tour-grade-score" data-report-grade={formatGrade(card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade)} className={`${
                 // 🎯 Check conversational AI grade first, then DVG v1
                 (card.conversational_decimal_grade === null && recommendedGrade.recommended_decimal_grade === null)
                   ? 'bg-gradient-to-r from-red-600 to-orange-600'

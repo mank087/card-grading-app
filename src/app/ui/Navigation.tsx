@@ -94,7 +94,6 @@ export default function Navigation() {
 function NavigationInner() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false); // Track if initial auth check is done
   const [searchSerial, setSearchSerial] = useState("");
   const [gradeDropdownOpen, setGradeDropdownOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
@@ -133,7 +132,6 @@ function NavigationInner() {
       } catch (error: any) {
         setUser(null);
       }
-      setAuthChecked(true); // Mark auth as checked after first check
     };
 
     checkAuth();
@@ -267,7 +265,8 @@ function NavigationInner() {
 
   return (
     <nav
-      className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50"
+      data-site-chrome="header"
+      className="dcm-site-nav bg-white border-b border-gray-200 sticky top-0 z-50"
       // Org workspace: the header carries the brand accent so members always
       // know which hat they're wearing. A 3px brand-color bar tops the nav
       // and key purple accents follow the brand primary via CSS var.
@@ -316,17 +315,13 @@ function NavigationInner() {
 
             {/* Left Section - Navigation Links */}
             <div className="flex items-center space-x-1 min-h-[40px]">
-              {!authChecked ? (
-                /* Skeleton placeholders to prevent CLS — match the 6 logged-out items */
-                <>
-                  <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
-                </>
-              ) : user ? (
+              {/* Logged-OUT links are the default render (SSR + pre-hydration);
+                  the signed-in set swaps in once the synchronous stored-session
+                  check resolves. One-directional, so signed-in users never see
+                  a logged-out flash after the swap. No skeleton here: an
+                  animated placeholder for the primary links overshot the
+                  ~0ms the check actually takes. min-h-[40px] holds the row. */}
+              {user ? (
                 <>
                   {/* Logged In — see MEMBER_* at the top of the file. Bulk
                       grading has no nav entry: the binder / My Collection is
@@ -420,13 +415,10 @@ function NavigationInner() {
                 )}
               </div>
 
-              {!authChecked ? (
-                /* Skeleton placeholders for auth buttons — match logged-out widths */
-                <>
-                  <div className="h-9 w-14 bg-gray-200 rounded-md animate-pulse"></div>
-                  <div className="h-9 w-36 bg-purple-200 rounded-md animate-pulse"></div>
-                </>
-              ) : user ? (
+              {/* Same one-directional swap: the logged-out Log in / Sign up
+                  pair (the primary CTA) renders immediately rather than as a
+                  skeleton. */}
+              {user ? (
                 <>
                   {/* Enterprise members get ONE compact control combining the
                       workspace switcher and the active balance — two separate
@@ -624,7 +616,7 @@ function NavigationInner() {
                       onClick={() => setGradeDropdownOpen(!gradeDropdownOpen)}
                       aria-expanded={gradeDropdownOpen}
                       aria-haspopup="true"
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-1 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
+                      className="dcm-nav-action bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-1 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
                     style={isOrgScope && orgMembership?.brandColor ? { backgroundColor: orgMembership.brandColor } : undefined}
                     >
                       <span>Grade a Card</span>
@@ -654,7 +646,7 @@ function NavigationInner() {
                       actual signup grant (2 free credits, src/lib/credits.ts). */}
                   <Link
                     href="/login?mode=signup"
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md whitespace-nowrap"
+                    className="dcm-nav-action bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md whitespace-nowrap"
                     style={isOrgScope && orgMembership?.brandColor ? { backgroundColor: orgMembership.brandColor } : undefined}
                   >
                     Grade 2 Cards Free
@@ -674,13 +666,10 @@ function NavigationInner() {
               min-h-[40px] at line 188. */}
           <div className="flex lg:hidden items-center space-x-2 min-h-[40px]">
 
-            {!authChecked ? (
-              /* Skeleton placeholders for mobile */
-              <>
-                <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse"></div>
-                <div className="h-7 w-14 bg-purple-200 rounded-md animate-pulse"></div>
-              </>
-            ) : user ? (
+            {/* Mobile: the logged-out "Grade 2 Cards Free" CTA is the default
+                render; the credits badge + Grade menu swap in for signed-in
+                users. */}
+            {user ? (
               <>
                 {/* Logged In: Credits Badge — org context shows the store pool */}
                 {isOrgScope && orgMembership ? (
@@ -713,7 +702,9 @@ function NavigationInner() {
                 <div className="relative grade-dropdown">
                   <button
                     onClick={() => setGradeDropdownOpen(!gradeDropdownOpen)}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
+                    aria-expanded={gradeDropdownOpen}
+                    aria-haspopup="true"
+                    className="dcm-nav-action bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
                     style={isOrgScope && orgMembership?.brandColor ? { backgroundColor: orgMembership.brandColor } : undefined}
                   >
                     Grade
@@ -729,7 +720,9 @@ function NavigationInner() {
             ) : (
               <Link
                 href="/login?mode=signup"
-                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
+                aria-expanded={gradeDropdownOpen}
+                    aria-haspopup="true"
+                    className="dcm-nav-action bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
                     style={isOrgScope && orgMembership?.brandColor ? { backgroundColor: orgMembership.brandColor } : undefined}
               >
                 Grade 2 Cards Free

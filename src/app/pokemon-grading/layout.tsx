@@ -1,9 +1,11 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { MarketingShowcaseBoundary } from '@/components/marketing/MarketingShowcaseBoundary'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'Pokémon Card Grading — Instant DCM Optic™ Grades, Verified Against 26,000+ Cards',
+export const metadata: Metadata = completeMetadata({
+  title: "Pokémon Card Grading with DCM Optic",
   description:
-    'Grade Pokémon cards instantly with DCM Optic™. Every card is matched against our own database of 20,933 English and 5,548 Japanese cards across 322 sets, so the set, number and rarity on your label are verified. Base Set Charizard to Prismatic Evolutions. As low as $0.50 a card with Card Lovers Annual.',
+    "Grade Pokémon cards with DCM Optic. Review condition findings, four subgrades and Heritage labels, with card identification supported by our database.",
   keywords:
     'pokemon card grading, grade pokemon cards, pokemon PSA, charizard grading, pikachu card grade, vintage pokemon grading, WOTC card grading, base set charizard grade, japanese pokemon card grading, holo scratch grading, modern pokemon grading, instant pokemon grades',
   alternates: {
@@ -32,7 +34,7 @@ export const metadata: Metadata = {
       'Instant Pokémon grades with verified card ID across 322 sets. Holo, edge and centering inspected at magnification.',
     images: ['/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg'],
   },
-};
+});
 
 // Structured data. The FAQ entries below MUST stay in sync with the visible
 // FAQ in page.tsx — Google penalises FAQ markup that isn't on the page.
@@ -119,7 +121,7 @@ export default function PokemonGradingLayout({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      {children}
+      <MarketingShowcaseBoundary selection="ai-card-grading">{children}</MarketingShowcaseBoundary>
     </>
   );
 }

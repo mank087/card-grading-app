@@ -164,9 +164,9 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
   // live featured-cards rail, so it had nothing left to order.
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
       {/* HERO SECTION - Conversion Optimized */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-emerald-950">
+      <section className="relative overflow-hidden dcm-directory-accent">
         {/* Background accents */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
@@ -300,7 +300,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
             <div id="signup" className="w-full lg:w-1/2 max-w-md scroll-mt-6">
               <div className="bg-gray-800/90 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Free Credit Header */}
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3">
+                <div className="dcm-directory-accent px-5 py-3">
                   <div className="flex items-center justify-center gap-2">
                     <span className="text-xl">🎁</span>
                     <span className="text-white font-bold text-lg">Grade Your First Card FREE</span>
@@ -356,7 +356,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                     <Link
                       href="/credits"
                       onClick={() => trackSignupClick(show.slug, 'logged_in_cta')}
-                      className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg"
+                      className="block w-full dcm-directory-accent text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg"
                     >
                       Start Grading Now
                     </Link>
@@ -447,7 +447,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                         <button
                           type="submit"
                           disabled={emailLoading || isSigningUp}
-                          className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all disabled:opacity-50 text-sm"
+                          className="w-full dcm-directory-accent text-white font-semibold py-2.5 px-4 rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all disabled:opacity-50 text-sm"
                         >
                           {emailLoading ? 'Creating...' : 'Sign Up Free'}
                         </button>
@@ -480,7 +480,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
 
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <div className="w-14 h-14 dcm-directory-accent rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -490,7 +490,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
               <p className="text-gray-400 text-sm">Take front & back photos with your phone at the vendor table</p>
             </div>
             <div className="text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <div className="w-14 h-14 dcm-directory-accent rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
@@ -499,7 +499,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
               <p className="text-gray-400 text-sm">DCM inspects centering, corners, edges & surface in about a minute</p>
             </div>
             <div className="text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+              <div className="w-14 h-14 dcm-directory-accent rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -660,7 +660,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
       </section>
 
       {/* Final CTA */}
-      <section className="py-12 bg-gradient-to-r from-emerald-900 to-teal-900">
+      <section className="py-12 dcm-directory-accent">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
             Heading to {show.short_name || show.name}?

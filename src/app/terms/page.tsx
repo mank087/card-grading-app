@@ -1,20 +1,22 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  twitter: { card: 'summary', title: 'Terms and Conditions', description: 'DCM Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.', images: ['/DCM-logo.png'] },
+  openGraph: { title: 'Terms and Conditions', description: 'DCM Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.', type: 'website', siteName: 'DCM Grading', images: ['/DCM-logo.png'] },
+  alternates: { canonical: 'https://dcmgrading.com/terms' },
   title: 'Terms and Conditions',
   description: 'DCM Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.',
   robots: {
     index: true,
     follow: true,
   },
-};
+});
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <FloatingCardsBackground />
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
+    <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10 dcm-editorial-heading">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Terms and Conditions</h1>
         <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
 

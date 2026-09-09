@@ -1,3 +1,4 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import type { Metadata } from 'next';
 import { getCategoryFromSlug, getCategoryMeta, POP_CATEGORIES } from '@/lib/popReport';
 
@@ -10,7 +11,7 @@ export async function generateMetadata({
   const meta = getCategoryMeta(category);
   const name = meta?.displayName || getCategoryFromSlug(category);
 
-  return {
+  return completeMetadata({
     // Root layout appends " | DCM Grading" via its title template.
     title: `${name} Population Report`,
     description: `View every ${name} card graded by DCM — grade distributions, player stats, and grading volume. Explore the full ${name} population report.`,
@@ -24,7 +25,7 @@ export async function generateMetadata({
     alternates: {
       canonical: `https://dcmgrading.com/pop/${category}`,
     },
-  };
+  });
 }
 
 export async function generateStaticParams() {

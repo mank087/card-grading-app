@@ -1,12 +1,12 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import { UPDATED_LABEL, UPDATED_ISO, HONEST_MIDDLE } from '@/lib/aeo/gradingCompanies';
 
-export const metadata: Metadata = {
-  title: 'Is AI Card Grading Accurate? How DCM Optic Works and Where It Stops',
+export const metadata: Metadata = completeMetadata({
+  title: "AI Card Grading Accuracy: Methods & Limits",
   description:
-    'How accurate is AI card grading, and can it be trusted? DCM Optic runs three independent evaluation passes per card, takes the median, publishes its rubric and its limitations, and rates image confidence A to D. Every grade is publicly verifiable.',
+    "DCM Optic runs 3 independent passes per card and takes the median, with a published rubric, published limits and an A to D image confidence letter.",
   keywords:
     'is AI card grading accurate, can AI grading be trusted, AI card grading bias, robograding accuracy, DCM Optic, computer vision card grading, AI grading consistency',
   alternates: {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     description: 'Three passes, median consensus, published rubric, published limits, public verification.',
     images: ['/why-dcm/judge-graded-card.png'],
   },
-};
+});
 
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',
@@ -146,8 +146,7 @@ const method = [
 
 export default function AiCardGradingAccuracyPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
@@ -155,7 +154,7 @@ export default function AiCardGradingAccuracyPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero. Answer in the first paragraph. */}
-        <section className="mb-14">
+        <section className="mb-14 dcm-editorial-heading">
           <div className="inline-block bg-purple-100 text-purple-700 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             The method, in public
           </div>
@@ -174,7 +173,7 @@ export default function AiCardGradingAccuracyPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/grading-standard"
-              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg dcm-editorial-primary"
             >
               Read the Published Rubric
             </Link>
@@ -211,7 +210,7 @@ export default function AiCardGradingAccuracyPage() {
 
         {/* Consistency */}
         <section className="mb-16">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 border border-blue-200">
+          <div className="rounded-2xl p-8 border border-blue-200 dcm-editorial-soft">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">The consistency argument</h2>
             <p className="text-lg text-gray-700 mb-4">
               DCM Optic grades card #1 and card #4,000 identically. It does not have a bad day, it does not know your
@@ -362,7 +361,7 @@ export default function AiCardGradingAccuracyPage() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Read the rubric, then test it on your own card</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Two free grades to start. Four subgrades, a written reason for every deduction, and a confidence letter
@@ -370,7 +369,7 @@ export default function AiCardGradingAccuracyPage() {
             </p>
             <Link
               href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

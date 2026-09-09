@@ -189,9 +189,10 @@ export default function StarWarsDatabasePage() {
   const totalCards = sets.reduce((acc, set) => acc + (set.total_cards || 0), 0)
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
+      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database">Pokémon</Link><Link href="/sports-database">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database">Yu-Gi-Oh!</Link><Link href="/starwars-database" aria-current="page">Star Wars</Link></div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-yellow-900 via-gray-900 to-blue-900 py-12">
+      <section className="dcm-directory-hero py-12">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
@@ -252,7 +253,7 @@ export default function StarWarsDatabasePage() {
           {/* Mobile: Name search + Filter toggle */}
           <div className="flex gap-2 md:hidden">
             <div className="flex-1">
-              <input
+              <input aria-label="Card name"
                 ref={searchInputRef}
                 type="text"
                 value={searchName}
@@ -285,8 +286,8 @@ export default function StarWarsDatabasePage() {
           <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-80 mt-3' : 'max-h-0'}`}>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Card #</label>
-                <input
+                <label htmlFor="database-filter-1" className="block text-xs text-gray-400 mb-1">Card #</label>
+                <input id="database-filter-1"
                   type="text"
                   value={searchNumber}
                   onChange={(e) => setSearchNumber(e.target.value)}
@@ -295,8 +296,8 @@ export default function StarWarsDatabasePage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Set</label>
-                <select
+                <label htmlFor="database-filter-2" className="block text-xs text-gray-400 mb-1">Set</label>
+                <select id="database-filter-2"
                   value={selectedSetId}
                   onChange={(e) => setSelectedSetId(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-yellow-500 transition-colors text-sm"
@@ -330,8 +331,8 @@ export default function StarWarsDatabasePage() {
           {/* Desktop: All filters in a row */}
           <div className="hidden md:flex md:flex-row gap-3">
             <div className="flex-1">
-              <label className="block text-xs text-gray-400 mb-1">Card Name</label>
-              <input
+              <label htmlFor="database-filter-3" className="block text-xs text-gray-400 mb-1">Card Name</label>
+              <input id="database-filter-3"
                 type="text"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
@@ -341,8 +342,8 @@ export default function StarWarsDatabasePage() {
             </div>
 
             <div className="w-32">
-              <label className="block text-xs text-gray-400 mb-1">Card #</label>
-              <input
+              <label htmlFor="database-filter-4" className="block text-xs text-gray-400 mb-1">Card #</label>
+              <input id="database-filter-4"
                 type="text"
                 value={searchNumber}
                 onChange={(e) => setSearchNumber(e.target.value)}
@@ -352,8 +353,8 @@ export default function StarWarsDatabasePage() {
             </div>
 
             <div className="w-72">
-              <label className="block text-xs text-gray-400 mb-1">Set</label>
-              <select
+              <label htmlFor="database-filter-5" className="block text-xs text-gray-400 mb-1">Set</label>
+              <select id="database-filter-5"
                 value={selectedSetId}
                 onChange={(e) => setSelectedSetId(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-yellow-500 transition-colors"
@@ -607,7 +608,7 @@ export default function StarWarsDatabasePage() {
             {/* Grade This Card CTA */}
             <Link
               href={getGradeCtaLink()}
-              className="block w-full bg-gradient-to-r from-yellow-600 to-amber-500 text-white font-bold text-lg px-6 py-4 rounded-xl hover:from-yellow-500 hover:to-amber-400 transition-all text-center shadow-lg shadow-yellow-500/20 mb-4"
+              className="block w-full dcm-directory-accent text-white font-bold text-lg px-6 py-4 rounded-xl hover:from-yellow-500 hover:to-amber-400 transition-all text-center shadow-lg shadow-yellow-500/20 mb-4"
             >
               {getGradeCtaText()}
             </Link>
@@ -641,7 +642,7 @@ export default function StarWarsDatabasePage() {
       </div>
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
+      <div className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>Data from PriceCharting. Star Wars is a trademark of Lucasfilm Ltd.</p>
           <div className="flex justify-center gap-6 mt-4">
@@ -650,7 +651,7 @@ export default function StarWarsDatabasePage() {
             <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
           </div>
         </div>
-      </footer>
+      </div>
     </main>
   )
 }

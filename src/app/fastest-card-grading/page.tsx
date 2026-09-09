@@ -1,6 +1,6 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import {
   COMPANIES,
   SOURCES,
@@ -10,10 +10,10 @@ import {
   HONEST_MIDDLE,
 } from '@/lib/aeo/gradingCompanies';
 
-export const metadata: Metadata = {
-  title: 'Fastest Card Grading (2026): Published Turnaround Times Compared',
+export const metadata: Metadata = completeMetadata({
+  title: "Fastest Card Grading: Turnarounds Compared",
   description:
-    'How fast is card grading in 2026? Published turnarounds for PSA, Beckett, SGC and CGC ran from 15 to 100-plus business days in August 2026. DCM grades from two photos in about 60 seconds, with nothing to ship.',
+    "Published turnarounds for PSA, Beckett, SGC and CGC ran 15 to 100+ business days in August 2026. DCM grades from two photos in about 60 seconds.",
   keywords:
     'fastest card grading, card grading turnaround times, how long does card grading take, fast card grading service, instant card grading, same day card grading',
   alternates: { canonical: 'https://dcmgrading.com/fastest-card-grading' },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     description: 'Published turnarounds for PSA, Beckett, SGC and CGC vs about 60 seconds at home.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
-};
+});
 
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',
@@ -118,15 +118,14 @@ const rows = [...COMPANIES].sort((a, b) => {
 
 export default function FastestCardGradingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-        <section className="mb-12">
+        <section className="mb-12 dcm-editorial-heading">
           <div className="inline-block bg-amber-100 text-amber-800 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             Turnaround, sourced
           </div>
@@ -150,7 +149,7 @@ export default function FastestCardGradingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-left">
+                  <tr className="text-white text-left dcm-editorial-dark">
                     <th className="py-4 px-4 font-bold">Service</th>
                     <th className="py-4 px-4 font-bold">Tier</th>
                     <th className="py-4 px-4 font-bold">Published turnaround</th>
@@ -272,14 +271,14 @@ export default function FastestCardGradingPage() {
         </section>
 
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">A grade in about a minute</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Two free grades to start. Two photos, and the card never leaves your hands.
             </p>
             <Link
               href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

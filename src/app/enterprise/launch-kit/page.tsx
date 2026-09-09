@@ -36,7 +36,7 @@ export default function LaunchKitPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4 print:bg-white print:py-0">
+    <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-10 px-4 print:bg-white print:py-0">
       {/* Hide site chrome + control page breaks when printing */}
       <style>{`
         @media print {
@@ -48,7 +48,7 @@ export default function LaunchKitPage() {
 
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Intro (screen only) */}
-        <div className="no-print">
+        <div className="no-print dcm-editorial-heading">
           <p className="uppercase tracking-widest text-purple-600 text-xs font-semibold mb-2">DCM Enterprise</p>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Launch Kit</h1>
           <p className="text-gray-600 text-sm max-w-xl">
@@ -59,7 +59,7 @@ export default function LaunchKitPage() {
               : ' Sign in with your store account to personalize the signage with your logo and name.'}
           </p>
           <button onClick={() => window.print()}
-            className="mt-4 px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700">
+            className="mt-4 px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 dcm-editorial-primary">
             🖨️ Print signage &amp; pitch sheet
           </button>
         </div>

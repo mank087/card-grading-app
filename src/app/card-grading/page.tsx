@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
-import FeaturedCardsShowcase from './LatestCardsShowcase'
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -174,54 +174,18 @@ export default function CardGradingLanding() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-campaign min-h-screen bg-gray-900">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background gradient - Universal DCM theme */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900" />
+        <div className="absolute inset-0 dcm-editorial-dark" />
 
         {/* Animated cards background - mix of all card types, hidden on mobile */}
         {/* All background images use loading="lazy" since they're decorative */}
-        <div className="absolute inset-0 opacity-15 hidden md:block" aria-hidden="true">
-          {/* Left side cards - Pokemon */}
-          <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
-          </div>
-          <div className="absolute bottom-24 left-[8%] w-24 h-34 animate-float-medium">
-            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" loading="lazy" sizes="96px" />
-          </div>
-
-          {/* Center-left cards */}
-          <div className="absolute top-8 left-[22%] w-24 h-34 animate-float-fast">
-            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[6deg]" loading="lazy" sizes="96px" />
-          </div>
-          <div className="absolute bottom-16 left-[28%] w-26 h-36 animate-float-slow">
-            <Image src="/Sports/DCM-Card-Shohei-Ohtani-192904-front.jpg" alt="" fill className="object-contain rotate-[-8deg]" loading="lazy" sizes="104px" />
-          </div>
-
-          {/* Center cards - only visible on large screens */}
-          <div className="absolute top-32 left-[42%] w-24 h-34 animate-float-medium hidden lg:block">
-            <Image src="/homepage-cards/Black Lotus MTG.png" alt="" fill className="object-contain rotate-[10deg]" loading="lazy" sizes="96px" />
-          </div>
-          <div className="absolute bottom-8 left-[38%] w-22 h-32 animate-float-fast hidden lg:block">
-            <Image src="/DCM-Card-Mega-Charizard-X-EX-261763-front.jpg" alt="" fill className="object-contain rotate-[-5deg]" loading="lazy" sizes="88px" />
-          </div>
-
-          {/* Extra cards for very wide screens */}
-          <div className="absolute top-20 left-[15%] w-20 h-28 animate-float-slow hidden xl:block">
-            <Image src="/homepage-cards/Mickey Mouse Brave Little Prince.png" alt="" fill className="object-contain rotate-[15deg]" loading="lazy" sizes="80px" />
-          </div>
-        </div>
+        {/* Heritage card above provides the hero imagery. */}
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
-        <div className="absolute inset-0 opacity-10 md:hidden" aria-hidden="true">
-          <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-10deg]" loading="lazy" sizes="80px" />
-          </div>
-          <div className="absolute top-24 right-[8%] w-18 h-26 animate-float-medium">
-            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" loading="lazy" sizes="72px" />
-          </div>
-        </div>
+        {/* Heritage card above provides the hero imagery. */}
 
         <div className="relative z-10 container mx-auto px-4 py-8 md:py-24">
           {/* Mobile: Animation First */}
@@ -250,7 +214,7 @@ export default function CardGradingLanding() {
 
             {/* Latest Cards Showcase - Mobile */}
             <div className="flex justify-center mb-6">
-              <FeaturedCardsShowcase />
+              <ReferenceCardShowcase page="grading-standard" />
             </div>
 
             {/* Signup CTA for mobile */}
@@ -263,14 +227,14 @@ export default function CardGradingLanding() {
                 <Link
                   href="/credits"
                   onClick={() => trackSignupClick('hero_mobile_logged_in')}
-                  className="block w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg px-8 py-4 rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all text-center shadow-lg shadow-purple-500/30"
+                  className="block w-full text-white font-bold text-lg px-8 py-4 rounded-xl transition-all text-center shadow-lg shadow-purple-500/30 dcm-editorial-primary"
                 >
                   Get Credits & Start Grading
                 </Link>
               ) : (
                 <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden">
                   {/* Header */}
-                  <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                  <div className="px-6 py-4 dcm-editorial-dark">
                     <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
                     <p className="text-purple-200 text-sm text-center">Create your account</p>
                   </div>
@@ -312,8 +276,8 @@ export default function CardGradingLanding() {
 
                     {/* Free credit highlight */}
                     <div className="relative mb-5">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
-                      <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                      {/* Heritage card above provides the hero imagery. */}
+                      <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center dcm-campaign-offer">
                         <div className="flex items-center justify-center gap-2">
                           <span className="text-2xl">🎁</span>
                           <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
@@ -411,7 +375,7 @@ export default function CardGradingLanding() {
                       <button
                         type="submit"
                         disabled={emailLoading || isSigningUp}
-                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-white font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed dcm-editorial-primary"
                       >
                         {emailLoading ? 'Creating Account...' : 'Create Account'}
                       </button>
@@ -433,7 +397,7 @@ export default function CardGradingLanding() {
           <div className="hidden xl:flex flex-row items-center gap-6">
             {/* Left: Latest Cards Showcase */}
             <div className="flex-shrink-0 w-[340px]">
-              <FeaturedCardsShowcase />
+              <ReferenceCardShowcase page="grading-standard" />
             </div>
 
             {/* Center: Hero Content */}
@@ -513,7 +477,7 @@ export default function CardGradingLanding() {
             <div className="w-full max-w-md">
               <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                <div className="px-6 py-4 dcm-editorial-dark">
                   <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
                   <p className="text-purple-200 text-sm text-center">Create your account</p>
                 </div>
@@ -555,8 +519,8 @@ export default function CardGradingLanding() {
 
                   {/* Free credit highlight */}
                   <div className="relative mb-6">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
-                    <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                    {/* Heritage card above provides the hero imagery. */}
+                    <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center dcm-campaign-offer">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-2xl">🎁</span>
                         <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
@@ -574,7 +538,7 @@ export default function CardGradingLanding() {
                     <Link
                       href="/credits"
                       onClick={() => trackSignupClick('signup_card_logged_in')}
-                      className="block w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg px-6 py-4 rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all text-center shadow-lg shadow-purple-500/30"
+                      className="block w-full text-white font-bold text-lg px-6 py-4 rounded-xl transition-all text-center shadow-lg shadow-purple-500/30 dcm-editorial-primary"
                     >
                       Get Credits & Start Grading
                     </Link>
@@ -669,7 +633,7 @@ export default function CardGradingLanding() {
                         <button
                           type="submit"
                           disabled={emailLoading || isSigningUp}
-                          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full text-white font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed dcm-editorial-primary"
                         >
                           {emailLoading ? 'Creating Account...' : 'Create Account'}
                         </button>
@@ -813,7 +777,7 @@ export default function CardGradingLanding() {
       </section>
 
       {/* Example Report Section */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-800">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4">
           {/* Mobile: Stack vertically, Desktop: 3 columns */}
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-6">
@@ -958,7 +922,7 @@ export default function CardGradingLanding() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
             {/* Card Lovers Subscription */}
             <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-rose-400 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-5 py-4 relative">
+              <div className="px-5 py-4 relative dcm-editorial-dark">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">♥</span>
@@ -1062,7 +1026,7 @@ export default function CardGradingLanding() {
                 <Link
                   href="/login?mode=signup&redirect=/card-lovers"
                   onClick={() => trackSignupClick('pricing_card_lovers')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 text-white shadow-lg hover:shadow-xl cursor-pointer dcm-editorial-primary"
                 >
                   Sign Up to Subscribe
                 </Link>
@@ -1129,7 +1093,7 @@ export default function CardGradingLanding() {
                 <Link
                   href="/login?mode=signup&redirect=/credits"
                   onClick={() => trackSignupClick('pricing_vip')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 text-white shadow-lg hover:shadow-xl cursor-pointer dcm-editorial-primary"
                 >
                   Sign Up to Purchase
                 </Link>
@@ -1181,7 +1145,7 @@ export default function CardGradingLanding() {
                 <Link
                   href="/login?mode=signup&redirect=/credits"
                   onClick={() => trackSignupClick('pricing_basic')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer dcm-editorial-primary"
                 >
                   Sign Up to Purchase
                 </Link>
@@ -1190,7 +1154,7 @@ export default function CardGradingLanding() {
 
             {/* Pro Package */}
             <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-purple-500 flex flex-col">
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
+              <div className="px-5 py-4 dcm-editorial-dark">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">🚀</span>
@@ -1237,7 +1201,7 @@ export default function CardGradingLanding() {
                 <Link
                   href="/login?mode=signup&redirect=/credits"
                   onClick={() => trackSignupClick('pricing_pro')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer dcm-editorial-primary"
                 >
                   Sign Up to Purchase
                 </Link>
@@ -1291,7 +1255,7 @@ export default function CardGradingLanding() {
                 <Link
                   href="/login?mode=signup&redirect=/credits"
                   onClick={() => trackSignupClick('pricing_elite')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer dcm-editorial-primary"
                 >
                   Sign Up to Purchase
                 </Link>
@@ -1325,7 +1289,7 @@ export default function CardGradingLanding() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-16 bg-gradient-to-r from-purple-900 to-indigo-900">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Grade Your Collection?
@@ -1339,7 +1303,7 @@ export default function CardGradingLanding() {
             <Link
               href="/credits"
               onClick={() => trackSignupClick('footer_cta')}
-              className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg px-10 py-4 rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all shadow-lg shadow-purple-500/30"
+              className="inline-block text-white font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg shadow-purple-500/30 dcm-editorial-primary"
             >
               Get Credits & Start Grading
             </Link>
@@ -1378,7 +1342,7 @@ export default function CardGradingLanding() {
               </button>
               <Link
                 href="/login?mode=signup"
-                className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg"
+                className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg dcm-editorial-primary"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

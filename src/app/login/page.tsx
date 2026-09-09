@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
-import FloatingCardsBackground from '../ui/FloatingCardsBackground'
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 
 // Declare rdt, gtag, and fbq for TypeScript
 declare global {
@@ -24,6 +24,7 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [showExistingAccountError, setShowExistingAccountError] = useState(false)
 
   // Default to signup mode, unless mode=login is specified in URL
@@ -68,13 +69,15 @@ function LoginPageContent() {
            lowerError.includes('email already')
   }
 
+  const modeHref = (mode: string) => `/login?mode=${mode}${redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : ''}`
+
   // Handle switching to login with pre-filled credentials
   const handleSwitchToLogin = () => {
     setShowExistingAccountError(false)
     setError('')
     setIsSignUp(false)
     // Update URL without full navigation to preserve form state
-    router.push('/login?mode=login', { scroll: false })
+    router.push(modeHref('login'), { scroll: false })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,148 +178,32 @@ function LoginPageContent() {
   }
 
   return (
-    <main className="min-h-screen flex">
-      {/* Left Panel - Value Proposition */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-700 relative overflow-hidden">
-        <FloatingCardsBackground />
-        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 py-12">
-          {/* Logo and Headline */}
-          <div className="mb-10">
-            <div className="flex items-center gap-4 mb-6">
-              <Image
-                src="/DCM Logo white.png"
-                alt="DCM Logo"
-                width={64}
-                height={64}
-                className="object-contain"
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-white leading-tight">Dynamic Collectibles<br />Management</h1>
-                <p className="text-purple-200">Professional Card Grading</p>
-              </div>
-            </div>
-            <h2 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
-              Grade Your Cards<br />in Seconds
-            </h2>
-            <p className="text-xl text-purple-100">
-              Get professional-quality condition assessments powered by DCM Optic™ technology.
-            </p>
-          </div>
-
-          {/* Benefits List */}
-          <div className="space-y-4 mb-10">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Triple-Pass DCM Optic™ Consensus</p>
-                <p className="text-purple-200 text-sm">Every card graded 3 times independently for maximum accuracy</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Results in Under 60 Seconds</p>
-                <p className="text-purple-200 text-sm">No waiting weeks or months for professional grading</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">8-Component Analysis</p>
-                <p className="text-purple-200 text-sm">Centering, corners, edges & surface for front and back</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">All Card Types Supported</p>
-                <p className="text-purple-200 text-sm">Sports, Pokémon, MTG, Lorcana, and more</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Free Credits with Signup</p>
-                <p className="text-purple-200 text-sm">Try DCM grading when you create your account</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Social Proof */}
-          <div className="border-t border-purple-500/30 pt-8">
-            <p className="text-purple-200 text-sm mb-4">Trusted by collectors for:</p>
-            <div className="flex flex-wrap gap-3">
-              <span className="px-3 py-1 bg-white/10 rounded-full text-white text-sm">Pre-submission screening</span>
-              <span className="px-3 py-1 bg-white/10 rounded-full text-white text-sm">Collection management</span>
-              <span className="px-3 py-1 bg-white/10 rounded-full text-white text-sm">Selling preparation</span>
-            </div>
-          </div>
+    <main className="dcm-brand dcm-auth-page">
+      <aside className="dcm-auth-story dcm-dark" aria-label="Explore DCM grading">
+        <p className="dcm-eyebrow">Your cards. A clearer picture.</p>
+        <h2>Know the condition.<br />See the possibilities.</h2>
+        <p className="dcm-auth-intro">Detailed card analysis, custom labels, and your collection in one place.</p>
+        <ReferenceCardShowcase page="reports-and-labels" />
+        <div className="dcm-auth-benefits">
+          <p><strong>Understand every grade</strong><span>Centering, corners, edges, and surface analysis.</span></p>
+          <p><strong>Make your collection your own</strong><span>Heritage labels, portfolio tools, and eBay InstaList.</span></p>
         </div>
-      </div>
-
-      {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 sm:px-12 lg:px-16 xl:px-24 py-12 bg-gray-50 relative z-10">
-        {/* Mobile Logo (shown only on small screens) */}
-        <div className="lg:hidden mb-8 text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Image
-              src="/DCM-logo.png"
-              alt="DCM Logo"
-              width={48}
-              height={48}
-              className="object-contain"
-            />
-            <div className="text-left">
-              <h1 className="text-xl font-bold text-gray-900 leading-tight">Dynamic Collectibles<br />Management</h1>
-            </div>
-          </div>
-          <p className="text-gray-600">Professional card grading in seconds</p>
-        </div>
-
+        <Link href="/why-dcm" className="dcm-auth-explore">Explore everything DCM can do →</Link>
+      </aside>
+      <div className="dcm-auth-form-panel">
         <div className="w-full max-w-md mx-auto">
-          {/* Form Header */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              {isSignUp ? 'Create your account' : 'Welcome back'}
-            </h2>
-            <p className="text-gray-600">
-              {isSignUp
-                ? 'Start grading your cards with DCM Optic™ technology'
-                : 'Sign in to access your collection and grade cards'}
-            </p>
-            {isSignUp && (
-              <p className="mt-2 text-green-600 font-semibold">
-                🎁 Grade Your First Card Free with Sign Up
-              </p>
-            )}
+          <Link href="/" className="dcm-auth-logo" aria-label="DCM home">
+            <Image src="/DCM-logo.png" alt="DCM" width={44} height={44} className="object-contain" />
+            <span>DCM Grading</span>
+          </Link>
+          <div className="dcm-auth-heading">
+            <p className="dcm-eyebrow">{isSignUp ? 'Start your collection' : 'Your collection awaits'}</p>
+            <h1>{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
+            <p>{isSignUp ? 'Get 2 free credits to try card grading, plus reports and collection tools.' : 'Sign in to view your cards, grades, and portfolio.'}</p>
           </div>
 
           {/* Auth Form Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-8">
+          <div className="dcm-auth-form-card">
             {/* OAuth Buttons */}
             <div className="space-y-3 mb-6">
               <button
@@ -390,6 +277,7 @@ function LoginPageContent() {
                 <input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -414,18 +302,24 @@ function LoginPageContent() {
                 </div>
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  aria-describedby={isSignUp ? 'password-hint' : undefined}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={10}
+                  minLength={isSignUp ? 10 : undefined}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   placeholder="••••••••"
                 />
+                <div className="dcm-auth-password-help">
+                  {isSignUp && <p id="password-hint">Use at least 10 characters.</p>}
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} aria-pressed={showPassword}>{showPassword ? 'Hide password' : 'Show password'}</button>
+                </div>
               </div>
 
               {showExistingAccountError && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl text-sm">
+                <div role="alert" className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl text-sm">
                   <p className="mb-2">
                     That email is already associated with an existing DCM account.
                   </p>
@@ -440,15 +334,15 @@ function LoginPageContent() {
               )}
 
               {error && !showExistingAccountError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                   {error}
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all font-semibold shadow-lg shadow-purple-500/25"
+                disabled={loading || oauthLoading}
+                className="dcm-button dcm-button--primary w-full"
               >
                 {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
               </button>
@@ -457,7 +351,7 @@ function LoginPageContent() {
             {/* Toggle Sign In / Sign Up */}
             <div className="mt-6 text-center">
               <Link
-                href={isSignUp ? '/login?mode=login' : '/login?mode=signup'}
+                href={modeHref(isSignUp ? 'login' : 'signup')}
                 className="text-sm text-purple-600 hover:text-purple-800 font-medium"
               >
                 {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
@@ -473,83 +367,7 @@ function LoginPageContent() {
             <Link href="/privacy" className="text-purple-600 hover:text-purple-800">Privacy Policy</Link>
           </p>
 
-          {/* Mobile Benefits (shown only on small screens) */}
-          <div className="lg:hidden mt-10 pt-8 border-t border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Why Dynamic Collectibles Management?</h3>
-
-            {/* Benefits List - Expanded to match desktop */}
-            <div className="space-y-4 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-semibold">Triple-Pass DCM Optic™ Consensus</p>
-                  <p className="text-gray-600 text-sm">Every card graded 3 times independently for maximum accuracy</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-semibold">Results in Under 60 Seconds</p>
-                  <p className="text-gray-600 text-sm">No waiting weeks or months for professional grading</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-semibold">8-Component Analysis</p>
-                  <p className="text-gray-600 text-sm">Centering, corners, edges & surface for front and back</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-semibold">All Card Types Supported</p>
-                  <p className="text-gray-600 text-sm">Sports, Pokémon, MTG, Lorcana, and more</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-semibold">Free Credits with Signup</p>
-                  <p className="text-gray-600 text-sm">Try DCM grading when you create your account</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Social Proof - Matching desktop */}
-            <div className="border-t border-gray-200 pt-6">
-              <p className="text-gray-500 text-sm mb-3 text-center">Trusted by collectors for:</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Pre-submission screening</span>
-                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Collection management</span>
-                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Selling preparation</span>
-              </div>
-            </div>
-          </div>
+          <p className="dcm-auth-mobile-note">Card analysis · Custom labels · Collection tools<br /><Link href="/why-dcm">Explore DCM →</Link></p>
         </div>
       </div>
     </main>

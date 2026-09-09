@@ -1,5 +1,7 @@
 "use client";
 
+import ReportSectionNav from '@/components/design/ReportSectionNav';
+import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
 
 // Declare gtag for TypeScript
@@ -1492,7 +1494,7 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
         '@type': 'ListItem',
         position: 2,
         name: 'Other Cards',
-        item: 'https://dcmgrading.com/upload/other'
+        item: 'https://dcmgrading.com/upload?category=Other'
       },
       {
         '@type': 'ListItem',
@@ -2734,7 +2736,8 @@ export function OtherCardDetails() {
   const structuredData = generateStructuredData(card, dvgGrading, currentUrl);
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="dcm-report-page container mx-auto p-6 max-w-7xl" style={{ '--dcm-report-foil': reportFoil } as React.CSSProperties}>
+      <ReportSectionNav />
       {/* Structured Data (JSON-LD) for SEO */}
       <Script
         id="structured-data"
@@ -3189,7 +3192,7 @@ export function OtherCardDetails() {
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
             <div className="space-y-6">
               {/* Header / Grade Summary */}
-              <div id="tour-grade-score" className={`${
+              <div id="tour-grade-score" data-report-grade={formatGrade(card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade)} className={`${
                 // 🎯 Check conversational AI grade first, then DVG v1
                 (card.conversational_decimal_grade === null && recommendedGrade.recommended_decimal_grade === null)
                   ? 'bg-gradient-to-r from-red-600 to-orange-600'
@@ -4931,7 +4934,7 @@ export function OtherCardDetails() {
                                 The image quality affects grading accuracy. For the most reliable results, consider uploading clearer photos with better lighting and no obstructions.
                               </p>
                               <a
-                                href="/upload/other"
+                                href="/upload?category=Other"
                                 className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                               >
                                 <span>Upload New Photos</span>

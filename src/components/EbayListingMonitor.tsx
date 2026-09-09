@@ -62,7 +62,7 @@ export default function EbayListingMonitor({ showCaption = true }: { showCaption
             </span>
             <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
+              Example
             </span>
           </div>
 

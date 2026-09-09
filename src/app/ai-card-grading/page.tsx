@@ -1,11 +1,13 @@
+import { BASE_PRICE_PER_CREDIT } from '@/lib/creditPackages'
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase';
 
-export const metadata: Metadata = {
-  title: 'AI Card Grading. Professional Grades in Under 60 Seconds',
-  description: 'AI card grading powered by DCM Optic. Three independent passes evaluate centering, corners, edges, and surface in under a minute. Grade any card you own. Sports, Pokémon, MTG, Lorcana, and more. No mailing.',
+export const metadata: Metadata = completeMetadata({
+  title: 'AI Card Grading in Under 60 Seconds',
+  description: "AI card grading with DCM Optic: three passes assess centering, corners, edges and surface. Get a condition report from front and back photos. No mailing.",
   keywords: 'AI card grading, automated card grading, computer vision card grading, robograding, instant card grading, AI trading card grading, photo card grading, online card grading, DCM Optic, three-pass grading',
   alternates: {
     canonical: 'https://dcmgrading.com/ai-card-grading',
@@ -31,12 +33,9 @@ export const metadata: Metadata = {
     description: 'Three independent AI passes per card. Under a minute. No mailing required.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
-};
+});
 
-// JSON-LD Service schema. Google can surface this as a rich result for
-// service queries like "ai card grading near me" or "ai trading card
-// grading service." Keep aligned with the visible page copy so the
-// structured data and on-page content don't drift apart.
+// Service schema describes the visible service; it does not guarantee a search feature.
 const serviceJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Service',
@@ -53,10 +52,10 @@ const serviceJsonLd = {
     'Photo-based AI card grading using three-pass consensus computer vision. Evaluates centering, corners, edges, and surface across sports, Pokémon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, and other trading cards.',
   offers: {
     '@type': 'Offer',
-    price: '0.50',
+    price: BASE_PRICE_PER_CREDIT,
     priceCurrency: 'USD',
     description:
-      'As low as $0.50 a card with Card Lovers Annual. Pay-as-you-go is $2.99 for a single card, or $0.66 a card on the 150-credit VIP pack.',
+      'Single-card credit pack: $2.99. Other packages and annual membership are priced separately.',
     url: 'https://dcmgrading.com/credits',
   },
   hasOfferCatalog: {
@@ -74,7 +73,7 @@ const serviceJsonLd = {
   },
 };
 
-// FAQPage schema. Eligible for the "People also ask" rich result.
+// FAQPage schema mirrors the visible questions; no rich-result eligibility is implied.
 // Keep questions and answers in lockstep with the visible FAQ section
 // at the bottom of the page.
 const faqJsonLd = {
@@ -134,8 +133,8 @@ const faqJsonLd = {
 
 export default function AiCardGradingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative">
+
 
       {/* Structured data for search engines. Lives inside the page so it
           ships with the same revision as the visible copy. */}
@@ -150,7 +149,7 @@ export default function AiCardGradingPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero */}
-        <section className="text-center mb-16">
+        <section className="dcm-editorial-heading mb-16">
           <div className="inline-block bg-purple-100 text-purple-700 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             DCM Optic. Three-Pass Consensus
           </div>
@@ -158,12 +157,12 @@ export default function AiCardGradingPage() {
             AI Card Grading. Professional Grades in Under 60 Seconds
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Upload two photos. Get a full PSA-aligned grade with subgrades, defect notes, and market pricing in less than a minute. No mailing, no waiting weeks, no card-value minimums.
+            Upload two photos. Get a full DCM grade with subgrades, defect notes, and market pricing in less than a minute. No mailing, no waiting weeks, no card-value minimums.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/get-started"
-              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 dcm-editorial-primary text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
             >
               Grade Your First Card Free
             </Link>
@@ -175,6 +174,8 @@ export default function AiCardGradingPage() {
             </Link>
           </div>
         </section>
+
+        <section className="dcm-ai-example mb-16" aria-label="Actual graded card examples"><ReferenceCardShowcase page="ai-card-grading" /></section>
 
         {/* What AI Card Grading Means */}
         <section className="mb-16">
@@ -194,7 +195,7 @@ export default function AiCardGradingPage() {
 
         {/* Three-Pass Consensus */}
         <section className="mb-16">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 border border-blue-200">
+          <div className="dcm-editorial-soft rounded-2xl p-8 border border-blue-200">
             <div className="flex items-center mb-6">
               <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mr-4">
                 <span className="text-white text-2xl font-bold">3×</span>
@@ -324,7 +325,7 @@ export default function AiCardGradingPage() {
               { n: '4', title: 'Get your grade', body: 'Whole-number 1 to 10 grade, subgrades, defect log, market price.' },
             ].map((s) => (
               <div key={s.n} className="bg-white rounded-xl shadow-md p-5">
-                <div className="w-9 h-9 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold mb-3">{s.n}</div>
+                <div className="w-9 h-9 dcm-editorial-primary text-white rounded-full flex items-center justify-center font-bold mb-3">{s.n}</div>
                 <h3 className="font-bold text-gray-900 mb-1">{s.title}</h3>
                 <p className="text-sm text-gray-600">{s.body}</p>
               </div>
@@ -448,7 +449,7 @@ export default function AiCardGradingPage() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="dcm-editorial-dark rounded-2xl p-12 text-white shadow-xl">
             <h2 className="text-3xl font-bold mb-4">Ready to grade your first card?</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Sign up free and grade your first card on us. No shipping, no waiting, no minimums.

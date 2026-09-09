@@ -1,3 +1,4 @@
+import { emailPlainText } from '@/lib/emailMarkup'
 /**
  * Scheduled Email Cron Job
  * Runs every hour to send pending marketing emails
@@ -214,6 +215,7 @@ async function processScheduledEmail(
     to: [email.user_email],
     subject: subject,
     html: html,
+    text: emailPlainText(html),
     headers: {
       'List-Unsubscribe': `<${unsubscribeUrl}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

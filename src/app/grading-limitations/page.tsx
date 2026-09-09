@@ -1,23 +1,24 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next'
 import Link from 'next/link'
-import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
-export const metadata: Metadata = {
-  title: 'Grading Limitations | DCM Grading',
+export const metadata: Metadata = completeMetadata({
+  twitter: { card: 'summary', title: 'Grading Limitations | DCM Grading', description: 'Understanding the limitations of photo-based card grading. Learn what DCM Optic™ can and cannot reliably assess from card images.', images: ['/DCM-logo.png'] },
+  openGraph: { title: 'Grading Limitations | DCM Grading', description: 'Understanding the limitations of photo-based card grading. Learn what DCM Optic™ can and cannot reliably assess from card images.', type: 'website', siteName: 'DCM Grading', images: ['/DCM-logo.png'] },
+  title: { absolute: 'Grading Limitations | DCM Grading' },
   description: 'Understanding the limitations of photo-based card grading. Learn what DCM Optic™ can and cannot reliably assess from card images.',
   alternates: {
     canonical: 'https://dcmgrading.com/grading-limitations',
   },
-}
+})
 
 export default function GradingLimitationsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 relative">
-      <FloatingCardsBackground />
+    <div className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12 relative z-10">
+      <main className="dcm-brand dcm-editorial max-w-4xl mx-auto px-4 py-12 relative z-10">
         {/* Page Title */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 dcm-editorial-heading">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Understanding Grading Limitations
           </h1>
@@ -375,7 +376,7 @@ export default function GradingLimitationsPage() {
         </section>
 
         {/* Understanding Our Grades */}
-        <section className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-8 mb-8 text-white">
+        <section className="rounded-2xl shadow-lg p-8 mb-8 text-white dcm-editorial-dark">
           <h2 className="text-2xl font-bold mb-4">
             Understanding DCM Optic™ Confidence Ratings
           </h2>

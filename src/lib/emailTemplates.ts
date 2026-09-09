@@ -1,3 +1,4 @@
+import { emailUrl } from './emailMarkup'
 /**
  * Email Templates
  * HTML templates for marketing emails
@@ -31,7 +32,7 @@ export function getFollowUp24hEmailSubject(): string {
 export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
   return `
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -66,7 +67,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
       .cta-wrap td { display: block !important; width: 100% !important; text-align: center !important; }
       .cta-wrap a { display: block !important; width: 100% !important; padding: 16px 10px !important; box-sizing: border-box !important; }
       .cmp-cell { padding: 8px 6px !important; font-size: 12px !important; }
-      .nav-td a { font-size: 11px !important; padding: 0 5px !important; }
+      .nav-td a { font-size: 12px !important; padding: 0 5px !important; }
       .hero-h1 { font-size: 24px !important; }
       .feature-col { display: block !important; width: 100% !important; max-width: 100% !important; margin-bottom: 16px !important; }
       .step-col { display: block !important; width: 100% !important; text-align: center !important; margin-bottom: 20px !important; }
@@ -75,14 +76,14 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
     }
   </style>
 </head>
-<body id="body" style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, Helvetica, sans-serif;">
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
 
   <!-- Preview text -->
   <div style="display: none; max-height: 0; overflow: hidden;">
     Your free credits are still waiting &mdash; plus 10% off your first purchase with code Grade10.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
   </div>
 
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr>
       <td align="center" style="padding: 20px 10px 40px 10px;">
         <!--[if mso]>
@@ -94,7 +95,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- TOP NAV                                      -->
           <!-- ============================================ -->
           <tr>
-            <td bgcolor="#0a0f1a" style="padding: 0;">
+            <td bgcolor="#14233b" style="padding: 0;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td width="130" style="padding: 12px 0 12px 20px;" valign="middle">
@@ -103,7 +104,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                     </a>
                   </td>
                   <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=nav-credits" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Pricing</a>
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=nav-credits" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Pricing</a>
                     <a href="https://dcmgrading.com/faq?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=nav-faq" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">FAQ</a>
                     <a href="https://dcmgrading.com/blog?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=nav-blog" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Blog</a>
                   </td>
@@ -116,7 +117,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- HERO                                         -->
           <!-- ============================================ -->
           <tr>
-            <td align="center" bgcolor="#0a0f1a" class="pad-mobile" style="padding: 0;">
+            <td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <!-- Left cards (hidden on mobile) -->
@@ -126,14 +127,14 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   </td>
                   <!-- Center hero content -->
                   <td align="center" style="padding: 40px 15px 35px 15px;">
-                    <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; Don&rsquo;t Miss Out</p>
-                    <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Free Credits Are<br><span style="color: #34d399;">Still Waiting</span></h1>
+                    <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; Don&rsquo;t Miss Out</p>
+                    <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Free Credits Are<br><span style="color: #d8b4fe;">Still Waiting</span></h1>
                     <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Grade your first card in about a minute.<br>No mailing. No waiting. Results in minutes.</p>
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">DCM Optic&trade; multi-pass grading &bull; Detailed reports &bull; Market pricing</p>
 
               <!-- Hero CTA -->
               <!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=hero-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=hero-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#7624b5" fillcolor="#7624b5">
               <w:anchorlock/>
               <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:17px;font-weight:bold;">Grade My First Card &rarr;</center>
               </v:roundrect>
@@ -141,7 +142,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
               <!--[if !mso]><!-->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;">
                 <tr>
-                  <td align="center" bgcolor="#059669" style="border-radius: 8px;">
+                  <td align="center" bgcolor="#7624b5" style="border-radius: 8px;">
                     <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=hero-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 15px 40px; font-weight: 700; font-size: 17px; font-family: Arial, Helvetica, sans-serif;">
                       Grade My First Card &rarr;
                     </a>
@@ -165,7 +166,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- FREE CREDIT BANNER                           -->
           <!-- ============================================ -->
           <tr>
-            <td bgcolor="#059669" style="padding: 0;">
+            <td bgcolor="#7624b5" style="padding: 0;">
               <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=free-credits-banner" style="display: block; text-decoration: none; padding: 14px 20px;">
                 <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You still have FREE credits &mdash; use them anytime!</p>
               </a>
@@ -177,10 +178,10 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- ============================================ -->
           <tr>
             <td class="pad-mobile-sm" style="padding: 25px 30px 5px 30px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #34d399; border-radius: 12px; overflow: hidden;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #d8b4fe; border-radius: 12px; overflow: hidden;">
                 <tr>
                   <td bgcolor="#f0fdf4" style="padding: 22px 24px;" align="center">
-                    <p style="color: #059669; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#127873; Special Offer Inside &#127873;</p>
+                    <p style="color: #7624b5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#127873; Special Offer Inside &#127873;</p>
                     <p style="color: #065f46; font-size: 22px; font-weight: 800; margin: 0 0 8px 0;">Save 10% on Your First Purchase</p>
                     <p style="color: #374151; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Ready to grade more? Apply this code at checkout for <strong>10% off any credit pack</strong> or Card Lovers subscription.</p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
@@ -190,7 +191,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                         </td>
                       </tr>
                     </table>
-                    <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0;">Plus, first-time graders get up to <strong style="color: #059669;">5 bonus credits FREE</strong> on their first purchase!</p>
+                    <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0;">Plus, first-time graders get up to <strong style="color: #7624b5;">5 bonus credits FREE</strong> on their first purchase!</p>
                   </td>
                 </tr>
               </table>
@@ -228,7 +229,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr><td align="center" bgcolor="#d1fae5" style="width: 44px; height: 44px; border-radius: 12px; font-size: 20px; line-height: 44px;">&#128247;</td></tr>
                     </table>
-                    <p style="color: #059669; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 1</p>
+                    <p style="color: #7624b5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 1</p>
                     <p style="color: #1f2937; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">Upload</p>
                     <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.4;">Snap a photo of your card&rsquo;s front and back</p>
                   </td>
@@ -236,7 +237,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr><td align="center" bgcolor="#d1fae5" style="width: 44px; height: 44px; border-radius: 12px; font-size: 20px; line-height: 44px;">&#128161;</td></tr>
                     </table>
-                    <p style="color: #059669; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 2</p>
+                    <p style="color: #7624b5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 2</p>
                     <p style="color: #1f2937; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">DCM Optic&trade; Grades</p>
                     <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.4;">Multi-pass analysis of centering, corners, edges &amp; surface</p>
                   </td>
@@ -244,7 +245,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr><td align="center" bgcolor="#d1fae5" style="width: 44px; height: 44px; border-radius: 12px; font-size: 20px; line-height: 44px;">&#128196;</td></tr>
                     </table>
-                    <p style="color: #059669; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 3</p>
+                    <p style="color: #7624b5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 3</p>
                     <p style="color: #1f2937; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">Get Results</p>
                     <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.4;">Detailed grade report with sub-scores and market pricing</p>
                   </td>
@@ -252,7 +253,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr><td align="center" bgcolor="#d1fae5" style="width: 44px; height: 44px; border-radius: 12px; font-size: 20px; line-height: 44px;">&#9889;</td></tr>
                     </table>
-                    <p style="color: #059669; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 4</p>
+                    <p style="color: #7624b5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px 0;">Step 4</p>
                     <p style="color: #1f2937; font-size: 14px; font-weight: 700; margin: 0 0 3px 0;">Share &amp; Sell</p>
                     <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.4;">Print labels, list to eBay, track your portfolio</p>
                   </td>
@@ -266,10 +267,10 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- ============================================ -->
           <tr>
             <td class="pad-mobile-sm" style="padding: 15px 30px 25px 30px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0f1a" style="border-radius: 12px; overflow: hidden;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 12px; overflow: hidden;">
                 <tr>
                   <td class="pad-mobile-sm" style="padding: 28px 28px;">
-                    <h2 style="color: #34d399; font-size: 18px; margin: 0 0 6px 0; text-align: center; font-weight: 700;">Why DCM Grading?</h2>
+                    <h2 style="color: #d8b4fe; font-size: 18px; margin: 0 0 6px 0; text-align: center; font-weight: 700;">Why DCM Grading?</h2>
                     <p style="color: #9ca3af; font-size: 13px; text-align: center; margin: 0 0 22px 0;">A structured, repeatable grading methodology you can trust</p>
 
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -279,7 +280,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                             <tr>
                               <td width="36" valign="top" style="padding-right: 12px;">
                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                                  <tr><td align="center" bgcolor="#065f46" style="width: 32px; height: 32px; border-radius: 8px; color: #34d399; font-size: 14px; font-weight: 800; line-height: 32px; font-family: Arial, sans-serif;">3x</td></tr>
+                                  <tr><td align="center" bgcolor="#065f46" style="width: 32px; height: 32px; border-radius: 8px; color: #d8b4fe; font-size: 14px; font-weight: 800; line-height: 32px; font-family: Arial, sans-serif;">3x</td></tr>
                                 </table>
                               </td>
                               <td valign="top">
@@ -482,22 +483,22 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
             <td class="pad-mobile-sm" style="padding: 10px 30px 25px 30px;">
               <h2 style="color: #1f2937; font-size: 18px; margin: 0 0 6px 0; text-align: center; font-weight: 600;">Simple, Affordable Pricing</h2>
               <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 0 0 4px 0;">Credits never expire. Buy what you need, grade when you&rsquo;re ready.</p>
-              <p style="color: #059669; font-size: 14px; text-align: center; margin: 0 0 18px 0; font-weight: 700;">&#127873; Use code <strong>Grade10</strong> for 10% off any package below!</p>
+              <p style="color: #7624b5; font-size: 14px; text-align: center; margin: 0 0 18px 0; font-weight: 700;">&#127873; Use code <strong>Grade10</strong> for 10% off any package below!</p>
 
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=pricing-table" style="text-decoration: none;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
                 <tr>
                   <td width="25%" bgcolor="#f9fafb" class="cmp-cell" style="padding: 10px 8px; border-bottom: 2px solid #e5e7eb;">
-                    <p style="color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0;">Package</p>
+                    <p style="color: #6b7280; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0;">Package</p>
                   </td>
                   <td width="25%" align="center" bgcolor="#f9fafb" class="cmp-cell" style="padding: 10px 6px; border-bottom: 2px solid #e5e7eb;">
-                    <p style="color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0;">Credits</p>
+                    <p style="color: #6b7280; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0;">Credits</p>
                   </td>
                   <td width="25%" align="center" bgcolor="#f9fafb" class="cmp-cell" style="padding: 10px 6px; border-bottom: 2px solid #e5e7eb;">
-                    <p style="color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0;">Price</p>
+                    <p style="color: #6b7280; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0;">Price</p>
                   </td>
                   <td width="25%" align="center" bgcolor="#f9fafb" class="cmp-cell" style="padding: 10px 6px; border-bottom: 2px solid #e5e7eb;">
-                    <p style="color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 0;">Per Grade</p>
+                    <p style="color: #6b7280; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 0;">Per Grade</p>
                   </td>
                 </tr>
                 <tr>
@@ -519,14 +520,14 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   <td align="center" class="cmp-cell" style="padding: 9px 6px; border-bottom: 1px solid #e5e7eb;"><p style="color: #6b7280; font-size: 13px; margin: 0;">$1.00</p></td>
                 </tr>
                 <tr>
-                  <td bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 8px;"><p style="color: #059669; font-size: 13px; margin: 0; font-weight: 700;">&#11088; VIP</p></td>
-                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #059669; font-size: 13px; margin: 0; font-weight: 700;">150</p></td>
-                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #059669; font-size: 13px; margin: 0; font-weight: 700;">$99</p></td>
-                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #059669; font-size: 13px; margin: 0; font-weight: 800;">$0.66</p></td>
+                  <td bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 8px;"><p style="color: #7624b5; font-size: 13px; margin: 0; font-weight: 700;">&#11088; VIP</p></td>
+                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #7624b5; font-size: 13px; margin: 0; font-weight: 700;">150</p></td>
+                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #7624b5; font-size: 13px; margin: 0; font-weight: 700;">$99</p></td>
+                  <td align="center" bgcolor="#f0fdf4" class="cmp-cell" style="padding: 9px 6px;"><p style="color: #7624b5; font-size: 13px; margin: 0; font-weight: 800;">$0.66</p></td>
                 </tr>
               </table>
               </a>
-              <p style="text-align: center; color: #059669; font-size: 12px; margin: 10px 0 0 0; font-weight: 600;">VIP = Most Popular! 150 credits + VIP badge on all labels</p>
+              <p style="text-align: center; color: #7624b5; font-size: 12px; margin: 10px 0 0 0; font-weight: 600;">VIP = Most Popular! 150 credits + VIP badge on all labels</p>
               <p style="text-align: center; margin: 4px 0 0 0;">
                 <a href="https://dcmgrading.com/card-lovers?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=card-lovers-link" style="color: #be185d; font-size: 12px; text-decoration: underline; font-family: Arial, Helvetica, sans-serif;">Looking for more? Check out Card Lovers &hearts; &mdash; 900 credits/yr at $0.50/grade</a>
               </p>
@@ -542,7 +543,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                 <tr>
                   <td align="center">
                     <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">&#128241; Web &middot; iPhone &middot; Android</p>
-                    <p style="color: #111827; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">Grading is easier from your phone.</p>
+                    <p style="color: #14233b; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">Grading is easier from your phone.</p>
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6;">Same account, same credits, same Label Studio. Snap a card and get your grade in minutes.</p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="badge-stack" style="margin: 0 auto 10px auto;">
                       <tr>
@@ -554,7 +555,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                         </td>
                       </tr>
                     </table>
-                    <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 1.5;">Prefer the browser? <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=mobile-web-link" style="color: #059669; text-decoration: underline; font-weight: 700;">Use DCM on the web</a></p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Prefer the browser? <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=mobile-web-link" style="color: #7624b5; text-decoration: underline; font-weight: 700;">Use DCM on the web</a></p>
                   </td>
                 </tr>
               </table>
@@ -604,11 +605,11 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
             <td bgcolor="#f9fafb" style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
               <p style="text-align: center; color: #6b7280; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;">Follow Us</p>
               <p style="text-align: center; margin: 0;">
-                <a href="https://www.facebook.com/dcmgrading" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Facebook</a>
+                <a href="https://www.facebook.com/dcmgrading" style="color: #7624b5; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Facebook</a>
                 <span style="color: #d1d5db;">&bull;</span>
-                <a href="https://www.instagram.com/dcm_grading/" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Instagram</a>
+                <a href="https://www.instagram.com/dcm_grading/" style="color: #7624b5; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Instagram</a>
                 <span style="color: #d1d5db;">&bull;</span>
-                <a href="https://x.com/DCM_Grading" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">X / Twitter</a>
+                <a href="https://x.com/DCM_Grading" style="color: #7624b5; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">X / Twitter</a>
               </p>
             </td>
           </tr>
@@ -617,16 +618,16 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <!-- FOOTER                                       -->
           <!-- ============================================ -->
           <tr>
-            <td bgcolor="#f3f4f6" style="padding: 25px 40px; border-top: 1px solid #e5e7eb;">
+            <td bgcolor="#f6f5f8" style="padding: 25px 40px; border-top: 1px solid #e5e7eb;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td align="center">
-                    <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #059669; text-decoration: none;">admin@dcmgrading.com</a></p>
-                    <p style="color: #9ca3af; font-size: 11px; margin: 0 0 10px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
-                    <p style="color: #9ca3af; font-size: 11px; margin: 0 0 8px 0;">
-                      <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a> from marketing emails
+                    <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #7624b5; text-decoration: none;">admin@dcmgrading.com</a></p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0 0 10px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px 0;">
+                      <a href="${emailUrl(unsubscribeUrl)}" style="color: #596579; text-decoration: underline;">Unsubscribe</a> from marketing emails
                     </p>
-                    <p style="color: #9ca3af; font-size: 10px; margin: 0;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
+                    <p style="color: #596579; font-size: 12px; margin: 0;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
                   </td>
                 </tr>
               </table>

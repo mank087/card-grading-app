@@ -1,6 +1,8 @@
 "use client";
 
 // Force rebuild to pick up card text changes
+import ReportSectionNav from '@/components/design/ReportSectionNav';
+import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
 
 // Declare gtag for TypeScript
@@ -1532,7 +1534,7 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
         '@type': 'ListItem',
         position: 2,
         name: 'Yu-Gi-Oh Cards',
-        item: 'https://dcmgrading.com/upload/yugioh'
+        item: 'https://dcmgrading.com/upload?category=Yu-Gi-Oh'
       },
       {
         '@type': 'ListItem',
@@ -2214,7 +2216,7 @@ export function YugiohCardDetails() {
     return (
       <div className="text-center p-8">
         <h1 className="text-2xl font-bold mb-4">Yu-Gi-Oh Card Not Found</h1>
-        <Link href="/upload/yugioh" className="text-blue-500">
+        <Link href="/upload?category=Yu-Gi-Oh" className="text-blue-500">
           Back to Yu-Gi-Oh Upload
         </Link>
       </div>
@@ -2794,7 +2796,8 @@ export function YugiohCardDetails() {
   const structuredData = generateStructuredData(card, dvgGrading, currentUrl);
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="dcm-report-page container mx-auto p-6 max-w-7xl" style={{ '--dcm-report-foil': reportFoil } as React.CSSProperties}>
+      <ReportSectionNav />
       {/* Structured Data (JSON-LD) for SEO */}
       <Script
         id="structured-data"
@@ -2807,7 +2810,7 @@ export function YugiohCardDetails() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/upload/yugioh" className="text-purple-600 hover:text-purple-800">
+          <Link href="/upload?category=Yu-Gi-Oh" className="text-purple-600 hover:text-purple-800">
             ← Back to Yu-Gi-Oh Upload
           </Link>
           <button
@@ -3248,7 +3251,7 @@ export function YugiohCardDetails() {
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
             <div className="space-y-6">
               {/* Header / Grade Summary */}
-              <div id="tour-grade-score" className={`${
+              <div id="tour-grade-score" data-report-grade={formatGrade(card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade)} className={`${
                 // 🎯 Check conversational AI grade first, then DVG v1
                 (card.conversational_decimal_grade === null && recommendedGrade.recommended_decimal_grade === null)
                   ? 'bg-gradient-to-r from-red-600 to-orange-600'
@@ -5140,7 +5143,7 @@ export function YugiohCardDetails() {
                                 The image quality affects grading accuracy. For the most reliable results, consider uploading clearer photos with better lighting and no obstructions.
                               </p>
                               <a
-                                href="/upload/yugioh"
+                                href="/upload?category=Yu-Gi-Oh"
                                 className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                               >
                                 <span>Upload New Photos</span>

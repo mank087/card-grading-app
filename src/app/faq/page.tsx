@@ -1,13 +1,14 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import { isValidElement, type ReactNode } from 'react';
 import Link from 'next/link';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'FAQ - Frequently Asked Questions',
   description: 'Find answers to common questions about DCM card grading services, our three-pass consensus technology, pricing, supported card types, and more.',
   keywords: 'DCM grading FAQ, card grading questions, DCM Optic card grading, three-pass grading, card authentication, grading accuracy, how does card grading work',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
     title: 'FAQ - Frequently Asked Questions | DCM Grading',
     description: 'Find answers to common questions about DCM card grading services, pricing, and supported card types.',
     type: 'website',
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://dcmgrading.com/faq',
   },
-};
+});
 
 interface FAQItem {
   id: string;
@@ -574,8 +575,7 @@ const faqJsonLd = {
 
 export default function FAQPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script
         type="application/ld+json"
@@ -583,7 +583,7 @@ export default function FAQPage() {
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero Section */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 dcm-editorial-heading">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             Frequently Asked Questions
           </h1>
@@ -593,7 +593,7 @@ export default function FAQPage() {
         </div>
 
         {/* Quick Navigation */}
-        <nav className="bg-white rounded-xl shadow-md p-6 mb-12">
+        <div role="navigation" aria-label="FAQ topics" className="bg-white rounded-xl shadow-md p-6 mb-12">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Jump to a topic:</h2>
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
@@ -606,7 +606,7 @@ export default function FAQPage() {
               </a>
             ))}
           </div>
-        </nav>
+        </div>
 
         {/* FAQ Sections */}
         <div className="space-y-12">
@@ -642,7 +642,7 @@ export default function FAQPage() {
 
         {/* Still Have Questions CTA */}
         <section className="mt-16">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 text-white text-center shadow-xl">
+          <div className="rounded-2xl p-8 text-white text-center shadow-xl dcm-editorial-dark">
             <h2 className="text-2xl font-bold mb-4">Still have questions?</h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
               Our team is here to help. Reach out and we'll get back to you as soon as possible.
@@ -650,7 +650,7 @@ export default function FAQPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/contact"
-                className="inline-block bg-white text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors"
+                className="inline-block bg-white text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors dcm-editorial-secondary"
               >
                 Contact Us
               </Link>

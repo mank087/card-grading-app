@@ -47,7 +47,7 @@ export default function BlogPagination({
   const pageNumbers = getPageNumbers();
 
   return (
-    <nav className="flex items-center justify-center gap-2 mt-8" aria-label="Pagination">
+    <div role="navigation" className="flex items-center justify-center gap-2 mt-8" aria-label="Pagination">
       {/* Previous Button */}
       {currentPage > 1 ? (
         <Link
@@ -79,6 +79,7 @@ export default function BlogPagination({
             <Link
               key={page}
               href={buildUrl(page)}
+              aria-current={currentPage === page ? 'page' : undefined}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 currentPage === page
                   ? 'bg-purple-600 text-white'
@@ -115,6 +116,6 @@ export default function BlogPagination({
           </svg>
         </span>
       )}
-    </nav>
+    </div>
   );
 }

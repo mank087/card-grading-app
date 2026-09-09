@@ -1,10 +1,10 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost } from '@/types/blog';
-import FloatingCardsBackground from '../../ui/FloatingCardsBackground';
 import {
   BlogPostContent,
   CategoryBadge,
@@ -63,11 +63,12 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
   const title = post.meta_title || `${post.title} | DCM Grading Blog`;
   const description = post.meta_description || post.excerpt || post.subtitle || '';
 
-  return {
+  return completeMetadata({
     title: { absolute: title },
     description,
     keywords: post.tags?.join(', '),
     openGraph: {
+      url: `https://dcmgrading.com/blog/${slug}`,
       title: post.title,
       description,
       type: 'article',
@@ -92,7 +93,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
         ],
       },
     },
-  };
+  });
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
@@ -150,15 +151,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-        <FloatingCardsBackground />
+      <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
 
         <article className="relative z-10">
           {/* Hero Section */}
-          <header className="bg-white border-b border-gray-100">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <section className="dcm-blog-hero bg-white border-b border-gray-100">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 dcm-editorial-heading">
               {/* Breadcrumb */}
-              <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+              <div role="navigation" aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-gray-500 mb-6">
                 <Link href="/" className="hover:text-purple-600 transition-colors">
                   Home
                 </Link>
@@ -177,7 +177,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                     </Link>
                   </>
                 )}
-              </nav>
+              </div>
 
               {/* Category Badge */}
               {post.category && (
@@ -205,7 +205,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 <span>{post.read_time_minutes} min read</span>
               </div>
             </div>
-          </header>
+          </section>
 
           {/* Featured Image */}
           {post.featured_image_path && (
@@ -293,14 +293,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
         {/* CTA */}
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 relative z-10">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-center text-white">
+          <div className="rounded-2xl shadow-xl p-8 text-center text-white dcm-editorial-dark">
             <h2 className="text-2xl font-bold mb-3">Ready to Grade Your Cards?</h2>
             <p className="text-lg opacity-90 mb-6">
               Get accurate, instant card grades with DCM Optic&trade; technology.
             </p>
             <Link
               href="/login?mode=signup"
-              className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

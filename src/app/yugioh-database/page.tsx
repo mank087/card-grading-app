@@ -256,7 +256,7 @@ export default function YuGiOhDatabasePage() {
       'synchro': 'bg-gray-200 text-gray-900',
       'xyz': 'bg-gray-900 text-white border border-gray-600',
       'link': 'bg-blue-700 text-white',
-      'pendulum': 'bg-gradient-to-r from-green-500 to-blue-500 text-white',
+      'pendulum': 'dcm-directory-accent text-white',
       'spell': 'bg-teal-600 text-white',
       'trap': 'bg-pink-700 text-white',
     }
@@ -280,9 +280,10 @@ export default function YuGiOhDatabasePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
+      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database">Pokémon</Link><Link href="/sports-database">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database" aria-current="page">Yu-Gi-Oh!</Link><Link href="/starwars-database">Star Wars</Link></div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-indigo-900 via-gray-900 to-blue-900 py-12">
+      <section className="dcm-directory-hero py-12">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
@@ -343,7 +344,7 @@ export default function YuGiOhDatabasePage() {
           {/* Mobile: Name search + Filter toggle button */}
           <div className="flex gap-2 md:hidden">
             <div className="flex-1">
-              <input
+              <input aria-label="Card name"
                 ref={searchInputRef}
                 type="text"
                 value={searchName}
@@ -376,8 +377,8 @@ export default function YuGiOhDatabasePage() {
           <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-96 mt-3' : 'max-h-0'}`}>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Set</label>
-                <select
+                <label htmlFor="database-filter-1" className="block text-xs text-gray-400 mb-1">Set</label>
+                <select id="database-filter-1"
                   value={selectedSetCode}
                   onChange={(e) => setSelectedSetCode(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
@@ -391,8 +392,8 @@ export default function YuGiOhDatabasePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Card Type</label>
-                <select
+                <label htmlFor="database-filter-2" className="block text-xs text-gray-400 mb-1">Card Type</label>
+                <select id="database-filter-2"
                   value={selectedCardType}
                   onChange={(e) => setSelectedCardType(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
@@ -404,8 +405,8 @@ export default function YuGiOhDatabasePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Attribute</label>
-                <select
+                <label htmlFor="database-filter-3" className="block text-xs text-gray-400 mb-1">Attribute</label>
+                <select id="database-filter-3"
                   value={selectedAttribute}
                   onChange={(e) => setSelectedAttribute(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
@@ -417,8 +418,8 @@ export default function YuGiOhDatabasePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Frame Type</label>
-                <select
+                <label htmlFor="database-filter-4" className="block text-xs text-gray-400 mb-1">Frame Type</label>
+                <select id="database-filter-4"
                   value={selectedFrameType}
                   onChange={(e) => setSelectedFrameType(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
@@ -451,8 +452,8 @@ export default function YuGiOhDatabasePage() {
           <div className="hidden md:flex md:flex-row gap-3">
             {/* Name Search */}
             <div className="flex-1">
-              <label className="block text-xs text-gray-400 mb-1">Card Name</label>
-              <input
+              <label htmlFor="database-filter-5" className="block text-xs text-gray-400 mb-1">Card Name</label>
+              <input id="database-filter-5"
                 type="text"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
@@ -463,8 +464,8 @@ export default function YuGiOhDatabasePage() {
 
             {/* Set Filter */}
             <div className="w-52">
-              <label className="block text-xs text-gray-400 mb-1">Set</label>
-              <select
+              <label htmlFor="database-filter-6" className="block text-xs text-gray-400 mb-1">Set</label>
+              <select id="database-filter-6"
                 value={selectedSetCode}
                 onChange={(e) => setSelectedSetCode(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors"
@@ -480,8 +481,8 @@ export default function YuGiOhDatabasePage() {
 
             {/* Card Type Filter */}
             <div className="w-48">
-              <label className="block text-xs text-gray-400 mb-1">Card Type</label>
-              <select
+              <label htmlFor="database-filter-7" className="block text-xs text-gray-400 mb-1">Card Type</label>
+              <select id="database-filter-7"
                 value={selectedCardType}
                 onChange={(e) => setSelectedCardType(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors"
@@ -495,8 +496,8 @@ export default function YuGiOhDatabasePage() {
 
             {/* Attribute Filter */}
             <div className="w-36">
-              <label className="block text-xs text-gray-400 mb-1">Attribute</label>
-              <select
+              <label htmlFor="database-filter-8" className="block text-xs text-gray-400 mb-1">Attribute</label>
+              <select id="database-filter-8"
                 value={selectedAttribute}
                 onChange={(e) => setSelectedAttribute(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors"
@@ -510,8 +511,8 @@ export default function YuGiOhDatabasePage() {
 
             {/* Frame Type Filter */}
             <div className="w-36">
-              <label className="block text-xs text-gray-400 mb-1">Frame Type</label>
-              <select
+              <label htmlFor="database-filter-9" className="block text-xs text-gray-400 mb-1">Frame Type</label>
+              <select id="database-filter-9"
                 value={selectedFrameType}
                 onChange={(e) => setSelectedFrameType(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors"
@@ -887,7 +888,7 @@ export default function YuGiOhDatabasePage() {
             {/* Grade This Card CTA */}
             <Link
               href={getGradeCtaLink()}
-              className="block w-full bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-bold text-lg px-6 py-4 rounded-xl hover:from-indigo-500 hover:to-blue-400 transition-all text-center shadow-lg shadow-indigo-500/20 mb-4"
+              className="block w-full dcm-directory-accent text-white font-bold text-lg px-6 py-4 rounded-xl hover:from-indigo-500 hover:to-blue-400 transition-all text-center shadow-lg shadow-indigo-500/20 mb-4"
             >
               {getGradeCtaText()}
             </Link>
@@ -931,7 +932,7 @@ export default function YuGiOhDatabasePage() {
       </div>
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
+      <div className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>Data from YGOPRODeck API. Card images from YGOPRODeck CDN. Yu-Gi-Oh! is a trademark of Kazuki Takahashi / Konami.</p>
           <div className="flex justify-center gap-6 mt-4">
@@ -940,7 +941,7 @@ export default function YuGiOhDatabasePage() {
             <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
           </div>
         </div>
-      </footer>
+      </div>
     </main>
   )
 }

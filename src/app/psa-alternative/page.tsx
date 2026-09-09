@@ -1,7 +1,7 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import {
   SOURCES,
   LAST_CHECKED,
@@ -10,10 +10,10 @@ import {
   HONEST_MIDDLE,
 } from '@/lib/aeo/gradingCompanies';
 
-export const metadata: Metadata = {
-  title: 'PSA Alternative: Grade Any Card From a Photo in About 60 Seconds',
+export const metadata: Metadata = completeMetadata({
+  title: "PSA Alternative: Photo-Based Card Grading",
   description:
-    'Looking for a PSA alternative? DCM grades any trading card from two photos in about 60 seconds, as low as $0.50 a card with Card Lovers Annual or $2.99 for a single card, with four subgrades and a written reason for every deduction. No mailing, no insurance, no queue. Updated August 2026 with sourced PSA pricing.',
+    "A PSA alternative: grade any card from two photos in about 60 seconds. From $0.50 a card with Card Lovers Annual, or $2.99 for one. Four subgrades.",
   keywords:
     'PSA alternative, alternative to PSA grading, PSA vs DCM, cheap card grading, fast card grading, AI card grading, online card grading, no-mail card grading, photo card grading',
   alternates: {
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     description: 'No mailing. As low as $0.50 a card with Card Lovers Annual. Four subgrades on every grade.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
-};
+});
 
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',
@@ -178,8 +178,7 @@ function ComparisonRow({ feature, dcm, psa, dcmWin = true }: RowProps) {
 
 export default function PsaAlternativePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
@@ -188,7 +187,7 @@ export default function PsaAlternativePage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero. The first paragraph answers the question outright. */}
-        <section className="mb-14">
+        <section className="mb-14 dcm-editorial-heading">
           <div className="inline-block bg-amber-100 text-amber-800 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             The PSA Alternative
           </div>
@@ -210,7 +209,7 @@ export default function PsaAlternativePage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/get-started"
-              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg dcm-editorial-primary"
             >
               Grade Your First Card Free
             </Link>
@@ -268,7 +267,7 @@ export default function PsaAlternativePage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                  <tr className="text-white dcm-editorial-dark">
                     <th className="py-4 px-4 text-left font-bold w-1/3">Feature</th>
                     <th className="py-4 px-4 text-left font-bold">DCM Grading</th>
                     <th className="py-4 px-4 text-left font-bold">PSA (mail-in)</th>
@@ -447,7 +446,7 @@ export default function PsaAlternativePage() {
         {/* What you get */}
         <section className="mb-16">
           <div className="bg-white rounded-2xl shadow-md overflow-hidden md:grid md:grid-cols-2">
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 flex items-center justify-center p-6 order-2 md:order-1">
+            <div className="flex items-center justify-center p-6 order-2 md:order-1 dcm-editorial-soft">
               <Image
                 src="/why-dcm/judge-graded-card.png"
                 alt="DCM-graded card with subgrades for centering, corners, edges, and surface alongside a defect log"
@@ -479,7 +478,7 @@ export default function PsaAlternativePage() {
 
         {/* Pricing */}
         <section className="mb-16">
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl">
+          <div className="rounded-2xl p-8 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Pricing. As Low as $0.50 a Card with Card Lovers Annual</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
@@ -550,14 +549,14 @@ export default function PsaAlternativePage() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Try the PSA Alternative That Doesn&apos;t Ask You to Mail Anything</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Sign up free and grade your first card on us. Two photos and about a minute is all it takes.
             </p>
             <Link
               href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

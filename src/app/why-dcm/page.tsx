@@ -1,50 +1,15 @@
 'use client'
 
+import { RelatedGuides } from '@/components/design/RelatedGuides'
 import { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
-import HeroGradingAnimation from '@/app/sports-grading/HeroGradingAnimation'
 import AppStoreBadge from '@/components/AppStoreBadge'
-import FeaturedCardSlab from '@/components/marketing/FeaturedCardSlab'
-import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
 import GooglePlayBadge from '@/components/GooglePlayBadge'
-import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart'
-import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart'
-import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart'
-import TopSetsChart from '@/components/market-pricing/TopSetsChart'
-import PriceSourceChart from '@/components/market-pricing/PriceSourceChart'
-import EbayListingMonitor from '@/components/EbayListingMonitor'
-import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
-
-// Static mock data for decorative background charts
-const MOCK_CATEGORIES = [
-  { category: 'Pokemon', count: 42, value: 3840.50, percentage: 38.2 },
-  { category: 'Sports', count: 28, value: 2950.00, percentage: 29.3 },
-  { category: 'MTG', count: 18, value: 1620.75, percentage: 16.1 },
-  { category: 'Lorcana', count: 12, value: 980.25, percentage: 9.7 },
-  { category: 'One Piece', count: 8, value: 670.00, percentage: 6.7 },
-]
-const MOCK_GRADES = [
-  { grade: '10', count: 8 }, { grade: '9', count: 36 }, { grade: '8', count: 33 },
-  { grade: '7', count: 18 }, { grade: '6', count: 5 },
-]
-const MOCK_VALUES = [
-  { label: '$0-10', count: 18, min: 0.01, max: 10 }, { label: '$10-25', count: 24, min: 10, max: 25 },
-  { label: '$25-50', count: 20, min: 25, max: 50 }, { label: '$50-100', count: 16, min: 50, max: 100 },
-  { label: '$100-250', count: 12, min: 100, max: 250 }, { label: '$250+', count: 6, min: 250, max: 999999 },
-]
-const MOCK_SETS = [
-  { set: 'Prismatic Evolutions', category: 'Pokemon', value: 1240.00, count: 8 },
-  { set: 'Gold Standard Football', category: 'Sports', value: 980.00, count: 5 },
-  { set: 'Modern Horizons 3', category: 'MTG', value: 720.50, count: 6 },
-  { set: 'The First Chapter', category: 'Lorcana', value: 540.25, count: 4 },
-  { set: 'Topps Chrome', category: 'Sports', value: 480.00, count: 7 },
-]
-const MOCK_SOURCES = [
-  { source: 'PriceCharting', count: 78 }, { source: 'eBay', count: 14 },
-  { source: 'Scryfall', count: 10 }, { source: 'Unpriced', count: 6 },
-]
+import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
+import WhyDcmCapabilities from '@/components/marketing/WhyDcmCapabilities'
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
+import { ActionLink, SectionHeading, Icon } from '@/components/design/Primitives'
 
 declare global {
   interface Window {
@@ -87,95 +52,10 @@ const trackSignupClick = (location: string) => {
   }
 }
 
-// ============================================================================
-// FEATURED CARD COMPONENT
-// ============================================================================
-
-
-// ============================================================================
-// FLOATING CTA BAR
-// ============================================================================
-
-
-// ============================================================================
-// SECTION COMPONENTS
-// ============================================================================
-
-function SectionHeading({ title, subtitle, light = false }: { title: string; subtitle?: React.ReactNode; light?: boolean }) {
-  return (
-    <div className="text-center mb-10 sm:mb-14">
-      <h2 className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${light ? 'text-white' : 'text-gray-900'}`}>{title}</h2>
-      {subtitle && <p className={`mt-3 text-base sm:text-lg max-w-2xl mx-auto ${light ? 'text-gray-300' : 'text-gray-600'}`}>{subtitle}</p>}
-    </div>
-  )
-}
-
-function StepCard({ number, icon, title, description }: { number: number; icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-center text-center">
-      <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center mb-3 relative">
-        {icon}
-        <span className="absolute -top-2 -right-2 w-6 h-6 bg-purple-600 text-white rounded-full text-xs font-bold flex items-center justify-center">{number}</span>
-      </div>
-      <h3 className="font-bold text-gray-900 mb-1">{title}</h3>
-      <p className="text-gray-600 text-sm">{description}</p>
-    </div>
-  )
-}
-
-function LabelHolderCard({ name, emptyImg, cardImg, desc, delay }: { name: string; emptyImg: string; cardImg: string; desc: string; delay: number }) {
-  const [showCard, setShowCard] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    timeoutRef.current = setTimeout(() => {
-      setShowCard(true)
-      intervalRef.current = setInterval(() => {
-        setShowCard((prev) => !prev)
-      }, 2000)
-    }, delay * 1000)
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [delay])
-
-  return (
-    <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-5 text-center hover:bg-white/15 transition-colors">
-      <div className="w-full h-56 relative mb-4">
-        {/* Empty holder */}
-        <Image
-          src={emptyImg}
-          alt={`${name} holder`}
-          fill
-          className={`object-contain transition-opacity duration-700 ${showCard ? 'opacity-0' : 'opacity-100'}`}
-          sizes="300px"
-        />
-        {/* Holder with Lugia card */}
-        <Image
-          src={cardImg}
-          alt={`${name} with Lugia card`}
-          fill
-          className={`object-contain transition-opacity duration-700 ${showCard ? 'opacity-100' : 'opacity-0'}`}
-          sizes="300px"
-        />
-      </div>
-      <h3 className="font-bold text-lg">{name}</h3>
-      <p className="text-purple-200 text-sm mt-1">{desc}</p>
-    </div>
-  )
-}
-
-// ============================================================================
-// MAIN PAGE
-// ============================================================================
 
 export default function WhyDcmPage() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [featuredCards, setFeaturedCards] = useState<any[]>([])
   const heroRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -203,18 +83,6 @@ export default function WhyDcmPage() {
       if (window.rdt) window.rdt('track', 'ViewContent')
     }
   }, [])
-
-  // Fetch featured cards
-  useEffect(() => {
-    fetch('/api/cards/featured?limit=8')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.cards) setFeaturedCards(data.cards)
-      })
-      .catch(() => {})
-  }, [])
-
-  // (scroll-reveal for the floating CTA now lives inside FloatingCtaBar)
 
   const isAuthenticated = !!user
 
@@ -282,83 +150,28 @@ export default function WhyDcmPage() {
     }
   }
 
-  return (
-    <main className="min-h-screen bg-white">
-      {/* ================================================================ */}
-      {/* HERO */}
-      {/* ================================================================ */}
-      <section ref={heroRef} className="relative overflow-hidden bg-gradient-to-b from-gray-950 via-gray-900 to-slate-900">
-        {/* Subtle gradient overlay for depth */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.08),transparent_60%)]" />
-
-        {/* Animated card backgrounds */}
-        <div className="absolute inset-0 opacity-[0.06] md:opacity-10" aria-hidden="true">
-          <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
-          </div>
-          <div className="absolute bottom-24 left-[8%] w-24 h-34 animate-float-medium">
-            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" loading="lazy" sizes="96px" />
-          </div>
-          <div className="absolute top-8 right-[22%] w-24 h-34 animate-float-fast">
-            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[6deg]" loading="lazy" sizes="96px" />
-          </div>
-          <div className="absolute bottom-16 right-[8%] w-26 h-36 animate-float-slow">
-            <Image src="/Sports/DCM-Card-Shohei-Ohtani-192904-front.jpg" alt="" fill className="object-contain rotate-[-8deg]" loading="lazy" sizes="104px" />
-          </div>
-          <div className="absolute top-32 left-[42%] w-24 h-34 animate-float-medium hidden lg:block">
-            <Image src="/homepage-cards/Black Lotus MTG.png" alt="" fill className="object-contain rotate-[10deg]" loading="lazy" sizes="96px" />
-          </div>
+  return <div className="dcm-brand dcm-why-page">
+    <section ref={heroRef} className="dcm-hero dcm-dark">
+      <div className="dcm-container dcm-why-hero">
+        <div className="dcm-why-intro">
+          <p className="dcm-eyebrow">Why DCM · 2 free grades</p>
+          <h1>Why DCM Grading?<br /><span>Your collection, connected.</span></h1>
+          <p className="dcm-lead">Grade your cards, track your portfolio, create custom labels and prepare eBay listings. Explore everything DCM brings to your collection, without mailing your cards away.</p>
+          <div className="dcm-actions"><ActionLink href="/get-started" variant="secondary">How It Works</ActionLink><ActionLink href="#benefits" variant="text">Explore the benefits →</ActionLink></div>
         </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
-          <div className="flex flex-col xl:flex-row items-center gap-10 xl:gap-12">
-            {/* Hero text */}
-            <div className="flex-1 text-center xl:text-left">
-              <div className="inline-flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/25 rounded-full px-4 py-1.5 mb-6">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-emerald-300 text-sm font-medium">2 Free Grades</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6">
-                Card Grading,<br />
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">In Your Hands</span>
-              </h1>
-              <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-xl mx-auto xl:mx-0 leading-relaxed">
-                Grade any trading card in seconds. Full reports, live market pricing, and custom slab labels, all without mailing your cards anywhere or{' '}
-                <Link href="/fastest-card-grading" className="text-emerald-400 hover:text-emerald-300 underline">waiting weeks for results</Link>.
-              </p>
-
-              {/* Trust signals */}
-              <div className="flex flex-wrap justify-center xl:justify-start gap-x-5 gap-y-2 text-sm text-gray-400">
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  10-Point Scale
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Instant Results
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  From $0.50/Card with Card Lovers Annual
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Keep Your Cards
-                </span>
-              </div>
-            </div>
-
+        <ReferenceCardShowcase page="why-dcm" />
+        <div className="dcm-why-signup">
             {/* Signup card */}
             {!isAuthenticated && !isLoading && (
               <div className="w-full max-w-md flex-shrink-0">
                 <div className="bg-white rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
-                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                  <div className="bg-purple-600 px-6 py-4">
                     <h2 className="text-white font-bold text-lg">Start Grading for Free</h2>
-                    <p className="text-emerald-100 text-sm">Your first 2 grades are on us + bonus credits with first purchase</p>
+                    <p className="text-purple-100 text-sm">Your first 2 grades are on us + bonus credits with first purchase</p>
                   </div>
                   <div className="p-6">
                     {heroSuccess ? (
-                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm text-center">{heroSuccess}</div>
+                      <div className="bg-purple-50 border border-purple-200 text-purple-700 px-4 py-3 rounded-xl text-sm text-center">{heroSuccess}</div>
                     ) : (
                       <>
                         <div className="space-y-2 mb-4">
@@ -392,18 +205,18 @@ export default function WhyDcmPage() {
                           <div className="relative flex justify-center text-xs"><span className="px-3 bg-white text-gray-400">or email</span></div>
                         </div>
                         <form onSubmit={handleHeroEmail} className="space-y-3">
-                          <input type="email" value={heroEmail} onChange={(e) => setHeroEmail(e.target.value)} placeholder="you@example.com" required
-                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
-                          <input type="password" value={heroPassword} onChange={(e) => setHeroPassword(e.target.value)} placeholder="Password (10+ chars)" required minLength={10}
-                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
-                          {heroError && <p className="text-red-500 text-xs">{heroError}</p>}
+                          <input aria-label="Email address" autoComplete="email" type="email" value={heroEmail} onChange={(e) => setHeroEmail(e.target.value)} placeholder="you@example.com" required
+                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                          <input aria-label="Password" autoComplete="new-password" type="password" value={heroPassword} onChange={(e) => setHeroPassword(e.target.value)} placeholder="Password (10+ chars)" required minLength={10}
+                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+                          {heroError && <p role="alert" className="text-red-600 text-sm">{heroError}</p>}
                           <button type="submit" disabled={heroLoading}
-                            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/25">
+                            className="w-full bg-purple-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-purple-700 hover:to-purple-700 disabled:opacity-50 transition-all shadow-lg shadow-purple-500/25">
                             {heroLoading ? 'Creating Account...' : 'Create Free Account'}
                           </button>
                         </form>
-                        <p className="text-gray-400 text-[10px] text-center mt-3">
-                          By signing up you agree to our <Link href="/terms" className="text-emerald-600 hover:text-emerald-700">Terms</Link> and <Link href="/privacy" className="text-emerald-600 hover:text-emerald-700">Privacy Policy</Link>
+                        <p className="text-gray-600 text-xs text-center mt-3">
+                          By signing up you agree to our <Link href="/terms" className="text-purple-600 hover:text-purple-700">Terms</Link> and <Link href="/privacy" className="text-purple-600 hover:text-purple-700">Privacy Policy</Link>
                         </p>
                       </>
                     )}
@@ -415,906 +228,56 @@ export default function WhyDcmPage() {
             {/* Authenticated: show CTA to collection */}
             {isAuthenticated && !isLoading && (
               <div className="w-full max-w-md flex-shrink-0 text-center">
-                <Link href="/collection" className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25">
+                <Link href="/collection" className="inline-block bg-purple-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-purple-700 hover:to-purple-700 transition-all shadow-lg shadow-purple-500/25">
                   Go to My Collection
                 </Link>
               </div>
             )}
-          </div>
+
         </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* LIVE TRUST STRIP — real numbers from the same endpoint as /pop  */}
-      {/* ================================================================ */}
-      <section className="bg-slate-950 border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm">
-            <Link href="/pop" className="flex items-center gap-2 text-gray-300 hover:text-emerald-300 transition-colors">
-              <span className="text-emerald-400 font-bold text-base tabular-nums">
-                {popTotal != null ? popTotal.toLocaleString('en-US') : 'Thousands of'}
-              </span>
-              <span>cards graded</span>
-            </Link>
-            <span className="flex items-center gap-2 text-gray-300">
-              <span className="text-emerald-400 font-bold text-base">8</span>
-              <span>card types supported</span>
-            </span>
-            <span className="flex items-center gap-2 text-gray-300">
-              <span className="text-emerald-400 font-bold text-base">Every grade</span>
-              <span>publicly verifiable by serial</span>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* APP STORE LAUNCH — placed right after hero so it gets seen by */}
-      {/* paid-media traffic before the marketing content kicks in.       */}
-      {/* ================================================================ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 sm:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
-
-            {/* LEFT: copy + bullets + badge */}
-            <div className="text-white order-2 md:order-1">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 mb-4 border border-white/20">
-                <span aria-hidden>📱</span>
-                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">New — Now Live</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 leading-tight">
-                Now on the App Store and Google Play
-              </h2>
-              <p className="text-base sm:text-lg text-gray-200 mb-6">
-                Grade your collection from anywhere. The DCM Grading app brings full
-                DCM Optic™ grading to iPhone, iPad, and Android — same accurate grades,
-                same instant reports, now in your pocket.
-              </p>
-              <ul className="space-y-2 mb-6 text-sm sm:text-base text-gray-200">
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Native camera with guided card capture</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Design custom slab labels right on your phone</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
-                  <span>List graded cards to eBay in two taps</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Your collection syncs with dcmgrading.com</span>
-                </li>
-              </ul>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <AppStoreBadge variant="white" height={52} />
-                <GooglePlayBadge height={52} />
-              </div>
-
-              <p className="text-xs sm:text-sm text-gray-400 mt-5 max-w-md">
-                Prefer to use a computer? Grade on <span className="text-white font-semibold">dcmgrading.com</span> from any browser —
-                full feature parity, no app required.
-              </p>
-            </div>
-
-            {/* RIGHT: phone mockup wrapping the onboarding screenshot. CSS-only
-                bezel — no extra asset, scales cleanly. Frame uses a thick
-                rounded border + camera notch + side buttons. */}
-            <div className="order-1 md:order-2 flex justify-center">
-              <div
-                className="relative bg-gray-900 rounded-[2.5rem] sm:rounded-[3rem] p-2.5 sm:p-3 shadow-2xl"
-                style={{
-                  // Aspect ratio matches the 1290×2796 iPhone Pro Max screenshot
-                  // so the inner image fills exactly without cropping.
-                  width: 'min(280px, 80vw)',
-                }}
-              >
-                {/* Notch */}
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 top-3 sm:top-4 w-24 sm:w-28 h-5 sm:h-6 bg-black rounded-full z-10"
-                  aria-hidden
-                />
-                {/* Side buttons (decorative) */}
-                <div className="absolute -left-0.5 top-20 w-1 h-8 bg-gray-700 rounded-l" aria-hidden />
-                <div className="absolute -left-0.5 top-32 w-1 h-12 bg-gray-700 rounded-l" aria-hidden />
-                <div className="absolute -left-0.5 top-48 w-1 h-12 bg-gray-700 rounded-l" aria-hidden />
-                <div className="absolute -right-0.5 top-28 w-1 h-16 bg-gray-700 rounded-r" aria-hidden />
-
-                {/* Screen — clip the screenshot to the inner rounded rectangle */}
-                <div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.25rem] bg-black">
-                  <Image
-                    src="/mobile-screenshots/onboarding-hero.png"
-                    alt="DCM Grading iPhone app showing the welcome screen"
-                    width={1290}
-                    height={2796}
-                    className="w-full h-auto"
-                    sizes="(max-width: 768px) 60vw, 280px"
-                  />
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* CARD ANALYSIS VISUAL */}
-      {/* ================================================================ */}
-      <section className="py-12 sm:py-20 bg-white overflow-hidden">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="What DCM Optic™ Analyzes" subtitle="Every card is evaluated across four key categories for both front and back" />
-          {/* Desktop: card with side annotations */}
-          <div className="hidden md:block">
-            <div className="relative max-w-[400px] mx-auto">
-              <Image
-                src="/why-dcm/judge-graded-card.png"
-                alt="Aaron Judge graded card with DCM analysis points"
-                width={400}
-                height={580}
-                className="w-full h-auto rounded-xl shadow-2xl"
-                priority
-              />
-
-              {/* Corners — top-left corner of the actual card (inside slab) */}
-              <div className="absolute top-[30%] left-[-42%] flex items-center animate-fade-in-delay-1">
-                <div className="text-right mr-3 max-w-[150px]">
-                  <p className="text-sm font-bold text-purple-700">Corners</p>
-                  <p className="text-xs text-gray-500 leading-tight">Sharpness, wear, and rounding at all four corner points.</p>
-                </div>
-                <div className="w-16 h-[2px] bg-gradient-to-r from-purple-400 to-purple-600 animate-pulse-slow" />
-                <div className="w-6 h-6 rounded-full border-2 border-purple-500 bg-purple-500/20 animate-ping-slow flex-shrink-0" />
-                <div className="w-10 h-[2px] bg-purple-500/40" />
-              </div>
-
-              {/* Edges — right edge of the card, mid-height */}
-              <div className="absolute top-[45%] right-[-42%] flex items-center animate-fade-in-delay-2">
-                <div className="w-10 h-[2px] bg-blue-500/40" />
-                <div className="w-6 h-6 rounded-full border-2 border-blue-500 bg-blue-500/20 animate-ping-slow flex-shrink-0" />
-                <div className="w-16 h-[2px] bg-gradient-to-r from-blue-600 to-blue-400 animate-pulse-slow" />
-                <div className="ml-3 max-w-[150px]">
-                  <p className="text-sm font-bold text-blue-700">Edges</p>
-                  <p className="text-xs text-gray-500 leading-tight">Chipping, nicks, and border integrity along all four edges.</p>
-                </div>
-              </div>
-
-              {/* Surface — center of the card face */}
-              <div className="absolute top-[58%] left-[-42%] flex items-center animate-fade-in-delay-3">
-                <div className="text-right mr-3 max-w-[150px]">
-                  <p className="text-sm font-bold text-emerald-700">Surface</p>
-                  <p className="text-xs text-gray-500 leading-tight">Scratches, print lines, stains, and blemishes across the card face.</p>
-                </div>
-                <div className="w-16 h-[2px] bg-gradient-to-r from-emerald-400 to-emerald-600 animate-pulse-slow" />
-                <div className="w-6 h-6 rounded-full border-2 border-emerald-500 bg-emerald-500/20 animate-ping-slow flex-shrink-0" />
-                <div className="w-16 h-[2px] bg-emerald-500/40" />
-              </div>
-
-              {/* Centering — bottom border of the card */}
-              <div className="absolute bottom-[14%] right-[-42%] flex items-center animate-fade-in-delay-4">
-                <div className="w-6 h-[2px] bg-amber-500/40" />
-                <div className="w-6 h-6 rounded-full border-2 border-amber-500 bg-amber-500/20 animate-ping-slow flex-shrink-0" />
-                <div className="w-16 h-[2px] bg-gradient-to-r from-amber-600 to-amber-400 animate-pulse-slow" />
-                <div className="ml-3 max-w-[150px]">
-                  <p className="text-sm font-bold text-amber-700">Centering</p>
-                  <p className="text-xs text-gray-500 leading-tight">Left-right and top-bottom border symmetry measured on both sides.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile: card image with scanning pings + category cards below */}
-          <div className="md:hidden">
-            <div className="max-w-[280px] mx-auto mb-6 relative">
-              <Image
-                src="/why-dcm/judge-graded-card.png"
-                alt="Aaron Judge graded card analyzed by DCM"
-                width={280}
-                height={400}
-                className="w-full h-auto rounded-xl shadow-2xl"
-                priority
-              />
-              {/* Scanning overlay with random analysis pings */}
-              <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                {/* Scanning line */}
-                <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" style={{ animation: 'scanLine 3s linear infinite' }} />
-                {/* Analysis pings at key card areas */}
-                <div className="absolute top-[25%] left-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 0s' }} />
-                <div className="absolute top-[25%] right-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 0.8s' }} />
-                <div className="absolute bottom-[22%] left-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 1.6s' }} />
-                <div className="absolute bottom-[22%] right-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 2.4s' }} />
-                <div className="absolute top-[50%] right-[12%] w-2.5 h-2.5 rounded-full bg-blue-400/50 border border-blue-400/80" style={{ animation: 'analysisPing 3.5s ease-in-out infinite 0.5s' }} />
-                <div className="absolute top-[40%] left-[12%] w-2.5 h-2.5 rounded-full bg-blue-400/50 border border-blue-400/80" style={{ animation: 'analysisPing 3.5s ease-in-out infinite 1.8s' }} />
-                <div className="absolute top-[45%] left-[35%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 5s ease-in-out infinite 0.3s' }} />
-                <div className="absolute top-[55%] right-[30%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 5s ease-in-out infinite 2s' }} />
-                <div className="absolute top-[35%] left-[50%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 4.5s ease-in-out infinite 3s' }} />
-                <div className="absolute bottom-[35%] left-[25%] w-2.5 h-2.5 rounded-full bg-amber-400/40 border border-amber-400/70" style={{ animation: 'analysisPing 4s ease-in-out infinite 1s' }} />
-                <div className="absolute bottom-[30%] right-[20%] w-2.5 h-2.5 rounded-full bg-amber-400/40 border border-amber-400/70" style={{ animation: 'analysisPing 4s ease-in-out infinite 2.5s' }} />
-              </div>
-              {/* DCM Optic badge */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-                <span className="inline-flex items-center gap-1.5 bg-gray-900/80 backdrop-blur-sm border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] text-emerald-300 font-medium">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                  DCM Optic™ Analyzing
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { name: 'Corners', desc: 'Sharpness, wear, and rounding at all four corner points.', color: 'purple', icon: '◢' },
-                { name: 'Edges', desc: 'Chipping, nicks, and border integrity along all four edges.', color: 'blue', icon: '▬' },
-                { name: 'Surface', desc: 'Scratches, print lines, stains, and blemishes on the card face.', color: 'emerald', icon: '◻' },
-                { name: 'Centering', desc: 'Left-right and top-bottom border symmetry on both sides.', color: 'amber', icon: '⊞' },
-              ].map((cat, i) => (
-                <div key={cat.name} className={`bg-gray-50 border border-gray-200 rounded-xl p-3 animate-fade-in-delay-${i + 1}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={`w-7 h-7 rounded-lg bg-${cat.color}-100 flex items-center justify-center flex-shrink-0`}>
-                      <span className={`text-${cat.color}-600 text-xs font-bold`}>{cat.icon}</span>
-                    </div>
-                    <h4 className={`text-sm font-bold text-${cat.color}-700`}>{cat.name}</h4>
-                  </div>
-                  <p className="text-[11px] text-gray-600 leading-snug">{cat.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* HOW IT WORKS */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="How It Works" subtitle="Photo in. Full grade out. Under 60 seconds." />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <StepCard number={1} title="Upload" description="Snap a photo of your card's front and back"
-              icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
-            <StepCard number={2} title="DCM Optic™ Grades" description="Our multi-pass grading system analyzes centering, corners, edges, and surface"
-              icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>} />
-            <StepCard number={3} title="Get Results" description="Detailed grade report with sub-scores, defect analysis, and market pricing"
-              icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
-            <StepCard number={4} title="Share & Sell" description="Print custom labels, list to eBay instantly, track your portfolio value"
-              icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>} />
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* TESTIMONIALS */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-50 to-indigo-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="What Collectors Are Saying" subtitle="Hear from real collectors using DCM Grading every day" />
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                quote: "DCM has completely changed how I manage my collection. I can grade a card, see what it\'s worth, and organize everything in one place. It\'s like having a full grading service and portfolio tracker built into one tool.",
-                name: 'Mike R.',
-                label: 'Pokemon & Sports Collector',
-              },
-              {
-                quote: "I used to send cards off and wait 6-8 weeks just to find out a grade. Now I get results in minutes and my cards never leave my desk. The three-pass system gives me real confidence in every grade I get back.",
-                name: 'Anthony M.',
-                label: 'Sports Card Enthusiast',
-              },
-              {
-                quote: "The label studio is my favorite feature. I love being able to customize the colors and design of my slab labels to match the card inside. My display case has never looked this good — every card feels premium.",
-                name: 'Paul S.',
-                label: 'TCG Hobbyist',
-              },
-            ].map((t) => (
-              <div key={t.name} className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col">
-                {/* Stars */}
-                <div className="flex gap-0.5 mb-3">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <svg key={s} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-gray-700 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="font-bold text-gray-900 text-sm">{t.name}</p>
-                  <p className="text-gray-500 text-xs">{t.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* VIDEO — SEE IT IN ACTION */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="See It in Action" subtitle="Watch the full grading process from upload to finished label — the walkthrough runs under 3 minutes" />
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200" style={{ aspectRatio: '16 / 9' }}>
-            <iframe
-              src="https://www.youtube-nocookie.com/embed/oSz9lfvaEK4?rel=0"
-              title="DCM Grading — Full Process Walkthrough"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* DCM OPTIC — THE APPROACH */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <SectionHeading
-            title="The DCM Optic™ Approach"
-            subtitle={<>A structured, repeatable <Link href="/grading-standard" className="text-emerald-400 hover:text-emerald-300 underline">grading methodology</Link> that gives you confidence in every grade</>}
-            light
-          />
-
-          {/* Desktop: 3-column layout | Mobile: stacked */}
-          <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-start">
-
-            {/* Left: Grading scan animation — fixed height prevents layout shift */}
-            <div className="flex justify-center lg:justify-start">
-              <div className="w-full max-w-[300px] h-[620px] relative overflow-hidden">
-                <div className="absolute inset-x-0 top-0 bottom-0">
-                  <HeroGradingAnimation rawCardImage="/Sports/drake may - daniel- williams f.png" />
-                </div>
-              </div>
-            </div>
-
-            {/* Center: 4 bullet points */}
-            <div className="space-y-5">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <span className="text-purple-400 font-bold text-sm">3x</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">Multi-Pass Consensus Grading</h3>
-                  <p className="text-gray-400 text-xs mt-1">Every card is evaluated three independent times. The median of the three is taken server-side, so one outlier pass can&apos;t drag the grade.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">Four Sub-Grade Categories</h3>
-                  <p className="text-gray-400 text-xs mt-1">Centering, corners, edges, and surface, each scored on both sides. Final grade matches the weakest category.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">Server-Verified Results</h3>
-                  <p className="text-gray-400 text-xs mt-1">Every grade is recalculated server-side by median consensus and standard rounding, never trusted from a single pass.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">No More Mailing & Waiting</h3>
-                  <p className="text-gray-400 text-xs mt-1">Mail-away grading companies take weeks and cost $20-$150+ per card. DCM delivers results in minutes for $2.99 a single card, $0.66 a card with the VIP pack, and as low as $0.50 a card with Card Lovers Annual.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Multi-pass convergence table */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 p-5 sm:p-6">
-              <h4 className="text-center text-xs font-semibold text-gray-400 uppercase tracking-wide mb-5">Multi-Pass Consensus</h4>
-              <div className="space-y-3">
-                {/* Column headers */}
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-gray-500 w-11" />
-                  <div className="flex-1 flex gap-1.5">
-                    {['C', 'Co', 'E', 'S'].map((h) => (
-                      <div key={h} className="flex-1 text-center text-[10px] text-gray-500 font-medium">{h}</div>
-                    ))}
-                  </div>
-                </div>
-                {['Pass 1', 'Pass 2', 'Pass 3'].map((label, i) => {
-                  const scores = [
-                    { c: 10, co: 9, e: 10, s: 10 },
-                    { c: 10, co: 10, e: 9, s: 10 },
-                    { c: 10, co: 9, e: 10, s: 10 },
-                  ]
-                  const s = scores[i]
-                  return (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="text-[10px] font-medium text-gray-400 w-11">{label}</span>
-                      <div className="flex-1 flex gap-1.5">
-                        {[s.c, s.co, s.e, s.s].map((val, j) => (
-                          <div key={j} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${val === 10 ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                            {val}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-                <div className="border-t border-white/10 pt-3 mt-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-purple-400 w-11">Final</span>
-                    <div className="flex-1 flex gap-1.5">
-                      {[10, 9, 10, 10].map((val, i) => (
-                        <div key={i} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${val === 10 ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                          {val}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-center mt-4">
-                    <span className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
-                      Grade: 9
-                      <span className="text-purple-200 text-[10px] font-normal">(Weakest: Corners)</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* DETAILED CARD REPORTS */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Detailed Card Reports" subtitle="Every grade comes with a full breakdown, not just a number" />
-
-          {/* Desktop: 3-column (left cards | center text | right cards), Mobile: stacked */}
-          <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-center">
-
-            {/* Left column: One Piece + Pokemon */}
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
-                <Image src="/why-dcm/one-piece-graded-card.png" alt="One Piece Monkey.D.Luffy graded card report" width={560} height={900} className="w-full h-auto" />
-              </div>
-              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
-                <Image src="/why-dcm/pokemon-graded-card.png" alt="Pokemon Charizard VMAX graded card report" width={560} height={900} className="w-full h-auto" />
-              </div>
-            </div>
-
-            {/* Center column: feature descriptions */}
-            <div className="space-y-6 lg:px-2">
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Sub-Grade Breakdown</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Centering, corners, edges, and surface, each scored on both sides with a weighted composite.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Defect Analysis</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Identified defects are cataloged with severity ratings, locations, and descriptions so you know exactly what was found.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Condition Label</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Every grade includes a plain-English condition label, from &quot;Poor&quot; to &quot;Gem Mint,&quot; so there&apos;s no guessing what a 7.5 means.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Image Confidence Rating</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">We tell you how confident our system is in the grade based on image quality, so you know when to retake photos.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Market Value Estimate</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Every report includes a grade-adjusted market value pulled from multiple pricing sources.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column: Baseball + Football */}
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
-                <Image src="/why-dcm/baseball-graded-card.png" alt="Shohei Ohtani graded card report" width={560} height={900} className="w-full h-auto" />
-              </div>
-              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
-                <Image src="/why-dcm/football-graded-card.png" alt="Jaxson Dart graded card report" width={560} height={900} className="w-full h-auto" />
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* CARD DATABASES */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Accurate Card Identification" subtitle="Internal databases covering hundreds of thousands of cards across every major game" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {[
-              { name: 'Pokemon', img: '/why-dcm/pikachu-graded-card.png', sub: 'English + Japanese' },
-              { name: 'Sports', img: '/why-dcm/drake-maye-graded-card.png', sub: '6 categories' },
-              { name: 'MTG', img: '/why-dcm/magic-the-gathering-graded-card.png', sub: 'Magic: The Gathering' },
-              { name: 'Lorcana', img: '/why-dcm/lorcana-graded-card.png', sub: 'Disney Lorcana' },
-              { name: 'One Piece', img: '/why-dcm/monkey-luffy-graded-card.png', sub: 'One Piece TCG' },
-              { name: 'Yu-Gi-Oh', img: '/why-dcm/yugioh-garded-card.png', sub: 'Yu-Gi-Oh!' },
-              { name: 'Star Wars', img: '/why-dcm/star-wars-graded-card.png', sub: 'Star Wars Unlimited' },
-              { name: 'Other', img: '/why-dcm/garbage-pail-kids-graded-card.png', sub: 'GPK, Digimon & more' },
-            ].map((cat) => (
-              <div key={cat.name} className="group text-center">
-                <div className="rounded-xl overflow-hidden shadow-md border border-gray-100 bg-white hover:shadow-xl transition-shadow">
-                  <Image src={cat.img} alt={`${cat.name} graded card`} width={400} height={600} className="w-full h-auto group-hover:scale-[1.02] transition-transform" />
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm mt-3">{cat.name}</h3>
-                <p className="text-gray-500 text-xs">{cat.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* MARKET PRICING */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gray-50 relative overflow-hidden">
-        {/* Decorative background: mock dashboard charts at low opacity */}
-        <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-          <div className="opacity-[0.07] origin-top scale-[0.6] sm:scale-75 md:scale-90" style={{ width: '100%', minWidth: '900px' }}>
-            {/* Mock summary cards */}
-            <div className="max-w-7xl mx-auto px-4 mb-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white rounded-xl shadow-md p-5">
-                  <div className="text-sm text-gray-500 mb-1">Total Portfolio Value</div>
-                  <div className="text-2xl font-bold text-gray-900">$10,061.50</div>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-5">
-                  <div className="text-sm text-gray-500 mb-1">Cards With Value</div>
-                  <div className="text-2xl font-bold text-gray-900">92 / 108</div>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-5">
-                  <div className="text-sm text-gray-500 mb-1">Average Card Value</div>
-                  <div className="text-2xl font-bold text-gray-900">$109.36</div>
-                </div>
-              </div>
-            </div>
-            {/* Mock charts */}
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-6">
-                  <div className="bg-white rounded-xl p-6 border border-gray-100">
-                    <CategoryBreakdownChart data={MOCK_CATEGORIES} />
-                  </div>
-                  <div className="bg-white rounded-xl p-6 border border-gray-100">
-                    <GradeDistributionChart data={MOCK_GRADES} />
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div className="bg-white rounded-xl p-6 border border-gray-100">
-                    <ValueDistributionChart data={MOCK_VALUES} />
-                  </div>
-                  <div className="bg-white rounded-xl p-6 border border-gray-100">
-                    <TopSetsChart data={MOCK_SETS} />
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-6 mt-6">
-                <div className="bg-white rounded-xl p-6 border border-gray-100">
-                  <PriceSourceChart data={MOCK_SOURCES} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Foreground content */}
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Market Pricing at Your Fingertips" subtitle="Real-time pricing from multiple sources so you always know what your cards are worth" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-            {[
-              { name: 'PriceCharting', desc: 'TCG cards', color: 'from-blue-500 to-blue-600' },
-              { name: 'SportsCardsPro', desc: 'Sports cards', color: 'from-green-500 to-green-600' },
-              { name: 'eBay', desc: 'All card types', color: 'from-yellow-500 to-orange-500' },
-              { name: 'Scryfall', desc: 'MTG pricing', color: 'from-purple-500 to-indigo-500' },
-            ].map((source) => (
-              <div key={source.name} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 text-center hover:shadow-md transition-shadow">
-                <div className={`w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${source.color} flex items-center justify-center mb-3`}>
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm">{source.name}</h3>
-                <p className="text-gray-500 text-xs mt-0.5">{source.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
-            <p className="text-gray-700">
-              See how your card&apos;s <span className="font-semibold text-purple-600">grade affects its market value</span>. We pull grade-adjusted pricing so you can understand the real-world impact of condition on what your card is worth.
-            </p>
-          </div>
-          {/* Price by Grade chart */}
-          <div className="mt-6 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            <Image src="/why-dcm/Price-graded-cards.png" alt="Price by Grade — market prices from raw to graded" width={900} height={300} className="w-full h-auto" />
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* LABEL STUDIO */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Your Label, Your Way" subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders" light />
-          <div className="grid md:grid-cols-3 gap-8 mb-10">
-            {[
-              { name: 'Graded Slab', emptyImg: '/labels/graded-card-slab.png', cardImg: '/why-dcm/lugia-graded-slab.png', desc: 'Insert into standard grading slab cases with front and back labels' },
-              { name: 'Magnetic One-Touch', emptyImg: '/labels/mag-one-touch-DCM.png', cardImg: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic card holders' },
-              { name: 'Toploader', emptyImg: '/labels/top-loader-dcm.png', cardImg: '/why-dcm/lugia-top-loader.png', desc: 'Front + back label pairs or fold-over labels for toploaders' },
-            ].map((label, idx) => (
-              <LabelHolderCard key={label.name} name={label.name} emptyImg={label.emptyImg} cardImg={label.cardImg} desc={label.desc} delay={idx * 1.5} />
-            ))}
-          </div>
-          <div className="flex flex-wrap justify-center gap-3 text-sm">
-            {['8 Color Themes', 'Custom Gradients', 'Border Controls', 'Color-Match Eyedropper', 'Save 4 Custom Designs'].map((feature) => (
-              <span key={feature} className="bg-white/10 border border-white/20 rounded-full px-4 py-1.5">{feature}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* BADGES */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <SectionHeading title="Wear Your Badge" subtitle="Show off your status on every graded card label. Fun enhancements for the hobby." />
-          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            {[
-              { name: 'VIP', desc: 'Exclusive VIP emblem displayed on all your labels', color: 'from-amber-400 to-orange-500', textColor: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
-              { name: 'Card Lovers', desc: 'Subscriber badge with loyalty rewards and premium perks', color: 'from-purple-400 to-rose-500', textColor: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-            ].map((badge) => (
-              <div key={badge.name} className={`${badge.bgColor} ${badge.borderColor} border rounded-xl p-6`}>
-                <div className={`w-14 h-14 mx-auto rounded-full bg-gradient-to-br ${badge.color} flex items-center justify-center mb-3`}>
-                  <span className="text-white font-bold text-lg">{badge.name[0]}</span>
-                </div>
-                <h3 className={`font-bold ${badge.textColor}`}>{badge.name}</h3>
-                <p className="text-gray-600 text-sm mt-1">{badge.desc}</p>
-              </div>
-            ))}
-          </div>
-          {/* Card Lover + VIP label example */}
-          <div className="mt-8 max-w-md mx-auto rounded-xl overflow-hidden shadow-lg border border-gray-200">
-            <Image src="/why-dcm/card-lover-vip-label.png" alt="Card Lover and VIP badges on a graded card label" width={600} height={200} className="w-full h-auto" />
-          </div>
-          <p className="text-gray-500 text-xs text-center mt-3">Card Lover and VIP badges displayed on a graded card label</p>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* FEATURED CARDS GALLERY */}
-      {/* EBAY INSTALIST */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Grade It. List It. Sell It." subtitle="InstaList turns any graded card into a complete eBay listing — photos, title, condition, and the full DCM report — in one click." />
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            <div>
-              <div className="space-y-4 mb-8">
-                {[
-                  'Professional HTML description auto-generated with grade details',
-                  '5 images auto-created: labeled front/back, raw front/back, and mini-report',
-                  'Grade automatically mapped to eBay\'s condition system',
-                  'Built-in shipping calculator with domestic and international options',
-                  'Supports fixed price and auction formats',
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-3">
-                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <p className="text-gray-700 text-sm">{item}</p>
-                  </div>
-                ))}
-              </div>
-              {isAuthenticated ? (
-                <Link
-                  href="/instalist-marketplace"
-                  className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
-                >
-                  Open InstaList
-                </Link>
-              ) : (
-                <Link
-                  href="/login?mode=signup"
-                  onClick={() => trackSignupClick('instalist_section')}
-                  className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-7 py-3.5 rounded-xl font-bold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25"
-                >
-                  Start with 2 Free Grades
-                </Link>
-              )}
-            </div>
-            <EbayListingMonitor />
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* ================================================================ */}
-      {featuredCards.length > 0 && (
-        <section className="py-16 sm:py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <SectionHeading title="Real Grades from Real Collectors" subtitle="Browse cards graded by the DCM community" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-              {featuredCards.slice(0, 8).map((card) => (
-                <Link key={card.id} href={`/${categoryToRouteSlug(card.category)}/${card.id}`} className="group">
-                  <FeaturedCardSlab card={card} />
-                  <div className="text-center mt-2">
-                    <p className="text-sm font-medium text-gray-900 truncate group-hover:text-purple-600 transition-colors">{card.card_name || 'Graded Card'}</p>
-                    <p className="text-xs text-gray-500">{card.category}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ================================================================ */}
-      {/* FAQ — the three objections that stall a first signup            */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Fair Questions" subtitle="The things collectors ask before their first grade" />
-          <div className="space-y-8">
-            <div>
-              <h3 className="font-bold text-gray-900 text-lg mb-2">How accurate is DCM Optic™ grading?</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Every card is evaluated by three independent grading passes plus a magnified inspection of
-                each corner, edge, and surface region, and the consensus becomes your grade. The engine is
-                continuously calibrated against reference cards with known grades, and every report states
-                its own confidence range instead of pretending certainty. You also get estimated equivalents
-                on the{' '}
-                <Link href="/psa-alternative" className="text-purple-600 hover:text-purple-800 underline">PSA, BGS, SGC, and CGC scales</Link>{' '}
-                so you can put the number in familiar terms, or{' '}
-                <Link href="/card-grading-companies" className="text-purple-600 hover:text-purple-800 underline">see the full comparison</Link>{' '}
-                of what each service charges and how long it takes.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900 text-lg mb-2">Will buyers take a DCM grade seriously?</h3>
-              <p className="text-gray-600 leading-relaxed">
-                A DCM grade is not an opinion buyers have to trust, it is a report they can read. Every graded
-                card gets a public report page and a serial number anyone can verify, and InstaList embeds the
-                full condition breakdown right in your eBay listing. Buyers see the sub-grades and the evidence,
-                not just a number, and DCM graded cards are selling on eBay today.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900 text-lg mb-2">What if I disagree with my grade?</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Open the report and you can see exactly what was found, down to magnified evidence photos of
-                specific findings. Photo quality matters: if your report shows a wide confidence range, better
-                lighting and a re-shoot often resolve it. And if something still looks wrong, contact support
-                and a human will review it.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* PRICING */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gray-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading
-            title="Simple, Affordable Pricing"
-            subtitle={<>Credits never expire. Buy what you need, grade when you&apos;re ready, and <Link href="/cheapest-card-grading" className="text-purple-600 hover:text-purple-800 underline">see how the cost compares</Link>.</>}
-          />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-            {[
-              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: true },
-              { name: 'Basic', price: '$2.99', credits: '1', perGrade: '$2.99', bonus: '+1 bonus on first purchase', popular: false },
-              { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: false },
-              { name: 'Elite', price: '$19.99', credits: '20', perGrade: '$1.00', bonus: '+5 bonus on first purchase', popular: false },
-            ].map((tier) => (
-              <div key={tier.name} className={`bg-white rounded-2xl shadow-lg border-2 p-6 text-center relative ${tier.popular ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
-                {tier.popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">Most Popular</span>
-                )}
-                <h3 className="font-bold text-gray-900 text-lg mb-1">{tier.name}</h3>
-                <div className="text-3xl font-bold text-gray-900 mb-1">{tier.price}</div>
-                <p className="text-gray-500 text-sm mb-4">{tier.credits} credit{tier.credits !== '1' ? 's' : ''} &middot; {tier.perGrade}/grade</p>
-                <p className="text-green-600 text-sm font-medium">{tier.bonus}</p>
-              </div>
-            ))}
-          </div>
-          <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
-            <h3 className="font-bold text-xl mb-2">♥ Card Lovers Subscription</h3>
-            <p className="text-rose-100 mb-4">For serious collectors. 70+ credits a month, 20% off all purchases, portfolio tracking, and loyalty bonuses that scale with your tenure.</p>
-            <div className="flex justify-center gap-4">
-              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
-                <div className="font-bold text-lg">$49.99<span className="text-sm font-normal">/mo</span></div>
-                <p className="text-purple-200 text-xs">70 credits/month</p>
-              </div>
-              <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
-                <div className="font-bold text-lg">$449<span className="text-sm font-normal">/yr</span></div>
-                <p className="text-purple-200 text-xs">900 credits/year</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* FINAL CTA */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Grade Your First Card?</h2>
-          <p className="text-purple-200 text-lg mb-8">Upload a photo, get your grade in about a minute. Your first two credits are on us.</p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-purple-300 mb-8">
-            <span>No mailing required</span>
-            <span>&middot;</span>
-            <span>Instant results</span>
-            <span>&middot;</span>
-            <span>Keep your cards safe</span>
-          </div>
-          {!isAuthenticated ? (
-            <Link href="/login?mode=signup" onClick={() => trackSignupClick('final_cta')}
-              className="inline-block bg-white text-purple-700 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-100 transition-all shadow-lg">
-              Sign Up Free
-            </Link>
-          ) : (
-            <Link href="/upload"
-              className="inline-block bg-white text-purple-700 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-100 transition-all shadow-lg">
-              Grade a Card Now
-            </Link>
-          )}
-        </div>
-      </section>
-
-      {/* Bottom padding for floating CTA */}
-      {!isAuthenticated && <div className="h-16" />}
-
-      {/* Floating CTA */}
-      <FloatingCtaBar
-        isAuthenticated={isAuthenticated}
-        accent="purple"
-        source="why_dcm"
-        heroRef={heroRef}
-      />
-    </main>
-  )
+      </div>
+    </section>
+    <div className="dcm-why-proof dcm-container"><span>{popTotal ? `${popTotal.toLocaleString()} cards graded` : 'Built for trading card collectors'}</span><span>4 condition subgrades</span><span>Verifiable reports</span><span>Your cards stay with you</span></div>
+    <div role="navigation" className="dcm-why-section-nav dcm-container" aria-label="Explore DCM features">{[['grading','Grading'],['reports','Reports'],['portfolio','Portfolio'],['labels','Label Studio'],['instalist','eBay InstaList'],['explore','Card tools'],['walkthrough','Watch the walkthrough'],['plans','Plans & membership']].map(([id,label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div>
+    <section id="benefits" className="dcm-section dcm-container">
+      <SectionHeading eyebrow="From the first photo to your next decision" title="More than a number on a card.">A connected workflow for understanding, organizing and sharing your collection.</SectionHeading>
+      <div className="dcm-why-benefits">
+        {([
+          ['scan', 'Understand the condition', 'Centering, corners, edges and surface are assessed on both sides, with findings you can review in the card report.', '#grading', 'Explore DCM Optic'],
+          ['report', 'See why it earned that grade', 'Review the analysis and photo evidence behind your result. Compare it with the published DCM grading standard.', '#reports', 'Explore card reports'],
+          ['label', 'Give your card its own identity', 'A Heritage label pairs your card’s colors with its recorded grade, condition and verifiable serial number.', '#labels', 'Explore label options'],
+          ['collection', 'Keep your collection together', 'Organize your graded cards and revisit their reports. Follow market estimates and portfolio insights as your collection grows.', '#portfolio', 'Explore Portfolio'],
+          ['sell', 'Share the condition with buyers', 'Use InstaList to bring your card photos and condition breakdown into an eBay listing, with the report behind the grade.', '#instalist', 'Explore InstaList'],
+          ['chart', 'Put the grade in context', 'Browse DCM’s population data to see grade distributions across categories and individual cards.', '#explore', 'Explore card tools'],
+        ] as const).map(([icon, title, copy, href, link]) => <article key={title}><Icon name={icon} /><h3>{title}</h3><p>{copy}</p><ActionLink href={href} variant="text">{link} →</ActionLink></article>)}
+      </div>
+    </section>
+    <WhyDcmCapabilities /><RelatedGuides />
+    <section className="dcm-section dcm-surface">
+      <div className="dcm-container dcm-why-next">
+        <div><SectionHeading eyebrow="Made for your collecting routine" title="Start with the cards you have.">Photograph the front and back, upload them and review your grade and condition analysis. Pokémon, sports, Magic: The Gathering, One Piece and more.</SectionHeading><ActionLink href="/get-started" variant="primary">Prepare your first card</ActionLink></div>
+        <div className="dcm-why-note"><p className="dcm-eyebrow">Better photos, clearer analysis</p><h3>The details need to be visible.</h3><p>Use even lighting, keep every edge in frame and avoid glare. Your report explains the findings and limitations of the photos you provide.</p><ActionLink href="/grading-limitations" variant="text">Understand the limitations →</ActionLink></div>
+      </div>
+    </section>
+    <section id="plans" className="dcm-section dcm-container">
+      <SectionHeading eyebrow="Choose your pace" title="Grade a few. Build a collection.">Start with your two free grades, then choose the credit package or membership that fits.</SectionHeading>
+      <div className="dcm-why-plans">
+        <article><p className="dcm-eyebrow">On your schedule</p><h3>Grading credits</h3><p>Buy credits when you need them. Compare packages and first-purchase bonuses.</p><ActionLink href="/credits" variant="secondary">View pricing</ActionLink></article>
+        <article><p className="dcm-eyebrow">A bigger collection</p><h3>VIP package</h3><p>Explore the credit bundle and VIP label benefits for your next group of cards.</p><ActionLink href="/vip" variant="secondary">Explore VIP</ActionLink></article>
+        <article><p className="dcm-eyebrow">An ongoing hobby</p><h3>Card Lovers</h3><p>Compare monthly and annual memberships, ongoing credits and member benefits.</p><ActionLink href="/card-lovers" variant="secondary">Explore membership</ActionLink></article>
+      </div>
+    </section>
+    <section className="dcm-section dcm-surface"><div className="dcm-container dcm-why-faq">
+      <SectionHeading eyebrow="Before your first grade" title="Questions collectors ask." />
+      <details><summary>What does the grade tell me?</summary><p>The DCM grade summarizes the condition visible in your photographs. Open the report to review the four subgrades, findings and supporting evidence. Photo quality affects what can be assessed.</p><ActionLink href="/grading-standard" variant="text">Read the grading standard</ActionLink></details>
+      <details><summary>Can someone else verify my card’s grade?</summary><p>Share your public card report or serial number so another collector can review the recorded grade and condition analysis.</p></details>
+      <details><summary>What if I disagree with my grade?</summary><p>Review the report’s findings and photo evidence first. If glare or focus obscures a detail, take clearer photos. Contact support if something still looks wrong.</p><ActionLink href="/contact" variant="text">Contact support</ActionLink></details>
+    </div></section>
+    <section className="dcm-section dcm-dark"><div className="dcm-container dcm-why-next">
+      <div><p className="dcm-eyebrow">Your next card starts here</p><h2>Get to know your collection.</h2><p className="dcm-lead">Your first two grades are on us.</p><Link className="dcm-button dcm-button--primary" href={isAuthenticated ? '/upload' : '/login?mode=signup'} onClick={() => { if (!isAuthenticated) trackSignupClick('final_cta') }}>{isAuthenticated ? 'Grade a Card' : 'Create Free Account'}</Link></div>
+      <div><h3>Take DCM with you.</h3><p className="dcm-lead">Grade and manage your cards on your phone.</p><div className="dcm-actions"><AppStoreBadge variant="white" /><GooglePlayBadge /></div></div>
+    </div></section>
+    {!isAuthenticated && <div className="h-16" />}
+    <FloatingCtaBar isAuthenticated={isAuthenticated} accent="purple" source="why_dcm" heroRef={heroRef} />
+  </div>
 }

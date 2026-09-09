@@ -1,8 +1,10 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   title: 'Grade Your Card - Upload Photos',
-  description: 'Upload your trading card photos to get an instant grade powered by DCM Optic™. It analyzes centering, corners, edges, and surface for accurate results in seconds.',
+  description: 'Upload front and back photos to get an instant grade from DCM Optic™: centering, corners, edges and surface, with a condition report in seconds.',
   keywords: 'grade card, upload card, online card grading, instant grading, card analysis, centering check, corner analysis',
   openGraph: {
     title: 'Grade Your Card - Upload Photos | DCM Grading',
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'DCM Grading',
   },
-};
+});
 
 export default function UploadLayout({
   children,

@@ -1,16 +1,18 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import Link from 'next/link'
 
-export const metadata = {
-  title: 'Affiliate Program | DCM Grading',
+export const metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/affiliates' },
+  title: { absolute: 'Affiliate Program | DCM Grading' },
   description: 'Partner with DCM Grading and earn commissions on every sale you refer. Join our affiliate program for card grading influencers and community figures.',
-}
+})
 
 export default function AffiliatesPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="dcm-brand dcm-editorial min-h-screen dcm-editorial-soft">
       {/* Hero */}
       <section className="py-20 px-4">
-        <div className="max-w-3xl mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center dcm-editorial-heading">
           <div className="inline-block bg-indigo-100 text-indigo-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
             Partner Program
           </div>
@@ -24,7 +26,7 @@ export default function AffiliatesPage() {
           </p>
           <Link
             href="mailto:partners@dcmgrading.com?subject=Affiliate Program Interest"
-            className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl text-lg"
+            className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl text-lg dcm-editorial-primary"
           >
             Apply to Partner
           </Link>
@@ -97,7 +99,7 @@ export default function AffiliatesPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-4 bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+      <section className="py-20 px-4 text-white dcm-editorial-dark">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Interested in Partnering?</h2>
           <p className="text-indigo-200 mb-8">

@@ -1,18 +1,22 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@supabase/supabase-js'
 import { CardShow, getShowStatus, getDaysUntil, formatDateRange, getCurrentOrNextShow } from '@/types/cardShow'
 
-export const metadata: Metadata = {
-  title: 'Card Shows 2026 | Grade Cards Instantly | DCM Grading',
-  description: 'Attending a card show in 2026? Grade your sports cards, Pokemon, and TCG cards on the spot with DCM — a real grade and a printable label in about a minute, right at the table.',
+export const metadata: Metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/card-shows' },
+  title: { absolute: 'Card Shows 2026 | Grade Cards Instantly | DCM Grading' },
+  description: "Find 2026 card shows and prepare your cards with DCM. Review card condition, create grading labels and organize your collection before the event.",
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
+    url: 'https://dcmgrading.com/card-shows',
     title: 'Card Shows 2026 | DCM Grading',
     description: 'Grade your cards instantly at any card show. No shipping, no waiting.',
     type: 'website',
   },
-}
+})
 
 // Revalidate every hour
 export const revalidate = 3600
@@ -78,7 +82,7 @@ function ShowCard({ show }: { show: CardShow }) {
       }`}
     >
       {/* Header with show type badge */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between dcm-editorial-dark">
         <span className="text-xs font-medium text-emerald-200 uppercase tracking-wider">{show.show_type}</span>
         <ShowStatusBadge show={show} />
       </div>
@@ -143,7 +147,7 @@ function FeaturedShow({ show }: { show: CardShow }) {
   const daysUntil = getDaysUntil(show)
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-teal-900 to-blue-900 rounded-2xl border border-emerald-500/30">
+    <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 dcm-editorial-dark">
       {/* Background decoration */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-40 h-40 bg-emerald-400 rounded-full blur-3xl"></div>
@@ -200,7 +204,7 @@ function FeaturedShow({ show }: { show: CardShow }) {
 
             <Link
               href={`/card-shows/${show.slug}`}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
+              className="inline-flex items-center gap-2 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/30 dcm-editorial-primary"
             >
               Get Started - Grade Cards Free
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,10 +249,10 @@ export default async function CardShowsPage() {
   })
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
       {/* Hero Section */}
-      <section className="relative py-16 md:py-24">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/20 to-transparent"></div>
+      <section className="dcm-directory-hero relative py-16 md:py-24">
+        <div className="absolute inset-0 dcm-directory-accent"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-12">
             <div className="flex items-center justify-center gap-3 mb-6">
@@ -350,7 +354,7 @@ export default async function CardShowsPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-r from-emerald-900 to-teal-900">
+      <section className="py-16 dcm-editorial-dark">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
             Ready to Grade at Your Next Show?
@@ -360,7 +364,7 @@ export default async function CardShowsPage() {
           </p>
           <Link
             href="/login?mode=signup&redirect=/credits"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
+            className="inline-flex items-center gap-2 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/30 dcm-editorial-primary"
           >
             Sign Up Free
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

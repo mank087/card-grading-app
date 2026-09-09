@@ -1,6 +1,8 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   title: 'Login or Sign Up',
   description: 'Sign in to your DCM Grading account or create a new account. Get 2 free credits when you sign up to grade your first cards.',
   keywords: 'DCM login, sign up, create account, card grading account, free grading credit',
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'DCM Grading',
   },
-};
+});
 
 export default function LoginLayout({
   children,

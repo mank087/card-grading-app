@@ -1,3 +1,4 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import type { Metadata } from 'next'
 import SharedCollectionClient from './SharedCollectionClient'
 
@@ -7,8 +8,8 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params
-  return {
-    title: `${username}'s Collection | DCM Grading`,
+  return completeMetadata({
+    title: { absolute: `${username}'s Collection | DCM Grading` },
     description: `View ${username}'s DCM Optic™ graded trading card collection on DCM Grading. Browse grades, sub-scores, and condition analysis for Pokemon, Sports, MTG, Lorcana, and One Piece cards.`,
     openGraph: {
       title: `${username}'s Collection | DCM Grading`,
@@ -18,8 +19,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `https://dcmgrading.com/collection/${username}`,
       images: [{ url: '/DCM-logo.png', width: 512, height: 512, alt: 'DCM Grading' }],
     },
+    alternates: { canonical: `https://dcmgrading.com/collection/${encodeURIComponent(username)}` },
     robots: { index: true, follow: true },
-  }
+  })
 }
 
 export default async function SharedCollectionPage({ params }: Props) {

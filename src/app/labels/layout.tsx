@@ -1,10 +1,13 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = {
-  title: 'Label Studio — Design & Print Custom Grading Labels | DCM Grading',
+export const metadata: Metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/labels' },
+  title: { absolute: 'Label Studio: Custom Grading Labels | DCM Grading' },
   description:
-    'Design and print professional grading labels for card slabs, magnetic one-touch holders, and toploaders. 8 color themes, custom gradients, fold-over printing, and batch label generation. Free with every DCM grade.',
+    "Create printable grading labels for slabs, one-touch holders and top loaders. Customize colors, patterns and dimensions with DCM Label Studio.",
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
     title: 'Label Studio — Custom Grading Labels',
     description:
       'Design professional grading labels for slabs, one-touch holders, and toploaders. Custom colors, batch printing, and fold-over support.',
@@ -35,7 +38,7 @@ export const metadata: Metadata = {
     'card display labels',
     'fold-over labels',
   ],
-}
+})
 
 export default function LabelsLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>

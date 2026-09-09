@@ -1,5 +1,8 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { notFound } from 'next/navigation';
+import { privateCardMetadata } from '@/lib/seo/pageMetadata';
 import { Metadata } from 'next';
-import { supabaseServer } from '@/lib/supabaseServer';
+import { getCardMetadataRow, requireCardMetadataRow } from '@/lib/seo/cardMetadataRow';
 import { isUuid } from '@/lib/uuid';
 import { getCardOgImageUrl, type CardMetadataRow } from '@/lib/seo/cardMetadataImage';
 import { SportsCardDetails } from './CardDetailClient';
@@ -466,26 +469,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
 
   // Non-UUID ids (e.g. /sports/null from bots or stale links) would fail in Postgres with 22P02
-  if (!isUuid(id)) {
-    return notFoundMetadata();
-  }
-
-  const supabase = supabaseServer();
+  if (!isUuid(id)) notFound();
 
   // Fetch card data server-side
-  const { data: cardRow, error } = await supabase
-    .from('cards')
-    .select(METADATA_COLUMNS)
-    .eq('id', id)
-    .single();
+  const { data: cardRow, error } = await getCardMetadataRow(id, METADATA_COLUMNS);
 
   // Narrow-select results are typed loosely by supabase-js; helpers below expect the row shape.
   const card = cardRow as CardMetadataRow | null;
 
   // Default metadata if card not found
   if (error || !card) {
+    if (!error || error.code === 'PGRST116') notFound();
     return notFoundMetadata();
   }
+
+  if (card.visibility !== 'public') return privateCardMetadata();
 
   // Extract card data from DVG grading
   // Supabase returns JSONB as objects, not strings - no parsing needed
@@ -520,8 +518,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const playerName = card.featured || dvgGrading?.card_info?.player_or_character || 'Card';
 
   // Return enhanced metadata with full SEO optimization
-  return {
-    title,
+  return completeMetadata({
+    title: { absolute: title },
     description,
     keywords, // Auto-generated meta keywords
     alternates: {
@@ -564,10 +562,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         'max-snippet': -1,
       },
     },
-  };
+  });
 }
 
 // Server component that renders the client component
-export default function Page() {
+export default async function Page({ params }: PageProps) {
+  const { id } = await params;
+  await requireCardMetadataRow(id, METADATA_COLUMNS);
   return <SportsCardDetails />;
 }

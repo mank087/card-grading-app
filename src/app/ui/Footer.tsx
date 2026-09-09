@@ -35,7 +35,8 @@ function FooterInner({ currentYear }: { currentYear: number }) {
 
   return (
     <footer
-      className="bg-gray-900 text-white relative z-10"
+      data-site-chrome="footer"
+      className="dcm-site-footer bg-gray-900 text-white relative z-10"
       style={isOrgScope && orgMembership ? { borderTop: `3px solid ${orgMembership.brandColor || '#7C3AED'}` } : undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

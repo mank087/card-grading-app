@@ -1,8 +1,9 @@
 'use client'
 
+import { OfferCardSlider } from '@/components/design/OfferCardSlider'
+import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession, getValidSession } from '@/lib/directAuth'
@@ -126,57 +127,22 @@ export default function VipPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-100 via-slate-100 to-indigo-50">
-      {/* Hero Section */}
-      <section className="relative py-16 md:py-24 overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-[10%] w-20 h-20 bg-gray-400 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-[15%] w-32 h-32 bg-indigo-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 left-[30%] w-24 h-24 bg-slate-400 rounded-full blur-3xl" />
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-6 shadow-lg text-gray-800" style={{ background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 25%, #d4d4d4 50%, #f0f0f0 75%, #c0c0c0 100%)' }}>
-              <span className="text-indigo-600 text-lg">◆</span>
-              Best Value Package
-            </div>
-
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-              <Image src="/DCM-logo.png" alt="DCM" width={80} height={80} className="rounded-xl shadow-lg" />
-            </div>
-
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-4">
-              Get the <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-600 to-indigo-600">VIP Package</span>
-            </h1>
-
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Our best value credit package with exclusive VIP perks. Purchase as many times as you like!
-            </p>
-
-            {isVip && (
-              <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold">
-                <span className="text-lg">◆</span>
-                You&apos;re a VIP!
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+    <div className="dcm-brand dcm-offer-page">
+      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro"><div className="dcm-offer-intro-copy">
+        <p className="dcm-eyebrow">One-time bulk value</p>
+        <h1>Grade more cards.<br />Know their condition.</h1>
+        <p className="dcm-lead">The VIP package: 150 grading credits and your own VIP label emblem. One purchase, ready whenever your collection is.</p>
+        <div className="dcm-actions mt-6"><ActionLink href="#vip-package">Explore the VIP Package</ActionLink><ActionLink href="/credits" variant="text">Compare All Plans</ActionLink></div>
+        {isVip && <p className="dcm-fineprint">Your VIP status is active. Purchase again whenever you need more credits.</p>}
+      </div><OfferCardSlider /></div></section>
 
       {/* Package Details */}
-      <section className="py-12 bg-white">
+      <section id="vip-package" className="py-12 bg-white scroll-mt-20">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               {/* Left: Package Card */}
-              <div className="rounded-3xl p-8 text-gray-800 shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 25%, #d4d4d4 50%, #f0f0f0 75%, #c0c0c0 100%)' }}>
-                {/* Animated shine effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-pulse" style={{ animationDuration: '3s' }}></div>
-
+              <div className="rounded-2xl p-8 text-gray-800 shadow-sm relative overflow-hidden" style={{ background: '#f6f7fa', border: '1px solid #dfe3eb' }}>
                 {/* Decorative diamond */}
                 <div className="absolute top-4 right-4 text-indigo-600">
                   <span className="text-3xl">◆</span>
@@ -234,7 +200,7 @@ export default function VipPage() {
                     <button
                       onClick={handlePurchase}
                       disabled={purchasing}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="dcm-button dcm-button--primary w-full"
                     >
                       {purchasing ? 'Processing...' : isAuthenticated ? 'Get VIP Package' : 'Sign Up & Get VIP Package'}
                     </button>
@@ -254,7 +220,7 @@ export default function VipPage() {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900">What You Get</h2>
 
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
+                <div className="bg-[#f6f7fa] rounded-xl p-6 border border-indigo-100">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-bold text-xl">150</span>
@@ -269,7 +235,7 @@ export default function VipPage() {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-xl p-6 border border-gray-200">
+                <div className="bg-[#f6f7fa] rounded-xl p-6 border border-gray-200">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 50%, #c0c0c0 100%)' }}>
                       <span className="text-indigo-600 text-2xl">◆</span>
@@ -284,7 +250,7 @@ export default function VipPage() {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+                <div className="bg-[#f6f7fa] rounded-xl p-6 border border-green-100">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
                       <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -341,7 +307,7 @@ export default function VipPage() {
                     <td className="px-6 py-4 text-center text-gray-700">$19.99</td>
                     <td className="px-6 py-4 text-center text-gray-700">$1.00</td>
                   </tr>
-                  <tr className="bg-gradient-to-r from-gray-100 to-indigo-50">
+                  <tr className="bg-[#f6f7fa]">
                     <td className="px-6 py-4">
                       <span className="font-bold text-gray-900 flex items-center gap-2">
                         <span className="text-indigo-600">◆</span>
@@ -407,7 +373,7 @@ export default function VipPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-16 text-gray-800" style={{ background: 'linear-gradient(135deg, #d4d4d4 0%, #e8e8e8 25%, #c0c0c0 50%, #e0e0e0 75%, #b8b8b8 100%)' }}>
+      <section className="py-16 text-gray-800" style={{ background: '#f6f7fa' }}>
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4 text-gray-900">
             Ready to Get VIP?
@@ -419,7 +385,7 @@ export default function VipPage() {
           <button
             onClick={handlePurchase}
             disabled={purchasing || checkingVip}
-            className="inline-block bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+            className="dcm-button dcm-button--primary"
           >
             {purchasing ? 'Processing...' : 'Get VIP Package — $99'}
           </button>
@@ -438,6 +404,6 @@ export default function VipPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

@@ -15,6 +15,16 @@ import { getStoredSession } from '@/lib/directAuth'
 import { useOrgContext } from '@/contexts/OrgContext'
 import LabelWizard from '@/components/labelWizard/LabelWizard'
 
+function LabelStudioLoading() {
+  return <section className="dcm-brand dcm-section"><div className="dcm-container">
+    <p className="dcm-eyebrow">Design, print and display</p>
+    <h1 className="text-3xl font-bold">Label Studio: custom card grading labels</h1>
+    <p className="dcm-lead">Create Heritage, Modern and Traditional labels from your DCM grading reports. Customize a design, choose a holder format, and prepare it for printing. Guests can explore with sample cards.</p>
+    <div className="dcm-actions"><Link className="dcm-button dcm-button--secondary" href="/reports-and-labels">Explore label and report formats</Link><Link className="dcm-button dcm-button--text" href="/get-started">Grade your first card</Link></div>
+    <p className="dcm-fineprint" role="status">Loading the label designer…</p>
+  </div></section>
+}
+
 function LabelsPageInner() {
   const [cards, setCards] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,16 +66,7 @@ function LabelsPageInner() {
     init()
   }, [])
 
-  if (loading || !membershipLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading Label Studio...</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading || !membershipLoaded) return <LabelStudioLoading />
 
   if (isOrgScope && membership) {
     return (
@@ -98,7 +99,7 @@ function LabelsPageInner() {
 
 export default function LabelsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<LabelStudioLoading />}>
       <LabelsPageInner />
     </Suspense>
   )

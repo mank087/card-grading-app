@@ -250,6 +250,7 @@ export default function HelpBot() {
       {/* Floating bubble */}
       {!isExpanded && (
         <button
+          data-site-chrome="floating"
           onClick={toggleExpanded}
           className={`fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all z-40 flex items-center justify-center ${
             showPulse ? 'animate-pulse' : ''

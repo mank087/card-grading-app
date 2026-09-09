@@ -18,8 +18,8 @@
 
 - There is NO mail-in service. Cards are never shipped to DCM and never leave the
   collector's possession.
-- DCM does not encapsulate cards for you. It sells labels and slab supplies so
-  collectors slab their own cards.
+- DCM does not encapsulate cards for you. Reports and printable label designs are included with grading; collectors
+  source compatible holders and apply labels themselves.
 
 ## How the grade is produced
 
@@ -68,7 +68,7 @@ Pricing page: https://dcmgrading.com/credits
 
 ## Public, verifiable data
 
-- Population report (every card DCM has graded, by category, set, and card):
+- Population report (aggregate grading counts by category, set, and card):
   https://dcmgrading.com/pop
 - Grade verification by serial number: https://dcmgrading.com/verify/[serial]
 - Published grading standard: https://dcmgrading.com/grading-standard
@@ -82,7 +82,16 @@ grade, the subgrades, and the card's identifying details into the listing.
 
 - Home: https://dcmgrading.com
 - Why DCM: https://dcmgrading.com/why-dcm
-- How grading works: https://dcmgrading.com/card-grading
+- How to start: https://dcmgrading.com/get-started
+- How grading works: https://dcmgrading.com/ai-card-grading
+- AI grading accuracy: https://dcmgrading.com/ai-card-grading-accuracy
+- Compare grading companies: https://dcmgrading.com/card-grading-companies
+- PSA alternative: https://dcmgrading.com/psa-alternative
+- Card types: https://dcmgrading.com/card-grading
+- Portfolio: https://dcmgrading.com/market-pricing
+- eBay InstaList: https://dcmgrading.com/instalist-marketplace
+- Membership: https://dcmgrading.com/card-lovers
+- Enterprise: https://dcmgrading.com/enterprise
 - Grading standard: https://dcmgrading.com/grading-standard
 - Grading rubric: https://dcmgrading.com/grading-rubric
 - Grading limitations: https://dcmgrading.com/grading-limitations

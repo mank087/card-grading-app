@@ -1,17 +1,23 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
 import * as fs from 'fs';
 import * as path from 'path';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ActionLink, SectionHeading } from '@/components/design/Primitives';
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase';
+import { GradeScaleExplorer } from '@/components/design/GradeScaleExplorer';
 
-export const metadata: Metadata = {
-  title: 'The DCM Grading Standard',
+export const metadata: Metadata = completeMetadata({
+  twitter: { card: 'summary', title: 'The DCM Grading Standard', description: 'The published, versioned standard DCM grades to. Scoring ladders for centering, corners, edges and surface, the weakest-link rule, structural caps, and how confidence is reported.', images: ['/DCM-logo.png'] },
+  title: { absolute: 'The DCM Grading Standard' },
   description:
-    'The published, versioned standard DCM grades to. Scoring ladders for centering, corners, edges and surface, the weakest-link rule, structural caps, and how confidence is reported.',
+    "Read DCM’s published grading standard: centering, corners, edges, surface, the weakest-link rule, structural caps and image confidence.",
   keywords:
     'DCM grading standard, card grading criteria, grading scale, weakest link grading, centering measurement, card grading rubric, trading card grading standards',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
     title: 'The DCM Grading Standard',
     description: 'The published, versioned standard DCM grades to.',
     type: 'article',
@@ -20,7 +26,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://dcmgrading.com/grading-standard',
   },
-};
+});
 
 // Rendered from docs/DCM_GRADING_STANDARD.md so the published page and the
 // document of record cannot drift apart. A standard whose page disagrees with
@@ -159,9 +165,13 @@ function techArticleJsonLd(markdown: string) {
 
 export default function GradingStandardPage() {
   const markdown = readStandard();
+  const sectionId = (heading: string) => `standard-${heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')}`;
+  const sections = [...markdown.matchAll(/^## (.+)$/gm)].map(match => ({ title: match[1], id: sectionId(match[1]) }));
+  const scaleSection = markdown.match(/## 2\. The scale([\s\S]*?)(?=\n## )/)?.[1] ?? '';
+  const grades = [...scaleSection.matchAll(/^\| (\d+) \| ([^|]+) \| ([^|]+) \|\s*$/gm)].map(match => ({ grade: Number(match[1]), name: match[2].trim(), profile: match[3].trim() }));
 
   return (
-    <main className="min-h-screen bg-white">
+    <div className="dcm-brand dcm-reference-page">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(techArticleJsonLd(markdown)) }}
@@ -170,16 +180,17 @@ export default function GradingStandardPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(definedTermSetJsonLd(markdown)) }}
       />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <nav className="mb-8 text-sm">
-          <Link href="/grading-rubric" className="text-purple-600 hover:text-purple-800">
-            &larr; How we grade
-          </Link>
-        </nav>
+      <section className="dcm-learning-hero"><div className="dcm-container dcm-learning-split">
+        <div><p className="dcm-eyebrow">The DCM Grading Standard · {versionLabel(markdown)}</p><h1>A clear standard.<br /><em>Behind every grade.</em></h1><p className="dcm-lead">Whole-number grades. Four condition categories. Published criteria you can read and compare with your card’s report.</p><div className="dcm-actions"><ActionLink href="#published-standard">Read the Full Standard</ActionLink><ActionLink href="/grading-rubric" variant="secondary">How We Grade</ActionLink></div></div>
+        <ReferenceCardShowcase page="grading-standard" />
+      </div></section>
+      <section className="dcm-section"><div className="dcm-container"><SectionHeading eyebrow="From Poor to Gem Mint" title="Explore the 1–10 scale.">Select a grade to read its condition profile from the published standard.</SectionHeading><GradeScaleExplorer grades={grades} /></div></section>
+      <div id="published-standard" className="dcm-container dcm-standard-layout">
+        <aside><div role="navigation" aria-label="Standard sections"><p className="dcm-eyebrow">In this standard</p>{sections.map(section => <Link key={section.id} href={`#${section.id}`}>{section.title}</Link>)}</div></aside>
 
         <article
           className="
-            prose prose-slate max-w-none
+            dcm-standard-document prose prose-slate max-w-none
             prose-headings:font-bold prose-headings:text-gray-900
             prose-h1:text-4xl prose-h1:mb-2
             prose-h2:text-2xl prose-h2:mt-12 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
@@ -201,6 +212,11 @@ export default function GradingStandardPage() {
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
+              h1: ({ children }) => <h2>{children}</h2>,
+              h2: ({ node, children }) => {
+                const line = markdown.split('\n')[(node?.position?.start.line ?? 1) - 1].replace(/^## /, '');
+                return <h2 id={sectionId(line)}>{children}</h2>;
+              },
               table: ({ node, ...props }) => (
                 <div className="overflow-x-auto">
                   <table {...props} />
@@ -212,6 +228,6 @@ export default function GradingStandardPage() {
           </ReactMarkdown>
         </article>
       </div>
-    </main>
+    </div>
   );
 }

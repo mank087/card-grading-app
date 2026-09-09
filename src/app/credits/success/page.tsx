@@ -107,7 +107,7 @@ function PurchaseSuccessContent() {
   }, [refreshCredits])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center px-4">
+    <div className="dcm-brand min-h-screen bg-[#f6f7fa] flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
         {/* Success Icon */}
         <div className="mb-6">
@@ -180,7 +180,7 @@ function PurchaseSuccessContent() {
 export default function PurchaseSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center px-4">
+      <div className="dcm-brand min-h-screen bg-[#f6f7fa] flex items-center justify-center px-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     }>

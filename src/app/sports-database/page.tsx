@@ -301,9 +301,10 @@ export default function SportsDatabasePage() {
   )
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
+      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database">Pokémon</Link><Link href="/sports-database" aria-current="page">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database">Yu-Gi-Oh!</Link><Link href="/starwars-database">Star Wars</Link></div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-emerald-900 via-gray-900 to-blue-900 py-12">
+      <section className="dcm-directory-hero py-12">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
@@ -362,7 +363,7 @@ export default function SportsDatabasePage() {
           </p>
           <Link
             href={getGradeCtaLink()}
-            className="inline-block bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold px-8 py-3 rounded-xl hover:from-emerald-500 hover:to-teal-400 transition-all shadow-lg shadow-emerald-500/20"
+            className="inline-block dcm-directory-accent text-white font-bold px-8 py-3 rounded-xl hover:from-emerald-500 hover:to-teal-400 transition-all shadow-lg shadow-emerald-500/20"
           >
             {getGradeCtaText()}
           </Link>
@@ -385,7 +386,7 @@ export default function SportsDatabasePage() {
             <div className="container mx-auto px-4 py-3 md:py-4">
               {/* Mobile: searches + filter toggle */}
               <div className="flex flex-col gap-2 md:hidden">
-                <input
+                <input aria-label="Player search"
                   type="text"
                   value={playerSearch}
                   onChange={(e) => setPlayerSearch(e.target.value)}
@@ -393,7 +394,7 @@ export default function SportsDatabasePage() {
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors"
                 />
                 <div className="flex gap-2">
-                  <input
+                  <input aria-label="Set query"
                     type="text"
                     value={setQuery}
                     onChange={(e) => setSetQuery(e.target.value)}
@@ -423,8 +424,8 @@ export default function SportsDatabasePage() {
               <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-80 mt-3' : 'max-h-0'}`}>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Sport</label>
-                    <select
+                    <label htmlFor="database-filter-1" className="block text-xs text-gray-400 mb-1">Sport</label>
+                    <select id="database-filter-1"
                       value={sportFilter}
                       onChange={(e) => setSportFilter(e.target.value)}
                       className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm capitalize"
@@ -436,8 +437,8 @@ export default function SportsDatabasePage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Brand</label>
-                    <select
+                    <label htmlFor="database-filter-2" className="block text-xs text-gray-400 mb-1">Brand</label>
+                    <select id="database-filter-2"
                       value={manufacturerFilter}
                       onChange={(e) => setManufacturerFilter(e.target.value)}
                       className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
@@ -449,8 +450,8 @@ export default function SportsDatabasePage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Year</label>
-                    <select
+                    <label htmlFor="database-filter-3" className="block text-xs text-gray-400 mb-1">Year</label>
+                    <select id="database-filter-3"
                       value={yearFilter}
                       onChange={(e) => setYearFilter(e.target.value)}
                       className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
@@ -481,8 +482,8 @@ export default function SportsDatabasePage() {
               {/* Desktop: all filters in a row */}
               <div className="hidden md:flex md:flex-row gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-400 mb-1">Player Search (all sets)</label>
-                  <input
+                  <label htmlFor="database-filter-4" className="block text-xs text-gray-400 mb-1">Player Search (all sets)</label>
+                  <input id="database-filter-4"
                     type="text"
                     value={playerSearch}
                     onChange={(e) => setPlayerSearch(e.target.value)}
@@ -491,8 +492,8 @@ export default function SportsDatabasePage() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-400 mb-1">Set Name</label>
-                  <input
+                  <label htmlFor="database-filter-5" className="block text-xs text-gray-400 mb-1">Set Name</label>
+                  <input id="database-filter-5"
                     type="text"
                     value={setQuery}
                     onChange={(e) => setSetQuery(e.target.value)}
@@ -501,8 +502,8 @@ export default function SportsDatabasePage() {
                   />
                 </div>
                 <div className="w-40">
-                  <label className="block text-xs text-gray-400 mb-1">Sport</label>
-                  <select
+                  <label htmlFor="database-filter-6" className="block text-xs text-gray-400 mb-1">Sport</label>
+                  <select id="database-filter-6"
                     value={sportFilter}
                     onChange={(e) => setSportFilter(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors capitalize"
@@ -514,8 +515,8 @@ export default function SportsDatabasePage() {
                   </select>
                 </div>
                 <div className="w-44">
-                  <label className="block text-xs text-gray-400 mb-1">Manufacturer</label>
-                  <select
+                  <label htmlFor="database-filter-7" className="block text-xs text-gray-400 mb-1">Manufacturer</label>
+                  <select id="database-filter-7"
                     value={manufacturerFilter}
                     onChange={(e) => setManufacturerFilter(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors"
@@ -527,8 +528,8 @@ export default function SportsDatabasePage() {
                   </select>
                 </div>
                 <div className="w-28">
-                  <label className="block text-xs text-gray-400 mb-1">Year</label>
-                  <select
+                  <label htmlFor="database-filter-8" className="block text-xs text-gray-400 mb-1">Year</label>
+                  <select id="database-filter-8"
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition-colors"
@@ -658,8 +659,8 @@ export default function SportsDatabasePage() {
                   </h2>
                 </div>
                 <div className="w-full md:w-64">
-                  <label className="block text-xs text-gray-400 mb-1">Player Name</label>
-                  <input
+                  <label htmlFor="database-filter-9" className="block text-xs text-gray-400 mb-1">Player Name</label>
+                  <input id="database-filter-9"
                     type="text"
                     value={playerSearch}
                     onChange={(e) => setPlayerSearch(e.target.value)}
@@ -668,8 +669,8 @@ export default function SportsDatabasePage() {
                   />
                 </div>
                 <div className="w-full md:w-32">
-                  <label className="block text-xs text-gray-400 mb-1">Card #</label>
-                  <input
+                  <label htmlFor="database-filter-10" className="block text-xs text-gray-400 mb-1">Card #</label>
+                  <input id="database-filter-10"
                     type="text"
                     value={cardNumberSearch}
                     onChange={(e) => setCardNumberSearch(e.target.value)}
@@ -679,7 +680,7 @@ export default function SportsDatabasePage() {
                 </div>
                 <Link
                   href={getGradeCtaLink()}
-                  className="shrink-0 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold px-5 py-2.5 rounded-lg hover:from-emerald-500 hover:to-teal-400 transition-all text-center shadow-lg shadow-emerald-500/20"
+                  className="shrink-0 dcm-directory-accent text-white font-semibold px-5 py-2.5 rounded-lg hover:from-emerald-500 hover:to-teal-400 transition-all text-center shadow-lg shadow-emerald-500/20"
                 >
                   {getGradeCtaText()}
                 </Link>
@@ -833,7 +834,7 @@ export default function SportsDatabasePage() {
       )}
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
+      <div className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>Market data from SportsCardsPro. Grade 9 values are cross-company aggregates; PSA 10 values are PSA-specific.</p>
           <div className="flex justify-center gap-6 mt-4">
@@ -842,7 +843,7 @@ export default function SportsDatabasePage() {
             <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
           </div>
         </div>
-      </footer>
+      </div>
     </main>
   )
 }

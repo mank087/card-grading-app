@@ -1,6 +1,6 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import {
   COMPANIES,
   DCM_PACKS,
@@ -12,10 +12,10 @@ import {
   HONEST_MIDDLE,
 } from '@/lib/aeo/gradingCompanies';
 
-export const metadata: Metadata = {
-  title: 'Cheapest Card Grading (2026): Published Prices Compared',
+export const metadata: Metadata = completeMetadata({
+  title: 'Cheapest Card Grading: 2026 Prices Compared',
   description:
-    'What is the cheapest card grading service? In August 2026 the mail-in majors published base prices from $15 to about $80 per card before shipping. DCM grades a card for $2.99, as low as $0.66 a card with the VIP package, with nothing to ship.',
+    "Compare card grading costs, shipping and package rates. See sourced mail-in prices and DCM’s $2.99 single-card option and $99 VIP package.",
   keywords:
     'cheapest card grading, card grading prices, how much does card grading cost, cheap card grading service, card grading cost comparison, affordable card grading',
   alternates: { canonical: 'https://dcmgrading.com/cheapest-card-grading' },
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     description: 'Published base prices for the mail-in majors next to grading at home, as low as $0.50 a card with Card Lovers Annual.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
-};
+});
 
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',
@@ -120,15 +120,14 @@ const rows = [...COMPANIES].sort((a, b) => {
 
 export default function CheapestCardGradingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-        <section className="mb-12">
+        <section className="mb-12 dcm-editorial-heading">
           <div className="inline-block bg-amber-100 text-amber-800 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             Pricing, sourced
           </div>
@@ -152,7 +151,7 @@ export default function CheapestCardGradingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-left">
+                  <tr className="text-white text-left dcm-editorial-dark">
                     <th className="py-4 px-4 font-bold">Service</th>
                     <th className="py-4 px-4 font-bold">Cheapest open tier</th>
                     <th className="py-4 px-4 font-bold">Price per card</th>
@@ -334,14 +333,14 @@ export default function CheapestCardGradingPage() {
         </section>
 
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Grade the binder for less than one submission</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Two free grades to start. After that it is $2.99 for a single card, $0.66 a card with the VIP pack, and as low as $0.50 a card with Card Lovers Annual. Nothing to ship.
             </p>
             <Link
               href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

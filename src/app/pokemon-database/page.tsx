@@ -257,9 +257,10 @@ export default function PokemonDatabasePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900">
+    <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
+      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database" aria-current="page">Pokémon</Link><Link href="/sports-database">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database">Yu-Gi-Oh!</Link><Link href="/starwars-database">Star Wars</Link></div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 py-12">
+      <section className="dcm-directory-hero py-12">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
@@ -283,7 +284,7 @@ export default function PokemonDatabasePage() {
                 <div className="text-xs md:text-sm text-gray-400">Card Sets</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-white">1999-2025</div>
+                <div className="text-2xl md:text-3xl font-bold text-white">1999 onward</div>
                 <div className="text-xs md:text-sm text-gray-400">Year Coverage</div>
               </div>
               <div className="text-center">
@@ -356,7 +357,7 @@ export default function PokemonDatabasePage() {
           {/* Mobile: Name search + Filter toggle button */}
           <div className="flex gap-2 md:hidden">
             <div className="flex-1">
-              <input
+              <input aria-label="Card name"
                 ref={searchInputRef}
                 type="text"
                 value={searchName}
@@ -389,8 +390,8 @@ export default function PokemonDatabasePage() {
           <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-60 mt-3' : 'max-h-0'}`}>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Card #</label>
-                <input
+                <label htmlFor="database-filter-1" className="block text-xs text-gray-400 mb-1">Card #</label>
+                <input id="database-filter-1"
                   type="text"
                   value={searchNumber}
                   onChange={(e) => setSearchNumber(e.target.value.toUpperCase())}
@@ -399,8 +400,8 @@ export default function PokemonDatabasePage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Set Total</label>
-                <input
+                <label htmlFor="database-filter-2" className="block text-xs text-gray-400 mb-1">Set Total</label>
+                <input id="database-filter-2"
                   type="text"
                   value={searchSetTotal}
                   onChange={(e) => setSearchSetTotal(e.target.value.replace(/\D/g, ''))}
@@ -409,8 +410,8 @@ export default function PokemonDatabasePage() {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs text-gray-400 mb-1">Set</label>
-                <select
+                <label htmlFor="database-filter-3" className="block text-xs text-gray-400 mb-1">Set</label>
+                <select id="database-filter-3"
                   value={selectedSetId}
                   onChange={(e) => setSelectedSetId(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors text-sm"
@@ -426,8 +427,8 @@ export default function PokemonDatabasePage() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs text-gray-400 mb-1">Rarity</label>
-                <select
+                <label htmlFor="database-filter-4" className="block text-xs text-gray-400 mb-1">Rarity</label>
+                <select id="database-filter-4"
                   value={selectedRarity}
                   onChange={(e) => setSelectedRarity(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors text-sm"
@@ -460,8 +461,8 @@ export default function PokemonDatabasePage() {
           <div className="hidden md:flex md:flex-row gap-3">
             {/* Name Search */}
             <div className="flex-1">
-              <label className="block text-xs text-gray-400 mb-1">Card Name</label>
-              <input
+              <label htmlFor="database-filter-5" className="block text-xs text-gray-400 mb-1">Card Name</label>
+              <input id="database-filter-5"
                 type="text"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
@@ -474,7 +475,7 @@ export default function PokemonDatabasePage() {
             <div className="w-52">
               <label className="block text-xs text-gray-400 mb-1 text-center">Card # / Set Total</label>
               <div className="flex items-center gap-1">
-                <input
+                <input aria-label="Card number"
                   type="text"
                   value={searchNumber}
                   onChange={(e) => setSearchNumber(e.target.value.toUpperCase())}
@@ -482,7 +483,7 @@ export default function PokemonDatabasePage() {
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2.5 text-white placeholder-gray-600 placeholder:text-xs focus:outline-none focus:border-purple-500 transition-colors text-center text-sm"
                 />
                 <span className="text-gray-500 text-lg font-bold">/</span>
-                <input
+                <input aria-label="Set total"
                   type="text"
                   value={searchSetTotal}
                   onChange={(e) => setSearchSetTotal(e.target.value.replace(/\D/g, ''))}
@@ -498,7 +499,7 @@ export default function PokemonDatabasePage() {
                 Set {searchLanguage === 'ja' && <span className="text-red-400">(Japanese)</span>}
                 {searchLanguage === 'all' && <span className="text-purple-400">(All Languages)</span>}
               </label>
-              <select
+              <select aria-label="Set"
                 value={selectedSetId}
                 onChange={(e) => setSelectedSetId(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition-colors"
@@ -518,8 +519,8 @@ export default function PokemonDatabasePage() {
 
             {/* Rarity Filter */}
             <div className="w-56">
-              <label className="block text-xs text-gray-400 mb-1">Rarity</label>
-              <select
+              <label htmlFor="database-filter-6" className="block text-xs text-gray-400 mb-1">Rarity</label>
+              <select id="database-filter-6"
                 value={selectedRarity}
                 onChange={(e) => setSelectedRarity(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition-colors"
@@ -803,7 +804,7 @@ export default function PokemonDatabasePage() {
             {/* Grade This Card CTA */}
             <Link
               href={getGradeCtaLink()}
-              className="block w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all text-center shadow-lg shadow-orange-500/20 mb-4"
+              className="block w-full dcm-directory-accent text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all text-center shadow-lg shadow-orange-500/20 mb-4"
             >
               🎯 {getGradeCtaText()}
             </Link>
@@ -847,7 +848,7 @@ export default function PokemonDatabasePage() {
       />
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
+      <div className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>English data from Pokemon TCG API. Japanese data from TCGdex. Pokemon is a trademark of Nintendo.</p>
           <div className="flex justify-center gap-6 mt-4">
@@ -856,7 +857,7 @@ export default function PokemonDatabasePage() {
             <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
           </div>
         </div>
-      </footer>
+      </div>
     </main>
   )
 }

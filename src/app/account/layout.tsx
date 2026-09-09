@@ -1,6 +1,7 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'My Account - Settings & Preferences',
   description: 'Manage your DCM Grading account settings, subscription, emblem preferences, and profile information.',
   keywords: 'account settings, DCM account, grading preferences, emblem settings, subscription management',
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-};
+});
 
 export default function AccountLayout({
   children,

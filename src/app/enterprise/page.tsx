@@ -1,14 +1,18 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import LeadForm from './LeadForm';
 import NeonSign from './NeonSign';
 import BrandedSlabVisual, { StoreMockRow } from './BrandedSlabVisual';
 import { ORG_PLANS, ORG_OVERAGE_PACK } from '@/lib/orgPlans';
 
-export const metadata: Metadata = {
-  title: 'Enterprise Card Grading for Stores, Breakers & Creators',
-  description: 'Launch your own card grading brand. Branded slab labels, grading reports, card pages, and a hosted storefront, powered by DCM Optic™ grading. Wholesale grading from $0.40/card for card shops, case breakers, streamers, and high-volume collectors.',
+export const metadata: Metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/enterprise' },
+  title: 'Enterprise Card Grading for Shops & Breakers',
+  description: "Build your card grading brand with DCM Optic: branded labels, grading reports and a hosted storefront. Explore wholesale plans for shops and sellers.",
   keywords: 'card store grading, dealer card grading, case breaker grading, streamer card grading, white label card grading, branded slab labels, LCS grading service, enterprise card grading, card shop grading program',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
+    url: 'https://dcmgrading.com/enterprise',
     title: 'DCM Enterprise: Launch Your Own Card Grading Brand',
     description: 'Branded grading for shops, breakers, streamers, and collectors: your logo on labels, reports, and card pages, backed by the DCM verification registry.',
     type: 'website',
@@ -19,7 +23,7 @@ export const metadata: Metadata = {
     title: 'DCM Enterprise: Launch Your Own Card Grading Brand',
     description: 'Your own card grading brand, powered by DCM Optic™ grading.',
   },
-};
+});
 
 const BENEFITS = [
   {
@@ -107,9 +111,9 @@ function SectionDeco({ variant }: { variant: 'left' | 'right' }) {
 
 export default function EnterprisePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <main className="dcm-brand dcm-editorial min-h-screen dcm-editorial-soft">
       {/* Hero — kept tight so the primary CTA sits above the fold on desktop */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-purple-700 text-white py-12 sm:py-14">
+      <section className="relative overflow-hidden text-white py-12 sm:py-14 dcm-editorial-dark">
         {/* ambient glow orbs */}
         <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-400/30 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-20 w-[28rem] h-[28rem] rounded-full bg-blue-400/25 blur-3xl" />
@@ -129,7 +133,7 @@ export default function EnterprisePage() {
           </svg>
         </div>
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center dcm-editorial-heading">
           <p className="uppercase tracking-widest text-purple-200 text-sm font-semibold mb-3">DCM Enterprise</p>
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
             Launch your own card grading brand
@@ -145,7 +149,7 @@ export default function EnterprisePage() {
               Launch your brand
             </a>
             <a href="#contact"
-              className="inline-block px-8 py-3 border border-purple-300 text-white rounded-lg font-semibold hover:bg-purple-600 transition-colors">
+              className="inline-block px-8 py-3 border border-purple-300 text-white rounded-lg font-semibold hover:bg-purple-600 transition-colors dcm-editorial-primary">
               Talk to us first
             </a>
           </div>

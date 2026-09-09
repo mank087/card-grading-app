@@ -1,9 +1,10 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import type { Metadata } from 'next'
 import FeaturedPageClient from './FeaturedPageClient'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'Featured Cards',
-  description: 'Browse our curated showcase of cards graded by DCM Optic™. See detailed grade reports with centering, corners, edges, and surface sub-scores, market pricing estimates, and front & back slab images for Pokemon, Sports, MTG, Lorcana, and One Piece cards.',
+  description: "Browse featured DCM-graded cards. View Heritage labels, original photos, four subgrades and detailed condition reports across Pokémon, sports and more.",
   keywords: [
     'featured graded cards',
     'DCM Optic graded trading cards',
@@ -54,7 +55,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://dcmgrading.com/featured',
   },
-}
+})
 
 export default function FeaturedPage() {
   return <FeaturedPageClient />

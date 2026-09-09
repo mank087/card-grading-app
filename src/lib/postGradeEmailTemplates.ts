@@ -1,3 +1,5 @@
+import { emailText, emailUrl } from './emailMarkup'
+
 /**
  * Post-Grade Email Templates
  *
@@ -53,11 +55,11 @@ export function getFirstGradeEducationSubject(): string {
 }
 
 export function getSocialProofEmailSubject(): string {
-  return "The cards graders are listing this week";
+  return "Explore graded cards and your DCM toolkit";
 }
 
 export function getLastChanceEmailSubject(): string {
-  return "Last chance: your 20% off expires in 48 hours";
+  return "Save 20% on your first credit pack";
 }
 
 export function getWinbackEmailSubject(): string {
@@ -71,7 +73,7 @@ export function getWinbackEmailSubject(): string {
 export function getFirstGradeEducationHtml(data: FirstGradeEducationData): string {
   const creditsPlural = Number(data.credits_remaining) === 1 ? '' : 's';
   return `<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -95,7 +97,7 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
       .cta-wrap { width: 100% !important; }
       .cta-wrap td { display: block !important; width: 100% !important; text-align: center !important; }
       .cta-wrap a { display: block !important; width: 100% !important; padding: 16px 10px !important; box-sizing: border-box !important; }
-      .nav-td a { font-size: 11px !important; padding: 0 5px !important; }
+      .nav-td a { font-size: 12px !important; padding: 0 5px !important; }
       .hero-h1 { font-size: 24px !important; }
       .grade-card-col { display: block !important; width: 100% !important; max-width: 320px !important; margin: 0 auto 20px auto !important; }
       .sub-grade-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
@@ -104,29 +106,29 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
     }
   </style>
 </head>
-<body id="body" style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, Helvetica, sans-serif;">
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
   <div style="display: none; max-height: 0; overflow: hidden;">A quick breakdown of how DCM analyzed your card and why your sub-grades came out the way they did.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr><td align="center" style="padding: 20px 10px 40px 10px;">
       <!--[if mso]><table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="600"><tr><td width="600"><![endif]-->
       <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; margin: 0 auto;">
-        <tr><td bgcolor="#0a0f1a" style="padding: 0;">
+        <tr><td bgcolor="#14233b" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="130" style="padding: 12px 0 12px 20px;" valign="middle">
               <a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=nav-logo" style="text-decoration: none;"><img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;"></a>
             </td>
             <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-              <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=nav-collection" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">My Collection</a>
+              <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=nav-collection" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">My Collection</a>
               <a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=nav-featured" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Featured</a>
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=nav-credits" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Credits</a>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td align="center" bgcolor="#0a0f1a" class="pad-mobile" style="padding: 0;">
+        <tr><td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td align="center" style="padding: 40px 15px 35px 15px;">
-              <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#128269; Your Grade, Explained</p>
-              <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Here&rsquo;s What Your<br><span style="color: #34d399;">Sub-Grades Mean</span></h1>
+              <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#128269; Your Grade, Explained</p>
+              <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Here&rsquo;s What Your<br><span style="color: #d8b4fe;">Sub-Grades Mean</span></h1>
               <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">A behind-the-scenes look at how DCM Optic&trade;<br>analyzed your card, pass by pass and score by score.</p>
             </td>
           </tr></table>
@@ -134,15 +136,15 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
         <tr><td class="pad-mobile" style="padding: 35px 30px 20px 30px;" bgcolor="#ffffff">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="40%" align="center" valign="top" class="grade-card-col" style="padding: 0 12px 0 0;">
-              <img src="${data.front_image_url}" alt="Your graded card" width="200" style="display: block; width: 100%; max-width: 200px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
-              <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">${data.card_name}</p>
+              <img src="${emailUrl(data.front_image_url)}" alt="Your graded card" width="200" style="display: block; width: 100%; max-width: 200px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
+              <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">${emailText(data.card_name)}</p>
             </td>
             <td width="60%" valign="top" class="grade-card-col">
               <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0; font-weight: 700;">Your Final Grade</p>
-              <p style="color: #111827; font-size: 64px; font-weight: 800; margin: 0; line-height: 1; font-family: Arial Black, Arial, sans-serif;">${data.final_grade}</p>
-              <p style="color: #4b5563; font-size: 14px; margin: 8px 0 16px 0; line-height: 1.5;">Your final grade is the <strong>lowest</strong> of your four sub-grades. We don&rsquo;t average. One weak sub-grade caps the whole card.</p>
+              <p style="color: #14233b; font-size: 64px; font-weight: 800; margin: 0; line-height: 1; font-family: Arial Black, Arial, sans-serif;">${emailText(data.final_grade)}</p>
+              <p style="color: #4b5563; font-size: 14px; margin: 8px 0 16px 0; line-height: 1.5;">Your report explains how centering, corners, edges, and surface condition contribute to the final grade. Review the evidence alongside each score.</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
-                <td bgcolor="#059669" style="border-radius: 6px;"><a href="https://dcmgrading.com/${data.category_slug}/${data.card_id}?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=view-report" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 11px 22px; font-weight: 700; font-size: 14px; font-family: Arial, Helvetica, sans-serif;">View Full Report &rarr;</a></td>
+                <td bgcolor="#7624b5" style="border-radius: 6px;"><a href="https://dcmgrading.com/${encodeURIComponent(data.category_slug)}/${encodeURIComponent(data.card_id)}?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=view-report" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 11px 22px; font-weight: 700; font-size: 14px; font-family: Arial, Helvetica, sans-serif;">View Full Report &rarr;</a></td>
               </tr></table>
             </td>
           </tr></table>
@@ -150,25 +152,25 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
         <tr><td class="pad-mobile" style="padding: 10px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 30px 30px 10px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Sub-Grade Breakdown</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 6px 0; font-weight: 800;">What each score actually measures</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 6px 0; font-weight: 800;">What each score actually measures</h2>
           <p style="color: #6b7280; font-size: 14px; margin: 0 0 22px 0; line-height: 1.6;">Every grade is built from four independent dimensions. Here&rsquo;s how yours scored and what we look at for each one.</p>
         </td></tr>
         ${renderSubGradeRow('Centering', 'How balanced the borders are, front and back', String(data.centering_score), '#6366f1', '#4338ca', 'DCM Optic&trade; measures the ratio of border width on all four sides. Even a small shift (55/45 or worse) can knock points off.')}
-        ${renderSubGradeRow('Corners', 'Sharpness of all eight corners', String(data.corners_score), '#d97706', '#b45309', 'Each corner is examined at high zoom across three passes. Whitening, fraying, blunting, or chipping on a single corner can cap this score.')}
+        ${renderSubGradeRow('Corners', 'Sharpness of all eight corners', String(data.corners_score), '#d97706', '#7624b5', 'Each corner is examined at high zoom across three passes. Whitening, fraying, blunting, or chipping on a single corner can cap this score.')}
         ${renderSubGradeRow('Edges', 'Clean lines along every edge', String(data.edges_score), '#0891b2', '#0e7490', 'We trace the full perimeter on front and back. Roughness, nicks, factory edge wear, and color loss along the cut all show up here.')}
-        ${renderSubGradeRow('Surface', 'Print quality, scratches, scuffs, dings', String(data.surface_score), '#059669', '#047857', 'The biggest sub-grade by detection area. Print lines, roller marks, scratches, scuffs, dimples, and holo wear all show up here.', true)}
+        ${renderSubGradeRow('Surface', 'Print quality, scratches, scuffs, dings', String(data.surface_score), '#7624b5', '#66209e', 'The biggest sub-grade by detection area. Print lines, roller marks, scratches, scuffs, dimples, and holo wear all show up here.', true)}
         <tr><td class="pad-mobile" style="padding: 10px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 8px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Why You Can Trust This Grade</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 14px 0; font-weight: 800;">Three independent passes. One unbiased result.</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 14px 0; font-weight: 800;">Three independent passes. One unbiased result.</h2>
           <p style="color: #4b5563; font-size: 14px; margin: 0 0 16px 0; line-height: 1.7;">DCM Optic&trade; doesn&rsquo;t grade your card once. It grades it <strong>three times</strong>, independently, in a single analysis run. The three scores are reconciled, outliers get flagged, and the consensus becomes your final number.</p>
           <p style="color: #4b5563; font-size: 14px; margin: 0 0 22px 0; line-height: 1.7;">That&rsquo;s why two photos of the same card produce the same grade. No grader having a bad day, no human bias, just consistent analysis built for collectors.</p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 25px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #059669; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">1</p><p style="color: #111827; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">First Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Fresh look. No prior context.</p></div></td>
-            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #059669; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">2</p><p style="color: #111827; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">Second Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Independent re-analysis.</p></div></td>
-            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #059669; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">3</p><p style="color: #111827; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">Third Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Final verification &amp; reconcile.</p></div></td>
+            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #7624b5; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">1</p><p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">First Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Fresh look. No prior context.</p></div></td>
+            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #7624b5; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">2</p><p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">Second Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Independent re-analysis.</p></div></td>
+            <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #7624b5; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">3</p><p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">Third Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Final verification &amp; reconcile.</p></div></td>
           </tr></table>
         </td></tr>
         ${renderMobileCallout({
@@ -179,7 +181,7 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
         <tr><td class="pad-mobile" style="padding: 10px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Everything In Your Report</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">Your card&rsquo;s full DCM profile</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">Your card&rsquo;s full DCM profile</h2>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -190,14 +192,14 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
           </table>
         </td></tr>
         <tr><td class="pad-mobile-sm" style="padding: 12px 30px 30px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0f1a" style="border-radius: 10px;"><tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 10px;"><tr>
             <td align="center" class="pad-mobile" style="padding: 28px 30px;">
               <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Grade your next card</p>
-              <p style="color: #d1d5db; font-size: 14px; margin: 0 0 18px 0; line-height: 1.5;">You still have <strong style="color: #34d399;">${data.credits_remaining}</strong> credit${creditsPlural} left from signup. See how your collection stacks up.</p>
-              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#34d399" fillcolor="#34d399"><w:anchorlock/><center style="color:#0a0f1a;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade Another Card &rarr;</center></v:roundrect><![endif]-->
+              <p style="color: #d1d5db; font-size: 14px; margin: 0 0 18px 0; line-height: 1.5;">You still have <strong style="color: #d8b4fe;">${emailText(data.credits_remaining)}</strong> credit${creditsPlural} left from signup. See how your collection stacks up.</p>
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#d8b4fe" fillcolor="#d8b4fe"><w:anchorlock/><center style="color:#14233b;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade Another Card &rarr;</center></v:roundrect><![endif]-->
               <!--[if !mso]><!-->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;"><tr>
-                <td align="center" bgcolor="#34d399" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=primary-cta" style="display: inline-block; color: #0a0f1a; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade Another Card &rarr;</a></td>
+                <td align="center" bgcolor="#d8b4fe" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_education&utm_content=primary-cta" style="display: inline-block; color: #14233b; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade Another Card &rarr;</a></td>
               </tr></table>
               <!--<![endif]-->
             </td>
@@ -218,13 +220,13 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
 
 export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
   return `<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
-  <title>The Cards Graders Are Listing This Week &middot; DCM Grading</title>
+  <title>Explore Graded Cards and Your DCM Toolkit &middot; DCM Grading</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
   <style type="text/css">
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
@@ -238,7 +240,7 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
       .cta-wrap { width: 100% !important; }
       .cta-wrap td { display: block !important; width: 100% !important; text-align: center !important; }
       .cta-wrap a { display: block !important; width: 100% !important; padding: 16px 10px !important; box-sizing: border-box !important; }
-      .nav-td a { font-size: 11px !important; padding: 0 5px !important; }
+      .nav-td a { font-size: 12px !important; padding: 0 5px !important; }
       .hero-h1 { font-size: 24px !important; }
       .feat-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
       .tool-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
@@ -247,38 +249,38 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
     }
   </style>
 </head>
-<body id="body" style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, Helvetica, sans-serif;">
-  <div style="display: none; max-height: 0; overflow: hidden;">Most graders try 3 to 5 cards before they figure out which ones to slab and sell. Here&rsquo;s what the rest are working on.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
+  <div style="display: none; max-height: 0; overflow: hidden;">Explore example reports, then review condition across your own collection.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr><td align="center" style="padding: 20px 10px 40px 10px;">
       <!--[if mso]><table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="600"><tr><td width="600"><![endif]-->
       <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; margin: 0 auto;">
-        <tr><td bgcolor="#0a0f1a" style="padding: 0;">
+        <tr><td bgcolor="#14233b" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="130" style="padding: 12px 0 12px 20px;" valign="middle"><a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-logo" style="text-decoration: none;"><img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;"></a></td>
             <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-              <a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-featured" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Featured</a>
+              <a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-featured" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Featured</a>
               <a href="https://dcmgrading.com/market-pricing?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-market" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Market Pricing</a>
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-credits" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Credits</a>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td align="center" bgcolor="#0a0f1a" class="pad-mobile" style="padding: 0;">
+        <tr><td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding: 40px 15px 35px 15px;">
-            <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#127919; This Week On DCM</p>
-            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">The Cards Graders<br><span style="color: #34d399;">Are Listing Now</span></h1>
-            <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">See what&rsquo;s being graded, slabbed, and listed.<br>You might find your next grade in here.</p>
+            <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#127919; Explore DCM</p>
+            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">The Cards Graders<br><span style="color: #d8b4fe;">Are Listing Now</span></h1>
+            <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Explore example grades and reports.<br>See the tools available for your collection.</p>
           </td></tr></table>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 32px 30px 18px 30px;">
-          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0; font-weight: 700;">A Pattern We&rsquo;ve Noticed</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 12px 0; font-weight: 800;">Most graders try 3 to 5 cards before they commit.</h2>
-          <p style="color: #4b5563; font-size: 15px; margin: 0 0 8px 0; line-height: 1.7;">The first card teaches you how your photos affect the score. The second one tells you which cards in your collection are actually worth slabbing. By the third or fourth, you&rsquo;ve got something you want to post.</p>
-          <p style="color: #4b5563; font-size: 15px; margin: 0; line-height: 1.7;">If your first grade surprised you in either direction, that&rsquo;s normal. Grade a few more and the pattern usually clicks.</p>
+          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0; font-weight: 700;">Review Your Collection</p>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 12px 0; font-weight: 800;">Compare condition across your collection.</h2>
+          <p style="color: #4b5563; font-size: 15px; margin: 0 0 8px 0; line-height: 1.7;">Review the condition evidence in each report before deciding which cards to protect, keep, or list. Clear front and back photos help make the analysis useful.</p>
+          <p style="color: #4b5563; font-size: 15px; margin: 0; line-height: 1.7;">If a grade surprises you, start with the subgrades and defect notes to understand the result.</p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 22px 30px 6px 30px;">
-          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Trending On DCM Right Now</p>
-          <h3 style="color: #111827; font-size: 18px; margin: 0 0 18px 0; font-weight: 800;">Recently graded by the community</h3>
+          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Example DCM Reports</p>
+          <h3 style="color: #14233b; font-size: 18px; margin: 0 0 18px 0; font-weight: 800;">Recently graded by the community</h3>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
@@ -286,12 +288,12 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
             ${renderFeaturedCard('https://dcmgrading.com/pokemon/83abd9b2-c176-4b42-94a7-0a6891438d52', 'https://dcmgrading.com/why-dcm/pokemon-graded-card.png', 'Charizard VMAX', 'Pokemon', '10', 'featured-2')}
             ${renderFeaturedCard('https://dcmgrading.com/sports/2a7caf2c-fe35-48a9-add5-2b130ad8ba70', 'https://dcmgrading.com/why-dcm/football-graded-card.png', 'Jaxson Dart, QB', 'Football', '9', 'featured-3')}
           </tr></table>
-          <p align="center" style="margin: 18px 0 0 0;"><a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=see-all" style="color: #059669; font-size: 13px; font-weight: 700; text-decoration: none;">See all featured cards &rarr;</a></p>
+          <p align="center" style="margin: 18px 0 0 0;"><a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=see-all" style="color: #7624b5; font-size: 13px; font-weight: 700; text-decoration: none;">See all featured cards &rarr;</a></p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Built For Collectors</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">DCM is more than the grade.</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">DCM is more than the grade.</h2>
           <p style="color: #4b5563; font-size: 14px; margin: 0 0 22px 0; line-height: 1.7;">Every card in your collection comes with the full DCM toolkit. Not just a score, but everything you need to slab it, price it, and sell it.</p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
@@ -312,9 +314,9 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
           utmCampaign: 'post_grade_social',
         })}
         <tr><td class="pad-mobile-sm" style="padding: 22px 30px 6px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #34d399; border-radius: 12px; overflow: hidden;"><tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #d8b4fe; border-radius: 12px; overflow: hidden;"><tr>
             <td bgcolor="#f0fdf4" style="padding: 22px 24px;" align="center">
-              <p style="color: #059669; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#127873; Stack Two Offers</p>
+              <p style="color: #7624b5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#127873; Stack Two Offers</p>
               <p style="color: #065f46; font-size: 20px; font-weight: 800; margin: 0 0 8px 0;">10% off + up to 5 bonus credits</p>
               <p style="color: #374151; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Apply <strong>Grade10</strong> at checkout for 10% off any credit pack. First-time buyers also get up to 5 bonus credits added free.</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;"><tr>
@@ -324,14 +326,14 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
           </tr></table>
         </td></tr>
         <tr><td class="pad-mobile-sm" style="padding: 18px 30px 30px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0f1a" style="border-radius: 10px;"><tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 10px;"><tr>
             <td align="center" class="pad-mobile" style="padding: 28px 30px;">
               <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Pick another card to grade</p>
               <p style="color: #d1d5db; font-size: 14px; margin: 0 0 18px 0; line-height: 1.5;">The second grade is usually where it clicks.</p>
-              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#34d399" fillcolor="#34d399"><w:anchorlock/><center style="color:#0a0f1a;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade My Next Card &rarr;</center></v:roundrect><![endif]-->
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#d8b4fe" fillcolor="#d8b4fe"><w:anchorlock/><center style="color:#14233b;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade My Next Card &rarr;</center></v:roundrect><![endif]-->
               <!--[if !mso]><!-->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;"><tr>
-                <td align="center" bgcolor="#34d399" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=primary-cta" style="display: inline-block; color: #0a0f1a; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade My Next Card &rarr;</a></td>
+                <td align="center" bgcolor="#d8b4fe" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=primary-cta" style="display: inline-block; color: #14233b; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade My Next Card &rarr;</a></td>
               </tr></table>
               <!--<![endif]-->
             </td>
@@ -352,13 +354,13 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
 
 export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
   return `<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
-  <title>Last Chance: 20% Off Expires In 48 Hours &middot; DCM Grading</title>
+  <title>Save 20% on Your First Credit Pack &middot; DCM Grading</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
   <style type="text/css">
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
@@ -372,7 +374,7 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
       .cta-wrap { width: 100% !important; }
       .cta-wrap td { display: block !important; width: 100% !important; text-align: center !important; }
       .cta-wrap a { display: block !important; width: 100% !important; padding: 16px 10px !important; box-sizing: border-box !important; }
-      .nav-td a { font-size: 11px !important; padding: 0 5px !important; }
+      .nav-td a { font-size: 12px !important; padding: 0 5px !important; }
       .hero-h1 { font-size: 26px !important; }
       .pack-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
       .vip-left { display: block !important; width: 100% !important; padding-bottom: 16px !important; text-align: center !important; }
@@ -382,44 +384,44 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
     }
   </style>
 </head>
-<body id="body" style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, Helvetica, sans-serif;">
-  <div style="display: none; max-height: 0; overflow: hidden;">Your one-time 20% intro discount expires in 48 hours. Stack it with bonus credits and lock in the lowest cost-per-grade DCM offers.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
+  <div style="display: none; max-height: 0; overflow: hidden;">Use your 20% introductory discount with eligible first-purchase bonus credits. Offer eligibility is confirmed at checkout.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr><td align="center" style="padding: 20px 10px 40px 10px;">
       <!--[if mso]><table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="600"><tr><td width="600"><![endif]-->
       <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; margin: 0 auto;">
-        <tr><td bgcolor="#0a0f1a" style="padding: 0;">
+        <tr><td bgcolor="#14233b" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="130" style="padding: 12px 0 12px 20px;" valign="middle"><a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=nav-logo" style="text-decoration: none;"><img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;"></a></td>
             <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-              <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=nav-credits" style="color: #fbbf24; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Credits</a>
+              <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=nav-credits" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Credits</a>
               <a href="https://dcmgrading.com/faq?utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=nav-faq" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">FAQ</a>
               <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=nav-collection" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">My Cards</a>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td align="center" bgcolor="#7c2d12" class="pad-mobile" style="padding: 0; background: linear-gradient(135deg, #7c2d12 0%, #b91c1c 100%);">
+        <tr><td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0; background: #14233b;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding: 42px 15px 38px 15px;">
-            <p style="color: #fbbf24; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; 48 Hours Left</p>
-            <h1 class="hero-h1" style="color: #ffffff; font-size: 30px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.2;">Your Intro Discount<br><span style="color: #fbbf24;">Expires Soon</span></h1>
-            <p style="color: #fecaca; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Lock in <strong style="color: #fbbf24;">20% off</strong> any credit pack, plus up to 5 bonus<br>credits added free on your first purchase.</p>
+            <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; Your First-Purchase Offer</p>
+            <h1 class="hero-h1" style="color: #ffffff; font-size: 30px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.2;">Your Intro Discount<br><span style="color: #d8b4fe;">Save 20%</span></h1>
+            <p style="color: #e8dafa; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Lock in <strong style="color: #d8b4fe;">20% off</strong> any credit pack, plus up to 5 bonus<br>credits added free on your first purchase.</p>
           </td></tr></table>
         </td></tr>
         <tr><td class="pad-mobile-sm" style="padding: 30px 30px 6px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 3px dashed #fbbf24; border-radius: 14px; overflow: hidden;"><tr>
-            <td bgcolor="#fffbeb" style="padding: 26px 20px;" align="center">
-              <p style="color: #b45309; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 8px 0;">&#127873; One-Time Code &middot; First Purchase Only</p>
-              <p style="color: #78350f; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Apply this code at checkout for the biggest discount we offer new graders:</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 3px dashed #d8b4fe; border-radius: 14px; overflow: hidden;"><tr>
+            <td bgcolor="#f5effb" style="padding: 26px 20px;" align="center">
+              <p style="color: #7624b5; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 8px 0;">&#127873; One-Time Code &middot; First Purchase Only</p>
+              <p style="color: #512172; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Apply this code at checkout for 20% off an eligible first credit pack:</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 14px auto;"><tr>
-                <td bgcolor="#92400e" style="padding: 0; border-radius: 10px;"><a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=promo-code-button" style="display: inline-block; color: #ffffff; font-size: 32px; font-weight: 800; letter-spacing: 4px; font-family: 'Courier New', Courier, monospace; text-decoration: none; padding: 16px 36px;">GRADE20</a></td>
+                <td bgcolor="#7624b5" style="padding: 0; border-radius: 10px;"><a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=promo-code-button" style="display: inline-block; color: #ffffff; font-size: 32px; font-weight: 800; letter-spacing: 4px; font-family: 'Courier New', Courier, monospace; text-decoration: none; padding: 16px 36px;">GRADE20</a></td>
               </tr></table>
-              <p style="color: #92400e; font-size: 13px; margin: 0; font-weight: 600;">Single-use &middot; Expires 48 hours from now</p>
+              <p style="color: #7624b5; font-size: 13px; margin: 0; font-weight: 600;">Single-use &middot; First purchase only</p>
             </td>
           </tr></table>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">What You Actually Get</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 18px 0; font-weight: 800;">More than just a grade.</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 18px 0; font-weight: 800;">More than just a grade.</h2>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -432,7 +434,7 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
         <tr><td class="pad-mobile" style="padding: 14px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 26px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">After Your 20% Off</p>
-          <h3 style="color: #111827; font-size: 18px; margin: 0 0 14px 0; font-weight: 800;">Cost per grade with GRADE20 applied</h3>
+          <h3 style="color: #14233b; font-size: 18px; margin: 0 0 14px 0; font-weight: 800;">Cost per grade with GRADE20 applied</h3>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
@@ -440,7 +442,7 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
             ${renderTierCard('Pro &middot; Best Value', '$7.99', '8 credits with bonus', '~$1.00 / grade', true, 'tier-pro')}
             ${renderTierCard('Elite', '$15.99', '25 credits with bonus', '~$0.64 / grade', false, 'tier-elite')}
           </tr></table>
-          <p align="center" style="color: #9ca3af; font-size: 11px; margin: 14px 0 0 0;">Prices after GRADE20 discount + first-purchase bonus credits. Credits never expire.</p>
+          <p align="center" style="color: #9ca3af; font-size: 12px; margin: 14px 0 0 0;">Prices after GRADE20 discount + first-purchase bonus credits. Credits never expire.</p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 18px 30px 6px 30px;">
           <a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=tier-vip" style="text-decoration: none; color: inherit; display: block;">
@@ -448,32 +450,32 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
             <td bgcolor="#1e1b4b" style="padding: 24px 26px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
                 <td valign="middle" class="vip-left">
-                  <p style="color: #fbbf24; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#128081; VIP Package &middot; Top Tier</p>
+                  <p style="color: #d8b4fe; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#128081; VIP Package &middot; Top Tier</p>
                   <p style="color: #ffffff; font-size: 22px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.25;">150 credits, biggest savings.</p>
                   <p style="color: #c4b5fd; font-size: 13px; margin: 0; line-height: 1.6;">The lowest cost per grade DCM offers. Built for serious collectors and dealers.</p>
                 </td>
                 <td valign="middle" align="right" width="160" class="vip-right">
-                  <p style="color: #c4b5fd; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 4px 0;">After GRADE20</p>
+                  <p style="color: #c4b5fd; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 4px 0;">After GRADE20</p>
                   <p style="color: #ffffff; font-size: 32px; font-weight: 800; margin: 0 0 4px 0; line-height: 1; font-family: Arial Black, Arial, sans-serif;">$79.20</p>
                   <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px 0; text-decoration: line-through;">$99.00</p>
-                  <p style="color: #fbbf24; font-size: 13px; font-weight: 800; margin: 0;">~$0.53 / grade</p>
+                  <p style="color: #d8b4fe; font-size: 13px; font-weight: 800; margin: 0;">~$0.53 / grade</p>
                 </td>
               </tr></table>
             </td>
           </tr></table>
           </a>
-          <p align="center" style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">VIP includes 150 credits flat. Credits never expire.</p>
+          <p align="center" style="color: #9ca3af; font-size: 12px; margin: 12px 0 0 0;">VIP includes 150 credits flat. Credits never expire.</p>
         </td></tr>
         <tr><td class="pad-mobile-sm" style="padding: 22px 30px 30px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#7c2d12" style="border-radius: 10px;"><tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 10px;"><tr>
             <td align="center" class="pad-mobile" style="padding: 28px 30px;">
               <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Lock in 20% off</p>
-              <p style="color: #fecaca; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">Code <strong style="color: #fbbf24;">GRADE20</strong> applies automatically at the link below.</p>
-              <p style="color: #fde68a; font-size: 12px; margin: 0 0 18px 0; font-weight: 700;">Single-use &middot; First purchase only &middot; 48 hours to redeem</p>
-              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#fbbf24" fillcolor="#fbbf24"><w:anchorlock/><center style="color:#7c2d12;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Redeem 20% Off Now &rarr;</center></v:roundrect><![endif]-->
+              <p style="color: #e8dafa; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">Code <strong style="color: #d8b4fe;">GRADE20</strong> applies automatically at the link below.</p>
+              <p style="color: #e8dafa; font-size: 12px; margin: 0 0 18px 0; font-weight: 700;">Single-use &middot; First purchase only &middot; Eligibility confirmed at checkout</p>
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#d8b4fe" fillcolor="#d8b4fe"><w:anchorlock/><center style="color:#14233b;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Redeem 20% Off Now &rarr;</center></v:roundrect><![endif]-->
               <!--[if !mso]><!-->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;"><tr>
-                <td align="center" bgcolor="#fbbf24" style="border-radius: 8px;"><a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=primary-cta" style="display: inline-block; color: #7c2d12; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Redeem 20% Off Now &rarr;</a></td>
+                <td align="center" bgcolor="#d8b4fe" style="border-radius: 8px;"><a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=primary-cta" style="display: inline-block; color: #14233b; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Redeem 20% Off Now &rarr;</a></td>
               </tr></table>
               <!--<![endif]-->
             </td>
@@ -499,7 +501,7 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
 
 export function getWinbackEmailHtml(data: WinbackEmailData): string {
   return `<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -519,7 +521,7 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
       .cta-wrap { width: 100% !important; }
       .cta-wrap td { display: block !important; width: 100% !important; text-align: center !important; }
       .cta-wrap a { display: block !important; width: 100% !important; padding: 16px 10px !important; box-sizing: border-box !important; }
-      .nav-td a { font-size: 11px !important; padding: 0 5px !important; }
+      .nav-td a { font-size: 12px !important; padding: 0 5px !important; }
       .hero-h1 { font-size: 24px !important; }
       .saved-card-col { display: block !important; width: 100% !important; max-width: 320px !important; margin: 0 auto 20px auto !important; }
       .miss-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
@@ -528,43 +530,43 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
     }
   </style>
 </head>
-<body id="body" style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: Arial, Helvetica, sans-serif;">
+<body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
   <div style="display: none; max-height: 0; overflow: hidden;">We saved your work. Your free credit is already in your account. Come back and pick up where you left off.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr><td align="center" style="padding: 20px 10px 40px 10px;">
       <!--[if mso]><table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="600"><tr><td width="600"><![endif]-->
       <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; margin: 0 auto;">
-        <tr><td bgcolor="#0a0f1a" style="padding: 0;">
+        <tr><td bgcolor="#14233b" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="130" style="padding: 12px 0 12px 20px;" valign="middle"><a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=nav-logo" style="text-decoration: none;"><img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;"></a></td>
             <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-              <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=nav-collection" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">My Collection</a>
+              <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=nav-collection" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">My Collection</a>
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=nav-credits" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Credits</a>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td align="center" bgcolor="#0a0f1a" class="pad-mobile" style="padding: 0;">
+        <tr><td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding: 40px 15px 35px 15px;">
-            <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#128173; We Saved Your Spot</p>
-            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Collection<br><span style="color: #34d399;">Is Still Here</span></h1>
+            <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#128173; We Saved Your Spot</p>
+            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Collection<br><span style="color: #d8b4fe;">Is Still Here</span></h1>
             <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">It&rsquo;s been a couple of weeks. Your graded card<br>is still in your collection, right where you left it.</p>
           </td></tr></table>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 35px 30px 20px 30px;" bgcolor="#ffffff">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="45%" align="center" valign="top" class="saved-card-col" style="padding: 0 12px 0 0;">
-              <div style="position: relative;"><img src="${data.front_image_url}" alt="Your graded card" width="220" style="display: block; width: 100%; max-width: 220px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);"></div>
-              <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">${data.card_name}</p>
-              <p style="color: #059669; font-size: 14px; font-weight: 700; margin: 4px 0 0 0;">Grade ${data.final_grade}</p>
+              <div style="position: relative;"><img src="${emailUrl(data.front_image_url)}" alt="Your graded card" width="220" style="display: block; width: 100%; max-width: 220px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);"></div>
+              <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">${emailText(data.card_name)}</p>
+              <p style="color: #7624b5; font-size: 14px; font-weight: 700; margin: 4px 0 0 0;">Grade ${emailText(data.final_grade)}</p>
             </td>
             <td width="55%" valign="middle" class="saved-card-col">
-              <p style="color: #111827; font-size: 18px; font-weight: 800; margin: 0 0 10px 0; line-height: 1.4;">Pick up where you left off.</p>
+              <p style="color: #14233b; font-size: 18px; font-weight: 800; margin: 0 0 10px 0; line-height: 1.4;">Pick up where you left off.</p>
               <p style="color: #4b5563; font-size: 14px; margin: 0 0 14px 0; line-height: 1.7;">You already have a graded card, which means your label is ready to design, the market price is being tracked, and your eBay listing is one click away.</p>
               <p style="color: #4b5563; font-size: 14px; margin: 0; line-height: 1.7;">A lot of graders don&rsquo;t come back until they realize what they can do with the cards they&rsquo;ve already graded. So here&rsquo;s a nudge.</p>
             </td>
           </tr></table>
         </td></tr>
-        <tr><td bgcolor="#059669" style="padding: 0;">
+        <tr><td bgcolor="#7624b5" style="padding: 0;">
           <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=free-credit-banner" style="display: block; text-decoration: none; padding: 20px 24px;">
             <p style="color: #ffffff; font-size: 17px; font-weight: 800; margin: 0 0 4px 0; text-align: center;">&#127873; 1 FREE credit added to your account</p>
             <p style="color: #d1fae5; font-size: 13px; margin: 0; text-align: center;">Grade another card on us. No purchase required.</p>
@@ -577,7 +579,7 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
         })}
         <tr><td class="pad-mobile" style="padding: 30px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Things You Haven&rsquo;t Tried Yet</p>
-          <h2 style="color: #111827; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">What&rsquo;s waiting in your collection</h2>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">What&rsquo;s waiting in your collection</h2>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
@@ -587,21 +589,21 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
           </tr></table>
         </td></tr>
         <tr><td class="pad-mobile-sm" style="padding: 26px 30px 22px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0f1a" style="border-radius: 10px;"><tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#14233b" style="border-radius: 10px;"><tr>
             <td align="center" class="pad-mobile" style="padding: 28px 30px;">
               <p style="color: #ffffff; font-size: 20px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Use your free credit</p>
               <p style="color: #d1d5db; font-size: 14px; margin: 0 0 18px 0; line-height: 1.5;">No payment details, no commitment. Just grade and see what comes back.</p>
-              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#34d399" fillcolor="#34d399"><w:anchorlock/><center style="color:#0a0f1a;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade A Card Free &rarr;</center></v:roundrect><![endif]-->
+              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=primary-cta" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="17%" strokecolor="#d8b4fe" fillcolor="#d8b4fe"><w:anchorlock/><center style="color:#14233b;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Grade A Card Free &rarr;</center></v:roundrect><![endif]-->
               <!--[if !mso]><!-->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;"><tr>
-                <td align="center" bgcolor="#34d399" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=primary-cta" style="display: inline-block; color: #0a0f1a; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade A Card Free &rarr;</a></td>
+                <td align="center" bgcolor="#d8b4fe" style="border-radius: 8px;"><a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=primary-cta" style="display: inline-block; color: #14233b; text-decoration: none; padding: 14px 36px; font-weight: 800; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">Grade A Card Free &rarr;</a></td>
               </tr></table>
               <!--<![endif]-->
             </td>
           </tr></table>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 0 30px 30px 30px;" align="center">
-          <p style="color: #6b7280; font-size: 13px; margin: 0;">Just want to see your card? <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=view-collection" style="color: #059669; text-decoration: underline; font-weight: 700;">Open your collection &rarr;</a></p>
+          <p style="color: #6b7280; font-size: 13px; margin: 0;">Just want to see your card? <a href="https://dcmgrading.com/collection?utm_source=email&utm_medium=email&utm_campaign=post_grade_winback&utm_content=view-collection" style="color: #7624b5; text-decoration: underline; font-weight: 700;">Open your collection &rarr;</a></p>
         </td></tr>
         ${renderFooter('This is the last email in this series. We won&rsquo;t bother you again unless you grade another card.', data.unsubscribe_url)}
       </table>
@@ -623,11 +625,11 @@ function renderSubGradeRow(label: string, summary: string, score: string, border
       <td style="padding: 18px 22px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
           <td>
-            <p style="color: ${labelColor}; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 2px 0;">${label}</p>
-            <p style="color: #111827; font-size: 16px; font-weight: 700; margin: 0;">${summary}</p>
+            <p style="color: ${labelColor}; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 2px 0;">${label}</p>
+            <p style="color: #14233b; font-size: 16px; font-weight: 700; margin: 0;">${summary}</p>
           </td>
           <td align="right" valign="top" width="80">
-            <p style="color: #111827; font-size: 32px; font-weight: 800; margin: 0; line-height: 1; font-family: Arial Black, Arial, sans-serif;">${score}</p>
+            <p style="color: #14233b; font-size: 32px; font-weight: 800; margin: 0; line-height: 1; font-family: Arial Black, Arial, sans-serif;">${emailText(score)}</p>
           </td>
         </tr></table>
         <p style="color: #4b5563; font-size: 13px; line-height: 1.6; margin: 10px 0 0 0;">${description}</p>
@@ -639,10 +641,10 @@ function renderSubGradeRow(label: string, summary: string, score: string, border
 function renderFeatureRow(emoji: string, title: string, body: string): string {
   return `<tr>
     <td width="60" valign="top" style="padding: 4px 14px 0 0;">
-      <div style="background-color: #ecfdf5; border-radius: 50%; width: 44px; height: 44px; line-height: 44px; text-align: center; color: #059669; font-size: 22px; font-weight: 800;">${emoji}</div>
+      <div style="background-color: #ecfdf5; border-radius: 50%; width: 44px; height: 44px; line-height: 44px; text-align: center; color: #7624b5; font-size: 22px; font-weight: 800;">${emoji}</div>
     </td>
     <td valign="top" style="padding: 2px 0 16px 0;">
-      <p style="color: #111827; font-size: 15px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
+      <p style="color: #14233b; font-size: 15px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
       <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">${body}</p>
     </td>
   </tr>`;
@@ -652,9 +654,9 @@ function renderFeaturedCard(url: string, image: string, name: string, subtitle: 
   return `<td width="33%" align="center" valign="top" class="feat-col" style="padding: 0 6px;">
     <a href="${url}?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=${utmContent}" style="text-decoration: none; color: inherit;">
       <img src="${image}" alt="${name} graded card" width="170" style="display: block; width: 100%; max-width: 170px; height: auto; border-radius: 8px;">
-      <p style="color: #111827; font-size: 13px; font-weight: 700; margin: 10px 0 2px 0;">${name}</p>
-      <p style="color: #6b7280; font-size: 11px; margin: 2px 0 0 0;">${subtitle}</p>
-      <p style="color: #059669; font-size: 13px; font-weight: 700; margin: 4px 0 0 0;">Grade ${grade}</p>
+      <p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 10px 0 2px 0;">${name}</p>
+      <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0 0;">${subtitle}</p>
+      <p style="color: #7624b5; font-size: 13px; font-weight: 700; margin: 4px 0 0 0;">Grade ${grade}</p>
     </a>
   </td>`;
 }
@@ -662,8 +664,8 @@ function renderFeaturedCard(url: string, image: string, name: string, subtitle: 
 function renderToolCard(emoji: string, title: string, body: string): string {
   return `<td width="50%" valign="top" class="tool-col" style="padding: 0 6px 12px 6px;">
     <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 18px;">
-      <p style="color: #059669; font-size: 22px; margin: 0 0 6px 0;">${emoji}</p>
-      <p style="color: #111827; font-size: 15px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
+      <p style="color: #7624b5; font-size: 22px; margin: 0 0 6px 0;">${emoji}</p>
+      <p style="color: #14233b; font-size: 15px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
       <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">${body}</p>
     </div>
   </td>`;
@@ -672,26 +674,26 @@ function renderToolCard(emoji: string, title: string, body: string): string {
 function renderCheckRow(title: string, body: string): string {
   return `<tr>
     <td width="50" valign="top" style="padding: 4px 12px 0 0;">
-      <div style="background-color: #fef3c7; border-radius: 50%; width: 38px; height: 38px; line-height: 38px; text-align: center; color: #b45309; font-size: 20px; font-weight: 800;">&#10003;</div>
+      <div style="background-color: #fef3c7; border-radius: 50%; width: 38px; height: 38px; line-height: 38px; text-align: center; color: #7624b5; font-size: 20px; font-weight: 800;">&#10003;</div>
     </td>
     <td valign="top" style="padding: 4px 0 14px 0;">
-      <p style="color: #111827; font-size: 15px; font-weight: 700; margin: 0 0 2px 0;">${title}</p>
+      <p style="color: #14233b; font-size: 15px; font-weight: 700; margin: 0 0 2px 0;">${title}</p>
       <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">${body}</p>
     </td>
   </tr>`;
 }
 
 function renderTierCard(label: string, price: string, credits: string, perGrade: string, highlighted: boolean, utmContent: string): string {
-  const bg = highlighted ? '#fffbeb' : '#f9fafb';
-  const border = highlighted ? '2px solid #fbbf24' : '1px solid #e5e7eb';
-  const labelColor = highlighted ? '#b45309' : '#6b7280';
+  const bg = highlighted ? '#f5effb' : '#f9fafb';
+  const border = highlighted ? '2px solid #d8b4fe' : '1px solid #e5e7eb';
+  const labelColor = highlighted ? '#7624b5' : '#6b7280';
   return `<td width="33%" valign="top" class="pack-col" style="padding: 0 6px;">
     <a href="https://dcmgrading.com/credits?promo=GRADE20&utm_source=email&utm_medium=email&utm_campaign=post_grade_last_chance&utm_content=${utmContent}" style="text-decoration: none; color: inherit; display: block;">
       <div style="background-color: ${bg}; border: ${border}; border-radius: 10px; padding: 18px 14px; text-align: center;">
-        <p style="color: ${labelColor}; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">${label}</p>
-        <p style="color: #111827; font-size: 22px; font-weight: 800; margin: 0 0 4px 0;">${price}</p>
+        <p style="color: ${labelColor}; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">${label}</p>
+        <p style="color: #14233b; font-size: 22px; font-weight: 800; margin: 0 0 4px 0;">${price}</p>
         <p style="color: #6b7280; font-size: 12px; margin: 0 0 8px 0;">${credits}</p>
-        <p style="color: #059669; font-size: 12px; font-weight: 700; margin: 0;">${perGrade}</p>
+        <p style="color: #7624b5; font-size: 12px; font-weight: 700; margin: 0;">${perGrade}</p>
       </div>
     </a>
   </td>`;
@@ -700,8 +702,8 @@ function renderTierCard(label: string, price: string, credits: string, perGrade:
 function renderMissCard(emoji: string, title: string, body: string): string {
   return `<td width="33%" align="center" valign="top" class="miss-col" style="padding: 0 6px;">
     <div style="background-color: #f9fafb; border-radius: 10px; padding: 22px 14px;">
-      <p style="color: #059669; font-size: 28px; margin: 0 0 8px 0;">${emoji}</p>
-      <p style="color: #111827; font-size: 14px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
+      <p style="color: #7624b5; font-size: 28px; margin: 0 0 8px 0;">${emoji}</p>
+      <p style="color: #14233b; font-size: 14px; font-weight: 700; margin: 0 0 4px 0;">${title}</p>
       <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.6;">${body}</p>
     </div>
   </td>`;
@@ -725,7 +727,7 @@ function renderMobileCallout(opts: {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
       <td align="center">
         <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">&#128241; Web &middot; iPhone &middot; Android</p>
-        <p style="color: #111827; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">${opts.headline}</p>
+        <p style="color: #14233b; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">${opts.headline}</p>
         <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6;">${opts.tagline}</p>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="badge-stack" style="margin: 0 auto 10px auto;"><tr>
           <td align="center" valign="middle" style="padding: 0 6px;">
@@ -735,7 +737,7 @@ function renderMobileCallout(opts: {
             <a href="${google}&${utm('mobile-badge-google')}" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/GetItOnGooglePlay_Badge_Web_color_English.png" alt="Get it on Google Play" width="160" height="48" style="display: block; width: 160px; height: 48px;"></a>
           </td>
         </tr></table>
-        <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 1.5;">Already in your browser? <a href="https://dcmgrading.com/upload?${utm('mobile-web-link')}" style="color: #059669; text-decoration: underline; font-weight: 700;">Use DCM on the web</a> &middot; <a href="${apple}?${utm('mobile-text-apple')}" style="color: #6b7280; text-decoration: underline;">App Store</a> &middot; <a href="${google}&${utm('mobile-text-google')}" style="color: #6b7280; text-decoration: underline;">Google Play</a></p>
+        <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.5;">Already in your browser? <a href="https://dcmgrading.com/upload?${utm('mobile-web-link')}" style="color: #7624b5; text-decoration: underline; font-weight: 700;">Use DCM on the web</a> &middot; <a href="${apple}?${utm('mobile-text-apple')}" style="color: #6b7280; text-decoration: underline;">App Store</a> &middot; <a href="${google}&${utm('mobile-text-google')}" style="color: #6b7280; text-decoration: underline;">Google Play</a></p>
       </td>
     </tr></table>
   </td></tr>`;
@@ -744,8 +746,8 @@ function renderMobileCallout(opts: {
 function renderFooter(intro: string, unsubscribeUrl: string): string {
   return `<tr><td bgcolor="#f9fafb" style="padding: 28px 30px; border-top: 1px solid #e5e7eb;">
     <p style="color: #6b7280; font-size: 12px; line-height: 1.6; margin: 0 0 12px 0; text-align: center;">${intro}</p>
-    <p style="color: #9ca3af; font-size: 11px; line-height: 1.6; margin: 0 0 8px 0; text-align: center;">DCM Grading &middot; <a href="https://dcmgrading.com" style="color: #9ca3af; text-decoration: underline;">dcmgrading.com</a> &middot; <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a></p>
-    <p style="color: #9ca3af; font-size: 10px; line-height: 1.5; margin: 0; text-align: center;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
+    <p style="color: #596579; font-size: 12px; line-height: 1.6; margin: 0 0 8px 0; text-align: center;">DCM Grading &middot; <a href="https://dcmgrading.com" style="color: #596579; text-decoration: underline;">dcmgrading.com</a> &middot; <a href="${emailUrl(unsubscribeUrl)}" style="color: #596579; text-decoration: underline;">Unsubscribe</a></p>
+    <p style="color: #596579; font-size: 12px; line-height: 1.5; margin: 0; text-align: center;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
   </td></tr>`;
 }
 

@@ -461,12 +461,12 @@ export default function MarketplaceClient() {
   // -------------------------------- Render --------------------------------
 
   if (pageState === 'loading') {
-    return <FullPageLoader message="Loading marketplace..." />;
+    return <MarketplaceInfo variant="hero" ctaMode="none" />;
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="dcm-brand min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8 text-center">
           <h1 className="text-xl font-bold text-gray-900 mb-2">Couldn&rsquo;t load marketplace</h1>
           <p className="text-gray-600 mb-4">{error}</p>
@@ -477,7 +477,7 @@ export default function MarketplaceClient() {
             Try again
           </button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -504,14 +504,14 @@ export default function MarketplaceClient() {
   // ------------------- Full marketplace (pageState === 'marketplace') -------------------
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="dcm-brand dcm-workspace dcm-instalist-workspace">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div className="dcm-instalist-workspace-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">InstaList: Sell Your Graded Cards on eBay</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">eBay InstaList</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-1">
-              List your graded cards on eBay and track performance.
+              Prepare listings, follow sales and manage your eBay connection.
             </p>
           </div>
           {/* Right-side controls — wrap on narrow screens so the pill chips
@@ -547,7 +547,7 @@ export default function MarketplaceClient() {
 
         {/* Tabs — scrollable on mobile so the row doesn't wrap awkwardly */}
         <div className="mt-6 border-b border-gray-200 overflow-x-auto">
-          <nav className="-mb-px flex gap-4 sm:gap-6 min-w-max">
+          <nav aria-label="InstaList workspace" className="-mb-px flex gap-4 sm:gap-6 min-w-max">
             <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')}>
               List a Card
             </TabButton>
@@ -566,6 +566,7 @@ export default function MarketplaceClient() {
           </nav>
         </div>
 
+        <p className="dcm-workspace-context">{activeTab === 'list' ? 'Choose a graded card, review its images and details, then set your price and shipping before publishing.' : activeTab === 'active' ? 'Follow your active listings, views and watchers.' : activeTab === 'sold' ? 'Review completed sales separately from your active listings.' : activeTab === 'ended' ? 'Review ended listings and select an eligible card to relist.' : 'Manage your eBay connection and seller listing preferences.'}</p>
         {/* Tab content */}
         <div className="mt-6">
           {activeTab === 'list' && (
@@ -629,7 +630,7 @@ export default function MarketplaceClient() {
           customLabelConfig={activeConfig}
         />
       )}
-    </main>
+    </div>
   );
 }
 
@@ -646,6 +647,8 @@ function TabButton({
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
         active
@@ -791,16 +794,5 @@ function DisconnectPanel({
         {error && <p className="text-xs text-red-700">{error}</p>}
       </div>
     </section>
-  );
-}
-
-function FullPageLoader({ message }: { message: string }) {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-3" />
-        <p className="text-gray-600">{message}</p>
-      </div>
-    </main>
   );
 }

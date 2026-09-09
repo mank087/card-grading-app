@@ -1,3 +1,4 @@
+import { cleanMetaText } from '@/lib/seo/completeMetadata'
 import { notFound } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getStorefront } from '../../data';
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const label = getLabelData(card as any);
   const grade = label.gradeFormatted;
   const serial = (card as any).org_serial_display || card.serial;
-  const title = `${label.primaryName} — Graded ${grade} ${label.condition} | ${sf.org.name}`;
+  const title = `${label.primaryName}: Graded ${grade} ${label.condition} | ${sf.org.name}`;
   const description = `${label.primaryName}${label.contextLine ? ` (${label.contextLine})` : ''} professionally graded ${grade}/10 ${label.condition} by ${sf.org.name}. Serial ${serial}. View the verified grading report with sub-scores and condition analysis.`;
   const canonical = `https://dcmgrading.com/enterprise/${slug}/card/${card.id}`;
 
@@ -46,7 +47,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   return {
     title: { absolute: title },
-    description,
+    description: cleanMetaText(description),
     keywords: [label.primaryName, sf.org.name, 'graded card', `grade ${grade}`, label.condition, 'card grading'],
     icons: {
       icon: [{ url: `/enterprise/${slug}/favicon`, type: 'image/png' }],
@@ -57,13 +58,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     robots: { index: true, follow: true },
     openGraph: {
       title,
-      description,
+      description: cleanMetaText(description),
       url: canonical,
       siteName: sf.org.name,
       type: 'website',
-      images: ogImage ? [{ url: ogImage, width: 800, height: 1120, alt: `${label.primaryName} — graded ${grade}` }] : undefined,
+      images: ogImage ? [{ url: ogImage, width: 800, height: 1120, alt: `${label.primaryName}: graded ${grade}` }] : undefined,
     },
-    twitter: { card: ogImage ? 'summary_large_image' : 'summary', title, description },
+    twitter: { card: ogImage ? 'summary_large_image' : 'summary', title, description: cleanMetaText(description) },
   };
 }
 

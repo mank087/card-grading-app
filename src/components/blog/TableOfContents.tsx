@@ -63,7 +63,7 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
   }
 
   return (
-    <nav className="sticky top-24">
+    <div role="navigation" className="sticky top-24" aria-label="Article contents">
       <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
         Table of Contents
       </h3>
@@ -75,6 +75,7 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
           >
             <a
               href={`#${item.id}`}
+              aria-current={activeId === item.id ? 'location' : undefined}
               className={`block text-sm transition-colors duration-200 ${
                 activeId === item.id
                   ? 'text-purple-600 font-medium border-l-2 border-purple-600 -ml-[2px] pl-4'
@@ -92,6 +93,6 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
           </li>
         ))}
       </ul>
-    </nav>
+    </div>
   );
 }

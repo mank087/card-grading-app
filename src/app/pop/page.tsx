@@ -74,43 +74,44 @@ export default async function PopReportPage() {
   const maxGradeCount = Math.max(...GRADE_COLUMNS.map((g) => stats.distribution[g] || 0), 1);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="dcm-brand dcm-pop-page">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetJsonLd) }}
       />
 
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
+      <div className="dcm-hero dcm-dark">
+        <div className="dcm-container">
+          <div>
+            <p className="dcm-eyebrow">The DCM grading database</p>
             <h1 className="text-4xl sm:text-5xl font-bold mb-4">Population Report</h1>
-            <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
+            <p className="dcm-lead max-w-2xl mb-8">
               Every card graded by DCM, broken down by category and individual card with complete grade distributions.
             </p>
 
             {/* Platform Stats */}
             {totals.totalGraded > 0 && (
-              <div className="flex flex-wrap justify-center gap-8 mt-6">
+              <div className="dcm-pop-stats">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-300">
+                  <div className="text-3xl font-bold text-cyan-200">
                     {totalGraded.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-400 mt-1">Cards Graded</div>
+                  <div className="text-sm text-slate-300 mt-1">Cards Graded</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-300">
+                  <div className="text-3xl font-bold text-cyan-200">
                     {totals.totalUniqueCards.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-400 mt-1">Unique Cards</div>
+                  <div className="text-sm text-slate-300 mt-1">Unique Cards</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-300">{categories.length}</div>
-                  <div className="text-sm text-gray-400 mt-1">Categories</div>
+                  <div className="text-3xl font-bold text-cyan-200">{categories.length}</div>
+                  <div className="text-sm text-slate-300 mt-1">Categories</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-300">{pct(stats.gemRate)}</div>
-                  <div className="text-sm text-gray-400 mt-1">Graded 10</div>
+                  <div className="text-3xl font-bold text-cyan-200">{pct(stats.gemRate)}</div>
+                  <div className="text-sm text-slate-300 mt-1">Graded 10</div>
                 </div>
               </div>
             )}
@@ -118,9 +119,55 @@ export default async function PopReportPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="dcm-container dcm-section">
+        <div className="dcm-pop-categories">
+        {/* Category Grid */}
+        <h2 id="categories" className="text-xl font-bold text-gray-900 mb-4">Browse by category</h2>
+        {categories.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-gray-500 text-lg">No graded cards yet. Be the first!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categories.slice(0, 8).map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/pop/${cat.slug}`}
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all"
+              >
+                <div className="text-3xl mb-3">{cat.icon}</div>
+                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-purple-600 transition-colors mb-3">
+                  {cat.displayName}
+                </h3>
+                <div className="space-y-1 text-sm text-gray-500">
+                  <div>{cat.totalGraded.toLocaleString()} graded</div>
+                  <div>{cat.uniqueCards.toLocaleString()} unique cards</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {categories.length > 8 && <details className="dcm-pop-more"><summary>View all {categories.length} categories</summary><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-5">            {categories.slice(8).map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/pop/${cat.slug}`}
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all"
+              >
+                <div className="text-3xl mb-3">{cat.icon}</div>
+                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-purple-600 transition-colors mb-3">
+                  {cat.displayName}
+                </h3>
+                <div className="space-y-1 text-sm text-gray-500">
+                  <div>{cat.totalGraded.toLocaleString()} graded</div>
+                  <div>{cat.uniqueCards.toLocaleString()} unique cards</div>
+                </div>
+              </Link>
+            ))}</div></details>}
+        </div>
+        <div role="navigation" className="dcm-actions dcm-pop-jumps" aria-label="Population report sections"><Link className="dcm-button dcm-button--secondary" href="#distribution">Grade distribution</Link><Link className="dcm-button dcm-button--secondary" href="#grade-context">What the numbers mean</Link><Link className="dcm-button dcm-button--text" href="/featured">View real graded cards →</Link></div>
         {/* Narrative summary — the answer, first, in plain sentences. */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-10">
+        <section id="grade-context" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-10">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             What percentage of cards get a 10?
           </h2>
@@ -163,7 +210,7 @@ export default async function PopReportPage() {
         </section>
 
         {/* Platform-wide grade distribution */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-12">
+        <section id="distribution" className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-12">
           <div className="px-6 pt-6 pb-3">
             <h2 className="text-xl font-bold text-gray-900">Grade distribution, all categories</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -286,33 +333,6 @@ export default async function PopReportPage() {
           </section>
         )}
 
-        {/* Category Grid */}
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Browse by category</h2>
-        {categories.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg">No graded cards yet. Be the first!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {categories.map((cat) => (
-              <Link
-                key={cat.slug}
-                href={`/pop/${cat.slug}`}
-                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all"
-              >
-                <div className="text-3xl mb-3">{cat.icon}</div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-purple-600 transition-colors mb-3">
-                  {cat.displayName}
-                </h3>
-                <div className="space-y-1 text-sm text-gray-500">
-                  <div>{cat.totalGraded.toLocaleString()} graded</div>
-                  <div>{cat.uniqueCards.toLocaleString()} unique cards</div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-
         {/* CTA */}
         <div className="text-center mt-16">
           <h2 className="text-xl font-semibold text-gray-900 mb-3">
@@ -323,7 +343,7 @@ export default async function PopReportPage() {
           </p>
           <Link
             href="/upload"
-            className="inline-block bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-md"
+            className="dcm-button dcm-button--primary"
           >
             Get Your Cards Graded
           </Link>

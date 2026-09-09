@@ -1216,7 +1216,7 @@ function UniversalUploadPageContent() {
       console.log('[Upload] paywall_seen (upload_blocked) tracked')
     }
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-br from-gray-50 to-purple-50">
+      <main className="dcm-brand dcm-upload-workspace flex min-h-screen flex-col items-center justify-center p-4 md:p-8">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
           {/* Icon */}
           <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
@@ -1300,7 +1300,7 @@ function UniversalUploadPageContent() {
         {hiddenFileInputs}
         <div className="fixed inset-0 bg-white z-50 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
+        <div className="dcm-dark text-white px-4 py-3">
           <h2 className="text-lg font-bold text-center">Select from Gallery</h2>
         </div>
 
@@ -1485,9 +1485,9 @@ function UniversalUploadPageContent() {
     return (
       <>
         {hiddenFileInputs}
-        <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
+        <div className="dcm-brand dcm-upload-workspace fixed inset-0 bg-gray-50 z-50 flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
+          <div className="dcm-dark text-white px-4 py-3">
             <h2 className="text-lg font-bold text-center">
               {wizardStep === 1 && 'Confirm Card Type'}
               {wizardStep === 2 && 'Review Your Photos'}
@@ -2044,7 +2044,7 @@ function UniversalUploadPageContent() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 pt-20">
+    <main className="dcm-brand dcm-upload-workspace flex min-h-screen flex-col items-center p-4 md:p-8">
       {hiddenFileInputs}
 
       {/* Photo Tips Popup */}
@@ -2099,8 +2099,8 @@ function UniversalUploadPageContent() {
 
       {/* Header - Always first */}
       <div className="text-center mb-4 md:mb-6 w-full">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Upload Card for Grading</h1>
-        <p className="text-gray-600 text-sm md:text-base">DCM Optic™ grading and analysis for all card types</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Grade Your Card</h1>
+        <p className="text-gray-600 text-sm md:text-base">Photograph both sides. Review your images. Submit for condition analysis.</p>
 
         {/* Credit Balance Display */}
         {!creditsLoading && (
@@ -2119,7 +2119,7 @@ function UniversalUploadPageContent() {
       {/* Flex container for reordering on mobile */}
       <div className="flex flex-col w-full max-w-md md:max-w-3xl">
         {/* Informational Sections - Show after upload form on mobile, before on desktop */}
-        <div className="order-3 md:order-1 mb-6 md:mb-8">
+        <div className="order-3 mt-6 mb-6 md:mb-8">
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2 text-sm md:text-base">📊 What We Analyze</h3>
@@ -2146,7 +2146,8 @@ function UniversalUploadPageContent() {
         </div>
 
         {/* Upload Form - Show first on mobile, after info sections on desktop */}
-        <div className="order-1 md:order-2 w-full space-y-6 bg-white p-4 md:p-6 rounded-lg shadow-lg">
+        <div className="order-1 w-full space-y-6 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="dcm-photo-guidance"><strong>Before you upload</strong><p>Use even lighting, avoid glare and keep all four edges visible. Make sure the front and back photos belong to the same card.</p><Link href="/get-started" target="_blank" rel="noopener noreferrer">Photo guide →</Link></div>
         {/* Card Type Selector */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

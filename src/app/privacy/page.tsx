@@ -1,20 +1,22 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  twitter: { card: 'summary', title: 'Privacy Policy', description: 'DCM Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.', images: ['/DCM-logo.png'] },
+  openGraph: { title: 'Privacy Policy', description: 'DCM Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.', type: 'website', siteName: 'DCM Grading', images: ['/DCM-logo.png'] },
+  alternates: { canonical: 'https://dcmgrading.com/privacy' },
   title: 'Privacy Policy',
   description: 'DCM Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.',
   robots: {
     index: true,
     follow: true,
   },
-};
+});
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <FloatingCardsBackground />
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
+    <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10 dcm-editorial-heading">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
         <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
 

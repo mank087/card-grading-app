@@ -1,21 +1,23 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import FloatingCardsBackground from '../../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  twitter: { card: 'summary', title: 'Enterprise Program Terms', description: 'Supplemental terms for the DCM Enterprise program for card stores, dealers, and grading businesses.', images: ['/DCM-logo.png'] },
+  openGraph: { title: 'Enterprise Program Terms', description: 'Supplemental terms for the DCM Enterprise program for card stores, dealers, and grading businesses.', type: 'website', siteName: 'DCM Grading', images: ['/DCM-logo.png'] },
+  alternates: { canonical: 'https://dcmgrading.com/enterprise/terms' },
   title: 'Enterprise Program Terms',
   description: 'Supplemental terms for the DCM Enterprise program for card stores, dealers, and grading businesses.',
   robots: {
     index: true,
     follow: true,
   },
-};
+});
 
 export default function EnterpriseTermsPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <FloatingCardsBackground />
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
+    <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10 dcm-editorial-heading">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">DCM Enterprise Program Terms</h1>
         <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
 

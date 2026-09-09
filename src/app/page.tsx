@@ -1,3 +1,6 @@
+import { homeMetadata } from './metadata'
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { MarketingShowcaseBoundary } from '@/components/marketing/MarketingShowcaseBoundary'
 import type { Metadata } from 'next';
 import HomePageClient from './HomePageClient';
 
@@ -6,7 +9,9 @@ import HomePageClient from './HomePageClient';
 // carry the canonical: it CANNOT live on the root layout, because metadata is
 // merged down the tree and a root canonical would be inherited by every page
 // that does not set its own.
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  ...homeMetadata,
+  title: { absolute: String(homeMetadata.title) },
   alternates: {
     canonical: 'https://dcmgrading.com',
     // `alternates` is REPLACED, not merged, when a page declares it — so the
@@ -17,8 +22,8 @@ export const metadata: Metadata = {
       ],
     },
   },
-};
+});
 
 export default function Page() {
-  return <HomePageClient />;
+  return <MarketingShowcaseBoundary selection="1"><HomePageClient /></MarketingShowcaseBoundary>;
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { useMotionActive } from '@/components/design/useMotionActive'
+
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { signInWithOAuth, signUp } from '@/lib/directAuth'
@@ -45,7 +47,7 @@ const DEFAULT_MESSAGES = [
   '2 free grades + bonus credits',
   'Grade cards in minutes, not weeks',
   'Labels, pricing & eBay listing',
-  'As low as $0.50 a card with Card Lovers Annual — credits never expire',
+  'As low as $0.50 a card with Card Lovers Annual. Credits never expire',
 ]
 
 export interface FloatingCtaBarProps {
@@ -81,15 +83,17 @@ export default function FloatingCtaBar({
   const [ctaIndex, setCtaIndex] = useState(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  const motionActive = useMotionActive()
   const a = ACCENTS[accent]
 
-  // Rotate the benefit line
+  // Rotate only when the visitor can see the bar.
   useEffect(() => {
+    if (isAuthenticated || !isVisible || isExpanded || !motionActive || messages.length < 2) return
     intervalRef.current = setInterval(() => {
       setCtaIndex(prev => (prev + 1) % messages.length)
     }, 4000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [messages.length])
+  }, [messages.length, isAuthenticated, isVisible, isExpanded, motionActive])
 
   // Reveal after the hero scrolls past
   useEffect(() => {
@@ -145,8 +149,8 @@ export default function FloatingCtaBar({
     }
     try {
       await signInWithOAuth(provider)
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
       setOauthLoading(false)
     }
   }
@@ -171,15 +175,15 @@ export default function FloatingCtaBar({
         setEmail('')
         setPassword('')
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
+    <div data-site-chrome="floating" className="fixed bottom-0 left-0 right-0 z-50">
       {isExpanded && (
         <div className={`bg-gray-900 border-t ${a.borderStrong} shadow-2xl p-4 sm:p-6 animate-slide-up`}>
           <div className="max-w-md mx-auto">

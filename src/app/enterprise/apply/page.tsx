@@ -134,7 +134,7 @@ export default function EnterpriseApplyPage() {
 
   if (signedIn === null || !membershipLoaded || pendingApplication === null) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
       </main>
     )
@@ -142,8 +142,8 @@ export default function EnterpriseApplyPage() {
 
   if (!signedIn) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center">
+      <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center dcm-editorial-heading">
           <h1 className="text-xl font-bold text-gray-900 mb-2">Create your DCM account first</h1>
           <p className="text-gray-600 text-sm mb-6">
             Your store is managed through a regular DCM account. Sign up (or sign in), and we&apos;ll
@@ -151,7 +151,7 @@ export default function EnterpriseApplyPage() {
           </p>
           <div className="flex justify-center gap-3">
             <Link href="/login?mode=signup&redirect=/enterprise/apply"
-              className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700">
+              className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700 dcm-editorial-primary">
               Sign up
             </Link>
             <Link href="/login?mode=login&redirect=/enterprise/apply"
@@ -166,14 +166,14 @@ export default function EnterpriseApplyPage() {
 
   if (membership) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center">
+      <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center dcm-editorial-heading">
           <h1 className="text-xl font-bold text-gray-900 mb-2">You&apos;re already part of {membership.name}</h1>
           <p className="text-gray-600 text-sm mb-6">
             Each DCM account can belong to one enterprise account. Manage yours from the billing page.
           </p>
           <Link href="/store/billing"
-            className="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700">
+            className="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700 dcm-editorial-primary">
             Manage your account
           </Link>
         </div>
@@ -183,8 +183,8 @@ export default function EnterpriseApplyPage() {
 
   if (done || pendingApplication) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center">
+      <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md text-center dcm-editorial-heading">
           <div className="text-4xl mb-3">✅</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Application received</h1>
           <p className="text-gray-600 text-sm mb-6">
@@ -196,7 +196,7 @@ export default function EnterpriseApplyPage() {
             In the meantime, your personal DCM account works as always.
           </p>
           <Link href="/"
-            className="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700">
+            className="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold text-sm hover:bg-purple-700 dcm-editorial-primary">
             Back to DCM home
           </Link>
         </div>
@@ -205,9 +205,9 @@ export default function EnterpriseApplyPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4">
+    <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 dcm-editorial-heading">
           <p className="uppercase tracking-widest text-purple-600 text-xs font-semibold mb-2">DCM Enterprise</p>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Set up your enterprise grading account</h1>
           <p className="text-gray-600 text-sm max-w-lg mx-auto">
@@ -221,16 +221,16 @@ export default function EnterpriseApplyPage() {
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Business details</h2>
             <div>
-              <label className={labelCls}>Brand or business name *</label>
-              <input value={storeName} onChange={e => setStoreName(e.target.value)}
+              <label htmlFor="enterprise-storeName" className={labelCls}>Brand or business name *</label>
+              <input id="enterprise-storeName" value={storeName} onChange={e => setStoreName(e.target.value)}
                 placeholder="Enter brand or business name" className={inputCls} maxLength={120} />
               <p className="text-xs text-gray-400 mt-1">Exactly as it should appear on slab labels and reports.</p>
             </div>
             <div>
-              <label className={labelCls}>Branded URL</label>
+              <label htmlFor="enterprise-effectiveSlug" className={labelCls}>Branded URL</label>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-gray-400 whitespace-nowrap">dcmgrading.com/enterprise/</span>
-                <input value={effectiveSlug}
+                <input id="enterprise-effectiveSlug" value={effectiveSlug}
                   onChange={e => { setSlugTouched(true); setSlug(e.target.value.toLowerCase()) }}
                   className={inputCls} maxLength={32} />
               </div>
@@ -240,12 +240,12 @@ export default function EnterpriseApplyPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>Phone</label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} maxLength={40} />
+                <label htmlFor="enterprise-phone" className={labelCls}>Phone</label>
+                <input id="enterprise-phone" value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} maxLength={40} />
               </div>
               <div>
-                <label className={labelCls}>Website or social</label>
-                <input value={website} onChange={e => setWebsite(e.target.value)}
+                <label htmlFor="enterprise-website" className={labelCls}>Website or social</label>
+                <input id="enterprise-website" value={website} onChange={e => setWebsite(e.target.value)}
                   placeholder="https://" className={inputCls} maxLength={200} />
               </div>
             </div>
@@ -283,13 +283,13 @@ export default function EnterpriseApplyPage() {
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Enterprise Page basics <span className="text-sm font-normal text-gray-400">(optional)</span></h2>
             <div>
-              <label className={labelCls}>Tagline</label>
-              <input value={tagline} onChange={e => setTagline(e.target.value)}
+              <label htmlFor="enterprise-tagline" className={labelCls}>Tagline</label>
+              <input id="enterprise-tagline" value={tagline} onChange={e => setTagline(e.target.value)}
                 placeholder="Your neighborhood grading counter" className={inputCls} maxLength={140} />
             </div>
             <div>
-              <label className={labelCls}>About your brand or business</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)}
+              <label htmlFor="enterprise-description" className={labelCls}>About your brand or business</label>
+              <textarea id="enterprise-description" value={description} onChange={e => setDescription(e.target.value)}
                 rows={3} className={inputCls} maxLength={1000} />
             </div>
           </section>
@@ -299,8 +299,8 @@ export default function EnterpriseApplyPage() {
             <h2 className="text-lg font-semibold text-gray-900">Grading volume</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>Cards per month (estimate)</label>
-                <select value={monthlyVolume} onChange={e => setMonthlyVolume(e.target.value)} className={inputCls}>
+                <label htmlFor="enterprise-monthlyVolume" className={labelCls}>Cards per month (estimate)</label>
+                <select id="enterprise-monthlyVolume" value={monthlyVolume} onChange={e => setMonthlyVolume(e.target.value)} className={inputCls}>
                   <option value="">Select...</option>
                   <option value="under-100">Under 100</option>
                   <option value="100-400">100 to 400</option>
@@ -309,8 +309,8 @@ export default function EnterpriseApplyPage() {
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Plan you&apos;re considering</label>
-                <select value={tierIntent} onChange={e => setTierIntent(e.target.value)} className={inputCls}>
+                <label htmlFor="enterprise-tierIntent" className={labelCls}>Plan you&apos;re considering</label>
+                <select id="enterprise-tierIntent" value={tierIntent} onChange={e => setTierIntent(e.target.value)} className={inputCls}>
                   <option value="">Not sure yet</option>
                   {Object.values(ORG_PLANS).map(p => (
                     <option key={p.key} value={p.key}>
@@ -338,7 +338,7 @@ export default function EnterpriseApplyPage() {
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
             )}
             <button onClick={submit} disabled={!canSubmit}
-              className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed dcm-editorial-primary">
               {submitting ? 'Submitting...' : 'Submit application'}
             </button>
             <p className="text-xs text-gray-400 text-center">

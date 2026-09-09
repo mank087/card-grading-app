@@ -254,7 +254,7 @@ function CardLoversSuccessContent() {
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <Link
-          href="/grade"
+          href="/upload"
           className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,7 +297,7 @@ function LoadingFallback() {
 
 export default function CardLoversSuccessPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-rose-50 to-pink-50 py-16">
+    <main className="dcm-brand min-h-screen bg-[#f6f7fa] py-16">
       <div className="container mx-auto px-4">
         <Suspense fallback={<LoadingFallback />}>
           <CardLoversSuccessContent />

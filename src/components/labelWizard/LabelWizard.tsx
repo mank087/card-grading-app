@@ -108,12 +108,12 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
   return (
     // touch-action: manipulation removes the double-tap-to-zoom delay on all
     // the wizard's chips and buttons without disabling pinch-zoom.
-    <div className="min-h-screen bg-gray-50" style={{ touchAction: 'manipulation' }}>
+    <div className="dcm-brand dcm-label-workspace min-h-screen bg-gray-50" style={{ touchAction: 'manipulation' }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-2 mb-5">
+        <div className="dcm-tool-heading flex flex-wrap items-start justify-between gap-2 mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Label Studio: Custom Slab Labels for Your Cards</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Label Studio</h1>
             <p className="text-sm text-gray-500">Design labels for up to {MAX_WIZARD_CARDS} cards in five quick steps.</p>
           </div>
           <Link
@@ -125,7 +125,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
         </div>
 
         {/* Stepper */}
-        <nav aria-label="Wizard steps" className="mb-6">
+        <div role="navigation" aria-label="Wizard steps" className="mb-6">
           <ol className="flex items-center gap-1 sm:gap-2">
             {STEPS.map((s, i) => {
               const status = s.n === state.step ? 'current' : s.n <= maxReachable ? 'done' : 'todo'
@@ -165,8 +165,9 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               )
             })}
           </ol>
-        </nav>
+        </div>
 
+        <p className="dcm-step-context" role="status">Step {state.step} of {state.step === 6 ? 6 : 5}: {STEPS.find(step => step.n === state.step)?.name}{state.step === 6 ? ' (optional)' : ''}</p>
         {/* Step body */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
           {state.step === 1 && (
@@ -263,7 +264,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
           </button>
           <div className="flex items-center gap-3 min-w-0">
             {blocker ? (
-              <p className="text-xs text-gray-400 truncate">{blocker}</p>
+              <p className="text-xs text-gray-600">{blocker}</p>
             ) : state.step === 1 ? (
               <p className="text-xs text-gray-400">
                 {state.cards.length} card{state.cards.length === 1 ? '' : 's'} selected

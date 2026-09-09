@@ -1,5 +1,8 @@
 'use client'
 
+import { useMotionActive } from '@/components/design/useMotionActive'
+import type { ShowcaseCard } from '@/components/design/featuredCard'
+
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { CardSlabGrid } from '@/components/CardSlab'
@@ -39,13 +42,15 @@ export default function LatestGradesCarousel({
   cta,
   className = 'py-12 bg-gradient-to-br from-purple-900/30 via-gray-900 to-blue-900/30',
 }: LatestGradesCarouselProps) {
-  const [cards, setCards] = useState<any[]>([])
+  const [cards, setCards] = useState<ShowcaseCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isScrollPaused, setIsScrollPaused] = useState(false)
-  const [scrollPosition, setScrollPosition] = useState(0)
+  const motionActive = useMotionActive()
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const animationRef = useRef<number | null>(null)
+  const offsetRef = useRef(0)
   const lastTimeRef = useRef<number>(0)
   const isTouchingRef = useRef(false)
 
@@ -54,66 +59,40 @@ export default function LatestGradesCarousel({
     fetch(apiPath)
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (!cancelled) setCards(data?.cards || []) })
-      .catch(err => console.error('[LatestGrades] fetch failed:', err))
+      .catch(() => { if (!cancelled) setCards([]) })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [apiPath])
 
-  // Auto-scroll animation
+  // Scroll the DOM directly: no React render on each animation frame.
   useEffect(() => {
     const container = containerRef.current
-    if (!container || cards.length === 0) return
-
-    const animate = (currentTime: number) => {
-      if (isScrollPaused || isTouchingRef.current) {
-        lastTimeRef.current = 0
-        animationRef.current = requestAnimationFrame(animate)
-        return
-      }
-      if (lastTimeRef.current === 0) lastTimeRef.current = currentTime
-
-      const deltaTime = (currentTime - lastTimeRef.current) / 1000
-      lastTimeRef.current = currentTime
-
-      const scrollAmount = SCROLL_SPEED * deltaTime
-      const maxScroll = container.scrollWidth - container.clientWidth
-
-      if (maxScroll > 0) {
-        setScrollPosition(prev => {
-          const next = prev + scrollAmount
-          return next >= maxScroll ? 0 : next
-        })
+    if (!container || !cards.length || isScrollPaused || !motionActive) return
+    lastTimeRef.current = 0
+    offsetRef.current = container.scrollLeft
+    const animate = (time: number) => {
+      const delta = lastTimeRef.current ? Math.min((time - lastTimeRef.current) / 1000, .1) : 0
+      lastTimeRef.current = time
+      const max = container.scrollWidth - container.clientWidth
+      if (max > 0) {
+        offsetRef.current = offsetRef.current >= max ? 0 : Math.min(max, offsetRef.current + SCROLL_SPEED * delta)
+        container.scrollLeft = offsetRef.current
       }
       animationRef.current = requestAnimationFrame(animate)
     }
-
     animationRef.current = requestAnimationFrame(animate)
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current) }
-  }, [isScrollPaused, cards.length])
-
-  // Apply scroll position
-  useEffect(() => {
-    const container = containerRef.current
-    if (container && !isTouchingRef.current) container.scrollLeft = scrollPosition
-  }, [scrollPosition])
-
+    return () => { if (animationRef.current !== null) cancelAnimationFrame(animationRef.current) }
+  }, [isScrollPaused, motionActive, cards.length])
+  useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current) }, [])
   const scrollBy = (direction: 'left' | 'right') => {
     const container = containerRef.current
     if (!container) return
-    const step = (CARD_WIDTH + GAP) * 2
-    const maxScroll = container.scrollWidth - container.clientWidth
-    setScrollPosition(direction === 'left'
-      ? Math.max(0, scrollPosition - step)
-      : Math.min(maxScroll, scrollPosition + step))
+    container.scrollLeft += (direction === 'left' ? -1 : 1) * (CARD_WIDTH + GAP) * 2
+    offsetRef.current = container.scrollLeft
   }
-
   const handleTouchEnd = () => {
-    const container = containerRef.current
-    if (container) setScrollPosition(container.scrollLeft)
-    setTimeout(() => {
-      isTouchingRef.current = false
-      lastTimeRef.current = 0
-    }, 2000)
+    if (resumeTimer.current) clearTimeout(resumeTimer.current)
+    resumeTimer.current = setTimeout(() => { isTouchingRef.current = false; setIsScrollPaused(false) }, 2000)
   }
 
   // Hide entirely rather than render an empty shell
@@ -153,7 +132,9 @@ export default function LatestGradesCarousel({
           ref={containerRef}
           onMouseEnter={() => { setIsScrollPaused(true); lastTimeRef.current = 0 }}
           onMouseLeave={() => { setIsScrollPaused(false); lastTimeRef.current = 0 }}
-          onTouchStart={() => { isTouchingRef.current = true; lastTimeRef.current = 0 }}
+          onTouchStart={() => { if (resumeTimer.current) clearTimeout(resumeTimer.current); isTouchingRef.current = true; setIsScrollPaused(true) }}
+          onFocusCapture={() => setIsScrollPaused(true)}
+          onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsScrollPaused(false) }}
           onTouchEnd={handleTouchEnd}
           className="flex flex-nowrap gap-6 overflow-x-auto pb-4 -mx-4 px-4"
           style={{
@@ -184,7 +165,7 @@ export default function LatestGradesCarousel({
                       serial={labelData.serial}
                       grade={labelData.grade}
                       condition={labelData.condition}
-                      frontImageUrl={card.front_url}
+                      frontImageUrl={card.front_url ?? null}
                       isAlteredAuthentic={labelData.isAlteredAuthentic}
                       className="hover:shadow-xl hover:shadow-purple-500/20 transition-shadow duration-200"
                     />

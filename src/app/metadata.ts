@@ -1,9 +1,10 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
 // Homepage metadata - exported and used in layout.tsx
-export const homeMetadata: Metadata = {
-  title: 'DCM Grading - Instant Card Grading for Pokemon, Sports, MTG & More',
-  description: 'Professional card grading powered by DCM Optic™. Get instant, accurate grades for Pokemon, Sports Cards, Magic: The Gathering, Lorcana & One Piece. Multi-point inspection, as low as $0.50 a card with Card Lovers Annual, with downloadable labels.',
+export const homeMetadata: Metadata = completeMetadata({
+  title: 'Instant Card Grading for Pokémon & Sports | DCM Grading',
+  description: 'Grade Pokémon, sports and other trading cards from photos with DCM Optic. Review card condition, subgrades and printable Heritage labels.',
   // Icons for Google Search, browsers, and mobile devices
   icons: {
     icon: [
@@ -28,14 +29,13 @@ export const homeMetadata: Metadata = {
     'disney lorcana grading',
     'DCM grading',
     'professional card grading',
-    'card authentication',
     'PSA alternative',
     'BGS alternative',
     'instant card grading',
     'online card grading',
   ].join(', '),
   openGraph: {
-    title: 'DCM Grading - Instant Card Grading for Pokemon, Sports, MTG & More',
+    title: 'Instant Card Grading for Pokémon & Sports | DCM Grading',
     description: 'Professional card grading powered by DCM Optic™. Instant grades for Pokemon, Sports Cards, MTG, Lorcana & One Piece. As low as $0.50 a card with Card Lovers Annual.',
     type: 'website',
     siteName: 'DCM Grading',
@@ -66,4 +66,4 @@ export const homeMetadata: Metadata = {
       'max-snippet': -1,
     },
   },
-};
+});

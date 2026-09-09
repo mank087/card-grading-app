@@ -1,3 +1,4 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
@@ -59,8 +60,8 @@ export async function generateMetadata({
   const description = generateMetaDescription(show)
   const dateRange = formatDateRange(show.start_date, show.end_date)
 
-  return {
-    title,
+  return completeMetadata({
+    title: { absolute: title },
     description,
     keywords: [
       show.name,
@@ -90,7 +91,7 @@ export async function generateMetadata({
         }
       ] : [
         {
-          url: 'https://dcmgrading.com/og-image.png',
+          url: 'https://dcmgrading.com/opengraph-image',
           width: 1200,
           height: 630,
           alt: 'DCM Grading - Card Grading Powered by DCM Optic™',
@@ -101,7 +102,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      images: show.hero_image_url ? [show.hero_image_url] : ['https://dcmgrading.com/og-image.png'],
+      images: show.hero_image_url ? [show.hero_image_url] : ['https://dcmgrading.com/opengraph-image'],
     },
     alternates: {
       canonical: `https://dcmgrading.com/card-shows/${show.slug}`,
@@ -114,7 +115,7 @@ export async function generateMetadata({
         follow: true,
       },
     },
-  }
+  })
 }
 
 // Page component

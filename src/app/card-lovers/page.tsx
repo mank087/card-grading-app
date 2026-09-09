@@ -1,5 +1,7 @@
 'use client'
 
+import { OfferCardSlider } from '@/components/design/OfferCardSlider'
+import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -135,65 +137,28 @@ export default function CardLoversPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-rose-50 to-pink-50">
-      {/* Hero Section */}
-      <section className="relative py-16 md:py-24 overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-[10%] w-20 h-20 bg-purple-400 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-[15%] w-32 h-32 bg-rose-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 left-[30%] w-24 h-24 bg-pink-400 rounded-full blur-3xl" />
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-rose-500 text-white px-4 py-2 rounded-full text-sm font-semibold mb-6 shadow-lg">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-              </svg>
-              Monthly Subscription
-            </div>
-
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-              <Image src="/DCM-logo.png" alt="DCM" width={80} height={80} className="rounded-xl shadow-lg" />
-            </div>
-
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-4">
-              Become a <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-rose-600">Card Lover</span>
-            </h1>
-
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Get 70 credits every month, exclusive perks, and the best value for collectors who grade regularly.
-            </p>
-
-            {subscriptionStatus?.isActive && (
-              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                You&apos;re a Card Lover!
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+    <div className="dcm-brand dcm-offer-page">
+      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro"><div className="dcm-offer-intro-copy">
+        <p className="dcm-eyebrow">Card Lovers membership</p>
+        <h1>For the collection<br />you keep coming back to.</h1>
+        <p className="dcm-lead">Regular grading credits, exclusive label emblems, and member savings. Choose the billing period that fits your collection.</p>
+        <div className="dcm-actions mt-6"><ActionLink href="#membership">Explore Membership</ActionLink><ActionLink href="/credits" variant="text">Compare All Plans</ActionLink></div>
+      </div><OfferCardSlider /></div></section>
 
       {/* Pricing Card - Single box with toggle */}
-      <section className="py-12 bg-white">
+      <section id="membership" className="py-12 bg-white scroll-mt-20">
         <div className="container mx-auto px-4">
           <div className="max-w-lg mx-auto">
-            <div className={`relative rounded-3xl shadow-2xl overflow-hidden ${
+            <div className={`relative rounded-2xl shadow-sm overflow-hidden ${
               subscriptionStatus?.isActive
-                ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300'
-                : 'bg-white ring-4 ring-rose-300'
+                ? 'bg-green-50 border-2 border-green-300'
+                : 'bg-white border border-[#dfe3eb]'
             }`}>
               {/* Header with Toggle */}
-              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-6 py-5">
+              <div className="bg-[#14233b] px-6 py-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-3xl">♥</span>
+                    <span className="text-3xl text-rose-300" aria-hidden="true">♥</span>
                     <h3 className="text-2xl font-bold text-white">Card Lovers</h3>
                   </div>
                   {subscriptionStatus?.isActive && (
@@ -207,6 +172,8 @@ export default function CardLoversPage() {
                 {!subscriptionStatus?.isActive && (
                   <div className="flex items-center justify-center gap-2 bg-white/20 rounded-full p-1">
                     <button
+                      type="button"
+                      aria-pressed={selectedPlan === 'annual'}
                       onClick={() => setSelectedPlan('annual')}
                       className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                         selectedPlan === 'annual'
@@ -217,6 +184,8 @@ export default function CardLoversPage() {
                       Annual (Save $150)
                     </button>
                     <button
+                      type="button"
+                      aria-pressed={selectedPlan === 'monthly'}
                       onClick={() => setSelectedPlan('monthly')}
                       className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                         selectedPlan === 'monthly'
@@ -246,23 +215,23 @@ export default function CardLoversPage() {
                     <>
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-4xl font-bold text-gray-900">
-                          {subscriptionStatus.plan === 'annual' ? '$37.42' : '$49.99'}
+                          {subscriptionStatus.plan === 'annual' ? '$449' : '$49.99'}
                         </span>
-                        <span className="text-gray-500 text-lg">/month</span>
+                        <span className="text-gray-500 text-lg">/{subscriptionStatus.plan === 'annual' ? 'year' : 'month'}</span>
                       </div>
                       <p className="text-gray-500 text-sm mt-1">
                         {subscriptionStatus.plan === 'annual'
-                          ? 'Billed annually at $449/year'
+                          ? 'Billed annually. Equivalent to $37.42/month.'
                           : 'Billed monthly'}
                       </p>
                     </>
                   ) : selectedPlan === 'annual' ? (
                     <>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-4xl font-bold text-gray-900">$37.42</span>
-                        <span className="text-gray-500 text-lg">/month</span>
+                        <span className="text-4xl font-bold text-gray-900">$449</span>
+                        <span className="text-gray-500 text-lg">/year</span>
                       </div>
-                      <p className="text-gray-500 text-sm mt-1">Billed annually at $449/year</p>
+                      <p className="text-gray-500 text-sm mt-1">Billed annually. Equivalent to $37.42/month.</p>
                       <div className="inline-block mt-2 bg-green-100 text-green-700 text-sm font-bold px-3 py-1 rounded-full">
                         Save $150/year vs monthly
                       </div>
@@ -279,7 +248,7 @@ export default function CardLoversPage() {
                 </div>
 
                 {/* Credits Display */}
-                <div className="mb-5 p-4 bg-gradient-to-r from-purple-50 to-rose-50 rounded-xl text-center">
+                <div className="mb-5 p-4 bg-[#f6f7fa] rounded-xl text-center">
                   <span className="text-3xl font-bold text-purple-600">
                     {subscriptionStatus?.isActive
                       ? (subscriptionStatus.plan === 'annual' ? '900' : '70')
@@ -362,7 +331,7 @@ export default function CardLoversPage() {
                     {subscriptionStatus.plan === 'monthly' && (
                       <Link
                         href="/account"
-                        className="w-full block bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 font-bold py-3 px-6 rounded-xl text-center transition-all shadow-md hover:shadow-lg text-sm"
+                        className="dcm-button dcm-button--secondary w-full"
                       >
                         Upgrade to Annual & Save $150/year
                       </Link>
@@ -372,7 +341,7 @@ export default function CardLoversPage() {
                   <button
                     onClick={() => handleSubscribe(selectedPlan)}
                     disabled={purchasing}
-                    className="w-full bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="dcm-button dcm-button--primary w-full"
                   >
                     {purchasing ? (
                       <span className="flex items-center justify-center gap-2">
@@ -481,7 +450,7 @@ export default function CardLoversPage() {
 
               <div className="bg-white rounded-xl p-6 shadow-md border border-purple-100 md:col-span-2">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-rose-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 bg-[#14233b] rounded-xl flex items-center justify-center flex-shrink-0">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
@@ -538,7 +507,7 @@ export default function CardLoversPage() {
                     <td className="px-6 py-4 text-center text-gray-700">$99</td>
                     <td className="px-6 py-4 text-center text-gray-700">$0.66</td>
                   </tr>
-                  <tr className="bg-gradient-to-r from-purple-50 to-rose-50">
+                  <tr className="bg-[#f6f7fa]">
                     <td className="px-6 py-4">
                       <span className="font-bold text-gray-900 flex items-center gap-2">
                         <svg className="w-5 h-5 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
@@ -606,7 +575,7 @@ export default function CardLoversPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-16 bg-gradient-to-r from-purple-900 to-rose-900 text-white">
+      <section className="py-16 dcm-dark">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">
             Ready to Become a Card Lover?
@@ -619,14 +588,14 @@ export default function CardLoversPage() {
             <button
               onClick={() => handleSubscribe('monthly')}
               disabled={purchasing || checkingStatus || subscriptionStatus?.isActive}
-              className="inline-block bg-white text-purple-900 font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+              className="dcm-button dcm-button--secondary"
             >
               {subscriptionStatus?.isActive ? 'Already Subscribed' : 'Subscribe Monthly — $49.99/mo'}
             </button>
             <button
               onClick={() => handleSubscribe('annual')}
               disabled={purchasing || checkingStatus || subscriptionStatus?.isActive}
-              className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+              className="dcm-button dcm-button--primary"
             >
               {subscriptionStatus?.isActive ? 'Already Subscribed' : 'Subscribe Annually — $449/yr'}
             </button>
@@ -637,6 +606,6 @@ export default function CardLoversPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

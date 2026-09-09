@@ -16,6 +16,7 @@
  *     a second one.
  */
 
+import { emailPlainText } from '@/lib/emailMarkup';
 import { Resend } from 'resend';
 import type { ServerClient } from '@/lib/ebay/bulkService';
 
@@ -172,15 +173,18 @@ export async function sendBulkCompletionEmail(
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
+    const html = `
+        <p>Your bulk listing batch has finished.</p>
+        <p>${bits.join(' &middot; ')}.</p>
+        <p><a href="${link}">Open the batch</a></p>
+      `;
     const { error } = await resend.emails.send({
       from: 'DCM Grading <admin@dcmgrading.com>',
       to: [to],
       subject,
-      html: `
-        <p>Your bulk listing batch has finished.</p>
-        <p>${bits.join(' &middot; ')}.</p>
-        <p><a href="${link}">Open the batch</a></p>
-      `,
+      html,
+      // Plain-text alternative derived from the HTML, as the lifecycle templates do.
+      text: emailPlainText(html),
     });
     if (error) console.error(`${LOG} completion email failed:`, error.message);
   } catch (e: any) {

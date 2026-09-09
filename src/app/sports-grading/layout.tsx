@@ -1,9 +1,11 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { MarketingShowcaseBoundary } from '@/components/marketing/MarketingShowcaseBoundary'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'Sports Card Grading — Instant DCM Optic™ Grades, Verified Against 2,900+ Sets',
+export const metadata: Metadata = completeMetadata({
+  title: "Sports Card Grading with DCM Optic",
   description:
-    'Grade sports cards instantly with DCM Optic™. Every card is matched against a catalog of 2,951 sets spanning 1901 to 2026, so parallels, serial numbering and rookie status are verified — not guessed. Baseball, basketball, football, hockey and more. As low as $0.50 a card with Card Lovers Annual.',
+    "Grade baseball, football, basketball and other sports cards with DCM Optic. Get four subgrades, condition findings and a personalized Heritage label.",
   keywords:
     'sports card grading, grade sports cards, baseball card grading, basketball card grading, football card grading, hockey card grading, rookie card grading, PSA alternative, prizm parallel grading, topps chrome grading, bowman 1st grading, vintage baseball card grading, patch auto grading, instant sports grading',
   alternates: {
@@ -32,7 +34,7 @@ export const metadata: Metadata = {
       'Instant sports grades with verified set and parallel ID across 2,951 sets. Chrome, corners and centering inspected at magnification.',
     images: ['/Sports/DCM-Card-LeBron-James-547249-front.jpg'],
   },
-};
+});
 
 // Structured data. The FAQ entries below MUST stay in sync with the visible
 // FAQ in page.tsx — Google penalises FAQ markup that isn't on the page.
@@ -119,7 +121,7 @@ export default function SportsGradingLayout({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      {children}
+      <MarketingShowcaseBoundary selection="ai-card-grading">{children}</MarketingShowcaseBoundary>
     </>
   );
 }

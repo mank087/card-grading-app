@@ -17,7 +17,7 @@
 export const LAST_CHECKED = 'August 24, 2026';
 export const UPDATED_LABEL = 'Updated August 2026';
 /** ISO date used for `dateModified` in JSON-LD. */
-export const UPDATED_ISO = '2026-08-24';
+export const UPDATED_ISO = '2026-09-09';
 
 export interface Source {
   id: string;

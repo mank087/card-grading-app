@@ -57,38 +57,23 @@ function HeroVariant({
   connectError?: string | null;
 }) {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white to-indigo-50/40">
+    <div className="dcm-brand dcm-instalist-preview">
       {/* HERO — split layout on desktop, stacked on mobile */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 lg:py-20">
+      <section className="dcm-hero dcm-dark dcm-instalist-hero">
+        <div className="dcm-container">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
             {/* Left: copy + CTA */}
-            <div className="text-center lg:text-left">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-3 py-1.5 rounded-full mb-4">
-                <span className="text-base">⚡</span> InstaList Marketplace
-              </p>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
-                List your graded cards on
-                {' '}
-                <img
-                  src="/eBay-Instalist-Marketplace/Ebay-logo.jpg"
-                  alt="eBay logo"
-                  className="inline-block h-[1.4em] w-auto align-middle"
-                  style={{ verticalAlign: '-0.2em' }}
-                />
-                <br />
-                <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  in seconds.
-                </span>
-              </h1>
-              <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
+            <div className="dcm-instalist-intro">
+              <p className="dcm-eyebrow">eBay InstaList · Included with DCM</p>
+              <h1>Sell graded cards on eBay.<br /><span>Prepare listings with InstaList.</span></h1>
+              <p className="dcm-lead mb-8">
                 InstaList is a complimentary tool for DCM users. We generate the listing images,
-                pre-fill the title and price, and bake your DCM grade into eBay&rsquo;s
+                pre-fill the title and price, and include your DCM grade in eBay&rsquo;s
                 certification fields automatically. You review, hit publish, and the card&rsquo;s live.
               </p>
 
               <div className="flex justify-center lg:justify-start">
-                <CtaBlock ctaMode={ctaMode} onConnect={onConnect} isConnecting={isConnecting} connectError={connectError} />
+                <CtaBlock ctaMode={ctaMode} onConnect={onConnect} isConnecting={isConnecting} connectError={connectError} inverted />
               </div>
             </div>
 
@@ -100,13 +85,15 @@ function HeroVariant({
         </div>
       </section>
 
+      <nav className="dcm-container dcm-why-section-nav" aria-label="InstaList overview"><a href="#instalist-features">Listing tools</a><a href="#instalist-process">How listing works</a><a href="#instalist-questions">Common questions</a></nav>
+      <div className="dcm-container dcm-instalist-readiness"><p className="dcm-eyebrow">Your next step</p><p>{ctaMode === 'none' ? 'Grade a card, connect your eBay account, and review your listing before publishing.' : ctaMode === 'signup' ? 'Create a DCM account, grade a card, then connect eBay to prepare your first listing.' : ctaMode === 'grade' ? 'Your account is ready. Grade your first card to create the images and report for your listing.' : 'Your graded cards are ready. Connect your eBay account to start preparing listings.'}</p></div>
       {/* BENEFITS GRID */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <section id="instalist-features" className="dcm-container dcm-section">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-3">
           What InstaList does for every card
         </h2>
         <p className="text-gray-600 text-center max-w-2xl mx-auto mb-10">
-          The same images and pricing that take other sellers an hour are generated automatically the moment you pick a card.
+          Choose a graded card to prepare listing images, card details and pricing, then review everything before publishing.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -139,7 +126,7 @@ function HeroVariant({
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="bg-gray-900 text-white">
+      <section id="instalist-process" className="dcm-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3">
             How it works
@@ -181,7 +168,7 @@ function HeroVariant({
       </section>
 
       {/* FAQ / TRUST */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <section id="instalist-questions" className="dcm-container dcm-section">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FaqItem
             q="Will buyers trust a DCM grade on eBay?"
@@ -204,7 +191,7 @@ function HeroVariant({
 
       {/* CLOSING CTA */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20">
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl px-6 sm:px-12 py-10 sm:py-14 text-center text-white">
+        <div className="dcm-dark rounded-2xl px-6 sm:px-12 py-10 sm:py-14 text-center text-white">
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">
             {ctaMode === 'signup' && 'Ready to Grade and List Your First Card?'}
             {ctaMode === 'grade' && 'Grade your first card to get started'}
@@ -217,7 +204,7 @@ function HeroVariant({
           <CtaBlock ctaMode={ctaMode} onConnect={onConnect} isConnecting={isConnecting} connectError={connectError} inverted />
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -334,10 +321,10 @@ function CtaBlock({
           {isConnecting ? 'Opening eBay...' : 'Connect your eBay account'}
         </button>
         {connectError && (
-          <p className={`text-sm ${inverted ? 'text-red-100' : 'text-red-600'}`}>{connectError}</p>
+          <p role="alert" className={`text-sm ${inverted ? 'text-red-100' : 'text-red-600'}`}>{connectError}</p>
         )}
         <p className={`text-xs ${inverted ? 'text-indigo-100' : 'text-gray-500'}`}>
-          One-time OAuth handshake. We never post anything without your action.
+          Sign in securely to eBay. Review your listing before you publish.
         </p>
       </div>
     );

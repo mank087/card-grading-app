@@ -1,0 +1,60 @@
+﻿Route,HTTP status,Title,Canonical,Robots,Initial visible H1,Notes
+/,200,DCM Grading - Card Grading Powered by DCM Optic™,https://dcmgrading.com,"index, follow",Professional card grading.Instant results.,
+/about,200,About Us - Our Story &amp; Mission | DCM Grading,https://dcmgrading.com/about,"index, follow",About DCM,
+/account,200,My Account - Settings &amp; Preferences | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/affiliates,200,Affiliate Program | DCM Grading,https://dcmgrading.com/affiliates,"index, follow",Earn With DCM Grading,
+/ai-card-grading,200,AI Card Grading. Professional Grades in Under 60 Seconds | DCM Grading,https://dcmgrading.com/ai-card-grading,"index, follow",AI Card Grading. Professional Grades in Under 60 Seconds,
+/ai-card-grading-accuracy,200,Is AI Card Grading Accurate? How DCM Optic Works and Where It Stops | DCM Grading,https://dcmgrading.com/ai-card-grading-accuracy,"index, follow",Is AI Card Grading Accurate?,
+/blog,200,Blog - Card Collecting News &amp; Tips | DCM Grading,https://dcmgrading.com/blog,"index, follow",DCM Blog,
+/card-grading,200,Card Grading Service - Trading Card Grades Powered by DCM Optic™ | DCM Grading,https://dcmgrading.com/card-grading,"index, follow",Grade Any Card Instantly,
+/card-grading-companies,200,"Card Grading Companies Compared (2026): PSA, BGS, SGC, CGC, TAG, DCM | DCM Grading",https://dcmgrading.com/card-grading-companies,"index, follow",Card Grading Companies Compared,
+/card-lovers,200,Card Lovers Program - Monthly Subscription | DCM Grading,https://dcmgrading.com/card-lovers,"index, follow",For the collectionyou keep coming back to.,
+/card-lovers/success,200,Membership Confirmation,https://dcmgrading.com/card-lovers,"noindex, nofollow",,Intentional indexing exclusion
+/card-shows,200,Card Shows 2026 | Grade Cards Instantly | DCM Grading,https://dcmgrading.com/card-shows,"index, follow",Card Shows 2026,
+/cheapest-card-grading,200,Cheapest Card Grading (2026): Published Prices Compared | DCM Grading,https://dcmgrading.com/cheapest-card-grading,"index, follow",Cheapest Card Grading,
+/collection,200,My Collection - Graded Cards | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/contact,200,Contact Us | DCM Grading,https://dcmgrading.com/contact,"index, follow",Contact Us,
+/credits,200,Buy Credits - Pricing &amp; Packages | DCM Grading,https://dcmgrading.com/credits,"index, follow",Simple pricing.Every detail included.,
+/credits/success,200,Purchase Confirmation,https://dcmgrading.com/credits,"noindex, nofollow",,Intentional indexing exclusion
+/data-deletion-status,200,Data Deletion Status | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/ebay-auth-success,200,eBay Connection Complete | DCM Grading,,"noindex, nofollow",Processing...,Intentional indexing exclusion
+/enterprise,200,"Enterprise Card Grading for Stores, Breakers &amp; Creators | DCM Grading",https://dcmgrading.com/enterprise,"index, follow",Launch your own card grading brand,
+/enterprise/apply,200,Apply for DCM Enterprise | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/enterprise/launch-kit,200,Store Launch Kit | DCM Grading,,"noindex, nofollow",Store Launch Kit,Intentional indexing exclusion
+/enterprise/terms,200,Enterprise Program Terms | DCM Grading,https://dcmgrading.com/enterprise/terms,"index, follow",DCM Enterprise Program Terms,
+/faq,200,FAQ - Frequently Asked Questions | DCM Grading,https://dcmgrading.com/faq,"index, follow",Frequently Asked Questions,
+/fastest-card-grading,200,Fastest Card Grading (2026): Published Turnaround Times Compared | DCM Grading,https://dcmgrading.com/fastest-card-grading,"index, follow",Fastest Card Grading,
+/featured,200,Featured Cards | DCM Grading,https://dcmgrading.com/featured,"index, follow",Real cards.Every detail counts.,
+/forgot-password,200,Reset Your Password | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/founders,200,Card Lovers Program - Monthly Subscription | DCM Grading,https://dcmgrading.com/card-lovers,"index, follow",For the collectionyou keep coming back to.,
+/founders/success,200,Purchase Confirmation,,"noindex, nofollow",,Intentional indexing exclusion
+/get-started,200,Get Started: Grade Your First Card in About a Minute | DCM Grading,https://dcmgrading.com/get-started,"index, follow",Grade your first card.Start with two photos.,
+/grade-your-first-card,200,DCM - Grade Your First Card | DCM Grading,https://dcmgrading.com/grade-your-first-card,"index, follow",Grade Your First Card,
+/grading-limitations,200,Grading Limitations | DCM Grading,https://dcmgrading.com/grading-limitations,"index, follow",Understanding Grading Limitations,
+/grading-rubric,200,Grading Rubric - How We Grade Cards | DCM Grading,https://dcmgrading.com/grading-rubric,"index, follow",DCM Grading Rubric,
+/grading-standard,200,The DCM Grading Standard,https://dcmgrading.com/grading-standard,"index, follow",A clear standard.Behind every grade.,
+/instalist-marketplace,200,InstaList Marketplace — DCM Grading,https://dcmgrading.com/instalist-marketplace,"index, follow",Sell graded cards on eBay.Prepare listings with InstaList.,
+/labels,200,Label Studio — Design &amp; Print Custom Grading Labels | DCM Grading,https://dcmgrading.com/labels,"index, follow",Label Studio: custom card grading labels,
+/labels/classic,200,Label Studio Classic — Full Label Designer | DCM Grading,https://dcmgrading.com/labels,noindex,,Intentional indexing exclusion
+/login,200,Login or Sign Up | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/lorcana-database,200,Disney Lorcana Card Database - Browse &amp; Grade Cards | DCM Grading,https://dcmgrading.com/lorcana-database,"index, follow",Lorcana Card Database,
+/market-pricing,200,Portfolio | DCM Grading,https://dcmgrading.com/market-pricing,"index, follow",Portfolio,
+/mtg-database,200,MTG Card Database - Browse &amp; Grade Magic Cards | DCM Grading,https://dcmgrading.com/mtg-database,"index, follow",Magic: The Gathering Database,
+/onepiece-database,200,One Piece Card Database - Browse &amp; Grade Cards | DCM Grading,https://dcmgrading.com/onepiece-database,"index, follow",One Piece Card Database,
+/pokemon-database,200,Pokemon Card Database - Browse &amp; Grade Cards | DCM Grading,https://dcmgrading.com/pokemon-database,"index, follow",Pokemon Card Database,
+/pokemon-grading,200,"Pokémon Card Grading — Instant DCM Optic™ Grades, Verified Against 26,000+ Cards | DCM Grading",https://dcmgrading.com/pokemon-grading,"index, follow",Grade Your Pokemon CardInstantly,
+/pop,200,Population Report | DCM Grading,https://dcmgrading.com/pop,"index, follow",Population Report,Initial database timeout; retry returned 200; load check still needed
+/privacy,200,Privacy Policy | DCM Grading,https://dcmgrading.com/privacy,"index, follow",Privacy Policy,
+/psa-alternative,200,PSA Alternative: Grade Any Card From a Photo in About 60 Seconds | DCM Grading,https://dcmgrading.com/psa-alternative,"index, follow",A PSA Alternative That Doesn't Require Mailing Your Cards,Initial local 404; retry returned 200
+/reports-and-labels,200,Reports &amp; Labels | DCM Grading,https://dcmgrading.com/reports-and-labels,"index, follow",Your card’s condition.Made visible.,
+/reset-password,200,Choose a New Password | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/search,200,Search Cards | DCM Grading,https://dcmgrading.com/search,"noindex, follow",,Internal lookup intentionally excluded from indexing; Intentional indexing exclusion
+/shop,200,Recommended Products | DCM Grading,https://dcmgrading.com/shop,"index, follow",Recommended Products,
+/sports-database,200,Sports Card Database: Browse Sets and Players | DCM Grading,https://dcmgrading.com/sports-database,"index, follow",Sports Card Database,
+/sports-grading,200,"Sports Card Grading — Instant DCM Optic™ Grades, Verified Against 2,900+ Sets | DCM Grading",https://dcmgrading.com/sports-grading,"index, follow",Grade Your Sports CardInstantly,
+/starwars-database,200,Star Wars Card Database: Browse Cards and Sets | DCM Grading,https://dcmgrading.com/starwars-database,"index, follow",Star Wars Card Database,
+/terms,200,Terms and Conditions | DCM Grading,https://dcmgrading.com/terms,"index, follow",Terms and Conditions,
+/unsubscribe,200,Email Preferences | DCM Grading,,"noindex, nofollow",,Intentional indexing exclusion
+/vip,200,VIP Package - 150 Credits at Best Value | DCM Grading,https://dcmgrading.com/vip,"index, follow",Grade more cards.Know their condition.,
+/why-dcm,200,"Why DCM Grading? | Card Grading for Collectors, by Collectors",https://dcmgrading.com/why-dcm,"index, follow","Why DCM Grading?Your collection, connected.",
+/yugioh-database,200,Yu-Gi-Oh! Card Database - Browse &amp; Grade Cards | DCM Grading,https://dcmgrading.com/yugioh-database,"index, follow",Yu-Gi-Oh! Card Database,

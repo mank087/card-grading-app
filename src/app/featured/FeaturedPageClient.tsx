@@ -1,84 +1,54 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import FeaturedCardTile from '@/components/FeaturedCardTile'
+import { ActionLink } from '@/components/design/Primitives'
+import { showcaseGrade, type ShowcaseCard } from '@/components/design/featuredCard'
 
 export default function FeaturedPageClient() {
-  const [cards, setCards] = useState<any[]>([])
+  const [cards, setCards] = useState<ShowcaseCard[]>([])
   const [loading, setLoading] = useState(true)
-
+  const [error, setError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('All categories')
+  const [sort, setSort] = useState('recent')
   useEffect(() => {
-    const fetchCards = async () => {
-      try {
-        const res = await fetch('/api/cards/featured?limit=30')
-        const data = await res.json()
-        setCards(data.cards || [])
-      } catch (err) {
-        console.error('Error fetching featured cards:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchCards()
-  }, [])
-
-  return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Dark header banner */}
-      <section className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">Featured Cards</h1>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            A curated showcase of recently graded cards from our community. View details below or view their full grade reports.
-          </p>
-        </div>
-      </section>
-
-      <div className="container mx-auto px-4 py-12">
-        {loading ? (
-          /* Loading skeleton */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl shadow-lg overflow-hidden animate-pulse">
-                <div className="flex gap-4 p-4">
-                  <div className="w-1/2 aspect-[3/4] bg-gray-200 rounded-lg" />
-                  <div className="w-1/2 aspect-[3/4] bg-gray-200 rounded-lg" />
-                </div>
-                <div className="px-4 pb-4 space-y-3">
-                  <div className="h-20 bg-gray-200 rounded-xl" />
-                  <div className="h-14 bg-gray-200 rounded-xl" />
-                  <div className="h-10 bg-gray-200 rounded-lg" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : cards.length === 0 ? (
-          /* Empty state */
-          <div className="text-center py-20">
-            <div className="w-20 h-20 mx-auto mb-6 bg-purple-100 rounded-full flex items-center justify-center">
-              <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No Featured Cards Yet</h2>
-            <p className="text-gray-600 mb-6">Check back soon for our curated showcase of graded cards.</p>
-            <Link
-              href="/"
-              className="inline-block bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-            >
-              Back to Home
-            </Link>
-          </div>
-        ) : (
-          /* Card grid */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {cards.map((card) => (
-              <FeaturedCardTile key={card.id} card={card} />
-            ))}
-          </div>
-        )}
+    const controller = new AbortController()
+    setLoading(true)
+    setError(false)
+    fetch('/api/cards/featured?limit=30', { signal: controller.signal })
+      .then(res => { if (!res.ok) throw new Error('Unavailable'); return res.json() })
+      .then(data => setCards(Array.isArray(data.cards) ? data.cards : []))
+      .catch(() => { if (!controller.signal.aborted) setError(true) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [attempt])
+  const categories = [...new Set(cards.map(card => card.category).filter((value): value is string => Boolean(value)))].sort()
+  const filtered = cards.filter(card => (category === 'All categories' || card.category === category)
+    && `${card.card_name ?? ''} ${card.card_set ?? ''} ${card.serial ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()))
+  if (sort === 'grade') filtered.sort((a, b) => (showcaseGrade(b) ?? 0) - (showcaseGrade(a) ?? 0))
+  if (sort === 'name') filtered.sort((a, b) => (a.card_name ?? '').localeCompare(b.card_name ?? ''))
+  return <div className="dcm-brand dcm-browse-page">
+    <section className="dcm-hero dcm-dark">
+      <div className="dcm-container">
+        <p className="dcm-eyebrow">The community showcase</p>
+        <h1>Featured graded cards.<br /><span>Every detail counts.</span></h1>
+        <p className="dcm-lead">Explore featured cards, their Heritage labels and the condition analysis behind each grade.</p>
+        <div className="dcm-actions"><ActionLink href="#cards" variant="primary">Browse featured cards</ActionLink><ActionLink href="/grading-standard" variant="secondary">Understand the grades</ActionLink></div>
       </div>
-    </main>
-  )
+    </section>
+    <section id="cards" className="dcm-container dcm-section" aria-label="Featured Cards">
+      <div className="dcm-browse-toolbar">
+        <label>Find a card<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Card name, set or serial number" /></label>
+        <label>Category<select value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(value => <option key={value}>{value}</option>)}</select></label>
+        <label>Sort by<select value={sort} onChange={event => setSort(event.target.value)}><option value="recent">Recently graded</option><option value="grade">Highest grade</option><option value="name">Card name</option></select></label>
+      </div>
+      <p className="dcm-browse-count" role="status">{loading ? 'Loading featured cards…' : error ? 'Featured cards could not be loaded.' : `${filtered.length} of ${cards.length} featured cards`}</p>
+      {error ? <div className="dcm-browse-empty"><h2>Please try again</h2><p>The card showcase is temporarily unavailable.</p><button className="dcm-button dcm-button--primary" onClick={() => setAttempt(value => value + 1)}>Reload cards</button></div>
+        : loading ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" aria-hidden="true">{[0, 1].map(key => <div key={key} className="h-96 bg-gray-200 rounded-2xl animate-pulse" />)}</div>
+        : filtered.length ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">{filtered.map(card => <FeaturedCardTile key={card.id} card={card} />)}</div>
+        : <div className="dcm-browse-empty"><h2>{cards.length ? 'No matching cards' : 'The next cards are on their way'}</h2><p>{cards.length ? 'Try another name, set or category.' : 'Check back soon for more graded cards from the community.'}</p>{cards.length > 0 && <button className="dcm-button dcm-button--secondary" onClick={() => { setSearch(''); setCategory('All categories') }}>Clear filters</button>}</div>}
+    </section>
+  </div>
 }

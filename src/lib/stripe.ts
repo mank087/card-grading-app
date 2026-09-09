@@ -3,6 +3,7 @@
  */
 
 import Stripe from 'stripe';
+import { CARD_LOVERS_PLANS } from './creditPackages';
 
 // Server-side Stripe client (only use in API routes)
 // Using SDK default API version (v20 uses 2025-09-30.clover)
@@ -52,22 +53,12 @@ export type StripePriceTier = keyof typeof STRIPE_PRICES;
 // Card Lovers subscription configuration
 export const CARD_LOVERS_SUBSCRIPTION = {
   monthly: {
+    ...CARD_LOVERS_PLANS.monthly,
     priceId: process.env.STRIPE_PRICE_CARD_LOVERS_MONTHLY!,
-    credits: 70,
-    price: 49.99,
-    interval: 'month' as const,
-    name: 'Card Lovers Monthly',
-    description: '70 credits/month + exclusive perks',
   },
   annual: {
+    ...CARD_LOVERS_PLANS.annual,
     priceId: process.env.STRIPE_PRICE_CARD_LOVERS_ANNUAL!,
-    credits: 840, // Base credits (70 x 12)
-    bonusCredits: 60, // Annual bonus
-    totalCredits: 900, // 840 + 60
-    price: 449,
-    interval: 'year' as const,
-    name: 'Card Lovers Annual',
-    description: '900 credits/year + exclusive perks (save $150)',
   },
 } as const;
 

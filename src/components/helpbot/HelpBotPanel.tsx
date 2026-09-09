@@ -45,7 +45,7 @@ export default function HelpBotPanel({
   }))
 
   return (
-    <div className="fixed bottom-6 right-6 w-[380px] max-h-[min(600px,80vh)] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-40 animate-fadeIn max-[640px]:bottom-0 max-[640px]:left-0 max-[640px]:right-0 max-[640px]:w-full max-[640px]:max-h-[85vh] max-[640px]:rounded-b-none max-[640px]:rounded-t-2xl">
+    <div data-site-chrome="floating" className="fixed bottom-6 right-6 w-[380px] max-h-[min(600px,80vh)] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-40 animate-fadeIn max-[640px]:bottom-0 max-[640px]:left-0 max-[640px]:right-0 max-[640px]:w-full max-[640px]:max-h-[85vh] max-[640px]:rounded-b-none max-[640px]:rounded-t-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 rounded-t-2xl shrink-0">
         <div className="flex items-center gap-2">

@@ -1,10 +1,14 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/yugioh-database' },
   title: 'Yu-Gi-Oh! Card Database - Browse & Grade Cards',
-  description: 'Browse the complete Yu-Gi-Oh! card database with 14,000+ cards. Find cards by set, type, attribute, or archetype. View card details and get instant DCM Optic™ grades for any Yu-Gi-Oh! card.',
+  description: "Browse Yu-Gi-Oh! cards by set, type, attribute or archetype. View card details and explore DCM Optic grading from front and back photos.",
   keywords: 'yugioh card database, yu-gi-oh cards, yugioh card search, yugioh TCG database, find yugioh cards, konami yugioh sets',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
+    url: 'https://dcmgrading.com/yugioh-database',
     title: 'Yu-Gi-Oh! Card Database | DCM Grading',
     description: 'Browse the complete Yu-Gi-Oh! card database. Find and grade any Yu-Gi-Oh! card.',
     type: 'website',
@@ -15,7 +19,7 @@ export const metadata: Metadata = {
     title: 'Yu-Gi-Oh! Card Database',
     description: 'Browse and search the complete Yu-Gi-Oh! card database.',
   },
-};
+});
 
 export default function YugiohDatabaseLayout({
   children,

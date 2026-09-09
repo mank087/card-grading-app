@@ -1,6 +1,6 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import {
   COMPANIES,
   MAIL_IN_COMPANIES,
@@ -11,10 +11,10 @@ import {
   HONEST_MIDDLE,
 } from '@/lib/aeo/gradingCompanies';
 
-export const metadata: Metadata = {
-  title: 'Card Grading Companies Compared (2026): PSA, BGS, SGC, CGC, TAG, DCM',
+export const metadata: Metadata = completeMetadata({
+  title: "Card Grading Companies: PSA, BGS, CGC & DCM",
   description:
-    'A sourced comparison of the major card grading companies in August 2026: published base price, published turnaround, grading method and format for PSA, Beckett (BGS), SGC, CGC, TAG and DCM Grading.',
+    "Compare PSA, BGS, SGC, CGC, TAG and DCM: published prices, turnaround times, grading methods and report formats, with sources dated August 2026.",
   keywords:
     'card grading companies, best card grading service, card grading comparison, PSA vs BGS vs SGC vs CGC, grading company prices, grading turnaround times, cheapest card grading, fastest card grading',
   alternates: {
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     description: 'Published prices and turnarounds for PSA, Beckett, SGC, CGC, TAG and DCM. Sourced, August 2026.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
-};
+});
 
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',
@@ -124,8 +124,7 @@ const faqJsonLd = {
 
 export default function CardGradingCompaniesPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
@@ -133,7 +132,7 @@ export default function CardGradingCompaniesPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Hero. The first paragraph answers the page's question outright. */}
-        <section className="mb-14">
+        <section className="mb-14 dcm-editorial-heading">
           <div className="inline-block bg-amber-100 text-amber-800 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
             Sourced comparison
           </div>
@@ -155,7 +154,7 @@ export default function CardGradingCompaniesPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/get-started"
-              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg dcm-editorial-primary"
             >
               Grade Your First Card Free
             </Link>
@@ -182,7 +181,7 @@ export default function CardGradingCompaniesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-left">
+                  <tr className="text-white text-left dcm-editorial-dark">
                     <th className="py-4 px-4 font-bold">Service</th>
                     <th className="py-4 px-4 font-bold">Cheapest open tier</th>
                     <th className="py-4 px-4 font-bold">Published price</th>
@@ -374,14 +373,14 @@ export default function CardGradingCompaniesPage() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
+          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
             <h2 className="text-3xl font-bold mb-4">Find out which of your cards are worth sending out</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Two free grades to start. Two photos, about a minute, and the card never leaves your hands.
             </p>
             <Link
               href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Grade Your First Card Free
             </Link>

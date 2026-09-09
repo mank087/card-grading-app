@@ -1,13 +1,15 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { notFound, redirect } from 'next/navigation';
+import { blogPageNumber, blogPagePath } from '@/lib/seo/blogPagination';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost, BlogCategory } from '@/types/blog';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import { BlogPostCard, BlogPagination, CategoryBadge } from '@/components/blog';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+const blogMetadata: Metadata = {
   title: 'Blog - Card Collecting News & Tips',
   description: 'Expert insights on card grading, market trends, collecting tips, and more from the DCM Grading team. Stay informed about Pokemon, Sports, MTG card news.',
   keywords: 'card grading blog, trading cards, collecting tips, market insights, pokemon cards, sports cards, MTG, card collecting news, grading tips',
@@ -34,6 +36,19 @@ export const metadata: Metadata = {
 
 interface BlogPageProps {
   searchParams: Promise<{ page?: string; category?: string }>;
+}
+
+export async function generateMetadata({ searchParams }: BlogPageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const page = blogPageNumber(params.page);
+  const base = params.category ? `/blog/category/${encodeURIComponent(params.category)}` : '/blog';
+  const url = `https://dcmgrading.com${blogPagePath(base, page)}`;
+  return completeMetadata({
+    ...blogMetadata,
+    title: page > 1 ? `Card Grading Blog - Page ${page}` : blogMetadata.title,
+    alternates: { ...blogMetadata.alternates, canonical: url },
+    openGraph: { ...blogMetadata.openGraph, url },
+  });
 }
 
 async function getBlogPosts(page: number, categorySlug?: string) {
@@ -84,24 +99,27 @@ async function getCategories() {
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
   const params = await searchParams;
-  const page = parseInt(params.page || '1');
+  const page = blogPageNumber(params.page);
   const categorySlug = params.category;
+  if (categorySlug) redirect(blogPagePath(`/blog/category/${encodeURIComponent(categorySlug)}`, page));
 
   const [{ posts, total, totalPages }, categories] = await Promise.all([
     getBlogPosts(page, categorySlug),
     getCategories(),
   ]);
 
+  if (page > 1 && posts.length === 0) notFound();
+
   const featuredPost = page === 1 && !categorySlug ? posts[0] : null;
   const regularPosts = featuredPost ? posts.slice(1) : posts;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
-      <FloatingCardsBackground />
+    <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="mb-12 dcm-blog-hero">
+          <p className="dcm-eyebrow">Card condition · Collecting · Market insights</p>
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             DCM Blog
           </h1>
@@ -111,9 +129,10 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         </div>
 
         {/* Category Filters */}
-        <div className="flex flex-wrap justify-center gap-3 mb-10">
+        <div className="dcm-blog-filters flex flex-wrap gap-3 mb-10">
           <Link
             href="/blog"
+            aria-current={!categorySlug ? 'page' : undefined}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               !categorySlug
                 ? 'bg-purple-600 text-white'
@@ -126,6 +145,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             <Link
               key={category.id}
               href={`/blog?category=${category.slug}`}
+              aria-current={categorySlug === category.slug ? 'page' : undefined}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 categorySlug === category.slug
                   ? 'bg-purple-600 text-white'
@@ -187,14 +207,14 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         )}
 
         {/* Newsletter CTA */}
-        <div className="mt-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-3">Stay Updated</h2>
+        <div className="mt-16 rounded-2xl shadow-xl p-8 text-center text-white dcm-editorial-dark">
+          <h2 className="text-2xl font-bold mb-3">Put your card knowledge to work</h2>
           <p className="text-lg opacity-90 mb-6 max-w-xl mx-auto">
-            Get the latest card grading tips, market insights, and news delivered to your inbox.
+            Create a DCM account to grade your cards, read condition reports, and manage your collection.
           </p>
           <Link
             href="/login?mode=signup"
-            className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg"
+            className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
           >
             Sign Up for Free
           </Link>

@@ -248,12 +248,12 @@ export default function MarketPricingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="dcm-brand dcm-workspace dcm-portfolio-workspace">
         {/* Header */}
-        <section className="bg-gradient-to-r from-purple-600 via-rose-500 to-orange-500 text-white">
+        <section className="dcm-workspace-header dcm-dark">
           <div className="max-w-7xl mx-auto px-4 py-8">
             <h1 className="text-3xl md:text-4xl font-bold">Portfolio</h1>
-            <p className="text-white/80 mt-1">Track your collection&apos;s market value in real time</p>
+            <p className="text-white/80 mt-1">Review your holdings, available market estimates and sold cards.</p>
 
             {/* Holdings vs Sold. Kept as separate views on purpose: mixing what
                 you still hold with what you've already sold produces a number
@@ -266,6 +266,7 @@ export default function MarketPricingPage() {
                 <button
                   key={t.key}
                   onClick={() => setPortfolioTab(t.key)}
+                  aria-pressed={portfolioTab === t.key}
                   className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                     portfolioTab === t.key ? 'bg-white text-purple-700' : 'text-white/90 hover:bg-white/10'
                   }`}
@@ -285,7 +286,7 @@ export default function MarketPricingPage() {
         <>
 
         {/* Value Summary */}
-        <section className="max-w-7xl mx-auto px-4 -mt-6">
+        <section className="max-w-7xl mx-auto px-4 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Total Value */}
             <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
@@ -370,7 +371,7 @@ export default function MarketPricingPage() {
                     {refreshFeedback.failed > 0 && `, ${refreshFeedback.failed} couldn't be priced`}
                     {refreshFeedback.remaining > 0 && (
                       <>
-                        {' '}&middot; {refreshFeedback.remaining} more stale card{refreshFeedback.remaining === 1 ? '' : 's'} will refresh on the next click or weekly cron
+                        {' '}&middot; {refreshFeedback.remaining} more stale card{refreshFeedback.remaining === 1 ? '' : 's'} will refresh on the next click or scheduled update
                       </>
                     )}
                     .
@@ -379,7 +380,7 @@ export default function MarketPricingPage() {
                 {refreshFeedback.kind === 'rate-limited' && (
                   <>
                     <strong>Easy there.</strong> Please wait {refreshFeedback.retryAfterSec}s
-                    before refreshing again so we don&apos;t hammer the pricing APIs.
+                    before requesting another price update.
                   </>
                 )}
                 {refreshFeedback.kind === 'error' && (
@@ -407,6 +408,7 @@ export default function MarketPricingPage() {
               {/* "All" pill */}
               <button
                 onClick={() => setSelectedCategory(null)}
+                aria-pressed={selectedCategory === null}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   selectedCategory === null
                     ? 'bg-purple-600 text-white'
@@ -419,6 +421,7 @@ export default function MarketPricingPage() {
               {portfolio.categoryBreakdown.map(cat => (
                 <button
                   key={cat.category}
+                  aria-pressed={selectedCategory === cat.category}
                   onClick={() => setSelectedCategory(
                     selectedCategory === cat.category ? null : cat.category
                   )}
@@ -435,6 +438,7 @@ export default function MarketPricingPage() {
           </section>
         )}
 
+        {!loading && !error && portfolio && <div role="navigation" className="max-w-7xl mx-auto px-4 mt-6 dcm-workspace-jumps" aria-label="Portfolio sections"><a href="#holdings-breakdown">Collection breakdown</a><a href="#valuable-cards">Most valuable cards</a><a href="#pricing-sources">Pricing sources</a><a href="#value-changes">Value changes</a><Link href="/collection">Open collection →</Link></div>}
         {/* Content */}
         <section className="max-w-7xl mx-auto px-4 py-6">
           <div className="space-y-6">
@@ -462,7 +466,7 @@ export default function MarketPricingPage() {
                     {/* Left column: Category + Grade + Value Distribution */}
                     <div className="space-y-6">
                       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Collection Value by Category</h3>
+                        <h3 id="holdings-breakdown" className="text-lg font-semibold text-gray-900 mb-4">Collection Value by Category</h3>
                         <CategoryBreakdownChart data={portfolio?.categoryBreakdown || []} />
                       </div>
 
@@ -480,7 +484,7 @@ export default function MarketPricingPage() {
                     {/* Right column: Most Valuable Cards */}
                     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Most Valuable Cards</h3>
+                        <h3 id="valuable-cards" className="text-lg font-semibold text-gray-900">Most Valuable Cards</h3>
                         <Link href="/collection" className="text-sm text-purple-600 hover:text-purple-700">
                           View All
                         </Link>
@@ -504,7 +508,7 @@ export default function MarketPricingPage() {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Data Sources</h3>
+                      <h3 id="pricing-sources" className="text-lg font-semibold text-gray-900 mb-4">Price Data Sources</h3>
                       <PriceSourceChart data={portfolio?.priceSourceBreakdown || []} />
                     </div>
                   </div>
@@ -518,7 +522,7 @@ export default function MarketPricingPage() {
 
                   {/* Movers */}
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Value Changes Since Grading</h3>
+                    <h3 id="value-changes" className="text-lg font-semibold text-gray-900 mb-1">Value Changes Since Grading</h3>
                     <p className="text-xs text-gray-400 mb-4">Comparing current market value to the price when each card was graded</p>
                     <MoversTable
                       gainers={portfolio?.movers.gainers || []}
@@ -542,6 +546,6 @@ export default function MarketPricingPage() {
         </section>
         </>
         )}
-      </main>
+      </div>
   );
 }

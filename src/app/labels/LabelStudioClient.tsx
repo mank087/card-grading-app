@@ -3236,13 +3236,13 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
   }, [selectedCard, showFounderEmblem, showVipEmblem, showCardLoversEmblem, cardOrgLogos])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="dcm-brand dcm-label-workspace min-h-screen bg-gray-50">
       {/* Page Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Label Studio</h1>
+              <h1 className="text-xl font-bold text-gray-900">Label Studio · Classic</h1>
               <p className="text-sm text-gray-500">Design, preview, and download labels for any case</p>
             </div>
             {isAuthenticated && (

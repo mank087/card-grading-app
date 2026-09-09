@@ -1,11 +1,12 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
-import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'About Us - Our Story & Mission',
-  description: 'DCM Grading is built by collectors, for collectors. Learn about our card grading service powered by DCM Optic™ technology for fast, accurate, and affordable trading card assessments.',
+  description: "Meet DCM Grading, built by collectors. Explore photo-based card condition analysis, detailed grading reports and printable labels powered by DCM Optic.",
   keywords: 'about DCM, card grading company, DCM Optic grading, DCM Optic, card collectors, trading card grading service, who is DCM',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
     title: 'About DCM Grading - Our Story & Mission',
     description: 'Built by collectors, for collectors. Fast, accurate card grading with DCM Optic™ technology.',
     type: 'website',
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://dcmgrading.com/about',
   },
-};
+});
 
 const ORG_ID = 'https://dcmgrading.com/#organization';
 const ABOUT_URL = 'https://dcmgrading.com/about';
@@ -196,15 +197,14 @@ const aboutJsonLd = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
+    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}
       />
-      <FloatingCardsBackground />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative z-10">
         {/* Hero Section */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 dcm-editorial-heading">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
             About DCM
           </h1>
@@ -278,14 +278,14 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-white text-center">
+          <div className="rounded-2xl shadow-xl p-8 text-white text-center dcm-editorial-dark">
             <h2 className="text-2xl font-bold mb-4">Join Our Community</h2>
             <p className="text-lg mb-6">
               We're constantly improving DCM based on feedback from collectors like you. Have ideas? Questions? Just want to share your latest pull? We'd love to hear from you.
             </p>
             <a
               href="/contact"
-              className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-block bg-white text-purple-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
             >
               Get in Touch
             </a>

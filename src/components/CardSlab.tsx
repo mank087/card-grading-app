@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import Image from 'next/image'
+import ProgressiveCardImage from './ProgressiveCardImage'
 import { QRCodeCanvas } from 'qrcode.react'
 import { ModernFrontLabel } from './labels/ModernFrontLabel'
 import { ModernBackLabel } from './labels/ModernBackLabel'
@@ -407,7 +407,7 @@ export function CardSlab({
       onClick={onClick}
     >
       {url ? (
-        <Image
+        <ProgressiveCardImage
           src={url}
           alt={alt}
           fill
@@ -560,6 +560,8 @@ export function CardSlab({
  * Single card view with click-through to details
  */
 export interface CardSlabGridProps {
+  /** Optional display-only photo framing. Coordinates are fractions of the original image. */
+  imageViewport?: { x: number; y: number; width: number; height: number; sourceAspect: number }
   displayName: string
   setLineText: string
   features?: string[]
@@ -583,6 +585,7 @@ export interface CardSlabGridProps {
 }
 
 export function CardSlabGrid({
+  imageViewport,
   displayName,
   setLineText,
   features = [],
@@ -778,16 +781,26 @@ export function CardSlabGrid({
         <div className="h-1" style={separatorStyle} />
 
         {/* Card Image */}
-        <div className="aspect-[3/4] relative bg-gray-100">
+        <div className="aspect-[3/4] relative overflow-hidden bg-gray-100" style={imageViewport ? { aspectRatio: imageViewport.sourceAspect * imageViewport.width / imageViewport.height } : undefined}>
           {frontImageUrl ? (
-            <Image
+            <div className="absolute inset-0" style={imageViewport ? {
+                width: `${100 / imageViewport.width}%`,
+                height: `${100 / imageViewport.height}%`,
+                maxWidth: 'none',
+                left: `${-100 * imageViewport.x / imageViewport.width}%`,
+                top: `${-100 * imageViewport.y / imageViewport.height}%`,
+                right: 'auto',
+                bottom: 'auto',
+              } : undefined}>
+            <ProgressiveCardImage
               src={frontImageUrl}
-              alt="Card"
+              alt={`${displayName || 'Trading card'} front photo`}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-contain"
               unoptimized={frontImageUrl.includes('supabase')}
             />
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400">
               No Image

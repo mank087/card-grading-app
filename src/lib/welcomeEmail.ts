@@ -1,3 +1,4 @@
+import { emailPlainText } from './emailMarkup'
 /**
  * Welcome Email Helper
  *
@@ -94,11 +95,13 @@ export async function sendWelcomeEmail(params: {
       }
     }
 
+    const html = getWelcomeEmailHtml({ name, unsubscribeUrl })
     const { data, error } = await resend.emails.send({
       from: 'DCM Grading <admin@dcmgrading.com>',
       to: [email],
       subject: WELCOME_SUBJECT,
-      html: getWelcomeEmailHtml({ name, unsubscribeUrl }),
+      html,
+      text: emailPlainText(html),
       ...(unsubscribeUrl
         ? {
             headers: {

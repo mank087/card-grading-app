@@ -1,10 +1,16 @@
+import { MarketingServiceSchema } from '@/components/marketing/MarketingServiceSchema'
+import { completeMetadata } from '@/lib/seo/completeMetadata'
+import { MarketingShowcaseBoundary } from '@/components/marketing/MarketingShowcaseBoundary'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
+  alternates: { canonical: 'https://dcmgrading.com/card-lovers' },
   title: 'Card Lovers Program - Monthly Subscription',
-  description: 'Join the Card Lovers subscription: Get 70 credits monthly, 20% off all purchases, exclusive heart emblem, and credits that never expire. Annual plan just $0.50 per grade.',
+  description: "Join Card Lovers for 70 credits monthly or 900 yearly, member purchase discounts and an exclusive label emblem. Compare monthly and annual plans.",
   keywords: 'card grading subscription, monthly grading credits, Card Lovers, DCM subscription, grading membership, cheapest card grading',
   openGraph: {
+    images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
+    url: 'https://dcmgrading.com/card-lovers',
     title: 'Card Lovers Program - Monthly Grading Subscription | DCM',
     description: 'Join Card Lovers: 70 credits/month, 20% off purchases, exclusive emblem. Annual plan just $0.50 per grade - our lowest price ever.',
     type: 'website',
@@ -15,12 +21,12 @@ export const metadata: Metadata = {
     title: 'Card Lovers - DCM Grading Subscription',
     description: '70 credits/month + 20% off + exclusive emblem. Annual plan just $0.50 per grade.',
   },
-};
+});
 
 export default function CardLoversLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <MarketingShowcaseBoundary selection="1"><MarketingServiceSchema page="card-lovers" />{children}</MarketingShowcaseBoundary>;
 }

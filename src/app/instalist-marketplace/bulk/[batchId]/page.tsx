@@ -1,3 +1,4 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 /**
  * /instalist-marketplace/bulk/[batchId] — the bulk listing review page.
  *
@@ -11,10 +12,10 @@ import BulkBatchClient from './BulkBatchClient';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'Review your batch | DCM InstaList',
   robots: { index: false, follow: false },
-};
+});
 
 export default async function BulkBatchPage({
   params,

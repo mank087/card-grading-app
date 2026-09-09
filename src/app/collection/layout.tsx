@@ -1,6 +1,7 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'My Collection - Graded Cards',
   description: 'View and manage your graded card collection. Access grades, download labels, share cards, and track your collection value with DCM Grading.',
   keywords: 'card collection, graded cards, my cards, card portfolio, grading history, card labels',
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-};
+});
 
 export default function CollectionLayout({
   children,

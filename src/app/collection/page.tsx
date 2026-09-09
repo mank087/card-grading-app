@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { ActionLink } from '@/components/design/Primitives'
 import Image from 'next/image'
 import { getStoredSession } from '../../lib/directAuth'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
@@ -2293,22 +2294,12 @@ function CollectionPageContent() {
     }
   }
 
-  if (loading) return <p className="p-6 text-center">Loading your collection...</p>
+  if (loading) return <div className="dcm-brand dcm-collection-page"><div className="dcm-container py-10"><h1 className="dcm-collection-title">My Collection</h1><p role="status" className="dcm-lead">Loading your cards and binders…</p><div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8" aria-hidden="true">{[0,1,2,3].map(key => <div key={key} className="h-80 bg-gray-200 rounded-xl animate-pulse" />)}</div></div></div>
   if (error) {
     // Check if error is about not being logged in
     const isAuthError = error.includes('logged in');
     return (
-      <div className="p-8 text-center">
-        <p className="text-red-600 mb-6">{error}</p>
-        {isAuthError && (
-          <Link
-            href="/login"
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-          >
-            Login or Create Account
-          </Link>
-        )}
-      </div>
+      <div className="dcm-brand dcm-collection-page"><div className="dcm-container dcm-collection-welcome"><p className="dcm-eyebrow">Your cards, together</p><h1 className="dcm-collection-title">My Collection</h1><p className="dcm-lead">{isAuthError ? 'Sign in to organize your graded cards, open reports, create labels and prepare cards for sale.' : error}</p><div className="dcm-actions">{isAuthError ? <><ActionLink href="/login?mode=login&redirect=/collection">Sign in to your collection</ActionLink><ActionLink href="/login?mode=signup&redirect=/collection" variant="secondary">Create a free account</ActionLink></> : <ActionLink href="/collection">Reload collection</ActionLink>}<ActionLink href="/get-started" variant="text">How It Works →</ActionLink></div></div></div>
     );
   }
   // Only bail out of the whole page when the account genuinely has NO cards.
@@ -2320,21 +2311,18 @@ function CollectionPageContent() {
   if (cards.length === 0 && totalAcrossViews === 0 && !searchQuery && !selectedBinderId && !orgInfo) {
     // The banner matters most here: a first-ever batch means no cards yet.
     return (
-      <div className="p-6">
-        {batchBanner}
-        <p className="text-center">You have not uploaded any cards yet.</p>
-      </div>
+      <div className="dcm-brand dcm-collection-page"><div className="dcm-container dcm-collection-welcome">{batchBanner}<p className="dcm-eyebrow">Your collection starts here</p><h1 className="dcm-collection-title">Make room for your first card.</h1><p className="dcm-lead">Upload front and back photos to get a grade and condition report. Your cards, labels and reports will be available here.</p><div className="dcm-actions"><ActionLink href="/upload">Grade your first card</ActionLink><ActionLink href="/get-started" variant="secondary">Photo & upload guide</ActionLink></div></div></div>
     )
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 sm:p-8">
+    <div className="dcm-brand dcm-collection-page flex min-h-screen flex-col items-center p-4 sm:p-8">
       <div className="w-full max-w-6xl">
         {batchBanner}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+        <div className="dcm-collection-header flex flex-col gap-4 mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold">My Collection</h1>
+              <h1 className="dcm-collection-title">My Collection</h1>
               {/* Badges are decorative and cost a full stacked row on phones */}
               <div className="hidden sm:flex items-center gap-3">
               {isFounder && (
@@ -2363,6 +2351,7 @@ function CollectionPageContent() {
               )}
               </div>
             </div>
+            <p className="dcm-collection-description">Browse your cards, organize binders and open the details behind each grade.</p>
             {searchQuery && (
               <p className="text-gray-600 mt-2">
                 Search results for: "{searchQuery}"
@@ -2370,6 +2359,7 @@ function CollectionPageContent() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <Link href="/upload" className="dcm-button dcm-button--primary dcm-collection-grade">Grade a Card</Link>
             {/* Share Collection Button */}
             <button
               onClick={() => {
@@ -2435,6 +2425,7 @@ function CollectionPageContent() {
             <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
+                aria-label="Grid view" aria-pressed={viewMode === 'grid'}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'grid'
                     ? 'bg-white text-blue-600 shadow-sm'
@@ -2448,6 +2439,7 @@ function CollectionPageContent() {
               </button>
               <button
                 onClick={() => setViewMode('list')}
+                aria-label="List view" aria-pressed={viewMode === 'list'}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'list'
                     ? 'bg-white text-blue-600 shadow-sm'
@@ -2473,6 +2465,7 @@ function CollectionPageContent() {
           </div>
         </div>
 
+        <div role="navigation" className="dcm-collection-shortcuts" aria-label="Collection tools"><Link href="/market-pricing">Portfolio & values →</Link><Link href="/labels">Label Studio →</Link><Link href="/instalist-marketplace">eBay InstaList →</Link></div>
         {/* Enterprise store scope — active workspace is chosen in the nav
             switcher; this row only shows the store toolbar while in it. */}
         {orgInfo && scope === 'store' && (
@@ -2634,12 +2627,13 @@ function CollectionPageContent() {
             Replaces the Owned/Sold tab row, its hint, the search block and
             the 8-chip category row (which wrapped to two lines on phones).
             Everything not ACTIVE now lives behind the Filter button. */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-white/95 backdrop-blur border-b border-gray-100 mb-3">
+        <div className="dcm-collection-searchbar sticky z-30 px-4 py-3 bg-white/95 backdrop-blur mb-4">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <input
-                type="text"
-                placeholder="Search your collection…"
+                type="search"
+                aria-label="Search your collection"
+                placeholder="Search card name, set or serial…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -2648,7 +2642,7 @@ function CollectionPageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Clear search">
+                <button aria-label="Clear search" onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Clear search">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -2657,6 +2651,7 @@ function CollectionPageContent() {
             </div>
             <button
               onClick={() => setFilterOpen(true)}
+              aria-label="Filter and sort cards" aria-expanded={filterOpen}
               className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
                 activeFilters > 0 ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
@@ -2664,7 +2659,7 @@ function CollectionPageContent() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 12h12M10 20h4" />
               </svg>
-              <span className="hidden sm:inline">Filter</span>
+              <span>Filter & sort</span>
               {activeFilters > 0 && <span className="text-xs">{activeFilters}</span>}
             </button>
           </div>
@@ -2675,28 +2670,28 @@ function CollectionPageContent() {
               {searchTerm && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
                   “{searchTerm}”
-                  <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-700">✕</button>
+                  <button aria-label="Clear search" onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-700">✕</button>
                 </span>
               )}
               {selectedCategory !== 'all' && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold">
                   {selectedCategory}
-                  <button onClick={() => { setSelectedCategory('all'); setSelectedSport(null) }} className="text-purple-400 hover:text-purple-800">✕</button>
+                  <button aria-label="Clear category filter" onClick={() => { setSelectedCategory('all'); setSelectedSport(null) }} className="text-purple-400 hover:text-purple-800">✕</button>
                 </span>
               )}
               {selectedSport && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold">
                   {selectedSport}
-                  <button onClick={() => setSelectedSport(null)} className="text-purple-400 hover:text-purple-800">✕</button>
+                  <button aria-label="Clear sport filter" onClick={() => setSelectedSport(null)} className="text-purple-400 hover:text-purple-800">✕</button>
                 </span>
               )}
               {sortColumn && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
                   {sortColumn} {sortDirection === 'asc' ? '▲' : '▼'}
-                  <button onClick={() => setSortColumn(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+                  <button aria-label="Clear sorting" onClick={() => setSortColumn(null)} className="text-gray-400 hover:text-gray-700">✕</button>
                 </span>
               )}
-              <span className="text-xs text-gray-400 ml-1">{filteredCards.length} shown</span>
+              <span className="text-xs text-gray-500 ml-1" role="status">{filteredCards.length} matching cards</span>
             </div>
           )}
         </div>
@@ -2938,7 +2933,9 @@ function CollectionPageContent() {
         {viewMode === 'grid' && (
           <>
             {filteredCards.length === 0 ? (
-              scope === 'store' ? (
+              (searchTerm.trim() || selectedCategory !== 'all' || selectedSport) && !storeLoading ? (
+                <div className="dcm-collection-no-results"><h2>No matching cards</h2><p>Try a different name, set or serial number, or clear the search and category filters in this view.</p><button type="button" className="dcm-button dcm-button--secondary" onClick={() => { setSearchTerm(''); setSelectedCategory('all'); setSelectedSport(null) }}>Clear search & category filters</button></div>
+              ) : scope === 'store' ? (
                 <p className="p-10 text-center text-gray-500">
                   {storeLoading ? 'Loading store inventory…' : 'No cards in the store inventory yet.'}
                 </p>
@@ -3161,7 +3158,9 @@ function CollectionPageContent() {
         {viewMode === 'list' && (
           <>
             {filteredCards.length === 0 ? (
-              scope === 'store' ? (
+              (searchTerm.trim() || selectedCategory !== 'all' || selectedSport) && !storeLoading ? (
+                <div className="dcm-collection-no-results"><h2>No matching cards</h2><p>Try a different name, set or serial number, or clear the search and category filters in this view.</p><button type="button" className="dcm-button dcm-button--secondary" onClick={() => { setSearchTerm(''); setSelectedCategory('all'); setSelectedSport(null) }}>Clear search & category filters</button></div>
+              ) : scope === 'store' ? (
                 <p className="p-10 text-center text-gray-500">
                   {storeLoading ? 'Loading store inventory…' : 'No cards in the store inventory yet.'}
                 </p>
@@ -3869,7 +3868,7 @@ function CollectionPageContent() {
           onConfirm={(details) => updateOwnership(sellCard.id, 'sold', details)}
         />
       )}
-    </main>
+    </div>
   )
 }
 

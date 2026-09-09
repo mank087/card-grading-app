@@ -1,6 +1,7 @@
+import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = completeMetadata({
   title: 'Founders (program closed) - see Card Lovers',
   description: 'The DCM Founders program is closed to new members. Existing Founders keep their credits and Founder emblem. For an ongoing plan, see Card Lovers.',
   robots: { index: false, follow: true },
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
     title: 'Founders (program closed) - DCM Grading',
     description: 'Closed to new members. See Card Lovers for our current plans.',
   },
-};
+});
 
 export default function FoundersLayout({
   children,

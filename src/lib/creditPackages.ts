@@ -75,3 +75,9 @@ export const VIP_PACKAGE = {
   description: 'Lowest cost per grade',
   icon: '◆',
 } as const
+
+/** Public subscription values shared by marketing and the server-side Stripe config. */
+export const CARD_LOVERS_PLANS = {
+  monthly: { credits: 70, price: 49.99, interval: 'month', name: 'Card Lovers Monthly', description: '70 credits/month + exclusive perks' },
+  annual: { credits: 840, bonusCredits: 60, totalCredits: 900, price: 449, interval: 'year', name: 'Card Lovers Annual', description: '900 credits/year + exclusive perks (save $150)' },
+} as const

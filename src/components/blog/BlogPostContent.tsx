@@ -219,7 +219,7 @@ export default function BlogPostContent({ content }: BlogPostContentProps) {
   );
 
   return (
-    <div className="prose prose-lg max-w-none">
+    <div className="dcm-blog-reading prose prose-lg max-w-none">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
