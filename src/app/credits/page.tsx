@@ -33,7 +33,7 @@ function CreditsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
-  const [cardLoversSelectedPlan, setCardLoversSelectedPlan] = useState<'monthly' | 'annual'>('annual')
+  const [cardLoversSelectedPlan, setCardLoversSelectedPlan] = useState<'monthly' | 'annual'>('monthly')
   const [isCardLover, setIsCardLover] = useState(false)
   const [resumed, setResumed] = useState(false)
   const [highlightPack, setHighlightPack] = useState<'basic' | 'pro' | 'elite' | 'vip' | null>(null)
