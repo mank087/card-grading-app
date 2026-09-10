@@ -160,7 +160,7 @@ export default function PsaAlternativePage() {
       <div className={styles.container}>
         <section className={styles.hero}>
           <div><p className="dcm-eyebrow">The PSA alternative · Your cards stay with you</p>
-            <h1>A PSA alternative.<br />A closer look at your cards.</h1>
+            <h1>A PSA alternative.<br />Card grading on your terms.</h1>
             <p className={styles.lead}>A PSA alternative for card condition analysis at home. Get a DCM grade, four subgrades and a detailed report from front-and-back photos, usually in about a minute.</p>
             <div className={styles.actions}><Link className={styles.primary} href={signup}>Grade 2 Cards Free →</Link><a className={styles.secondary} href="#real-report">Explore a Real Report</a></div>
             <p className={styles.note}>No credit card required. No mailing. Digital assessment and printable labels; physical authentication and encapsulation are separate services.</p>
