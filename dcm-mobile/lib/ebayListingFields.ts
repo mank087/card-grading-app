@@ -103,7 +103,7 @@ const LEAGUE_BY_SPORT: Record<string, string> = {
  * they are legitimate answers to a yes/no aspect. Serials get the extra check.
  */
 const EMPTY_VALUES = new Set([
-  '', 'n/a', 'na', 'none', 'unknown', 'null', 'undefined', '??', '-', '--',
+  '', 'n/a', 'na', 'none', 'unknown', 'unconfirmed', 'null', 'undefined', '??', '-', '--',
 ])
 
 /** Extra "means none" spellings the model writes into serial_number. */
@@ -294,7 +294,7 @@ export function resolveListingFields(card: any, cardType?: string): ListingField
     subset: firstOf(ci.subset, ci.insert_set),
     cardNumber: firstOf(ci.card_number, card?.card_number).replace(/^#/, ''),
     parallel: firstOf(ci.parallel, ci.variety, ci.op_variant_type, ci.variant),
-    rarity: firstOf(ci.rarity, card?.mtg_rarity, card?.rarity_tier, card?.rarity_description),
+    rarity: firstOf(ci.rarity, card?.mtg_rarity, card?.rarity_description, card?.rarity_tier),
     rookie: truthyFlag(ci.rookie, card?.rookie_card, card?.first_print_rookie, ci.rookie_card),
     autograph: hasAutograph(card),
     autographFormat: resolveAutographFormat(card),
