@@ -36,6 +36,7 @@ export default function HelpBotMessage({ message, onTopicSelect, onFeedback }: P
               <Link
                 key={link.href}
                 href={link.href}
+                {...(link.href.startsWith('http') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 className="text-xs text-purple-600 underline hover:text-purple-800"
               >
                 {link.label}
