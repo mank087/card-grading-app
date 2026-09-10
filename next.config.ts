@@ -95,7 +95,15 @@ const nextConfig: NextConfig = {
         // Authorization header — every authenticated mobile call 401'd
         // ("not authorized" purchase failures, credits not issued). Pages
         // redirect for SEO; API requests are served on either host.
-        source: '/:path((?!api/).*)',
+        //
+        // /.well-known is EXEMPT too (Sept 10): Android App Links and Apple
+        // Universal Links verifiers fetch assetlinks.json / AASA on EVERY host
+        // the app manifest lists and do not follow redirects. The 308 here made
+        // www.dcmgrading.com fail 3 of 7 website checks in Google Ads' Deep Link
+        // Validator, which flagged every Search campaign with 'App deep links
+        // have issues'. The files are static, so serving them on both hosts is
+        // harmless for SEO.
+        source: '/:path((?!api/|\.well-known/).*)',
         has: [{ type: 'host', value: 'www.dcmgrading.com' }],
         destination: 'https://dcmgrading.com/:path',
         permanent: true,
