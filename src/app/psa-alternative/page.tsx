@@ -1,28 +1,27 @@
 import { completeMetadata } from '@/lib/seo/completeMetadata'
 import { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
-import {
-  SOURCES,
-  LAST_CHECKED,
-  UPDATED_LABEL,
-  UPDATED_ISO,
-  HONEST_MIDDLE,
-} from '@/lib/aeo/gradingCompanies';
+import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase';
+import { MarketingShowcaseBoundary } from '@/components/marketing/MarketingShowcaseBoundary';
+import { PsaCostComparison, PsaReportExample } from '@/components/marketing/PsaComparisonTools';
+import { CARD_LOVERS_PLANS } from '@/lib/creditPackages';
+import styles from '@/components/marketing/PsaExperience.module.css';
+const PSA_SOURCE = 'https://www.psacard.com/articles/articleview/15763';
+const UPDATED_ISO = '2026-09-10';
 
 export const metadata: Metadata = completeMetadata({
   title: "PSA Alternative: Photo-Based Card Grading",
   description:
-    "A PSA alternative: grade any card from two photos in about 60 seconds. From $0.50 a card with Card Lovers Annual, or $2.99 for one. Four subgrades.",
+    "A PSA alternative: assess trading cards from two photos in about 60 seconds. From $0.50 a card with Card Lovers Annual, or $2.99 for one. Four subgrades.",
   keywords:
     'PSA alternative, alternative to PSA grading, PSA vs DCM, cheap card grading, fast card grading, AI card grading, online card grading, no-mail card grading, photo card grading',
   alternates: {
     canonical: 'https://dcmgrading.com/psa-alternative',
   },
   openGraph: {
-    title: 'PSA Alternative. Grade Any Card From a Photo | DCM Grading',
+    title: 'PSA Alternative. Understand Card Condition From Photos | DCM Grading',
     description:
-      'No mailing. As low as $0.50 a card with Card Lovers Annual, or $2.99 for a single card. Four subgrades on every grade. Every card type accepted.',
+      'No mailing. As low as $0.50 a card with Card Lovers Annual, or $2.99 for a single card. Four subgrades on every grade. Sports, Pokémon and other trading cards.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/psa-alternative',
@@ -37,7 +36,7 @@ export const metadata: Metadata = completeMetadata({
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PSA Alternative. Grade Any Card From a Photo',
+    title: 'PSA Alternative. Understand Card Condition From Photos',
     description: 'No mailing. As low as $0.50 a card with Card Lovers Annual. Four subgrades on every grade.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
@@ -85,10 +84,10 @@ const serviceJsonLd = {
 const articleJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
-  headline: 'PSA Alternative: Grade Any Card From a Photo in About 60 Seconds',
+  headline: 'PSA Alternative: Understand Card Condition From Photos in About 60 Seconds',
   description:
     'What a good PSA alternative looks like in 2026, with sourced PSA pricing and turnaround, and an honest account of what a photo-based grade is and is not.',
-  datePublished: UPDATED_ISO,
+  datePublished: '2026-09-09',
   dateModified: UPDATED_ISO,
   mainEntityOfPage: 'https://dcmgrading.com/psa-alternative',
   author: { '@type': 'Organization', name: 'DCM Grading', url: 'https://dcmgrading.com' },
@@ -98,7 +97,7 @@ const articleJsonLd = {
     url: 'https://dcmgrading.com',
     logo: { '@type': 'ImageObject', url: 'https://dcmgrading.com/DCM-logo.png' },
   },
-  citation: [SOURCES.psaPricing.url, SOURCES.psaUpdates.url, SOURCES.dkPsaTurnaround.url, SOURCES.pregradeRoundup.url],
+  citation: [PSA_SOURCE, 'https://www.psacard.com/services/tradingcardgrading'],
 };
 
 /**
@@ -108,7 +107,7 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the best PSA alternative for grading cards in 2026?',
-    a: 'For a grade you can have today on a card that never leaves your hands, DCM is the closest alternative to PSA. It grades against a published rubric covering centering, corners, edges and surface, returns a whole-number grade from 1 to 10 with four subgrades and a written reason for every deduction, and costs $2.99 for a single card, as low as $0.66 a card with the 150-credit VIP package. Mail-in grading from PSA, Beckett, SGC or CGC remains the right call when the card is valuable enough that a sealed, serialized slab changes what a buyer will pay.',
+    a: 'For a grade you can have today on a card that never leaves your hands, DCM is a photo-based option for documenting card condition at home. It grades against a published rubric covering centering, corners, edges and surface, returns a whole-number grade from 1 to 10 with four subgrades and a written reason for every deduction, and costs $2.99 for a single card, as low as $0.66 a card with the 150-credit VIP package. Mail-in grading from PSA, Beckett, SGC or CGC remains the right call when the card is valuable enough that a sealed, serialized slab changes what a buyer will pay.',
   },
   {
     q: 'Do I have to mail my cards in for DCM?',
@@ -116,11 +115,11 @@ const faqs = [
   },
   {
     q: 'How does DCM pricing compare to PSA?',
-    a: 'DCM is $2.99 for a single grade, versus $79.99 for PSA’s cheapest tier that was open in August 2026. PSA’s Value services, published at $24.99 to $64.99, were listed as paused at that time. DCM packs bring the per-grade cost down to $2.00 (5 for $9.99), $1.00 (20 for $19.99) and $0.66 (150 for $99), and Card Lovers Annual is $449 for 900 grades, about $0.50 each. Neither PSA figure includes insured shipping in both directions, typically $15 to $40 by declared value; DCM has no shipping at all.',
+    a: 'DCM costs $2.99 for a single grading credit, $19.99 for 20, or $99 for 150. Card Lovers Annual is $449 for 900 credits upfront. PSA announced Standard at $59.99 per card, opening September 14, 2026, with a $1,000 maximum insured value. Its Value tiers remain paused. These are different services: DCM provides a digital assessment and printable labels; PSA provides physical authentication, grading and encapsulation. Shipping and applicable taxes are additional to PSA grading fees.',
   },
   {
     q: 'How long does PSA take compared to DCM?',
-    a: 'PSA published a 40 to 50 business day turnaround on its cheapest open tier in August 2026, and DCM returns a grade in about 60 seconds. PSA’s own updates page reported a backlog above 12 million cards in late July 2026, so published turnarounds are best read as a floor rather than a promise. Neither figure includes the time the card spends in transit each way.',
+    a: 'DCM typically returns a digital assessment in about a minute, although processing time varies. PSA’s September 9 announcement gives Standard an estimated 90–100 business-day turnaround, opening September 14, 2026. Priority, formerly Regular, is estimated at 70–80 business days. PSA estimates are not guarantees, and shipping adds time to the physical submission journey.',
   },
   {
     q: 'Does DCM have a card-value minimum?',
@@ -128,7 +127,7 @@ const faqs = [
   },
   {
     q: 'Are subgrades included with every DCM grade?',
-    a: 'Yes, all four, on every grade, at no extra cost. Centering, corners, edges and surface are each scored, and the final grade is the lowest of the four under a weakest-link rule. Among the mail-in graders, Beckett prints subgrades on the label at every tier while PSA, SGC and CGC do not as standard.',
+    a: 'Yes, all four, on every grade, at no extra cost. Centering, corners, edges and surface are each scored, with the final result determined by DCM’s published grading standard and three-pass consensus process. Among the mail-in graders, Beckett prints subgrades on the label at every tier while PSA, SGC and CGC do not as standard.',
   },
   {
     q: 'Can a DCM grade replace a PSA slab for selling on eBay?',
@@ -150,419 +149,76 @@ const faqJsonLd = {
   })),
 };
 
-interface RowProps {
-  feature: string;
-  dcm: string;
-  psa: string;
-  dcmWin?: boolean;
-}
-
-function ComparisonRow({ feature, dcm, psa, dcmWin = true }: RowProps) {
-  return (
-    <tr className="border-b border-gray-200 last:border-0">
-      <td className="py-4 px-4 font-semibold text-gray-900 align-top w-1/3">{feature}</td>
-      <td className={`py-4 px-4 align-top ${dcmWin ? 'bg-purple-50' : ''}`}>
-        <div className="flex items-start gap-2">
-          {dcmWin && (
-            <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-          )}
-          <span className="text-gray-800 text-sm">{dcm}</span>
-        </div>
-      </td>
-      <td className="py-4 px-4 align-top text-gray-700 text-sm">{psa}</td>
-    </tr>
-  );
-}
-
 export default function PsaAlternativePage() {
-  return (
-    <main className="dcm-brand dcm-editorial min-h-screen relative dcm-editorial-soft">
-
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-        {/* Hero. The first paragraph answers the question outright. */}
-        <section className="mb-14 dcm-editorial-heading">
-          <div className="inline-block bg-amber-100 text-amber-800 text-xs font-bold tracking-wide uppercase px-3 py-1 rounded-full mb-4">
-            The PSA Alternative
+  const signup = '/login?mode=signup&redirect=%2Fupload'
+  return <div className={`dcm-brand ${styles.page}`}>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+    <MarketingShowcaseBoundary selection="reports-and-labels">
+      <div className={styles.container}>
+        <section className={styles.hero}>
+          <div><p className="dcm-eyebrow">The PSA alternative · Your cards stay with you</p>
+            <h1>A PSA alternative.<br />A closer look at your cards.</h1>
+            <p className={styles.lead}>A PSA alternative for card condition analysis at home. Get a DCM grade, four subgrades and a detailed report from front-and-back photos, usually in about a minute.</p>
+            <div className={styles.actions}><Link className={styles.primary} href={signup}>Grade 2 Cards Free →</Link><a className={styles.secondary} href="#real-report">Explore a Real Report</a></div>
+            <p className={styles.note}>No credit card required. No mailing. Digital assessment and printable labels; physical authentication and encapsulation are separate services.</p>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-5">
-            A PSA Alternative That Doesn&apos;t Require Mailing Your Cards
-          </h1>
-          <p className="text-xl text-gray-700 leading-relaxed mb-4">
-            The PSA alternative for most of a collection is grading at home: DCM grades any trading card from two
-            photos in <strong>about 60 seconds</strong> for <strong>$2.99</strong>, or{' '}
-            <strong>as low as $0.50 a card with Card Lovers Annual</strong>, with four subgrades and a written
-            reason for every deduction, and the card never leaves your hands. No packing, no insurance, no queue. The
-            honest limit is that DCM returns a digital grade and a printable label, not a sealed PSA slab, so the cards
-            that genuinely need one still go out.
-          </p>
-          <p className="text-sm text-gray-500 mb-6">
-            {UPDATED_LABEL}. PSA figures on this page are published numbers last checked {LAST_CHECKED} and are linked
-            to their sources below.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/get-started"
-              className="inline-flex items-center justify-center px-8 py-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors shadow-lg dcm-editorial-primary"
-            >
-              Grade Your First Card Free
-            </Link>
-            <Link
-              href="/card-grading-companies"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-purple-700 font-bold rounded-lg border-2 border-purple-200 hover:bg-purple-50 transition-colors"
-            >
-              Compare All Grading Companies
-            </Link>
+          <div className={styles.heroCard}><ReferenceCardShowcase page="reports-and-labels" category="Pokemon" /></div>
+        </section>
+        <aside className={styles.update} aria-label="PSA service update">
+          <strong>PSA update · Checked September 10, 2026</strong>
+          <p>Standard opens September 14: <strong>$59.99 per card</strong>, estimated <strong>90–100 business days</strong>, maximum insured value <strong>$1,000</strong>. Value tiers remain paused. Existing Value and Bulk orders will be processed before Standard orders.</p>
+          <p>Regular is being renamed Priority: $79.99 per card, estimated 70–80 business days. <a href={PSA_SOURCE} target="_blank" rel="noopener noreferrer">Read PSA’s September 9 announcement ↗</a></p>
+        </aside>
+        <section id="real-report" className={styles.section}><PsaReportExample /></section>
+        <section className={styles.section}><PsaCostComparison /></section>
+        <section className={styles.section}>
+          <p className="dcm-eyebrow">Two different journeys</p><h2>From your card to your next decision.</h2>
+          <div className={styles.two}>
+            <article className={styles.tile}><h3>DCM · Photo-based analysis</h3><p>Your card stays on your desk. Receive a digital grade and condition report, then choose how to use it.</p><ol className={styles.steps}><li>Photograph the front and back</li><li>Upload for DCM Optic analysis</li><li>Explore your grade and four subgrades</li><li>Create labels, organize or prepare a listing</li></ol><p className={styles.note}>Usually about a minute per analysis. Photo quality and processing conditions can affect timing.</p></article>
+            <article className={styles.tile}><h3>PSA · Physical grading</h3><p>Choose this path when you want physical authentication, a sealed PSA holder or PSA-specific certification.</p><ol className={styles.steps}><li>Select an eligible service level</li><li>Prepare and send your cards</li><li>Physical authentication, grading and encapsulation</li><li>Receive your graded cards</li></ol><p className={styles.note}>Standard: estimated 90–100 business days, announced opening September 14. Shipping adds time. Estimates are not guaranteed.</p></article>
           </div>
         </section>
-
-        {/* Why people look for a PSA alternative */}
-        <section className="mb-16">
-          <div className="bg-white rounded-2xl p-8 shadow-md">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Collectors Look for a PSA Alternative</h2>
-            <p className="text-lg text-gray-700 mb-4">
-              PSA is the reference point in this hobby for a reason. If you are holding a vintage rookie or a chase
-              card out of a good break, a sealed PSA slab is still what the resale market asks for. For the rest of a
-              collection, the arithmetic gets harder.
-            </p>
-            <p className="text-lg text-gray-700 mb-4">
-              In August 2026 PSA&apos;s cheapest tier that was open was <strong>Regular at $79.99</strong> per card
-              with a published turnaround of <strong>40 to 50 business days</strong>; the Value services published at
-              $24.99 to $64.99 were listed as paused, alongside a reported backlog above 12 million cards in late July{' '}
-              <a href={SOURCES.psaUpdates.url} target="_blank" rel="noopener noreferrer" className="text-purple-700 underline">
-                (PSA submission updates)
-              </a>
-              ,{' '}
-              <a href={SOURCES.dkPsaTurnaround.url} target="_blank" rel="noopener noreferrer" className="text-purple-700 underline">
-                (DraftKings Network turnaround breakdown, May 2026)
-              </a>
-              . Add insured shipping both ways, typically $15 to $40 by declared value, on top of the fee.
-            </p>
-            <p className="text-lg text-gray-700">
-              DCM exists for the cards that do not clear that bar. It grades any card you own, from photos, right now,
-              with four subgrades and a defect log — within{' '}
-              <Link href="/grading-limitations" className="text-purple-700 underline">the limits a photo-based grade honestly has</Link>,
-              which we publish. And when a card does turn out to deserve a mail-in submission, you have the evidence to
-              decide before you pay for it, which is{' '}
-              <Link href="/why-dcm" className="text-purple-700 underline">the whole case for grading at home first</Link>.
-            </p>
+        <section className={styles.section}>
+          <p className="dcm-eyebrow">Make the result useful</p><h2>More ways to enjoy your collection.</h2>
+          <div className={styles.grid}>
+            <article className={styles.tile}><p className="dcm-eyebrow">01 / Keep</p><h3>Understand what you own.</h3><p>Document condition, create Heritage labels and keep your cards and reports together in your collection.</p><Link href="/reports-and-labels">Explore reports and labels →</Link></article>
+            <article className={styles.tile}><p className="dcm-eyebrow">02 / Consider</p><h3>Inspect before you submit.</h3><p>Review condition evidence before deciding whether physical grading fits your goals. DCM grades do not predict or guarantee PSA results.</p><Link href="/grading-standard">See the grading standard →</Link></article>
+            <article className={styles.tile}><p className="dcm-eyebrow">03 / Sell</p><h3>Prepare your next listing.</h3><p>Bring your card details and documented condition into an eBay listing with InstaList. Review your listing before publishing.</p><Link href="/instalist-marketplace">Explore InstaList →</Link></article>
           </div>
         </section>
-
-        {/* The Comparison Table */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">DCM vs PSA at a Glance</h2>
-          <p className="text-center text-gray-600 mb-8 max-w-3xl mx-auto">
-            Published figures where they exist, side by side. PSA prices and turnarounds are as published in August
-            2026 and are linked below the table.
-          </p>
-
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-white dcm-editorial-dark">
-                    <th className="py-4 px-4 text-left font-bold w-1/3">Feature</th>
-                    <th className="py-4 px-4 text-left font-bold">DCM Grading</th>
-                    <th className="py-4 px-4 text-left font-bold">PSA (mail-in)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <ComparisonRow
-                    feature="Need to mail your cards?"
-                    dcm="No. Photo-based. Cards never leave your hands."
-                    psa="Yes. Cards must be shipped with insurance and return shipping."
-                  />
-                  <ComparisonRow
-                    feature="Turnaround time"
-                    dcm="About 60 seconds per card."
-                    psa="40 to 50 business days published on Regular, the cheapest tier open in August 2026, before transit."
-                  />
-                  <ComparisonRow
-                    feature="Price per card"
-                    dcm="$2.99 for a single grade. $2.00 on a 5-pack, $1.00 on a 20-pack, $0.66 on a 150-pack, about $0.50 on Card Lovers Annual."
-                    psa="$79.99 on Regular, the cheapest tier open in August 2026. Value services at $24.99 to $64.99 were paused."
-                  />
-                  <ComparisonRow
-                    feature="Shipping and insurance"
-                    dcm="None. Nothing ships."
-                    psa="Insured shipping both ways, typically $15 to $40 depending on declared value, on top of the fee."
-                  />
-                  <ComparisonRow
-                    feature="Card-value minimum"
-                    dcm="None. Commons, low-value parallels and sentimental cards are graded the same way as chases."
-                    psa="Service levels are structured by declared value, and the budget tiers were paused in August 2026."
-                  />
-                  <ComparisonRow
-                    feature="Subgrades included?"
-                    dcm="Yes. Centering, corners, edges and surface on every grade at no extra cost."
-                    psa="Not printed on the standard label."
-                  />
-                  <ComparisonRow
-                    feature="Grading method"
-                    dcm="Three independent computer-vision passes per card, median consensus, rubric published at /grading-standard."
-                    psa="Human graders. Multiple graders on higher service levels."
-                  />
-                  <ComparisonRow
-                    feature="Defect explanations"
-                    dcm="Every deduction is logged with a short written reason."
-                    psa="A grade is assigned. Detailed reasoning is not part of the standard report."
-                  />
-                  <ComparisonRow
-                    feature="Card types supported"
-                    dcm="Sports, Pokémon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, non-sports, and more."
-                    psa="Broad coverage across major TCG and sports categories."
-                    dcmWin={false}
-                  />
-                  <ComparisonRow
-                    feature="Final output"
-                    dcm="Digital grade, four subgrades, defect log, confidence letter, market price, and a printable label with a QR that resolves to a public verification page."
-                    psa="Sealed physical slab with a serialized cert. Registry-eligible."
-                    dcmWin={false}
-                  />
-                  <ComparisonRow
-                    feature="Risk of loss or damage in transit"
-                    dcm="None. The card stays with you."
-                    psa="Real, which is why insured shipping is part of the cost."
-                  />
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-6">
-            <h3 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide">Sources</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              {[SOURCES.psaPricing, SOURCES.psaUpdates, SOURCES.dkPsaTurnaround, SOURCES.pregradeRoundup].map((s) => (
-                <li key={s.id}>
-                  <a
-                    href={s.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-700 underline hover:text-purple-900"
-                  >
-                    {s.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-gray-500 mt-4">
-              PSA pricing and service availability change often. Last checked {LAST_CHECKED}. The full sourced table
-              covering Beckett, SGC, CGC and TAG is on{' '}
-              <Link href="/card-grading-companies" className="underline">
-                the grading companies comparison
-              </Link>
-              .
-            </p>
-          </div>
-        </section>
-
-        {/* Key advantages */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">What DCM Does Differently</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className={styles.section}>
+          <p className="dcm-eyebrow">Choose the outcome you need</p><h2>DCM vs PSA at a glance.</h2>
+          <div className={styles.tableWrap}><table><caption className="sr-only">DCM digital assessments compared with PSA physical grading; PSA Standard announced for September 14, 2026</caption><thead><tr><th scope="col">What matters to you</th><th scope="col">DCM</th><th scope="col">PSA Standard · announced</th></tr></thead><tbody>
             {[
-              {
-                title: 'Nothing ships, so nothing is at risk',
-                body: 'Your cards stay in your possession. Two photos, upload, grade. There is no window where the card is a tracking number, and no insured shipping cost on either leg.',
-              },
-              {
-                title: 'As low as $0.50 a card with Card Lovers Annual',
-                body: 'A single grade is $2.99. Five are $9.99 ($2.00 a card), twenty are $19.99 ($1.00 a card), and the 150-credit VIP pack is $99, which is $0.66 a card. Card Lovers Annual is $449 for 900 grades. Two free grades to start.',
-              },
-              {
-                title: 'No card-value minimum',
-                body: 'Every card gets the same protocol, whether it is a ten-cent base card or a four-figure chase. There is no declared-value band to fit into and no minimum submission size.',
-              },
-              {
-                title: 'Four subgrades on every grade',
-                body: 'Centering, corners, edges and surface are each scored, and the final grade is the lowest of the four under a weakest-link rule. No upcharge, no service tier to pick.',
-              },
-              {
-                title: 'Three-pass median consensus',
-                body: 'Every card runs through three independent evaluations and the median becomes the grade, computed server-side. A single outlier read cannot decide the result.',
-              },
-              {
-                title: 'A written reason for every deduction',
-                body: 'Print line on the top edge. Light whitening at the upper-left corner. Surface scratch in zone 5. You see what the evaluation saw and can check the call against the card.',
-              },
-              {
-                title: 'A confidence letter, A to D',
-                body: 'Photo grading is not perfect and glare and soft focus are real. Every grade carries an image confidence letter and an uncertainty range, so a shaky read announces itself instead of hiding.',
-              },
-              {
-                title: 'A public record, not a screenshot',
-                body: 'Every label carries a QR that resolves to a public verification page with the grade, the subgrades and the reasoning. The platform-wide grade distribution is open at /pop.',
-              },
-            ].map((f) => (
-              <div key={f.title} className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-700 leading-relaxed">{f.body}</p>
-              </div>
-            ))}
-          </div>
+              ['Your card', 'Stays with you; front-and-back photos required', 'Physical submission required'],
+              ['Price', '$2.99 for one credit; one-time packs and optional membership available', '$59.99 per card; opens September 14'],
+              ['Timing', 'Usually about a minute for a digital analysis', 'Estimated 90–100 business days, plus shipping'],
+              ['Condition evidence', 'Centering, corners, edges and surface subgrades with written analysis', 'PSA grade and certification; four subgrades are not printed on the standard label'],
+              ['Value thresholds', 'No card-value-based pricing bands', '$1,000 maximum insured value per card on Standard'],
+              ['Output', 'Digital report, customizable printable labels and collection tools', 'Physical authentication, grading and sealed holder'],
+              ['Shipping', 'No shipping for the assessment', 'Shipping and applicable charges are additional'],
+            ].map(([feature,dcm,psa]) => <tr key={feature}><th scope="row">{feature}</th><td>{dcm}</td><td>{psa}</td></tr>)}
+          </tbody></table></div>
+          <p className={styles.note}>DCM uses its own published standard. A DCM assessment is not PSA certification or a substitute for physical authentication. <Link href="/grading-limitations">Understand photo-based grading limitations</Link>. <a href={PSA_SOURCE} target="_blank" rel="noopener noreferrer">PSA source, September 9, 2026 ↗</a></p>
         </section>
-
-        {/* When DCM is right, when PSA is right */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">When to Use DCM vs When to Send to PSA</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
-              <div className="text-2xl font-bold text-purple-700 mb-3">Use DCM when</div>
-              <ul className="space-y-2 text-sm text-gray-800">
-                <li>• You want the grade today, not in forty to fifty business days.</li>
-                <li>• You are valuing or insuring a collection.</li>
-                <li>• The card would not clear a $79.99 fee plus shipping.</li>
-                <li>• You are deciding which cards are worth a paid mail-in submission.</li>
-                <li>• You are listing raw on eBay and want documented condition in the listing.</li>
-                <li>• You do not want to ship a sentimental or fragile card anywhere.</li>
-                <li>• You want a printable label and a scannable report for display.</li>
-              </ul>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-6 border-2 border-gray-200">
-              <div className="text-2xl font-bold text-gray-700 mb-3">Send to PSA when</div>
-              <ul className="space-y-2 text-sm text-gray-800">
-                <li>• The card is valuable enough that a sealed slab changes what a buyer will pay.</li>
-                <li>• You are selling where buyers expect a PSA slab in hand.</li>
-                <li>• You are building a registry set, which needs a slab from a company that runs one.</li>
-                <li>• The card needs a third-party authenticity opinion.</li>
-                <li>• You have already graded at home and confirmed the card earns the fee.</li>
-              </ul>
-            </div>
+        <section className={styles.section}>
+          <p className="dcm-eyebrow">Start with two cards</p><h2>Choose a plan when you’re ready for more.</h2>
+          <div className={styles.grid}>
+            <article className={styles.tile}><h3>Try DCM</h3><strong>2 free credits</strong><p>Experience your own card report. No payment card required and no automatic subscription.</p><Link className={styles.primary} style={{color:'white'}} href={signup}>Create Your Free Account</Link></article>
+            <article className={styles.tile}><h3>Grade a batch</h3><strong>One-time packs</strong><p>Start with one credit for $2.99, or choose a larger pack. Unused credits never expire.</p><Link href="/credits">Compare All Pricing →</Link></article>
+            <article className={styles.tile}><h3>Card Lovers</h3><strong>${CARD_LOVERS_PLANS.monthly.price}/month</strong><p>{CARD_LOVERS_PLANS.monthly.credits} credits each month, member savings and a heart emblem. Or ${CARD_LOVERS_PLANS.annual.price}/year for {CARD_LOVERS_PLANS.annual.totalCredits} credits upfront, about $0.50 per included grade.</p><Link href="/card-lovers">Explore Membership →</Link></article>
           </div>
-          <div className="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-200 text-center">
-            <p className="text-blue-900">
-              <strong>{HONEST_MIDDLE}</strong>
-            </p>
-          </div>
+          <p className={styles.note}>Prices in USD before applicable taxes. Card Lovers is recurring; annual is billed $449/year. Signup credits are separate from eligible pack bonuses. Basic reports, labels and collection tools do not require membership.</p>
         </section>
-
-        {/* What you get */}
-        <section className="mb-16">
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden md:grid md:grid-cols-2">
-            <div className="flex items-center justify-center p-6 order-2 md:order-1 dcm-editorial-soft">
-              <Image
-                src="/why-dcm/judge-graded-card.png"
-                alt="DCM-graded card with subgrades for centering, corners, edges, and surface alongside a defect log"
-                width={500}
-                height={400}
-                className="rounded-lg shadow-md w-full h-auto"
-              />
-            </div>
-            <div className="p-8 order-1 md:order-2">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">What You Get With Every DCM Grade</h2>
-              <ul className="text-gray-700 space-y-2 mb-4 text-sm">
-                <li>• Whole-number grade from 1 to 10</li>
-                <li>• Subgrades for centering, corners, edges and surface</li>
-                <li>• A defect log explaining every deduction</li>
-                <li>• Image confidence rating from A to D, with an uncertainty range</li>
-                <li>• Three-pass consistency score</li>
-                <li>• Printable mini-report for your toploader</li>
-                <li>• Full report with the complete breakdown</li>
-                <li>• Custom slab label you can print and pair with a One Touch or magnetic holder</li>
-                <li>• A public verification page at /verify, reachable by scanning the label</li>
-                <li>• Current market price for the grade (Card Lovers and VIP)</li>
-              </ul>
-              <Link href="/reports-and-labels" className="inline-flex items-center text-purple-600 font-semibold hover:text-purple-700">
-                See reports and labels
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing */}
-        <section className="mb-16">
-          <div className="rounded-2xl p-8 text-white shadow-xl dcm-editorial-dark">
-            <h2 className="text-3xl font-bold mb-4">Pricing. As Low as $0.50 a Card with Card Lovers Annual</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-3xl font-bold">$2.99</p>
-                <p className="text-sm opacity-90 mt-1">A single grade.</p>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-3xl font-bold">$1.00</p>
-                <p className="text-sm opacity-90 mt-1">Per card on the 20-pack ($19.99).</p>
-              </div>
-              <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-3xl font-bold">$0.66</p>
-                <p className="text-sm opacity-90 mt-1">Per card on the 150-pack ($99).</p>
-              </div>
-            </div>
-            <p className="text-lg opacity-95 mb-4">
-              Card Lovers Annual is $449 for 900 grades, about $0.50 each. Four subgrades and a defect log are included
-              on every grade, with no tier upcharges and nothing to ship.
-            </p>
-            <Link
-              href="/credits"
-              className="inline-block bg-white text-purple-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors"
-            >
-              See all pricing
-            </Link>
-          </div>
-        </section>
-
-        {/* FAQ, rendered open for extraction */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">Frequently Asked Questions</h2>
-          <div className="space-y-6">
-            {faqs.map((f) => (
-              <div key={f.q} className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{f.q}</h3>
-                <p className="text-gray-700 leading-relaxed">{f.a}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Related */}
-        <section className="mb-16">
-          <div className="bg-white rounded-2xl p-8 shadow-md">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Related pages</h2>
-            <div className="flex flex-wrap gap-3 text-sm">
-              <Link href="/card-grading-companies" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                All grading companies compared →
-              </Link>
-              <Link href="/cheapest-card-grading" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                Cheapest card grading →
-              </Link>
-              <Link href="/fastest-card-grading" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                Fastest card grading →
-              </Link>
-              <Link href="/ai-card-grading-accuracy" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                Is AI card grading accurate? →
-              </Link>
-              <Link href="/grading-standard" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                The published grading standard →
-              </Link>
-              <Link href="/pop" className="px-4 py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100">
-                Public pop report →
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA */}
-        <section className="text-center">
-          <div className="rounded-2xl p-12 text-white shadow-xl dcm-editorial-dark">
-            <h2 className="text-3xl font-bold mb-4">Try the PSA Alternative That Doesn&apos;t Ask You to Mail Anything</h2>
-            <p className="text-xl mb-8 max-w-2xl mx-auto">
-              Sign up free and grade your first card on us. Two photos and about a minute is all it takes.
-            </p>
-            <Link
-              href="/get-started"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg dcm-editorial-secondary"
-            >
-              Grade Your First Card Free
-            </Link>
-          </div>
-        </section>
+        <section className={`${styles.section} ${styles.faq}`}><p className="dcm-eyebrow">Your questions, answered</p><h2>Choosing a PSA alternative.</h2>{faqs.map(f => <article key={f.q}><h3>{f.q}</h3><p>{f.a}</p></article>)}</section>
+        <section className={styles.section}><h2>Take a closer look.</h2><div className={styles.related}>{[
+          ['All grading companies','/card-grading-companies'],['Cheapest card grading','/cheapest-card-grading'],['Fastest card grading','/fastest-card-grading'],['AI grading accuracy','/ai-card-grading-accuracy'],['Published grading standard','/grading-standard'],['Public population report','/pop'],['Everything DCM can do','/why-dcm'],['How it works','/get-started'],['Portfolio tools','/market-pricing'],
+        ].map(([label,href]) => <Link className={styles.secondary} key={href} href={href}>{label} →</Link>)}</div></section>
       </div>
-    </main>
-  );
+    </MarketingShowcaseBoundary>
+    <section className={styles.closing}><h2>Your next card deserves a closer look.</h2><p>Start with two free credits. See the condition, explore the report and decide what comes next.</p><div className={styles.actions}><Link className={styles.primary} href={signup}>Grade 2 Cards Free →</Link><Link className={styles.secondary} href="/credits">Compare Plans</Link></div></section>
+  </div>
 }
