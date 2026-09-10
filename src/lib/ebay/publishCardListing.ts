@@ -31,6 +31,7 @@ import {
   type PackageDimensions,
   DEFAULT_DOMESTIC_SHIPPING_SERVICE,
   normalizeDomesticService,
+  hostPicturesOnEbay,
 } from '@/lib/ebay/tradingApi';
 import type { EbayListing } from '@/lib/ebay/types';
 import {
@@ -798,6 +799,14 @@ export async function publishCardListing(
     sandbox: connection.is_sandbox,
   };
 
+  // Re-host the pictures on eBay Picture Services first. Externally hosted
+  // <PictureURL>s made the eBay app refuse gallery photos on DCM listings and
+  // drop the first image on every edit. Falls back per picture to the
+  // original URL, so this never blocks a listing.
+  const hosting = await hostPicturesOnEbay(tradingConfig, imageUrls, sku);
+  const pictureUrls = hosting.urls;
+  console.log(`[eBay Listing] Pictures hosted on EPS: ${hosting.hosted}/${imageUrls.length}`);
+
   // Prepare listing details
   const listingDetails: ListingDetails = {
     title: listingTitle,
@@ -810,7 +819,7 @@ export async function publishCardListing(
     listingFormat,
     quantity: listingFormat === 'AUCTION' ? 1 : quantity,
     conditionId: EBAY_CONDITIONS.GRADED,
-    imageUrls,
+    imageUrls: pictureUrls,
     itemSpecifics: itemSpecifics.map(spec => ({
       name: spec.name,
       value: spec.value,

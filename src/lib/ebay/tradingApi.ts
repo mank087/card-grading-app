@@ -889,6 +889,82 @@ export async function verifyAddItem(
 }
 
 // =============================================================================
+// eBay Picture Services (EPS) hosting
+// =============================================================================
+
+/**
+ * Re-host externally hosted listing images on eBay Picture Services.
+ *
+ * Listings created with self-hosted <PictureURL>s (our Supabase bucket) are
+ * treated by eBay as "API-attached" pictures. Sellers then hit two problems
+ * in the eBay app: adding a photo from the gallery is refused ("attaching
+ * images via API and via gallery are not allowed at the same time"), and any
+ * edit to the title or details re-fetches the external URLs and drops the
+ * first one. Pictures uploaded through UploadSiteHostedPictures live on
+ * i.ebayimg.com for the life of the listing and behave like photos added in
+ * the app. One call per picture; eBay fetches the source URL itself, so no
+ * multipart upload is needed. A failure falls back to the original URL so a
+ * listing is never blocked by hosting.
+ */
+export async function hostPicturesOnEbay(
+  config: TradingApiConfig,
+  urls: string[],
+  pictureNamePrefix = 'DCM'
+): Promise<{ urls: string[]; hosted: number }> {
+  const out: string[] = [];
+  let hosted = 0;
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    if (/^https?:\/\/i\.ebayimg\.com\//i.test(url)) { out.push(url); hosted++; continue; }
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <PictureName>${escapeXml(`${pictureNamePrefix}-${i + 1}`)}</PictureName>
+  <PictureSet>Supersize</PictureSet>
+  <ExternalPictureURL>${escapeXml(url)}</ExternalPictureURL>
+</UploadSiteHostedPicturesRequest>`;
+    try {
+      const response = await callTradingApi(config, 'UploadSiteHostedPictures', xml);
+      const parsed = parseUploadSiteHostedPicturesResponse(response);
+      if (parsed.fullUrl) { out.push(parsed.fullUrl); hosted++; }
+      else {
+        console.warn('[Trading API] UploadSiteHostedPictures gave no FullURL, keeping external URL:', parsed.errors);
+        out.push(url);
+      }
+    } catch (err) {
+      console.warn('[Trading API] UploadSiteHostedPictures failed, keeping external URL:', err);
+      out.push(url);
+    }
+  }
+  return { urls: out, hosted };
+}
+
+export function parseUploadSiteHostedPicturesResponse(xmlResponse: string): {
+  fullUrl: string | null;
+  errors: Array<{ code: string; message: string }>;
+} {
+  const getTagValue = (xml: string, tag: string): string | null => {
+    const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, 'i'));
+    return match ? match[1] : null;
+  };
+  const ack = getTagValue(xmlResponse, 'Ack');
+  const details = xmlResponse.match(/<SiteHostedPictureDetails>([\s\S]*?)<\/SiteHostedPictureDetails>/i)?.[1] ?? '';
+  const raw = getTagValue(details, 'FullURL');
+  // eBay XML-escapes ampersands inside the URL.
+  const fullUrl = raw ? raw.replace(/&amp;/g, '&') : null;
+  const errors: Array<{ code: string; message: string }> = [];
+  for (const m of xmlResponse.matchAll(/<Errors>([\s\S]*?)<\/Errors>/gi)) {
+    if ((getTagValue(m[1], 'SeverityCode') || '') !== 'Error') continue;
+    errors.push({ code: getTagValue(m[1], 'ErrorCode') || '', message: getTagValue(m[1], 'LongMessage') || getTagValue(m[1], 'ShortMessage') || '' });
+  }
+  return { fullUrl: ack === 'Success' || ack === 'Warning' ? fullUrl : null, errors };
+}
+
+// =============================================================================
 // Get Item Status
 // =============================================================================
 

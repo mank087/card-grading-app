@@ -150,7 +150,7 @@ const SPLIT_SEASON_SPORTS = ['Basketball', 'Hockey'];
  * aspect like Autographed. Serial numbers get the extra check below.
  */
 const EMPTY_VALUES = new Set([
-  '', 'n/a', 'na', 'none', 'unknown', 'null', 'undefined', '??', '-', '--',
+  '', 'n/a', 'na', 'none', 'unknown', 'unconfirmed', 'null', 'undefined', '??', '-', '--',
 ]);
 
 /** Extra "means none" spellings the model writes into serial_number. */
@@ -377,7 +377,7 @@ export function resolveListingFields(card: any, cardType?: string): ListingField
   if (!finish && truthyFlag(card?.is_foil, ci.foil)) finish = 'Foil';
   if (truthyFlag(card?.is_enchanted, ci.enchanted)) finish = 'Enchanted';
 
-  const rarity = firstOf(ci.rarity, card?.mtg_rarity, card?.rarity_tier, card?.rarity_description);
+  const rarity = firstOf(ci.rarity, card?.mtg_rarity, card?.rarity_description, card?.rarity_tier);
 
   // v9.23 designation. It is a NOTATION, never a grade suppressor: an
   // unverified-autograph card keeps its full numeric grade (Bob's card is a
