@@ -10,8 +10,29 @@ export const revalidate = 3600;
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 export default async function PopReportPage() {
-  const { categories, totals } = await fetchPopCategories();
-  const stats = await fetchPopGradeStats(categories);
+  // A database timeout while prerendering must not fail the whole deploy
+  // (it did on Sept 10 2026). Render a short holding page instead; ISR
+  // regenerates it on the next revalidation window.
+  let popData: Awaited<ReturnType<typeof fetchPopCategories>>;
+  let stats: Awaited<ReturnType<typeof fetchPopGradeStats>>;
+  try {
+    popData = await fetchPopCategories();
+    stats = await fetchPopGradeStats(popData.categories);
+  } catch (err) {
+    console.error('[pop] data unavailable at render time:', err);
+    return (
+      <main className="dcm-brand max-w-3xl mx-auto px-4 py-16">
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">DCM Population Report</h1>
+        <p className="text-gray-700">
+          The population counts are being refreshed. Please check back in a few minutes.
+        </p>
+        <p className="mt-6">
+          <Link href="/" className="text-purple-700 underline">Back to DCM Grading</Link>
+        </p>
+      </main>
+    );
+  }
+  const { categories, totals } = popData;
 
   const totalGraded = stats.totalGraded || totals.totalGraded;
   const updatedIso = new Date().toISOString();

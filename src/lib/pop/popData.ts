@@ -77,8 +77,24 @@ export async function fetchPopCategories(): Promise<{
   categories: PopCategoryRow[];
   totals: PopTotals;
 }> {
+  // The categories RPC aggregates the whole cards table and occasionally
+  // trips the statement timeout (57014) under load. That once failed a
+  // production build (Sept 10 2026, /pop prerender). A timeout is transient,
+  // so retry before giving up.
+  const rpcWithRetry = async () => {
+    let last: Awaited<ReturnType<typeof supabaseAdmin.rpc>> | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, attempt * 1500));
+      last = await supabaseAdmin.rpc('get_pop_categories');
+      if (!last.error) return last;
+      if (last.error.code !== '57014') return last;
+      console.warn(`Pop categories RPC timed out (attempt ${attempt + 1}/3)`);
+    }
+    return last!;
+  };
+
   const [rpcResult, subCatResult] = await Promise.all([
-    supabaseAdmin.rpc('get_pop_categories'),
+    rpcWithRetry(),
     supabaseAdmin
       .from('cards')
       .select('sub_category')
