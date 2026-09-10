@@ -249,9 +249,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   const batch = await loadOwnedBatch(supabase, batchId, userId);
   if (!batch) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (batch.status !== 'draft') {
+  // A running or paused batch still owns queued rows the drain may claim;
+  // it must be cancelled first. Drafts and finished batches (complete,
+  // failed, cancelled) are safe: items cascade, and ebay_listings rows keep
+  // their live listing because bulk_item_id is ON DELETE SET NULL.
+  const DELETABLE = new Set(['draft', 'complete', 'failed', 'cancelled']);
+  if (!DELETABLE.has(batch.status)) {
     return NextResponse.json(
-      { error: 'Only a draft batch can be deleted.' },
+      { error: `This batch is ${batch.status}. Cancel it before deleting.` },
       { status: 409 }
     );
   }

@@ -889,7 +889,7 @@ export default function EbayBulkScreen() {
           </View>
         }
         ListFooterComponent={
-          isDraft ? (
+          (isDraft || ['complete', 'failed', 'cancelled'].includes(String(batch?.status))) ? (
             <TouchableOpacity
               style={[styles.deleteBatchBtn, deleting && styles.deleteBatchBtnDisabled]}
               onPress={handleDeleteBatch}

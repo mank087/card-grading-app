@@ -41,6 +41,25 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function BulkBatchesStrip({ token }: { token: string | null }) {
   const [batches, setBatches] = useState<BulkBatchSummary[]>([]);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteBatch = async (id: string) => {
+    if (!token) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/ebay/bulk/batches/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setBatches(prev => prev.filter(b => b.id !== id));
+    } catch {
+      // Leave the row in place; the seller can retry.
+    } finally {
+      setDeletingId(null);
+      setConfirmId(null);
+    }
+  };
   // A running batch publishes without this page: the counts here are stale the
   // moment they land, so the strip refreshes while one is in flight and stops
   // the moment nothing is (and while the tab is hidden — nobody is reading it).
@@ -99,6 +118,29 @@ export default function BulkBatchesStrip({ token }: { token: string | null }) {
             >
               {batch.status === 'draft' ? 'Continue review' : 'Open'}
             </Link>
+            {['draft', 'complete', 'failed', 'cancelled'].includes(batch.status) && (
+              confirmId === batch.id ? (
+                <span className="flex items-center gap-2 text-xs">
+                  <span className="text-red-800">Delete?</span>
+                  <button
+                    onClick={() => deleteBatch(batch.id)}
+                    disabled={deletingId === batch.id}
+                    className="px-2 py-1 bg-red-600 text-white rounded font-semibold hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deletingId === batch.id ? 'Deleting…' : 'Yes'}
+                  </button>
+                  <button onClick={() => setConfirmId(null)} className="text-gray-600 hover:text-gray-900">No</button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(batch.id)}
+                  className="text-xs text-gray-400 hover:text-red-700"
+                  title={batch.status === 'draft' ? 'Delete this draft batch' : 'Delete this batch'}
+                >
+                  Delete
+                </button>
+              )
+            )}
           </li>
         ))}
       </ul>

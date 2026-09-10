@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getStoredSession } from '@/lib/directAuth';
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
@@ -106,6 +107,9 @@ export default function BulkBatchClient({ batchId }: Props) {
   // Progress view (batch.status !== 'draft')
   const [batchBusy, setBatchBusy] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
   const [retryingAll, setRetryingAll] = useState(false);
 
   const [settings, setSettings] = useState<BulkBatchSettings | null>(null);
@@ -693,6 +697,31 @@ export default function BulkBatchClient({ batchId }: Props) {
     [batchId, load, token]
   );
 
+  /** Delete a draft or finished batch. Cards, grades and live listings stay. */
+  const deleteBatch = useCallback(async () => {
+    if (!token) return;
+    setDeleting(true);
+    setPublishNote(null);
+    try {
+      const res = await fetch(`/api/ebay/bulk/batches/${batchId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPublishNote({ text: json.error || 'Could not delete this batch.', tone: 'warning' });
+        setDeleting(false);
+        setConfirmDelete(false);
+        return;
+      }
+      router.replace('/instalist-marketplace');
+    } catch {
+      setPublishNote({ text: 'Could not delete this batch.', tone: 'warning' });
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }, [batchId, router, token]);
+
   const retryItem = useCallback(
     async (itemId: string): Promise<string | null> => {
       if (!token) return 'Please sign in again.';
@@ -867,6 +896,42 @@ export default function BulkBatchClient({ batchId }: Props) {
             )}
           </div>
         </div>
+
+        {['draft', 'complete', 'failed', 'cancelled'].includes(batch.status) && (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            {confirmDelete ? (
+              <div className="flex flex-wrap items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <span className="text-sm text-red-800">
+                  {batch.status === 'draft'
+                    ? 'Delete this draft batch? Your cards and grades are untouched.'
+                    : 'Delete this batch? Listings already on eBay stay live.'}
+                </span>
+                <button
+                  onClick={deleteBatch}
+                  disabled={deleting}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900"
+                >
+                  Keep it
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                disabled={batchBusy !== null}
+                className="px-3 py-1.5 text-sm text-gray-500 hover:text-red-700 font-semibold disabled:opacity-50"
+              >
+                {batch.status === 'draft' ? 'Delete draft' : 'Delete batch'}
+              </button>
+            )}
+          </div>
+        )}
 
         {publishNote && (
           <div
