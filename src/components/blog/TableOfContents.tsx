@@ -1,39 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-interface TOCItem {
-  id: string;
-  text: string;
-  level: number;
-}
+import { useEffect, useMemo, useState } from 'react';
+import { extractHeadings } from '@/lib/seo/blogSchema';
 
 interface TableOfContentsProps {
   content: string;
+  /**
+   * sidebar: sticky list for the desktop aside (default).
+   * inline:  collapsible block placed above the article body for small
+   *          screens, open by default so the links are in the HTML.
+   */
+  variant?: 'sidebar' | 'inline';
 }
 
-export default function TableOfContents({ content }: TableOfContentsProps) {
-  const [items, setItems] = useState<TOCItem[]>([]);
+/**
+ * Headings are extracted synchronously (useMemo) so the list is part of the
+ * server-rendered HTML; only the active-heading highlight needs the browser.
+ */
+export default function TableOfContents({ content, variant = 'sidebar' }: TableOfContentsProps) {
+  const items = useMemo(() => extractHeadings(content), [content]);
   const [activeId, setActiveId] = useState<string>('');
-
-  // Extract headings from markdown content
-  useEffect(() => {
-    const headingRegex = /^\s*(#{2,3})\s+(.+)$/gm;
-    const extractedItems: TOCItem[] = [];
-    let match;
-
-    while ((match = headingRegex.exec(content)) !== null) {
-      const level = match[1].length;
-      const text = match[2].replace(/[*_`]/g, ''); // Remove markdown formatting
-      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-      extractedItems.push({ id, text, level });
-    }
-
-    setItems(extractedItems);
-  }, [content]);
 
   // Track active heading on scroll
   useEffect(() => {
+    if (variant !== 'sidebar' || items.length < 3) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -56,10 +46,48 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
     });
 
     return () => observer.disconnect();
-  }, [items]);
+  }, [items, variant]);
 
   if (items.length < 3) {
     return null;
+  }
+
+  const list = (
+    <ul className="space-y-2 border-l-2 border-gray-200">
+      {items.map((item) => (
+        <li key={item.id} className={`${item.level === 3 ? 'pl-6' : 'pl-4'}`}>
+          <a
+            href={`#${item.id}`}
+            aria-current={activeId === item.id ? 'location' : undefined}
+            className={`block text-sm transition-colors duration-200 ${
+              activeId === item.id
+                ? 'text-purple-600 font-medium border-l-2 border-purple-600 -ml-[2px] pl-4'
+                : 'text-gray-600 hover:text-purple-600'
+            }`}
+            onClick={(e) => {
+              const el = document.getElementById(item.id);
+              if (!el) return;
+              e.preventDefault();
+              el.scrollIntoView({ behavior: 'smooth' });
+              history.replaceState(null, '', `#${item.id}`);
+            }}
+          >
+            {item.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (variant === 'inline') {
+    return (
+      <details open className="lg:hidden mb-8 rounded-xl border border-gray-200 bg-gray-50 p-4" role="navigation" aria-label="Article contents">
+        <summary className="cursor-pointer text-sm font-semibold text-gray-900 uppercase tracking-wider">
+          In this article
+        </summary>
+        <div className="mt-3">{list}</div>
+      </details>
+    );
   }
 
   return (
@@ -67,32 +95,7 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
       <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
         Table of Contents
       </h3>
-      <ul className="space-y-2 border-l-2 border-gray-200">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className={`${item.level === 3 ? 'pl-6' : 'pl-4'}`}
-          >
-            <a
-              href={`#${item.id}`}
-              aria-current={activeId === item.id ? 'location' : undefined}
-              className={`block text-sm transition-colors duration-200 ${
-                activeId === item.id
-                  ? 'text-purple-600 font-medium border-l-2 border-purple-600 -ml-[2px] pl-4'
-                  : 'text-gray-600 hover:text-purple-600'
-              }`}
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById(item.id)?.scrollIntoView({
-                  behavior: 'smooth',
-                });
-              }}
-            >
-              {item.text}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {list}
     </div>
   );
 }

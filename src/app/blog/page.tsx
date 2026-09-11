@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost, BlogCategory } from '@/types/blog';
 import { BlogPostCard, BlogPagination, CategoryBadge } from '@/components/blog';
+import { blogItemList, breadcrumbList, SITE_URL } from '@/lib/seo/blogSchema';
 
 export const revalidate = 60;
 
@@ -113,8 +114,14 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   const featuredPost = page === 1 && !categorySlug ? posts[0] : null;
   const regularPosts = featuredPost ? posts.slice(1) : posts;
 
+  const pageUrl = `${SITE_URL}${blogPagePath('/blog', page)}`;
+  const listLd = blogItemList(posts, pageUrl, page > 1 ? `DCM Blog, page ${page}` : 'DCM Blog', 'Card grading guides, market insights and collecting tips from DCM Grading.');
+  const crumbsLd = breadcrumbList([{ name: 'Home', url: SITE_URL }, { name: 'Blog', url: `${SITE_URL}/blog` }]);
+
   return (
     <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(listLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbsLd) }} />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Header */}

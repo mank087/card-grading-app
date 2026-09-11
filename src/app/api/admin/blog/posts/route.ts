@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sanitizeFaq } from '@/lib/seo/blogSchema';
 import { verifyAdminSession, logAdminActivity } from '@/lib/admin/adminAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { BlogPost, BlogPostFormData } from '@/types/blog';
@@ -113,6 +114,8 @@ export async function POST(request: NextRequest) {
       tags: body.tags || [],
       meta_title: body.meta_title || null,
       meta_description: body.meta_description || null,
+      quick_answer: typeof body.quick_answer === 'string' && body.quick_answer.trim() ? body.quick_answer.trim().slice(0, 600) : null,
+      faq: sanitizeFaq(body.faq),
       status: body.status || 'draft',
       published_at: body.status === 'published' ? (body.published_at || new Date().toISOString()) : body.published_at || null,
       author_name: body.author_name || 'DCM Team',
@@ -120,7 +123,7 @@ export async function POST(request: NextRequest) {
       updated_by: admin.id,
     };
 
-    const { data: newPost, error } = await supabaseAdmin
+    let { data: newPost, error } = await supabaseAdmin
       .from('blog_posts')
       .insert(postData)
       .select(`
@@ -128,6 +131,20 @@ export async function POST(request: NextRequest) {
         category:blog_categories(*)
       `)
       .single();
+
+    if (error && /quick_answer|faq|schema cache/i.test(error.message)) {
+      // Migration 20260911_blog_quick_answer_faq.sql not applied yet: save
+      // the post without the two answer-engine fields rather than fail.
+      const { quick_answer: _qa, faq: _faq, ...legacy } = postData;
+      ({ data: newPost, error } = await supabaseAdmin
+        .from('blog_posts')
+        .insert(legacy)
+        .select(`
+          *,
+          category:blog_categories(*)
+        `)
+        .single());
+    }
 
     if (error) {
       console.error('Error creating blog post:', error);

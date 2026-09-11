@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost } from '@/types/blog';
+import { breadcrumbList, faqPage, markdownWordCount, SITE_URL } from '@/lib/seo/blogSchema';
 import {
   BlogPostContent,
   CategoryBadge,
@@ -116,31 +117,49 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const postUrl = `${baseUrl}/blog/${post.slug}`;
 
   // JSON-LD structured data for SEO
+  // "Updated" is only worth showing when an edit happened well after publish;
+  // the trigger bumps updated_at on any save, so a same-day touch is noise.
+  const publishedMs = post.published_at ? new Date(post.published_at).getTime() : 0;
+  const updatedMs = post.updated_at ? new Date(post.updated_at).getTime() : 0;
+  const showUpdated = publishedMs > 0 && updatedMs - publishedMs > 24 * 60 * 60 * 1000;
+  const formattedUpdated = showUpdated
+    ? new Date(post.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '';
+  const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.question && f?.answer) : [];
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
+    '@id': `${postUrl}#article`,
     headline: post.title,
     description: post.excerpt || post.subtitle,
+    ...(post.quick_answer ? { abstract: post.quick_answer } : {}),
     image: post.featured_image_path,
     datePublished: post.published_at,
-    dateModified: post.updated_at,
+    dateModified: showUpdated ? post.updated_at : post.published_at,
+    inLanguage: 'en-US',
+    wordCount: markdownWordCount(post.content),
+    ...(post.category?.name ? { articleSection: post.category.name } : {}),
+    ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
     author: {
       '@type': 'Organization',
       name: post.author_name,
+      url: SITE_URL,
     },
-    publisher: {
-      '@type': 'Organization',
-      name: 'DCM Grading',
-      logo: {
-        '@type': 'ImageObject',
-        url: `${baseUrl}/DCM-logo.png`,
-      },
-    },
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    isPartOf: { '@id': `${SITE_URL}/#website` },
     mainEntityOfPage: {
       '@type': 'WebPage',
       '@id': postUrl,
     },
   };
+  const breadcrumbLd = breadcrumbList([
+    { name: 'Home', url: SITE_URL },
+    { name: 'Blog', url: `${SITE_URL}/blog` },
+    ...(post.category ? [{ name: post.category.name, url: `${SITE_URL}/blog/category/${post.category.slug}` }] : []),
+    { name: post.title, url: postUrl },
+  ]);
+  const faqLd = faq.length ? faqPage(faq) : null;
 
   return (
     <>
@@ -150,6 +169,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
+      {faqLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+        />
+      )}
 
       <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
 
@@ -201,9 +230,25 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 <span className="font-medium text-gray-900">{post.author_name}</span>
                 <span className="hidden sm:inline">·</span>
                 <time dateTime={post.published_at || undefined}>{formattedDate}</time>
+                {showUpdated && (
+                  <>
+                    <span className="hidden sm:inline">·</span>
+                    <span>Updated <time dateTime={post.updated_at}>{formattedUpdated}</time></span>
+                  </>
+                )}
                 <span className="hidden sm:inline">·</span>
                 <span>{post.read_time_minutes} min read</span>
               </div>
+
+              {/* Quick answer: the direct answer to the title, first thing on
+                  the page after the headline so readers and answer engines
+                  get it without scrolling. */}
+              {post.quick_answer && (
+                <div className="mt-6 rounded-xl border-l-4 border-purple-600 bg-purple-50 px-5 py-4" data-quick-answer>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-purple-700 mb-1">Quick answer</p>
+                  <p className="text-base sm:text-lg text-gray-900 leading-relaxed">{post.quick_answer}</p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -235,7 +280,23 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <div className="lg:grid lg:grid-cols-[1fr_250px] lg:gap-12">
               {/* Main Content */}
               <div className="bg-white rounded-2xl shadow-md p-6 sm:p-8 lg:p-10">
+                <TableOfContents content={post.content} variant="inline" />
                 <BlogPostContent content={post.content} />
+
+                {/* FAQ */}
+                {faq.length > 0 && (
+                  <section className="mt-10 pt-6 border-t border-gray-200" aria-labelledby="post-faq">
+                    <h2 id="post-faq" className="text-2xl font-bold text-gray-900 mb-4">Frequently asked questions</h2>
+                    <dl className="space-y-5">
+                      {faq.map((f, i) => (
+                        <div key={i}>
+                          <dt className="text-base font-semibold text-gray-900">{f.question}</dt>
+                          <dd className="mt-1 text-gray-700 leading-relaxed">{f.answer}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                )}
 
                 {/* Tags */}
                 {post.tags && post.tags.length > 0 && (

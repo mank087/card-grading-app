@@ -32,6 +32,8 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
     tags: post?.tags || [],
     meta_title: post?.meta_title || '',
     meta_description: post?.meta_description || '',
+    quick_answer: post?.quick_answer || '',
+    faq: Array.isArray(post?.faq) ? post!.faq! : [],
     status: post?.status || 'draft',
     published_at: post?.published_at || '',
     author_name: post?.author_name || 'DCM Team',
@@ -275,6 +277,76 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
             <p className="text-xs text-gray-500 mt-1">
               {formData.excerpt?.length || 0}/300 characters recommended
             </p>
+          </div>
+
+          {/* Quick answer: shown in a summary box under the title and the
+              first thing answer engines quote. Two or three sentences that
+              answer the title question directly. */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Quick answer <span className="font-normal text-gray-500">(answer the title question in 2 to 3 sentences)</span>
+            </label>
+            <textarea
+              value={formData.quick_answer || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, quick_answer: e.target.value }))}
+              rows={3}
+              maxLength={600}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="Example: Most mail-away grading takes 30 to 90 days. DCM grades a card from two photos in about a minute, so you can decide which cards are worth sending."
+            />
+            <p className="text-xs text-gray-500 mt-1">{formData.quick_answer?.length || 0}/600 · shown under the title as a summary box</p>
+          </div>
+
+          {/* FAQ: rendered at the end of the post and emitted as FAQPage schema. */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                FAQ <span className="font-normal text-gray-500">(3 to 5 short questions readers ask; shown at the end of the post and as FAQ structured data)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, faq: [...(prev.faq || []), { question: '', answer: '' }] }))}
+                disabled={(formData.faq?.length || 0) >= 10}
+                className="text-xs font-semibold text-purple-700 hover:underline disabled:opacity-50"
+              >
+                + Add question
+              </button>
+            </div>
+            {(formData.faq || []).length === 0 && (
+              <p className="text-xs text-gray-500">No questions yet.</p>
+            )}
+            <div className="space-y-3">
+              {(formData.faq || []).map((item, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={item.question}
+                      onChange={(e) => setFormData(prev => ({ ...prev, faq: (prev.faq || []).map((f, j) => j === i ? { ...f, question: e.target.value } : f) }))}
+                      maxLength={300}
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="Question, e.g. Does grading a card increase its value?"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, faq: (prev.faq || []).filter((_, j) => j !== i) }))}
+                      className="text-xs text-gray-500 hover:text-red-600"
+                      title="Remove"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <textarea
+                    value={item.answer}
+                    onChange={(e) => setFormData(prev => ({ ...prev, faq: (prev.faq || []).map((f, j) => j === i ? { ...f, answer: e.target.value } : f) }))}
+                    rows={2}
+                    maxLength={2000}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Answer in one or two plain sentences."
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Content — side-by-side WYSIWYG (left) + markdown source (right).

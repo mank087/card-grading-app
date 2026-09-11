@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sanitizeFaq } from '@/lib/seo/blogSchema';
 import { verifyAdminSession, logAdminActivity } from '@/lib/admin/adminAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { BlogPostFormData } from '@/types/blog';
@@ -111,11 +112,13 @@ export async function PUT(
     if (body.tags !== undefined) updateData.tags = body.tags || [];
     if (body.meta_title !== undefined) updateData.meta_title = body.meta_title || null;
     if (body.meta_description !== undefined) updateData.meta_description = body.meta_description || null;
+    if (body.quick_answer !== undefined) updateData.quick_answer = typeof body.quick_answer === 'string' && body.quick_answer.trim() ? body.quick_answer.trim().slice(0, 600) : null;
+    if (body.faq !== undefined) updateData.faq = sanitizeFaq(body.faq);
     if (body.status !== undefined) updateData.status = body.status;
     if (publishedAt !== undefined) updateData.published_at = publishedAt;
     if (body.author_name !== undefined) updateData.author_name = body.author_name || 'DCM Team';
 
-    const { data: updatedPost, error } = await supabaseAdmin
+    let { data: updatedPost, error } = await supabaseAdmin
       .from('blog_posts')
       .update(updateData)
       .eq('id', id)
@@ -124,6 +127,21 @@ export async function PUT(
         category:blog_categories(*)
       `)
       .single();
+
+    if (error && /quick_answer|faq|schema cache/i.test(error.message)) {
+      // Migration 20260911_blog_quick_answer_faq.sql not applied yet: save
+      // everything else rather than fail the edit.
+      const { quick_answer: _qa, faq: _faq, ...legacy } = updateData;
+      ({ data: updatedPost, error } = await supabaseAdmin
+        .from('blog_posts')
+        .update(legacy)
+        .eq('id', id)
+        .select(`
+          *,
+          category:blog_categories(*)
+        `)
+        .single());
+    }
 
     if (error) {
       console.error('Error updating blog post:', error);

@@ -15,6 +15,11 @@ export interface BlogCategory {
   updated_at?: string;
 }
 
+export interface BlogFaqItem {
+  question: string;
+  answer: string;
+}
+
 export interface BlogPost {
   id: string;
   slug: string;
@@ -29,6 +34,10 @@ export interface BlogPost {
   tags: string[];
   meta_title: string | null;
   meta_description: string | null;
+  /** Two or three sentences that answer the title question; shown under the title. */
+  quick_answer?: string | null;
+  /** Rendered at the end of the post and as FAQPage structured data. */
+  faq?: BlogFaqItem[] | null;
   status: 'draft' | 'published' | 'scheduled' | 'archived';
   published_at: string | null;
   author_name: string;
@@ -68,6 +77,8 @@ export interface BlogPostFormData {
   tags?: string[];
   meta_title?: string;
   meta_description?: string;
+  quick_answer?: string;
+  faq?: BlogFaqItem[];
   status: 'draft' | 'published' | 'scheduled' | 'archived';
   published_at?: string;
   author_name?: string;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost, BlogCategory } from '@/types/blog';
 import { BlogPostCard, BlogPagination, CategoryBadge } from '@/components/blog';
+import { blogItemList, breadcrumbList, SITE_URL } from '@/lib/seo/blogSchema';
 
 export const revalidate = 60;
 
@@ -109,8 +110,18 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   if (page > 1 && posts.length === 0) notFound();
 
+  const categoryUrl = `${SITE_URL}${blogPagePath(`/blog/category/${category.slug}`, page)}`;
+  const listLd = blogItemList(posts, categoryUrl, page > 1 ? `${category.name}, page ${page}` : category.name, category.description || undefined);
+  const crumbsLd = breadcrumbList([
+    { name: 'Home', url: SITE_URL },
+    { name: 'Blog', url: `${SITE_URL}/blog` },
+    { name: category.name, url: `${SITE_URL}/blog/category/${category.slug}` },
+  ]);
+
   return (
     <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(listLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbsLd) }} />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Breadcrumb */}
