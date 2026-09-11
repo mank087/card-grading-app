@@ -182,6 +182,9 @@ export default function PokemonGradingLanding() {
           if (window.fbq) {
             window.fbq('track', 'CompleteRegistration', { content_name: 'Pokemon Landing Email Signup' })
           }
+          if ((window as any).uetq) {
+            (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'pokemon_landing_email' })
+          }
         }
         setSuccessMessage('Account created! Check your email for the confirmation link.')
         setEmail('')

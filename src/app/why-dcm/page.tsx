@@ -138,6 +138,7 @@ export default function WhyDcmPage() {
           if (window.rdt) window.rdt('track', 'SignUp', { conversionId: `signup_whydcm_hero_${Date.now()}` })
           if (window.gtag) window.gtag('event', 'sign_up', { method: 'email' })
           if (window.fbq) window.fbq('track', 'CompleteRegistration', { content_name: 'Why DCM Hero Signup' })
+          if ((window as any).uetq) (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'why_dcm_hero_email' })
         }
         setHeroSuccess('Account created! Check your email to confirm.')
         setHeroEmail('')

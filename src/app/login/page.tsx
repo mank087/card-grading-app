@@ -132,6 +132,13 @@ function LoginPageContent() {
               })
               console.log('[Meta Pixel] CompleteRegistration event tracked')
             }
+
+            // Microsoft Advertising UET signup event. Safe pre-consent: uetq is
+            // a plain array stub until the visitor accepts, so this only queues.
+            if ((window as any).uetq) {
+              (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'login_page_email' })
+              console.log('[Microsoft UET] signup event tracked')
+            }
           }
           setConfirmationSentTo(email)
           setResendState('idle')

@@ -170,6 +170,7 @@ export default function FloatingCtaBar({
           if (window.rdt) window.rdt('track', 'SignUp', { conversionId: `signup_${source}_${Date.now()}` })
           if (window.gtag) window.gtag('event', 'sign_up', { method: 'email' })
           if (window.fbq) window.fbq('track', 'CompleteRegistration', { content_name: `${source} Floating Signup` })
+          if ((window as any).uetq) (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: `${source}_floating_email` })
         }
         setSuccess('Account created! Check your email to confirm.')
         setEmail('')

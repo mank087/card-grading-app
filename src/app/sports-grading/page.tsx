@@ -161,6 +161,9 @@ export default function SportsGradingLanding() {
           if (window.fbq) {
             window.fbq('track', 'CompleteRegistration', { content_name: 'Sports Landing Email Signup' })
           }
+          if ((window as any).uetq) {
+            (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'sports_landing_email' })
+          }
         }
         setSuccessMessage('Account created! Check your email for the confirmation link.')
         setEmail('')
