@@ -24,6 +24,8 @@ import {
   buildPairs,
   detectConvention,
   type PairSlot,
+  type SlotRef,
+  applyImageMove,
   type PickedFile,
   type SubmissionConvention,
 } from '@/lib/submissions/pairing'
@@ -468,6 +470,57 @@ function SubmissionsNewInner() {
       return next
     })
   }
+
+  // ---------------------------------------------------------------------
+  // Move images between slots (Sept 11 2026, customer request). Any image can
+  // be dragged onto any front/back slot of any card; the two images swap, so
+  // nothing is ever lost. Touch/keyboard fallback: tap an image to pick it
+  // up, then tap the slot it belongs in. Overrides are keyed by position, so
+  // rotation (keyed by file id) and preflight results follow the image.
+  // ---------------------------------------------------------------------
+
+  const [moveSource, setMoveSource] = useState<SlotRef | null>(null)
+  const [dragOverSlot, setDragOverSlot] = useState<SlotRef | null>(null)
+  const [thumbSize, setThumbSize] = useState<'compact' | 'large'>('compact')
+  const [zoomSlot, setZoomSlot] = useState<SlotRef | null>(null)
+
+  const moveImage = (from: SlotRef, to: SlotRef) => {
+    setPairOverrides((prev) => applyImageMove(prev, pairs, from, to))
+  }
+
+  const slotEq = (x: SlotRef | null, y: SlotRef) => !!x && x.position === y.position && x.side === y.side
+
+  const handleSlotTap = (slot: SlotRef, hasImage: boolean) => {
+    if (stage !== 'review') return
+    if (!moveSource) {
+      if (hasImage) setMoveSource(slot)
+      return
+    }
+    moveImage(moveSource, slot)
+    setMoveSource(null)
+  }
+
+  useEffect(() => {
+    if (!moveSource && !zoomSlot) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMoveSource(null); setZoomSlot(null) } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moveSource, zoomSlot])
+
+  // Object URLs for thumbnails, one per file, revoked when the file leaves.
+  const previewUrls = useRef<Map<string, string>>(new Map())
+  const previewUrl = (f: PickedFile) => {
+    let u = previewUrls.current.get(f.id)
+    if (!u) { u = URL.createObjectURL(f.file); previewUrls.current.set(f.id, u) }
+    return u
+  }
+  useEffect(() => {
+    const live = new Set(files.map((f) => f.id))
+    for (const [id, u] of previewUrls.current) {
+      if (!live.has(id)) { URL.revokeObjectURL(u); previewUrls.current.delete(id) }
+    }
+  }, [files])
+  useEffect(() => () => { for (const u of previewUrls.current.values()) URL.revokeObjectURL(u) }, [])
 
   // ---------------------------------------------------------------------
   // Rotation — keyed by PickedFile.id (not position/side) so a rotation
@@ -1178,10 +1231,31 @@ function SubmissionsNewInner() {
                   <button onClick={reverseOrder} className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Reverse order</button>
                   <button onClick={rotateAllFronts} className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-gray-50">⟳ Rotate all fronts</button>
                   <button onClick={rotateAllBacks} className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-gray-50">⟳ Rotate all backs</button>
+                  <button
+                    onClick={() => setThumbSize((s) => (s === 'compact' ? 'large' : 'compact'))}
+                    className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    {thumbSize === 'compact' ? 'Larger thumbnails' : 'Smaller thumbnails'}
+                  </button>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[28rem] overflow-y-auto p-1">
+              {stage === 'review' && (
+                moveSource ? (
+                  <div className="flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-lg px-3 py-2 text-sm text-indigo-900">
+                    <span>
+                      Holding the <span className="font-semibold">{moveSource.side}</span> of card #{moveSource.position + 1}. Tap the slot it belongs in to swap them.
+                    </span>
+                    <button onClick={() => setMoveSource(null)} className="text-xs font-semibold text-indigo-700 hover:underline">Cancel</button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Wrong photo on a card? Drag any image onto the slot it belongs in and the two will swap. On a phone, tap an image, then tap its correct slot. Use the magnifier to check a card up close.
+                  </p>
+                )
+              )}
+
+              <div className={`grid gap-3 overflow-y-auto p-1 ${thumbSize === 'large' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-h-[44rem]' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 max-h-[28rem]'}`}>
                 {effectivePairs.map((pair) => {
                   const upload = uploadState.get(pair.position)
                   const preflight = pairPreflight(pair)
@@ -1205,27 +1279,62 @@ function SubmissionsNewInner() {
                           const result = picked ? preflightResults.get(picked.id) : undefined
                           const sideBlocking = result ? preflightBlocks(result) : false
                           const isDup = picked ? duplicateInfo.duplicateFileIds.has(picked.id) : false
+                          const slot: SlotRef = { position: pair.position, side }
+                          const isSource = slotEq(moveSource, slot)
+                          const isOver = slotEq(dragOverSlot, slot)
+                          const interactive = stage === 'review'
                           return (
                             <div key={side}>
-                            <div className="relative aspect-[5/7] bg-gray-100 rounded overflow-hidden border border-gray-200">
+                            <div
+                              className={`relative aspect-[5/7] bg-gray-100 rounded overflow-hidden border-2 transition-colors ${isSource ? 'border-indigo-600 ring-2 ring-indigo-300' : isOver ? 'border-indigo-500 bg-indigo-50' : moveSource ? 'border-dashed border-indigo-300' : 'border-gray-200'} ${interactive ? 'cursor-pointer' : ''}`}
+                              draggable={interactive && !!picked}
+                              onDragStart={(e) => { if (!interactive || !picked) return; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', `${pair.position}:${side}`); setMoveSource(slot) }}
+                              onDragEnd={() => { setMoveSource(null); setDragOverSlot(null) }}
+                              onDragOver={(e) => { if (!interactive) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!isOver) setDragOverSlot(slot) }}
+                              onDragLeave={() => { if (isOver) setDragOverSlot(null) }}
+                              onDrop={(e) => {
+                                if (!interactive) return
+                                e.preventDefault()
+                                const rawRef = e.dataTransfer.getData('text/plain')
+                                const [pos, sd] = rawRef.split(':')
+                                const from: SlotRef | null = rawRef && (sd === 'front' || sd === 'back') ? { position: Number(pos), side: sd } : moveSource
+                                if (from) moveImage(from, slot)
+                                setMoveSource(null); setDragOverSlot(null)
+                              }}
+                              onClick={() => handleSlotTap(slot, !!picked)}
+                              role={interactive ? 'button' : undefined}
+                              aria-label={picked ? `${side} of card ${pair.position + 1}` : `empty ${side} slot of card ${pair.position + 1}`}
+                            >
                               {picked ? (
                                 <img
-                                  src={URL.createObjectURL(picked.file)}
+                                  src={previewUrl(picked)}
                                   alt={side}
-                                  className="w-full h-full object-contain"
+                                  className="w-full h-full object-contain pointer-events-none select-none"
                                   style={{ transform: `rotate(${deg}deg)` }}
+                                  draggable={false}
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[10px] text-red-500 text-center px-1">missing {side}</div>
+                                <div className="w-full h-full flex items-center justify-center text-[10px] text-red-500 text-center px-1">
+                                  {moveSource ? 'drop here' : `missing ${side}`}
+                                </div>
                               )}
                               {stage === 'review' && picked && (
-                                <button
-                                  onClick={() => rotateOne(picked.id)}
-                                  title="Rotate 90°"
-                                  className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center text-xs leading-none bg-black/50 text-white rounded hover:bg-black/70"
-                                >
-                                  ⟳
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); rotateOne(picked.id) }}
+                                    title="Rotate 90°"
+                                    className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center text-xs leading-none bg-black/50 text-white rounded hover:bg-black/70"
+                                  >
+                                    ⟳
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setZoomSlot(slot) }}
+                                    title="View larger"
+                                    className="absolute bottom-1 right-1 w-5 h-5 flex items-center justify-center text-xs leading-none bg-black/50 text-white rounded hover:bg-black/70"
+                                  >
+                                    🔍
+                                  </button>
+                                </>
                               )}
                               {picked && isDup && (
                                 <div className="absolute top-1 left-1 px-1 py-0.5 text-[8px] font-bold bg-amber-500 text-white rounded" title="This exact image appears more than once">
@@ -1260,6 +1369,46 @@ function SubmissionsNewInner() {
                   )
                 })}
               </div>
+
+              {zoomSlot && (() => {
+                const zp = effectivePairs.find((p) => p.position === zoomSlot.position)
+                if (!zp) return null
+                const idx = effectivePairs.findIndex((p) => p.position === zoomSlot.position)
+                const go = (delta: number) => {
+                  const n = effectivePairs[idx + delta]
+                  if (n) setZoomSlot({ position: n.position, side: zoomSlot.side })
+                }
+                return (
+                  <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4" onClick={() => setZoomSlot(null)} role="dialog" aria-label={`Card ${zoomSlot.position + 1} preview`}>
+                    <div className="bg-white rounded-xl max-w-4xl w-full p-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold text-gray-900">Card #{zoomSlot.position + 1}</p>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => go(-1)} disabled={idx <= 0} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-40">← Prev</button>
+                          <button onClick={() => go(1)} disabled={idx >= effectivePairs.length - 1} className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-40">Next →</button>
+                          <button onClick={() => swapPair(zoomSlot.position)} className="px-2 py-1 text-xs border border-gray-300 rounded">⇄ Swap front/back</button>
+                          <button onClick={() => setZoomSlot(null)} className="px-2 py-1 text-xs border border-gray-300 rounded">Close</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['front', 'back'] as const).map((sd) => {
+                          const img = zp[sd]
+                          const d = img ? (rotations.get(img.id) || 0) : 0
+                          return (
+                            <div key={sd} className={`rounded-lg border-2 ${sd === zoomSlot.side ? 'border-indigo-500' : 'border-gray-200'} bg-gray-50 p-2`}>
+                              <p className="text-xs text-gray-500 capitalize mb-1 truncate">{sd}{img ? ` · ${img.name}` : ''}</p>
+                              <div className="h-[55vh] flex items-center justify-center overflow-hidden">
+                                {img ? <img src={previewUrl(img)} alt={sd} className="max-w-full max-h-full object-contain" style={{ transform: `rotate(${d}deg)` }} /> : <span className="text-sm text-red-500">missing {sd}</span>}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">If these are not the same card, close this and drag the wrong image onto the card it belongs to.</p>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Binder */}
               {stage === 'review' && bindersAvailable && (

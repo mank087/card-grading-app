@@ -181,3 +181,41 @@ export function buildPairs(
   if (convention === 'folders') return buildFolders(files);
   return buildAlternating(files, preferTimeOrder);
 }
+
+// ---------------------------------------------------------------------------
+// Manual image moves in the review grid (Sept 11 2026).
+// ---------------------------------------------------------------------------
+
+export interface SlotRef {
+  position: number;
+  side: 'front' | 'back';
+}
+
+/**
+ * Move the image in `from` to `to`, swapping with whatever was there (possibly
+ * nothing). Pure: returns a new overrides map layered on `base` pairs, which
+ * is exactly how the intake page composes manual edits. Dropping a slot on
+ * itself is a no-op; dropping on the other side of the same card is a swap.
+ */
+export function applyImageMove(
+  overrides: Map<number, PairSlot>,
+  base: PairSlot[],
+  from: SlotRef,
+  to: SlotRef
+): Map<number, PairSlot> {
+  if (from.position === to.position && from.side === to.side) return overrides;
+  const get = (pos: number) => overrides.get(pos) ?? base.find((p) => p.position === pos);
+  const a = get(from.position);
+  const b = get(to.position);
+  if (!a || !b) return overrides;
+  const next = new Map(overrides);
+  if (from.position === to.position) {
+    next.set(a.position, { ...a, front: a.back, back: a.front });
+    return next;
+  }
+  const moving = a[from.side];
+  const displaced = b[to.side];
+  next.set(a.position, { ...a, [from.side]: displaced });
+  next.set(b.position, { ...b, [to.side]: moving });
+  return next;
+}
