@@ -68,17 +68,17 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     // kept here so step counts stay consistent.
     {
       title: 'Welcome to DCM Grading',
-      body: 'Professional card grading in seconds — powered by DCM Optic™',
+      body: 'Grade a card from your phone in about a minute. The card never leaves your hands.',
     },
   ],
   grade: [
     {
       title: 'Welcome to your Grading Station',
-      body: 'This is where the magic happens. Snap photos of your card and DCM Optic™ analyzes centering, corners, edges, and surface for a professional grade in under 2 minutes.',
+      body: 'This is where the magic happens. Snap photos of your card and DCM Optic™ grades centering, corners, edges and surface, with a written reason for every deduction, in about a minute.',
     },
     {
       title: 'Pick your card type first',
-      body: 'We support Pokemon, Sports, MTG, Yu-Gi-Oh, Lorcana, One Piece, Star Wars and more. Each category uses a tuned grading model.',
+      body: 'We support Pokemon, Sports, MTG, Yu-Gi-Oh, Lorcana and One Piece, plus Star Wars and other collectibles under Other. Each category uses a tuned grading rubric.',
     },
     {
       title: 'Capture or upload',
@@ -86,13 +86,13 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     },
     {
       title: 'Your grading credits',
-      body: 'Each grade uses one credit. New users get bonus credits — buy more anytime when you’re ready to grade.',
+      body: 'Each grade uses one credit. Your first two grades are free. Buy more anytime when you’re ready to grade.',
     },
   ],
   collection: [
     {
       title: 'Your Graded Card Vault',
-      body: 'Every card you grade lands here, organized by category. Search, filter, and review your collection at a glance.',
+      body: 'Every card you grade lands here. Group cards into binders, search and filter, and switch between the cards you own and the ones you’ve sold.',
     },
     {
       title: 'List or grid view',
@@ -104,17 +104,17 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     },
     {
       title: 'Tap for the full report',
-      body: 'Open any card to see its complete grading report, sub-grades, market value, and label download options.',
+      body: 'Open any card for the full grading report, subgrades, centering, market value and label downloads, plus options to add it to a binder or mark it as sold.',
     },
   ],
   labels: [
     {
       title: 'Design Your Custom Labels',
-      body: 'Make your graded cards stand out. DCM-branded slab labels you can customize and print for your physical holders.',
+      body: 'Make your graded cards stand out with DCM slab labels you can customize and print for your physical holders.',
     },
     {
       title: 'Pick a base style',
-      body: 'Start with Modern (dark gradient) or Traditional (classic light), then customize colors or save your own templates.',
+      body: 'Start with Heritage (ivory classic), Modern (dark gradient) or Traditional (light), then customize colors or save your own templates.',
     },
     {
       title: 'Match your brand',
@@ -128,7 +128,7 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
   portfolio: [
     {
       title: 'Track Your Collection’s Value',
-      body: 'See what your collection is worth in real time, pulled from actual eBay sales of similarly-graded cards.',
+      body: 'See what your collection is worth, pulled from real eBay sold listings of cards at the same grade.',
     },
     {
       title: 'Portfolio at a glance',
@@ -150,7 +150,7 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     },
     {
       title: 'Connect once, list anywhere',
-      body: "Sign in to your eBay seller account a single time. After that, every card you grade is one tap away from being a live listing.",
+      body: "Sign in to your eBay seller account a single time. After that, every card you grade is one tap away from being a live listing, and bulk listing publishes up to 100 graded cards in one batch.",
     },
     {
       title: 'Track every listing',
@@ -160,7 +160,7 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
   account: [
     {
       title: 'Your Account Hub',
-      body: 'Manage credits, subscriptions, settings, and find help — all from here.',
+      body: 'Manage credits, subscriptions and settings, and find help, all from here.',
     },
     {
       title: 'Buy grading credits',
@@ -182,7 +182,7 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
   complete: [
     {
       title: 'You’re all set! 🎉',
-      body: 'You know the layout — let’s grade your first card. Each grade builds your verified collection and unlocks DCM’s full toolkit.',
+      body: 'You know the layout. Let’s grade your first card. Each grade builds your verified collection and unlocks DCM’s full toolkit.',
     },
   ],
 }

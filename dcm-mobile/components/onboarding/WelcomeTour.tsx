@@ -30,10 +30,10 @@ import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { TOUR_STEPS, TOUR_SCREEN_ORDER, type TourScreenId } from './welcomeTourContent'
 
 const WELCOME_BENEFITS = [
-  { icon: '🔬', title: 'Triple-pass DCM Optic™ grading', body: 'Every card is analyzed 3 independent times and averaged for maximum accuracy. PSA-aligned scoring.' },
-  { icon: '💰', title: 'Real market pricing', body: "See what your card is worth based on its grade — pulled from live eBay sales + PriceCharting data." },
-  { icon: '🏷️', title: 'Custom slab labels', body: 'Design and print labels for your slabs, magnetic one-touch holders, and toploaders.' },
-  { icon: '🛒', title: 'List to eBay from the InstaList tab', body: 'Publish graded cards to your eBay store in seconds with auto-generated labels and your full grading report attached. Track active and sold listings without leaving DCM.' },
+  { icon: '🔬', title: 'DCM Optic™ grading, three passes deep', body: 'Every card gets three independent grading passes and a consensus grade, with four subgrades and a written reason for every deduction.' },
+  { icon: '💰', title: 'Real market pricing', body: 'See what your card is worth at its grade, pulled from real eBay sold listings and PriceCharting data.' },
+  { icon: '🏷️', title: 'Custom slab labels', body: 'Heritage, Modern and Traditional labels you can customize and print for slabs, magnetic one-touch holders and toploaders.' },
+  { icon: '🛒', title: 'List to eBay from the InstaList tab', body: 'Publish graded cards to eBay in seconds with label images and your grading report attached, one at a time or up to 100 in a batch. Track active and sold listings without leaving DCM.' },
 ] as const
 
 export default function WelcomeTour() {
@@ -93,7 +93,7 @@ function WelcomeIntro({ onStart, onSkip }: { onStart: () => void; onSkip: () => 
 
           {/* Headline */}
           <Text style={st.introHeadline}>Welcome to DCM Grading</Text>
-          <Text style={st.introSubhead}>Professional card grading in seconds — powered by DCM Optic™</Text>
+          <Text style={st.introSubhead}>Grade a card from your phone in about a minute. The card never leaves your hands.</Text>
 
           {/* 4 benefit cards */}
           <View style={st.benefitsList}>

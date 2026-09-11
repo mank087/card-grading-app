@@ -23,7 +23,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'visibility-toggle',
     targetId: 'tour-visibility-toggle',
     title: 'Privacy & Label Style',
-    description: 'Control who can see your card with the Public/Private toggle. You can also switch between Modern and Traditional label styles to match your preference.',
+    description: 'Control who can see your card with the Public/Private toggle. Switch the slab label between Heritage, Modern and Traditional, or any custom design you saved in Label Studio.',
   },
   {
     id: 'grade-score',
@@ -47,7 +47,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'download-buttons',
     targetId: 'tour-download-buttons',
     title: 'Download Reports & Labels',
-    description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also download images of your cards with their graded labels included!',
+    description: 'Download the full grading report or a mini-report as a PDF, print labels for graded slabs, magnetic one-touch holders and toploaders, or save the card images with their grade labels. Your DCM serial number and share links live here too.',
   },
   {
     id: 'card-info',
@@ -71,7 +71,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'market-value',
     targetId: 'tour-market-value',
     title: 'Market Value',
-    description: 'Your estimated card value based on real market data, plus quick links to search eBay, TCGplayer, and other marketplaces. Pricing updates weekly to track market changes.',
+    description: 'Your estimated value at this grade, based on real sold listings, plus quick links to search eBay, TCGplayer and other marketplaces. Prices refresh every Sunday, and Card Lovers can refresh on demand.',
   },
   {
     id: 'pro-estimates',
@@ -306,7 +306,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
           {/* Content */}
           <div className="p-6">
             <p className="text-gray-700 text-center mb-6">
-              You've completed the tour! Now you know everything about your graded card. Ready to grow your collection?
+              You've completed the tour! From this page you can also add the card to a binder, mark it as sold when it moves on, or request a manual grade review as a Card Lovers or VIP member. Ready to grow your collection?
             </p>
 
             {/* Stats/Achievement */}

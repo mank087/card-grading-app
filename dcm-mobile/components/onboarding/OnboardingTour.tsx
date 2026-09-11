@@ -275,7 +275,7 @@ export function OnboardingTour({
           </View>
           <View style={styles.finalBody}>
             <Text style={styles.finalBlurb}>
-              You've completed the tour! Now you know everything about your graded card. Ready to grow your collection?
+              You've completed the tour! From this page you can also add the card to a binder, mark it as sold when it moves on, or request a manual grade review as a Card Lovers or VIP member. Ready to grow your collection?
             </Text>
             <View style={styles.achievementBox}>
               <View style={styles.achievementIcon}>
