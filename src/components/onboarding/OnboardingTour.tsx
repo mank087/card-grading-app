@@ -149,10 +149,14 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
         setTimeout(scrollToTarget, 800)
         return
       }
-      // Skip step if element truly doesn't exist
+      // Skip step if element truly doesn't exist. On the last step (e.g. the
+      // owner-only Insta-List section for a visitor) drop the stale ring so the
+      // previous section is not left highlighted under the wrong caption.
       retryCountRef.current = 0
       if (currentStep < TOUR_STEPS.length - 1) {
         setCurrentStep(prev => prev + 1)
+      } else {
+        setHighlightRect(null)
       }
       return
     }
