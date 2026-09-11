@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getOAuthSession, getStoredSession } from '@/lib/directAuth'
+import { syncClickIdsToProfile } from '@/lib/adClickIds'
+import { readRegionCookie } from '@/lib/consentRegion'
 import {
   readPurchaseIntent,
   savePurchaseIntent,
@@ -202,6 +204,14 @@ export default function AuthCallbackPage() {
                 }
                 console.log('[Auth Callback] Signup conversion events tracked:', provider)
               }
+
+              // Persist any first-party ad click IDs (gclid / msclkid) onto the
+              // new profile for server-side conversion reporting. First-party
+              // only; the stored consent value gates any later upload.
+              syncClickIdsToProfile(storedSession.access_token, {
+                consent: (() => { try { return localStorage.getItem('dcm_consent_v1') || undefined } catch { return undefined } })(),
+                region: readRegionCookie(),
+              })
 
               // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
               fetch('/api/email/welcome', {

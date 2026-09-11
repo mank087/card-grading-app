@@ -358,6 +358,17 @@ function FooterInner({ currentYear }: { currentYear: number }) {
                   Cookie Preferences
                 </button>
               </li>
+              <li>
+                {/* CCPA/CPRA: the opt-out link has to be reachable from every
+                    page under this exact wording. Opens the same preferences
+                    panel; "Opt out" / "Essential only" there is the opt-out. */}
+                <button
+                  onClick={() => window.dispatchEvent(new Event('dcm-open-consent-preferences'))}
+                  className="text-gray-400 hover:text-white transition-colors text-left"
+                >
+                  Do Not Sell or Share My Personal Information
+                </button>
+              </li>
             </ul>
           </div>
         </div>

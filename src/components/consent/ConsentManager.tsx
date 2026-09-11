@@ -1,45 +1,62 @@
 'use client'
 
 /**
- * Consent gate for marketing/analytics scripts (2026-07-17).
+ * Consent gate for marketing/analytics scripts (2026-07-17, regions 2026-09-11).
  *
- * DEFAULT-BLOCKED: Google Analytics/Ads, Meta Pixel, Reddit Pixel and the
- * Microsoft Advertising UET tag load ONLY after the visitor explicitly
- * accepts. Until then, safe no-op stubs are installed for fbq/rdt/gtag/uetq so
- * existing event-tracking call sites throughout the app never throw.
- * "Essential only" (or no choice) = nothing loads.
+ * Two regimes, chosen per visitor by src/lib/consentRegion.ts:
+ *
+ *   strict (default everywhere)
+ *     DEFAULT-BLOCKED: Google Analytics/Ads, Meta Pixel, Reddit Pixel and the
+ *     Microsoft Advertising UET tag load ONLY after the visitor explicitly
+ *     accepts. Until then, safe no-op stubs are installed for fbq/rdt/gtag/uetq
+ *     so existing event-tracking call sites never throw. "Essential only" (or
+ *     no choice) = nothing loads. Applies to the EEA/UK/Switzerland, to any
+ *     visitor whose country is unknown, to every GPC visitor, and to the US
+ *     unless the flag below is on. This is the behavior shipped in July.
+ *
+ *   us-optout (US visitors, only while NEXT_PUBLIC_CONSENT_US_OPTOUT=1)
+ *     Notice-and-opt-out, the standard US pattern. The Google tag loads with
+ *     Consent Mode v2 in the DENIED state before any choice (cookieless pings,
+ *     no identifiers, modeled conversions). Meta, Reddit and Microsoft UET
+ *     still load only after "Accept". "Opt out" turns everything off and
+ *     clears our first-party click-ID cookies. The flag is OFF until counsel
+ *     clears the pre-consent Google load; with it off the US is strict.
  *
  * NOTE ON UET (added 2026-09-02, owner-directed): Microsoft's own install
  * instructions say to paste bat.js into <head> on every page, and their
  * Consent Mode pattern loads the script first and then restricts storage.
  * That is deliberately NOT what we do — loading the vendor script at all
  * opens the third-party connection this gate exists to prevent, so UET is
- * injected from loadMarketingScripts() like every other tracker and never
- * runs for essential-only or GPC visitors.
+ * injected from loadOtherVendors() like every other tracker and never runs
+ * for essential-only or GPC visitors, in either regime.
  *
- * Consent state persists in localStorage + a 1-year cookie (dcm_consent=v1:
+ * Consent state persists in localStorage + a 1-year cookie (dcm_consent=
  * granted|essential, with timestamp) — the cookie doubles as the audit record
  * of when consent was given. Every choice is also logged server-side
- * (POST /api/consent/log, fire-and-forget) for a durable audit trail.
+ * (POST /api/consent/log, fire-and-forget, with region + mode) for a durable
+ * audit trail.
  *
  * Global Privacy Control: if the browser sends GPC and the visitor has made
  * no explicit choice, we auto-apply "essential only" without showing the
  * banner (CCPA opt-out signal honoring). GPC is CONTROLLING: while the
  * signal is present, the reopened preferences panel does not offer
  * "Accept all" — CA's AG treats GPC as a formal opt-out, and re-soliciting
- * opt-in after an opt-out is restricted (12-month rule). Do not add an
- * override path without counsel's sign-off.
+ * opt-in after an opt-out is restricted (12-month rule). GPC also forces the
+ * strict regime regardless of region. Do not add an override path without
+ * counsel's sign-off.
  *
  * Re-open preferences from anywhere via:
  *   window.dispatchEvent(new Event('dcm-open-consent-preferences'))
  *
- * Google Consent Mode v2 defaults are set to DENIED before GA ever loads and
- * updated to granted only on acceptance.
+ * VENDOR DISCLOSURE: the banner copy names every vendor. Adding a tracker
+ * means updating every variant of that copy in this file.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { isStorefrontHost, isOrgPublicPath } from '@/lib/storefrontHost'
+import { consentModeFor, readRegionCookie, type ConsentMode, type ConsentRegion } from '@/lib/consentRegion'
+import { captureClickIdsFromUrl, clearClickIds } from '@/lib/adClickIds'
 
 const STORAGE_KEY = 'dcm_consent_v1'
 const COOKIE_NAME = 'dcm_consent'
@@ -48,6 +65,8 @@ const COOKIE_NAME = 'dcm_consent'
 // captured as images (incl. the mobile app's hidden label-rendering WebView),
 // so the banner must never overlay them. No trackers load there either.
 const FULLSCREEN_ROUTES = ['/label-export', '/label-preview']
+
+const VENDOR_LIST = 'Google Analytics, Google Ads, Meta, Reddit, Microsoft Advertising'
 
 type ConsentState = 'granted' | 'essential' | null
 
@@ -72,12 +91,12 @@ function gpcEnabled(): boolean {
 }
 
 /** Server-side audit log. Must never block or break the consent flow. */
-function logConsent(choice: 'granted' | 'essential', source: 'banner' | 'gpc') {
+function logConsent(choice: 'granted' | 'essential', source: 'banner' | 'gpc', region: ConsentRegion, mode: ConsentMode) {
   try {
     fetch('/api/consent/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ choice, source, gpc: gpcEnabled() }),
+      body: JSON.stringify({ choice, source, gpc: gpcEnabled(), region, mode }),
       keepalive: true,
     }).catch(() => { })
   } catch { }
@@ -99,21 +118,21 @@ function installStubs() {
   try { w.gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' }) } catch { }
 }
 
-/** Load the real trackers. Only ever called after explicit acceptance. */
-function loadMarketingScripts() {
+const GRANTED = { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted' }
+const DENIED = { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' }
+
+/**
+ * Load the Google tag (GA4 + Ads). `granted` = full storage consent; false =
+ * Consent Mode v2 denied (cookieless pings only), which is the ONLY thing
+ * that ever runs pre-consent, and only in us-optout mode.
+ */
+function loadGoogle(granted: boolean) {
   const w = window as any
   const d = document
-
-  // Remove stubs so the vendors' own bootstraps (which no-op if already
-  // defined) install their real queues.
-  if (w.fbq?._dcmStub) { delete w.fbq; delete w._fbq }
-  if (w.rdt?._dcmStub) { delete w.rdt }
-
-  // Google Consent Mode v2 → granted, then GA/Ads
   w.dataLayer = w.dataLayer || []
   w.gtag = function gtag() { w.dataLayer.push(arguments) }
-  w.gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' })
-  w.gtag('consent', 'update', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted' })
+  w.gtag('consent', 'default', DENIED)
+  if (granted) w.gtag('consent', 'update', GRANTED)
   w.gtag('js', new Date())
   w.gtag('config', 'G-YLC2FKKBGC')
   w.gtag('config', 'AW-17817758517')
@@ -121,6 +140,23 @@ function loadMarketingScripts() {
   ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-YLC2FKKBGC'
   ga.async = true
   d.head.appendChild(ga)
+}
+
+/** Upgrade an already-loaded denied-mode Google tag to granted. */
+function grantGoogle() {
+  const w = window as any
+  try { w.gtag('consent', 'update', GRANTED) } catch { }
+}
+
+/** Meta, Reddit and Microsoft UET. Only ever called after explicit acceptance. */
+function loadOtherVendors() {
+  const w = window as any
+  const d = document
+
+  // Remove stubs so the vendors' own bootstraps (which no-op if already
+  // defined) install their real queues.
+  if (w.fbq?._dcmStub) { delete w.fbq; delete w._fbq }
+  if (w.rdt?._dcmStub) { delete w.rdt }
 
   // Reddit Pixel
   ;(function (win: any, doc: Document) {
@@ -182,26 +218,49 @@ export default function ConsentManager() {
   const suppressed = tenantHost || (!!pathname && (FULLSCREEN_ROUTES.some(p => pathname.startsWith(p)) || isOrgPublicPath(pathname)))
   const [consent, setConsent] = useState<ConsentState>(null)
   const [bannerOpen, setBannerOpen] = useState(false)
-  const [loadedForThisPage, setLoadedForThisPage] = useState(false)
   const [gpcActive, setGpcActive] = useState(false)
+  const [region, setRegion] = useState<ConsentRegion>('unknown')
+  const [mode, setMode] = useState<ConsentMode>('strict')
+  // What is actually running on this page, so a later "opt out" can reload
+  // for a clean page and a later "accept" can upgrade instead of re-adding.
+  const googleLoaded = useRef<'none' | 'denied' | 'granted'>('none')
+  const vendorsLoaded = useRef(false)
 
   useEffect(() => {
     if (suppressed) { installStubs(); return }
     installStubs()
-    setGpcActive(gpcEnabled())
+    const gpc = gpcEnabled()
+    const r = readRegionCookie()
+    const m = consentModeFor(r, gpc)
+    setGpcActive(gpc)
+    setRegion(r)
+    setMode(m)
+
     let stored = readStored()
-    if (gpcEnabled() && stored !== 'essential') {
+    if (gpc && stored !== 'essential') {
       // Honor Global Privacy Control: opt out silently, no banner. This also
       // supersedes an earlier stored "granted" — the GPC signal is the more
       // recent expression of the visitor's intent, and CA treats it as a
       // formal opt-out request. Persisting keeps this to one audit-log row.
       persist('essential')
-      logConsent('essential', 'gpc')
+      logConsent('essential', 'gpc', r, m)
+      clearClickIds()
       stored = 'essential'
     }
     setConsent(stored)
     setBannerOpen(stored === null)
-    if (stored === 'granted') { loadMarketingScripts(); setLoadedForThisPage(true) }
+
+    if (stored === 'granted') {
+      loadGoogle(true); googleLoaded.current = 'granted'
+      loadOtherVendors(); vendorsLoaded.current = true
+      captureClickIdsFromUrl()
+    } else if (stored === null && m === 'us-optout') {
+      // US notice-and-opt-out: Google in Consent Mode denied only. Nothing
+      // else, and never for GPC (m is forced to strict above).
+      loadGoogle(false); googleLoaded.current = 'denied'
+      captureClickIdsFromUrl()
+    }
+
     const reopen = () => setBannerOpen(true)
     window.addEventListener('dcm-open-consent-preferences', reopen)
     return () => window.removeEventListener('dcm-open-consent-preferences', reopen)
@@ -210,18 +269,29 @@ export default function ConsentManager() {
 
   const choose = useCallback((state: 'granted' | 'essential') => {
     persist(state)
-    logConsent(state, 'banner')
+    logConsent(state, 'banner', region, mode)
     setConsent(state)
     setBannerOpen(false)
-    if (state === 'granted' && !loadedForThisPage) { loadMarketingScripts(); setLoadedForThisPage(true) }
-    if (state === 'essential' && loadedForThisPage) {
-      // Scripts from a prior acceptance are already on this page; a reload
-      // gives a clean tracker-free page immediately.
-      window.location.reload()
+    if (state === 'granted') {
+      if (googleLoaded.current === 'none') { loadGoogle(true); googleLoaded.current = 'granted' }
+      else if (googleLoaded.current === 'denied') { grantGoogle(); googleLoaded.current = 'granted' }
+      if (!vendorsLoaded.current) { loadOtherVendors(); vendorsLoaded.current = true }
+      captureClickIdsFromUrl()
+    } else {
+      clearClickIds()
+      if (googleLoaded.current !== 'none' || vendorsLoaded.current) {
+        // Scripts from a prior acceptance (or the denied-mode Google tag) are
+        // already on this page; a reload gives a clean tracker-free page.
+        window.location.reload()
+      }
     }
-  }, [loadedForThisPage])
+  }, [region, mode])
 
   if (suppressed || !bannerOpen) return null
+
+  const equalButtons = mode === 'strict' && region === 'eu'
+  const secondaryBtn = 'px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50'
+  const primaryBtn = equalButtons ? secondaryBtn : 'px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700'
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]" role="dialog" aria-label="Cookie preferences">
@@ -230,34 +300,37 @@ export default function ConsentManager() {
           {gpcActive ? (
             <>
               Your browser is sending a Global Privacy Control signal, so optional tracking
-              (Google Analytics, Meta, Reddit, Microsoft Advertising) is turned off and will
-              stay off. Essential features like sign-in and checkout work normally. See our{' '}
+              ({VENDOR_LIST}) is turned off and will stay off. Essential features like sign-in
+              and checkout work normally. See our{' '}
+              <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
+            </>
+          ) : mode === 'us-optout' ? (
+            <>
+              We use cookies and similar technologies for analytics and advertising
+              ({VENDOR_LIST}). You can opt out at any time here or through &ldquo;Do Not Sell or
+              Share My Personal Information&rdquo; in the footer. Essential features like sign-in
+              and checkout work either way. See our{' '}
               <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
             </>
           ) : (
             <>
-              We use cookies and similar technologies for analytics and advertising. Optional tracking
-              (Google Analytics, Meta, Reddit, Microsoft Advertising) only runs if you allow it —
-              essential features like sign-in and checkout work either way. See our{' '}
+              We use cookies and similar technologies for analytics and advertising. Optional
+              tracking ({VENDOR_LIST}) only runs if you allow it, and you can change your choice
+              any time from the footer. Essential features like sign-in and checkout work
+              either way. See our{' '}
               <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
             </>
           )}
         </p>
         <div className="flex gap-2 shrink-0">
-          <button
-            onClick={() => choose('essential')}
-            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            {gpcActive ? 'OK' : 'Essential only'}
+          <button onClick={() => choose('essential')} className={secondaryBtn}>
+            {gpcActive ? 'OK' : mode === 'us-optout' ? 'Opt out' : consent === 'granted' ? 'Essential only' : 'Reject optional'}
           </button>
           {/* GPC is a formal CCPA opt-out; while the signal is present we do
               not offer opt-in. Do not change without counsel's approval. */}
           {!gpcActive && (
-            <button
-              onClick={() => choose('granted')}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Accept all
+            <button onClick={() => choose('granted')} className={primaryBtn}>
+              {mode === 'us-optout' ? 'Accept' : 'Accept all'}
             </button>
           )}
         </div>
