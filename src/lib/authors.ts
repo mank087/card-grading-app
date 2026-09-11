@@ -16,7 +16,7 @@ export interface Author {
   /** One paragraph, answer-first. Used as the page summary and meta description source. */
   summary: string
   /** Markdown-free sections rendered as headed prose on the author page. */
-  sections: { heading: string; paragraphs: string[] }[]
+  sections: { heading: string; paragraphs: string[]; image?: { src: string; alt: string; caption: string } }[]
   topics: string[]
   facts: string[]
   /** Public profile URLs for schema sameAs. Empty until the owner supplies them. */
@@ -40,6 +40,11 @@ export const AUTHORS: Author[] = [
           'That upbringing shaped how he sees the hobby. Cards were never spreadsheets of resale value. They were stories, players, artists and moments, and the fun was in finding them, holding them and sharing them with people who cared about the same things.',
           'When he became a parent, he wanted his own children to feel that. Opening packs together, sorting a stack of pulls, reading comics on the floor, arguing about which card in a box is the best one. DCM Grading started as a way to make that experience easier to keep, protect and pass on.',
         ],
+        image: {
+          src: 'https://zyxtqcvwkbpvsjsszbzg.supabase.co/storage/v1/object/public/blog-images/authors/doug-joe-montana-signing.jpg',
+          alt: 'A young Doug Mankiewicz watches Joe Montana sign his jersey at a card show signing table',
+          caption: 'Doug as a kid, watching Joe Montana sign the jersey he still has today.',
+        },
       },
       {
         heading: 'Why he built DCM Grading',
@@ -101,5 +106,11 @@ export function personSchema(author: Author) {
     url: authorUrl(author),
     worksFor: { '@id': `${SITE_URL}/#organization` },
     ...(author.sameAs.length ? { sameAs: author.sameAs } : {}),
+    ...(authorImage(author) ? { image: authorImage(author) } : {}),
   }
+}
+
+/** First section image, used as the Person schema image. */
+export function authorImage(author: Author): string | null {
+  return author.sections.find((s) => s.image)?.image?.src ?? null
 }

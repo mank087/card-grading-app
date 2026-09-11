@@ -98,6 +98,17 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
                 <div className="space-y-4 text-gray-700 leading-relaxed">
                   {s.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
                 </div>
+                {s.image && (
+                  <figure className="mt-6">
+                    <img
+                      src={s.image.src}
+                      alt={s.image.alt}
+                      loading="lazy"
+                      className="w-full rounded-xl border border-gray-200 shadow-sm"
+                    />
+                    <figcaption className="mt-2 text-sm text-gray-500 text-center">{s.image.caption}</figcaption>
+                  </figure>
+                )}
               </section>
             ))}
 
