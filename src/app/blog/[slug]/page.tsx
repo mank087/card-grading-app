@@ -187,11 +187,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       <main className="dcm-brand dcm-editorial dcm-blog min-h-screen relative dcm-editorial-soft">
 
         <article className="relative z-10">
-          {/* Hero Section */}
-          <section className="dcm-blog-hero bg-white border-b border-gray-100">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 dcm-editorial-heading">
-              {/* Breadcrumb */}
-              <div role="navigation" aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+          {/* Header: breadcrumb, category and title only. The subtitle, byline
+              and quick answer sit under the featured image so the top of the
+              page is title, picture, details, in that order. (The old hero
+              used .dcm-blog-hero, whose white heading colour on a light
+              surface rendered the title invisible.) */}
+          <header className="bg-white border-b border-gray-100">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+              <div role="navigation" aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-gray-500 mb-5">
                 <Link href="/" className="hover:text-purple-600 transition-colors">
                   Home
                 </Link>
@@ -212,60 +215,22 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 )}
               </div>
 
-              {/* Category Badge */}
               {post.category && (
                 <div className="mb-4">
                   <CategoryBadge category={post.category} size="md" />
                 </div>
               )}
 
-              {/* Title */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight" style={{ color: '#111827' }}>
                 {post.title}
               </h1>
-
-              {/* Subtitle */}
-              {post.subtitle && (
-                <p className="text-xl text-gray-600 mb-6">{post.subtitle}</p>
-              )}
-
-              {/* Meta Info */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                {author ? (
-                  <Link href={`/authors/${author.slug}`} rel="author" className="font-medium text-gray-900 hover:text-purple-600 transition-colors">
-                    {author.name}
-                  </Link>
-                ) : (
-                  <span className="font-medium text-gray-900">{post.author_name}</span>
-                )}
-                <span className="hidden sm:inline">·</span>
-                <time dateTime={post.published_at || undefined}>{formattedDate}</time>
-                {showUpdated && (
-                  <>
-                    <span className="hidden sm:inline">·</span>
-                    <span>Updated <time dateTime={post.updated_at}>{formattedUpdated}</time></span>
-                  </>
-                )}
-                <span className="hidden sm:inline">·</span>
-                <span>{post.read_time_minutes} min read</span>
-              </div>
-
-              {/* Quick answer: the direct answer to the title, first thing on
-                  the page after the headline so readers and answer engines
-                  get it without scrolling. */}
-              {post.quick_answer && (
-                <div className="mt-6 rounded-xl border-l-4 border-purple-600 bg-purple-50 px-5 py-4" data-quick-answer>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-purple-700 mb-1">Quick answer</p>
-                  <p className="text-base sm:text-lg text-gray-900 leading-relaxed">{post.quick_answer}</p>
-                </div>
-              )}
             </div>
-          </section>
+          </header>
 
           {/* Featured Image */}
           {post.featured_image_path && (
             <div className="bg-white">
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-2">
                 <div className="aspect-[16/9] relative rounded-2xl overflow-hidden shadow-lg">
                   <Image
                     src={post.featured_image_path}
@@ -284,6 +249,49 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
             </div>
           )}
+
+          {/* Details under the image: subtitle, byline, quick answer */}
+          <section className="bg-white">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+              {post.subtitle && (
+                <p className="text-xl text-gray-600 mb-4">{post.subtitle}</p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                <span>By</span>
+                {author ? (
+                  <Link
+                    href={`/authors/${author.slug}`}
+                    rel="author"
+                    className="font-semibold text-purple-700 underline decoration-purple-300 underline-offset-4 hover:text-purple-900 hover:decoration-purple-700 transition-colors"
+                  >
+                    {author.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold text-gray-900">{post.author_name}</span>
+                )}
+                <span aria-hidden="true">·</span>
+                <time dateTime={post.published_at || undefined}>{formattedDate}</time>
+                {showUpdated && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Updated <time dateTime={post.updated_at}>{formattedUpdated}</time></span>
+                  </>
+                )}
+                <span aria-hidden="true">·</span>
+                <span>{post.read_time_minutes} min read</span>
+              </div>
+
+              {/* Quick answer: the direct answer to the title, kept near the
+                  top so readers and answer engines get it without scrolling. */}
+              {post.quick_answer && (
+                <div className="mt-6 rounded-xl border-l-4 border-purple-600 bg-purple-50 px-5 py-4" data-quick-answer>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-purple-700 mb-1">Quick answer</p>
+                  <p className="text-base sm:text-lg text-gray-900 leading-relaxed">{post.quick_answer}</p>
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Content */}
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
