@@ -18,7 +18,7 @@ export default function PrivacyPolicyPage() {
     <main className="dcm-brand dcm-editorial min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10 dcm-editorial-heading">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-600 mb-8">Last Updated: August 13, 2026</p>
+        <p className="text-sm text-gray-600 mb-8">Last Updated: September 11, 2026</p>
 
         <div className="prose prose-lg max-w-none space-y-6 text-gray-700">
           <section>
@@ -127,10 +127,17 @@ export default function PrivacyPolicyPage() {
               <li><strong>Marketplace Integration:</strong> eBay — only when you use our Insta-List to eBay feature</li>
               <li><strong>Market Pricing:</strong> PriceCharting and similar pricing-data providers — for market value lookups (no personal information is sent)</li>
               <li><strong>Transactional Email:</strong> Resend</li>
+              <li>
+                <strong>Website Analytics and Advertising (only with your consent):</strong> Google Analytics, Google Ads,
+                Microsoft Advertising, Meta (Facebook) Pixel, and Reddit Pixel. These run on dcmgrading.com only after you
+                choose &quot;Accept&quot; in our cookie notice, as described in Section 11.
+              </li>
             </ul>
             <p className="mt-4">
               These service providers only have access to your information as necessary to perform their functions and are obligated to maintain confidentiality.
-              We do not sell your personal information.
+              We do not sell your personal information. With your consent, we share limited browsing and conversion data with the
+              advertising partners listed above for advertising measurement and cross-context behavioral advertising; you can
+              withdraw that consent at any time as described in Sections 9 and 11.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.2 Legal Compliance</h3>
@@ -278,11 +285,19 @@ export default function PrivacyPolicyPage() {
               <li><strong>Portability:</strong> Request transfer of your data to another service</li>
               <li><strong>Opt-out:</strong> Unsubscribe from marketing communications</li>
               <li><strong>Withdrawal of consent:</strong> Withdraw consent where we rely on it</li>
+              <li>
+                <strong>Cookie and advertising opt-out:</strong> Change or withdraw your cookie choice at any time using the
+                &quot;Cookie Preferences&quot; or &quot;Do Not Sell or Share My Personal Information&quot; links in the footer, or by
+                enabling the Global Privacy Control signal in your browser (see Section 11)
+              </li>
             </ul>
             <p className="mt-4">
               <strong>California residents (CCPA / CPRA)</strong> have the right to know what personal information we collect, request
               deletion, request correction, and opt out of any &quot;sale&quot; or &quot;sharing&quot; of personal information. We do not sell personal
-              information.
+              information. Sharing for cross-context behavioral advertising happens only with your consent, and you can opt out at
+              any time using the &quot;Do Not Sell or Share My Personal Information&quot; link in the footer of every page. We also honor
+              the Global Privacy Control browser signal as a valid opt-out request, and we will not discriminate against you for
+              exercising any of these rights.
             </p>
             <p className="mt-4">
               <strong>Residents of the European Economic Area and United Kingdom (GDPR / UK GDPR)</strong> have rights of access,
@@ -327,6 +342,77 @@ export default function PrivacyPolicyPage() {
               The mobile app does not use browser cookies but uses similar device-level identifiers (IDFA on iOS, AAID on Android)
               for analytics and ad attribution as described in Section 6.
             </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.1 Essential Cookies</h3>
+            <p>
+              These are required for the website to work and are always on: your sign-in session, cart and checkout state, your
+              cookie choice itself, and a coarse region setting (for example &quot;EU&quot; or &quot;US&quot;) used only to show you the
+              correct cookie notice. They do not track you across other websites.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.2 Optional Cookies and Trackers</h3>
+            <p>
+              The following optional technologies are used on dcmgrading.com for analytics and advertising measurement. None of them
+              load until you choose &quot;Accept&quot; in our cookie notice.
+            </p>
+            <div className="overflow-x-auto mt-4">
+              <table className="min-w-full text-sm border border-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 border-b border-gray-200">Partner</th>
+                    <th className="text-left px-3 py-2 border-b border-gray-200">Purpose</th>
+                    <th className="text-left px-3 py-2 border-b border-gray-200">Partner privacy policy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td className="px-3 py-2 border-b border-gray-100">Google Analytics</td><td className="px-3 py-2 border-b border-gray-100">Measuring how the website is used</td><td className="px-3 py-2 border-b border-gray-100"><a href="https://policies.google.com/privacy" className="text-blue-600 underline" rel="noopener noreferrer" target="_blank">policies.google.com/privacy</a></td></tr>
+                  <tr><td className="px-3 py-2 border-b border-gray-100">Google Ads</td><td className="px-3 py-2 border-b border-gray-100">Measuring conversions and attributing them to our Google ads</td><td className="px-3 py-2 border-b border-gray-100"><a href="https://policies.google.com/privacy" className="text-blue-600 underline" rel="noopener noreferrer" target="_blank">policies.google.com/privacy</a></td></tr>
+                  <tr><td className="px-3 py-2 border-b border-gray-100">Microsoft Advertising</td><td className="px-3 py-2 border-b border-gray-100">Measuring conversions and attributing them to our Microsoft (Bing) ads</td><td className="px-3 py-2 border-b border-gray-100"><a href="https://privacy.microsoft.com/privacystatement" className="text-blue-600 underline" rel="noopener noreferrer" target="_blank">privacy.microsoft.com</a></td></tr>
+                  <tr><td className="px-3 py-2 border-b border-gray-100">Meta (Facebook) Pixel</td><td className="px-3 py-2 border-b border-gray-100">Advertising attribution</td><td className="px-3 py-2 border-b border-gray-100"><a href="https://www.facebook.com/privacy/policy" className="text-blue-600 underline" rel="noopener noreferrer" target="_blank">facebook.com/privacy/policy</a></td></tr>
+                  <tr><td className="px-3 py-2">Reddit Pixel</td><td className="px-3 py-2">Advertising attribution</td><td className="px-3 py-2"><a href="https://www.reddit.com/policies/privacy-policy" className="text-blue-600 underline" rel="noopener noreferrer" target="_blank">reddit.com/policies/privacy-policy</a></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.3 How Consent Works</h3>
+            <p>
+              When you first visit dcmgrading.com you will see a cookie notice with the choices &quot;Accept&quot; and &quot;Decline.&quot;
+              None of the optional partners in Section 11.2 load until you choose &quot;Accept.&quot; This opt-in approach is required by
+              law for visitors in the European Economic Area, the United Kingdom and Switzerland, and we apply the same rule to every
+              visitor. If you decline, or make no choice, nothing optional runs. Declining does not affect card grading, sign-in,
+              checkout or any other feature of the Service.
+            </p>
+            <p className="mt-4">
+              You can change your choice at any time using the &quot;Cookie Preferences&quot; or &quot;Do Not Sell or Share My Personal
+              Information&quot; links in the footer of every page. Withdrawing consent removes the optional partners from the pages
+              you visit from that point on.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.4 Global Privacy Control</h3>
+            <p>
+              If your browser or a browser extension sends the Global Privacy Control (GPC) signal, we treat it as a request to opt
+              out of the sale or sharing of personal information. We do not show the cookie notice, none of the optional partners
+              load, and the signal overrides any acceptance you may have given earlier. The preferences panel will confirm that
+              optional tracking is off.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.5 Advertising Click Identifiers</h3>
+            <p>
+              When you reach dcmgrading.com by clicking one of our Google or Microsoft ads, the link may include a click identifier
+              (such as a &quot;gclid&quot; or &quot;msclkid&quot;). We may store that identifier in a first-party cookie for up to 90 days and,
+              if you create an account, save it to your profile together with your cookie choice, so that we can measure which ads
+              lead to purchases. Where consent is required, this happens only after you choose &quot;Accept.&quot; Declining or opting out
+              deletes these cookies. The identifier is not shared with anyone other than the advertising platform that issued it, and
+              only for conversion measurement.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.6 Consent Records</h3>
+            <p>
+              We keep a record of each cookie-consent decision made on our website, including the date and time, the choice made,
+              whether a Global Privacy Control signal was present, the region setting, a truncated IP address and the browser type.
+              We keep these records so that we can demonstrate that optional trackers were not loaded without permission. They are
+              not used for any other purpose.
+            </p>
           </section>
 
           <section>
@@ -344,6 +430,13 @@ export default function PrivacyPolicyPage() {
             <p>
               DCM is based in Georgia, United States. Your information may be transferred to and maintained on computers located outside of your state, province, country,
               or other governmental jurisdiction where data protection laws may differ. By using our Service, you consent to such transfers to Georgia, United States and other locations where our service providers operate.
+            </p>
+            <p className="mt-4">
+              For visitors in the European Economic Area, the United Kingdom and Switzerland: your information is processed in the
+              United States by DCM and by the service providers named in Section 5.1. The transfer is necessary to provide the
+              Service you have requested, and each provider is bound by contractual terms requiring it to protect your information.
+              Optional advertising and analytics partners receive information only after you have given consent as described in
+              Section 11, and you may withdraw that consent at any time.
             </p>
           </section>
 
