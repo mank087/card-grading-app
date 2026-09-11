@@ -91,7 +91,7 @@ function gpcEnabled(): boolean {
 }
 
 /** Server-side audit log. Must never block or break the consent flow. */
-function logConsent(choice: 'granted' | 'essential', source: 'banner' | 'gpc', region: ConsentRegion, mode: ConsentMode) {
+function logConsent(choice: 'granted' | 'essential' | 'shown', source: 'banner' | 'gpc', region: ConsentRegion, mode: ConsentMode) {
   try {
     fetch('/api/consent/log', {
       method: 'POST',
@@ -249,6 +249,16 @@ export default function ConsentManager() {
     }
     setConsent(stored)
     setBannerOpen(stored === null)
+    if (stored === null) {
+      // Impression record, once per browser session, so the accept rate can be
+      // measured against everyone who saw the banner, not only those who clicked.
+      try {
+        if (!sessionStorage.getItem('dcm_consent_shown')) {
+          sessionStorage.setItem('dcm_consent_shown', '1')
+          logConsent('shown', 'banner', r, m)
+        }
+      } catch { logConsent('shown', 'banner', r, m) }
+    }
 
     if (stored === 'granted') {
       loadGoogle(true); googleLoaded.current = 'granted'
@@ -296,7 +306,11 @@ export default function ConsentManager() {
   return (
     <div className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]" role="dialog" aria-label="Cookie preferences">
       <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <p className="text-sm text-gray-700 flex-1">
+        <div className="flex-1">
+        {!gpcActive && mode === 'strict' && (
+          <p className="text-sm font-semibold text-gray-900 mb-1">Help us improve DCM</p>
+        )}
+        <p className="text-sm text-gray-700">
           {gpcActive ? (
             <>
               Your browser is sending a Global Privacy Control signal, so optional tracking
@@ -314,23 +328,23 @@ export default function ConsentManager() {
             </>
           ) : (
             <>
-              We use cookies and similar technologies for analytics and advertising. Optional
-              tracking ({VENDOR_LIST}) only runs if you allow it, and you can change your choice
-              any time from the footer. Essential features like sign-in and checkout work
-              either way. See our{' '}
+              We use analytics and advertising cookies to see which features people use and
+              which ads bring collectors here. They run only if you accept. Grading, sign-in
+              and checkout work either way. Optional partners: {VENDOR_LIST}.{' '}
               <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
             </>
           )}
         </p>
+        </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => choose('essential')} className={secondaryBtn}>
-            {gpcActive ? 'OK' : mode === 'us-optout' ? 'Opt out' : consent === 'granted' ? 'Essential only' : 'Reject optional'}
+            {gpcActive ? 'OK' : mode === 'us-optout' ? 'Opt out' : 'Decline'}
           </button>
           {/* GPC is a formal CCPA opt-out; while the signal is present we do
               not offer opt-in. Do not change without counsel's approval. */}
           {!gpcActive && (
             <button onClick={() => choose('granted')} className={primaryBtn}>
-              {mode === 'us-optout' ? 'Accept' : 'Accept all'}
+              Accept
             </button>
           )}
         </div>

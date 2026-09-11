@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
     const choice = body?.choice
-    if (choice !== 'granted' && choice !== 'essential') {
+    if (choice !== 'granted' && choice !== 'essential' && choice !== 'shown') {
       return NextResponse.json({ error: 'invalid choice' }, { status: 400 })
     }
     const source = body?.source === 'gpc' ? 'gpc' : 'banner'
@@ -51,6 +51,11 @@ export async function POST(req: NextRequest) {
     let { error } = await supabaseAdmin
       .from('consent_logs')
       .insert({ choice, source, gpc, ip, user_agent: userAgent, region, mode })
+    if (error && choice === 'shown' && /check constraint/i.test(error.message)) {
+      // Migration 20260911_consent_logs_shown.sql not applied yet: impressions
+      // are a metric, not an audit record, so drop the row rather than retry.
+      return NextResponse.json({ ok: true })
+    }
     if (error && /column|schema cache/i.test(error.message)) {
       // Migration 20260911_consent_logs_region.sql not applied yet: keep the
       // audit row rather than lose it.

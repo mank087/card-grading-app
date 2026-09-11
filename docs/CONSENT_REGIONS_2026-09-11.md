@@ -15,7 +15,7 @@ Status: built and deployed with the US opt-out regime OFF. Production behaves ex
 |---|---|---|
 | Region bucket | `src/middleware.ts`, `src/lib/consentRegion.ts` | Vercel's edge geolocation header is mapped to `eu`, `us`, `other` or `unknown` and stored in the `dcm_region` cookie (1 year, no raw country). `unknown` is retried on every request. |
 | Regime selection | `src/lib/consentRegion.ts` | `strict` for eu, other, unknown, and every GPC visitor. `us-optout` only for `us` and only while the flag is `1`. |
-| Banner | `src/components/consent/ConsentManager.tsx` | Three copy variants (GPC, US opt-out, strict). EU visitors see equal-weight Accept and Reject buttons. All variants name every vendor. |
+| Banner | `src/components/consent/ConsentManager.tsx` | Three copy variants (GPC, US opt-out, strict). Strict copy leads with the reason ("Help us improve DCM"), buttons are Accept / Decline, EU visitors get equal-weight buttons. All variants name every vendor. Each first display logs a "shown" impression. |
 | Pre-consent behavior | same | strict: nothing loads. us-optout: Google tag with all four Consent Mode v2 signals denied. Meta, Reddit and Microsoft UET never load before Accept in any regime. |
 | Opt-out | same, `src/app/ui/Footer.tsx` | "Cookie Preferences" and "Do Not Sell or Share My Personal Information" both reopen the banner. Choosing Opt out / Reject clears click-ID cookies and reloads for a clean page. |
 | Audit log | `src/app/api/consent/log/route.ts` | Every decision is stored with region and mode. Falls back to the old columns if the migration is not applied yet. |
@@ -27,6 +27,7 @@ Run both in the Supabase SQL editor before relying on the new columns. The code 
 
 - `supabase/migrations/20260911_consent_logs_region.sql`
 - `supabase/migrations/20260911_profiles_ad_click_ids.sql`
+- `supabase/migrations/20260911_consent_logs_shown.sql` (banner impressions: choice = shown, one row per browser session, so accept rate = granted / shown)
 
 ## The counsel decision
 
