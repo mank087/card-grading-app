@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       faq: sanitizeFaq(body.faq),
       status: body.status || 'draft',
       published_at: body.status === 'published' ? (body.published_at || new Date().toISOString()) : body.published_at || null,
-      author_name: body.author_name || 'DCM Team',
+      author_name: body.author_name || 'Douglas Mankiewicz',
       created_by: admin.id,
       updated_by: admin.id,
     };

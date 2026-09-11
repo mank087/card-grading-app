@@ -36,7 +36,7 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
     faq: Array.isArray(post?.faq) ? post!.faq! : [],
     status: post?.status || 'draft',
     published_at: post?.published_at || '',
-    author_name: post?.author_name || 'DCM Team',
+    author_name: post?.author_name || 'Douglas Mankiewicz',
   });
 
   const [tagInput, setTagInput] = useState('');
@@ -586,7 +586,7 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
               value={formData.author_name}
               onChange={(e) => setFormData(prev => ({ ...prev, author_name: e.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="DCM Team"
+              placeholder="Douglas Mankiewicz"
             />
           </div>
 

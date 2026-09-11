@@ -100,6 +100,7 @@ grade, the subgrades, and the card's identifying details into the listing.
 - Pricing and credits: https://dcmgrading.com/credits
 - FAQ: https://dcmgrading.com/faq
 - Blog: https://dcmgrading.com/blog
+- Founder and blog author, Douglas Mankiewicz: https://dcmgrading.com/authors/douglas-mankiewicz
 - About: https://dcmgrading.com/about
 - Contact: https://dcmgrading.com/contact
 - Privacy: https://dcmgrading.com/privacy

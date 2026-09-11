@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost } from '@/types/blog';
 import { breadcrumbList, faqPage, markdownWordCount, SITE_URL } from '@/lib/seo/blogSchema';
+import { getAuthorByName, personSchema } from '@/lib/authors';
 import {
   BlogPostContent,
   CategoryBadge,
@@ -126,6 +127,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     ? new Date(post.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
   const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.question && f?.answer) : [];
+  const author = getAuthorByName(post.author_name);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -141,11 +143,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     wordCount: markdownWordCount(post.content),
     ...(post.category?.name ? { articleSection: post.category.name } : {}),
     ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
-    author: {
-      '@type': 'Organization',
-      name: post.author_name,
-      url: SITE_URL,
-    },
+    author: author
+      ? personSchema(author)
+      : {
+          '@type': 'Organization',
+          name: post.author_name,
+          url: SITE_URL,
+        },
     publisher: { '@id': `${SITE_URL}/#organization` },
     isPartOf: { '@id': `${SITE_URL}/#website` },
     mainEntityOfPage: {
@@ -227,7 +231,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
               {/* Meta Info */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                <span className="font-medium text-gray-900">{post.author_name}</span>
+                {author ? (
+                  <Link href={`/authors/${author.slug}`} rel="author" className="font-medium text-gray-900 hover:text-purple-600 transition-colors">
+                    {author.name}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-gray-900">{post.author_name}</span>
+                )}
                 <span className="hidden sm:inline">·</span>
                 <time dateTime={post.published_at || undefined}>{formattedDate}</time>
                 {showUpdated && (

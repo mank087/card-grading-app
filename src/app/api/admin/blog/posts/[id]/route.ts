@@ -116,7 +116,7 @@ export async function PUT(
     if (body.faq !== undefined) updateData.faq = sanitizeFaq(body.faq);
     if (body.status !== undefined) updateData.status = body.status;
     if (publishedAt !== undefined) updateData.published_at = publishedAt;
-    if (body.author_name !== undefined) updateData.author_name = body.author_name || 'DCM Team';
+    if (body.author_name !== undefined) updateData.author_name = body.author_name || 'Douglas Mankiewicz';
 
     let { data: updatedPost, error } = await supabaseAdmin
       .from('blog_posts')
