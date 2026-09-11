@@ -24,30 +24,36 @@ export interface IAPProductDefinition {
   grantsVip?: boolean
   /** Human-readable, used in receipts / logs only. Not user-facing. */
   label: string
+  /** US list price, used only for server-side ad conversion value reporting. */
+  priceUsd: number
 }
 
 export const IAP_PRODUCTS: Record<string, IAPProductDefinition> = {
   // Credit packs (consumable)
   'dcm.credits.basic': {
     productId: 'dcm.credits.basic',
+    priceUsd: 2.99,
     credits: 1,
     type: 'consumable',
     label: 'DCM Grading - 1 Credit',
   },
   'dcm.credits.pro': {
     productId: 'dcm.credits.pro',
+    priceUsd: 9.99,
     credits: 5,
     type: 'consumable',
     label: 'DCM Grading - 5 Credits',
   },
   'dcm.credits.elite': {
     productId: 'dcm.credits.elite',
+    priceUsd: 19.99,
     credits: 20,
     type: 'consumable',
     label: 'DCM Grading - 20 Credits',
   },
   'dcm.credits.vip': {
     productId: 'dcm.credits.vip',
+    priceUsd: 99,
     credits: 150,
     type: 'consumable',
     grantsVip: true,
@@ -57,6 +63,7 @@ export const IAP_PRODUCTS: Record<string, IAPProductDefinition> = {
   // Card Lovers subscriptions
   'dcm.cardlovers.monthly': {
     productId: 'dcm.cardlovers.monthly',
+    priceUsd: 49.99,
     credits: 70,
     type: 'subscription',
     subscriptionPeriod: 'monthly',
@@ -64,6 +71,7 @@ export const IAP_PRODUCTS: Record<string, IAPProductDefinition> = {
   },
   'dcm.cardlovers.annual': {
     productId: 'dcm.cardlovers.annual',
+    priceUsd: 449,
     credits: 900,
     type: 'subscription',
     subscriptionPeriod: 'annual',

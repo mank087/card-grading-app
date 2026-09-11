@@ -9,6 +9,7 @@
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getProduct } from '@/lib/iap/products'
+import { enqueueAdConversion } from '@/lib/adConversions'
 
 export interface RecordIAPInput {
   userId: string
@@ -152,6 +153,20 @@ export async function recordIAPTransaction(input: RecordIAPInput): Promise<Recor
   //     locked. Idempotent — safe for repeat VIP purchases.
   if (product.grantsVip && shouldGrantCredits) {
     await grantVipStatus(input.userId)
+  }
+
+  // 5. Server-side ad conversion (consent-gated inside; never throws). This
+  //    is the only way an in-app purchase can reach Google Ads or Microsoft
+  //    Advertising: no pixel runs in the native apps.
+  if (shouldGrantCredits) {
+    await enqueueAdConversion({
+      userId: input.userId,
+      source: input.platform === 'apple' ? 'apple' : 'google_play',
+      eventId: `${input.platform}:${input.transactionId}`,
+      value: product.priceUsd,
+      currency: 'USD',
+      occurredAt: input.periodStart ?? undefined,
+    })
   }
 
   return {

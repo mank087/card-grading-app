@@ -403,7 +403,10 @@ export default function PrivacyPolicyPage() {
               if you create an account, save it to your profile together with your cookie choice, so that we can measure which ads
               lead to purchases. Where consent is required, this happens only after you choose &quot;Accept.&quot; Declining or opting out
               deletes these cookies. The identifier is not shared with anyone other than the advertising platform that issued it, and
-              only for conversion measurement.
+              only for conversion measurement. Specifically, when you make a purchase we may report that a purchase occurred, its
+              date, amount and currency, together with the click identifier, to Google Ads or Microsoft Advertising from our servers.
+              We do this only if you accepted optional cookies, we stop if you later opt out, and we do not include your name, email
+              address or any other personal details in that report. Stored identifiers are deleted after 90 days.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.6 Consent Records</h3>

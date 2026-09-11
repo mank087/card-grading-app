@@ -80,11 +80,24 @@ export function hasClickIds(ids: ClickIds): boolean {
   return CLICK_ID_PARAMS.some((k) => !!ids[k])
 }
 
-/** Opt-out clears everything we captured. */
+/**
+ * Opt-out clears everything we captured, in the browser and, for a signed-in
+ * visitor, on the profile too (so the server-side upload job stops).
+ */
 export function clearClickIds() {
   try {
     for (const key of [...CLICK_ID_PARAMS, 'click_meta']) {
       document.cookie = `${COOKIE_PREFIX}${key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
+    }
+    localStorage.removeItem('dcm_click_ids_synced')
+  } catch { /* ignore */ }
+  try {
+    // Session shape written by src/lib/directAuth.ts; read defensively so the
+    // consent flow never depends on the auth module.
+    const raw = localStorage.getItem('supabase.auth.token')
+    const token = raw ? (JSON.parse(raw)?.access_token as string | undefined) : undefined
+    if (token) {
+      fetch('/api/account/click-ids', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, keepalive: true }).catch(() => { })
     }
   } catch { /* ignore */ }
 }

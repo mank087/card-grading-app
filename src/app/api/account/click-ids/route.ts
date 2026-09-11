@@ -19,6 +19,32 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 const ID_KEYS = ['gclid', 'gbraid', 'wbraid', 'msclkid'] as const
 const ID_RE = /^[A-Za-z0-9_.-]{1,200}$/
 
+/**
+ * Opt-out: forget the stored click IDs. Called by the consent banner when a
+ * signed-in visitor declines or opts out, so the server-side upload job can
+ * no longer attribute anything for them (it re-reads the profile at send time).
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .update({ ad_click_ids: null, ad_click_captured_at: null })
+      .eq('id', authResult.user.id)
+    if (error) {
+      console.error('[click-ids] clear failed:', error.message)
+      return NextResponse.json({ error: 'Failed to clear click IDs' }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[click-ids] unexpected error:', error)
+    return NextResponse.json({ error: 'Unexpected error' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)

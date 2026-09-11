@@ -24,6 +24,7 @@ import {
   reverseCommission,
 } from '@/lib/affiliates';
 import { createClient } from '@supabase/supabase-js';
+import { enqueueAdConversion } from '@/lib/adConversions';
 import Stripe from 'stripe';
 import { Resend } from 'resend';
 
@@ -320,6 +321,15 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // Affiliate attribution for one-time purchases
   await processAffiliateAttribution(session, userId);
+
+  // Server-side ad conversion (consent-gated inside; never throws).
+  await enqueueAdConversion({
+    userId,
+    source: 'stripe',
+    eventId: session.id,
+    value: (session.amount_total || 0) / 100,
+    currency: session.currency || 'usd',
+  });
 }
 
 /**
@@ -411,6 +421,16 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
 
   // Affiliate attribution for subscription (first invoice only)
   await processAffiliateAttribution(session, userId);
+
+  // Server-side ad conversion for the first subscription payment
+  // (consent-gated inside; never throws).
+  await enqueueAdConversion({
+    userId,
+    source: 'stripe',
+    eventId: session.id,
+    value: (session.amount_total || 0) / 100,
+    currency: session.currency || 'usd',
+  });
 }
 
 /**

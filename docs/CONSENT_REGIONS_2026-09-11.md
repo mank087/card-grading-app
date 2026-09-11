@@ -41,7 +41,7 @@ Everything else in this change is live now and reduces, rather than adds, exposu
 
 ## What is still not built
 
-- The server-side conversion upload itself. The click IDs are now captured; sending purchases to Google Ads and Microsoft Advertising needs API credentials (Google Ads developer token plus OAuth, Microsoft Advertising developer token) that only the account owner can create. The upload job must skip any profile whose stored consent is not `granted` unless the region is `us` and the US regime is on, and must always skip GPC opt-outs.
+- The server-side conversion upload is BUILT (docs/AD_CONVERSION_UPLOAD_2026-09-11.md) and dormant until the Google Ads and Microsoft Advertising API credentials are set in Vercel. It only sends for profiles whose stored consent is `granted`, re-checks at send time, and never sends for GPC opt-outs.
 - Removing Meta Pixel and Reddit Pixel. Both remain opt-in only. Dropping them entirely is the single biggest CIPA exposure reduction available and is a business decision on ad spend.
 - Privacy Policy and Cookie Policy rewrite with counsel (open since July).
 

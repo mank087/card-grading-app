@@ -25,6 +25,10 @@
       "schedule": "0 4 * * 1"
     },
     {
+      "path": "/api/cron/upload-ad-conversions",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/submissions/drain",
       "schedule": "* * * * *"
     },
