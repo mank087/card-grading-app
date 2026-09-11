@@ -192,7 +192,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               page is title, picture, details, in that order. (The old hero
               used .dcm-blog-hero, whose white heading colour on a light
               surface rendered the title invisible.) */}
-          <header className="bg-white border-b border-gray-100">
+          <div className="bg-white border-b border-gray-100">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
               <div role="navigation" aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-gray-500 mb-5">
                 <Link href="/" className="hover:text-purple-600 transition-colors">
@@ -225,7 +225,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 {post.title}
               </h1>
             </div>
-          </header>
+          </div>
 
           {/* Featured Image */}
           {post.featured_image_path && (
