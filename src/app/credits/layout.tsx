@@ -25,6 +25,7 @@ const CARD_LOVERS = [
     billing: 'P1M',
     billingLabel: 'month',
     per: `$${(CARD_LOVERS_PLANS.monthly.price / CARD_LOVERS_PLANS.monthly.credits).toFixed(2)}`,
+    image: 'https://dcmgrading.com/packages/dcm-package-card-lovers-monthly.jpg',
   },
   {
     name: CARD_LOVERS_PLANS.annual.name,
@@ -33,6 +34,7 @@ const CARD_LOVERS = [
     billing: 'P1Y',
     billingLabel: 'year',
     per: `$${(CARD_LOVERS_PLANS.annual.price / CARD_LOVERS_PLANS.annual.totalCredits).toFixed(2)}`,
+    image: 'https://dcmgrading.com/packages/dcm-package-card-lovers-annual.jpg',
   },
 ] as const;
 
@@ -93,7 +95,6 @@ export const metadata: Metadata = completeMetadata({
  * nonrefundable, so the policy is "no returns" and shipping is free with
  * zero transit time.
  */
-const CARD_LOVERS_IMAGE = 'https://dcmgrading.com/packages/dcm-package-card-lovers.jpg';
 
 const RETURN_POLICY = {
   '@type': 'MerchantReturnPolicy',
@@ -178,7 +179,7 @@ const pricingJsonLd = {
         '@type': 'Service',
         name: `DCM ${m.name}`,
         serviceType: 'Trading card grading membership',
-        image: CARD_LOVERS_IMAGE,
+        image: m.image,
         provider: { '@type': 'Organization', name: 'DCM Grading', url: 'https://dcmgrading.com' },
       },
     })),
