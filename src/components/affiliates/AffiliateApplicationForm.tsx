@@ -109,6 +109,10 @@ export default function AffiliateApplicationForm() {
             placeholder="you@example.com"
             className={inputClass}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Use the email on your DCM Grading account so your credits land there.{' '}
+            <a href="/login?mode=signup&redirect=/affiliates" className="underline">No account yet? Create one first.</a>
+          </p>
         </div>
       </div>
 

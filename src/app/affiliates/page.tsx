@@ -99,8 +99,30 @@ export default function AffiliatesPage() {
         </div>
       </section>
 
+      {/* Program terms */}
+      <section className="py-12 px-4 bg-white">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">Program Terms</h2>
+          <ul className="space-y-3 text-sm text-gray-600">
+            {[
+              'A new customer is someone making their first paid purchase on dcmgrading.com. Free grades do not count, and purchases made inside the iOS app cannot use codes or be tracked.',
+              'The 15% discount applies to a first purchase at list price. It cannot be combined with Card Lovers or Founder member pricing.',
+              'You earn 20 grading credits once per new customer, credited to the DCM Grading account that matches the email on your application. Credits never expire.',
+              'If a referred purchase is refunded, the credits for that referral are removed.',
+              'Referring yourself, your own accounts, or accounts you control is not rewarded. Codes may be paused for misuse.',
+              'When you share your link or code, disclose that you are a DCM Grading partner as required by the FTC and your platform.',
+            ].map((line) => (
+              <li key={line} className="flex gap-3">
+                <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2" aria-hidden="true" />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* Application form */}
-      <section id="apply" className="py-16 px-4 bg-white scroll-mt-20">
+      <section id="apply" className="py-16 px-4 scroll-mt-20">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-3">Apply to Partner</h2>

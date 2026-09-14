@@ -279,7 +279,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'promo-codes',
     question: 'Do you have promo codes or discounts?',
     answer:
-      'Promo codes are entered on the checkout page. Your first pack purchase already includes bonus credits, and Card Lovers members get 20% off extra credits automatically. Referred customers get 10% off their first purchase through the affiliate program.',
+      'Promo codes are entered on the checkout page. Your first pack purchase already includes bonus credits, and Card Lovers members get 20% off extra credits automatically. Customers referred by a DCM partner get 15% off their first purchase with the partner\'s code.',
     keywords: ['promo', 'promo code', 'discount', 'coupon', 'code', 'sale', 'deal', 'grade10', 'grade20', 'affiliate', 'referral'],
     category: 'pricing-credits',
     links: [{ label: 'Pricing', href: '/credits' }, { label: 'Affiliate program', href: '/affiliates' }],
@@ -592,7 +592,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'affiliates',
     question: 'Do you have an affiliate program?',
     answer:
-      'Yes. Affiliates get a link and code that gives their audience 10% off a first DCM purchase and earn a commission on every sale they refer, with tracking and payouts in the affiliate dashboard.',
+      'Yes. Approved partners get a link and code that gives their audience 15% off a first DCM purchase, and they earn 20 grading credits every time a referred customer makes their first purchase. Stats show on the partner\'s account page. Apply on the affiliates page.',
     keywords: ['affiliate', 'referral', 'refer', 'commission', 'creator', 'influencer', 'youtube', 'partner program', 'link'],
     category: 'enterprise',
     links: [{ label: 'Affiliate program', href: '/affiliates' }],
