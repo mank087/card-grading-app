@@ -73,11 +73,15 @@ interface AffiliatePrefill {
   applicationId: string
 }
 
-/** Suggested code: uppercased first word of the name plus 15, e.g. SARAH15 */
-function suggestCode(name: string): string {
-  const first = (name || '').trim().split(/\s+/)[0] || 'PARTNER'
-  const cleaned = first.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-  return (cleaned || 'PARTNER') + '15'
+/**
+ * Suggested code from the applicant's name or business name: letters and
+ * digits only, uppercased, capped at 12 characters, plus the discount, e.g.
+ * "DCM Cards" -> DCMCARDS15, "Ben Raymond" -> BENRAYMOND15. The admin can
+ * still edit it before saving; the API rejects a code already in use.
+ */
+function suggestCode(name: string, discountPercent = 15): string {
+  const cleaned = (name || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12)
+  return (cleaned || 'PARTNER') + String(discountPercent)
 }
 
 export default function AdminAffiliatesPage() {
@@ -798,56 +802,6 @@ function AddAffiliateModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type (legacy)</label>
-              <select
-                value={form.commission_type}
-                onChange={(e) => setForm({ ...form, commission_type: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="percentage">Percentage</option>
-                <option value="flat">Flat Amount</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Commission Rate (legacy) {form.commission_type === 'percentage' ? '(%)' : '($)'}
-              </label>
-              <input
-                type="number"
-                value={form.commission_rate}
-                onChange={(e) => setForm({ ...form, commission_rate: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                min="0"
-                max={form.commission_type === 'percentage' ? '100' : undefined}
-                step="1"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payout Method</label>
-              <select
-                value={form.payout_method}
-                onChange={(e) => setForm({ ...form, payout_method: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="manual">Manual (PayPal/Venmo)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payout Details</label>
-              <input
-                type="text"
-                value={form.payout_details}
-                onChange={(e) => setForm({ ...form, payout_details: e.target.value })}
-                placeholder="PayPal email or Venmo handle"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>

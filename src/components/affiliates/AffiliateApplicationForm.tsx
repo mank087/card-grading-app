@@ -81,7 +81,7 @@ export default function AffiliateApplicationForm() {
       <div className="grid md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="aff-name" className="block text-sm font-medium text-gray-700 mb-1">
-            Name
+            Name or business name
           </label>
           <input
             id="aff-name"
@@ -91,9 +91,12 @@ export default function AffiliateApplicationForm() {
             maxLength={80}
             value={form.name}
             onChange={update('name')}
-            placeholder="Your name or channel name"
+            placeholder="Your name, channel or business name"
             className={inputClass}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Your referral code is built from this, for example DCMCARDS15.
+          </p>
         </div>
         <div>
           <label htmlFor="aff-email" className="block text-sm font-medium text-gray-700 mb-1">
