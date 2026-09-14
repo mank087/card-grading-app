@@ -42,12 +42,14 @@ const PACKS = [
     price: t.price,
     credits: t.credits,
     per: `$${t.perGradeCost.toFixed(2)}`,
+    image: `https://dcmgrading.com/packages/dcm-package-${t.id}.jpg`,
   })),
   {
     name: `${VIP_PACKAGE.name} Pack`,
     price: VIP_PACKAGE.price,
     credits: VIP_PACKAGE.credits,
     per: `$${VIP_PACKAGE.perGradeCost.toFixed(2)}`,
+    image: 'https://dcmgrading.com/packages/dcm-package-vip.jpg',
   },
 ];
 
@@ -85,11 +87,13 @@ export const metadata: Metadata = completeMetadata({
 /**
  * Merchant-listing fields Google asks for on every Product offer (GSC,
  * 2026-09-14: "Missing field image" critical, return policy and shipping
- * details non-critical). Credits are digital and delivered instantly, and
- * the Terms of Service (section 7.2) make every payment nonrefundable, so
- * the policy is "no returns" and shipping is free with zero transit time.
+ * details non-critical). Each pack points at the same package artwork the
+ * Stripe checkout shows (public/packages). Credits are digital and delivered
+ * instantly, and the Terms of Service (section 7.2) make every payment
+ * nonrefundable, so the policy is "no returns" and shipping is free with
+ * zero transit time.
  */
-const PRODUCT_IMAGE = 'https://dcmgrading.com/DCM-full-downloadable-report.png';
+const CARD_LOVERS_IMAGE = 'https://dcmgrading.com/packages/dcm-package-card-lovers.jpg';
 
 const RETURN_POLICY = {
   '@type': 'MerchantReturnPolicy',
@@ -139,7 +143,7 @@ const pricingJsonLd = {
         '@type': 'Product',
         name: `DCM Grading ${p.name}`,
         description: `${p.credits} card grades from DCM Optic. Each grade includes four subgrades, a written reason for every deduction, an image confidence letter and a printable label.`,
-        image: PRODUCT_IMAGE,
+        image: p.image,
         brand: { '@type': 'Brand', name: 'DCM Grading' },
         // Google validates each Product node in isolation and requires one of
         // offers / review / aggregateRating on it (GSC "Merchant listings"
@@ -174,6 +178,7 @@ const pricingJsonLd = {
         '@type': 'Service',
         name: `DCM ${m.name}`,
         serviceType: 'Trading card grading membership',
+        image: CARD_LOVERS_IMAGE,
         provider: { '@type': 'Organization', name: 'DCM Grading', url: 'https://dcmgrading.com' },
       },
     })),
