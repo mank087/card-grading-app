@@ -966,10 +966,13 @@ export default function AccountPage() {
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div className={`p-3 rounded-lg border-2 ${labelStyle === 'traditional' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
               <div className="text-center">
-                <div className="bg-gradient-to-b from-gray-50 to-white rounded-lg p-2 mb-2 shadow-sm">
-                  <p className="text-xs font-bold text-gray-700">Traditional</p>
+                {/* Classic in miniature: white field inside the purple frame. */}
+                <div className="rounded-lg p-1 mb-2 shadow-sm" style={{ background: '#7c3aed' }}>
+                  <div className="rounded bg-white py-1">
+                    <p className="text-xs font-bold text-gray-900">Traditional</p>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500">Light background with purple accents</p>
+                <p className="text-xs text-gray-500">Classic grading-house layout with a DCM purple frame</p>
               </div>
             </div>
             <div className={`p-3 rounded-lg border-2 ${labelStyle === 'modern' || labelStyle.startsWith('custom-') ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>

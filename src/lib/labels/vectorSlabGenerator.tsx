@@ -26,6 +26,8 @@ import {
   type SlabBackInputs,
 } from '@/lib/labelLab/customSlabPdfBlock'
 import { presetSpec, specFromCustomConfig, type LabStyleSpec } from '@/lib/labelLab/labStyleSpecs'
+import { ClassicFront, ClassicBack, type ClassicInputs } from '@/lib/labelLab/classicSlabPdfDoc'
+import { CLASSIC_PURPLE } from '@/lib/labelLab/classicLayout'
 import { evaluateLabelBackground } from '@/lib/labelLab/contrastWCAG'
 import type { SlabLabelInputs } from '@/lib/labelLab/slabLabelPdfDoc'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
@@ -525,7 +527,9 @@ function SlabFoldOverDoc({
 export async function generateFoldOverSlabLabelVector(
   data: SlabLabelData,
   style: 'modern' | 'traditional',
+  opts: ClassicRenderOptions = {},
 ): Promise<Blob> {
+  if (style === 'traditional') return renderDocToBlob(await buildClassicFoldOverDoc([data], opts))
   const spec = specForStyle(style)
   const guideColor = style === 'modern' ? '#999999' : '#000000'
   const entries = [{ front: mapFrontInputs(data), back: mapBackInputs(data) }]
@@ -538,13 +542,421 @@ export async function generateFoldOverSlabLabelVector(
 export async function generateBatchFoldOverSlabLabelsVector(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
+  opts: ClassicRenderOptions = {},
 ): Promise<Blob> {
+  if (style === 'traditional') return renderDocToBlob(await buildClassicFoldOverDoc(dataArray, opts))
   const spec = specForStyle(style)
   const guideColor = style === 'modern' ? '#999999' : '#000000'
   const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
   return renderDocToBlob(
     <SlabFoldOverDoc entries={entries} spec={spec} guideColor={guideColor} />,
   )
+}
+
+// ---------------------------------------------------------------------------
+// Classic label — the rebuilt BUILT-IN 'traditional' style (Sept 2026)
+// ---------------------------------------------------------------------------
+//
+// The built-in `traditional` id now renders the DCM-branded classic grading
+// label (purple frame, white field, four identification lines, right-hand
+// grade column, mark on a plate straddling the bottom frame) from the
+// ClassicFront / ClassicBack blocks in labelLab/classicSlabPdfDoc.
+//
+// CUSTOM LABEL SLOTS ARE NOT AFFECTED. A CustomLabelConfig whose style is
+// 'traditional' still resolves its spec through specFromCustomConfig() and
+// still renders through CustomSlabLabelBlock — customers designed on that and
+// keep it. Only specForStyle()'s callers (the built-in Modern/Traditional
+// generators) route here, and only for 'traditional'. 'modern' is untouched.
+
+/** Physical label size. Anything other than 2.8" x 0.8" renders scaled. */
+export interface ClassicDims { widthIn: number; heightIn: number }
+
+const CLASSIC_STD: ClassicDims = { widthIn: 2.8, heightIn: 0.8 }
+const isClassicStd = (d: ClassicDims) =>
+  Math.abs(d.widthIn - CLASSIC_STD.widthIn) < 0.001 && Math.abs(d.heightIn - CLASSIC_STD.heightIn) < 0.001
+const resolveClassicDims = (d?: ClassicDims): ClassicDims =>
+  d && d.widthIn > 0 && d.heightIn > 0 ? d : CLASSIC_STD
+const classicDimsLabel = (d: ClassicDims) => `${d.widthIn}" × ${d.heightIn}"`
+
+/** Classic is a light label — guides print black, as Traditional always has. */
+const CLASSIC_GUIDE = '#000000'
+
+export interface ClassicRenderOptions {
+  /** Non-standard physical size (e.g. Zion Mag Pro 2.51" × 0.76"). */
+  dims?: ClassicDims
+  /** Pre-loaded black mark; batch callers load it once. Org mark when set. */
+  logoBlack?: string | null
+  /** Per-card QR target; dcmgrading.com/verify/{serial} when absent. */
+  qrUrl?: string
+}
+
+/**
+ * Map a SlabLabelData row onto the Classic blocks.
+ *
+ * No CJK stripping: classicSlabPdfDoc registers Noto Sans JP and renders
+ * Japanese names as typed, so extractAsciiSafe() would only lose data. The QR
+ * is rebuilt at error-correction H to match Heritage's printed codes.
+ */
+async function buildClassicInputs(
+  data: SlabLabelData,
+  opts: ClassicRenderOptions = {},
+  preloadedBlackLogo?: string | null,
+): Promise<ClassicInputs> {
+  const verifyUrl = opts.qrUrl || `https://dcmgrading.com/verify/${data.serial}`
+  const [qrDataUrl, blackLogoDataUrl] = await Promise.all([
+    (async () => {
+      try {
+        const QRCode = (await import('qrcode')).default
+        return await QRCode.toDataURL(verifyUrl, {
+          errorCorrectionLevel: 'H', margin: 1, width: 560,
+          color: { dark: '#141026', light: '#ffffff' },
+        })
+      } catch {
+        return data.qrCodeDataUrl || null
+      }
+    })(),
+    opts.logoBlack !== undefined
+      ? Promise.resolve(opts.logoBlack)
+      : preloadedBlackLogo !== undefined
+        ? Promise.resolve(preloadedBlackLogo)
+        : (await import('@/lib/foldableLabelGenerator')).loadBlackLogoAsBase64().catch(() => null),
+  ])
+
+  const d = data as SlabLabelData & {
+    designation?: string | null
+    setName?: string | null
+    subset?: string | null
+    cardNumber?: string | null
+    formattedCardNumber?: string | null
+    year?: string | null
+    autographType?: string | null
+  }
+
+  return {
+    primaryName: data.primaryName || 'Card',
+    contextLine: data.contextLine || '',
+    features: data.features,
+    featuresLine: data.featuresLine,
+    serial: data.serial,
+    grade: data.grade,
+    gradeFormatted: data.gradeFormatted,
+    condition: data.condition,
+    isAlteredAuthentic: data.isAlteredAuthentic,
+    // Structured fields when the caller has them (labelDataGenerator carries
+    // all of these); otherwise classicLines() parses the context line.
+    designation: d.designation ?? null,
+    setName: d.setName ?? null,
+    subset: d.subset ?? null,
+    cardNumber: d.cardNumber ?? null,
+    formattedCardNumber: d.formattedCardNumber ?? null,
+    year: d.year ?? null,
+    autographType: d.autographType ?? null,
+    blackLogoDataUrl,
+    qrDataUrl,
+    verifyUrl,
+  }
+}
+
+/**
+ * A standard-authored Classic panel scaled to the target physical size.
+ *
+ * Same hard-won rule as heritageSlabGenerator's ScaledPanel: react-pdf 4.5
+ * applies a scale(sx, sy) transform correctly to a node's CHILDREN but shrinks
+ * the node's OWN background and border by the Y factor twice. So the outer
+ * chrome is painted HERE, unscaled, at the true label size, and the panel
+ * renders `bare` inside the transform. (Classic draws its purple frame as a
+ * child view, so the only thing this backdrop has to supply is the purple
+ * behind any sub-pixel seam at the edges.) Standard-size panels are untouched.
+ */
+function ClassicScaledPanel({ d, children }: { d: ClassicDims; children: React.ReactNode }) {
+  if (isClassicStd(d)) return <>{children}</>
+  const sx = d.widthIn / CLASSIC_STD.widthIn
+  const sy = d.heightIn / CLASSIC_STD.heightIn
+  return (
+    <View style={{ width: d.widthIn * INCH, height: d.heightIn * INCH, overflow: 'hidden', backgroundColor: CLASSIC_PURPLE }}>
+      <View style={{ width: LABEL_W, height: LABEL_H, transform: `scale(${sx}, ${sy})`, transformOrigin: '0 0' }}>
+        {React.Children.map(children, child =>
+          React.isValidElement(child) ? React.cloneElement(child as React.ReactElement<{ bare?: boolean }>, { bare: true }) : child,
+        )}
+      </View>
+    </View>
+  )
+}
+
+/** Absolutely-positioned, size-aware Classic label slot. */
+function ClassicLabelAt({ x, y, d, children }: { x: number; y: number; d: ClassicDims; children: React.ReactNode }) {
+  return (
+    <View style={{ position: 'absolute', left: x, top: y, width: d.widthIn * INCH, height: d.heightIn * INCH }}>
+      <ClassicScaledPanel d={d}>{children}</ClassicScaledPanel>
+    </View>
+  )
+}
+
+/**
+ * Print bleed. The Classic frame is purple on all four edges, so — unlike the
+ * Heritage band, which only touches one — the bleed underlay is simply purple
+ * on whichever outer edges the panel has. `seam` names the fold-over edge that
+ * must stay flush so the bleed cannot paint over the facing panel.
+ */
+function ClassicBleed({ x, y, d, seam = null, pairH }: {
+  x: number; y: number; d: ClassicDims; seam?: 'top' | 'bottom' | null; pairH?: number
+}) {
+  const B = BLEED
+  const w = d.widthIn * INCH
+  const h = pairH ?? d.heightIn * INCH
+  const top = seam === 'top' ? y : y - B
+  const bottom = seam === 'bottom' ? y + h : y + h + B
+  return (
+    <View style={{
+      position: 'absolute', left: x - B, top, width: w + B * 2, height: bottom - top,
+      backgroundColor: CLASSIC_PURPLE,
+    }} />
+  )
+}
+
+/** Size-aware cut guides: dashed rect (front) or corner ticks (back). */
+function ClassicDimsGuides({ x, y, d, cornersOnly }: { x: number; y: number; d: ClassicDims; cornersOnly?: boolean }) {
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const m = 8
+  if (!cornersOnly) {
+    return <Rect x={x} y={y} width={w} height={h} fill="none" stroke={CLASSIC_GUIDE} strokeWidth={0.5} strokeDasharray="3 3" />
+  }
+  return (
+    <>
+      <Line x1={x - m} y1={y} x2={x} y2={y} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x} y1={y - m} x2={x} y2={y} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y} x2={x + w + m} y2={y} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y - m} x2={x + w} y2={y} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x - m} y1={y + h} x2={x} y2={y + h} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x} y1={y + h} x2={x} y2={y + h + m} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y + h} x2={x + w + m} y2={y + h} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+      <Line x1={x + w} y1={y + h} x2={x + w} y2={y + h + m} stroke={CLASSIC_GUIDE} strokeWidth={0.5} />
+    </>
+  )
+}
+
+function ClassicDuplexDoc({ entries, d, geometry }: {
+  entries: ClassicInputs[]; d: ClassicDims; geometry?: SheetGeometry
+}) {
+  const std = isClassicStd(d)
+  const header = `${classicDimsLabel(d)} — Traditional`
+
+  // Single label: centred on the page (symmetric, so duplex mirroring is exact).
+  if (entries.length === 1) {
+    const i = entries[0]
+    const x = std ? SINGLE_X : (PAGE_W - d.widthIn * INCH) / 2
+    const y = std ? SINGLE_Y : (PAGE_H - d.heightIn * INCH) / 2
+    return (
+      <Document>
+        <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+          {std
+            ? <PageHeader pageType="front" pageNum={1} totalPages={1} variant="standard" />
+            : <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={header} />}
+          <ClassicBleed x={x} y={y} d={d} />
+          <ClassicLabelAt x={x} y={y} d={d}>
+            <ClassicFront i={i} idSuffix="sf" />
+          </ClassicLabelAt>
+          <GuidesLayer>
+            {std ? <FrontCutGuides x={x} y={y} color={CLASSIC_GUIDE} /> : <ClassicDimsGuides x={x} y={y} d={d} />}
+          </GuidesLayer>
+        </Page>
+        <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+          {std
+            ? <PageHeader pageType="back" pageNum={1} totalPages={1} variant="standard" />
+            : <PageHeader pageType="back" pageNum={1} totalPages={1} variant="custom" dims={header} />}
+          <ClassicBleed x={x} y={y} d={d} />
+          <ClassicLabelAt x={x} y={y} d={d}>
+            <ClassicBack i={i} idSuffix="sb" />
+          </ClassicLabelAt>
+          <GuidesLayer>
+            {std ? <CornerMarks x={x} y={y} color={CLASSIC_GUIDE} /> : <ClassicDimsGuides x={x} y={y} d={d} cornersOnly />}
+          </GuidesLayer>
+        </Page>
+      </Document>
+    )
+  }
+
+  // Batch: 2-column duplex pairs (front sheet then X-mirrored back sheet).
+  const geo = geometry ?? STANDARD_SLAB_GEOMETRY
+  // Non-standard labels centre inside the standard grid cell; the cells are
+  // page-symmetric, so long-edge-flip duplex mirroring stays exact.
+  const offX = std ? 0 : (geo.labelW - d.widthIn * INCH) / 2
+  const offY = std ? 0 : (geo.labelH - d.heightIn * INCH) / 2
+  const perPage = geo.labelsPerPage
+  const totalSheets = Math.ceil(entries.length / perPage)
+  const pages: React.ReactElement[] = []
+  for (let sheet = 0; sheet < totalSheets; sheet++) {
+    const slice = entries.slice(sheet * perPage, (sheet + 1) * perPage)
+    for (const side of ['front', 'back'] as const) {
+      const mirrored = side === 'back'
+      pages.push(
+        <Page key={`${side}-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+          {std
+            ? <PageHeader pageType={side} pageNum={sheet + 1} totalPages={totalSheets} variant="standard" geometry={geo} />
+            : <PageHeader pageType={side} pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={header} geometry={geo} />}
+          {slice.map((i, idx) => {
+            const { x, y } = gridPos(idx, mirrored, geo)
+            return (
+              <React.Fragment key={idx}>
+                <ClassicBleed x={x + offX} y={y + offY} d={d} />
+                <ClassicLabelAt x={x + offX} y={y + offY} d={d}>
+                  {side === 'front'
+                    ? <ClassicFront i={i} idSuffix={`f${sheet}-${idx}`} />
+                    : <ClassicBack i={i} idSuffix={`b${sheet}-${idx}`} />}
+                </ClassicLabelAt>
+              </React.Fragment>
+            )
+          })}
+          <GuidesLayer>
+            {slice.map((_, idx) => {
+              const { x, y } = gridPos(idx, mirrored, geo)
+              if (!std) return <ClassicDimsGuides key={idx} x={x + offX} y={y + offY} d={d} cornersOnly={mirrored} />
+              return mirrored
+                ? <CornerMarks key={idx} x={x} y={y} color={CLASSIC_GUIDE} w={geo.labelW} h={geo.labelH} />
+                : <FrontCutGuides key={idx} x={x} y={y} color={CLASSIC_GUIDE} w={geo.labelW} h={geo.labelH} />
+            })}
+          </GuidesLayer>
+        </Page>,
+      )
+    }
+  }
+  return <Document>{pages}</Document>
+}
+
+/** One fold pair: rotated back over front, at (x, y) = top-left of the pair. */
+function ClassicFoldPair({ i, x, y, d, idSuffix }: { i: ClassicInputs; x: number; y: number; d: ClassicDims; idSuffix: string }) {
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  return (
+    <>
+      {/* Purple bleed on the pair's outer edges only; the seam stays flush. */}
+      <ClassicBleed x={x} y={y} d={d} pairH={h * 2} />
+      <View style={{ position: 'absolute', left: x, top: y, width: w, height: h, transform: 'rotate(180deg)' }}>
+        <ClassicScaledPanel d={d}>
+          <ClassicBack i={i} idSuffix={`${idSuffix}b`} />
+        </ClassicScaledPanel>
+      </View>
+      <View style={{ position: 'absolute', left: x, top: y + h, width: w, height: h }}>
+        <ClassicScaledPanel d={d}>
+          <ClassicFront i={i} idSuffix={`${idSuffix}f`} />
+        </ClassicScaledPanel>
+      </View>
+    </>
+  )
+}
+
+/** Dashed cut outline around the pair + fold ticks at the seam. */
+function ClassicFoldGuides({ x, y, d }: { x: number; y: number; d: ClassicDims }) {
+  const w = d.widthIn * INCH
+  const h = d.heightIn * INCH
+  const foldY = y + h
+  return (
+    <>
+      <Rect x={x} y={y} width={w} height={h * 2} fill="none" stroke={CLASSIC_GUIDE} strokeWidth={0.5} strokeDasharray="3 3" />
+      <Line x1={x - 16} y1={foldY} x2={x - 4} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
+      <Line x1={x + w + 4} y1={foldY} x2={x + w + 16} y2={foldY} stroke="#bbbbbb" strokeWidth={0.8} />
+      <ScissorGlyph x={x - 9} y={y + 2} color={CLASSIC_GUIDE} />
+      <ScissorGlyph x={x + w + 2} y={y + 2} color={CLASSIC_GUIDE} />
+    </>
+  )
+}
+
+function ClassicFoldOverDoc({ entries, d }: { entries: ClassicInputs[]; d: ClassicDims }) {
+  const std = isClassicStd(d)
+  const w = d.widthIn * INCH
+  const pairH = d.heightIn * INCH * 2
+  const header = std
+    ? '2.8" × 1.6" fold-over — Traditional'
+    : `${d.widthIn}" × ${(d.heightIn * 2).toFixed(2)}" fold-over — Traditional`
+
+  if (entries.length === 1) {
+    const x = (PAGE_W - w) / 2
+    const y = (PAGE_H - pairH) / 2
+    return (
+      <Document>
+        <Page size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+          <PageHeader pageType="front" pageNum={1} totalPages={1} variant="custom" dims={header} />
+          <ClassicFoldPair i={entries[0]} x={x} y={y} d={d} idSuffix="fo" />
+          <GuidesLayer>
+            <ClassicFoldGuides x={x} y={y} d={d} />
+          </GuidesLayer>
+          <Text style={{ position: 'absolute', left: x, top: y + pairH + 8, fontSize: 7, color: '#9ca3af' }}>
+            {d.widthIn}&quot; × {(d.heightIn * 2).toFixed(2)}&quot; total — fold top panel behind front
+          </Text>
+        </Page>
+      </Document>
+    )
+  }
+
+  // Non-standard pairs centre inside the standard fold cell.
+  const offX = std ? 0 : (LABEL_W - w) / 2
+  const offY = std ? 0 : (FOLD_H - pairH) / 2
+  const totalSheets = Math.ceil(entries.length / FOLD_PER_PAGE)
+  const pages: React.ReactElement[] = []
+  for (let sheet = 0; sheet < totalSheets; sheet++) {
+    const slice = entries.slice(sheet * FOLD_PER_PAGE, (sheet + 1) * FOLD_PER_PAGE)
+    pages.push(
+      <Page key={sheet} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={header} />
+        {slice.map((i, idx) => {
+          const x = FOLD_GRID_X + (idx % FOLD_COLS) * FOLD_CELL_W + offX
+          const y = FOLD_GRID_Y + Math.floor(idx / FOLD_COLS) * FOLD_CELL_H + offY
+          return <ClassicFoldPair key={idx} i={i} x={x} y={y} d={d} idSuffix={`fo${sheet}-${idx}`} />
+        })}
+        <GuidesLayer>
+          {slice.map((_, idx) => {
+            const x = FOLD_GRID_X + (idx % FOLD_COLS) * FOLD_CELL_W + offX
+            const y = FOLD_GRID_Y + Math.floor(idx / FOLD_COLS) * FOLD_CELL_H + offY
+            return <ClassicFoldGuides key={idx} x={x} y={y} d={d} />
+          })}
+        </GuidesLayer>
+      </Page>,
+    )
+  }
+  return <Document>{pages}</Document>
+}
+
+/** Batch inputs, with the DCM mark loaded once for the whole sheet. */
+async function buildClassicBatch(dataArray: SlabLabelData[], opts: ClassicRenderOptions): Promise<ClassicInputs[]> {
+  const dcmBlack = opts.logoBlack !== undefined
+    ? opts.logoBlack
+    : await (await import('@/lib/foldableLabelGenerator')).loadBlackLogoAsBase64().catch(() => null)
+  return Promise.all(dataArray.map(d => buildClassicInputs(d, opts, dcmBlack)))
+}
+
+/** Node-safe Classic batch duplex document (no Blob) — used by proof scripts. */
+export async function buildBatchClassicSlabLabelsDoc(
+  dataArray: SlabLabelData[],
+  opts: ClassicRenderOptions = {},
+  density: SheetDensity = 'standard',
+): Promise<React.ReactElement> {
+  const d = resolveClassicDims(opts.dims)
+  const entries = await buildClassicBatch(dataArray, opts)
+  const geometry = density === 'dense'
+    ? resolveSheetGeometry({ labelWIn: d.widthIn, labelHIn: d.heightIn, density: 'dense' })
+    : STANDARD_SLAB_GEOMETRY
+  return <ClassicDuplexDoc entries={entries} d={d} geometry={geometry} />
+}
+
+/** Node-safe Classic single duplex document. */
+export async function buildClassicSlabLabelDoc(
+  data: SlabLabelData,
+  opts: ClassicRenderOptions = {},
+): Promise<React.ReactElement> {
+  const d = resolveClassicDims(opts.dims)
+  const i = await buildClassicInputs(data, opts)
+  return <ClassicDuplexDoc entries={[i]} d={d} />
+}
+
+/** Node-safe Classic fold-over document (one or many). */
+export async function buildClassicFoldOverDoc(
+  dataArray: SlabLabelData[],
+  opts: ClassicRenderOptions = {},
+): Promise<React.ReactElement> {
+  const d = resolveClassicDims(opts.dims)
+  const entries = await buildClassicBatch(dataArray, opts)
+  return <ClassicFoldOverDoc entries={entries} d={d} />
 }
 
 // ------- Public generators -------
@@ -563,7 +975,12 @@ async function renderDocToBlob(doc: React.ReactElement): Promise<Blob> {
 export async function generateSlabLabelVector(
   data: SlabLabelData,
   style: 'modern' | 'traditional',
+  opts: ClassicRenderOptions = {},
 ): Promise<Blob> {
+  // The built-in Traditional id is the Classic label (Sept 2026). Custom
+  // label slots configured with style 'traditional' do NOT come through here —
+  // they resolve their spec via specFromCustomConfig and keep the old block.
+  if (style === 'traditional') return renderDocToBlob(await buildClassicSlabLabelDoc(data, opts))
   const spec = specForStyle(style)
   const guideColor = style === 'modern' ? '#ffffff' : '#000000'
   const entries = [{ front: mapFrontInputs(data), back: mapBackInputs(data) }]
@@ -575,6 +992,10 @@ export async function generateSlabLabelVector(
 /**
  * Standard slab batch document (node-safe — returns the react-pdf element, no
  * Blob). `scripts/label-sheet-sample.ts` renders it with renderToBuffer.
+ *
+ * NOTE: this synchronous builder still emits the LEGACY traditional spec,
+ * because the Classic label has to await a QR and the DCM mark. Callers that
+ * want the production Traditional output use buildBatchClassicSlabLabelsDoc.
  */
 export function buildBatchSlabLabelsDoc(
   dataArray: SlabLabelData[],
@@ -599,7 +1020,11 @@ export async function generateBatchSlabLabelsVector(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
   density: SheetDensity = 'standard',
+  opts: ClassicRenderOptions = {},
 ): Promise<Blob> {
+  if (style === 'traditional') {
+    return renderDocToBlob(await buildBatchClassicSlabLabelsDoc(dataArray, opts, density))
+  }
   return renderDocToBlob(buildBatchSlabLabelsDoc(dataArray, style, density))
 }
 

@@ -153,6 +153,53 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * The rebuilt built-in `traditional` label — the Classic design — rasterized
+ * for the jsPDF fallback paths.
+ *
+ * This exists so a vector failure can NEVER print the retired light label:
+ * every raster entry point (single, batch, fold-over, and the Label Lab
+ * calibration sheet) goes through renderFrontLabelCanvas /
+ * renderBackLabelCanvas, and both delegate here for 'traditional'. The art
+ * comes from classicRaster — the same ClassicLabelPreview SVG every web
+ * surface shows — so the fallback is the same design at lower fidelity, not a
+ * different one.
+ *
+ * The 1400x400 design carries no bleed of its own, so it is drawn into the
+ * content area and the bleed margin is flooded with the frame purple. That is
+ * exactly what the vector path's ClassicBleed does: the Classic frame is
+ * purple on all four edges.
+ */
+async function renderClassicLabelWithBleed(
+  data: SlabLabelData,
+  side: 'front' | 'back'
+): Promise<string> {
+  const [{ renderClassicLabelPng }, { CLASSIC_PURPLE }] = await Promise.all([
+    import('./labels/classicRaster'),
+    import('./labelLab/classicLayout'),
+  ]);
+  const contentW = CANVAS_W - BLEED_PX * 2;
+  const png = await renderClassicLabelPng({
+    data,
+    side,
+    widthPx: contentW,
+    // Undefined on purpose: the rasterizer loads the black DCM mark, which is
+    // exactly what the vector path does for this style (buildClassicInputs
+    // falls back to loadBlackLogoAsBase64 when no logoBlack is passed).
+    logoBlack: undefined,
+    qrDataUrl: data.qrCodeDataUrl || null,
+  });
+  const img = await loadImage(png);
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_W;
+  canvas.height = CANVAS_H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = CLASSIC_PURPLE;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.drawImage(img, BLEED_PX, BLEED_PX, contentW, CANVAS_H - BLEED_PX * 2);
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
 function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -353,6 +400,7 @@ export async function renderFrontLabelCanvas(
   data: SlabLabelData,
   style: 'modern' | 'traditional'
 ): Promise<string> {
+  if (style === 'traditional') return renderClassicLabelWithBleed(data, 'front');
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -520,6 +568,7 @@ async function renderBackLabelCanvas(
   data: SlabLabelData,
   style: 'modern' | 'traditional'
 ): Promise<string> {
+  if (style === 'traditional') return renderClassicLabelWithBleed(data, 'back');
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;

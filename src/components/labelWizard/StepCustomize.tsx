@@ -47,6 +47,8 @@ interface StepCustomizeProps {
   onSideChange: (side: 'front' | 'back') => void
   orgLogoColor?: string | null
   toploaderVariant?: 'front-back' | 'foldover'
+  /** The untouched built-in Traditional selection - see WizardPreview.classic. */
+  classic?: boolean
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -93,6 +95,7 @@ export function StepCustomize({
   onSideChange,
   orgLogoColor,
   toploaderVariant = 'front-back',
+  classic = false,
 }: StepCustomizeProps) {
   const isHeritage = config.style === 'heritage'
   const activeCard = cards[activeIndex]
@@ -104,7 +107,7 @@ export function StepCustomize({
       activeIndex={activeIndex}
       onIndexChange={onIndexChange}
       renderItem={(i) => (
-        <WizardPreview card={cards[i]} data={dataMap.get(cards[i].id)} config={config} holder={holder} orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant} />
+        <WizardPreview card={cards[i]} data={dataMap.get(cards[i].id)} config={config} holder={holder} orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant} classic={classic} />
       )}
       caption={(i) => (
         <p className="text-xs text-gray-500 truncate">

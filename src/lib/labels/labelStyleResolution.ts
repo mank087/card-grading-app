@@ -108,3 +108,27 @@ export function resolveHeritageSelection(
     gradeColors: gradeColors && Object.keys(gradeColors).length ? gradeColors : null,
   }
 }
+
+/**
+ * Is the ACTIVE selection the rebuilt BUILT-IN Classic label?
+ *
+ * The built-in `traditional` id renders the DCM classic grading label (purple
+ * frame, white field, four identification lines, right-hand grade column) from
+ * labelLab/classicLayout — the same source the print PDF draws from.
+ *
+ * A saved custom slot (`custom-N`) whose config says `style: 'traditional'` is
+ * NOT Classic: the customer designed that light label and still prints it
+ * (vectorSlabGenerator routes config-backed styles through the custom block,
+ * so the preview has to match). That is the whole of the rule — heritage wins
+ * first, a config-backed selection is never Classic, then the built-in id.
+ */
+export function isClassicSelection(
+  labelStyle: string | null | undefined,
+  activeConfig?: Pick<
+    CustomLabelConfig,
+    'style' | 'heritagePattern' | 'heritageColorSource' | 'heritageBandColors' | 'heritageGradeColors'
+  > | null,
+): boolean {
+  if (activeConfig) return false
+  return isTraditionalSelection(labelStyle, activeConfig)
+}

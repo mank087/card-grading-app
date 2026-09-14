@@ -131,7 +131,7 @@ export function styleOptionsForHolder(
     return [
       { id: 'heritage', name: 'Heritage', blurb: 'Ivory field, patterned color band, grade chip. The DCM signature label.' },
       { id: 'modern', name: 'Modern', blurb: 'Dark gradient with bold type. The original DCM look.' },
-      { id: 'traditional', name: 'Traditional', blurb: 'Clean light label in the classic grading style.' },
+      { id: 'traditional', name: 'Traditional', blurb: 'Classic grading-house layout with a DCM purple frame.' },
       ...customStyles.map((s) => ({
         id: s.id as LabelStyleId,
         name: s.name,
@@ -305,4 +305,21 @@ export function stepBlocker(state: WizardState): string | null {
     default:
       return null
   }
+}
+
+/**
+ * Is the working design still the untouched built-in Traditional?
+ *
+ * The built-in 'traditional' id renders the Classic grading label; a design
+ * the user has since customized is a custom light label, which is what the
+ * print path produces for it. So the preview follows the same rule: pristine
+ * = Classic, edited = the canvas renderer that matches the paper.
+ */
+export function isPristineClassic(
+  styleId: LabelStyleId | null,
+  config: CustomLabelConfig,
+): boolean {
+  if (styleId !== 'traditional') return false
+  const base = { ...baseConfigForStyle('traditional', []), side: config.side }
+  return JSON.stringify(base) === JSON.stringify(config)
 }

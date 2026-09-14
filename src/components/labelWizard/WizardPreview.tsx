@@ -15,6 +15,7 @@ import type { CustomLabelConfig } from '@/lib/labelPresets'
 import { LABEL_TYPES } from '@/lib/labelPresets'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
 import HeritageLabelPreview from '@/components/labels/HeritageLabelPreview'
+import ClassicLabelPreview from '@/components/labels/ClassicLabelPreview'
 import LabelMockup from '@/components/labels/LabelMockup'
 import { BAND_PATTERNS, type BandPattern } from '@/lib/labelLab/bandGeometry'
 import { resolveHeritageBandColors, HERITAGE_BRAND_COLORS } from '@/lib/labelLab/heritageLayout'
@@ -61,12 +62,35 @@ interface LabelOnlyProps {
   data: SlabLabelData | undefined
   config: CustomLabelConfig
   orgLogoColor?: string | null
+  /**
+   * The selection is the untouched built-in Traditional, which is the Classic
+   * grading label. Computed by the wizard with isPristineClassic: the moment
+   * the design is customized this goes false and the preview returns to the
+   * canvas renderer, because that is what a saved custom slot prints.
+   */
+  classic?: boolean
 }
 
 /** Just the label artwork at label aspect ratio (no holder). */
-export function WizardLabelOnly({ card, data, config, orgLogoColor }: LabelOnlyProps) {
+export function WizardLabelOnly({ card, data, config, orgLogoColor, classic = false }: LabelOnlyProps) {
   if (!data) {
     return <div className="w-full bg-gray-200 animate-pulse rounded" style={{ aspectRatio: '3.5 / 1' }} />
+  }
+  if (classic) {
+    // Non-standard slots (Zion) stretch to the physical aspect, mirroring the
+    // print pipeline's scale transform — same rule as Heritage below.
+    const w = config.width || 2.8
+    const h = config.height || 0.8
+    const nonStd = Math.abs(w - 2.8) > 0.001 || Math.abs(h - 0.8) > 0.001
+    return (
+      <ClassicLabelPreview
+        data={data}
+        side={config.side}
+        blackLogoHref={orgLogoColor ?? undefined}
+        className="w-full"
+        stretchAspect={nonStd ? w / h : undefined}
+      />
+    )
   }
   if (config.style === 'heritage') {
     // Non-standard slots (Zion) stretch the preview to the physical aspect,
@@ -98,7 +122,7 @@ interface WizardPreviewProps extends LabelOnlyProps {
 }
 
 /** The label in context: slab composite, or the holder mockups. */
-export function WizardPreview({ card, data, config, holder, orgLogoColor, toploaderVariant = 'front-back' }: WizardPreviewProps) {
+export function WizardPreview({ card, data, config, holder, orgLogoColor, classic = false, toploaderVariant = 'front-back' }: WizardPreviewProps) {
   const labelType = useMemo(() => {
     if (holder === 'onetouch') return LABEL_TYPES.find((t) => t.id === 'onetouch')!
     if (toploaderVariant === 'foldover') return LABEL_TYPES.find((t) => t.id === 'foldover')!
@@ -150,7 +174,7 @@ export function WizardPreview({ card, data, config, holder, orgLogoColor, toploa
           className="absolute inset-0 w-full h-full object-contain"
         />
         <div className="absolute overflow-hidden" style={{ top: '4.5%', left: `${slotLeft}%`, width: `${slotPct}%` }}>
-          <WizardLabelOnly card={card} data={data} config={config} orgLogoColor={orgLogoColor} />
+          <WizardLabelOnly card={card} data={data} config={config} orgLogoColor={orgLogoColor} classic={classic} />
         </div>
         <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
           {config.side === 'back' && card?.back_url ? (

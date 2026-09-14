@@ -65,7 +65,8 @@ import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { ScaleToFit } from '@/components/labels/ScaleToFit'
-import { resolveHeritageSelection, isTraditionalSelection } from '@/lib/labels/labelStyleResolution'
+import { resolveHeritageSelection, isTraditionalSelection, isClassicSelection } from '@/lib/labels/labelStyleResolution'
+import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
@@ -1576,6 +1577,14 @@ export function StarWarsCardDetails() {
   // whose style is 'heritage'. Renders through the shared SVG preview.
   const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
   const isTraditionalLabel = isTraditionalSelection(labelStyle, activeConfig);
+  // Built-in 'traditional' is the Classic grading label (Sept 2026) - the
+  // same 1400x400 design the print PDF draws. A saved custom slot whose style
+  // is 'traditional' keeps the light label it was designed on, so it falls
+  // through to the block below instead.
+  const isClassicLabel = isClassicSelection(labelStyle, activeConfig);
+  const classicQrDataUrl = useClassicQrDataUrl(
+    isClassicLabel && origin && cardId ? `${origin}/starwars/${cardId}` : null
+  );
   const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
   useEffect(() => {
     // Same URL as the back-label QR (currentUrl, declared after the early
@@ -2647,6 +2656,20 @@ export function StarWarsCardDetails() {
     showCardLoversEmblem,
   } : null;
   const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
+  // Classic label data - the same unified labelData the print PDF is built
+  // from, so the on-screen slab and the paper cannot disagree.
+  const classicData = {
+    primaryName: labelData.primaryName,
+    contextLine: labelData.contextLine || '',
+    features: labelData.features || [],
+    featuresLine: labelData.featuresLine,
+    serial: labelData.serial,
+    grade: labelData.grade,
+    gradeFormatted: labelData.gradeFormatted,
+    condition: labelData.condition,
+    isAlteredAuthentic: labelData.isAlteredAuthentic,
+    qrCodeDataUrl: classicQrDataUrl,
+  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data'];
 
   // 🎯 Star Wars cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {
@@ -2922,6 +2945,8 @@ export function StarWarsCardDetails() {
                   size="lg"
                   colorOverrides={colorOverrides}
                 />
+              ) : isClassicLabel ? (
+                <ClassicLabelPreview data={classicData} side="front" blackLogoHref={orgLogos?.mark ?? undefined} />
               ) : (
                 <ScaleToFit designWidth={360}><div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[110px] flex">
                   <div className="flex items-center justify-between h-full w-full">
@@ -3085,6 +3110,8 @@ export function StarWarsCardDetails() {
                   showCardLoversEmblem={showCardLoversEmblem}
                   colorOverrides={colorOverrides}
                 />
+              ) : isClassicLabel ? (
+                <ClassicLabelPreview data={classicData} side="back" blackLogoHref={orgLogos?.mark ?? undefined} qrDataUrl={classicQrDataUrl} verifyUrl={currentUrl} />
               ) : (
                 <ScaleToFit designWidth={360}><div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
                   <div className="flex items-center justify-between h-full gap-2">

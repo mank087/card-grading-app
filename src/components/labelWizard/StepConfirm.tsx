@@ -22,7 +22,7 @@ import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { MAX_SAVED_LABEL_STYLES } from '@/lib/labelPresets'
 import { resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
-import { baseConfigForStyle, sheetsNeeded, SLAB_SIZES, type HolderType, type SlabSizeId } from './wizardTypes'
+import { baseConfigForStyle, isPristineClassic, sheetsNeeded, SLAB_SIZES, type HolderType, type SlabSizeId } from './wizardTypes'
 import type { WizardTextEdits } from './useWizardData'
 import CardSwiper from './CardSwiper'
 import WizardPreview from './WizardPreview'
@@ -148,6 +148,9 @@ export function StepConfirm({
   }, [styleId, customStyles, config])
 
   const isBuiltIn = styleId === 'heritage' || styleId === 'modern' || styleId === 'traditional'
+  // Untouched built-in Traditional = the Classic grading label, previewed and
+  // printed through the built-in path rather than the custom generators.
+  const classic = isPristineClassic(styleId, config)
 
   /**
    * Heritage Compact config for the small-holder sheets. Band colours stay
@@ -288,7 +291,7 @@ export function StepConfirm({
               activeIndex={activeIndex}
               onIndexChange={onIndexChange}
               renderItem={(i) => (
-                <WizardPreview card={cards[i]} data={previewDataMap.get(cards[i].id)} config={config} holder={holder} orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant} />
+                <WizardPreview card={cards[i]} data={previewDataMap.get(cards[i].id)} config={config} holder={holder} orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant} classic={classic} />
               )}
               caption={(i) => (
                 <p className="text-xs text-gray-500 truncate">
@@ -527,7 +530,13 @@ export function StepConfirm({
           isOpen
           onClose={() => setModal(null)}
           selectedCards={cards}
-          configOverride={config}
+          {...(classic
+            // Pristine built-in Traditional: hand the modal the BUILT-IN id, not
+            // the working config. A configOverride routes through the custom
+            // generators, which would print the retired light label instead of
+            // the Classic design the preview just showed.
+            ? { labelStyle: 'traditional' as const, configOverride: null }
+            : { configOverride: config })}
           showFounderEmblem={emblems.showFounderEmblem}
           showVipEmblem={emblems.showVipEmblem}
           showCardLoversEmblem={emblems.showCardLoversEmblem}

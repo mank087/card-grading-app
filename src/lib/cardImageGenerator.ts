@@ -1038,6 +1038,48 @@ async function drawHeritageLabel(
 }
 
 /**
+ * Draw the Classic label (the rebuilt built-in `traditional` style) by
+ * rasterizing the same SVG every web surface previews (classicRaster), so the
+ * composite matches print. Rendered at 2x the band width for sharpness; the
+ * 1400:400 design is drawn into the 800x220 band, the same ~3% vertical
+ * stretch Heritage takes here.
+ */
+async function drawClassicLabel(
+  ctx: CanvasRenderingContext2D,
+  data: CardImageData,
+  side: 'front' | 'back',
+  logoDataUrl: string | undefined,
+  qrCodeDataUrl: string,
+  x: number,
+  width: number,
+  y: number
+): Promise<void> {
+  const { renderClassicLabelCanvas } = await import('@/lib/labels/classicRaster');
+  const slabData = {
+    primaryName: data.cardName,
+    contextLine: data.contextLine,
+    features: [],
+    featuresLine: data.specialFeatures || null,
+    serial: data.serial,
+    grade: data.grade,
+    condition: data.conditionLabel,
+    qrCodeDataUrl,
+    logoDataUrl,
+  };
+  const labelCanvas = await renderClassicLabelCanvas({
+    data: slabData as any,
+    side,
+    widthPx: width * 2,
+    // Org cards print the store's Brand Setup mark; consumer cards take the
+    // DCM black mark the rasterizer loads for itself.
+    logoBlack: data.logoOverrides?.mark || data.logoOverrides?.black || data.logoOverrides?.color || undefined,
+    qrDataUrl: qrCodeDataUrl,
+    verifyUrl: data.cardUrl,
+  });
+  ctx.drawImage(labelCanvas, x, y, width, LABEL_HEIGHT);
+}
+
+/**
  * Generate a card image (front or back) with label
  */
 async function generateCardImage(
@@ -1061,8 +1103,10 @@ async function generateCardImage(
   const borderWidth = 8;
   const cornerRadius = 16;
   const isHeritage = !!data.heritage;
-  // Heritage is a light label — it takes the traditional (light) frame.
-  const isModern = !isHeritage && data.labelStyle !== 'traditional';
+  // The built-in `traditional` id is the rebuilt Classic label (Sept 2026).
+  // It and Heritage are light labels, so both take the light slab frame.
+  const isClassic = !isHeritage && data.labelStyle === 'traditional';
+  const isModern = !isHeritage && !isClassic;
 
   // Background - white for traditional, dark for modern
   if (isModern) {
@@ -1086,6 +1130,8 @@ async function generateCardImage(
   // Draw appropriate label - heritage, modern, or traditional
   if (isHeritage) {
     await drawHeritageLabel(ctx, data, side, logoDataUrl, qrCodeDataUrl, borderWidth, contentWidth, borderWidth);
+  } else if (isClassic) {
+    await drawClassicLabel(ctx, data, side, logoDataUrl, qrCodeDataUrl, borderWidth, contentWidth, borderWidth);
   } else if (isModern) {
     if (side === 'front') {
       await drawModernFrontLabel(ctx, data, logoDataUrl, borderWidth, contentWidth, borderWidth);
@@ -1180,7 +1226,9 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
     // Heritage composites the DCM mark over the QR itself (vector-crisp disc
     // in the raster); every other style embeds it at QR-generation time so
     // downloaded card images match the printed labels.
-    qrCodeDataUrl = data.heritage
+    // Classic prints a plain code on a white plate (no centre mark), exactly
+    // like its PDF back, so it takes the same plain QR Heritage does.
+    qrCodeDataUrl = data.heritage || data.labelStyle === 'traditional'
       ? await generateQRCodePlain(data.cardUrl)
       : await generateQRCodeWithLogo(data.cardUrl, data.logoOverrides?.color);
     console.log('[CARD IMAGE GEN] QR code generated successfully');

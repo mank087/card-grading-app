@@ -19,6 +19,7 @@ import {
   wizardReducer,
   stepBlocker,
   MAX_WIZARD_CARDS,
+  isPristineClassic,
   type WizardStep,
 } from './wizardTypes'
 import { useWizardData, type WizardTextEdits } from './useWizardData'
@@ -221,6 +222,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               onSideChange={(side) => dispatch({ type: 'SET_SIDE', side })}
               orgLogoColor={orgLogoColor}
               toploaderVariant={state.toploaderVariant}
+              classic={isPristineClassic(state.styleId, state.config)}
             />
           )}
           {state.step === 5 && state.holder && state.styleId && (

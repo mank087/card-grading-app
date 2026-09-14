@@ -2,17 +2,12 @@
 
 import { ReactNode } from 'react'
 import ProgressiveCardImage from './ProgressiveCardImage'
-import { QRCodeCanvas } from 'qrcode.react'
 import { ModernFrontLabel } from './labels/ModernFrontLabel'
 import { ModernBackLabel } from './labels/ModernBackLabel'
-import { ScaleToFit } from './labels/ScaleToFit'
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
+import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
-
-// Below this width labels transform-scale down as one unit (ScaleToFit)
-// instead of reflowing piecewise — same behavior as the heritage SVG.
-const LABEL_DESIGN_WIDTH = 360
 
 // Sub-scores interface for modern labels
 export interface SubScores {
@@ -79,12 +74,6 @@ export interface CardSlabProps {
   orgDesign?: OrgLabelDesign | null
 }
 
-// Helper: Format grade for display - v6.0: Always whole numbers
-const formatGrade = (grade: number): string => {
-  // v6.0: Always return whole number (no .5 grades)
-  return Math.round(grade).toString()
-}
-
 /**
  * CardSlab - A unified slab-like display component for graded cards
  * Features a metallic purple border wrapping both the label and card image
@@ -118,71 +107,6 @@ export function CardSlab({
   orgDesign = null,
 }: CardSlabProps) {
   const isModern = labelStyle !== 'traditional'
-  // Size configurations - heights match between front/back labels for consistency
-  const sizeConfig = {
-    sm: {
-      logoHeight: 'h-7',
-      nameMaxFontSize: 11,
-      nameMinFontSize: 8,
-      maxNameChars: 18,
-      setFontSize: '9px',
-      featureFontSize: 'text-[8px]',
-      serialFontSize: 'text-[8px]',
-      gradeSize: 'text-2xl',
-      conditionSize: 'text-[0.55rem]',
-      dividerWidth: 'w-6',
-      padding: 'p-2',
-      labelHeight: 'min-h-[85px]',
-      imageWidth: 300,
-      imageHeight: 420,
-      qrSize: 45,
-      qrLogoSize: '16px',
-    },
-    md: {
-      logoHeight: 'h-9',
-      nameMaxFontSize: 13,
-      nameMinFontSize: 9,
-      maxNameChars: 22,
-      setFontSize: '11px',
-      featureFontSize: 'text-[10px]',
-      serialFontSize: 'text-[10px]',
-      gradeSize: 'text-3xl',
-      conditionSize: 'text-[0.65rem]',
-      dividerWidth: 'w-8',
-      padding: 'p-3',
-      labelHeight: 'min-h-[95px]',
-      imageWidth: 350,
-      imageHeight: 490,
-      qrSize: 55,
-      qrLogoSize: '18px',
-    },
-    lg: {
-      logoHeight: 'h-14',
-      nameMaxFontSize: 14,
-      nameMinFontSize: 10,
-      maxNameChars: 26,
-      setFontSize: '12px',
-      featureFontSize: 'text-[11px]',
-      serialFontSize: 'text-[11px]',
-      gradeSize: 'text-4xl',
-      conditionSize: 'text-[0.7rem]',
-      dividerWidth: 'w-10',
-      padding: 'p-4',
-      labelHeight: 'min-h-[110px]',
-      imageWidth: 400,
-      imageHeight: 560,
-      qrSize: 58,
-      qrLogoSize: '20px',
-    },
-  }
-
-  const config = sizeConfig[size]
-
-  // Calculate dynamic font size for name (shrink to fit instead of scaleX)
-  const nameFontSize = displayName.length <= config.maxNameChars
-    ? config.nameMaxFontSize
-    : Math.max(config.nameMinFontSize, Math.floor(config.nameMaxFontSize * (config.maxNameChars / displayName.length)))
-
   // Slab border styles - modern has dark with glow, traditional has metallic purple
   const slabBorderStyle = isModern
     ? {
@@ -195,201 +119,20 @@ export function CardSlab({
         boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
       }
 
-  // Traditional label component (reused for front and back)
-  const FrontLabel = () => (
-    <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
-    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`}>
-      <div className="flex items-center justify-between h-full w-full gap-1.5">
-        {/* Left: DCM Logo */}
-        <div className="flex-shrink-0">
-          <img
-            src={orgLogoColor ?? '/DCM-logo.png'}
-            alt="DCM"
-            className={`${config.logoHeight} w-auto`}
-          />
-        </div>
-
-        {/* Center: Card Information */}
-        <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-          {/* Line 1: Player/Card Name - font shrinks to fit */}
-          <div
-            className="font-bold text-gray-900 leading-tight"
-            style={{
-              fontSize: `${nameFontSize}px`,
-              lineHeight: '1.2',
-              wordBreak: 'break-word'
-            }}
-            title={displayName}
-          >
-            {displayName}
-          </div>
-
-          {/* Line 2: Set Name - wraps freely */}
-          <div
-            className="text-gray-700 leading-tight"
-            style={{
-              fontSize: config.setFontSize,
-              wordBreak: 'break-word'
-            }}
-            title={setLineText}
-          >
-            {setLineText}
-          </div>
-
-          {/* Line 3: Special Features */}
-          {features.length > 0 && (
-            <div
-              className={`text-blue-600 font-semibold ${config.featureFontSize} leading-tight`}
-              style={{ wordBreak: 'break-word' }}
-            >
-              {features.join(' • ')}
-            </div>
-          )}
-
-          {/* Line 4: DCM Serial Number */}
-          <div className={`text-gray-500 font-mono ${config.serialFontSize} leading-tight`}>
-            {serial}
-          </div>
-        </div>
-
-        {/* Right: Grade Display */}
-        <div className="text-center flex-shrink-0">
-          <div className={`font-bold text-purple-700 ${config.gradeSize} leading-none`}>
-            {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
-          </div>
-          {(condition || isAlteredAuthentic) && (
-            <>
-              <div className={`border-t-2 border-purple-600 ${config.dividerWidth} mx-auto my-1`}></div>
-              <div className={`font-semibold text-purple-600 ${config.conditionSize} leading-tight`}>
-                {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-    </ScaleToFit>
-  )
-
-  // Back label with QR code, grade, and sub-scores (matches modern layout)
-  const BackLabel = () => {
-    // Size-specific configurations for back label elements
-    const backLabelConfig = {
-      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[12px]', founderTextSize: '7px' },
-      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[14px]', founderTextSize: '8px' },
-      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[16px]', founderTextSize: '9px' },
-    }
-    const backConfig = backLabelConfig[size]
-
-    return (
-      <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
-      <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding} flex`}>
-        <div className="flex items-center justify-between h-full w-full gap-2">
-          {/* LEFT: QR Code + Founder badge */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {qrCodeUrl ? (
-              <div className="bg-white p-1 rounded shadow-sm">
-                <QRCodeCanvas
-                  value={qrCodeUrl}
-                  size={config.qrSize}
-                  level="H"
-                  includeMargin={false}
-                  fgColor="#000000"
-                  bgColor="#FFFFFF"
-                />
-              </div>
-            ) : (
-              <div className="text-gray-400 text-sm">Back</div>
-            )}
-
-            {/* Founder badge - star at top, Founder sideways below */}
-            {showFounderEmblem && (
-              <div className="flex flex-col items-center justify-start h-full py-1">
-                <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#d97706' }}>
-                  ★
-                </span>
-                <span
-                  className="uppercase"
-                  style={{
-                    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-                    fontWeight: 600,
-                    fontSize: backConfig.founderTextSize,
-                    color: '#7c3aed',
-                    writingMode: 'vertical-rl',
-                    transform: 'rotate(180deg)',
-                    marginTop: '3px',
-                    letterSpacing: '0.5px',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    textRendering: 'optimizeLegibility',
-                  } as React.CSSProperties}
-                >
-                  Founder
-                </span>
-              </div>
-            )}
-
-            {/* Card Lovers badge - heart at top, Card Lover sideways below */}
-            {showCardLoversEmblem && (
-              <div className="flex flex-col items-center justify-start h-full py-1">
-                <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
-                  ♥
-                </span>
-                <span
-                  style={{
-                    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-                    fontWeight: 600,
-                    fontSize: backConfig.founderTextSize,
-                    color: '#ec4899',
-                    writingMode: 'vertical-rl',
-                    transform: 'rotate(180deg)',
-                    marginTop: '3px',
-                    letterSpacing: '0.5px',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    textRendering: 'optimizeLegibility',
-                  } as React.CSSProperties}
-                >
-                  Card Lover
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* CENTER: Large Grade + Condition */}
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className={`font-bold text-purple-700 ${backConfig.gradeSize} leading-none`}>
-              {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
-            </div>
-            {(condition || isAlteredAuthentic) && (
-              <div className={`font-semibold text-purple-600 ${backConfig.conditionSize} leading-tight mt-1 uppercase tracking-wide`}>
-                {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT: Four Sub-Grades */}
-          {subScores && (
-            <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 text-right">
-              <div className={`${backConfig.subScoreSize} text-gray-700`}>
-                Centering: {Math.round(subScores.centering)}
-              </div>
-              <div className={`${backConfig.subScoreSize} text-gray-700`}>
-                Corners: {Math.round(subScores.corners)}
-              </div>
-              <div className={`${backConfig.subScoreSize} text-gray-700`}>
-                Edges: {Math.round(subScores.edges)}
-              </div>
-              <div className={`${backConfig.subScoreSize} text-gray-700`}>
-                Surface: {Math.round(subScores.surface)}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      </ScaleToFit>
-    )
-  }
+  // Built-in 'traditional' is the Classic grading label (Sept 2026): the same
+  // 1400x400 design the print PDF draws, rendered from the shared layout math.
+  // Custom slots keep their own design - callers never pass 'traditional' for one.
+  const classicData = {
+    primaryName: displayName,
+    contextLine: setLineText || '',
+    features: features || [],
+    serial,
+    grade,
+    condition,
+    isAlteredAuthentic,
+    qrCodeDataUrl: '',
+  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
+  const classicQr = useClassicQrDataUrl(qrCodeUrl)
 
   // Card image component
   const CardImage = ({
@@ -478,7 +221,7 @@ export function CardSlab({
                 logoScale={orgLogoScale}
               />
             ) : (
-              <FrontLabel />
+              <ClassicLabelPreview data={classicData} side="front" blackLogoHref={orgLogoColor ?? undefined} />
             )}
             {/* Separator - mimics slab divider */}
             <div className="h-1" style={separatorStyle} />
@@ -535,7 +278,7 @@ export function CardSlab({
                   showCardLoversEmblem={showCardLoversEmblem}
                 />
               ) : (
-                <BackLabel />
+                <ClassicLabelPreview data={classicData} side="back" blackLogoHref={orgLogoColor ?? undefined} qrDataUrl={classicQr} verifyUrl={qrCodeUrl} />
               )}
               {/* Separator - mimics slab divider */}
               <div className="h-1" style={separatorStyle} />
@@ -606,19 +349,6 @@ export function CardSlabGrid({
 }: CardSlabGridProps) {
   const isModern = labelStyle !== 'traditional'
 
-  // Grid-specific config
-  const gridConfig = {
-    nameMaxFontSize: 13,
-    nameMinFontSize: 9,
-    maxNameChars: 22,
-    setFontSize: '11px',
-  }
-
-  // Calculate dynamic font size for name (shrink to fit instead of scaleX)
-  const nameFontSize = displayName.length <= gridConfig.maxNameChars
-    ? gridConfig.nameMaxFontSize
-    : Math.max(gridConfig.nameMinFontSize, Math.floor(gridConfig.nameMaxFontSize * (gridConfig.maxNameChars / displayName.length)))
-
   // Slab border styles - modern has dark with glow, traditional has metallic purple
   // Custom styles use their own gradient colors for the slab border
   const slabBorderStyle = isModern
@@ -655,81 +385,18 @@ export function CardSlabGrid({
         background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
       }
 
-  // Traditional label for grid
-  const TraditionalLabel = () => (
-    <ScaleToFit designWidth={LABEL_DESIGN_WIDTH}>
-    <div className="bg-gradient-to-b from-gray-50 to-white p-3 min-h-[95px] flex">
-      <div className="flex items-center justify-between gap-1.5 h-full w-full">
-        {/* Left: DCM Logo */}
-        <div className="flex-shrink-0 -ml-1">
-          <img
-            src={orgLogoColor ?? '/DCM-logo.png'}
-            alt="DCM"
-            className="h-9 w-auto"
-          />
-        </div>
-
-        {/* Center: Card Information */}
-        <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-          {/* Line 1: Player/Card Name - font shrinks to fit */}
-          <div
-            className="font-bold text-gray-900 leading-tight"
-            style={{
-              fontSize: `${nameFontSize}px`,
-              lineHeight: '1.2',
-              wordBreak: 'break-word'
-            }}
-            title={displayName}
-          >
-            {displayName}
-          </div>
-
-          {/* Line 2: Set Name - wraps freely */}
-          <div
-            className="text-gray-700 leading-tight"
-            style={{
-              fontSize: gridConfig.setFontSize,
-              wordBreak: 'break-word'
-            }}
-            title={setLineText}
-          >
-            {setLineText}
-          </div>
-
-          {/* Line 3: Special Features */}
-          {features.length > 0 && (
-            <div
-              className="text-blue-600 font-semibold text-[10px] leading-tight"
-              style={{ wordBreak: 'break-word' }}
-            >
-              {features.join(' • ')}
-            </div>
-          )}
-
-          {/* Line 4: DCM Serial Number */}
-          <div className="text-gray-500 font-mono text-[10px] leading-tight">
-            {serial}
-          </div>
-        </div>
-
-        {/* Right: Grade Display */}
-        <div className="text-center flex-shrink-0">
-          <div className="font-bold text-purple-700 text-3xl leading-none">
-            {grade !== null ? Math.round(grade).toString() : (isAlteredAuthentic ? 'A' : 'N/A')}
-          </div>
-          {(condition || isAlteredAuthentic) && (
-            <>
-              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-    </ScaleToFit>
-  )
+  // Built-in 'traditional' renders the Classic grading label, same as the
+  // detail slab above. The grid tile only ever shows the front.
+  const gridClassicData = {
+    primaryName: displayName,
+    contextLine: setLineText || '',
+    features: features || [],
+    serial,
+    grade,
+    condition,
+    isAlteredAuthentic,
+    qrCodeDataUrl: '',
+  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
 
   return (
     <div
@@ -774,7 +441,7 @@ export function CardSlabGrid({
             logoScale={orgLogoScale}
           />
         ) : (
-          <TraditionalLabel />
+          <ClassicLabelPreview data={gridClassicData} side="front" blackLogoHref={orgLogoColor ?? undefined} />
         )}
 
         {/* Separator - mimics slab divider */}

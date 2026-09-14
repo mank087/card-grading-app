@@ -102,6 +102,22 @@ function traditionalConfig(side: 'front' | 'back'): CustomLabelConfig {
   };
 }
 
+/**
+ * Is this config the BUILT-IN Traditional, i.e. the Classic grading label?
+ *
+ * `?type=slab-traditional` produces exactly traditionalConfig() above. The RN
+ * host can push a customized light design over the same bridge; that is a
+ * custom label and keeps the canvas renderer, because that is what it prints.
+ */
+function isBuiltInTraditional(cfg: CustomLabelConfig): boolean {
+  return cfg.style === 'traditional'
+    && cfg.preset === 'dcm-traditional'
+    && cfg.colorPreset === 'traditional'
+    && !cfg.borderEnabled
+    && cfg.gradientStart === '#f9fafb'
+    && cfg.gradientEnd === '#ffffff';
+}
+
 /** Heritage preset → CustomLabelConfig (band colours resolve per card). */
 function heritageConfig(side: 'front' | 'back', pattern?: string | null): CustomLabelConfig {
   return {
@@ -313,6 +329,23 @@ export default function LabelPreviewPage() {
         const canvas = await fn(inputs, COMPACT_PREVIEW_DPI);
         if (renderId !== renderIdRef.current) return;
         const url = canvas.toDataURL('image/png');
+        setImageUrl(url);
+        postToRN({ type: 'label-preview-ready', dataUrl: url, side });
+        return;
+      }
+      // Built-in Traditional is the Classic grading label — rasterized from
+      // the same ClassicLabelPreview SVG every web surface shows, so the
+      // mobile preview cannot drift from the printed label.
+      if (isBuiltInTraditional(config)) {
+        const { renderClassicLabelPng } = await import('@/lib/labels/classicRaster');
+        const url = await renderClassicLabelPng({
+          data: data as any,
+          side,
+          widthPx: 806,
+          logoBlack: heritageLogosRef.current?.logoBlack,
+          verifyUrl: cardUrlRef.current || null,
+        });
+        if (renderId !== renderIdRef.current) return;
         setImageUrl(url);
         postToRN({ type: 'label-preview-ready', dataUrl: url, side });
         return;

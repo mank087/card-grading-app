@@ -97,6 +97,7 @@ export function LabelStyleDropdown({
           </button>
           <button
             onClick={() => { onSwitch('traditional'); setOpen(false); }}
+            title="Classic grading-house layout with a DCM purple frame."
             className={`w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors ${
               labelStyle === 'traditional' ? 'bg-purple-50 text-purple-700' : 'hover:bg-gray-50 text-gray-900'
             }`}

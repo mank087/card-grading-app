@@ -13,7 +13,7 @@ import type { SavedCustomStyle } from '@/lib/labelPresets'
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import type { CustomLabelConfig } from '@/lib/labelPresets'
-import { styleOptionsForHolder, type HolderType, type SlabSizeId } from './wizardTypes'
+import { styleOptionsForHolder, isPristineClassic, type HolderType, type SlabSizeId } from './wizardTypes'
 import CardSwiper from './CardSwiper'
 import WizardPreview from './WizardPreview'
 
@@ -157,6 +157,7 @@ export function StepStyle({
                 config={config}
                 holder={holder}
                 orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant}
+                classic={isPristineClassic(styleId, config)}
               />
             )}
             caption={(i) => (

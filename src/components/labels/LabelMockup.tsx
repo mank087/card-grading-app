@@ -16,6 +16,7 @@
 
 import { useState } from 'react'
 import type { LabelTypeInfo } from '@/lib/labelPresets'
+import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
 
 interface LabelMockupProps {
   card: {
@@ -51,6 +52,25 @@ interface LabelMockupProps {
    * Only honoured by the One-Touch and Toploader mockups.
    */
   labelImages?: { front?: string | null; back?: string | null } | null
+}
+
+/**
+ * The built-in 'traditional' label is the Classic grading label (Sept 2026).
+ * LabelMockup only ever renders built-in LABEL_TYPES, so 'traditional' here is
+ * always the built-in id, never a customer's saved custom slot (which keeps
+ * the old light design it was designed on).
+ */
+function classicDataFrom(labelProps: LabelMockupProps['labelProps'], qrDataUrl = '') {
+  return {
+    primaryName: labelProps.displayName,
+    contextLine: labelProps.setLineText || '',
+    features: labelProps.features || [],
+    serial: labelProps.serial,
+    grade: labelProps.grade,
+    condition: labelProps.condition,
+    isAlteredAuthentic: labelProps.isAlteredAuthentic,
+    qrCodeDataUrl: qrDataUrl,
+  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
 }
 
 function gradeStr(grade: number | null, alt?: boolean): string {
@@ -121,6 +141,12 @@ function SlabFrontLabel({ labelProps, style }: {
   const isModern = style === 'modern'
   const condition = labelProps.isAlteredAuthentic && labelProps.grade === null
     ? 'AUTHENTIC' : (labelProps.condition || '').toUpperCase()
+
+  // Built-in Traditional is the Classic grading label — the same SVG the
+  // print PDF mirrors, so the holder mockup cannot drift from the paper.
+  if (!isModern) {
+    return <ClassicLabelPreview data={classicDataFrom(labelProps)} side="front" className="w-full" />
+  }
 
   // All font sizes as % of container width for proper scaling
   // At 146px wide (73% of 200px slab), these produce readable text
@@ -240,6 +266,20 @@ function SlabBackLabel({ labelProps, backLabelProps, style }: {
   const condition = labelProps.isAlteredAuthentic && labelProps.grade === null
     ? 'AUTHENTIC' : (labelProps.condition || '').toUpperCase()
   const subScores = backLabelProps?.subScores
+  // Declared above the Classic early return so the hook order never changes.
+  const classicQr = useClassicQrDataUrl(isModern ? null : backLabelProps?.qrCodeUrl)
+
+  if (!isModern) {
+    return (
+      <ClassicLabelPreview
+        data={classicDataFrom(labelProps, classicQr)}
+        side="back"
+        className="w-full"
+        qrDataUrl={classicQr}
+        verifyUrl={backLabelProps?.qrCodeUrl ?? null}
+      />
+    )
+  }
 
   return (
     <div
