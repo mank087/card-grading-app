@@ -102,3 +102,13 @@ public/email/slabs/
 /scripts/run-paired-accuracy-study.cjs
 /scripts/summarize-paired-accuracy-study.cjs
 /scripts/report-accuracy-study.cjs
+
+# Marketing render output (video frames, exports) stays local; only the docs are tracked.
+marketing/**
+!marketing/**/
+!marketing/**/*.md
+!marketing/package-refresh-*/**/*.tsx
+!marketing/package-refresh-*/**/*.cjs
+!marketing/package-refresh-*/**/*.ts
+tmp/
+supabase/.temp/
