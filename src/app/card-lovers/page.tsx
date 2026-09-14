@@ -1,6 +1,5 @@
 'use client'
 
-import { OfferCardSlider } from '@/components/design/OfferCardSlider'
 import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -149,12 +148,12 @@ export default function CardLoversPage() {
 
   return (
     <div className="dcm-brand dcm-offer-page">
-      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro"><div className="dcm-offer-intro-copy">
+      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro dcm-offer-intro--solo"><div className="dcm-offer-intro-copy">
         <p className="dcm-eyebrow">Card Lovers membership</p>
         <h1>For the collection<br />you keep coming back to.</h1>
         <p className="dcm-lead">Regular grading credits, exclusive label emblems, and member savings. Choose the billing period that fits your collection.</p>
         <div className="dcm-actions mt-6"><ActionLink href="#membership">Explore Membership</ActionLink><ActionLink href="/credits" variant="text">Compare All Plans</ActionLink></div>
-      </div><OfferCardSlider /></div></section>
+      </div></div></section>
 
       {/* Pricing Card - Single box with toggle */}
       <section id="membership" className="py-12 bg-white scroll-mt-20">

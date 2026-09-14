@@ -1,6 +1,5 @@
 'use client'
 
-import { OfferCardSlider } from '@/components/design/OfferCardSlider'
 import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -129,13 +128,13 @@ export default function VipPage() {
 
   return (
     <div className="dcm-brand dcm-offer-page">
-      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro"><div className="dcm-offer-intro-copy">
+      <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro dcm-offer-intro--solo"><div className="dcm-offer-intro-copy">
         <p className="dcm-eyebrow">One-time bulk value</p>
         <h1>Grade more cards.<br />Know their condition.</h1>
         <p className="dcm-lead">The VIP package: 150 grading credits and your own VIP label emblem. One purchase, ready whenever your collection is.</p>
         <div className="dcm-actions mt-6"><ActionLink href="#vip-package">Explore the VIP Package</ActionLink><ActionLink href="/credits" variant="text">Compare All Plans</ActionLink></div>
         {isVip && <p className="dcm-fineprint">Your VIP status is active. Purchase again whenever you need more credits.</p>}
-      </div><OfferCardSlider /></div></section>
+      </div></div></section>
 
       {/* Package Details */}
       <section id="vip-package" className="py-12 bg-white scroll-mt-20">

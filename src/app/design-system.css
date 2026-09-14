@@ -360,6 +360,9 @@
 }
 .dcm-offer-intro { display: grid; grid-template-columns: minmax(0,1fr) 220px; gap: 48px; align-items: center; text-align: left; }
 .dcm-offer-intro-copy .dcm-lead { margin-left: 0; }
+/* Hero without the card slider: the copy takes the full row. */
+.dcm-offer-intro--solo { grid-template-columns: minmax(0,1fr); }
+.dcm-offer-intro--solo .dcm-offer-intro-copy { max-width: 720px; }
 .dcm-offer-intro-copy .dcm-actions { justify-content: flex-start; }
 .dcm-offer-slider { width: 220px; justify-self: center; transform: translateX(-32px); }
 .dcm-offer-slider-stage { height: 365px; display: flex; align-items: center; justify-content: center; }
