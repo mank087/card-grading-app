@@ -126,6 +126,9 @@
 .dcm-plan { display: flex; flex-direction: column; border: 1px solid var(--dcm-border); border-radius: 16px; background: white; padding: 26px 22px; position: relative; }
 .dcm-plan--popular { border: 2px solid #9810fa; padding: 25px 21px; }
 .dcm-plan-badge { font-size: 10px; font-weight: 750; color: var(--dcm-purple-text); text-transform: uppercase; letter-spacing: .09em; min-height: 24px; }
+/* Text-free slab strip showing the credit count. Fluid: it scales with the plan card at every column count. */
+.dcm-plan-montage { border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.dcm-plan-montage img { width: 100%; height: auto; display: block; }
 .dcm-plan h3 { font-size: 24px; font-weight: 750; }
 .dcm-price { font-size: 42px; font-weight: 750; line-height: 1.2; letter-spacing: -.045em; margin-top: 18px; font-variant-numeric: tabular-nums; }
 .dcm-price-unit { font-size: 14px; font-family: var(--font-dcm-body), Arial, sans-serif; color: var(--dcm-muted); font-weight: 400; letter-spacing: 0; }

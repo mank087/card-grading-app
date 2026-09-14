@@ -5,6 +5,7 @@ import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession, getValidSession } from '@/lib/directAuth'
 
@@ -140,6 +141,15 @@ export default function VipPage() {
       <section id="vip-package" className="py-12 bg-white scroll-mt-20">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
+            <Image
+              src="/packages/dcm-package-vip.jpg"
+              alt="DCM VIP package: 150 grading credits for $99, shown as 150 Heritage slab illustrations"
+              width={1500}
+              height={1000}
+              sizes="(max-width: 1023px) 100vw, 1024px"
+              className="w-full h-auto rounded-2xl shadow-sm mb-8"
+              style={{ border: '1px solid #dfe3eb' }}
+            />
             <div className="grid md:grid-cols-2 gap-8 items-center">
               {/* Left: Package Card */}
               <div className="rounded-2xl p-8 text-gray-800 shadow-sm relative overflow-hidden" style={{ background: '#f6f7fa', border: '1px solid #dfe3eb' }}>

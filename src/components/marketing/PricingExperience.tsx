@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { pricingTiers, VIP_PACKAGE, CARD_LOVERS_PLANS, type PricingTier } from '@/lib/creditPackages'
 import { CardVisualRail } from '@/components/design/CardVisualRail'
 import { ActionButton, ActionLink, Icon, Notice, SectionHeading } from '@/components/design/Primitives'
+import PackageMontage, { type MontagePack } from '@/components/marketing/PackageMontage'
 
 export type PackId = 'basic' | 'pro' | 'elite' | 'vip'
 
@@ -104,6 +105,7 @@ export default function PricingExperience({ authenticated = null, balance = 0, b
       <div className="dcm-plans dcm-plans--trio">
         {pro && <article className={`dcm-plan ${highlightPack === 'pro' ? 'dcm-plan--popular' : ''}`} id="plan-pro">
           <p className="dcm-plan-badge">Most popular</p>
+          <div className="dcm-plan-montage"><PackageMontage pack="pro" priority /></div>
           <h3>{pro.name}</h3><p className="dcm-price">${pro.price.toFixed(2)}</p><p className="dcm-plan-meta">{pro.credits} credits · ${pro.perGradeCost.toFixed(2)} / grade</p>
           <div className="dcm-plan-benefits"><p>{pro.description}</p>{showBonus ? <p><strong>+{pro.bonusCredits} first-purchase bonus</strong><br />{pro.credits + pro.bonusCredits} total credits on your eligible first purchase.</p> : <p>Full report and labels included with every grade.</p>}<p>One-time purchase. Nothing recurring.</p></div>
           {packButton(pro, 'primary')}
@@ -111,6 +113,7 @@ export default function PricingExperience({ authenticated = null, balance = 0, b
 
         <article className="dcm-plan dcm-plan--featured" id="plan-card-lovers">
           <p className="dcm-plan-badge">Best for regular grading</p>
+          <div className="dcm-plan-montage"><PackageMontage pack={annual ? 'card-lovers-annual' : 'card-lovers-monthly'} /></div>
           <h3>Card Lovers</h3>
           <div className="dcm-segmented" role="group" aria-label="Membership billing period"><button type="button" aria-pressed={annual} onClick={() => onPlanChange?.('annual')}>Annual</button><button type="button" aria-pressed={!annual} onClick={() => onPlanChange?.('monthly')}>Monthly</button></div>
           <div aria-live="polite">
@@ -133,6 +136,7 @@ export default function PricingExperience({ authenticated = null, balance = 0, b
 
         <article className={`dcm-plan ${highlightPack === 'vip' ? 'dcm-plan--popular' : ''}`} id="plan-vip">
           <p className="dcm-plan-badge">One-time bulk value</p>
+          <div className="dcm-plan-montage"><PackageMontage pack="vip" /></div>
           <h3>{VIP_PACKAGE.name}</h3><p className="dcm-price">${VIP_PACKAGE.price}</p><p className="dcm-plan-meta">{VIP_PACKAGE.credits} credits · ${VIP_PACKAGE.perGradeCost.toFixed(2)} / grade</p>
           <div className="dcm-plan-benefits"><p>{VIP_PACKAGE.description}. More room for a whole collection.</p><p><strong>VIP diamond emblem</strong><br />Included on your card labels.</p><Link className="underline underline-offset-4" href="/vip">Explore VIP benefits</Link></div>
           <ActionButton variant="secondary" disabled={busy} onClick={onVipPurchase}>{signedIn ? purchaseLabel('vip', 'Get VIP Package') : 'Get VIP Package'}</ActionButton>
@@ -143,6 +147,7 @@ export default function PricingExperience({ authenticated = null, balance = 0, b
       <div className="dcm-plans dcm-plans--pair dcm-pack-compact" aria-labelledby="all-packs-heading">
         {compactTiers.map(tier => <article className={`dcm-plan ${highlightPack === tier.id ? 'dcm-plan--popular' : ''}`} key={tier.id} id={`plan-${tier.id}`}>
           <p className="dcm-plan-badge">{tier.id === 'basic' ? 'Start small' : 'Build your collection'}</p>
+          <div className="dcm-plan-montage"><PackageMontage pack={tier.id as MontagePack} /></div>
           <h3>{tier.name}</h3><p className="dcm-price">${tier.price.toFixed(2)}</p><p className="dcm-plan-meta">{tier.credits} credit{tier.credits === 1 ? '' : 's'} · ${tier.perGradeCost.toFixed(2)} / grade</p>
           <div className="dcm-plan-benefits"><p>{tier.description}</p>{showBonus && <p><strong>+{tier.bonusCredits} first-purchase bonus</strong> on your eligible first purchase.</p>}</div>
           {packButton(tier, 'secondary')}

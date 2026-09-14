@@ -8,8 +8,10 @@
 
 import Link from 'next/link';
 import { pricingTiers, VIP_PACKAGE } from '@/lib/creditPackages';
+import PackageMontage, { type MontagePack } from '@/components/marketing/PackageMontage';
 
 interface Card {
+  pack: MontagePack;
   name: string;
   price: string;
   credits: string;
@@ -23,6 +25,7 @@ const money = (n: number) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
 export default function CreditPacksShowcase() {
   const cards: Card[] = [
     {
+      pack: 'vip',
       name: VIP_PACKAGE.name,
       price: money(VIP_PACKAGE.price),
       credits: String(VIP_PACKAGE.credits),
@@ -31,6 +34,7 @@ export default function CreditPacksShowcase() {
       popular: true,
     },
     ...pricingTiers.map(t => ({
+      pack: t.id as MontagePack,
       name: t.name,
       price: money(t.price),
       credits: String(t.credits),
@@ -55,6 +59,9 @@ export default function CreditPacksShowcase() {
                 Best Value
               </span>
             )}
+            <span className="block rounded-lg overflow-hidden mb-3">
+              <PackageMontage pack={tier.pack} className="w-full h-auto block" />
+            </span>
             <span className="block font-bold text-gray-900 text-lg mb-1">{tier.name}</span>
             <span className="block text-3xl font-bold text-gray-900 mb-1">{tier.price}</span>
             <span className="block text-gray-500 text-sm mb-3">

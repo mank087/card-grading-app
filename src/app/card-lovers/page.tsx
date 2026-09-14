@@ -144,6 +144,9 @@ export default function CardLoversPage() {
     }
   }
 
+  // Which package sheet to show: the live plan when subscribed, otherwise the toggle
+  const sheetPlan = subscriptionStatus?.isActive ? subscriptionStatus.plan : selectedPlan
+
   return (
     <div className="dcm-brand dcm-offer-page">
       <section className="dcm-price-intro"><div className="dcm-container dcm-offer-intro"><div className="dcm-offer-intro-copy">
@@ -156,7 +159,31 @@ export default function CardLoversPage() {
       {/* Pricing Card - Single box with toggle */}
       <section id="membership" className="py-12 bg-white scroll-mt-20">
         <div className="container mx-auto px-4">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
+            {/* Package sheet, follows the plan toggle (or the active subscription) */}
+            <div>
+              <Image
+                src="/packages/dcm-package-card-lovers-annual.jpg"
+                alt="DCM Card Lovers Annual membership: 900 grading credits a year for $449"
+                width={1500}
+                height={1000}
+                sizes="(max-width: 767px) 100vw, 50vw"
+                className={`w-full h-auto rounded-2xl shadow-sm ${sheetPlan === 'annual' ? '' : 'hidden'}`}
+                style={{ border: '1px solid #dfe3eb' }}
+              />
+              <Image
+                src="/packages/dcm-package-card-lovers-monthly.jpg"
+                alt="DCM Card Lovers Monthly membership: 70 grading credits a month for $49.99"
+                width={1500}
+                height={1000}
+                sizes="(max-width: 767px) 100vw, 50vw"
+                className={`w-full h-auto rounded-2xl shadow-sm ${sheetPlan === 'monthly' ? '' : 'hidden'}`}
+                style={{ border: '1px solid #dfe3eb' }}
+              />
+            </div>
+
+            <div>
             <div className={`relative rounded-2xl shadow-sm overflow-hidden ${
               subscriptionStatus?.isActive
                 ? 'bg-green-50 border-2 border-green-300'
@@ -373,6 +400,8 @@ export default function CardLoversPage() {
             <p className="text-gray-500 text-xs mt-4 text-center italic">
               Note: for existing Founders, Founder and Card Lover discounts do not stack. If you hold both statuses, you&apos;ll receive one 20% discount on credit purchases. The Founders program itself closed to new members in February 2026.
             </p>
+            </div>
+            </div>
           </div>
         </div>
       </section>
