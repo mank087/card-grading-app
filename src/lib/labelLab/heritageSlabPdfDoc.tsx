@@ -444,7 +444,7 @@ function LogoBlock({ i, showRules = true, fit, geom }: { i: HeritageInputs; show
  * the lab doc below. Fitting, the accent-bar yield rule, and the theme all come
  * from heritageLayout so the Studio's SVG preview renders the same geometry.
  */
-export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+export function HeritageFront({ i, chip, bare = false }: { i: HeritageInputs; chip: GradeChip; bare?: boolean }) {
   const T = heritageTheme(!!i.printHardened)
   const geom = heritageGeometry(i.design)
   // House type case (enterprise design only) applied BEFORE fitting, so the
@@ -460,7 +460,7 @@ export function HeritageFront({ i, chip }: { i: HeritageInputs; chip: GradeChip 
     && heritageRulesFit(fit, heritageMarkBox(i.logoScale ?? 1, fit, geom))
   const TX = geom.text
   return (
-    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
+    <View style={bare ? { width: LABEL_W, height: LABEL_H, position: 'relative' } : { width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <Frame geom={geom} i={i} id="f" />
 
       {/* Text block — fitted, never truncated. Real card names run to 119
@@ -571,7 +571,7 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
   )
 }
 
-export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }) {
+export function HeritageBack({ i, chip, bare = false }: { i: HeritageInputs; chip: GradeChip; bare?: boolean }) {
   const T = heritageTheme(!!i.printHardened)
   const geom = heritageGeometry(i.design)
   const sg = i.subgrades
@@ -677,7 +677,7 @@ export function HeritageBack({ i, chip }: { i: HeritageInputs; chip: GradeChip }
     </>
   )
   return (
-    <View style={{ width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
+    <View style={bare ? { width: LABEL_W, height: LABEL_H, position: 'relative' } : { width: LABEL_W, height: LABEL_H, backgroundColor: T.field, position: 'relative', border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <Frame geom={geom} i={i} id="b" />
       {stockContent ? body : (
         <View style={{

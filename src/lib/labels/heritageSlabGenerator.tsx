@@ -262,15 +262,31 @@ const resolveDims = (d?: HeritageDims): HeritageDims =>
   d && d.widthIn > 0 && d.heightIn > 0 ? d : STD_DIMS
 const dimsLabel = (d: HeritageDims) => `${d.widthIn}" × ${d.heightIn}"`
 
-/** A standard-authored Heritage panel scaled to the target physical size. */
+/**
+ * A standard-authored Heritage panel scaled to the target physical size.
+ *
+ * The field and edge border are drawn HERE, unscaled, at the true label size,
+ * and the panel renders `bare` (no background, no border) inside the scale
+ * transform. react-pdf 4.5 applies a `scale(sx, sy)` transform correctly to a
+ * node's children but shrinks the node's OWN background and border by the
+ * Y factor twice, so a panel that painted its own chrome came out with a
+ * border box 0.04" shorter than the label while its contents landed at the
+ * right (full) height. On a Zion Mag Pro fold-over that put the back-panel
+ * serial and the front logo row on or past the drawn border (reported
+ * 2026-09-14). Standard-size panels are untouched.
+ */
 function ScaledPanel({ d, children }: { d: HeritageDims; children: React.ReactNode }) {
   if (isStdDims(d)) return <>{children}</>
   const sx = d.widthIn / STD_DIMS.widthIn
   const sy = d.heightIn / STD_DIMS.heightIn
+  const first = React.Children.toArray(children)[0] as React.ReactElement<{ i?: HeritageInputs }> | undefined
+  const T = heritageTheme(!!first?.props?.i?.printHardened)
   return (
-    <View style={{ width: d.widthIn * INCH, height: d.heightIn * INCH, overflow: 'hidden' }}>
+    <View style={{ width: d.widthIn * INCH, height: d.heightIn * INCH, overflow: 'hidden', backgroundColor: T.field, border: `${T.edgeWidth}pt solid ${T.edge}` }}>
       <View style={{ width: LABEL_W, height: LABEL_H, transform: `scale(${sx}, ${sy})`, transformOrigin: '0 0' }}>
-        {children}
+        {React.Children.map(children, child =>
+          React.isValidElement(child) ? React.cloneElement(child as React.ReactElement<{ bare?: boolean }>, { bare: true }) : child,
+        )}
       </View>
     </View>
   )
