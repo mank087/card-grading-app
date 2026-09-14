@@ -39,6 +39,7 @@ const GUEST_RESOURCES = [
   { href: '/pop', label: 'Pop Report' },
   { href: '/blog', label: 'Blog' },
   { href: '/enterprise', label: 'Enterprise' },
+  { href: '/affiliates', label: 'Affiliates' },
   { href: '/#get-the-app', label: 'Get the App' },
 ] as const;
 
@@ -68,6 +69,7 @@ const MEMBER_RESOURCES = [
   { href: '/faq', label: 'FAQ' },
   { href: '/shop', label: 'Recommended Products' },
   { href: '/enterprise', label: 'Enterprise' },
+  { href: '/affiliates', label: 'Affiliates' },
   { href: '/#get-the-app', label: 'Get the App' },
 ] as const;
 
