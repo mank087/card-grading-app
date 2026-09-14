@@ -82,6 +82,33 @@ export const metadata: Metadata = completeMetadata({
  * OfferCatalog carrying every purchasable option with its real USD price, so
  * the per-grade cost never has to be guessed at from prose.
  */
+/**
+ * Merchant-listing fields Google asks for on every Product offer (GSC,
+ * 2026-09-14: "Missing field image" critical, return policy and shipping
+ * details non-critical). Credits are digital and delivered instantly, and
+ * the Terms of Service (section 7.2) make every payment nonrefundable, so
+ * the policy is "no returns" and shipping is free with zero transit time.
+ */
+const PRODUCT_IMAGE = 'https://dcmgrading.com/DCM-full-downloadable-report.png';
+
+const RETURN_POLICY = {
+  '@type': 'MerchantReturnPolicy',
+  applicableCountry: 'US',
+  returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
+  merchantReturnLink: 'https://dcmgrading.com/terms',
+};
+
+const DIGITAL_SHIPPING = {
+  '@type': 'OfferShippingDetails',
+  shippingRate: { '@type': 'MonetaryAmount', value: '0.00', currency: 'USD' },
+  shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'US' },
+  deliveryTime: {
+    '@type': 'ShippingDeliveryTime',
+    handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 0, unitCode: 'DAY' },
+    transitTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 0, unitCode: 'DAY' },
+  },
+};
+
 const pricingJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'OfferCatalog',
@@ -112,6 +139,7 @@ const pricingJsonLd = {
         '@type': 'Product',
         name: `DCM Grading ${p.name}`,
         description: `${p.credits} card grades from DCM Optic. Each grade includes four subgrades, a written reason for every deduction, an image confidence letter and a printable label.`,
+        image: PRODUCT_IMAGE,
         brand: { '@type': 'Brand', name: 'DCM Grading' },
         // Google validates each Product node in isolation and requires one of
         // offers / review / aggregateRating on it (GSC "Merchant listings"
@@ -122,6 +150,8 @@ const pricingJsonLd = {
           priceCurrency: 'USD',
           availability: 'https://schema.org/InStock',
           url: 'https://dcmgrading.com/credits',
+          hasMerchantReturnPolicy: RETURN_POLICY,
+          shippingDetails: DIGITAL_SHIPPING,
         },
       },
     })),
