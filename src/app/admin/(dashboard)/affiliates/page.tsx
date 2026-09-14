@@ -11,6 +11,8 @@ interface Affiliate {
   status: 'active' | 'paused' | 'deactivated'
   commission_rate: number
   commission_type: string
+  reward_credits?: number | null
+  discount_percent?: number | null
   total_referrals: number
   total_commission_earned: number
   total_commission_paid: number
@@ -50,6 +52,34 @@ interface Commission {
   created_at: string
 }
 
+interface AffiliateApplication {
+  id: string
+  name: string
+  email: string
+  channel: string | null
+  channel_url: string | null
+  audience_size: string | null
+  promotion_plan: string | null
+  status: 'new' | 'approved' | 'declined'
+  admin_notes: string | null
+  affiliate_id: string | null
+  created_at: string
+}
+
+interface AffiliatePrefill {
+  name: string
+  email: string
+  code: string
+  applicationId: string
+}
+
+/** Suggested code: uppercased first word of the name plus 15, e.g. SARAH15 */
+function suggestCode(name: string): string {
+  const first = (name || '').trim().split(/\s+/)[0] || 'PARTNER'
+  const cleaned = first.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  return (cleaned || 'PARTNER') + '15'
+}
+
 export default function AdminAffiliatesPage() {
   return (
     <AdminAuthGuard>
@@ -62,6 +92,9 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [addPrefill, setAddPrefill] = useState<AffiliatePrefill | null>(null)
+  const [applications, setApplications] = useState<AffiliateApplication[]>([])
+  const [loadingApplications, setLoadingApplications] = useState(true)
   const [selectedAffiliate, setSelectedAffiliate] = useState<AffiliateDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -75,6 +108,7 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
 
   useEffect(() => {
     loadAffiliates()
+    loadApplications()
   }, [])
 
   useEffect(() => {
@@ -94,6 +128,52 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
       setError('Failed to load affiliates')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadApplications = async () => {
+    try {
+      setLoadingApplications(true)
+      const res = await fetch('/api/admin/affiliates/applications?status=new')
+      const data = await res.json()
+      setApplications(data.applications || [])
+    } catch (err) {
+      setError('Failed to load affiliate applications')
+    } finally {
+      setLoadingApplications(false)
+    }
+  }
+
+  const openApprove = (app: AffiliateApplication) => {
+    setAddPrefill({
+      name: app.name,
+      email: app.email,
+      code: suggestCode(app.name),
+      applicationId: app.id,
+    })
+    setShowAddModal(true)
+  }
+
+  const declineApplication = async (app: AffiliateApplication) => {
+    const note = window.prompt(`Decline ${app.name}. Add a short internal note (optional):`, '')
+    if (note === null) return
+    try {
+      setActionLoading(app.id)
+      const res = await fetch(`/api/admin/affiliates/applications/${app.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'declined', admin_notes: note || null }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to decline application')
+      }
+      setSuccessMessage(`Declined ${app.name}`)
+      loadApplications()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to decline application')
+    } finally {
+      setActionLoading(null)
     }
   }
 
@@ -203,18 +283,11 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Affiliates</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage affiliate partners and commissions</p>
+          <p className="text-gray-500 text-sm mt-1">Review applications and manage affiliate partners</p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={approveCommissions}
-            disabled={actionLoading === 'approve'}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-          >
-            {actionLoading === 'approve' ? 'Approving...' : 'Approve Pending'}
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setAddPrefill(null); setShowAddModal(true) }}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
           >
             + Add Affiliate
@@ -235,6 +308,95 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
         </div>
       )}
 
+      {/* Applications */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Applications{applications.length > 0 ? ` (${applications.length} new)` : ''}
+          </h2>
+          <button
+            onClick={loadApplications}
+            className="text-xs px-2 py-1 rounded border hover:bg-gray-100"
+          >
+            Refresh
+          </button>
+        </div>
+        {loadingApplications ? (
+          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-500 text-sm">
+            Loading applications...
+          </div>
+        ) : applications.length === 0 ? (
+          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-500 text-sm">
+            No new applications.
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Channel</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Audience</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {applications.map((app) => (
+                  <tr key={app.id} className="hover:bg-gray-50 align-top">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900 text-sm">{app.name}</div>
+                      <div className="text-xs text-gray-500">{app.email}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {app.channel_url ? (
+                        <a
+                          href={app.channel_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:underline"
+                        >
+                          {app.channel || app.channel_url}
+                        </a>
+                      ) : (
+                        app.channel || '-'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{app.audience_size || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                      <span title={app.promotion_plan || ''}>
+                        {app.promotion_plan
+                          ? app.promotion_plan.length > 120
+                            ? app.promotion_plan.slice(0, 120) + '...'
+                            : app.promotion_plan
+                          : '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(app.created_at)}</td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => openApprove(app)}
+                        className="text-xs px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 mr-2"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => declineApplication(app)}
+                        disabled={actionLoading === app.id}
+                        className="text-xs px-3 py-1 rounded border hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Affiliates Table */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading affiliates...</div>
@@ -250,11 +412,12 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Reward credits</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Referrals</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Earned</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pending</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy earned</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy paid</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy pending</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -273,11 +436,10 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                     <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono">{aff.code}</code>
                   </td>
                   <td className="px-4 py-3">{statusBadge(aff.status)}</td>
-                  <td className="px-4 py-3 text-right text-sm">
-                    {aff.commission_type === 'percentage'
-                      ? `${(aff.commission_rate * 100).toFixed(0)}%`
-                      : formatCurrency(aff.commission_rate)}
+                  <td className="px-4 py-3 text-right text-sm font-medium">
+                    {aff.reward_credits ?? 20} credits
                   </td>
+                  <td className="px-4 py-3 text-right text-sm">{aff.discount_percent ?? 15}%</td>
                   <td className="px-4 py-3 text-right text-sm">{aff.total_referrals}</td>
                   <td className="px-4 py-3 text-right text-sm font-medium">{formatCurrency(aff.total_commission_earned)}</td>
                   <td className="px-4 py-3 text-right text-sm text-green-600">{formatCurrency(aff.total_commission_paid)}</td>
@@ -299,6 +461,23 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
           </table>
         </div>
       )}
+
+      {/* Legacy cash commissions (pre-credit program) */}
+      <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Legacy cash commissions</h2>
+          <p className="text-gray-500 text-sm mt-1">
+            Historical percentage commissions. The current program pays grading credits, not cash.
+          </p>
+        </div>
+        <button
+          onClick={approveCommissions}
+          disabled={actionLoading === 'approve'}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+        >
+          {actionLoading === 'approve' ? 'Approving...' : 'Approve Pending'}
+        </button>
+      </div>
 
       {/* Affiliate Detail Panel */}
       {(selectedAffiliate || loadingDetail) && (
@@ -414,10 +593,13 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
       {/* Add Affiliate Modal */}
       {showAddModal && (
         <AddAffiliateModal
-          onClose={() => setShowAddModal(false)}
+          prefill={addPrefill}
+          onClose={() => { setShowAddModal(false); setAddPrefill(null) }}
           onSuccess={() => {
             setShowAddModal(false)
+            setAddPrefill(null)
             loadAffiliates()
+            loadApplications()
             setSuccessMessage('Affiliate created successfully')
           }}
         />
@@ -469,11 +651,21 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
 // Add Affiliate Modal
 // ============================================================================
 
-function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function AddAffiliateModal({
+  prefill,
+  onClose,
+  onSuccess,
+}: {
+  prefill?: AffiliatePrefill | null
+  onClose: () => void
+  onSuccess: () => void
+}) {
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    code: '',
+    name: prefill?.name || '',
+    email: prefill?.email || '',
+    code: prefill?.code || '',
+    reward_credits: '20',
+    discount_percent: '15',
     commission_rate: '20',
     commission_type: 'percentage',
     payout_method: 'manual',
@@ -496,6 +688,9 @@ function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSucc
           name: form.name,
           email: form.email,
           code: form.code,
+          reward_credits: parseInt(form.reward_credits, 10) || 20,
+          discount_percent: parseInt(form.discount_percent, 10) || 15,
+          ...(prefill?.applicationId ? { application_id: prefill.applicationId } : {}),
           commission_rate: parseFloat(form.commission_rate) / 100,
           commission_type: form.commission_type,
           payout_method: form.payout_method,
@@ -521,7 +716,7 @@ function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSucc
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">Add New Affiliate</h3>
+          <h3 className="text-lg font-bold">{prefill ? 'Approve Applicant' : 'Add New Affiliate'}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -577,7 +772,35 @@ function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSucc
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reward Credits</label>
+              <input
+                type="number"
+                value={form.reward_credits}
+                onChange={(e) => setForm({ ...form, reward_credits: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                min="0"
+                step="1"
+              />
+              <p className="text-xs text-gray-400 mt-1">Credits earned per new paying customer</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer Discount (%)</label>
+              <input
+                type="number"
+                value={form.discount_percent}
+                onChange={(e) => setForm({ ...form, discount_percent: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                min="0"
+                max="100"
+                step="1"
+              />
+              <p className="text-xs text-gray-400 mt-1">Off the referred customer&apos;s first purchase</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type (legacy)</label>
               <select
                 value={form.commission_type}
                 onChange={(e) => setForm({ ...form, commission_type: e.target.value })}
@@ -589,7 +812,7 @@ function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSucc
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Commission Rate {form.commission_type === 'percentage' ? '(%)' : '($)'}
+                Commission Rate (legacy) {form.commission_type === 'percentage' ? '(%)' : '($)'}
               </label>
               <input
                 type="number"
@@ -650,7 +873,7 @@ function AddAffiliateModal({ onClose, onSuccess }: { onClose: () => void; onSucc
               disabled={submitting}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
             >
-              {submitting ? 'Creating...' : 'Create Affiliate'}
+              {submitting ? 'Creating...' : prefill ? 'Approve and Create' : 'Create Affiliate'}
             </button>
           </div>
         </form>

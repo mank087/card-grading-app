@@ -4,6 +4,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getUserCredits } from '@/lib/credits';
 import crypto from 'crypto';
 
 // Types
@@ -26,6 +27,10 @@ export interface Affiliate {
   total_referrals: number;
   total_commission_earned: number;
   total_commission_paid: number;
+  /** Grading credits granted to this affiliate per referred first purchase. */
+  reward_credits: number;
+  /** Percent off the referred customer gets on their first purchase. */
+  discount_percent: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -47,6 +52,10 @@ export interface AffiliateCommission {
   paid_at: string | null;
   payout_reference: string | null;
   reversal_reason: string | null;
+  /** Grading credits granted for this referral (0 for legacy cash commissions). */
+  reward_credits: number;
+  /** credit_transactions.id of the reward grant, so a reversal can be traced. */
+  credit_transaction_id: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -270,6 +279,223 @@ export async function createCommission(
   return { success: true, commission: commission as AffiliateCommission };
 }
 
+// ============================================================================
+// Referral Rewards (credits model)
+// ============================================================================
+
+/** Fallbacks matching the column defaults in 20260915_affiliate_rewards.sql */
+export const DEFAULT_REWARD_CREDITS = 20;
+export const DEFAULT_DISCOUNT_PERCENT = 15;
+
+/**
+ * Add grading credits to a user's balance and write the ledger row, using the
+ * same user_credits + credit_transactions convention the Stripe webhook uses
+ * for purchases (see addCredits / refundGradeCredit in src/lib/credits.ts).
+ * Kept local to this module because addCredits hardcodes type 'purchase' and
+ * bumps total_purchased, neither of which is right for an earned reward.
+ */
+async function applyCreditDelta(
+  userId: string,
+  delta: number,
+  type: 'referral_reward' | 'referral_reward_reversal',
+  description: string,
+  stripeSessionId?: string | null
+): Promise<{ success: boolean; creditTransactionId?: string; newBalance?: number; error?: string }> {
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, error: 'No credit record for user ' + userId };
+  }
+
+  // Never take a balance below zero on a clawback.
+  const newBalance = Math.max(0, credits.balance + delta);
+  const appliedDelta = newBalance - credits.balance;
+
+  if (appliedDelta === 0) {
+    return { success: true, newBalance };
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('user_credits')
+    .update({ balance: newBalance })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('[Affiliate] Error updating affiliate credit balance:', updateError);
+    return { success: false, error: updateError.message };
+  }
+
+  const { data: tx, error: txError } = await supabaseAdmin
+    .from('credit_transactions')
+    .insert({
+      user_id: userId,
+      type,
+      amount: appliedDelta,
+      balance_after: newBalance,
+      description: description.slice(0, 250),
+      stripe_session_id: stripeSessionId || null,
+    })
+    .select('id')
+    .single();
+
+  if (txError) {
+    // Balance already moved; audit row is incomplete but do not retry and
+    // double-apply the delta.
+    console.error('[Affiliate] Failed to record referral credit transaction:', txError);
+    return { success: true, newBalance };
+  }
+
+  return { success: true, creditTransactionId: tx?.id as string | undefined, newBalance };
+}
+
+interface GrantReferralRewardOptions {
+  referredUserId: string;
+  sessionId: string;
+  orderAmount: number;
+  stripePaymentIntentId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Grant an affiliate their credit reward for a referred customer's first paid
+ * purchase. Replaces createCommission in the credits model.
+ *
+ * Idempotent on the Stripe session id, and still blocks self-referrals and a
+ * second reward for the same referred user. Credits are granted instantly, so
+ * the row is written with commission_amount 0, status 'paid' and paid_at set.
+ * When the affiliate has no linked account the row is recorded as 'pending'
+ * with the credits owed, so an admin can link the account and grant later.
+ */
+export async function grantReferralReward(
+  affiliate: Affiliate,
+  options: GrantReferralRewardOptions
+): Promise<{
+  success: boolean;
+  commission?: AffiliateCommission;
+  creditsGranted?: number;
+  skipped?: string;
+  error?: string;
+}> {
+  const { referredUserId, sessionId, orderAmount, stripePaymentIntentId, metadata } = options;
+
+  if (!affiliate || affiliate.status !== 'active') {
+    return { success: false, error: 'Affiliate not found or inactive' };
+  }
+
+  // FRAUD CHECK 1: Self-referral blocking
+  if (affiliate.user_id && affiliate.user_id === referredUserId) {
+    console.log(`[Affiliate] Self-referral blocked: affiliate ${affiliate.code}, user ${referredUserId}`);
+    return { success: true, skipped: 'self_referral' };
+  }
+
+  // IDEMPOTENCY: same duplicate-session guard shape as createCommission, so a
+  // Stripe webhook retry cannot grant the credits twice.
+  const { data: existingForSession } = await supabaseAdmin
+    .from('affiliate_commissions')
+    .select('id')
+    .eq('stripe_session_id', sessionId)
+    .neq('status', 'reversed')
+    .limit(1);
+
+  if (existingForSession && existingForSession.length > 0) {
+    console.log(`[Affiliate] Duplicate session blocked: affiliate ${affiliate.code}, session ${sessionId}`);
+    return { success: true, skipped: 'duplicate_session' };
+  }
+
+  // FRAUD CHECK 2: One reward per referred user per affiliate
+  const { data: existingForUser } = await supabaseAdmin
+    .from('affiliate_commissions')
+    .select('id')
+    .eq('affiliate_id', affiliate.id)
+    .eq('referred_user_id', referredUserId)
+    .neq('status', 'reversed')
+    .limit(1);
+
+  if (existingForUser && existingForUser.length > 0) {
+    console.log(`[Affiliate] Duplicate attribution blocked: affiliate ${affiliate.code}, user ${referredUserId}`);
+    return { success: true, skipped: 'duplicate_attribution' };
+  }
+
+  const rewardCredits = affiliate.reward_credits ?? DEFAULT_REWARD_CREDITS;
+  const now = new Date().toISOString();
+
+  const { data: commission, error: insertError } = await supabaseAdmin
+    .from('affiliate_commissions')
+    .insert({
+      affiliate_id: affiliate.id,
+      referred_user_id: referredUserId,
+      stripe_session_id: sessionId,
+      stripe_payment_intent_id: stripePaymentIntentId || null,
+      order_amount: orderAmount,
+      net_amount: orderAmount,
+      commission_rate: 0,
+      commission_amount: 0,
+      reward_credits: rewardCredits,
+      status: 'pending',
+      metadata: metadata || {},
+    })
+    .select()
+    .single();
+
+  if (insertError || !commission) {
+    console.error('[Affiliate] Error recording referral reward:', insertError);
+    return { success: false, error: insertError?.message || 'Insert failed' };
+  }
+
+  // Count the referral regardless of whether the credits could land yet.
+  await supabaseAdmin
+    .from('affiliates')
+    .update({
+      total_referrals: (affiliate.total_referrals || 0) + 1,
+      updated_at: now,
+    })
+    .eq('id', affiliate.id);
+
+  if (!affiliate.user_id) {
+    console.warn(
+      `[Affiliate] No linked account for affiliate ${affiliate.code}; ${rewardCredits} reward credits recorded as pending on commission ${commission.id}`
+    );
+    return { success: true, commission: commission as AffiliateCommission, creditsGranted: 0 };
+  }
+
+  const grant = await applyCreditDelta(
+    affiliate.user_id,
+    rewardCredits,
+    'referral_reward',
+    `Referral reward: ${rewardCredits} credits for a new customer (code ${affiliate.code})`,
+    sessionId
+  );
+
+  if (!grant.success) {
+    console.error(
+      `[Affiliate] Reward credit grant failed for affiliate ${affiliate.code}, commission ${commission.id}:`,
+      grant.error
+    );
+    return { success: true, commission: commission as AffiliateCommission, creditsGranted: 0 };
+  }
+
+  const { data: paidCommission } = await supabaseAdmin
+    .from('affiliate_commissions')
+    .update({
+      status: 'paid',
+      paid_at: now,
+      credit_transaction_id: grant.creditTransactionId || null,
+      updated_at: now,
+    })
+    .eq('id', commission.id)
+    .select()
+    .single();
+
+  console.log(
+    `[Affiliate] Referral reward granted: ${rewardCredits} credits to affiliate ${affiliate.code}, session ${sessionId}`
+  );
+
+  return {
+    success: true,
+    commission: (paidCommission || commission) as AffiliateCommission,
+    creditsGranted: rewardCredits,
+  };
+}
+
 /**
  * Batch approve all commissions that have passed their hold period
  */
@@ -346,6 +572,25 @@ export async function reverseCommission(
         updated_at: now,
       })
       .eq('id', commission.affiliate_id);
+
+    // Credits model: claw the reward credits back out of the affiliate's
+    // balance. Never below zero (they may already have graded with them).
+    const rewardCredits = commission.reward_credits || 0;
+    if (rewardCredits > 0 && affiliate.user_id) {
+      const clawback = await applyCreditDelta(
+        affiliate.user_id,
+        -rewardCredits,
+        'referral_reward_reversal',
+        `Referral reward reversed: ${rewardCredits} credits (code ${affiliate.code}, ${reason})`,
+        commission.stripe_session_id || null
+      );
+      if (!clawback.success) {
+        console.error(
+          `[Affiliate] Reward clawback failed for affiliate ${affiliate.code}, commission ${commission.id}:`,
+          clawback.error
+        );
+      }
+    }
   }
 
   console.log(`[Affiliate] Commission reversed: ${commission.id}, reason: ${reason}`);

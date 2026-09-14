@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
+import ReferralPartnerCard from '@/components/account/ReferralPartnerCard'
 
 type AccountStats = {
   totalCards: number
@@ -934,6 +935,9 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* Referral partner (affiliate): renders only for approved partners */}
+        <ReferralPartnerCard />
 
         {/* Label Style Settings */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">

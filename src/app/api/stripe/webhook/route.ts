@@ -20,7 +20,7 @@ import { depositOrgCredits, resetOrgMonthlyCredits, getOrgById } from '@/lib/org
 import {
   getAffiliateByCode,
   getAffiliateByPromotionCode,
-  createCommission,
+  grantReferralReward,
   reverseCommission,
 } from '@/lib/affiliates';
 import { createClient } from '@supabase/supabase-js';
@@ -879,8 +879,33 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 /**
+ * Has this user paid us before? Counts 'purchase' ledger rows for the user,
+ * excluding the session being processed (the purchase row for this session is
+ * written before attribution runs). Referral rewards are first-purchase only.
+ */
+async function hasPriorPaidPurchase(userId: string, sessionId: string): Promise<boolean> {
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('id, stripe_session_id')
+    .eq('user_id', userId)
+    .eq('type', 'purchase')
+    .limit(50);
+
+  if (error) {
+    console.error('[Affiliate] Error checking prior purchases:', error.message);
+    // Fail closed: do not hand out a reward we cannot justify.
+    return true;
+  }
+
+  return (data || []).some(row => row.stripe_session_id !== sessionId);
+}
+
+/**
  * Process affiliate attribution for a checkout session.
- * Looks up affiliate from metadata ref_code or Stripe promotion code.
+ * Looks up affiliate from metadata ref_code or Stripe promotion code, then
+ * grants the affiliate their credit reward if this is the referred user's
+ * first paid purchase.
  */
 async function processAffiliateAttribution(session: Stripe.Checkout.Session, userId: string) {
   try {
@@ -892,16 +917,25 @@ async function processAffiliateAttribution(session: Stripe.Checkout.Session, use
       affiliate = await getAffiliateByCode(refCode);
     }
 
-    // Method 2: Stripe promotion code used at checkout
-    if (!affiliate && session.total_details?.breakdown?.discounts) {
-      for (const discount of session.total_details.breakdown.discounts) {
-        const promoCodeId = typeof discount.discount?.promotion_code === 'string'
-          ? discount.discount.promotion_code
-          : (discount.discount?.promotion_code as any)?.id;
-        if (promoCodeId) {
-          affiliate = await getAffiliateByPromotionCode(promoCodeId);
-          if (affiliate) break;
+    // Method 2: Stripe promotion code typed (or auto-applied) at checkout.
+    // The webhook event payload never includes total_details.breakdown, so the
+    // session has to be re-fetched with the breakdown expanded.
+    if (!affiliate) {
+      try {
+        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['total_details.breakdown.discounts.discount.promotion_code'],
+        });
+        const discounts = fullSession.total_details?.breakdown?.discounts || [];
+        for (const discount of discounts) {
+          const promo = (discount.discount as any)?.promotion_code;
+          const promoCodeId = typeof promo === 'string' ? promo : promo?.id;
+          if (promoCodeId) {
+            affiliate = await getAffiliateByPromotionCode(promoCodeId);
+            if (affiliate) break;
+          }
         }
+      } catch (retrieveError) {
+        console.error('[Affiliate] Could not re-fetch session for discount breakdown:', retrieveError);
       }
     }
 
@@ -910,10 +944,25 @@ async function processAffiliateAttribution(session: Stripe.Checkout.Session, use
       return;
     }
 
-    // Calculate amounts
+    // Never reward a self-referral, by linked account or by email.
+    const buyerEmail = (session.customer_details?.email || session.customer_email || '').toLowerCase();
+    if (affiliate.user_id && affiliate.user_id === userId) {
+      console.log(`[Affiliate] Self-referral skipped (account) for session ${session.id}, code ${affiliate.code}`);
+      return;
+    }
+    if (buyerEmail && affiliate.email && affiliate.email.toLowerCase() === buyerEmail) {
+      console.log(`[Affiliate] Self-referral skipped (email) for session ${session.id}, code ${affiliate.code}`);
+      return;
+    }
+
+    // Reward only on the referred user's FIRST paid purchase.
+    if (await hasPriorPaidPurchase(userId, session.id)) {
+      console.log(`[Affiliate] Not a first purchase, no reward for session ${session.id}, code ${affiliate.code}`);
+      return;
+    }
+
+    // What the referred customer actually paid
     const orderAmount = (session.amount_total || 0) / 100;
-    // Net amount = what DCM receives after Stripe discount (not including Stripe fees)
-    const netAmount = (session.amount_total || 0) / 100;
 
     const paymentIntentId = typeof session.payment_intent === 'string'
       ? session.payment_intent
@@ -922,12 +971,11 @@ async function processAffiliateAttribution(session: Stripe.Checkout.Session, use
     const tier = session.metadata?.tier || 'unknown';
     const plan = session.metadata?.plan;
 
-    const commissionResult = await createCommission(affiliate.id, {
+    const rewardResult = await grantReferralReward(affiliate, {
       referredUserId: userId,
-      stripeSessionId: session.id,
-      stripePaymentIntentId: paymentIntentId,
+      sessionId: session.id,
       orderAmount,
-      netAmount,
+      stripePaymentIntentId: paymentIntentId,
       metadata: {
         tier,
         plan: plan || undefined,
@@ -935,14 +983,16 @@ async function processAffiliateAttribution(session: Stripe.Checkout.Session, use
       },
     });
 
-    if (commissionResult.success) {
-      if (commissionResult.skipped) {
-        console.log(`[Affiliate] Attribution skipped: ${commissionResult.skipped} for session ${session.id}`);
+    if (rewardResult.success) {
+      if (rewardResult.skipped) {
+        console.log(`[Affiliate] Attribution skipped: ${rewardResult.skipped} for session ${session.id}`);
       } else {
-        console.log(`[Affiliate] Commission created for session ${session.id}, affiliate ${affiliate.code}`);
+        console.log(
+          `[Affiliate] Referral reward of ${rewardResult.creditsGranted ?? 0} credits recorded for session ${session.id}, affiliate ${affiliate.code}`
+        );
       }
     } else {
-      console.error(`[Affiliate] Failed to create commission for session ${session.id}:`, commissionResult.error);
+      console.error(`[Affiliate] Failed to grant referral reward for session ${session.id}:`, rewardResult.error);
     }
   } catch (error) {
     // Don't fail the webhook if affiliate processing fails

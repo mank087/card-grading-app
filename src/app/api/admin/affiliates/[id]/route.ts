@@ -68,6 +68,9 @@ export async function PUT(
       'name', 'email', 'status', 'commission_rate', 'commission_type',
       'flat_commission_amount', 'payout_method', 'payout_details',
       'minimum_payout', 'attribution_window_days', 'notes',
+      // Credits reward model: how many credits the affiliate earns, how much
+      // the fan saves, and which account the credits land in.
+      'reward_credits', 'discount_percent', 'user_id',
     ];
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };

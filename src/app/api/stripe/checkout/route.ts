@@ -133,12 +133,15 @@ export async function POST(request: NextRequest) {
       ? `${origin}/founders?canceled=true`
       : `${origin}/credits?canceled=true`;
 
-    // Look up affiliate if ref_code provided (for metadata tracking)
+    // Look up affiliate if ref_code provided (for metadata tracking and for
+    // auto-applying the fan discount)
     let affiliateCode: string | undefined;
+    let affiliatePromotionCodeId: string | undefined;
     if (ref_code) {
       const affiliate = await getAffiliateByCode(ref_code);
       if (affiliate && affiliate.status === 'active') {
         affiliateCode = affiliate.code;
+        affiliatePromotionCodeId = affiliate.stripe_promotion_code_id || undefined;
       }
     }
 
@@ -165,7 +168,6 @@ export async function POST(request: NextRequest) {
       // Promo codes are typed at Stripe. Members already get their 20% via the
       // discounted price_data below; letting a code stack on top would give
       // 36% off, so the field is only offered at list price.
-      allow_promotion_codes: discountRate === 0,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: sessionMetadata,
@@ -174,6 +176,18 @@ export async function POST(request: NextRequest) {
       },
       ...taxParams(Boolean(stripeCustomerId)),
     };
+
+    // A referral link auto-applies the affiliate's fan code, which is
+    // restricted to first-time customers. Members already get their 20% via
+    // the discounted price_data below, so the fan code is only applied at list
+    // price. Stripe rejects discounts and allow_promotion_codes together, so
+    // the manual promo field is offered only when no code is pre-applied.
+    const applyAffiliateDiscount = Boolean(affiliatePromotionCodeId) && discountRate === 0;
+    if (applyAffiliateDiscount) {
+      checkoutOptions.discounts = [{ promotion_code: affiliatePromotionCodeId! }];
+    } else {
+      checkoutOptions.allow_promotion_codes = discountRate === 0;
+    }
 
     // Apply 20% discount using custom pricing (for Card Lovers or Founders), or use standard price
     if (discountRate > 0 && discountLabel) {
@@ -205,7 +219,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create(checkoutOptions);
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await stripe.checkout.sessions.create(checkoutOptions);
+    } catch (sessionError: unknown) {
+      // The fan code is new-customer only. A returning buyer arriving through a
+      // referral link gets a rejection from Stripe; drop the discount and let
+      // them check out at list price rather than failing the purchase. The
+      // ref_code metadata stays, so attribution is unaffected.
+      const err = sessionError as { type?: string; code?: string; param?: string; message?: string };
+      const isDiscountRejection =
+        applyAffiliateDiscount &&
+        err?.type === 'StripeInvalidRequestError' &&
+        (err?.code === 'promotion_code_not_active' ||
+          err?.code === 'coupon_expired' ||
+          String(err?.param || '').includes('discounts') ||
+          /first[- ]time|promotion code|promotional code/i.test(String(err?.message || '')));
+
+      if (!isDiscountRejection) throw sessionError;
+
+      console.warn(
+        '[Checkout] Affiliate discount rejected (not a first-time customer), retrying without it:',
+        err?.code || err?.message
+      );
+
+      delete checkoutOptions.discounts;
+      checkoutOptions.allow_promotion_codes = discountRate === 0;
+      session = await stripe.checkout.sessions.create(checkoutOptions);
+    }
 
     // Calculate what user will receive
     const creditsToReceive = firstPurchase
