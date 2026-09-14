@@ -1,0 +1,76 @@
+.page { background: white; }
+.container { width: min(1160px, calc(100% - 64px)); margin-inline: auto; }
+.section { padding-block: 80px; scroll-margin-top: 88px; }
+.hero { padding-block: 64px; }
+.heroGrid { display: grid; grid-template-columns: 1.3fr .85fr; gap: 72px; align-items: center; }
+.hero h1 { font-size: clamp(38px, 4.2vw, 60px); line-height: 1.08; font-weight: 750; letter-spacing: -.045em; }
+.hero h1 span { color: #cbb0ee; }
+.heroLead { color: #bdc7d7; font-size: 17px; line-height: 1.8; margin-block: 24px; max-width: 560px; }
+.starting { font-size: 19px; font-weight: 700; margin-bottom: 24px; }
+.starting span { color: #bdc7d7; font-size: 15px; font-weight: 400; }
+.heroLink { display: inline-block; color: #66d9e9; font-size: 14px; padding-block: 12px; margin-top: 8px; text-underline-offset: 4px; }
+.heroLink:hover { text-decoration: underline; }
+.heroVisual { padding: 24px; background: var(--dcm-navy); border: 1px solid #36435a; border-radius: 20px; text-align: center; }
+.heroVisual > p { color: #66d9e9; font-size: 13px; margin-bottom: 20px; }
+.heroVisual img { display: block; width: min(100%, 300px); height: auto; margin: auto; }
+.heroVisual figcaption { color: #bdc7d7; font-size: 12px; line-height: 1.6; margin-top: 20px; }
+.jump { border-bottom: 1px solid var(--dcm-border); }
+.jump > div { display: flex; flex-wrap: wrap; gap: 12px 32px; padding-block: 14px; }
+.jump a { color: var(--dcm-muted); font-size: 13px; padding-block: 8px; }
+.jump a:hover { color: var(--dcm-purple-text); }
+.lead { color: var(--dcm-muted); font-size: 17px; line-height: 1.8; margin-top: 18px; max-width: 710px; }
+.page h3 { font-size: 20px; line-height: 1.4; font-weight: 700; letter-spacing: -.02em; }
+.brandJourney { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-block: 36px; list-style: none; padding: 0; }
+.brandJourney li { border-top: 2px solid #d5bfec; padding-top: 20px; }
+.brandJourney span, .steps span { display: block; color: var(--dcm-purple-text); font-size: 12px; font-weight: 700; margin-bottom: 18px; }
+.brandJourney h3 { font-size: 18px; }
+.brandJourney p, .benefits p, .steps p, .supplies p, .pricingNotes p, .ready p, .useCases p { font-size: 15px; line-height: 1.75; color: var(--dcm-muted); margin-top: 10px; }
+.examples { background: var(--dcm-surface); border-radius: 16px; padding: 32px 64px; }
+.examples img { max-height: 390px; width: auto; max-width: 100%; margin: auto; object-fit: contain; }
+.caption { color: var(--dcm-muted); font-size: 13px; line-height: 1.8; margin-top: 20px; }
+.caption a { color: var(--dcm-purple-text); text-decoration: underline; text-underline-offset: 3px; }
+.tint { background: var(--dcm-surface); }
+.benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 40px; }
+.benefits article { border-top: 1px solid var(--dcm-border); padding-top: 24px; }
+.useCases { margin-top: 40px; border-left: 3px solid var(--dcm-purple); padding: 20px 24px; background: white; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; list-style: none; padding: 0; margin-top: 36px; }
+.steps li { padding: 26px; border: 1px solid var(--dcm-border); border-radius: 12px; }
+.supplies, .pricingNotes { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; padding-top: 28px; margin-top: 32px; border-top: 1px solid var(--dcm-border); }
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 36px; }
+.plan { display: flex; flex-direction: column; background: white; border: 1px solid var(--dcm-border); border-radius: 16px; padding: 32px; }
+.featured { border: 2px solid var(--dcm-purple); padding: 31px; }
+.plan h3 { font-size: 28px; }
+.price { font-family: var(--font-dcm-display), sans-serif; font-size: 52px; font-weight: 750; letter-spacing: -.045em; margin-top: 20px; }
+.price span { font-family: var(--font-dcm-body), sans-serif; font-size: 15px; font-weight: 400; color: var(--dcm-muted); letter-spacing: 0; margin-left: 5px; }
+.allowance { font-size: 17px; font-weight: 650; margin-top: 6px; }
+.rate { font-size: 13px; line-height: 1.7; color: var(--dcm-muted); margin-top: 10px; }
+.plan ul { list-style: disc; padding: 22px 0 0 20px; margin-block: 24px; border-top: 1px solid var(--dcm-border); flex: 1; }
+.plan li { font-size: 14px; line-height: 1.7; margin-bottom: 10px; }
+.plan li::marker { color: var(--dcm-purple-text); }
+.split { display: grid; grid-template-columns: .85fr 1.15fr; gap: 64px; align-items: start; }
+.faq details { border-bottom: 1px solid var(--dcm-border); padding-block: 20px; }
+.faq details:first-child { border-top: 1px solid var(--dcm-border); }
+.faq summary { cursor: pointer; font-size: 16px; font-weight: 650; }
+.faq p { font-size: 14px; line-height: 1.8; color: var(--dcm-muted); margin-top: 14px; }
+.ready { margin-top: 32px; padding-top: 26px; border-top: 1px solid var(--dcm-border); }
+.ready a { margin-top: 20px; }
+.formHeading { margin-bottom: 20px; }
+@media (max-width: 1000px) { .heroGrid, .split { gap: 36px; } .hero h1 { font-size: 44px; } .brandJourney { grid-template-columns: 1fr 1fr; } .examples { padding: 28px; } }
+@media (max-width: 760px) {
+  .container { width: calc(100% - 40px); }
+  .section { padding-block: 56px; }
+  .hero { padding-block: 44px; }
+  .heroGrid, .split, .plans, .steps, .benefits, .supplies, .pricingNotes { grid-template-columns: 1fr; gap: 28px; }
+  .hero h1 { font-size: clamp(35px, 9vw, 48px); }
+  .heroLead { font-size: 16px; }
+  .starting span { display: block; margin-top: 6px; }
+  .heroVisual { max-width: 400px; margin: auto; }
+  .heroVisual img { max-width: 260px; }
+  .jump > div { gap: 4px 24px; }
+  .brandJourney { gap: 24px 20px; }
+  .examples { padding: 24px; }
+  .examples img { max-height: 340px; }
+  .plan { padding: 24px; }
+  .featured { padding: 23px; }
+  .price { font-size: 46px; }
+}

@@ -49,7 +49,7 @@ export default function AffiliateApplicationForm() {
 
   if (status === 'success') {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <div role="status" className="bg-white rounded-xl border border-[var(--dcm-border)] shadow-sm p-8 text-center">
         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -65,15 +65,15 @@ export default function AffiliateApplicationForm() {
   }
 
   const inputClass =
-    'w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
+    'w-full border border-[var(--dcm-control-border)] rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--dcm-purple)] focus:border-transparent'
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 text-left space-y-4"
+      className="bg-white rounded-xl border border-[var(--dcm-border)] shadow-sm p-6 md:p-8 text-left space-y-4"
     >
       {errorMessage && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+        <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           {errorMessage}
         </div>
       )}
@@ -181,7 +181,7 @@ export default function AffiliateApplicationForm() {
           placeholder="Tell us a bit about your audience and how you would work DCM Grading into your content."
           className={inputClass}
         />
-        <p className="text-xs text-gray-400 mt-1">{form.promotionPlan.length} / 2000</p>
+        <p className="text-xs text-gray-600 mt-1">{form.promotionPlan.length} / 2000</p>
       </div>
 
       {/* Honeypot: hidden from real users */}
@@ -200,11 +200,12 @@ export default function AffiliateApplicationForm() {
       <button
         type="submit"
         disabled={status === 'submitting'}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl text-lg disabled:opacity-50 dcm-editorial-primary"
+        className="dcm-button dcm-button--primary w-full disabled:opacity-50"
       >
-        {status === 'submitting' ? 'Sending...' : 'Apply to Partner'}
+        {status === 'submitting' ? 'Sending...' : 'Apply to Become a Partner'}
       </button>
-      <p className="text-xs text-gray-400 text-center">
+      <p className="text-xs text-gray-600 text-center"><a href="#program-terms" className="underline underline-offset-2">Review the program terms</a></p>
+      <p className="text-xs text-gray-600 text-center">
         We review every application and reply within a few business days.
       </p>
     </form>

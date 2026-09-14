@@ -1,10 +1,11 @@
 import { completeMetadata } from '@/lib/seo/completeMetadata'
-import { Metadata } from 'next';
-import LeadForm from './LeadForm';
-import NeonSign from './NeonSign';
-import BrandedSlabVisual, { StoreMockRow } from './BrandedSlabVisual';
-import { ORG_PLANS, ORG_OVERAGE_PACK } from '@/lib/orgPlans';
-
+import type { Metadata } from 'next'
+import Image from 'next/image'
+import Link from 'next/link'
+import LeadForm from './LeadForm'
+import { StoreMockRow } from './BrandedSlabVisual'
+import { ORG_PLANS, ORG_OVERAGE_PACK } from '@/lib/orgPlans'
+import styles from './enterprise.module.css'
 export const metadata: Metadata = completeMetadata({
   alternates: { canonical: 'https://dcmgrading.com/enterprise' },
   title: 'Enterprise Card Grading for Shops & Breakers',
@@ -25,279 +26,142 @@ export const metadata: Metadata = completeMetadata({
   },
 });
 
-const BENEFITS = [
-  {
-    icon: '🎟️',
-    title: 'Monthly Grading Volumes',
-    body: `A fresh allotment of grades every billing cycle: ${ORG_PLANS.dealer.gradesPerMonth} or ${ORG_PLANS.enterprise.gradesPerMonth.toLocaleString()} per month at rates built for volume, as low as $${ORG_PLANS.enterprise.perCardUsd.toFixed(2)} a card. Traditional grading runs $15 to $25 per card with weeks of turnaround.`,
-  },
-  {
-    icon: '🏷️',
-    title: 'Your brand on every slab',
-    body: 'Upload your logo once and it appears on slab labels in every style, including the premium Heritage design. Fold-over and batch printing included, sized and recolored automatically for light and dark labels.',
-  },
-  {
-    icon: '📄',
-    title: 'Branded reports and card pages',
-    body: 'Graded card detail pages, full PDF grading reports, downloadable card images, and eBay listing imagery all carry your brand and colors.',
-  },
-  {
-    icon: '🔍',
-    title: 'Your serials, your branded registry',
-    body: "Your account gets its own serial prefix, and every card you grade is assigned a unique serial number. Scanning the QR on the slab resolves to a branded registry page with the card's photos, grade, and full details presented under your brand.",
-  },
-  {
-    icon: '⚡',
-    title: 'Grades in minutes, not months',
-    body: 'DCM Optic™ grading returns sub-grades for centering, corners, edges, and surface in minutes. Grade at the counter, on stream, or at a show while they watch.',
-  },
-  {
-    icon: '🏬',
-    title: 'Your own Enterprise Page',
-    body: 'A hosted landing page at dcmgrading.com with your branding, your story, contact and socials, a serial lookup, and a live feed of your recently graded cards. One link to share everywhere.',
-  },
-];
+const benefits = [
+  ['Grade inventory on your schedule', 'Photograph cards at your counter, on stream, or at a show. DCM Optic™ returns centering, corner, edge, and surface assessments in minutes.'],
+  ['Make every result recognizable', 'Your logo and colors carry through labels, reports, downloadable card images, and card pages. Give your inventory a consistent presentation.'],
+  ['Give customers the details', 'Share the condition report behind each grade. A unique serial and QR code let buyers look up the recorded card photos and assessment.'],
+  ['Keep your team working together', 'You and your staff draw from a shared monthly grading allowance. Choose the volume that fits your business.'],
+  ['Give your brand a home', 'Share a hosted business page with your story, contact details, socials, serial lookup, and recently graded cards.'],
+  ['Print where you work', 'Create Heritage labels, fold-over labels, and batches of labels for your own holders. Download the files and print locally.'],
+]
+const faqs = [
+  ['What happens after I apply?', 'The DCM team reviews your business and branding, usually within one business day. Once approved, you can choose and pay for a plan, finish setting up your brand, and start grading. There is no payment until approval.'],
+  ['What do I need to get started?', 'Have your business details and logo ready, plus a phone or camera for clear front and back card photos. For physical displays, you supply a compatible printer, label stock, and holders, and handle assembly yourself. DCM provides the grading software, records, and downloadable label and report files.'],
+  ['Can my team use the same plan?', 'Yes. Your team draws from your organization’s shared monthly grading allowance.'],
+  ['Do unused grades roll over?', 'Unused monthly grades do not roll over. Your monthly allowance refreshes each billing cycle. Separately purchased overage credits roll over and are used after your monthly allowance is exhausted.'],
+  ['What does the QR code verify?', 'It opens the card’s recorded assessment, including its photos, grade, and details on your branded registry page. It does not authenticate the physical card or certify that a holder contains that card.'],
+  ['Does DCM supply or seal the holders?', 'No. Your business supplies, assembles, and seals its holders. DCM Optic™ provides an AI-assisted visual condition assessment from card photos; DCM does not physically inspect or authenticate the card.'],
+  ['Can businesses outside the US apply?', 'Yes. International businesses are welcome. Prices are in USD, and you print labels locally and provide your own holders.'],
+  ['Can I cancel my plan?', 'You can cancel at any time, effective at the end of your current billing period. Monthly grades remain available through that paid period and expire when the plan ends. Overage credits remain usable while the organization’s account stays active. See the Enterprise Program Terms for full details.'],
+]
 
-const TIERS = [
-  {
-    name: ORG_PLANS.dealer.name,
-    blurb: 'For shops, breakers, and streamers adding grading to their business',
-    priceUsd: ORG_PLANS.dealer.priceUsd,
-    gradesPerMonth: ORG_PLANS.dealer.gradesPerMonth,
-    perCardUsd: ORG_PLANS.dealer.perCardUsd,
-    features: ['Branded labels & slabs', 'Branded reports & card pages', 'Your own Enterprise Page', 'Email support'],
-    highlight: false,
-  },
-  {
-    name: ORG_PLANS.enterprise.name,
-    blurb: 'For high-volume sellers and grading-first businesses',
-    priceUsd: ORG_PLANS.enterprise.priceUsd,
-    gradesPerMonth: ORG_PLANS.enterprise.gradesPerMonth,
-    perCardUsd: ORG_PLANS.enterprise.perCardUsd,
-    features: ['Everything in Dealer', 'Best per-card rate', 'Onboarding & launch support', 'Direct line to the DCM team'],
-    highlight: true,
-  },
-];
+// The visible FAQ <details> list and this JSON-LD are both built from `faqs`.
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(([question, answer]) => ({
+    '@type': 'Question',
+    name: question,
+    acceptedAnswer: { '@type': 'Answer', text: answer },
+  })),
+}
 
-/**
- * Faint, non-interactive background art for desktop: tilted slab/card
- * outlines, a stream play chip, and sparkles — stores, streamers, and
- * hobbyists in outline form. Hidden on mobile; never captures the pointer.
- */
-function SectionDeco({ variant }: { variant: 'left' | 'right' }) {
-  const side = variant === 'left' ? 'left-0 -translate-x-1/3' : 'right-0 translate-x-1/3';
-  const rot = variant === 'left' ? '-rotate-12' : 'rotate-12';
-  return (
-    <div aria-hidden className={`hidden lg:block absolute top-10 ${side} pointer-events-none select-none`}>
-      <svg width="360" height="480" viewBox="0 0 360 480" fill="none" className={`${rot} opacity-[0.05]`}>
-        {/* slab outline with label band */}
-        <rect x="40" y="20" width="200" height="300" rx="18" stroke="#6D28D9" strokeWidth="4" />
-        <rect x="58" y="40" width="164" height="56" rx="8" stroke="#6D28D9" strokeWidth="4" />
-        <rect x="58" y="112" width="164" height="188" rx="8" stroke="#6D28D9" strokeWidth="4" />
-        <rect x="178" y="48" width="36" height="40" rx="8" fill="#6D28D9" />
-        {/* stream play chip */}
-        <circle cx="290" cy="360" r="44" stroke="#6D28D9" strokeWidth="4" />
-        <path d="M278 340l38 20-38 20v-40z" fill="#6D28D9" />
-        {/* fanned cards */}
-        <rect x="20" y="360" width="90" height="126" rx="10" stroke="#6D28D9" strokeWidth="4" transform="rotate(-14 65 423)" />
-        <rect x="70" y="352" width="90" height="126" rx="10" stroke="#6D28D9" strokeWidth="4" transform="rotate(-2 115 415)" />
-        {/* sparkles */}
-        <path d="M300 120l6 16 16 6-16 6-6 16-6-16-16-6 16-6 6-16z" fill="#6D28D9" />
-        <path d="M320 220l4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10z" fill="#6D28D9" />
-      </svg>
-    </div>
-  );
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://dcmgrading.com' },
+    { '@type': 'ListItem', position: 2, name: 'Enterprise', item: 'https://dcmgrading.com/enterprise' },
+  ],
+}
+
+// Prices come from ORG_PLANS so the schema cannot drift from the plan cards.
+const serviceJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: 'DCM Enterprise white-label card grading',
+  serviceType: 'Branded photo-based trading card condition assessment for businesses',
+  description: 'Grade card inventory with DCM Optic and publish the result under your own brand: branded labels, condition reports, a serial registry, and a hosted business page.',
+  url: 'https://dcmgrading.com/enterprise',
+  // Reference the site-wide Organization node emitted by the root layout instead of minting a second one.
+  provider: { '@id': 'https://dcmgrading.com/#organization' },
+  offers: Object.values(ORG_PLANS).map(plan => ({
+    '@type': 'Offer',
+    name: `${plan.name}: ${plan.gradesPerMonth.toLocaleString()} grades per month`,
+    price: plan.priceUsd,
+    priceCurrency: 'USD',
+    url: 'https://dcmgrading.com/enterprise/apply',
+    priceSpecification: { '@type': 'UnitPriceSpecification', price: plan.priceUsd, priceCurrency: 'USD', billingDuration: 'P1M' },
+  })),
 }
 
 export default function EnterprisePage() {
-  return (
-    <main className="dcm-brand dcm-editorial min-h-screen dcm-editorial-soft">
-      {/* Hero — kept tight so the primary CTA sits above the fold on desktop */}
-      <section className="relative overflow-hidden text-white py-12 sm:py-14 dcm-editorial-dark">
-        {/* ambient glow orbs */}
-        <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-400/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-20 w-[28rem] h-[28rem] rounded-full bg-blue-400/25 blur-3xl" />
-        {/* faint slab outlines drifting at the edges */}
-        <div aria-hidden className="hidden lg:block pointer-events-none absolute -left-10 top-1/2 -translate-y-1/2 opacity-10">
-          <svg width="220" height="330" viewBox="0 0 220 330" fill="none" className="-rotate-12">
-            <rect x="10" y="10" width="200" height="310" rx="20" stroke="white" strokeWidth="3" />
-            <rect x="28" y="30" width="164" height="58" rx="8" stroke="white" strokeWidth="3" />
-            <rect x="28" y="104" width="164" height="196" rx="8" stroke="white" strokeWidth="3" />
-          </svg>
+  return <div className={`dcm-brand ${styles.page}`}>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, '\\u003c') }} />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd).replace(/</g, '\\u003c') }} />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, '\\u003c') }} />
+    <section className={`dcm-dark ${styles.hero}`}>
+      <div className={`${styles.container} ${styles.heroGrid}`}>
+        <div>
+          <p className="dcm-eyebrow">DCM Enterprise · For shops, breakers & sellers</p>
+          <h1>Bring card grading<br />to your counter.<br /><span>Put your brand<br />on every result.</span></h1>
+          <p className={styles.heroLead}>Grade cards with DCM Optic™, create branded labels and reports, and give customers a searchable grading record. All under your business name.</p>
+          <p className={styles.starting}>From ${ORG_PLANS.dealer.priceUsd}/month <span>· {ORG_PLANS.dealer.gradesPerMonth} grades included</span></p>
+          <div className="dcm-actions"><Link href="/enterprise/apply" className="dcm-button dcm-button--primary">Apply to Launch Your Brand <span aria-hidden="true">→</span></Link><Link href="#contact" className="dcm-button dcm-button--secondary">Request a Demo</Link></div>
+          <p className="dcm-fineprint">No payment until approved. Applications usually reviewed within one business day.</p>
+          <Link href="#pricing" className={styles.heroLink}>Compare monthly plans <span aria-hidden="true">↓</span></Link>
         </div>
-        <div aria-hidden className="hidden lg:block pointer-events-none absolute -right-8 top-8 opacity-10">
-          <svg width="190" height="290" viewBox="0 0 220 330" fill="none" className="rotate-12">
-            <rect x="10" y="10" width="200" height="310" rx="20" stroke="white" strokeWidth="3" />
-            <rect x="28" y="30" width="164" height="58" rx="8" stroke="white" strokeWidth="3" />
-            <rect x="28" y="104" width="164" height="196" rx="8" stroke="white" strokeWidth="3" />
-          </svg>
-        </div>
+        <figure className={styles.heroVisual}>
+          <p>Your name. Your colors. Your label.</p>
+          <Image src="/enterprise/slab-your-logo-v4.png" alt="Aaron Judge card in a Heritage slab display with a reserved space for your business logo" width={800} height={1314} priority sizes="(max-width: 760px) 75vw, 330px" />
+          <figcaption>Example branded display. Holders and printing supplied by your business.</figcaption>
+        </figure>
+      </div>
+    </section>
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center dcm-editorial-heading">
-          <p className="uppercase tracking-widest text-purple-200 text-sm font-semibold mb-3">DCM Enterprise</p>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
-            Launch your own card grading brand
-          </h1>
-          <p className="text-lg sm:text-xl text-purple-100 max-w-2xl mx-auto mb-6">
-            For card shops, case breakers, streamers, and serious collectors. Professional grading
-            under your brand: your logo on the slab, the report, and the card page, powered by
-            DCM Optic™ and backed by the DCM verification registry.
-          </p>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <a href="/enterprise/apply"
-              className="inline-block px-8 py-3 bg-white text-purple-700 rounded-lg font-semibold hover:bg-purple-50 transition-colors">
-              Launch your brand
-            </a>
-            <a href="#contact"
-              className="inline-block px-8 py-3 border border-purple-300 text-white rounded-lg font-semibold hover:bg-purple-600 transition-colors dcm-editorial-primary">
-              Talk to us first
-            </a>
-          </div>
-        </div>
-      </section>
+    <div className={styles.jump} role="navigation" aria-label="Enterprise page sections"><div className={styles.container}><Link href="#branding">Your brand in action</Link><Link href="#how-it-works">Getting started</Link><Link href="#pricing">Plans & pricing</Link><Link href="#questions">Common questions</Link></div></div>
 
-      {/* Brand visuals */}
-      <section className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <SectionDeco variant="right" />
-        <div className="relative grid gap-10 lg:grid-cols-2 items-center">
-          <div>
-            <NeonSign />
-            <p className="text-center text-gray-500 text-sm mt-4">
-              Grading at the counter, on stream, or at the show table gives people a reason to come to you.
-            </p>
-          </div>
-          <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4 text-center lg:text-left leading-tight">
-              <span className="block">Your cards.</span>
-              <span className="block">Your brand.</span>
-              <span className="block text-purple-600">Our engine.</span>
-            </h2>
-            <p className="text-gray-600 mb-8 text-center lg:text-left">
-              Every slab you produce carries your logo and colors. They show on the label,
-              the grading report, and the card&apos;s page online, with DCM Optic&trade; verification
-              behind it.
-            </p>
-            <BrandedSlabVisual />
-          </div>
-        </div>
+    <section id="branding" className={styles.section}><div className={styles.container}>
+      <p className="dcm-eyebrow">Built around your identity</p><h2>One brand, from label to lookup.</h2><p className={styles.lead}>Give customers a consistent experience when they see your card, read its report, or look up the grading record.</p>
+      <ol className={styles.brandJourney}>
+        {[
+          ['Branded label', 'Your logo and colors on Heritage and other label styles.'],
+          ['Grading report', 'Your branding alongside photos and condition details.'],
+          ['QR-linked record', 'Your serial prefix leads to a branded card assessment.'],
+          ['Business page', 'Your story, contact details, and graded cards in one place.'],
+        ].map(([title, copy], i) => <li key={title}><span>0{i + 1}</span><h3>{title}</h3><p>{copy}</p></li>)}
+      </ol>
+      <div className={styles.examples}><StoreMockRow /></div>
+      <p className={styles.caption}>Illustrative brands on real DCM label renders. Your own logo and colors are configured during onboarding.</p>
+    </div></section>
 
-        {/* Example brands */}
-        <div className="mt-16">
-          <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">See it with your brand on it</h3>
-          <p className="text-center text-gray-500 text-sm mb-8">
-            Example brands shown for illustration. Your logo, your colors, tailored with you at onboarding.
-          </p>
-          <StoreMockRow />
-        </div>
-      </section>
+    <section className={`${styles.section} ${styles.tint}`}><div className={styles.container}>
+      <p className="dcm-eyebrow">Built for your day-to-day business</p><h2>More ways to put grading to work.</h2>
+      <div className={styles.benefits}>{benefits.map(([title, copy]) => <article key={title}><h3>{title}</h3><p>{copy}</p></article>)}</div>
+      <div className={styles.useCases}><strong>At the counter. On stream. At the show.</strong><p>Walk a customer through a report, grade a pull after a break, or prepare inventory with consistent labels and card records.</p></div>
+    </div></section>
 
-      {/* Benefits */}
-      <section className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 overflow-visible">
-        <SectionDeco variant="left" />
-        <h2 className="relative text-3xl font-bold text-gray-900 text-center mb-10">Everything you need to grade under your brand</h2>
-        <div className="relative grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {BENEFITS.map(b => (
-            <div key={b.title} className="bg-white rounded-2xl shadow-md p-6">
-              <div className="text-3xl mb-3">{b.icon}</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{b.title}</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">{b.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <section id="how-it-works" className={styles.section}><div className={styles.container}>
+      <p className="dcm-eyebrow">From application to first card</p><h2>Set up your brand. Start grading.</h2>
+      <ol className={styles.steps}>{[
+        ['Apply with your business details', 'Share your business name, logo, and expected volume. The DCM team reviews your application before you pay.'],
+        ['Choose a plan and set up', 'After approval, subscribe and configure your branding, labels, and business page. Enterprise includes onboarding and launch support.'],
+        ['Grade, print, and share', 'Capture front and back photos, review the assessment, and download your branded files. Share the card’s record with your customers.'],
+      ].map(([title, copy], i) => <li key={title}><span>0{i + 1}</span><h3>{title}</h3><p>{copy}</p></li>)}</ol>
+      <div className={styles.supplies}><div><h3>DCM provides</h3><p>Grading software, card records, branded label and report files, and your hosted business page.</p></div><div><h3>You bring</h3><p>Your business identity, clear card photos, and, for physical displays, your printer, label stock, holders, and assembly.</p></div></div>
+    </div></section>
 
-      {/* Tiers */}
-      <section id="pricing" className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
-          <div className="w-[36rem] h-72 rounded-full bg-purple-200/40 blur-3xl" />
-        </div>
-        <h2 className="relative text-3xl font-bold text-gray-900 text-center mb-3">Flexible Enterprise Pricing Plans</h2>
-        <p className="relative text-center text-gray-600 mb-10 max-w-2xl mx-auto">
-          Monthly grades refresh every billing cycle, and every plan includes full branding, your
-          Enterprise Page, and your own serial registry.
-        </p>
-        <div className="relative grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto">
-          {TIERS.map(t => (
-            <div key={t.name}
-              className={`rounded-2xl p-6 flex flex-col ${t.highlight
-                ? 'bg-purple-700 text-white shadow-xl ring-2 ring-purple-400'
-                : 'bg-white text-gray-900 shadow-md'}`}>
-              <h3 className="text-xl font-bold mb-1">{t.name}</h3>
-              <p className={`text-sm mb-4 ${t.highlight ? 'text-purple-200' : 'text-gray-500'}`}>{t.blurb}</p>
-              <div className="mb-1">
-                <span className="text-4xl font-bold">${t.priceUsd}</span>
-                <span className={`text-sm ${t.highlight ? 'text-purple-200' : 'text-gray-500'}`}>/mo</span>
-              </div>
-              <p className={`text-sm mb-1 ${t.highlight ? 'text-purple-100' : 'text-gray-700'}`}>
-                {t.gradesPerMonth.toLocaleString()} grades every month
-              </p>
-              <p className={`text-sm font-semibold mb-4 ${t.highlight ? 'text-purple-200' : 'text-purple-600'}`}>
-                ${t.perCardUsd.toFixed(2)} per card
-              </p>
-              <ul className="space-y-2 text-sm flex-1">
-                {t.features.map(f => (
-                  <li key={f} className="flex items-start gap-2">
-                    <span className={t.highlight ? 'text-purple-300' : 'text-purple-600'}>✓</span>
-                    <span className={t.highlight ? 'text-purple-50' : 'text-gray-700'}>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <a href="/enterprise/apply"
-                className={`mt-6 text-center px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors ${t.highlight
-                  ? 'bg-white text-purple-700 hover:bg-purple-50'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
-                Get started
-              </a>
-            </div>
-          ))}
-        </div>
-        <p className="relative text-center text-sm text-gray-500 mt-6">
-          Need more in a hot month? Overage packs are ${ORG_OVERAGE_PACK.priceUsd.toFixed(2)} per{' '}
-          {ORG_OVERAGE_PACK.grades} grades (${ORG_OVERAGE_PACK.perGradeUsd.toFixed(2)}/grade) and roll
-          over until you use them.
-        </p>
-        <p className="relative text-center text-xs text-gray-400 mt-3">
-          Every brand is reviewed by the DCM team before going live, usually within one business day.
-          No payment until you&apos;re approved. All prices are in USD, and international businesses are
-          welcome: labels and slabs are printed locally by you, so nothing ships. Participation is subject to the{' '}
-          <a href="/enterprise/terms" className="underline hover:text-gray-600">Enterprise Program Terms</a>.
-        </p>
-      </section>
+    <section id="pricing" className={`${styles.section} ${styles.tint}`}><div className={styles.container}>
+      <p className="dcm-eyebrow">Predictable monthly grading budget</p><h2>Choose the volume that fits your business.</h2><p className={styles.lead}>Both plans include branded labels, reports, card pages, your business page, and your own serial registry.</p>
+      <div className={styles.plans}>{Object.values(ORG_PLANS).map(plan => <article key={plan.key} className={`${styles.plan} ${plan.key === 'enterprise' ? styles.featured : ''}`}>
+        <p className="dcm-eyebrow">{plan.key === 'dealer' ? 'Build grading into your business' : 'For higher monthly volume'}</p><h3>{plan.name}</h3>
+        <p className={styles.price}>${plan.priceUsd}<span>/month</span></p><p className={styles.allowance}>{plan.gradesPerMonth.toLocaleString()} grades included each month</p>
+        <p className={styles.rate}>Approximately ${(plan.priceUsd / plan.gradesPerMonth).toFixed(2)} per grade when the full allowance is used.</p>
+        <ul>{['Your logo and colors on labels & reports', 'Branded card records & serial registry', 'Hosted business page', 'Shared grading allowance for your team', ...(plan.key === 'dealer' ? ['Email support'] : ['Onboarding & launch support', 'Direct line to the DCM team'])].map(feature => <li key={feature}>{feature}</li>)}</ul>
+        <Link href="/enterprise/apply" className="dcm-button dcm-button--primary">Apply to Launch Your Brand <span aria-hidden="true">→</span></Link>
+      </article>)}</div>
+      <div className={styles.pricingNotes}><div><h3>Monthly grades reset</h3><p>Unused monthly grades do not roll over. Your allowance refreshes each billing cycle.</p></div><div><h3>Extra credits carry over</h3><p>Overage packs cost ${ORG_OVERAGE_PACK.priceUsd.toFixed(2)} for {ORG_OVERAGE_PACK.grades} grades (${ORG_OVERAGE_PACK.perGradeUsd.toFixed(2)} per grade). They roll over and are used after your monthly allowance.</p></div></div>
+      <p className={styles.caption}>All prices in USD. No payment until approved. Physical supplies and printing are provided by your business. <Link href="/enterprise/terms">Read the Enterprise Program Terms.</Link></p>
+    </div></section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="relative bg-white py-16 border-t border-gray-100 overflow-hidden scroll-mt-24">
-        <SectionDeco variant="right" />
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-10">How it works</h2>
-          <div className="grid gap-8 sm:grid-cols-3 text-center">
-            <div>
-              <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center mx-auto mb-3">1</div>
-              <h3 className="font-semibold text-gray-900 mb-2">We set up your brand</h3>
-              <p className="text-sm text-gray-600">Apply with your logo and details. We review and tailor your labels, reports, and pages with you, then you pick a plan. Most brands are live within a day.</p>
-            </div>
-            <div>
-              <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center mx-auto mb-3">2</div>
-              <h3 className="font-semibold text-gray-900 mb-2">You grade</h3>
-              <p className="text-sm text-gray-600">You and your team draw from a shared pool of monthly credits. Photograph the card, get sub-grades in minutes, print the slab label wherever you work.</p>
-            </div>
-            <div>
-              <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center mx-auto mb-3">3</div>
-              <h3 className="font-semibold text-gray-900 mb-2">Buyers verify on your branded registry</h3>
-              <p className="text-sm text-gray-600">Every slab carries a unique serial and QR code that resolve to your branded DCM registry page, so your grades sell with real verification behind your brand.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+    <section id="questions" className={styles.section}><div className={`${styles.container} ${styles.split}`}>
+      <div><p className="dcm-eyebrow">Before you launch</p><h2>Know what to expect.</h2><p className={styles.lead}>From setup and supplies to your monthly allowance.</p><Link href="/enterprise/terms" className="dcm-button dcm-button--text">Full Program Terms <span aria-hidden="true">→</span></Link></div>
+      <div className={styles.faq}>{faqs.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div>
+    </div></section>
 
-      {/* Lead form */}
-      <section id="contact" className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-3xl font-bold text-gray-900 text-center mb-3">Bring grading to your business</h2>
-        <p className="text-center text-gray-600 mb-8">
-          Whether you run a shop counter, a break room, a stream setup, or a show table, tell us
-          about your business and we&apos;ll reach out with plan options within one business day.
-        </p>
-        <LeadForm />
-      </section>
-    </main>
-  );
+    <section id="contact" className={`${styles.section} ${styles.tint}`}><div className={`${styles.container} ${styles.split}`}>
+      <div><p className="dcm-eyebrow">Let’s talk about your business</p><h2>See how your brand fits.</h2><p className={styles.lead}>Tell us what you sell and how much you expect to grade. We’ll reach out within one business day to discuss your workflow and plan options.</p><div className={styles.ready}><h3>Ready to get started?</h3><p>Have your business details and logo ready to apply.</p><Link href="/enterprise/apply" className="dcm-button dcm-button--primary">Apply to Launch Your Brand <span aria-hidden="true">→</span></Link><p className={styles.caption}>No payment until approved.</p></div></div>
+      <div><h3 className={styles.formHeading}>Request a Demo</h3><LeadForm /></div>
+    </div></section>
+  </div>
 }
