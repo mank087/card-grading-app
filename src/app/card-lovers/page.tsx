@@ -4,6 +4,7 @@ import { ActionLink } from '@/components/design/Primitives'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import ZoomableImage from '@/components/marketing/ZoomableImage'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession, getValidSession } from '@/lib/directAuth'
@@ -162,23 +163,18 @@ export default function CardLoversPage() {
             <div className="grid md:grid-cols-2 gap-8 items-start">
             {/* Package sheet, follows the plan toggle (or the active subscription) */}
             <div>
-              <Image
-                src="/packages/dcm-package-card-lovers-annual.jpg"
-                alt="DCM Card Lovers Annual membership: 900 grading credits a year for $449"
+              <ZoomableImage
+                key={sheetPlan}
+                src={sheetPlan === 'annual' ? '/packages/dcm-package-card-lovers-annual.jpg' : '/packages/dcm-package-card-lovers-monthly.jpg'}
+                alt={sheetPlan === 'annual'
+                  ? 'DCM Card Lovers Annual membership: 900 grading credits a year for $449'
+                  : 'DCM Card Lovers Monthly membership: 70 grading credits a month for $49.99'}
                 width={1500}
                 height={1000}
                 sizes="(max-width: 767px) 100vw, 50vw"
-                className={`w-full h-auto rounded-2xl shadow-sm ${sheetPlan === 'annual' ? '' : 'hidden'}`}
+                className="w-full h-auto rounded-2xl shadow-sm"
                 style={{ border: '1px solid #dfe3eb' }}
-              />
-              <Image
-                src="/packages/dcm-package-card-lovers-monthly.jpg"
-                alt="DCM Card Lovers Monthly membership: 70 grading credits a month for $49.99"
-                width={1500}
-                height={1000}
-                sizes="(max-width: 767px) 100vw, 50vw"
-                className={`w-full h-auto rounded-2xl shadow-sm ${sheetPlan === 'monthly' ? '' : 'hidden'}`}
-                style={{ border: '1px solid #dfe3eb' }}
+                zoomLabel="Expand the Card Lovers package sheet"
               />
             </div>
 

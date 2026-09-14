@@ -55,10 +55,6 @@ const layoutStyles = `
 }
 @media (max-width: 767px) {
   .dcm-plans--pair { grid-template-columns: 1fr; }
-  /* On a phone the montages turn the price ladder into a long scroll, so only
-     the featured pack keeps its slab strip. */
-  .dcm-plan .dcm-plan-montage { display: none; }
-  .dcm-plan#plan-elite .dcm-plan-montage { display: block; }
 }
 `
 
