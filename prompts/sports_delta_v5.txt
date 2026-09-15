@@ -653,7 +653,7 @@ are the holographic effect, not damage.
 • Traditional border centering impossible (no straight edges)
 • Use internal geometric centering only
 • Identify design anchors (player image, text, logos)
-• Maximum centering score: 9 (perfect centering difficult to verify)
+• Score from internal geometry. A die-cut card has no even border to measure and is not deducted for lacking one; if nothing shows a shift, score 10 and return XX/XX for the ratios.
 
 **Edge Grading:**
 • Die-cut edges are intentional, not defects

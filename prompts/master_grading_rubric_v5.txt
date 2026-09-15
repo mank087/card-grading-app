@@ -3318,26 +3318,26 @@ Before measuring, classify card into ONE category:
 • Borders differ intentionally left/right or top/bottom
 • Includes modern inserts (Dominators, My House, Fireworks, etc.)
 • Method: Design anchors required (borders unreliable)
-• Maximum centering score: 9 (unless exceptional anchor evidence)
+• Score from internal alignment. A design with no even border is not deducted for lacking one; if nothing shows a shift, score 10 and return XX/XX for the ratios.
 • Examples: Insert cards with asymmetric design elements
 
 **TYPE C - Borderless / Full-Art Card**
 • No visible border OR artwork extends to card edges
 • Method: Internal layout anchors ONLY (no borders to measure)
-• Maximum centering score: 9 (unless strong anchors prove near-perfect)
+• Score from internal alignment. A design with no even border is not deducted for lacking one; if nothing shows a shift, score 10 and return XX/XX for the ratios.
 • Examples: Full-art Pokemon cards, borderless MTG cards
 
 **TYPE D - Foil-Frame / Pattern-Frame Card**
 • Holographic or geometric frame (decorative, not structural)
 • Borders may appear "busy" or distorted by foil design
 • Method: Identify STRUCTURAL frame (ignore foil patterns)
-• Maximum centering score: 9 (if reflective distortion present)
+• Score from the STRUCTURAL frame, ignoring foil pattern and reflection. A decorative frame is not an even printed border, so do not deduct for being unable to measure one; if nothing shows a shift, score 10 and return XX/XX for the ratios.
 • Examples: Chrome/Prizm cards with holographic borders
 
 **TYPE E - Die-Cut / Non-Rectangular Card**
 • Shaped edges, removed corners, jagged/rounded cuts
 • Method: Internal geometric centering only
-• Maximum centering score: 9 (traditional border centering impossible)
+• Score from internal geometry. A shaped card has no even border to measure and is not deducted for lacking one; if nothing shows a shift, score 10 and return XX/XX for the ratios.
 • Examples: Die-cut inserts, shaped cards
 ---
 STEP 2: NUMERIC MEASUREMENT (REQUIRED)

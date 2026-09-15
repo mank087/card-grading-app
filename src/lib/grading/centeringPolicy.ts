@@ -18,6 +18,7 @@
  *
  * ── The rules, and what each one is for ────────────────────────────────────
  * R0  a face with no centre to measure IS centred  (the one rule that RAISES)
+ *     'foil_frame' joined R0's set in v9.25 — see the layout enum.
  * R1  ratio worse than 55/45 cannot be a 10   (kills the ±2% upward drift)
  * R2  no measured ratio at all cannot be a 10 (Dave Duerson: 10/10, no ratio)
  * R3  the three passes must agree             (if they disagree, nothing knows)
@@ -35,6 +36,7 @@ export type FaceLayout =
   | 'standard_bordered'   // a measurable printed border on all four sides
   | 'asymmetric'          // intentionally uneven design
   | 'full_bleed'          // art runs to the cut edge; no border to measure
+  | 'foil_frame'          // decorative foil/pattern frame, not an even printed border
   | 'obstructed'          // holder, sleeve glare or crop hides a side
   | 'indeterminate';      // could not be classified
 
@@ -52,9 +54,19 @@ const MEASURABLE_LAYOUTS: ReadonlySet<FaceLayout> = new Set<FaceLayout>(['standa
  * border is there, we just cannot see it. 'standard_bordered' is excluded
  * because a face that claims an even border and then reports no ratio is
  * contradicting itself; that is R2's case (Dave Duerson), not R0's.
+ *
+ * 'foil_frame' ADDED 2026-09-15 (v9.25). A Chrome/Prizm style holographic or
+ * geometric frame is decorative, not an even printed border, so it is the same
+ * class of card as full_bleed: there is nothing to measure and nothing for the
+ * card to fall short of. Until now it fell into 'indeterminate', so R0 never
+ * fired and R4 capped it: the customer case was serial 676561, front classified
+ * "Foil-Frame" with ratios XX/XX, held at centering 9 under three passes that
+ * had each scored it 10. It is in R0's set but deliberately NOT in
+ * MEASURABLE_LAYOUTS — a foil-frame face that DOES state a ratio has measured
+ * something the design does not have, and R4 still refuses it a Gem claim.
  */
 const UNMEASURABLE_BY_DESIGN_LAYOUTS: ReadonlySet<FaceLayout> =
-  new Set<FaceLayout>(['asymmetric', 'full_bleed']);
+  new Set<FaceLayout>(['asymmetric', 'full_bleed', 'foil_frame']);
 
 /**
  * R0 will not raise a face the model scored below this.
@@ -85,8 +97,12 @@ export function layoutFromCardType(cardType: string | null | undefined): FaceLay
   if (t.includes('asymmetric')) return 'asymmetric';
   if (t.includes('borderless') || t.includes('full')) return 'full_bleed';
   if (t.includes('die-cut') || t.includes('die cut')) return 'full_bleed';
-  // "Foil-Frame" and anything else: a frame is not a printed border with even
-  // margins, so it cannot support a Gem centering claim by border measurement.
+  // A frame is not a printed border with even margins, so it can never support a
+  // Gem centering claim BY MEASUREMENT (R4 still refuses one) — but equally there
+  // is no border here to fall short of, so R0 may score an unmeasured one as
+  // centred. The rubric's own vocabulary for this is "Foil-Frame".
+  if (t.includes('foil-frame') || t.includes('foil frame')) return 'foil_frame';
+  if (t.includes('pattern-frame') || t.includes('pattern frame')) return 'foil_frame';
   return 'indeterminate';
 }
 
@@ -225,7 +241,8 @@ export function applyCenteringPolicy(input: CenteringPolicyInput): CenteringPoli
   // The only rule here that RAISES a score, and it runs first because it is
   // the exact inverse of R4 — the two must never both act on one face.
   //
-  // A full-bleed or intentionally asymmetric design has no even border, so
+  // A full-bleed, intentionally asymmetric or foil-framed design has no even
+  // border, so
   // there is no ratio to state and no ratio to fall short of. Deducting for
   // that penalises the card for its own artwork. The customer-visible version
   // of this was the Venom (Fleer Ultra Pop Culture) card: full-bleed on both
@@ -378,8 +395,14 @@ export function centeringCapNote(result: CenteringPolicyResult): string | null {
  * on this design there is nothing to measure — and a report that quietly
  * claims otherwise is the same class of problem as the grade it replaced.
  */
-export function centeringUnmeasurableNote(result: CenteringPolicyResult): string | null {
+export function centeringUnmeasurableNote(
+  result: CenteringPolicyResult,
+  layout?: FaceLayout | null,
+): string | null {
   if (!result.firedRules.includes('R0')) return null;
+  if (layout === 'foil_frame') {
+    return 'This card’s frame is a decorative foil or pattern, not an even printed border, so there is no border ratio to measure. Centering is not counted against the grade on a design like this.';
+  }
   return 'This card’s artwork runs to the edge with no even printed border, so there is no border ratio to measure. Centering is not counted against the grade on a design like this.';
 }
 

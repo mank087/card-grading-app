@@ -640,7 +640,7 @@ Examining the textured surface under various lighting angles, I observe the text
 
 Additionally, I detect one very fine scratch in the upper-left area of the card, running for approximately 3mm. This scratch is visible when tilting the card and appears to affect the surface coating.
 
-For centering assessment on this borderless card, I use internal design anchors: the Pokemon's positioning and the card text elements. The Pokemon appears centered within the card frame with the text box positioned symmetrically. Estimating internal centering at approximately 55/45 left-right and 52/48 top-bottom, with left-right being the worst axis. Maximum centering score: 9 (borderless card).
+For centering assessment on this borderless card there is no printed border to measure, so I classify it Type C and report the ratios as XX/XX rather than inventing numbers against reference points the design does not have. Instead I check internal alignment: the Pokemon sits evenly within the card frame, the text box is positioned symmetrically, and nothing in the layout shows a shift toward any edge. A full-art card is not a worse card for being full-art, so it is not deducted for lacking a border. Centering scores 10 with ratios XX/XX.
 
 The presence of minor texture wear and one fine scratch results in a surface score of 9 for the front."
 

@@ -32,6 +32,7 @@ import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
+import { buildClampNote, buildGateDragNote, isAlreadyExplained } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
@@ -54,7 +55,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.24'; // v9.24: zoom parser canonicalises "REGION "-prefixed crop ids (findings were silently dropped)
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.25'; // v9.25: non-standard designs are no longer capped at centering 9; face-level clamps are folded into the pass rows and explained
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -2356,6 +2357,23 @@ Provide detailed analysis as markdown with all required sections.`
           final: med3(f1, f2, f3)
         };
 
+        // v9.25: RAW per-pass category scores, captured HERE because every pass row
+        // is mutated in place below - the R0 fold raises centering, the v9.1 fold caps
+        // to zoom/structural, and the gates drag tiles. These are the numbers shown in
+        // the three-pass table BEFORE any of that, and the only honest basis for
+        // deciding whether the displayed consensus needs explaining. Read-only:
+        // nothing in the grade is computed from them.
+        const rawPassCats: Record<'centering' | 'corners' | 'edges' | 'surface', number[]> = {
+          centering: [pass1.centering, pass2.centering, pass3.centering],
+          corners: [pass1.corners, pass2.corners, pass3.corners],
+          edges: [pass1.edges, pass2.edges, pass3.edges],
+          surface: [pass1.surface, pass2.surface, pass3.surface],
+        };
+        const rawMedianOf = (cat: 'centering' | 'corners' | 'edges' | 'surface'): number | null => {
+          const v = rawPassCats[cat].filter((n): n is number => typeof n === 'number');
+          return v.length === 3 ? med3(v[0], v[1], v[2]) : null;
+        };
+
         // Step 3: Round subgrades to whole integers using STANDARD rounding (v8.5)
         // Standard rounding: 9.5 → 10, 9.4 → 9, 8.5 → 9, 8.4 → 8
         // This replaces floor rounding which systematically suppressed grades
@@ -2383,6 +2401,19 @@ Provide detailed analysis as markdown with all required sections.`
         // than both displayed faces, which is impossible under weakest-link and looks broken.
         // Clamp each subgrade down to the weaker of its two faces. This only ever LOWERS a
         // subgrade, so it preserves weakest-link behavior and never inflates a grade.
+        //
+        // v9.25: the clamp is RECORDED here and EXPLAINED much later, once every gate
+        // has settled. Until now it went to the console and nowhere else - measured
+        // 2026-09-15, it is the mechanism behind 22% of recent cards showing 10/10/10
+        // in the pass table above a consensus row of 9 with no reason on the page. A
+        // note written at this point would be authored against a number three later
+        // gates can still move, which is the v9.1 narrate-after-consensus mistake.
+        const faceClamps: Array<{
+          cat: 'centering' | 'corners' | 'edges' | 'surface';
+          face: 'front' | 'back';
+          faceScore: number;
+          medianBefore: number;
+        }> = [];
         if (jsonData.raw_sub_scores) {
           const faceCats = ['centering', 'corners', 'edges', 'surface'] as const;
           for (const cat of faceCats) {
@@ -2392,6 +2423,7 @@ Provide detailed analysis as markdown with all required sections.`
               const faceMin = Math.min(f, b);
               if (serverRounded[cat] > faceMin) {
                 console.log(`[GRADE RECALC] 🔒 ${cat}: subgrade ${serverRounded[cat]} exceeded MIN(front,back)=${faceMin} (F:${f} B:${b}); clamping to ${faceMin} per weakest-link`);
+                faceClamps.push({ cat, face: f <= b ? 'front' : 'back', faceScore: faceMin, medianBefore: serverRounded[cat] });
                 serverRounded[cat] = faceMin;
               }
             }
@@ -2817,7 +2849,7 @@ Provide detailed analysis as markdown with all required sections.`
                 }
                 // Say WHY it is a 10, so the report does not imply the borders
                 // were measured and found perfect. They were not measured.
-                const note = centeringUnmeasurableNote(result);
+                const note = centeringUnmeasurableNote(result, layoutFromCardType(sec.card_type));
                 if (note) sec.analysis = `${note} ${sec.analysis ?? ''}`.trim();
                 // The measured-ratio vocabulary does not apply to this face.
                 sec.quality_tier = R0_QUALITY_TIER;
@@ -3182,6 +3214,15 @@ Provide detailed analysis as markdown with all required sections.`
         // in a magnetic one-touch whose own case_detection said "moderate impact,
         // limits surface inspection". 26% of recent 10s sat in a detected case.
         let gradeCapNote: string | null = null;
+        // v9.25: the gate's reason as a SUBORDINATE clause, so the tile-drag note
+        // below can reuse the exact words the summary uses instead of paraphrasing
+        // them into a second, subtly different explanation.
+        let gradeCapReason: string | null = null;
+        // v9.25: categories whose displayed drop is already narrated somewhere the
+        // customer can read it. Anything left out of this set and still sitting
+        // below the raw pass median is what the v9.25 block at the end explains.
+        const dissentReflectedCats = new Set<'centering' | 'corners' | 'edges' | 'surface'>();
+        const tileDraggedCats = new Set<'centering' | 'corners' | 'edges' | 'surface'>();
         const unanimous10 = Math.min(f1, f2, f3) >= 10;
         const caseInfo = jsonData.case_detection || {};
         const rigidCase =
@@ -3281,10 +3322,12 @@ Provide detailed analysis as markdown with all required sections.`
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uncertaintyValue >= 2) {
-            gradeCapNote = `The card presents at Gem Mint level, but the photos are not clear enough to confirm a 10 - the grade is held at 9.`;
+            gradeCapReason = 'the photos are not clear enough to confirm a 10';
+            gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9.`;
             console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
           } else if (rigidCase) {
-            gradeCapNote = `The card presents at Gem Mint level, but it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
+            gradeCapReason = 'it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection';
+            gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
             console.log(`[GRADE RECALC] ⚖️ case gate: 10 → 9 (case_type=${caseInfo.case_type}, impact=${caseInfo.impact_level})`);
           } else {
             // v9.9 DISSENT REFLECTION: don't show four 10 tiles under a 9 — surface
@@ -3301,6 +3344,7 @@ Provide detailed analysis as markdown with all required sections.`
                 const shown = Math.max(minAcross, finalGrade);
                 serverRounded[cat] = shown;
                 dissentCats.push(cat);
+                dissentReflectedCats.add(cat); // v9.25: the unanimity consensus note below names it
                 for (const face of ['front', 'back'] as const) {
                   const key = `${cat}_${face}`;
                   if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > shown) {
@@ -3368,10 +3412,13 @@ Provide detailed analysis as markdown with all required sections.`
               c => Math.min(pass1[c] ?? 10, pass2[c] ?? 10, pass3[c] ?? 10) < (serverRounded[c] ?? 10)
             );
             const targets = attributable.length > 0 ? attributable : [...cats];
+            // v9.25: what the tiles showed before the drag, for the note below.
+            const moved: Array<{ cat: typeof cats[number]; from: number }> = [];
             for (const cat of targets) {
               const minAcross = Math.min(pass1[cat] ?? 10, pass2[cat] ?? 10, pass3[cat] ?? 10);
               const shown = attributable.length > 0 ? Math.max(minAcross, finalGrade) : finalGrade;
               if (shown < (serverRounded[cat] ?? 10)) {
+                moved.push({ cat, from: serverRounded[cat] ?? 10 });
                 serverRounded[cat] = shown;
                 for (const face of ['front', 'back'] as const) {
                   const key = `${cat}_${face}`;
@@ -3382,8 +3429,120 @@ Provide detailed analysis as markdown with all required sections.`
               }
             }
             threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+            // v9.25: EXPLAIN the drag. The gates above wrote their reason into the
+            // summary, but the tiles moved silently - serial 626654 carried
+            // averaged 9/10/10/10 and averaged_rounded 9/9/9/9, so three categories
+            // the evaluations scored 10 displayed as 9 with nothing saying why.
+            // The reason text is the gate's own clause, not a paraphrase of it.
+            try {
+              for (const m of moved) tileDraggedCats.add(m.cat);
+              const dragNote = gradeCapReason
+                ? buildGateDragNote({ moved, shown: finalGrade, reason: gradeCapReason })
+                : null;
+              if (dragNote && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+                jsonData.grading_passes.consensus_notes.push(dragNote);
+              }
+            } catch (e: any) {
+              console.warn('[GRADE RECALC] tile-drag note failed (non-blocking):', e?.message || e);
+            }
             console.log(`[GRADE RECALC] 🔗 weakest-link display: subgrades capped to final ${finalGrade} (${attributable.length > 0 ? `attributed to ${attributable.join(',')}` : 'evidence-quality cap, all categories'})`);
           }
+        }
+
+        // ── v9.25: EXPLAIN (and display) THE FACE-LEVEL CLAMP ─────────────
+        //
+        // The failure, measured in production 2026-09-15: 22% of recent cards
+        // showed the three-pass table with a category at 10/10/10 and a consensus
+        // row of 9, with nothing on the page saying why. The mechanism is Step 3.5
+        // — the category is MIN(front, back) taken from the DETAILED per-face
+        // sections, and those sections are scored separately from the three
+        // whole-card passes. Correct weakest-link arithmetic, invisible to the
+        // reader, logged to the console and nowhere else.
+        //
+        // Runs LAST on purpose. The uncertainty, rigid-case, unanimity and
+        // weakest-link-display gates above can each still move serverRounded, so a
+        // note written any earlier would quote a number the page never shows —
+        // the same mistake v9.1 fixed for the summary prose.
+        //
+        // Two things happen, neither of which can move the grade:
+        //   1. the consensus is folded into the displayed pass rows, exactly as
+        //      v9.1 already does for zoom and structural caps. Capping is
+        //      monotonic, so median(folded passes) === serverRounded[cat] still
+        //      holds and finalGrade is not recomputed here.
+        //   2. ONE consensus note names the face that carried the clamp and
+        //      quotes that face's own first sentence, so the number points at
+        //      evidence instead of at nothing.
+        //
+        // Skipped whenever the gap is ALREADY accounted for in text the customer
+        // can read (zoom cap addendum, structural notice, the v9.9 unanimity note,
+        // the tile-drag note above). A second explanation in different words reads
+        // as a second deduction.
+        //
+        // Wrapped like the centering-policy block: an explanation must never fail
+        // a paid grade.
+        try {
+          const explainCats = ['centering', 'corners', 'edges', 'surface'] as const;
+          const foldedCats: string[] = [];
+          for (const cat of explainCats) {
+            const rawMedian = rawMedianOf(cat);
+            const consensus = serverRounded[cat];
+            if (rawMedian == null || typeof consensus !== 'number' || consensus >= rawMedian) continue;
+
+            // Only the FACE CLAMP is this block's to explain, and only when it is
+            // still the binding constraint. If a later gate pulled the category
+            // below the clamped face score, that gate owns the explanation and a
+            // note quoting the face would name the wrong cause.
+            const clamp = faceClamps.find(c => c.cat === cat);
+            if (!clamp || clamp.faceScore !== consensus) continue;
+
+            if (isAlreadyExplained({
+              zoomCapped: typeof appliedFaceCaps[`${cat}_front`] === 'number'
+                || typeof appliedFaceCaps[`${cat}_back`] === 'number',
+              structuralCapped: structuralDetected && cat === 'surface',
+              dissentReflected: dissentReflectedCats.has(cat),
+              gateDragged: tileDraggedCats.has(cat),
+            })) continue;
+
+            // 1. fold into the displayed pass rows (same shape as the v9.1 fold)
+            for (const pass of [threePassData.pass_1, threePassData.pass_2, threePassData.pass_3] as any[]) {
+              if (!pass || typeof pass[cat] !== 'number') continue;
+              if (pass[cat] > consensus) pass[cat] = consensus;
+              let pf = Math.min(pass.centering, pass.corners, pass.edges, pass.surface);
+              if (structuralDetected) pf = Math.min(pf, STRUCT_CAP);
+              pass.final = pf;
+            }
+
+            // 2. the note. Centering keeps its prose in `analysis`; corners,
+            // edges and surface keep theirs in `summary`.
+            const section = (jsonData as any)?.[cat]?.[clamp.face];
+            const detail = cat === 'centering'
+              ? (section?.analysis ?? section?.summary)
+              : (section?.summary ?? section?.analysis);
+            const note = buildClampNote({
+              cat,
+              face: clamp.face,
+              faceScore: clamp.faceScore,
+              consensus,
+              passScores: rawPassCats[cat],
+              detail,
+            });
+            if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(note);
+            }
+            foldedCats.push(cat);
+          }
+          if (foldedCats.length > 0) {
+            const refoldedFinals = [threePassData.pass_1?.final, threePassData.pass_2?.final, threePassData.pass_3?.final]
+              .filter((n): n is number => typeof n === 'number');
+            if (refoldedFinals.length > 0) {
+              threePassData.variance = Math.max(...refoldedFinals) - Math.min(...refoldedFinals);
+              threePassData.consistency = threePassData.variance === 0 ? 'high' : threePassData.variance <= 1 ? 'moderate' : 'low';
+            }
+            threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+            console.log(`[GRADE RECALC] 🧾 face-clamp fold: ${foldedCats.join(',')} folded into the pass rows and explained (grade unchanged at ${finalGrade})`);
+          }
+        } catch (e: any) {
+          console.warn('[GRADE RECALC] face-clamp explanation failed (non-blocking):', e?.message || e);
         }
 
         // v8.8: the condition label is DERIVED from the final grade — never the AI's prose.

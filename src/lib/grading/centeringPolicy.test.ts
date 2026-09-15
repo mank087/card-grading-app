@@ -15,6 +15,7 @@ import {
   centeringCapNote,
   centeringUnmeasurableNote,
   foldR0IntoPass,
+  layoutFromCardType,
   MAX_PASS_SPREAD,
   type CenteringPolicyInput,
 } from './centeringPolicy';
@@ -290,6 +291,70 @@ describe('R0 — a face with no centre to measure is centred', () => {
     expect(note).toMatch(/no even printed border/i);
     expect(note).not.toMatch(/measured|perfect/i);
     expect(centeringUnmeasurableNote(applyCenteringPolicy(base()))).toBeNull();
+  });
+});
+
+describe('foil-frame faces (v9.25)', () => {
+  // Customer case, serial 676561: the front was classified "Foil-Frame" with
+  // ratios XX/XX and held at centering 9, under three passes that had each
+  // scored the whole card's centering 10. "Foil-Frame" used to land in
+  // 'indeterminate', where R0 cannot fire and R4 caps — so a decorative frame
+  // was treated as an UNKNOWN layout rather than as a card with no border.
+  const foilFace = (over = {}) => base({
+    layout: 'foil_frame', ratio: null, proposedScore: 9,
+    passDevs: [], passScores: [10, 10, 10], ...over,
+  });
+
+  it.each([
+    ['Foil-Frame', 'foil_frame'],
+    ['foil frame', 'foil_frame'],
+    ['Pattern-Frame', 'foil_frame'],
+    ['pattern frame', 'foil_frame'],
+    ['Chrome Foil-Frame Card', 'foil_frame'],
+  ])('classifies %s as %s', (cardType, expected) => {
+    expect(layoutFromCardType(cardType)).toBe(expected);
+  });
+
+  it('still sends anything unrecognised to indeterminate', () => {
+    expect(layoutFromCardType('something nobody wrote down')).toBe('indeterminate');
+    expect(layoutFromCardType('')).toBeNull();
+  });
+
+  it('R0 raises an unmeasured foil-frame face to 10', () => {
+    const r = applyCenteringPolicy(foilFace());
+    expect(r.score).toBe(10);
+    expect(r.raised).toBe(true);
+    expect(r.capped).toBe(false);
+    expect(r.firedRules).toEqual(['R0']);
+  });
+
+  it('R0 does NOT fire once the face states a ratio — R4 still refuses the Gem claim', () => {
+    const r = applyCenteringPolicy(foilFace({ ratio: '52/48', proposedScore: 10 }));
+    expect(r.firedRules).not.toContain('R0');
+    expect(r.firedRules).toContain('R4');
+    expect(r.score).toBe(9);
+    expect(r.raised).toBe(false);
+  });
+
+  it('a stated ratio outside tolerance still caps by R1 as well', () => {
+    const r = applyCenteringPolicy(foilFace({ ratio: '65/35', proposedScore: 10 }));
+    expect(r.firedRules).toEqual(expect.arrayContaining(['R1', 'R4']));
+    expect(r.score).toBe(9);
+  });
+
+  it('honours the R0 floor on a foil-frame face too', () => {
+    const r = applyCenteringPolicy(foilFace({ proposedScore: 7 }));
+    expect(r.firedRules).not.toContain('R0');
+    expect(r.score).toBe(7);
+  });
+
+  it('says the frame is decorative rather than claiming the art runs to the edge', () => {
+    const r = applyCenteringPolicy(foilFace());
+    const note = centeringUnmeasurableNote(r, 'foil_frame')!;
+    expect(note).toMatch(/decorative foil or pattern/i);
+    expect(note).not.toMatch(/runs to the edge/i);
+    // Without the layout it falls back to the full-bleed wording, unchanged.
+    expect(centeringUnmeasurableNote(r)).toMatch(/artwork runs to the edge/i);
   });
 });
 
