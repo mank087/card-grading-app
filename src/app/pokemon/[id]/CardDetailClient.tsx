@@ -7123,6 +7123,10 @@ export function PokemonCardDetails() {
           onClose={() => setShowEditLabelModal(false)}
           cardId={card.id}
           labelData={labelData}
+          labelStyle={labelStyle}
+          activeConfig={activeConfig}
+          heritageBandColors={heritageBandColors}
+          colorOverrides={colorOverrides}
           hasCustomLabel={!!card.custom_label_data}
           onSaved={async () => {
             // Refetch card data to pick up custom label changes

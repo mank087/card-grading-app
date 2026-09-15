@@ -4,6 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { CustomLabelFields } from '../lib/useLabelData';
 import type { LabelData } from '../lib/labelDataGenerator';
 import { getStoredSession } from '../lib/directAuth';
+import { HeritageLabelPreview } from './labels/HeritageLabelPreview';
+import { ClassicLabelPreview } from './labels/ClassicLabelPreview';
+import { ModernFrontLabel } from './labels/ModernFrontLabel';
+import { resolveHeritageSelection, isClassicSelection } from '../lib/labels/labelStyleResolution';
+import { HERITAGE_BRAND_COLORS } from '../lib/labelLab/heritageLayout';
+import type { CustomLabelConfig, LabelColorOverrides } from '../lib/labelPresets';
+import type { SlabLabelData } from '../lib/slabLabelGenerator';
 
 interface EditCardLabelModalProps {
   isOpen: boolean;
@@ -15,6 +22,16 @@ interface EditCardLabelModalProps {
   hasCustomLabel: boolean;
   /** Callback after successful save or revert — parent should refresh card data */
   onSaved: () => void;
+  /**
+   * The account's active label style, so the preview shows the label the
+   * customer will actually print (Heritage, Traditional or Modern) instead
+   * of a fixed Modern mockup. Absent = Modern.
+   */
+  labelStyle?: string | null;
+  activeConfig?: CustomLabelConfig | null;
+  /** Per-card Heritage band palette (resolveHeritageBandColors). */
+  heritageBandColors?: string[];
+  colorOverrides?: LabelColorOverrides;
 }
 
 interface FieldConfig {
@@ -72,6 +89,10 @@ export function EditCardLabelModal({
   labelData,
   hasCustomLabel,
   onSaved,
+  labelStyle = 'modern',
+  activeConfig = null,
+  heritageBandColors,
+  colorOverrides,
 }: EditCardLabelModalProps) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [featuresText, setFeaturesText] = useState('');
@@ -223,50 +244,61 @@ export function EditCardLabelModal({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* Preview */}
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Label Preview</p>
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
-              }}
-            >
-              <div className="px-3 py-2 flex items-center justify-between gap-2">
-                <div className="flex-shrink-0">
-                  <img src="/DCM Logo white.png" alt="DCM" className="h-8 w-auto" />
-                </div>
-                <div className="flex-1 min-w-0 mx-1 flex flex-col gap-0">
-                  <div className="font-semibold text-white/95 text-xs leading-tight truncate">
-                    {fields.primaryName || 'Card Name'}
-                  </div>
-                  <div className="text-white/70 text-[10px] leading-tight truncate">
-                    {[fields.setName, fields.subset, fields.cardNumber, fields.year]
-                      .filter(Boolean)
-                      .join(' \u2022 ') || 'Set details'}
-                  </div>
-                  {featuresText.trim() && (
-                    <div className="text-green-400/90 font-medium text-[9px] leading-tight truncate">
-                      {featuresText.split(',').map(f => f.trim()).filter(Boolean).join(' \u2022 ')}
-                    </div>
-                  )}
-                  <div className="text-white/50 text-[9px] font-mono leading-tight">
-                    {labelData.serial}
-                  </div>
-                </div>
-                <div className="text-center flex-shrink-0">
-                  <div className="font-bold text-white text-2xl leading-none">
-                    {labelData.gradeFormatted || 'N/A'}
-                  </div>
-                  {labelData.condition && (
-                    <div className="font-semibold text-white/80 text-[8px] uppercase mt-0.5">
-                      {labelData.condition}
-                    </div>
+          {/* Preview: the label the account will actually print, redrawn live from the fields */}
+          {(() => {
+            const cardNumberText = fields.cardNumber
+              ? (fields.cardNumber.trim().startsWith('#') ? fields.cardNumber.trim() : `#${fields.cardNumber.trim()}`)
+              : '';
+            const contextLine = [fields.setName, fields.subset, cardNumberText, fields.year]
+              .map(v => (v || '').trim())
+              .filter(Boolean)
+              .join(' • ');
+            const features = featuresText.split(',').map(f => f.trim()).filter(Boolean);
+            const previewData = {
+              primaryName: fields.primaryName || 'Card Name',
+              contextLine: contextLine || 'Set details',
+              features,
+              serial: labelData.serial,
+              grade: labelData.grade,
+              gradeFormatted: labelData.gradeFormatted,
+              condition: labelData.condition,
+              isAlteredAuthentic: labelData.isAlteredAuthentic,
+              qrCodeDataUrl: '',
+              subScores: undefined,
+            } as unknown as SlabLabelData;
+            const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
+            const classic = isClassicSelection(labelStyle, activeConfig);
+            return (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Label Preview</p>
+                <div className="rounded-lg overflow-hidden bg-white">
+                  {heritageSel.active ? (
+                    <HeritageLabelPreview
+                      data={previewData}
+                      side="front"
+                      pattern={heritageSel.pattern}
+                      bandColors={heritageSel.bandColors ?? heritageBandColors ?? HERITAGE_BRAND_COLORS}
+                      gradeColors={heritageSel.gradeColors}
+                    />
+                  ) : classic ? (
+                    <ClassicLabelPreview data={previewData} side="front" />
+                  ) : (
+                    <ModernFrontLabel
+                      displayName={previewData.primaryName}
+                      setLineText={previewData.contextLine}
+                      features={features}
+                      serial={labelData.serial}
+                      grade={labelData.grade}
+                      condition={labelData.condition}
+                      isAlteredAuthentic={labelData.isAlteredAuthentic}
+                      size="md"
+                      colorOverrides={colorOverrides}
+                    />
                   )}
                 </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Form fields */}
           {FIELD_CONFIGS.map((config) => (
