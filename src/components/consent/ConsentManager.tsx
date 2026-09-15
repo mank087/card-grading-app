@@ -279,22 +279,32 @@ export default function ConsentManager() {
 
   const choose = useCallback((state: 'granted' | 'essential') => {
     persist(state)
-    logConsent(state, 'banner', region, mode)
     setConsent(state)
     setBannerOpen(false)
-    if (state === 'granted') {
-      if (googleLoaded.current === 'none') { loadGoogle(true); googleLoaded.current = 'granted' }
-      else if (googleLoaded.current === 'denied') { grantGoogle(); googleLoaded.current = 'granted' }
-      if (!vendorsLoaded.current) { loadOtherVendors(); vendorsLoaded.current = true }
-      captureClickIdsFromUrl()
-    } else {
-      clearClickIds()
-      if (googleLoaded.current !== 'none' || vendorsLoaded.current) {
-        // Scripts from a prior acceptance (or the denied-mode Google tag) are
-        // already on this page; a reload gives a clean tracker-free page.
-        window.location.reload()
+    // Everything below runs AFTER the click has painted. Bootstrapping four
+    // vendor tags inside the click handler made "Accept" the slowest tap on
+    // the site (Search Console INP 217 ms on mobile, Sept 2026). Deferring it
+    // one frame keeps the banner dismissal instant; the tags load a moment
+    // later on an idle slice.
+    const work = () => {
+      logConsent(state, 'banner', region, mode)
+      if (state === 'granted') {
+        if (googleLoaded.current === 'none') { loadGoogle(true); googleLoaded.current = 'granted' }
+        else if (googleLoaded.current === 'denied') { grantGoogle(); googleLoaded.current = 'granted' }
+        if (!vendorsLoaded.current) { loadOtherVendors(); vendorsLoaded.current = true }
+        captureClickIdsFromUrl()
+      } else {
+        clearClickIds()
+        if (googleLoaded.current !== 'none' || vendorsLoaded.current) {
+          // Scripts from a prior acceptance (or the denied-mode Google tag) are
+          // already on this page; a reload gives a clean tracker-free page.
+          window.location.reload()
+        }
       }
     }
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }
+    if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(work, { timeout: 1500 })
+    else setTimeout(work, 0)
   }, [region, mode])
 
   if (suppressed || !bannerOpen) return null

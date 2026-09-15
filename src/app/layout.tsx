@@ -1,6 +1,6 @@
 import { completeMetadata } from '@/lib/seo/completeMetadata'
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans_JP, Manrope, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Manrope, Inter } from "next/font/google";
 import "./globals.css";
 import "./design-system.css";
 import Navigation from "./ui/Navigation";
@@ -25,12 +25,10 @@ const geistMono = Geist_Mono({
 const dcmDisplay = Manrope({ variable: '--font-dcm-display', subsets: ['latin'], display: 'swap' });
 const dcmBody = Inter({ variable: '--font-dcm-body', subsets: ['latin'], display: 'swap' });
 
-const notoSansJP = Noto_Sans_JP({
-  preload: false,
-  variable: "--font-noto-sans-jp",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-});
+// Noto Sans JP used to be loaded here as a webfont for Japanese card names. Its
+// 372 subset font-face rules shipped as 31 KB of render-blocking CSS on every
+// page, unused on most, so it is gone: .font-noto-sans-jp in globals.css now
+// names the system CJK fonts every phone and desktop already has.
 
 export const metadata: Metadata = completeMetadata({
   metadataBase: new URL('https://dcmgrading.com'),
@@ -145,7 +143,7 @@ export default function RootLayout({
             visitor explicitly accepts. Nothing tracking-related loads here. */}
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoSansJP.variable} ${dcmDisplay.variable} ${dcmBody.variable} antialiased bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} ${dcmDisplay.variable} ${dcmBody.variable} antialiased bg-gray-50`}
       >
         <a href="#main-content" className="dcm-skip-link">Skip to content</a>
         <ClientLayout>

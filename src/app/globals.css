@@ -15,7 +15,8 @@
 
 /* Japanese font support */
 .font-noto-sans-jp {
-  font-family: var(--font-noto-sans-jp), sans-serif;
+  /* System CJK stack; the Noto Sans JP webfont left the root layout in Sept 2026 (31 KB render-blocking CSS on every page). */
+  font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, "Noto Sans CJK JP", sans-serif;
 }
 
 /* Dark mode disabled - components use fixed light colors */
