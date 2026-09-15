@@ -104,3 +104,18 @@ npx vitest run src/lib/labels src/lib/labelLab src/lib/grading
 npx tsx scripts/label-design-snapshot.ts check
 npx tsx scripts/_tmp-classic-proof.ts
 ```
+
+## Change order 7: review fixes (95131ac1, 3e8aa8bd)
+
+All five "fix before release" findings from the first review, plus the efficiency items.
+
+| Finding | Fix | Where |
+|---|---|---|
+| Authentic showed N/A | Authentic resolved before the formatted grade; renders AUTHENTIC / A; ungraded non-authentic stays N/A | `classicLayout.ts` + tests on real generated label data |
+| Designation dropped | One typed adapter `toSlabLabelData` used everywhere; SlabLabelData carries the structured fields | `src/lib/labels/slabLabelDataAdapter.ts`, `slabLabelGenerator.ts` |
+| Custom Traditional slot previewed as Modern | Explicit custom-config branch in the edit modal | `EditCardLabelModal.tsx`, `CustomConfigLabelPreview.tsx` |
+| Zoom cap masked a binding face clamp | Exclusion compares values; `decideClampExplanation` pure helper; integration test of the reviewer's scenario | `consensusExplain.ts`, `clampExplanationFold.test.ts`, `visionGrader.ts` |
+| Customizing Classic switched family silently | Explicit `customized` flag with an inline note | `wizardTypes.ts`, `StepCustomize.tsx` |
+| Efficiency | Raster round trip removed; QR only when the classic back shows; truncation warning; style-aware guidance; "Traditional (Classic layout)"; email sent-log normalisation | see commits |
+
+Gates after the fixes: typecheck clean, 202 tests, Heritage snapshot byte-identical, classic PDF sweep regenerated.
