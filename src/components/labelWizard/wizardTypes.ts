@@ -131,7 +131,7 @@ export function styleOptionsForHolder(
     return [
       { id: 'heritage', name: 'Heritage', blurb: 'Ivory field, patterned color band, grade chip. The DCM signature label.' },
       { id: 'modern', name: 'Modern', blurb: 'Dark gradient with bold type. The original DCM look.' },
-      { id: 'traditional', name: 'Traditional', blurb: 'Classic grading-house layout with a DCM purple frame.' },
+      { id: 'traditional', name: 'Traditional (Classic layout)', blurb: 'Classic grading-house layout with a DCM purple frame.' },
       ...customStyles.map((s) => ({
         id: s.id as LabelStyleId,
         name: s.name,
@@ -198,6 +198,15 @@ export interface WizardState {
   styleId: LabelStyleId | null
   /** The working design. Only meaningful once styleId is set. */
   config: CustomLabelConfig
+  /**
+   * Has the user deliberately customized the working design since picking the
+   * style? This is the label FAMILY switch, set explicitly by the reducer
+   * rather than inferred from deep-equality against the base config: a single
+   * font-size nudge used to silently move a Traditional selection off the
+   * Classic layout, and so did anything else that touched the config.
+   * Cleared whenever a style is (re)selected.
+   */
+  customized: boolean
   side: 'front' | 'back'
 }
 
@@ -210,6 +219,7 @@ export const initialWizardState: WizardState = {
   toploaderVariant: 'front-back',
   styleId: null,
   config: { ...DEFAULT_CUSTOM_CONFIG },
+  customized: false,
   side: 'front',
 }
 
@@ -274,16 +284,20 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       const isSavedDesign = action.styleId.startsWith('custom-')
       if (isSavedDesign) {
         const zion = Math.abs(base.width - 2.51) < 0.01 && Math.abs(base.height - 0.76) < 0.01
-        return { ...state, styleId: action.styleId, slabSize: zion ? 'zion' : 'standard', config: base }
+        return { ...state, styleId: action.styleId, slabSize: zion ? 'zion' : 'standard', config: base, customized: false }
       }
       return {
         ...state,
         styleId: action.styleId,
         config: applySlabSize(base, state.slabSize),
+        customized: false,
       }
     }
+    // The first design edit moves the selection to the custom light layout,
+    // which is what the print path produces for a customized design. Slab size
+    // and side are holder choices, not design edits, so they do not set it.
     case 'PATCH_CONFIG':
-      return { ...state, config: { ...state.config, ...action.patch } }
+      return { ...state, config: { ...state.config, ...action.patch }, customized: true }
     case 'SET_ACTIVE_INDEX':
       return { ...state, activeIndex: Math.max(0, Math.min(action.index, state.cards.length - 1)) }
     case 'SET_SIDE':
@@ -314,12 +328,15 @@ export function stepBlocker(state: WizardState): string | null {
  * the user has since customized is a custom light label, which is what the
  * print path produces for it. So the preview follows the same rule: pristine
  * = Classic, edited = the canvas renderer that matches the paper.
+ *
+ * The family is read from the explicit `customized` flag (WizardState), not
+ * from a deep-equality check against the base config: the old check made any
+ * incidental config change - a slab size, a re-applied default - a silent
+ * family switch.
  */
 export function isPristineClassic(
   styleId: LabelStyleId | null,
-  config: CustomLabelConfig,
+  customized: boolean,
 ): boolean {
-  if (styleId !== 'traditional') return false
-  const base = { ...baseConfigForStyle('traditional', []), side: config.side }
-  return JSON.stringify(base) === JSON.stringify(config)
+  return styleId === 'traditional' && !customized
 }

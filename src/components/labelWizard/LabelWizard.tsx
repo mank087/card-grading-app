@@ -196,6 +196,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               styleId={state.styleId}
               customStyles={customStyles}
               onSelect={(styleId) => dispatch({ type: 'SET_STYLE', styleId, customStyles })}
+              customized={state.customized}
               cards={patchedSelected}
               dataMap={wizardData.dataMap}
               config={state.config}
@@ -222,7 +223,8 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               onSideChange={(side) => dispatch({ type: 'SET_SIDE', side })}
               orgLogoColor={orgLogoColor}
               toploaderVariant={state.toploaderVariant}
-              classic={isPristineClassic(state.styleId, state.config)}
+              classic={isPristineClassic(state.styleId, state.customized)}
+              traditionalSelection={state.styleId === 'traditional'}
             />
           )}
           {state.step === 5 && state.holder && state.styleId && (
@@ -230,6 +232,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               holder={state.holder}
               styleId={state.styleId}
               config={state.config}
+              customized={state.customized}
               cards={patchedSelected}
               dataMap={wizardData.dataMap}
               activeIndex={state.activeIndex}

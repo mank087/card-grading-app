@@ -123,6 +123,7 @@ export function getCardSlabProps(card: any): {
   grade: number | null;
   condition: string;
   isAlteredAuthentic: boolean;
+  designation: string | null;
 } {
   const labelData = getCardLabelData(card);
 
@@ -134,6 +135,8 @@ export function getCardSlabProps(card: any): {
     grade: labelData.grade,
     condition: labelData.condition,
     isAlteredAuthentic: labelData.isAlteredAuthentic,
+    // The Classic label prints this as its fourth line; CardSlab forwards it.
+    designation: labelData.designation ?? null,
   };
 }
 

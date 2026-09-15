@@ -115,6 +115,27 @@ export interface SlabLabelData {
   isAlteredAuthentic?: boolean;
   englishName?: string;
 
+  /**
+   * Structured identification fields, carried alongside the pre-formatted
+   * contextLine / featuresLine. The Classic label draws its four left-hand
+   * lines from these when they are present (and parses contextLine when they
+   * are not), and the v9.23 designation is a line of its own, so a builder
+   * that drops them silently loses the autograph notation. Build this object
+   * with labels/slabLabelDataAdapter.toSlabLabelData, which forwards them all.
+   */
+  designation?: string | null;
+  setName?: string | null;
+  subset?: string | null;
+  cardNumber?: string | null;
+  formattedCardNumber?: string | null;
+  year?: string | null;
+  /** 'on-card' | 'sticker' | 'unverified' | 'none' - from autographPolicy. */
+  autographType?: string | null;
+  autographed?: boolean | null;
+  /** Parallel / variety, when the caller knows it structurally. */
+  rarity_or_variant?: string | null;
+  op_variant_type?: string | null;
+
   // Back label
   qrCodeDataUrl: string;
   subScores?: {

@@ -49,6 +49,8 @@ interface StepCustomizeProps {
   toploaderVariant?: 'front-back' | 'foldover'
   /** The untouched built-in Traditional selection - see WizardPreview.classic. */
   classic?: boolean
+  /** The chosen style is Traditional (customized or not). Drives the note below. */
+  traditionalSelection?: boolean
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -96,6 +98,7 @@ export function StepCustomize({
   orgLogoColor,
   toploaderVariant = 'front-back',
   classic = false,
+  traditionalSelection = false,
 }: StepCustomizeProps) {
   const isHeritage = config.style === 'heritage'
   const activeCard = cards[activeIndex]
@@ -509,6 +512,12 @@ export function StepCustomize({
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Make it yours</h2>
       <p className="text-sm text-gray-500 mb-5">Every change updates the preview live — flip through your cards to check each one.</p>
+
+      {traditionalSelection && (
+        <div className="mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Customizing switches to the custom light layout. Classic stays available as the built-in Traditional style.
+        </div>
+      )}
 
       {holder !== 'slab' && !isHeritage ? (
         <div>

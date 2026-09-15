@@ -31,6 +31,8 @@ interface StepConfirmProps {
   holder: HolderType
   styleId: LabelStyleId
   config: CustomLabelConfig
+  /** Has the working design been customized? Drives the Classic preview. */
+  customized?: boolean
   cards: any[]
   dataMap: Map<string, SlabLabelData>
   activeIndex: number
@@ -75,6 +77,7 @@ export function StepConfirm({
   holder,
   styleId,
   config,
+  customized = false,
   cards,
   dataMap,
   activeIndex,
@@ -150,7 +153,7 @@ export function StepConfirm({
   const isBuiltIn = styleId === 'heritage' || styleId === 'modern' || styleId === 'traditional'
   // Untouched built-in Traditional = the Classic grading label, previewed and
   // printed through the built-in path rather than the custom generators.
-  const classic = isPristineClassic(styleId, config)
+  const classic = isPristineClassic(styleId, customized)
 
   /**
    * Heritage Compact config for the small-holder sheets. Band colours stay

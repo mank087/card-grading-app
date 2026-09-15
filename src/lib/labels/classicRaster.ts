@@ -20,12 +20,11 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { ClassicLabelPreview } from '@/components/labels/ClassicLabelPreview'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
-import type { ClassicLineSource } from '@/lib/labelLab/classicLayout'
 import { CLASSIC_PX, classicBackMark } from '@/lib/labelLab/classicLayout'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
 
 export interface ClassicRasterOptions {
-  data: SlabLabelData & Partial<ClassicLineSource>
+  data: SlabLabelData
   side: 'front' | 'back'
   /** Output raster width in px; height follows the 1400:400 aspect. Default 1400. */
   widthPx?: number
@@ -110,8 +109,14 @@ async function compositeBitmaps(
   if (qr) ctx.drawImage(qr, P.QR_X * k, P.QR_Y * k, P.QR_BOX * k, P.QR_BOX * k)
 }
 
-/** Render the Classic label to a PNG data URL at the requested width. */
-export async function renderClassicLabelPng(opts: ClassicRasterOptions): Promise<string> {
+/**
+ * Same raster, delivered as a canvas for callers that keep compositing.
+ *
+ * This is the real renderer; the PNG entry point below just encodes what this
+ * returns. (It used to be the other way round, which meant a canvas caller
+ * paid for a PNG encode plus a decode plus a second canvas for nothing.)
+ */
+export async function renderClassicLabelCanvas(opts: ClassicRasterOptions): Promise<HTMLCanvasElement> {
   const blackLogo = opts.logoBlack ?? await loadBlackLogoAsBase64().catch(() => null)
   const markup = svgMarkup(opts)
   const blob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' })
@@ -128,21 +133,14 @@ export async function renderClassicLabelPng(opts: ClassicRasterOptions): Promise
     const ctx = canvas.getContext('2d')!
     ctx.drawImage(img, 0, 0, w, h)
     await compositeBitmaps(ctx, opts, blackLogo, w / CLASSIC_PX.W)
-    return canvas.toDataURL('image/png')
+    return canvas
   } finally {
     URL.revokeObjectURL(url)
   }
 }
 
-/** Same raster, delivered as a canvas for callers that keep compositing. */
-export async function renderClassicLabelCanvas(opts: ClassicRasterOptions): Promise<HTMLCanvasElement> {
-  const dataUrl = await renderClassicLabelPng(opts)
-  const img = new Image()
-  img.src = dataUrl
-  await img.decode()
-  const canvas = document.createElement('canvas')
-  canvas.width = img.width
-  canvas.height = img.height
-  canvas.getContext('2d')!.drawImage(img, 0, 0)
-  return canvas
+/** Render the Classic label to a PNG data URL at the requested width. */
+export async function renderClassicLabelPng(opts: ClassicRasterOptions): Promise<string> {
+  const canvas = await renderClassicLabelCanvas(opts)
+  return canvas.toDataURL('image/png')
 }

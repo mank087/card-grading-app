@@ -22,6 +22,8 @@ interface StepStyleProps {
   styleId: LabelStyleId | null
   customStyles: SavedCustomStyle[]
   onSelect: (styleId: LabelStyleId) => void
+  /** Has the working design been customized? Drives the Classic preview. */
+  customized?: boolean
   cards: any[]
   dataMap: Map<string, SlabLabelData>
   config: CustomLabelConfig
@@ -40,6 +42,7 @@ export function StepStyle({
   styleId,
   customStyles,
   onSelect,
+  customized = false,
   cards,
   dataMap,
   config,
@@ -157,7 +160,7 @@ export function StepStyle({
                 config={config}
                 holder={holder}
                 orgLogoColor={orgLogoColor} toploaderVariant={toploaderVariant}
-                classic={isPristineClassic(styleId, config)}
+                classic={isPristineClassic(styleId, customized)}
               />
             )}
             caption={(i) => (

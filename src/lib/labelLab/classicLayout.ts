@@ -293,14 +293,21 @@ export function classicLines(data: ClassicLineSource): ClassicLines {
     || (data.cardNumber ? (data.cardNumber.startsWith('#') ? data.cardNumber : `#${data.cardNumber}`) : '')
     || parsed.number).trim()
   const hasGrade = data.grade !== null && data.grade !== undefined && isFinite(Number(data.grade))
-  const descriptor = up(
-    (!hasGrade && data.isAlteredAuthentic ? 'Authentic' : (data.condition || '')).trim()
-  )
-  const grade = data.gradeFormatted
-    ? String(data.gradeFormatted)
-    : hasGrade
-      ? Math.round(Number(data.grade)).toString()
-      : (data.isAlteredAuthentic ? 'A' : 'N/A')
+  // Authentic cards (no numeric grade, altered/authentic flag set) read
+  // "AUTHENTIC / A" on Modern and Heritage, so resolve that case BEFORE
+  // looking at gradeFormatted: labelDataGenerator formats a null grade as the
+  // literal "N/A" whatever the flag says, so a caller that forwards the string
+  // would print "AUTHENTIC / N/A" while a caller that omits it prints "A".
+  // Non-authentic null grades stay "N/A", same as every other style.
+  const authentic = !hasGrade && !!data.isAlteredAuthentic
+  const descriptor = up((authentic ? 'Authentic' : (data.condition || '')).trim())
+  const grade = authentic
+    ? 'A'
+    : data.gradeFormatted
+      ? String(data.gradeFormatted)
+      : hasGrade
+        ? Math.round(Number(data.grade)).toString()
+        : 'N/A'
 
   return {
     left: [l1, l2, l3, l4],

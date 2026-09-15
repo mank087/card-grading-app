@@ -7,6 +7,7 @@ import { ModernBackLabel } from './labels/ModernBackLabel'
 import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
 import type { LabelColorOverrides } from '@/lib/labelPresets'
+import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
 // Sub-scores interface for modern labels
@@ -52,6 +53,9 @@ export interface CardSlabProps {
   // For Altered/Authentic cards
   isAlteredAuthentic?: boolean
 
+  /** v9.23 notation beside the grade (e.g. "Altered - Unverified Autograph"). */
+  designation?: string | null
+
   // Label style preference
   labelStyle?: string
 
@@ -96,6 +100,7 @@ export function CardSlab({
   showZoomHint = false,
   className = '',
   isAlteredAuthentic = false,
+  designation = null,
   labelStyle = 'modern',
   subScores,
   showFounderEmblem = false,
@@ -122,7 +127,8 @@ export function CardSlab({
   // Built-in 'traditional' is the Classic grading label (Sept 2026): the same
   // 1400x400 design the print PDF draws, rendered from the shared layout math.
   // Custom slots keep their own design - callers never pass 'traditional' for one.
-  const classicData = {
+  const isClassic = !isModern && !heritage
+  const classicData: SlabLabelData = {
     primaryName: displayName,
     contextLine: setLineText || '',
     features: features || [],
@@ -130,9 +136,12 @@ export function CardSlab({
     grade,
     condition,
     isAlteredAuthentic,
+    designation: designation ?? null,
     qrCodeDataUrl: '',
-  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
-  const classicQr = useClassicQrDataUrl(qrCodeUrl)
+  }
+  // Only the Classic back label draws a QR, so only generate one when that is
+  // what is being rendered. Every other style makes its own.
+  const classicQr = useClassicQrDataUrl(isClassic && showBackCard ? qrCodeUrl : null)
 
   // Card image component
   const CardImage = ({
@@ -313,6 +322,8 @@ export interface CardSlabGridProps {
   condition?: string
   frontImageUrl: string | null
   isAlteredAuthentic?: boolean
+  /** v9.23 notation beside the grade (e.g. "Altered - Unverified Autograph"). */
+  designation?: string | null
   children?: ReactNode // For additional content like buttons
   className?: string
   labelStyle?: string
@@ -337,6 +348,7 @@ export function CardSlabGrid({
   condition = '',
   frontImageUrl,
   isAlteredAuthentic = false,
+  designation = null,
   children,
   className = '',
   labelStyle = 'modern',
@@ -387,7 +399,7 @@ export function CardSlabGrid({
 
   // Built-in 'traditional' renders the Classic grading label, same as the
   // detail slab above. The grid tile only ever shows the front.
-  const gridClassicData = {
+  const gridClassicData: SlabLabelData = {
     primaryName: displayName,
     contextLine: setLineText || '',
     features: features || [],
@@ -395,8 +407,9 @@ export function CardSlabGrid({
     grade,
     condition,
     isAlteredAuthentic,
+    designation: designation ?? null,
     qrCodeDataUrl: '',
-  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
+  }
 
   return (
     <div

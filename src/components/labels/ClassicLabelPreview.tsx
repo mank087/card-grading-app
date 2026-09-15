@@ -34,7 +34,6 @@ import {
   classicLeftMaxWidths,
   fitClassicFront,
   fitClassicBack,
-  type ClassicLineSource,
 } from '@/lib/labelLab/classicLayout'
 import { designAspect, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 
@@ -47,7 +46,7 @@ const FONT = 'Helvetica, Arial, "Noto Sans JP", sans-serif'
 
 export interface ClassicLabelPreviewProps {
   /** Slab label row. Structured label fields (setName, year, designation, …) are honoured when present. */
-  data: SlabLabelData & Partial<ClassicLineSource>
+  data: SlabLabelData
   side: 'front' | 'back'
   className?: string
   /**
@@ -146,7 +145,7 @@ function Line({
 function FrontSide({ data, uid, blackLogoHref, suppressImages }: {
   data: ClassicLabelPreviewProps['data']; uid: string; blackLogoHref?: string; suppressImages?: boolean
 }) {
-  const lines = classicLines(data as ClassicLineSource)
+  const lines = classicLines(data)
   const maxWidths = classicLeftMaxWidths(lines.right)
   const fit = fitClassicFront(lines.left, { maxWidths })
 

@@ -9,11 +9,11 @@
  */
 'use client'
 
-import React, { useMemo, useRef } from 'react'
+import React, { useMemo } from 'react'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import type { CustomLabelConfig } from '@/lib/labelPresets'
 import { LABEL_TYPES } from '@/lib/labelPresets'
-import { useLabelPreview } from '@/hooks/useLabelPreview'
+import { CustomConfigLabelPreview } from '@/components/labels/CustomConfigLabelPreview'
 import HeritageLabelPreview from '@/components/labels/HeritageLabelPreview'
 import ClassicLabelPreview from '@/components/labels/ClassicLabelPreview'
 import LabelMockup from '@/components/labels/LabelMockup'
@@ -38,23 +38,9 @@ export function heritagePatternFromConfig(config: CustomLabelConfig): BandPatter
   return (BAND_PATTERNS.some((p) => p.id === raw) ? raw : 'diamond') as BandPattern
 }
 
-/** Canvas-rendered label (modern/traditional), as an <img>. */
+/** Canvas-rendered label (modern / custom light), as an <img>. */
 function CanvasLabel({ data, config }: { data: SlabLabelData; config: CustomLabelConfig }) {
-  const dummyRef = useRef<HTMLCanvasElement | null>(null)
-  const { previewDataUrl, isRendering } = useLabelPreview({ config, data, canvasRef: dummyRef, debounceMs: 150 })
-  if (!previewDataUrl) {
-    return <div className="w-full bg-gray-200 animate-pulse rounded" style={{ aspectRatio: '3.5 / 1' }} />
-  }
-  return (
-    <div className="relative w-full">
-      <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
-      {isRendering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/40">
-          <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-    </div>
-  )
+  return <CustomConfigLabelPreview data={data} config={config} />
 }
 
 interface LabelOnlyProps {

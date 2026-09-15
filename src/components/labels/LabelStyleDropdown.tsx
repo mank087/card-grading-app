@@ -33,7 +33,7 @@ export function LabelStyleDropdown({
   // Get display name for current style
   const getDisplayName = (id: LabelStyleId): string => {
     if (id === 'modern') return 'Modern (DCM)'
-    if (id === 'traditional') return 'Traditional'
+    if (id === 'traditional') return 'Traditional (Classic layout)'
     if (id === 'heritage') return 'Heritage'
     const custom = customStyles.find(s => s.id === id)
     return custom?.name || id
@@ -102,7 +102,7 @@ export function LabelStyleDropdown({
               labelStyle === 'traditional' ? 'bg-purple-50 text-purple-700' : 'hover:bg-gray-50 text-gray-900'
             }`}
           >
-            <span className="font-medium text-sm">Traditional</span>
+            <span className="font-medium text-sm">Traditional (Classic layout)</span>
             {labelStyle === 'traditional' && (
               <svg className="w-4 h-4 ml-auto text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

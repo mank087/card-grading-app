@@ -29,6 +29,8 @@ import {
 import { widthOf } from './textFit'
 import { HERITAGE_BRAND_COLORS } from './heritageLayout'
 import { UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy'
+import { getCardLabelData } from '@/lib/useLabelData'
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter'
 
 const base = {
   serial: '657840',
@@ -348,5 +350,94 @@ describe('fitClassicBack', () => {
     const f = fitClassicBack(serial, `dcmgrading.com/verify/${serial}`)
     expect(f.serialSize).toBeLessThan(CLASSIC_PX.BACK_SERIAL_SIZE)
     expect(widthOf(serial, f.serialSize, 0) * classicBoldFactor(serial)).toBeLessThanOrEqual(f.half * 2 + 0.001)
+  })
+})
+
+/**
+ * The Authentic case, end to end from the REAL generated label data.
+ *
+ * getCardLabelData formats a null grade as the literal "N/A" whatever the
+ * altered/authentic flag says, so a surface that forwards gradeFormatted used
+ * to print "AUTHENTIC / N/A" while a surface that omitted it printed "A".
+ * Both paths are pinned here, plus the ordinary ungraded card that really does
+ * read "N/A" on every other style.
+ */
+describe('classicLines + real label data', () => {
+  const authenticCard = {
+    id: 'aaaaaaaa-1111-2222-3333-444444444444',
+    category: 'pokemon',
+    serial: '901234',
+    conversational_decimal_grade: null,
+    conversational_whole_grade: null,
+    conversational_condition_label: 'Authentic Altered',
+    conversational_card_info: {
+      card_name: 'Charizard',
+      set_name: 'Base Set',
+      card_number: '4/102',
+      year: '1999',
+    },
+  }
+
+  it('reads AUTHENTIC / A through toSlabLabelData (gradeFormatted present)', () => {
+    const labelData = getCardLabelData(authenticCard)
+    expect(labelData.grade).toBeNull()
+    expect(labelData.isAlteredAuthentic).toBe(true)
+    // The generator really does hand us "N/A" here — that is the trap.
+    expect(labelData.gradeFormatted).toBe('N/A')
+
+    const l = classicLines(toSlabLabelData(labelData))
+    expect(l.right.descriptor).toBe('AUTHENTIC')
+    expect(l.right.grade).toBe('A')
+  })
+
+  it('reads the same when the caller omits gradeFormatted', () => {
+    const labelData = getCardLabelData(authenticCard)
+    const { gradeFormatted, ...withoutFormatted } = toSlabLabelData(labelData)
+    const l = classicLines(withoutFormatted)
+    expect(l.right.descriptor).toBe('AUTHENTIC')
+    expect(l.right.grade).toBe('A')
+  })
+
+  it('leaves an ungraded, non-authentic card at N/A', () => {
+    const labelData = getCardLabelData({
+      ...authenticCard,
+      conversational_condition_label: null,
+    })
+    expect(labelData.isAlteredAuthentic).toBe(false)
+    expect(classicLines(toSlabLabelData(labelData)).right.grade).toBe('N/A')
+  })
+
+  it('carries the v9.23 designation from the card row into line four', () => {
+    const labelData = getCardLabelData({
+      ...authenticCard,
+      conversational_decimal_grade: 9,
+      conversational_condition_label: 'Mint',
+      autograph_type: 'unverified',
+    })
+    expect(labelData.designation).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION)
+
+    const slab = toSlabLabelData(labelData)
+    expect(slab.designation).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION)
+    expect(classicLines(slab).left[3]).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION.toUpperCase())
+  })
+
+  it('keeps the structured identification fields the adapter forwards', () => {
+    const labelData = getCardLabelData(authenticCard)
+    const slab = toSlabLabelData(labelData)
+    expect(slab.setName).toBe(labelData.setName)
+    expect(slab.year).toBe(labelData.year)
+    expect(slab.formattedCardNumber).toBe(labelData.formattedCardNumber ?? null)
+    // Structured fields win over the parsed context line.
+    const l = classicLines(slab)
+    expect(l.left[0]).toBe(`${labelData.year} ${labelData.setName}`.toUpperCase())
+    expect(l.left[1]).toBe(labelData.primaryName.toUpperCase())
+  })
+
+  it('does not let extras with undefined values blank a resolved field', () => {
+    const labelData = getCardLabelData(authenticCard)
+    const slab = toSlabLabelData(labelData, { englishName: undefined, qrCodeDataUrl: 'data:image/png;base64,AAA' })
+    expect(slab.designation).toBeNull()
+    expect(slab.primaryName).toBe(labelData.primaryName)
+    expect(slab.qrCodeDataUrl).toBe('data:image/png;base64,AAA')
   })
 })

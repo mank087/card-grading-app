@@ -35,6 +35,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter';
 import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard } from '@/lib/orgBranding';
@@ -256,19 +257,11 @@ export default function LabelPreviewPage() {
         };
 
         if (cancelled) return;
-        slabDataRef.current = {
-          primaryName: labelData.primaryName,
-          contextLine: labelData.contextLine || '',
-          features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
-          featuresLine: labelData.featuresLine || null,
-          serial: labelData.serial,
-          // Pass grade through as null for ungraded cards (the renderer shows
-          // 'A'/'N/A' instead of a literal 0) and the real altered-authentic
-          // flag — matches web Label Studio (LabelStudioClient.tsx).
-          grade: labelData.grade,
-          gradeFormatted: labelData.gradeFormatted,
-          condition: labelData.condition,
-          isAlteredAuthentic: labelData.isAlteredAuthentic,
+        // The adapter passes grade through as null for ungraded cards (the
+        // renderer shows 'A'/'N/A' instead of a literal 0) and carries the real
+        // altered-authentic flag plus the structured identification fields —
+        // matches web Label Studio (LabelStudioClient.tsx).
+        slabDataRef.current = toSlabLabelData(labelData, {
           englishName: card.featured || card.pokemon_featured || undefined,
           qrCodeDataUrl,
           subScores,
@@ -277,7 +270,7 @@ export default function LabelPreviewPage() {
           showFounderEmblem,
           showVipEmblem,
           showCardLoversEmblem,
-        } as any;
+        }) as any;
 
         // Initial render with the URL-provided config
         const initialConfig = configFor(initialType, initialSide, decodeCustom(initialCustomConfigRaw));

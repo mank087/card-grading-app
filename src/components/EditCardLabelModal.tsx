@@ -6,7 +6,10 @@ import type { LabelData } from '../lib/labelDataGenerator';
 import { getStoredSession } from '../lib/directAuth';
 import { HeritageLabelPreview } from './labels/HeritageLabelPreview';
 import { ClassicLabelPreview } from './labels/ClassicLabelPreview';
+import { CustomConfigLabelPreview } from './labels/CustomConfigLabelPreview';
 import { ModernFrontLabel } from './labels/ModernFrontLabel';
+import { toSlabLabelData } from '../lib/labels/slabLabelDataAdapter';
+import { classicLines, classicLeftMaxWidths, fitClassicFront } from '../lib/labelLab/classicLayout';
 import { resolveHeritageSelection, isClassicSelection } from '../lib/labels/labelStyleResolution';
 import { HERITAGE_BRAND_COLORS } from '../lib/labelLab/heritageLayout';
 import type { CustomLabelConfig, LabelColorOverrides } from '../lib/labelPresets';
@@ -38,6 +41,13 @@ interface FieldConfig {
   key: keyof CustomLabelFields;
   label: string;
   guidance: string;
+  /**
+   * Guidance for the Classic (built-in Traditional) label, whose lines run in
+   * a different order: line one is the year plus the set, line two is the card
+   * name, line three the variety, line four the designation. The generic
+   * copy would tell the customer the wrong thing.
+   */
+  classicGuidance?: string;
   placeholder: string;
   type?: 'text' | 'tags';
 }
@@ -47,36 +57,42 @@ const FIELD_CONFIGS: FieldConfig[] = [
     key: 'primaryName',
     label: 'Card Name',
     guidance: 'The main name displayed on the label. For sports cards this is the player name, for TCG cards this is the card name.',
+    classicGuidance: 'The main name. On this label it is the second line, directly under the set line.',
     placeholder: 'e.g. Charizard EX, Tom Brady',
   },
   {
     key: 'setName',
     label: 'Set Name',
     guidance: 'The card set or product line. Appears in the second line of the label.',
+    classicGuidance: 'The card set or product line. On this label it shares the first line with the year.',
     placeholder: 'e.g. Scarlet & Violet, Topps Chrome',
   },
   {
     key: 'subset',
     label: 'Subset / Variant',
     guidance: 'The subset, parallel, or variant type. Appears after the set name.',
+    classicGuidance: 'The subset, parallel, or variant type. On this label it prints right after the set name on the first line.',
     placeholder: 'e.g. Holo Rare, Refractor, Full Art',
   },
   {
     key: 'cardNumber',
     label: 'Card Number',
     guidance: 'The collector number as printed on the card. Include # prefix if desired.',
+    classicGuidance: 'The collector number as printed on the card. On this label it sits at the top of the grade column, on the right.',
     placeholder: 'e.g. #25, 232/182, SM226',
   },
   {
     key: 'year',
     label: 'Year',
     guidance: 'The release year of the card or set.',
+    classicGuidance: 'The release year. On this label it opens the first line, ahead of the set name.',
     placeholder: 'e.g. 2024',
   },
   {
     key: 'features',
     label: 'Special Features',
     guidance: 'Notable attributes like Rookie Card, Autograph, Serial Numbered, 1st Edition, etc. Separate with commas.',
+    classicGuidance: 'Notable attributes like Rookie Card, Serial Numbered or 1st Edition. On this label they print as the variety line, the third line.',
     placeholder: 'e.g. RC, Auto, /99, 1st Edition',
     type: 'tags',
   },
@@ -219,6 +235,8 @@ export function EditCardLabelModal({
   if (!isOpen) return null;
 
   const isLoading = isSaving || isReverting;
+  // Line order differs per style, so the per-field guidance does too.
+  const classicActive = isClassicSelection(labelStyle, activeConfig);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -254,20 +272,35 @@ export function EditCardLabelModal({
               .filter(Boolean)
               .join(' • ');
             const features = featuresText.split(',').map(f => f.trim()).filter(Boolean);
-            const previewData = {
+            // Rebuild the card's LabelData with the edits applied, then run it
+            // through the one adapter every other surface uses — so the preview
+            // carries the designation and the structured identification fields
+            // instead of quietly dropping them.
+            const editedLabelData: LabelData = {
+              ...labelData,
               primaryName: fields.primaryName || 'Card Name',
+              setName: fields.setName || null,
+              subset: fields.subset || null,
+              cardNumber: fields.cardNumber || null,
+              formattedCardNumber: cardNumberText || null,
+              year: fields.year || null,
               contextLine: contextLine || 'Set details',
               features,
-              serial: labelData.serial,
-              grade: labelData.grade,
-              gradeFormatted: labelData.gradeFormatted,
-              condition: labelData.condition,
-              isAlteredAuthentic: labelData.isAlteredAuthentic,
-              qrCodeDataUrl: '',
-              subScores: undefined,
-            } as unknown as SlabLabelData;
+              featuresLine: features.length ? features.join(' • ') : null,
+            };
+            const previewData: SlabLabelData = toSlabLabelData(editedLabelData);
             const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
             const classic = isClassicSelection(labelStyle, activeConfig);
+            // Classic never wraps and never shrinks below a printable size: it
+            // truncates. Tell the customer which field lost characters.
+            const classicTruncated = classic ? (() => {
+              const lines = classicLines(previewData);
+              const fit = fitClassicFront(lines.left, { maxWidths: classicLeftMaxWidths(lines.right) });
+              const FIELD_BY_SOURCE = ['set line', 'card name', 'variety', 'designation'];
+              return fit.truncated
+                .map((cut, slot) => (cut && fit.sources[slot] >= 0 ? FIELD_BY_SOURCE[fit.sources[slot]] : null))
+                .filter((name): name is string => !!name);
+            })() : [];
             return (
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Label Preview</p>
@@ -282,6 +315,13 @@ export function EditCardLabelModal({
                     />
                   ) : classic ? (
                     <ClassicLabelPreview data={previewData} side="front" />
+                  ) : activeConfig && activeConfig.style === 'traditional' ? (
+                    // A saved custom slot on the light (traditional) spec is
+                    // NOT the Classic label: it prints through the canvas
+                    // renderer with the config's own colours. Preview it the
+                    // same way the wizard and the print path do, or the
+                    // customer is shown a Modern label they will never get.
+                    <CustomConfigLabelPreview data={previewData} config={activeConfig} />
                   ) : (
                     <ModernFrontLabel
                       displayName={previewData.primaryName}
@@ -296,6 +336,11 @@ export function EditCardLabelModal({
                     />
                   )}
                 </div>
+                {classicTruncated.length > 0 && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Too long to fit: the {classicTruncated.join(' and ')} {classicTruncated.length > 1 ? 'are' : 'is'} shortened on the printed label. Trim the text to control what is kept.
+                  </p>
+                )}
               </div>
             );
           })()}
@@ -306,7 +351,9 @@ export function EditCardLabelModal({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {config.label}
               </label>
-              <p className="text-xs text-gray-500 mb-1.5">{config.guidance}</p>
+              <p className="text-xs text-gray-500 mb-1.5">
+                {classicActive && config.classicGuidance ? config.classicGuidance : config.guidance}
+              </p>
               {config.type === 'tags' ? (
                 <input
                   type="text"

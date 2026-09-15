@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getStoredSession } from '@/lib/directAuth'
 import { getCardLabelData } from '@/lib/useLabelData'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter'
 import {
   generateQRCodePlain,
   loadLogoAsBase64,
@@ -189,16 +190,7 @@ export function useWizardData(cards: any[], isAuthenticated: boolean): WizardDat
         card.conversational_sub_scores?.centering !== undefined
       const cardOrg = orgLogos && card.org_id && card.org_id === orgLogos.orgId ? orgLogos : null
 
-      const data: SlabLabelData = {
-        primaryName: labelData.primaryName,
-        contextLine: labelData.contextLine,
-        features: labelData.features,
-        featuresLine: labelData.featuresLine,
-        serial: labelData.serial,
-        grade: labelData.grade,
-        gradeFormatted: labelData.gradeFormatted,
-        condition: labelData.condition,
-        isAlteredAuthentic: labelData.isAlteredAuthentic,
+      const data: SlabLabelData = toSlabLabelData(labelData, {
         englishName: (labelData as any).englishName,
         qrCodeDataUrl,
         subScores: hasSubScores
@@ -214,7 +206,7 @@ export function useWizardData(cards: any[], isAuthenticated: boolean): WizardDat
         showCardLoversEmblem: emblems.showCardLoversEmblem,
         logoDataUrl: cardOrg?.mark || dcmLogos!.color,
         whiteLogoDataUrl: cardOrg?.white || dcmLogos!.white,
-      }
+      })
       if (!cancelled) {
         setDataMap((prev) => {
           const next = new Map(prev)

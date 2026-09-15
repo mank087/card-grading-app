@@ -66,6 +66,7 @@ import { HeritageLabelPreview } from '@/components/labels/HeritageLabelPreview'
 import { ScaleToFit } from '@/components/labels/ScaleToFit'
 import { resolveHeritageSelection, isTraditionalSelection, isClassicSelection } from '@/lib/labels/labelStyleResolution'
 import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter'
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
 import { DefectLegend } from '@/components/grading/DefectLegend';
@@ -2626,14 +2627,7 @@ export function OnePieceCardDetails() {
   const labelData = getCardLabelData(card);
 
   // Heritage label data — feeds the shared SVG preview when heritage is active
-  const heritageData = heritageSel.active ? {
-    primaryName: labelData.primaryName,
-    contextLine: labelData.contextLine || '',
-    features: labelData.features || [],
-    serial: labelData.serial,
-    grade: labelData.grade,
-    condition: labelData.condition,
-    isAlteredAuthentic: labelData.isAlteredAuthentic,
+  const heritageData = heritageSel.active ? toSlabLabelData(labelData, {
     qrCodeDataUrl: heritageQrDataUrl,
     subScores: card?.conversational_sub_scores ? {
       centering: card.conversational_sub_scores.centering?.weighted ?? 0,
@@ -2644,22 +2638,11 @@ export function OnePieceCardDetails() {
     showFounderEmblem,
     showVipEmblem,
     showCardLoversEmblem,
-  } : null;
+  }) : null;
   const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
   // Classic label data - the same unified labelData the print PDF is built
   // from, so the on-screen slab and the paper cannot disagree.
-  const classicData = {
-    primaryName: labelData.primaryName,
-    contextLine: labelData.contextLine || '',
-    features: labelData.features || [],
-    featuresLine: labelData.featuresLine,
-    serial: labelData.serial,
-    grade: labelData.grade,
-    gradeFormatted: labelData.gradeFormatted,
-    condition: labelData.condition,
-    isAlteredAuthentic: labelData.isAlteredAuthentic,
-    qrCodeDataUrl: classicQrDataUrl,
-  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data'];
+  const classicData = toSlabLabelData(labelData, { qrCodeDataUrl: classicQrDataUrl });
 
   // 🎯 One Piece cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {

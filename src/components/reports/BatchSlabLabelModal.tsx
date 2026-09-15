@@ -6,6 +6,7 @@ import { generateBatchCustomSlabLabels, generateBatchFoldOverCustomLabels } from
 import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import { getCardLabelData } from '../../lib/useLabelData';
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
@@ -154,16 +155,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    return {
-      primaryName: labelData.primaryName,
-      contextLine: labelData.contextLine,
-      features: labelData.features,
-      featuresLine: labelData.featuresLine,
-      serial: labelData.serial,
-      grade: labelData.grade,
-      gradeFormatted: labelData.gradeFormatted,
-      condition: labelData.condition,
-      isAlteredAuthentic: labelData.isAlteredAuthentic,
+    return toSlabLabelData(labelData, {
       englishName: card.featured || card.pokemon_featured || card.card_name || undefined,
       qrCodeDataUrl,
       subScores: {
@@ -178,7 +170,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       logoDataUrl,
       whiteLogoDataUrl,
       logoScale,
-    };
+    });
   }, [showFounderEmblem, showVipEmblem, showCardLoversEmblem]);
 
   const handleGenerate = useCallback(async () => {

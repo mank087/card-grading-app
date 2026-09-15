@@ -17,6 +17,7 @@
 import { useState } from 'react'
 import type { LabelTypeInfo } from '@/lib/labelPresets'
 import { ClassicLabelPreview, useClassicQrDataUrl } from '@/components/labels/ClassicLabelPreview'
+import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 
 interface LabelMockupProps {
   card: {
@@ -60,7 +61,7 @@ interface LabelMockupProps {
  * always the built-in id, never a customer's saved custom slot (which keeps
  * the old light design it was designed on).
  */
-function classicDataFrom(labelProps: LabelMockupProps['labelProps'], qrDataUrl = '') {
+function classicDataFrom(labelProps: LabelMockupProps['labelProps'], qrDataUrl = ''): SlabLabelData {
   return {
     primaryName: labelProps.displayName,
     contextLine: labelProps.setLineText || '',
@@ -70,7 +71,7 @@ function classicDataFrom(labelProps: LabelMockupProps['labelProps'], qrDataUrl =
     condition: labelProps.condition,
     isAlteredAuthentic: labelProps.isAlteredAuthentic,
     qrCodeDataUrl: qrDataUrl,
-  } as unknown as Parameters<typeof ClassicLabelPreview>[0]['data']
+  }
 }
 
 function gradeStr(grade: number | null, alt?: boolean): string {

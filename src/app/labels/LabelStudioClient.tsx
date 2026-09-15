@@ -4,6 +4,7 @@ import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter'
 import { buildContextLine, buildFeaturesLine, formatCardNumberForContext } from '@/lib/labelDataGenerator'
 import { DIMENSION_PRESETS, COLOR_PRESETS, MAX_SAVED_LABEL_STYLES, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops, GRADE_CHIPS_PRINT, GRADE_CHIP_BLACK, GRADE_10_FOIL_CSS } from '@/lib/labelPresets'
 import { contrastRatioHex } from '@/lib/contrastWCAG'
@@ -3203,16 +3204,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
       }
       const hasSubScores = weightedScores.centering !== undefined || subScoresRaw.centering !== undefined
 
-      const data: SlabLabelData = {
-        primaryName: labelData.primaryName,
-        contextLine: labelData.contextLine,
-        features: labelData.features,
-        featuresLine: labelData.featuresLine,
-        serial: labelData.serial,
-        grade: labelData.grade,
-        gradeFormatted: labelData.gradeFormatted,
-        condition: labelData.condition,
-        isAlteredAuthentic: labelData.isAlteredAuthentic,
+      const data: SlabLabelData = toSlabLabelData(labelData, {
         englishName: (labelData as any).englishName,
         qrCodeDataUrl,
         subScores: hasSubScores ? {
@@ -3226,7 +3218,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         showCardLoversEmblem,
         logoDataUrl: cardOrgLogos?.mark || logoDataUrl,
         whiteLogoDataUrl: cardOrgLogos?.white || whiteLogoDataUrl,
-      }
+      })
 
       setSlabData(data)
     }

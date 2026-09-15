@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
@@ -580,16 +581,7 @@ export default function LabelExportPage() {
           // dark. Previously only logoDataUrl was loaded, so dark-themed
           // custom labels generated through the mobile path had no logo.
           const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl, logos.branding ? logos.color : undefined).catch(() => '');
-          const slabPayload: any = {
-            primaryName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
-            features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
-            featuresLine: labelData.featuresLine || null,
-            serial: labelData.serial,
-            grade: labelData.grade,
-            gradeFormatted: labelData.gradeFormatted,
-            condition: labelData.condition,
-            isAlteredAuthentic: labelData.isAlteredAuthentic,
+          const slabPayload: any = toSlabLabelData(labelData, {
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
@@ -598,7 +590,7 @@ export default function LabelExportPage() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-          };
+          });
           const blob = format === 'foldover'
             ? await generateFoldOverCustomSlabLabel(slabPayload, config)
             : await generateCustomSlabLabel(slabPayload, config);
@@ -613,14 +605,10 @@ export default function LabelExportPage() {
           postStatus('Generating Heritage slab label PDF…');
           const gen = await import('@/lib/labels/heritageSlabGenerator');
           const { resolveHeritageBandColors } = await import('@/lib/labelLab/heritageLayout');
-          const slabPayload: any = {
-            primaryName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
+          const slabPayload: any = toSlabLabelData(labelData, {
+            // Heritage's front draws from its own fitter; the features line is
+            // deliberately left off this payload.
             features: [],
-            serial: labelData.serial,
-            grade: labelData.grade,
-            condition: labelData.condition,
-            isAlteredAuthentic: labelData.isAlteredAuthentic,
             qrCodeDataUrl: '',
             subScores,
             // QR-centre disc (colorLogoDataUrl): org cards carry the org
@@ -632,7 +620,7 @@ export default function LabelExportPage() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-          };
+          });
           // Mobile Label Studio ships its in-flight heritage customizations
           // (pattern, hand-edited band colours, per-grade chip colours) via
           // ?customConfig — honor them the same way slab-custom does.
@@ -689,16 +677,7 @@ export default function LabelExportPage() {
           // Setup mark there for org cards, so print matches the preview.
           const whiteLogoDataUrl = logos.branding ? logos.mark : logos.white;
           // SlabLabelData shape per src/lib/slabLabelGenerator.ts
-          const slabPayload: any = {
-            primaryName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
-            features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
-            featuresLine: labelData.featuresLine || null,
-            serial: labelData.serial,
-            grade: labelData.grade,
-            gradeFormatted: labelData.gradeFormatted,
-            condition: labelData.condition,
-            isAlteredAuthentic: labelData.isAlteredAuthentic,
+          const slabPayload: any = toSlabLabelData(labelData, {
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
@@ -708,7 +687,7 @@ export default function LabelExportPage() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-          };
+          });
           const blob = format === 'foldover'
             ? await generateFoldOverSlabLabel(slabPayload, slabStyle)
             : await generateSlabLabel(slabPayload, slabStyle);
