@@ -1,6 +1,7 @@
 import { View, Image, Text, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '@/lib/constants'
+import ClassicLabelFace from '@/components/labels/ClassicLabelFace'
 
 /**
  * LabelMockup — Label Studio gallery preview tile.
@@ -212,6 +213,9 @@ function RealQR({ qrUrl, size }: { qrUrl?: string; size: number }) {
 // ============================================================================
 
 const MODERN_LABEL_GRADIENT: readonly string[] = ['#1a1625', '#2d1f47', '#1a1625']
+// Legacy light field. Since Sept 2026 the built-in Traditional slab label is
+// the classic design (ClassicLabelFace) and never reaches SlabBackground; this
+// stop list survives only for custom slots that were saved on the old spec.
 const TRADITIONAL_LABEL_GRADIENT: readonly string[] = ['#f9fafb', '#ffffff', '#f9fafb']
 // Heritage: paper-white field (print-hardened theme).
 const HERITAGE_LABEL_GRADIENT: readonly string[] = ['#ffffff', '#ffffff', '#ffffff']
@@ -535,7 +539,29 @@ function SlabBackground({
   )
 }
 
+/**
+ * ClassicLineSource for the shared classic face, built from the mockup's
+ * LabelInlineProps. `setLineText` is labelDataGenerator's context line, which
+ * is exactly what classicLines() parses.
+ */
+function classicDataFor(labelProps?: LabelInlineProps) {
+  return {
+    primaryName: labelProps?.displayName || '',
+    contextLine: labelProps?.setLineText || '',
+    features: labelProps?.features || [],
+    serial: labelProps?.serial || '',
+    grade: labelProps?.grade ?? null,
+    condition: labelProps?.condition || '',
+    isAlteredAuthentic: labelProps?.isAlteredAuthentic ?? false,
+  }
+}
+
 function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { width: number; labelProps?: LabelInlineProps; slabStyle: SlabStyle; customOverrides?: CustomColorOverrides }) {
+  // Built-in Traditional is the DCM classic grading label. Custom slots keep
+  // the light gradient design below (web: isClassicSelection).
+  if (slabStyle === 'traditional') {
+    return <ClassicLabelFace width={width} side="front" data={classicDataFor(labelProps)} />
+  }
   const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
   const dark = isDarkSlab(slabStyle, customOverrides)
 
@@ -609,6 +635,11 @@ function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { wi
 }
 
 function SlabBackInline({ width, labelProps, slabStyle, customOverrides, emblems }: { width: number; labelProps?: LabelInlineProps; slabStyle: SlabStyle; customOverrides?: CustomColorOverrides; emblems?: LabelEmblems }) {
+  // Classic back: mark + centred cert block + QR. No subgrades, no emblems —
+  // the printed classic back carries neither.
+  if (slabStyle === 'traditional') {
+    return <ClassicLabelFace width={width} side="back" data={classicDataFor(labelProps)} qrUrl={labelProps?.qrUrl} />
+  }
   const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
   const dark = isDarkSlab(slabStyle, customOverrides)
   const gradeColor = dark ? '#ffffff' : '#7c3aed'

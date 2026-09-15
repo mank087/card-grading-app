@@ -1,7 +1,9 @@
 import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image, Platform } from 'react-native'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
+import * as Clipboard from 'expo-clipboard'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
@@ -52,6 +54,138 @@ function MenuSection({ title, children }: { title: string; children: React.React
     <View style={styles.menuSection}>
       <Text style={styles.menuSectionTitle}>{title}</Text>
       <View style={styles.menuSectionContent}>{children}</View>
+    </View>
+  )
+}
+
+/**
+ * Native mirror of the web "Referral partner" card
+ * (src/components/account/ReferralPartnerCard.tsx).
+ *
+ * Renders only for approved partners: GET /api/affiliate/me returns
+ * `{ affiliate: null }` for everyone else, and any error keeps the card
+ * hidden rather than showing an empty shell.
+ */
+type PartnerAffiliate = {
+  code: string
+  status: string
+  discountPercent: number
+  rewardCredits: number
+  link: string
+}
+
+type PartnerStats = {
+  clicks30d: number
+  referrals: number
+  creditsEarned: number
+  pendingCredits: number
+  lastReferralAt: string | null
+}
+
+function ReferralPartnerCard() {
+  const [affiliate, setAffiliate] = useState<PartnerAffiliate | null>(null)
+  const [stats, setStats] = useState<PartnerStats | null>(null)
+  const [copied, setCopied] = useState<'code' | 'link' | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch(`${API_BASE}/api/affiliate/me`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        })
+        if (!res.ok) return
+        const json = await res.json().catch(() => null)
+        if (cancelled || !json?.affiliate) return
+        setAffiliate(json.affiliate as PartnerAffiliate)
+        setStats((json.stats as PartnerStats) ?? null)
+      } catch {
+        // Not a partner, or the program is unavailable: stay hidden.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const copy = async (value: string, which: 'code' | 'link') => {
+    try {
+      await Clipboard.setStringAsync(value)
+      setCopied(which)
+      setTimeout(() => setCopied(current => (current === which ? null : current)), 2000)
+    } catch {
+      // Clipboard unavailable: no-op, the value is still selectable on screen.
+    }
+  }
+
+  if (!affiliate) return null
+
+  const tiles: { label: string; value: number; color: string }[] = [
+    { label: 'Clicks last 30 days', value: stats?.clicks30d ?? 0, color: Colors.blue[600] },
+    { label: 'New customers', value: stats?.referrals ?? 0, color: Colors.green[600] },
+    { label: 'Credits earned', value: stats?.creditsEarned ?? 0, color: Colors.purple[600] },
+    { label: 'Pending', value: stats?.pendingCredits ?? 0, color: Colors.gray[600] },
+  ]
+
+  return (
+    <View style={styles.menuSection}>
+      <Text style={styles.menuSectionTitle}>Referral partner</Text>
+      <View style={[styles.menuSectionContent, styles.partnerCard]}>
+        {affiliate.status === 'paused' && (
+          <Text style={styles.partnerPaused}>Your partner code is paused</Text>
+        )}
+
+        <Text style={styles.partnerIntro}>
+          Share your code or link. New customers get {affiliate.discountPercent}% off their first
+          purchase and you get {affiliate.rewardCredits} credits when they buy.
+        </Text>
+
+        <Text style={styles.partnerLabel}>Your code</Text>
+        <View style={styles.partnerRow}>
+          <View style={styles.partnerCodeChip}>
+            <Text style={styles.partnerCodeText}>{affiliate.code}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.partnerCopyPrimary}
+            onPress={() => copy(affiliate.code, 'code')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Copy your referral code"
+          >
+            <Text style={styles.partnerCopyPrimaryText}>
+              {copied === 'code' ? 'Copied' : 'Copy'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.partnerLabel}>Your link</Text>
+        <View style={styles.partnerRow}>
+          <Text style={styles.partnerLink} numberOfLines={1}>{affiliate.link}</Text>
+          <TouchableOpacity
+            style={styles.partnerCopySecondary}
+            onPress={() => copy(affiliate.link, 'link')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Copy your referral link"
+          >
+            <Text style={styles.partnerCopySecondaryText}>
+              {copied === 'link' ? 'Copied' : 'Copy'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.partnerTiles}>
+          {tiles.map(tile => (
+            <View key={tile.label} style={styles.partnerTile}>
+              <Text style={styles.partnerTileLabel}>{tile.label}</Text>
+              <Text style={[styles.partnerTileValue, { color: tile.color }]}>{tile.value}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </View>
   )
 }
@@ -227,6 +361,9 @@ export default function AccountScreen() {
         )}
       </MenuSection>
 
+      {/* Referral partner — renders only for approved affiliate partners. */}
+      <ReferralPartnerCard />
+
       {/* Help */}
       <MenuSection title="Help & Info">
         <MenuItem icon="play" label="Welcome Tour" onPress={startWelcomeTour} />
@@ -238,6 +375,7 @@ export default function AccountScreen() {
         <MenuItem icon="newspaper" label="Blog" onPress={() => nav('blog')} />
         <MenuItem icon="shield-checkmark" label="Why DCM?" onPress={() => nav('why-dcm')} />
         <MenuItem icon="information-circle" label="About Us" onPress={() => nav('about')} />
+        <MenuItem icon="people" label="Affiliates" onPress={() => nav('affiliates')} />
         <MenuItem icon="mail" label="Contact Us" onPress={() => nav('contact')} />
       </MenuSection>
 
@@ -306,6 +444,53 @@ const styles = StyleSheet.create({
   menuItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuBadge: { backgroundColor: Colors.purple[100], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   menuBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.purple[700] },
+  partnerCard: { padding: 16, gap: 4 },
+  partnerPaused: { fontSize: 12, color: Colors.gray[500], marginBottom: 6 },
+  partnerIntro: { fontSize: 13, color: Colors.gray[600], lineHeight: 19, marginBottom: 12 },
+  partnerLabel: { fontSize: 12, fontWeight: '700', color: Colors.gray[700], marginBottom: 6 },
+  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  partnerCodeChip: {
+    backgroundColor: Colors.purple[50],
+    borderWidth: 2,
+    borderColor: Colors.purple[300],
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  partnerCodeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: Colors.purple[900],
+  },
+  partnerLink: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.gray[800],
+    backgroundColor: Colors.gray[50],
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  partnerCopyPrimary: { backgroundColor: Colors.purple[600], borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  partnerCopyPrimaryText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
+  partnerCopySecondary: { backgroundColor: Colors.gray[100], borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
+  partnerCopySecondaryText: { color: Colors.gray[700], fontSize: 13, fontWeight: '600' },
+  partnerTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  partnerTile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    backgroundColor: Colors.gray[50],
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    borderRadius: 10,
+    padding: 12,
+  },
+  partnerTileLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[600], marginBottom: 2 },
+  partnerTileValue: { fontSize: 24, fontWeight: '800' },
   signOutSection: { marginTop: 20, marginHorizontal: 12 },
   signOutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.red[50], borderRadius: 12, paddingVertical: 14, borderWidth: 1, borderColor: Colors.red[100] },
   signOutText: { fontSize: 15, fontWeight: '600', color: Colors.red[600] },

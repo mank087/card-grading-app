@@ -26,6 +26,7 @@ const NATIVE_PAGE_ROUTES: Record<string, string> = {
   '/account': '/pages/my-account',
   '/label-studio': '/pages/label-studio',
   '/market-pricing': '/pages/market-pricing',
+  '/affiliates': '/pages/affiliates',
   '/terms': '/pages/terms',
   '/privacy': '/pages/privacy',
 }

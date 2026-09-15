@@ -29,6 +29,7 @@ export default function PagesLayout() {
       <Stack.Screen name="blog" options={{ headerShown: false }} />
       <Stack.Screen name="grading-limitations" options={{ headerShown: false }} />
       <Stack.Screen name="card-shows" options={{ headerShown: false }} />
+      <Stack.Screen name="affiliates" options={{ headerShown: false }} />
       <Stack.Screen name="my-account" options={{ headerShown: false }} />
       <Stack.Screen name="terms" options={{ headerShown: false }} />
       <Stack.Screen name="privacy" options={{ headerShown: false }} />

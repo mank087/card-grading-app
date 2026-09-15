@@ -1,7 +1,8 @@
 /**
  * iOS-only credits purchase screen — mirrors the web /credits page card
- * layout (Basic / Pro / Elite / VIP) but uses StoreKit IAP instead of
- * Stripe Checkout. Required by Apple guideline 3.1.1.
+ * layout and order (Pro / Elite / VIP / Basic, Elite featured) but uses
+ * StoreKit IAP instead of Stripe Checkout. Required by Apple guideline
+ * 3.1.1.
  *
  * Connection + listener lifecycle is managed by the v15 `useIAP` hook
  * (the supported pattern in the Nitro architecture — survives screen
@@ -29,6 +30,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -51,6 +54,8 @@ import {
   getProductNumericPrice,
   formatPricePerGrade,
   formatStoreAmount,
+  packageMontageUrl,
+  packageSheetUrl,
   verifyAndFinishPurchase,
   recoverUnfinishedPurchases,
 } from '@/lib/iap'
@@ -77,6 +82,8 @@ export default function CreditsScreen() {
   const [purchasing, setPurchasing] = useState<IAPProductId | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
+  // Package sheet lightbox — mirrors the web tap-to-expand artwork.
+  const [sheetPack, setSheetPack] = useState<CreditPack | null>(null)
   // Ask to Buy / deferred purchases never fire onPurchaseSuccess or
   // onPurchaseError, so without this every Buy button stayed disabled
   // until the app restarted. Re-enable after two minutes and tell the user.
@@ -304,6 +311,24 @@ export default function CreditsScreen() {
                 pack.bestValue && st.cardBestValue,
               ]}
             >
+              {/* Package artwork strip — same montage the web pricing page
+                  shows. Tapping it opens the full package sheet. */}
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setSheetPack(pack)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`View the ${pack.name} package artwork`}
+                style={st.montageWrap}
+              >
+                <Image
+                  source={{ uri: packageMontageUrl(pack.id) }}
+                  style={st.montage}
+                  resizeMode="cover"
+                  accessible
+                  accessibilityLabel={`${pack.name} package artwork`}
+                />
+              </TouchableOpacity>
+
               {/* Gradient header */}
               <LinearGradient
                 colors={pack.headerGradient}
@@ -322,16 +347,15 @@ export default function CreditsScreen() {
                     </View>
                   ) : null}
                 </View>
-                {/* Second row: MOST POPULAR / BEST VALUE pill, inset to the
+                {/* Second row: the web pricing-page badge copy, inset to the
                     left so it reads as a label under the tier name. */}
-                {pack.popular && (
+                {pack.popular ? (
                   <View style={st.headerPillPopular}>
-                    <Text style={st.headerPillPopularText}>⭐ MOST POPULAR</Text>
+                    <Text style={st.headerPillPopularText}>⭐ {pack.badge.toUpperCase()}</Text>
                   </View>
-                )}
-                {pack.bestValue && (
+                ) : (
                   <View style={st.headerPillBest}>
-                    <Text style={st.headerPillBestText}>★ BEST VALUE</Text>
+                    <Text style={st.headerPillBestText}>{pack.badge.toUpperCase()}</Text>
                   </View>
                 )}
               </LinearGradient>
@@ -341,6 +365,14 @@ export default function CreditsScreen() {
                 {/* Price */}
                 <View style={st.priceBlock}>
                   <Text style={st.priceText}>{formatProductPrice(storeProduct)}</Text>
+                  {/* Per-grade cost sits directly under the price, the way
+                      the web pricing page prints it. Omitted when we can't
+                      express it in the store's own currency. */}
+                  {perGradeLocalized && (
+                    <Text style={[st.pricePer, { color: accent.text }]}>
+                      {perGradeLocalized} per grade
+                    </Text>
+                  )}
                   <Text style={st.priceDescription}>{pack.description}</Text>
                 </View>
 
@@ -354,18 +386,10 @@ export default function CreditsScreen() {
                   </Text>
                 </View>
 
-                {/* Per-grade cost — omitted entirely when we can't express
-                    it in the same currency the store is charging. */}
-                {(perGradeLocalized || savingsAmount || !pack.savingsPercent) && (
+                {/* Savings line — omitted entirely when we can't express it
+                    in the same currency the store is charging. */}
+                {(savingsAmount || !pack.savingsPercent) && (
                   <View style={st.perGradeBox}>
-                    {perGradeLocalized && (
-                      <View style={st.perGradeRow}>
-                        <Text style={st.perGradeLabel}>Cost per grade</Text>
-                        <Text style={[st.perGradeValue, { color: accent.text }]}>
-                          {perGradeLocalized}
-                        </Text>
-                      </View>
-                    )}
                     {savingsAmount ? (
                       <Text style={st.perGradeSavings}>You save {savingsAmount} vs Basic</Text>
                     ) : !pack.savingsPercent ? (
@@ -433,6 +457,41 @@ export default function CreditsScreen() {
 
         <View style={{ height: 16 + insets.bottom }} />
       </ScrollView>
+
+      {/* Package sheet lightbox. Matches the web tap-to-expand behaviour:
+          tap anywhere (or the close button) to dismiss. */}
+      <Modal
+        visible={sheetPack !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSheetPack(null)}
+      >
+        <TouchableOpacity
+          style={st.sheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setSheetPack(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close package artwork"
+        >
+          {sheetPack && (
+            <Image
+              source={{ uri: packageSheetUrl(sheetPack.id) }}
+              style={st.sheetImage}
+              resizeMode="contain"
+              accessible
+              accessibilityLabel={`${sheetPack.name} package sheet`}
+            />
+          )}
+          <TouchableOpacity
+            style={[st.sheetClose, { top: 12 + insets.top }]}
+            onPress={() => setSheetPack(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <MobileTabBar />
     </View>
@@ -598,8 +657,33 @@ const st = StyleSheet.create({
 
   cardBody: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 18 },
 
+  // Package artwork strip — 5:2, the montage's native aspect (1500x600).
+  montageWrap: { width: '100%', aspectRatio: 5 / 2, backgroundColor: Colors.gray[100] },
+  montage: { width: '100%', height: '100%', borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+
+  // Full package sheet lightbox — 3:2 (1500x1000).
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(12,10,24,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  sheetImage: { width: '100%', aspectRatio: 3 / 2, borderRadius: 12 },
+  sheetClose: {
+    position: 'absolute',
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   priceBlock: { alignItems: 'center', marginBottom: 14 },
   priceText: { fontSize: 40, fontWeight: '800', color: Colors.gray[900], letterSpacing: -0.5 },
+  pricePer: { fontSize: 14, fontWeight: '700', marginTop: 2 },
   priceDescription: { fontSize: 13, color: Colors.gray[500], marginTop: 4, textAlign: 'center' },
 
   // Big credits hero — the headline spec on each card
@@ -628,13 +712,6 @@ const st = StyleSheet.create({
     borderColor: Colors.gray[100],
     marginBottom: 16,
   },
-  perGradeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  perGradeLabel: { fontSize: 13, fontWeight: '600', color: Colors.gray[600] },
-  perGradeValue: { fontSize: 20, fontWeight: '800' },
   perGradeSavings: { fontSize: 11, fontWeight: '700', color: Colors.green[600], marginTop: 3 },
   perGradeStandard: { fontSize: 11, color: Colors.gray[400], marginTop: 3 },
 

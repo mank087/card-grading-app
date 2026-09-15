@@ -12,6 +12,14 @@ import Constants from 'expo-constants'
  * banner, help bot) with a `data-site-chrome` attribute. In-content headers
  * and section navs deliberately do NOT get that attribute, so they survive.
  *
+ * The app additionally sweeps away any fixed-position element that looks like
+ * the floating help bot (bottom and right both under 50px, z-index 40+). Web
+ * UI that legitimately has that shape — currently the package-artwork
+ * lightbox in `src/components/marketing/ZoomableImage.tsx`, a fixed inset:0
+ * overlay at z-index 1000 — must carry `data-dcm-keep="1"`. The app skips any
+ * element that has the attribute or sits inside one that does. Children do
+ * not need their own copy.
+ *
  * Older web deployments do neither. The app therefore keeps the legacy
  * blanket `header, nav, footer { display:none }` rule, but applies it ONLY
  * when `data-embedded` is absent — see InAppPage's injected script.

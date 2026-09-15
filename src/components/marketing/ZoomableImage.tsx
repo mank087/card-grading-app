@@ -63,9 +63,14 @@ export default function ZoomableImage({ src, alt, width, height, sizes, priority
         />
       </button>
       {open && (
+        // data-dcm-keep: the native app's WebView sweeps away fixed-position
+        // elements shaped like the floating help bot (bottom/right near 0,
+        // high z-index), which is exactly this overlay. The attribute is the
+        // opt-out the app honours, for the element and everything inside it.
         <div
           role="dialog"
           aria-modal="true"
+          data-dcm-keep="1"
           aria-label={zoomAlt ?? alt}
           onClick={close}
           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(12, 10, 24, 0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', cursor: 'zoom-out', overflow: 'auto' }}

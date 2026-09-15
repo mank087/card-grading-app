@@ -6,8 +6,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "ota": "eas update --branch production --platform all --message",
+    "ota:ios": "eas update --branch production --platform ios --message",
+    "ota:android": "eas update --branch production --platform android --message"
   },
+  "//ota": "Publish with: npm run ota -- \"what changed\". runtimeVersion policy is appVersion, so an OTA only reaches binaries built at the current app.json version (1.0.2); older 1.0.1/1.0.0 lanes need their own publish. Never omit --platform.",
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",

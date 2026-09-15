@@ -178,8 +178,16 @@ export default function InAppPage({ path, title }: InAppPageProps) {
       // Belt-and-suspenders: anything HelpBot-shaped that escapes the
       // class selectors gets hidden by computed-style sweep. Never sweeps
       // non-fixed content, so it cannot hide page copy.
+      //
+      // Opt-out: the web side marks real fixed-position UI that must survive
+      // in the app (the package-artwork lightbox on /credits, /vip and
+      // /card-lovers) with \`data-dcm-keep\`. That overlay is inset:0 with
+      // z-index 1000, so bottom/right are both 0 and it matched the HelpBot
+      // shape exactly — it used to be hidden the instant it opened. Anything
+      // carrying the attribute, or inside something that does, is skipped.
       function sweepFloating() {
         document.querySelectorAll('.fixed').forEach(function(el) {
+          if (el.closest && el.closest('[data-dcm-keep]')) { return; }
           var s = window.getComputedStyle(el);
           if (s.position === 'fixed'
               && parseInt(s.bottom) < 50

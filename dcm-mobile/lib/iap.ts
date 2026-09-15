@@ -41,6 +41,8 @@ export interface CreditPack {
   /** First-purchase bonus, web-only for now (server applies it). Display only. */
   bonusCredits: number
   description: string
+  /** Short badge line shown above the pack name, mirrors the web pricing page. */
+  badge: string
   popular?: boolean
   bestValue?: boolean
   /** Emoji glyph shown in the header */
@@ -54,10 +56,41 @@ export interface CreditPack {
   perGradeCost: number
 }
 
-// Order matches the web /credits page: VIP first as a value anchor, then
-// Basic → Pro → Elite ascending. Pro sits in the visual middle so its
-// "Most Popular" highlight lands at the natural eye-stop on the page.
+// Order mirrors the web pricing page (src/components/marketing/
+// PricingExperience.tsx): the hero trio is Pro | Elite | VIP, with Elite
+// featured as "Most popular" and VIP anchoring the lowest cost per grade.
+// Basic follows underneath as the "start small" option. Card Lovers is a
+// subscription and is deliberately NOT sold here — credit packs only.
 export const CREDIT_PACKS: CreditPack[] = [
+  {
+    productId: 'dcm.credits.pro',
+    id: 'pro',
+    name: 'Pro',
+    credits: 5,
+    bonusCredits: 3,
+    description: 'Best value for casual collectors',
+    badge: 'Good first batch',
+    icon: '🚀',
+    colorKey: 'purple',
+    headerGradient: ['#9333ea', '#4f46e5'],
+    savingsPercent: 33,
+    perGradeCost: 2.0,
+  },
+  {
+    productId: 'dcm.credits.elite',
+    id: 'elite',
+    name: 'Elite',
+    credits: 20,
+    bonusCredits: 5,
+    description: 'For serious collectors and dealers',
+    badge: 'Most popular',
+    popular: true,
+    icon: '👑',
+    colorKey: 'amber',
+    headerGradient: ['#f59e0b', '#ea580c'],
+    savingsPercent: 67,
+    perGradeCost: 1.0,
+  },
   {
     productId: 'dcm.credits.vip',
     id: 'vip',
@@ -65,6 +98,7 @@ export const CREDIT_PACKS: CreditPack[] = [
     credits: 150,
     bonusCredits: 0,
     description: '150 credits + VIP emblem',
+    badge: 'Lowest cost per grade',
     bestValue: true,
     icon: '◆',
     colorKey: 'silver',
@@ -79,39 +113,27 @@ export const CREDIT_PACKS: CreditPack[] = [
     credits: 1,
     bonusCredits: 1,
     description: 'Perfect for trying out DCM Grading',
+    badge: 'Start small',
     icon: '⭐',
     colorKey: 'blue',
     headerGradient: ['#3b82f6', '#2563eb'],
     perGradeCost: 2.99,
   },
-  {
-    productId: 'dcm.credits.pro',
-    id: 'pro',
-    name: 'Pro',
-    credits: 5,
-    bonusCredits: 3,
-    description: 'Best value for casual collectors',
-    popular: true,
-    icon: '🚀',
-    colorKey: 'purple',
-    headerGradient: ['#9333ea', '#4f46e5'],
-    savingsPercent: 33,
-    perGradeCost: 2.0,
-  },
-  {
-    productId: 'dcm.credits.elite',
-    id: 'elite',
-    name: 'Elite',
-    credits: 20,
-    bonusCredits: 5,
-    description: 'For serious collectors and dealers',
-    icon: '👑',
-    colorKey: 'amber',
-    headerGradient: ['#f59e0b', '#ea580c'],
-    savingsPercent: 67,
-    perGradeCost: 1.0,
-  },
 ]
+
+/**
+ * Package artwork, served from the website so the app and the web pricing
+ * page always show the same images.
+ *   - montage: 1500x600 strip shown on the pack card
+ *   - sheet:   1500x1000 full package sheet shown when the strip is tapped
+ */
+export function packageMontageUrl(id: CreditPack['id']): string {
+  return `https://dcmgrading.com/packages/dcm-package-${id}-montage.jpg`
+}
+
+export function packageSheetUrl(id: CreditPack['id']): string {
+  return `https://dcmgrading.com/packages/dcm-package-${id}.jpg`
+}
 
 export const BASE_PRICE_PER_CREDIT = 2.99
 

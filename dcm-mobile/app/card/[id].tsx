@@ -1315,6 +1315,40 @@ export default function CardDetailScreen() {
               <View style={s.editHandle} />
               <Text style={s.editTitle}>Edit Label</Text>
               <Text style={s.editSubtitle}>Overrides what appears on the slab, Collection thumbnail, and downloadable labels. Grade and serial cannot be changed.</Text>
+
+              {/* Live front-label preview — redrawn from the field state on
+                  every keystroke, in the user's own label style (heritage,
+                  classic or modern, including a saved custom slot). Grade,
+                  condition and serial come from the card and are not editable.
+                  labelOnly drops the separator and card window so the sheet
+                  shows the label and nothing else. */}
+              {card && (
+                <View style={{ alignSelf: 'center', width: '100%', maxWidth: 320, marginBottom: 12 }}>
+                  <SlabCard
+                    labelOnly
+                    imageUrl={null}
+                    displayName={editLabelForm.primaryName || getDisplayName(card as any)}
+                    contextLine={[
+                      editLabelForm.setName,
+                      editLabelForm.subset,
+                      editLabelForm.cardNumber
+                        ? (editLabelForm.cardNumber.startsWith('#') ? editLabelForm.cardNumber : `#${editLabelForm.cardNumber}`)
+                        : '',
+                      editLabelForm.year,
+                    ].map(p => (p || '').trim()).filter(Boolean).join(' • ')}
+                    features={editLabelForm.features.split(',').map(f => f.trim()).filter(Boolean).slice(0, 10)}
+                    serial={getLabelSerial(card as any)}
+                    grade={grade}
+                    condition={getConditionFromGrade(grade)}
+                    isAlteredAuthentic={checkAlteredAuthentic(card as any)}
+                    size="lg"
+                    labelStyle={labelStyle}
+                    colorOverrides={colorOverrides}
+                    heritageBandColors={resolveHeritageBandColors((card as any).card_colors)}
+                  />
+                </View>
+              )}
+
               <ScrollView
                 style={{ flexShrink: 1 }}
                 keyboardShouldPersistTaps="handled"

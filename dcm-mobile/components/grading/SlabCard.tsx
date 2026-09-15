@@ -36,6 +36,11 @@ interface SlabCardProps {
   showFounderEmblem?: boolean
   showVipEmblem?: boolean
   showCardLoversEmblem?: boolean
+  /**
+   * Render only the label (no separator, no card window). Used by the Edit
+   * Card Label modal, which previews the label the fields will produce.
+   */
+  labelOnly?: boolean
 }
 
 import {
@@ -49,6 +54,7 @@ import {
   GRADE_10_FOIL_STOPS,
   resolveHeritagePattern,
 } from '@/lib/heritage'
+import ClassicLabelFace, { CLASSIC_ASPECT } from '@/components/labels/ClassicLabelFace'
 
 const EMBLEMS = {
   founder: { icon: 'star', label: 'Founder', iconColor: '#FFD700', textColor: '#FFFFFF' },
@@ -665,6 +671,7 @@ function SlabCardImpl({
   showVipEmblem = false,
   showCardLoversEmblem = false,
   heritageBandColors,
+  labelOnly = false,
 }: SlabCardProps) {
   // Altered/Authentic parity with web ModernFrontLabel: grade "A", condition
   // "Authentic", only when there is no numeric grade to show.
@@ -672,6 +679,12 @@ function SlabCardImpl({
   const conditionText = (isAlteredAuthentic && grade === null ? 'Authentic' : condition || '').toUpperCase()
   const fontScale = size === 'sm' ? 0.85 : size === 'md' ? 1 : 1.15
   const isTraditional = labelStyle === 'traditional'
+  // The BUILT-IN `traditional` style is the DCM classic grading label (purple
+  // frame, white field, four all-caps lines, right-hand grade column). A saved
+  // custom slot ('custom-N') keeps the old light design it was designed on —
+  // mirroring the web's labelStyleResolution.isClassicSelection, where any
+  // activeConfig/custom-N selection is NOT classic.
+  const isClassic = isTraditional
   // Heritage: built-in id, or a saved custom style whose config is Heritage.
   const isHeritage = labelStyle === 'heritage' || !!colorOverrides?.isHeritage
   // Front and back labels share the same height so they line up across the slab —
@@ -681,7 +694,9 @@ function SlabCardImpl({
   // design at min-height ~110 (w/3.27). Until layout runs (or below the
   // legibility floor) we fall back to the historical fixed heights.
   const [slabW, setSlabW] = useState(0)
-  const labelAspect = isHeritage ? 3.5 : 3.27
+  // Classic shares Heritage's 1400x400 canvas; modern/custom keep the legacy
+  // 360px design at min-height ~110 (w/3.27).
+  const labelAspect = isHeritage ? 3.5 : isClassic ? CLASSIC_ASPECT : 3.27
   const fallbackLabelHeight = size === 'sm' ? 70 : size === 'md' ? 84 : 110
   // slabGradient pads 4px per side; the label spans the remainder.
   const labelHeight = slabW > 0 ? Math.max(56, (slabW - 8) / labelAspect) : fallbackLabelHeight
@@ -757,6 +772,39 @@ function SlabCardImpl({
         style={styles.slabGradient}
       >
         {/* Label */}
+        {isClassic ? (
+          // Classic front/back — the purple frame runs edge to edge, so the
+          // face replaces the padded gradient label entirely. Everything is
+          // scaled from the shared 1400x400 design space, so sm (collection
+          // grid) and lg (card detail) are the same drawing at two sizes.
+          <View
+            style={{
+              height: labelHeight,
+              borderTopLeftRadius: 10,
+              borderTopRightRadius: 10,
+              borderBottomLeftRadius: labelOnly ? 10 : 0,
+              borderBottomRightRadius: labelOnly ? 10 : 0,
+              overflow: 'hidden',
+            }}
+          >
+            <ClassicLabelFace
+              width={Math.max(0, slabW - 8)}
+              side={isBack ? 'back' : 'front'}
+              data={{
+                primaryName: displayName,
+                contextLine,
+                features,
+                serial,
+                grade,
+                condition,
+                isAlteredAuthentic,
+              }}
+              qrUrl={qrUrl}
+              borderTopRadius={10}
+              borderBottomRadius={labelOnly ? 10 : 0}
+            />
+          </View>
+        ) : (
         <LinearGradient
           colors={labelColors as any}
           start={{ x: 0, y: 0 }}
@@ -764,6 +812,7 @@ function SlabCardImpl({
           style={[
             styles.label,
             { height: labelHeight },
+            labelOnly && { borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
             isTraditional && { borderWidth: 1, borderColor: Colors.gray[200] },
             // Heritage: subtle edge keyline around the ivory field (web theme).
             isHeritage && { borderWidth: StyleSheet.hairlineWidth, borderColor: HERITAGE_SCREEN_EDGE },
@@ -996,8 +1045,10 @@ function SlabCardImpl({
             </View>
           )}
         </LinearGradient>
+        )}
 
         {/* Separator */}
+        {!labelOnly && (
         <LinearGradient
           colors={isHeritage
             ? ['rgba(16,16,20,0.15)', 'rgba(16,16,20,0.55)', 'rgba(16,16,20,0.15)']
@@ -1008,8 +1059,10 @@ function SlabCardImpl({
           end={{ x: 1, y: 0 }}
           style={styles.separator}
         />
+        )}
 
         {/* Card image */}
+        {!labelOnly && (
         <View style={styles.imageContainer}>
           {imageUrl ? (
             <ExpoImage source={imageUrl} style={styles.cardImage} contentFit="contain" cachePolicy="disk" transition={150} />
@@ -1019,6 +1072,7 @@ function SlabCardImpl({
             </View>
           )}
         </View>
+        )}
       </LinearGradient>
     </View>
   )
