@@ -1579,6 +1579,11 @@ export function OtherCardDetails() {
   // is 'traditional' keeps the light label it was designed on, so it falls
   // through to the block below instead.
   const isClassicLabel = isClassicSelection(labelStyle, activeConfig);
+  // Hook order: this must run on every render, so it lives above the early
+  // returns below, not next to the label data it feeds.
+  const classicQrDataUrl = useClassicQrDataUrl(
+    isClassicLabel && origin && cardId ? `${origin}/other/${cardId}` : null
+  );
   const [heritageQrDataUrl, setHeritageQrDataUrl] = useState('');
   useEffect(() => {
     // Same URL as the back-label QR (currentUrl, declared after the early
@@ -2620,9 +2625,6 @@ export function OtherCardDetails() {
     showCardLoversEmblem,
   } : null;
   const heritageBandColors = heritageSel.active ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors)) : [];
-  const classicQrDataUrl = useClassicQrDataUrl(
-    isClassicLabel && origin && cardId ? `${origin}/other/${cardId}` : null
-  );
   // Classic label data - the same unified labelData the print PDF is built
   // from, so the on-screen slab and the paper cannot disagree.
   const classicData = {
