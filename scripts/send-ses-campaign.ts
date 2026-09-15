@@ -16,6 +16,7 @@
  *     [--to email@example.com]     # send to only one address (must be in audience or verified)
  *     [--rate 5]                   # sends per second (default 5; sandbox cap is 1, prod is 14)
  *     [--campaign app-launch-may2026]  # log file slug; defaults to template filename
+ *     [--skip-list logs/x-openers.csv] # addresses to exclude, one per line (re-send to non-openers)
  *
  * Resumability: every attempt is appended to logs/<campaign>-sent.csv with
  * status (sent|failed|skipped). On startup the script reads that file and
@@ -56,6 +57,7 @@ const testMode = getFlag('test')
 const limit = Number(getArg('limit')) || undefined
 const sendOnlyTo = getArg('to')
 const rate = Number(getArg('rate')) || 5
+const skipListPath = getArg('skip-list')
 const campaignSlug = getArg('campaign') ||
   (templatePath ? path.basename(templatePath, path.extname(templatePath)) : 'campaign')
 
@@ -162,6 +164,18 @@ const logDir = path.join(process.cwd(), 'logs')
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true })
 const logPath = path.join(logDir, `${campaignSlug}-sent.csv`)
 
+/**
+ * The one spelling of an address used for every comparison in this script.
+ *
+ * Dedup used to trim and lower-case while the sent-log was matched raw, so a
+ * resumed run could send a second copy to " Bob@Example.com " after "bob@
+ * example.com" was already logged as sent. Reads, writes and dedup all go
+ * through here so the log and the audience cannot disagree about identity.
+ */
+function normalizeEmail(email: string): string {
+  return String(email ?? '').trim().toLowerCase()
+}
+
 async function loadAlreadySent(): Promise<Set<string>> {
   const sent = new Set<string>()
   if (!fs.existsSync(logPath)) return sent
@@ -171,13 +185,13 @@ async function loadAlreadySent(): Promise<Set<string>> {
   })
   for await (const line of rl) {
     const [ts, email, status] = line.split(',')
-    if (status === 'sent') sent.add(email)
+    if (status === 'sent') sent.add(normalizeEmail(email))
   }
   return sent
 }
 
 function logSend(email: string, status: 'sent' | 'failed' | 'skipped', detail: string) {
-  const line = `${new Date().toISOString()},${email},${status},"${detail.replace(/"/g, '""')}"\n`
+  const line = `${new Date().toISOString()},${normalizeEmail(email)},${status},"${detail.replace(/"/g, '""')}"\n`
   fs.appendFileSync(logPath, line)
 }
 
@@ -275,7 +289,41 @@ async function main() {
     if (alreadySent.size > 0) {
       console.log(`Resuming: ${alreadySent.size} previously-sent emails will be skipped`)
     }
-    audience = audience.filter(r => !alreadySent.has(r.email))
+    audience = audience.filter(r => !alreadySent.has(normalizeEmail(r.email)))
+
+    // One copy per address. A few dozen emails sit on more than one profile
+    // (found Sept 2 2026: 10,212 eligible profiles, 10,164 unique emails) and
+    // used to get the campaign twice.
+    const seen = new Set<string>()
+    const before = audience.length
+    audience = audience.filter(r => {
+      const key = normalizeEmail(r.email)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    if (audience.length < before) {
+      console.log(`Deduped ${before - audience.length} duplicate address(es)`)
+    }
+
+    // --skip-list: addresses to leave out, one per line (case-insensitive).
+    // Used for "re-send to non-openers": export the openers of the first
+    // send from SES VDM (Message Insights, LastEngagementEvent OPEN/CLICK),
+    // pass that file here, and everyone still opted in who did not open —
+    // plus anyone who subscribed since — gets the re-send. Bounces,
+    // complaints and unsubscribes never reach this point: the SES webhook
+    // and the unsubscribe route flip marketing_emails_enabled off.
+    if (skipListPath) {
+      const skip = new Set(
+        fs.readFileSync(skipListPath, 'utf8')
+          .split(/\r?\n/)
+          .map(l => normalizeEmail(l))
+          .filter(Boolean)
+      )
+      const beforeSkip = audience.length
+      audience = audience.filter(r => !skip.has(normalizeEmail(r.email)))
+      console.log(`--skip-list ${skipListPath}: ${skip.size} addresses listed, ${beforeSkip - audience.length} removed from audience`)
+    }
   }
 
   if (limit && audience.length > limit) {

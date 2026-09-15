@@ -32,7 +32,7 @@ import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
-import { buildClampNote, buildGateDragNote, isAlreadyExplained } from './grading/consensusExplain';
+import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
@@ -3221,8 +3221,11 @@ Provide detailed analysis as markdown with all required sections.`
         // v9.25: categories whose displayed drop is already narrated somewhere the
         // customer can read it. Anything left out of this set and still sitting
         // below the raw pass median is what the v9.25 block at the end explains.
-        const dissentReflectedCats = new Set<'centering' | 'corners' | 'edges' | 'surface'>();
-        const tileDraggedCats = new Set<'centering' | 'corners' | 'edges' | 'surface'>();
+        // v9.25.1: the VALUE each mechanism wrote into the tile, not just the fact
+        // that it fired. A mechanism explains the displayed consensus only when it
+        // accounts for it (see decideClampExplanation).
+        const dissentReflectedCats = new Map<'centering' | 'corners' | 'edges' | 'surface', number>();
+        const tileDraggedCats = new Map<'centering' | 'corners' | 'edges' | 'surface', number>();
         const unanimous10 = Math.min(f1, f2, f3) >= 10;
         const caseInfo = jsonData.case_detection || {};
         const rigidCase =
@@ -3344,7 +3347,7 @@ Provide detailed analysis as markdown with all required sections.`
                 const shown = Math.max(minAcross, finalGrade);
                 serverRounded[cat] = shown;
                 dissentCats.push(cat);
-                dissentReflectedCats.add(cat); // v9.25: the unanimity consensus note below names it
+                dissentReflectedCats.set(cat, shown); // v9.25: the unanimity consensus note below names it
                 for (const face of ['front', 'back'] as const) {
                   const key = `${cat}_${face}`;
                   if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > shown) {
@@ -3419,6 +3422,7 @@ Provide detailed analysis as markdown with all required sections.`
               const shown = attributable.length > 0 ? Math.max(minAcross, finalGrade) : finalGrade;
               if (shown < (serverRounded[cat] ?? 10)) {
                 moved.push({ cat, from: serverRounded[cat] ?? 10 });
+                tileDraggedCats.set(cat, shown); // v9.25.1: the value this drag displayed
                 serverRounded[cat] = shown;
                 for (const face of ['front', 'back'] as const) {
                   const key = `${cat}_${face}`;
@@ -3435,7 +3439,6 @@ Provide detailed analysis as markdown with all required sections.`
             // the evaluations scored 10 displayed as 9 with nothing saying why.
             // The reason text is the gate's own clause, not a paraphrase of it.
             try {
-              for (const m of moved) tileDraggedCats.add(m.cat);
               const dragNote = gradeCapReason
                 ? buildGateDragNote({ moved, shown: finalGrade, reason: gradeCapReason })
                 : null;
@@ -3476,7 +3479,9 @@ Provide detailed analysis as markdown with all required sections.`
         // Skipped whenever the gap is ALREADY accounted for in text the customer
         // can read (zoom cap addendum, structural notice, the v9.9 unanimity note,
         // the tile-drag note above). A second explanation in different words reads
-        // as a second deduction.
+        // as a second deduction. "Accounted for" is a comparison of VALUES, not a
+        // presence check: a zoom cap only explains the consensus when it sits at or
+        // below it (v9.25.1 - see decideClampExplanation).
         //
         // Wrapped like the centering-policy block: an explanation must never fail
         // a paid grade.
@@ -3486,27 +3491,34 @@ Provide detailed analysis as markdown with all required sections.`
           for (const cat of explainCats) {
             const rawMedian = rawMedianOf(cat);
             const consensus = serverRounded[cat];
-            if (rawMedian == null || typeof consensus !== 'number' || consensus >= rawMedian) continue;
 
             // Only the FACE CLAMP is this block's to explain, and only when it is
-            // still the binding constraint. If a later gate pulled the category
-            // below the clamped face score, that gate owns the explanation and a
-            // note quoting the face would name the wrong cause.
+            // still the binding constraint, and only when nothing else on the page
+            // already ACCOUNTS for the displayed number.
+            //
+            // v9.25.1: the exclusions compare VALUES, not presence. A zoom cap of 9
+            // on the back does not explain a consensus of 8 that came from a front
+            // clamp - the v9.1 fold leaves the pass rows at 9, and suppressing the
+            // note there left a 9 to 8 gap with nothing behind it.
             const clamp = faceClamps.find(c => c.cat === cat);
-            if (!clamp || clamp.faceScore !== consensus) continue;
+            const decision = decideClampExplanation({
+              rawMedian,
+              consensus: consensus as number,
+              clampFaceScore: clamp ? clamp.faceScore : null,
+              zoomCaps: [appliedFaceCaps[`${cat}_front`], appliedFaceCaps[`${cat}_back`]],
+              structuralCap: structuralDetected && cat === 'surface' ? STRUCT_CAP : null,
+              dissentValue: dissentReflectedCats.get(cat) ?? null,
+              dragValue: tileDraggedCats.get(cat) ?? null,
+            });
+            if (!decision.shouldExplain || !clamp || decision.foldTo == null) continue;
+            const foldTo = decision.foldTo;
 
-            if (isAlreadyExplained({
-              zoomCapped: typeof appliedFaceCaps[`${cat}_front`] === 'number'
-                || typeof appliedFaceCaps[`${cat}_back`] === 'number',
-              structuralCapped: structuralDetected && cat === 'surface',
-              dissentReflected: dissentReflectedCats.has(cat),
-              gateDragged: tileDraggedCats.has(cat),
-            })) continue;
-
-            // 1. fold into the displayed pass rows (same shape as the v9.1 fold)
+            // 1. fold into the displayed pass rows (same shape as the v9.1 fold).
+            // Folds to the CONSENSUS, so a higher zoom cap that the v9.1 fold
+            // already wrote into the rows is superseded rather than left standing.
             for (const pass of [threePassData.pass_1, threePassData.pass_2, threePassData.pass_3] as any[]) {
               if (!pass || typeof pass[cat] !== 'number') continue;
-              if (pass[cat] > consensus) pass[cat] = consensus;
+              if (pass[cat] > foldTo) pass[cat] = foldTo;
               let pf = Math.min(pass.centering, pass.corners, pass.edges, pass.surface);
               if (structuralDetected) pf = Math.min(pf, STRUCT_CAP);
               pass.final = pf;

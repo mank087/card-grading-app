@@ -112,26 +112,101 @@ export function buildClampNote(input: ClampNoteInput): string {
  * Why a category might already be explained elsewhere on the page, in which
  * case a second note only repeats it in different words.
  *
- * Every flag here corresponds to text the customer can already read:
- *   zoomCapped        — the magnified-inspection addendum on the face prose
- *   structuralCapped  — the structural-damage notice and the capped summary
- *   dissentReflected  — the v9.9 unanimity consensus note naming the category
- *   gateDragged       — the gate-drag note built below, which covers the tile
+ * Each input is a VALUE, not a flag, and that is the whole point. An earlier
+ * mechanism explains the displayed consensus only if it actually ACCOUNTS for
+ * it. Measured 2026-09-15: whole-card passes at corners 10/10/10, the detailed
+ * front assessment clamping corners to 8, and a zoom cap of 9 on the BACK. The
+ * page showed pass rows of 9 (folded to the zoom cap) over a consensus of 8,
+ * and the mere presence of a zoom cap suppressed the clamp note, so the 9 to 8
+ * gap had no explanation anywhere. A cap of 9 cannot explain a consensus of 8.
+ *
+ * Every input here corresponds to text the customer can already read:
+ *   zoomCaps       — the magnified-inspection addendum on the face prose
+ *   structuralCap  — the structural-damage notice and the capped summary
+ *   dissentValue   — the v9.9 unanimity consensus note naming the category
+ *   dragValue      — the gate-drag note built below, which covers the tile
+ *
+ * A cap explains the consensus when it sits AT OR BELOW it. A reflected or
+ * dragged value explains it only when it IS the consensus: those mechanisms
+ * write the displayed number directly, so any other value means a different
+ * mechanism won and owns the explanation.
  *
  * Nothing here looks at WHY the clamp happened; it only asks whether the gap is
  * already accounted for.
  */
 export interface AlreadyExplainedInput {
-  zoomCapped?: boolean;
-  structuralCapped?: boolean;
-  dissentReflected?: boolean;
-  gateDragged?: boolean;
+  /** The consensus actually displayed for the category. */
+  consensus: number;
+  /** Zoom face caps APPLIED in this category (front and/or back). */
+  zoomCaps?: Array<number | null | undefined>;
+  /** The structural cap, when it applies to this category. */
+  structuralCap?: number | null;
+  /** The value the v9.9 dissent reflection wrote into this tile. */
+  dissentValue?: number | null;
+  /** The value the weakest-link display drag wrote into this tile. */
+  dragValue?: number | null;
+}
+
+const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/** The lowest zoom cap actually applied in a category, or null when there is none. */
+export function minZoomCap(caps?: Array<number | null | undefined>): number | null {
+  const v = (caps ?? []).filter(isNum);
+  return v.length ? Math.min(...v) : null;
 }
 
 export function isAlreadyExplained(input: AlreadyExplainedInput): boolean {
-  return Boolean(
-    input.zoomCapped || input.structuralCapped || input.dissentReflected || input.gateDragged,
-  );
+  const { consensus } = input;
+  if (!isNum(consensus)) return false;
+  const zoom = minZoomCap(input.zoomCaps);
+  if (zoom !== null && zoom <= consensus) return true;
+  if (isNum(input.structuralCap) && input.structuralCap <= consensus) return true;
+  if (isNum(input.dissentValue) && input.dissentValue === consensus) return true;
+  if (isNum(input.dragValue) && input.dragValue === consensus) return true;
+  return false;
+}
+
+export interface ClampExplanationInput extends AlreadyExplainedInput {
+  /** Median of the RAW per-pass category scores, before any fold or cap. */
+  rawMedian: number | null;
+  /** The face score the Step 3.5 face clamp pulled the category down to, if it fired. */
+  clampFaceScore?: number | null;
+}
+
+export interface ClampExplanationDecision {
+  /** Emit the clamp note and fold the displayed pass rows down to `foldTo`. */
+  shouldExplain: boolean;
+  /** The value the displayed pass rows must be folded to (the consensus). */
+  foldTo: number | null;
+  /** Why, for the log line and the tests. */
+  reason: 'explain' | 'no-gap' | 'no-clamp' | 'clamp-not-binding' | 'already-explained';
+}
+
+/**
+ * Should the face-level clamp be folded into the displayed pass rows and
+ * narrated? Pure, so the decision is unit-tested rather than reasoned about
+ * inside a 3,500-line grading path.
+ *
+ * Decides nothing about the grade: `foldTo` only ever equals the consensus that
+ * has already settled.
+ */
+export function decideClampExplanation(input: ClampExplanationInput): ClampExplanationDecision {
+  const { rawMedian, consensus, clampFaceScore } = input;
+  if (!isNum(rawMedian) || !isNum(consensus) || consensus >= rawMedian) {
+    return { shouldExplain: false, foldTo: null, reason: 'no-gap' };
+  }
+  if (!isNum(clampFaceScore)) {
+    return { shouldExplain: false, foldTo: null, reason: 'no-clamp' };
+  }
+  // If a later gate pulled the category below the clamped face score, that gate
+  // owns the explanation and a note quoting the face would name the wrong cause.
+  if (clampFaceScore !== consensus) {
+    return { shouldExplain: false, foldTo: null, reason: 'clamp-not-binding' };
+  }
+  if (isAlreadyExplained(input)) {
+    return { shouldExplain: false, foldTo: null, reason: 'already-explained' };
+  }
+  return { shouldExplain: true, foldTo: consensus, reason: 'explain' };
 }
 
 /** Join a list as "a, b and c" (no Oxford comma, matching the rest of the prose). */

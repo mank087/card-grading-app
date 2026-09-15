@@ -111,24 +111,52 @@ describe('buildClampNote', () => {
 
 describe('isAlreadyExplained', () => {
   it('is false when nothing else accounts for the drop', () => {
-    expect(isAlreadyExplained({})).toBe(false);
+    expect(isAlreadyExplained({ consensus: 8 })).toBe(false);
     expect(
       isAlreadyExplained({
-        zoomCapped: false,
-        structuralCapped: false,
-        dissentReflected: false,
-        gateDragged: false,
+        consensus: 8,
+        zoomCaps: [],
+        structuralCap: null,
+        dissentValue: null,
+        dragValue: null,
       }),
     ).toBe(false);
   });
 
   it.each([
-    ['zoomCapped', { zoomCapped: true }],
-    ['structuralCapped', { structuralCapped: true }],
-    ['dissentReflected', { dissentReflected: true }],
-    ['gateDragged', { gateDragged: true }],
-  ])('is true when %s', (_label, input) => {
+    ['a zoom cap at the consensus', { consensus: 9, zoomCaps: [9] }],
+    ['a zoom cap below the consensus', { consensus: 9, zoomCaps: [8] }],
+    ['the lower of two zoom caps at the consensus', { consensus: 9, zoomCaps: [10, 9] }],
+    ['a structural cap at the consensus', { consensus: 7, structuralCap: 7 }],
+    ['a structural cap below the consensus', { consensus: 7, structuralCap: 6 }],
+    ['a dissent reflection equal to the consensus', { consensus: 9, dissentValue: 9 }],
+    ['a gate drag equal to the consensus', { consensus: 9, dragValue: 9 }],
+  ])('is true with %s', (_label, input) => {
     expect(isAlreadyExplained(input)).toBe(true);
+  });
+
+  it.each([
+    ['a zoom cap ABOVE the consensus', { consensus: 8, zoomCaps: [9] }],
+    ['both zoom caps above the consensus', { consensus: 8, zoomCaps: [9, 10] }],
+    ['a structural cap above the consensus', { consensus: 6, structuralCap: 7 }],
+    ['a dissent reflection above the consensus', { consensus: 8, dissentValue: 9 }],
+    ['a dissent reflection below the consensus', { consensus: 9, dissentValue: 8 }],
+    ['a gate drag above the consensus', { consensus: 8, dragValue: 9 }],
+  ])('is false with %s', (_label, input) => {
+    expect(isAlreadyExplained(input)).toBe(false);
+  });
+
+  it('ignores absent caps rather than treating them as zero', () => {
+    expect(
+      isAlreadyExplained({ consensus: 8, zoomCaps: [undefined, null] }),
+    ).toBe(false);
+  });
+
+  it('the production miss: back zoom cap 9 does not explain a front clamp to 8', () => {
+    // corners 10/10/10 whole-card, front face section 8, zoom capped the BACK to 9.
+    expect(
+      isAlreadyExplained({ consensus: 8, zoomCaps: [undefined, 9] }),
+    ).toBe(false);
   });
 });
 
