@@ -9,7 +9,7 @@ import { verifyAdminSession } from '@/lib/admin/adminAuth';
 import { listAffiliates, DEFAULT_REWARD_CREDITS, DEFAULT_DISCOUNT_PERCENT } from '@/lib/affiliates';
 import { sendAffiliateWelcomeEmail } from '@/lib/affiliateEmails';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { stripe } from '@/lib/stripe';
+import { ensureAffiliateStripeCode, describeStripeError } from '@/lib/affiliateStripe';
 
 /**
  * Find the auth user id for an email so referral credits have somewhere to
@@ -129,32 +129,20 @@ export async function POST(request: NextRequest) {
       ? Math.round(Number(reward_credits))
       : DEFAULT_REWARD_CREDITS;
 
-    // Create Stripe coupon + promotion code for the buyer discount
+    // Create Stripe coupon + promotion code for the buyer discount. A failure
+    // is reported back to the admin (stripe_error) instead of being swallowed;
+    // the row is still saved so the code can be attached later from the
+    // affiliates table ("Create Stripe code").
     let stripeCouponId: string | null = null;
     let stripePromotionCodeId: string | null = null;
-
+    let stripeError: string | null = null;
     try {
-      // Create a coupon: percent off, once
-      const coupon = await stripe.coupons.create({
-        percent_off: discountPercent,
-        duration: 'once',
-        name: `Affiliate: ${normalizedCode} (${discountPercent}% off first purchase)`,
-        metadata: { affiliate_code: normalizedCode },
-      });
-      stripeCouponId = coupon.id;
-
-      // Create a promotion code linked to that coupon, restricted to customers
-      // who have never paid us before, so the fan discount is new-customer only
-      const promoCode = await stripe.promotionCodes.create({
-        promotion: { coupon: coupon.id, type: 'coupon' },
-        code: normalizedCode,
-        restrictions: { first_time_transaction: true },
-        metadata: { affiliate_code: normalizedCode },
-      });
-      stripePromotionCodeId = promoCode.id;
-    } catch (stripeError: any) {
-      console.error('Error creating Stripe promo code:', stripeError);
-      // Don't fail the whole creation — affiliate can work without Stripe promo
+      const ids = await ensureAffiliateStripeCode({ code: normalizedCode, discountPercent });
+      stripeCouponId = ids.couponId;
+      stripePromotionCodeId = ids.promotionCodeId;
+    } catch (err) {
+      stripeError = describeStripeError(err);
+      console.error(`[Affiliate] Stripe code creation failed for ${normalizedCode}:`, stripeError);
     }
 
     // Referral credits need an account to land in. If the admin did not pass a
@@ -226,7 +214,7 @@ export async function POST(request: NextRequest) {
       console.error('Error sending affiliate welcome email:', emailError);
     }
 
-    return NextResponse.json({ affiliate }, { status: 201 });
+    return NextResponse.json({ affiliate, stripe_error: stripeError }, { status: 201 });
   } catch (error) {
     console.error('Error creating affiliate:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

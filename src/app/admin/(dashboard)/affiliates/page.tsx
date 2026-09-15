@@ -9,6 +9,8 @@ interface Affiliate {
   email: string
   code: string
   status: 'active' | 'paused' | 'deactivated'
+  stripe_promotion_code_id?: string | null
+  stripe_coupon_id?: string | null
   commission_rate: number
   commission_type: string
   reward_credits?: number | null
@@ -121,6 +123,27 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
       return () => clearTimeout(timer)
     }
   }, [successMessage])
+
+  // Attach the Stripe coupon + promotion code to an affiliate whose approval
+  // failed at Stripe (the row exists, the discount does not). Idempotent.
+  const createStripeCode = async (aff: Affiliate) => {
+    try {
+      setActionLoading(`stripe-${aff.id}`)
+      setError(null)
+      const res = await fetch(`/api/admin/affiliates/${aff.id}/stripe`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || `Could not create the Stripe code for ${aff.code}`)
+        return
+      }
+      setSuccessMessage(`Stripe code ${aff.code} is live${data.reused ? ' (existing code reattached)' : ''}`)
+      await loadAffiliates()
+    } catch {
+      setError(`Could not create the Stripe code for ${aff.code}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
   const loadAffiliates = async () => {
     try {
@@ -438,6 +461,19 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                   </td>
                   <td className="px-4 py-3">
                     <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono">{aff.code}</code>
+                    {!aff.stripe_promotion_code_id && (
+                      <div className="mt-1 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">No Stripe code</span>
+                        <button
+                          type="button"
+                          onClick={() => createStripeCode(aff)}
+                          disabled={actionLoading === `stripe-${aff.id}`}
+                          className="text-[11px] font-semibold text-purple-700 underline disabled:opacity-50"
+                        >
+                          {actionLoading === `stripe-${aff.id}` ? 'Creating...' : 'Create Stripe code'}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">{statusBadge(aff.status)}</td>
                   <td className="px-4 py-3 text-right text-sm font-medium">
@@ -706,6 +742,16 @@ function AddAffiliateModal({
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Failed to create affiliate')
+      }
+
+      // The affiliate row is saved even when Stripe rejected the code; say so
+      // loudly instead of letting a codeless partner go unnoticed.
+      const created = await res.json().catch(() => ({} as { stripe_error?: string | null }))
+      if (created?.stripe_error) {
+        window.alert(
+          `Affiliate saved, but Stripe rejected the promo code: ${created.stripe_error}\n\n` +
+          'The row shows "No Stripe code" in the table. Fix the cause, then use "Create Stripe code" there.'
+        )
       }
 
       onSuccess()
