@@ -31,8 +31,8 @@ import {
   type PackageDimensions,
   DEFAULT_DOMESTIC_SHIPPING_SERVICE,
   normalizeDomesticService,
-  hostPicturesOnEbay,
 } from '@/lib/ebay/tradingApi';
+import { hostListingImages, ImageHostingError } from '@/lib/ebay/imageHosting';
 import type { EbayListing } from '@/lib/ebay/types';
 import {
   resolveListingFields,
@@ -178,6 +178,7 @@ export type PublishErrorCode =
   | 'policies_incomplete'
   | 'policies_invalid'
   | 'claim_insert_failed'
+  | 'photo_upload_failed'
   | 'ebay_error';
 
 export type PublishCardListingResult =
@@ -799,13 +800,19 @@ export async function publishCardListing(
     sandbox: connection.is_sandbox,
   };
 
-  // Re-host the pictures on eBay Picture Services first. Externally hosted
-  // <PictureURL>s made the eBay app refuse gallery photos on DCM listings and
-  // drop the first image on every edit. Falls back per picture to the
-  // original URL, so this never blocks a listing.
-  const hosting = await hostPicturesOnEbay(tradingConfig, imageUrls, sku);
-  const pictureUrls = hosting.urls;
-  console.log(`[eBay Listing] Pictures hosted on EPS: ${hosting.hosted}/${imageUrls.length}`);
+  // Both single and bulk publishing must have every photo on EPS before AddItem.
+  // No claim/listing exists yet, so photo errors can be safely retried.
+  let photoUploads;
+  try {
+    photoUploads = await hostListingImages(tradingConfig, imageUrls);
+  } catch (error) {
+    const failure = error instanceof ImageHostingError ? error : new ImageHostingError('temporary', 0);
+    console.warn('[eBay Photos] upload_failed', { cardId, kind: failure.kind, photoIndex: failure.photoIndex, httpStatus: failure.httpStatus });
+    return simpleFailure(failure.kind === 'authorization' ? 401 : 502,
+      failure.kind === 'authorization' ? 'token_refresh_failed' : 'photo_upload_failed', failure.message);
+  }
+  const pictureUrls = photoUploads.map(photo => photo.imageUrl);
+  console.log('[eBay Photos] upload_complete', { cardId, count: photoUploads.length });
 
   // Prepare listing details
   const listingDetails: ListingDetails = {
@@ -911,7 +918,8 @@ export async function publishCardListing(
     // Persist what we actually sent to eBay: fixed price is always GTC
     duration: listingFormat === 'AUCTION' ? (duration || 'GTC') : 'GTC',
     category_id: categoryId,
-    ebay_image_urls: imageUrls,
+    ebay_image_urls: pictureUrls,
+    ebay_photo_uploads: photoUploads,
     // eBay's own column names: the fulfillment policy is the shipping one.
     fulfillment_policy_id: policies?.shippingPolicyId ?? null,
     return_policy_id: policies?.returnPolicyId ?? null,

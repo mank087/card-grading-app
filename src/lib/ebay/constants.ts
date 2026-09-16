@@ -10,7 +10,7 @@
 // =============================================================================
 // Note: Only request scopes that are granted to your app in the eBay Developer Portal
 // commerce.identity.readonly - Required to fetch eBay username after OAuth
-// commerce.media.upload - May require special approval for image uploads
+// Media API image uploads use sell.inventory (already requested below).
 export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
