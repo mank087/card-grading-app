@@ -20,10 +20,13 @@ The shared single/bulk publisher now uses Media API `POST /commerce/media/v1_bet
 4. Before broad rollout, use an authorized controlled production listing to verify images on web and mobile, title editing, and adding a gallery photo in the eBay app. Automated mocked tests cannot prove those external UI behaviors.
 5. Monitor photo failures by HTTP status, especially 401/403 and 429, and overall publish duration. If uploads fail, preserve drafts and investigate; do not restore the retiring endpoint or silent external-photo fallback.
 
-No seller-account upload, listing creation/edit, production schema change, or deployment was performed as part of implementation. Real account validation and the deployment steps remain operational checks.
+The initial migration was deployed as c71d4c76 after the production schema migration was confirmed. A subsequent Android attempt exposed a routing bug: production api.ebay.com returns an empty 404 for the Media image endpoint. The hotfix uses apim.ebay.com (apim.sandbox.ebay.com for sandbox). Routing and unknown service errors no longer tell the seller to replace a photo; known image validation codes still identify the affected photo. OAuth error bodies are recognized even when eBay returns HTTP 400.
+
+POST /api/ebay/images/verify provides authenticated, card-owner-scoped photo-only verification. It accepts only public image URLs under that owner/card storage prefix, uploads them with the connected seller token, and returns EPS receipts. It never creates or edits a listing. Real account uploads are an explicit operational check; listing UI checks remain separate.
 
 ## Sources
 
 - [eBay image management](https://www.developer.ebay.com/api-docs/sell/static/inventory/managing-image-media.html): creation response, Location image ID, EPS image URL, and expiration metadata.
 - [eBay Media API authentication and image endpoints](https://www.ebay.co.jp/developer/api/media_api/documentation): seller user token with `sell.inventory`, REST paths, and response statuses.
 - [Deprecation status](https://developer.ebay.com/develop/get-started/api-deprecation-status): `UploadSiteHostedPictures` shuts down September 30, 2026.
+

@@ -8,12 +8,15 @@ export interface HostedListingImage {
 
 export class ImageHostingError extends Error {
   constructor(
-    public readonly kind: 'authorization' | 'invalid_image' | 'temporary' | 'invalid_response',
+    public readonly kind: 'authorization' | 'invalid_image' | 'temporary' | 'invalid_response' | 'service',
     public readonly photoIndex: number,
     public readonly httpStatus?: number,
+    public readonly ebayErrorId?: number,
   ) {
     super(kind === 'authorization'
       ? 'eBay could not authorize photo uploads. Reconnect your eBay account and try again.'
+      : kind === 'service'
+        ? 'eBay photo hosting is unavailable. Please try again shortly. No listing was created.'
       : kind === 'invalid_image'
         ? `eBay could not accept photo ${photoIndex + 1}. Re-upload that photo and try again.`
         : `Photo ${photoIndex + 1} could not be uploaded to eBay. Please try again. No listing was created.`);
@@ -37,7 +40,9 @@ export async function hostListingImages(
   urls.forEach((url, i) => {
     if (!httpsUrl(url)) throw new ImageHostingError('invalid_image', i);
   });
-  const base = `https://${config.sandbox ? 'api.sandbox.ebay.com' : 'api.ebay.com'}/commerce/media/v1_beta`;
+  // Media images use apim. Production api.ebay.com returns an empty 404 for
+  // this resource even though other eBay APIs (and the sandbox alias) work there.
+  const base = `https://${config.sandbox ? 'apim.sandbox.ebay.com' : 'apim.ebay.com'}/commerce/media/v1_beta`;
   const controller = new AbortController();
   const deadline = Date.now() + 25_000;
   const timer = setTimeout(() => controller.abort(), 25_000);
@@ -65,7 +70,12 @@ export async function hostListingImages(
           const delay = retryAfter
             ? (/^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now())
             : 400;
-          await response.body?.cancel();
+          const payload = await response.json().catch(() => ({}));
+          const errors: Array<{ errorId?: number; domain?: string }> = Array.isArray(payload?.errors) ? payload.errors : [];
+          // Retain safe diagnostic codes, never tokens/URLs or raw provider text.
+          const ebayErrorId = errors.find(e => Number.isFinite(e?.errorId))?.errorId;
+          const oauthError = errors.some(e => e?.domain === 'OAuth');
+          const imageError = errors.some(e => [190201, 190202, 190203, 190204].includes(e?.errorId ?? 0));
           // Respect Retry-After rather than retrying early when it exceeds our budget.
           if (retryable && attempt === 0 && Number.isFinite(delay) && delay >= 0 && Date.now() + delay + 1000 < deadline) {
             await new Promise<void>(resolve => {
@@ -76,8 +86,8 @@ export async function hostListingImages(
             });
             if (!controller.signal.aborted) continue;
           }
-          throw new ImageHostingError(response.status === 401 || response.status === 403
-            ? 'authorization' : retryable ? 'temporary' : 'invalid_image', index, response.status);
+          throw new ImageHostingError(response.status === 401 || response.status === 403 || oauthError
+            ? 'authorization' : retryable ? 'temporary' : imageError ? 'invalid_image' : 'service', index, response.status, ebayErrorId);
         }
         return { data: await response.json().catch(() => ({})), location: response.headers.get('location') };
       } catch (error) {

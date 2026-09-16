@@ -807,7 +807,7 @@ export async function publishCardListing(
     photoUploads = await hostListingImages(tradingConfig, imageUrls);
   } catch (error) {
     const failure = error instanceof ImageHostingError ? error : new ImageHostingError('temporary', 0);
-    console.warn('[eBay Photos] upload_failed', { cardId, kind: failure.kind, photoIndex: failure.photoIndex, httpStatus: failure.httpStatus });
+    console.warn('[eBay Photos] upload_failed', { cardId, kind: failure.kind, photoIndex: failure.photoIndex, httpStatus: failure.httpStatus, ebayErrorId: failure.ebayErrorId });
     return simpleFailure(failure.kind === 'authorization' ? 401 : 502,
       failure.kind === 'authorization' ? 'token_refresh_failed' : 'photo_upload_failed', failure.message);
   }

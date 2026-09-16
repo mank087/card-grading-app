@@ -17,7 +17,7 @@ describe('Media API listing photos', () => {
   it('uploads over REST with the seller token and preserves the source and receipt', async () => {
     fetchMock.mockResolvedValueOnce(created());
     const photos = await hostListingImages(config, [source]);
-    expect(fetchMock).toHaveBeenCalledWith('https://api.ebay.com/commerce/media/v1_beta/image/create_image_from_url', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('https://apim.ebay.com/commerce/media/v1_beta/image/create_image_from_url', expect.objectContaining({
       method: 'POST', body: JSON.stringify({ imageUrl: source }),
       headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
     }));
@@ -29,7 +29,8 @@ describe('Media API listing photos', () => {
       location: 'https://untrusted.example/commerce/media/v1_beta/image/123',
     } })).mockResolvedValueOnce(created());
     await hostListingImages({ ...config, sandbox: true }, [source]);
-    expect(fetchMock.mock.calls[1][0]).toBe('https://api.sandbox.ebay.com/commerce/media/v1_beta/image/123');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://apim.sandbox.ebay.com/commerce/media/v1_beta/image/create_image_from_url');
+    expect(fetchMock.mock.calls[1][0]).toBe('https://apim.sandbox.ebay.com/commerce/media/v1_beta/image/123');
   });
 
   it('keeps selected photo order when uploads finish out of order', async () => {
@@ -42,7 +43,7 @@ describe('Media API listing photos', () => {
   });
 
   it('rejects the entire photo batch on partial failure instead of returning original URLs', async () => {
-    fetchMock.mockResolvedValueOnce(created()).mockResolvedValueOnce(new Response('{}', { status: 400 }));
+    fetchMock.mockResolvedValueOnce(created()).mockResolvedValueOnce(new Response(JSON.stringify({ errors: [{ errorId: 190201 }] }), { status: 400 }));
     await expect(hostListingImages(config, [source, source + '?back'])).rejects.toMatchObject({ kind: 'invalid_image', photoIndex: 1 });
   });
 
@@ -50,6 +51,17 @@ describe('Media API listing photos', () => {
     fetchMock.mockResolvedValue(new Response('{}', { status }));
     await expect(hostListingImages(config, [source])).rejects.toMatchObject({ kind: 'authorization' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not blame a photo for an empty endpoint 404', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }));
+    await expect(hostListingImages(config, [source])).rejects.toMatchObject({ kind: 'service', httpStatus: 404 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('recognizes OAuth errors returned as HTTP 400', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ errors: [{ errorId: 1002, domain: 'OAuth' }] }), { status: 400 }));
+    await expect(hostListingImages(config, [source])).rejects.toMatchObject({ kind: 'authorization', ebayErrorId: 1002 });
   });
 
   it.each([429, 503])('retries a transient HTTP %s response', async status => {
