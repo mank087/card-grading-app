@@ -112,3 +112,6 @@ marketing/**
 !marketing/package-refresh-*/**/*.ts
 tmp/
 supabase/.temp/
+
+# One-time catalog download, image cache and database import backups
+/data/scrydex-30th-2026-09-16/

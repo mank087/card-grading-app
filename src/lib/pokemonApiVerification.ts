@@ -16,6 +16,7 @@ import {
 } from './pokemonTcgApi';
 import { namesAgree, speciesKey, type NameAgreement } from './identity/nameAgreement';
 import { findUniqueDigitVariant } from './cardNumberUtils';
+import { anniversaryNumber, anniversarySetIds, pokemonPrintedNumber, printedDenominatorMatches } from './pokemonAnniversary';
 
 export interface PokemonApiVerificationResult {
   success: boolean;
@@ -55,6 +56,8 @@ export interface CardInfoForVerification {
  */
 function normalizeCardNumber(cardNumber: string): string {
   if (!cardNumber) return '';
+  const rgb = anniversaryNumber(cardNumber);
+  if (rgb) return rgb;
 
   // If it's a fraction format, extract just the numerator
   const fractionMatch = cardNumber.match(/^(\d+)\/\d+$/);
@@ -551,12 +554,12 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   // Extract card info
   const cardName = cardInfo.player_or_character || cardInfo.card_name || '';
   const setName = cardInfo.set_name || '';
-  const cardNumber = cardInfo.card_number || '';
+  const cardNumber = cardInfo.card_number || cardInfo.card_number_raw || '';
   const setCode = cardInfo.set_code || '';
   // New format-aware fields
   const cardNumberRaw = cardInfo.card_number_raw || cardNumber;
   const cardNumberFormat = cardInfo.card_number_format as CardNumberFormat || detectCardNumberFormat(cardNumberRaw);
-  const setTotal = cardInfo.set_total || '';
+  const setTotal = cardInfo.set_total || cardNumberRaw.split('/')[1]?.trim() || '';
 
   if (!cardName && !cardNumber) {
     result.error = 'Insufficient card information for verification';
@@ -566,6 +569,28 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   console.log(`[Pokemon Local Verification] Detected format: ${cardNumberFormat}, setTotal: ${setTotal}`);
 
   let dbCard: PokemonCard | null = null;
+
+  // Anniversary evidence must be resolved before denominator-based legacy searches.
+  // Reprints share numbers/fractions with their originals and 30C spans two sets.
+  const anniversarySets = anniversarySetIds(cardInfo);
+  if (anniversarySets) {
+    const normalized = normalizeCardNumber(cardNumberRaw);
+    const candidates: PokemonCard[] = [];
+    for (const setId of anniversarySets) {
+      const matches = await searchLocalByNameNumberSetId('', normalized, setId);
+      candidates.push(...matches.filter(card =>
+        namesAgree(cardName, card.name).agrees &&
+        printedDenominatorMatches(card.printedNumber || pokemonPrintedNumber(card.id, card.number, card.set.printedTotal), setTotal)
+      ));
+    }
+    if (candidates.length !== 1) {
+      result.error = candidates.length ? 'Ambiguous anniversary card; retain the observed identity' : 'No anniversary card matches the observed name, number and denominator';
+      return result; // Never fall back to an older printing for explicit anniversary evidence.
+    }
+    dbCard = candidates[0];
+    result.verification_method = 'set_id_number';
+    result.confidence = cardName ? 'high' : 'medium';
+  }
 
   // Strategy 0 (NEW): Format-aware search for promos and special formats
   if (!dbCard && cardName && cardNumberRaw && (cardNumberFormat === 'swsh_promo' || cardNumberFormat === 'sv_promo' || cardNumberFormat === 'galarian_gallery' || cardNumberFormat === 'trainer_gallery')) {
@@ -698,8 +723,8 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     // Check for corrections
     const dbSetName = dbCard.set.name;
     const dbCardName = dbCard.name;
-    const dbCardNumber = `${dbCard.number}/${dbCard.set.printedTotal}`;
-    const dbYear = dbCard.set.releaseDate?.split('/')[0] || '';
+    const dbCardNumber = dbCard.printedNumber || pokemonPrintedNumber(dbCard.id, dbCard.number, dbCard.set.printedTotal);
+    const dbYear = dbCard.set.releaseDate?.match(/^\d{4}/)?.[0] || '';
 
     // VALIDATION: Reject matches where year is way off (more than 3 years different)
     if (cardInfo.year && dbYear) {
@@ -723,7 +748,11 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
 
     // CRITICAL VALIDATION: Reject matches where set denominator doesn't match
     // This prevents misidentification of cards like Base Set Charizard (4/102) vs Celebrations (4/25)
-    if (setTotal && dbCard.set.printedTotal) {
+    if (anniversarySets && !printedDenominatorMatches(dbCardNumber, setTotal)) {
+      result.error = 'Anniversary printed denominator mismatch';
+      return result;
+    }
+    if (!anniversarySets && setTotal && dbCard.set.printedTotal) {
       // Extract numeric portion from setTotal (handles cases like "102", "TG30", etc.)
       const aiDenominatorStr = setTotal.replace(/^[A-Za-z]+/, '').trim();
       const aiDenominator = parseInt(aiDenominatorStr);
@@ -845,9 +874,9 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
     ...(shouldApplyCorrections && {
       ...(shouldCorrectCardName && { card_name: dbCard.name }),
       card_set: dbCard.set.name,
-      release_date: dbCard.set.releaseDate?.split('/')[0] || null,
+      release_date: dbCard.set.releaseDate?.match(/^\d{4}/)?.[0] || null,
       ...(shouldCorrectCardNumber && {
-        card_number: `${dbCard.number}/${dbCard.set.printedTotal}`,
+        card_number: dbCard.printedNumber || pokemonPrintedNumber(dbCard.id, dbCard.number, dbCard.set.printedTotal),
       })
     })
   };
