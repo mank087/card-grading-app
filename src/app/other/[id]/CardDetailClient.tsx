@@ -60,6 +60,7 @@ import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
 import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
+import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
 import { DefectLegend } from '@/components/grading/DefectLegend';
 import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
@@ -3418,7 +3419,27 @@ export function OtherCardDetails() {
               })()}
 
               {/* 💰 DCM Estimated Price Callout */}
-              {dcmPriceData?.estimatedValue && (
+              {/* Value withheld: a large estimate on a card with no set or year is
+                  the shape that produced six-figure numbers on public pages. The
+                  owner is told how to release it; the public sees nothing.
+                  See @/lib/pricing/valueGuard. */}
+              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+                const session = getStoredSession();
+                const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                if (!isOwner) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                    <p className="text-sm font-semibold text-slate-800">Confirm your card details to see a value</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      This card has no set or year on file, so the matched listing may be a
+                      different printing. Add the set and year with Edit Card Details and the
+                      value will appear here.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (
                 <div className={`rounded-xl shadow-lg p-5 border-2 mt-6 ${
                   dcmPriceData.source === 'ebay'
                     ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200'
@@ -5111,7 +5132,7 @@ export function OtherCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                badge={dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted ? `~$${dcmPriceData.estimatedValue}` : undefined}
                 tourId="tour-market-value"
               >
 
@@ -5122,6 +5143,7 @@ export function OtherCardDetails() {
                   const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                   return (
                     <OtherPriceLookup
+                      guardIdentity={card as any}
                       card={{
                         card_name: cardInfo.card_name || card.card_name,
                         featured: (extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured)) as string | undefined,

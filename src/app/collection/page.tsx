@@ -77,6 +77,9 @@ type Card = {
   conversational_image_confidence?: string | null
   conversational_condition_label?: string | null
   conversational_card_info?: any  // JSON field containing card details
+  // 💰 Displayed-value guard inputs (see @/lib/pricing/valueGuard)
+  dcm_selected_product_id?: string | null
+  identity_confirmed_revision?: number | null
   dvg_decimal_grade?: number | null
   // 🎯 Unified label data (pre-generated)
   label_data?: any
@@ -302,8 +305,29 @@ const usesDcmPricing = (card: Card): boolean => {
 // preserve the existing UI semantics that distinguish "no price" from "$0".
 const getMarketValue = (card: Card): number | null => {
   const { value, source } = resolveCardValue(card);
-  return source === 'none' ? null : value;
+  return source === 'none' || source === 'withheld' ? null : value;
 };
+
+// 💰 Helper: true when a price exists but the displayed-value guard is hiding
+// it (a large number on a card with no set or no year). See
+// @/lib/pricing/valueGuard. Totals already ignore these because getMarketValue
+// returns null; this is what lets the tile say why instead of going blank.
+const isValueWithheld = (card: Card): boolean => {
+  return resolveCardValue(card).source === 'withheld';
+};
+
+const WITHHELD_VALUE_MESSAGE = 'Confirm your card details to see a value';
+
+// One line of text, not a new surface. The card links to its detail page,
+// where Edit Card Details already lives.
+const WithheldValueNote = ({ compact = false }: { compact?: boolean }) => (
+  <span
+    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"
+    title={WITHHELD_VALUE_MESSAGE}
+  >
+    {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+  </span>
+);
 
 // 💰 Helper: Check if price data is stale (> 7 days)
 const isPriceStale = (updatedAt: string | null | undefined): boolean => {
@@ -3064,7 +3088,14 @@ function CollectionPageContent() {
                     {(() => {
                       const marketValue = getMarketValue(card);
                       const priceStr = formatPrice(marketValue);
-                      if (!priceStr) return null;
+                      if (!priceStr) {
+                        if (!isValueWithheld(card)) return null;
+                        return (
+                          <div className="absolute -top-8 right-2">
+                            <WithheldValueNote compact />
+                          </div>
+                        );
+                      }
 
                       const isStale = isPriceStale(getPriceUpdatedAt(card));
                       // Determine price source label
@@ -3289,6 +3320,7 @@ function CollectionPageContent() {
                                       </span>
                                     );
                                   }
+                                  if (isValueWithheld(card)) return <WithheldValueNote />;
                                   return null;
                                 })()}
 
@@ -3581,6 +3613,7 @@ function CollectionPageContent() {
                               const isStale = isPriceStale(getPriceUpdatedAt(card));
 
                               if (!priceStr) {
+                                if (isValueWithheld(card)) return <WithheldValueNote compact />;
                                 return <span className="text-sm text-gray-400">-</span>;
                               }
 

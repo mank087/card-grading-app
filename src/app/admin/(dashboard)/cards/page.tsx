@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
 import Link from 'next/link'
+import { resolveCardValue } from '@/lib/pricing/resolveCardValue'
 
 interface Card {
   id: string
@@ -40,6 +41,9 @@ interface Card {
   scryfall_price_usd_foil: number | null
   dcm_price_estimate: number | null
   dcm_cached_prices: any
+  // Displayed-value guard inputs (see @/lib/pricing/valueGuard)
+  dcm_selected_product_id: string | null
+  identity_confirmed_revision: number | null
 }
 
 interface PaginationData {
@@ -164,6 +168,13 @@ const getMarketValue = (card: Card): number | null => {
     return card.ebay_price_median
   }
   return null
+}
+
+// Admin still sees the raw number, because the point of this table is to find
+// the affected cards. It just has to be obvious that the customer does not.
+// See @/lib/pricing/valueGuard.
+const isMarketValueWithheld = (card: Card): boolean => {
+  return resolveCardValue(card as any).source === 'withheld'
 }
 
 // Check if price is stale (>7 days old)
@@ -625,8 +636,9 @@ function CardsContent() {
                             {badge.label}
                           </span>
                           {marketValue !== null && (
-                            <span className="text-xs font-medium text-green-700">
+                            <span className={`text-xs font-medium ${isMarketValueWithheld(card) ? 'text-gray-500' : 'text-green-700'}`}>
                               {formatPrice(marketValue)}
+                              {isMarketValueWithheld(card) && ' (withheld from customer)'}
                             </span>
                           )}
                         </div>
@@ -864,9 +876,12 @@ function CardsContent() {
                       <td className="px-2 py-3">
                         {marketValue !== null ? (
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-green-700">
+                            <span className={`text-sm font-medium ${isMarketValueWithheld(card) ? 'text-gray-500' : 'text-green-700'}`}>
                               {formatPrice(marketValue)}
                             </span>
+                            {isMarketValueWithheld(card) && (
+                              <span className="text-[10px] text-gray-500">(withheld from customer)</span>
+                            )}
                             {isPriceStale(card.ebay_price_updated_at) && (
                               <span className="text-[10px] text-yellow-600" title="Price data is over 7 days old">
                                 ⚠ stale

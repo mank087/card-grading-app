@@ -30,8 +30,13 @@ const CARD_COLUMNS = `
   conversational_condition_label, conversational_card_info,
   ownership_status, sold_at, sold_price, sold_channel,
   dcm_price_estimate, ebay_price_median, scryfall_price_usd, is_foil,
+  dcm_selected_product_id, identity_confirmed_revision,
   custom_label_data, card_colors
 `;
+// dcm_selected_product_id and identity_confirmed_revision are the displayed-value
+// guard's inputs (src/lib/pricing/valueGuard). The collection grid renders binder
+// cards with the same helper it uses for My Collection, so without them a card
+// opened inside a binder would show a value the same card hides outside it.
 // card_colors is the per-card sampled palette the heritage slab bands are drawn
 // from. /api/cards/my-collection selects it, this route did not, so every card
 // opened inside a binder fell through resolveHeritageBandColors() to the DCM

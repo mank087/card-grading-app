@@ -11,6 +11,7 @@ import { GradeHeroBanner } from '@/components/grading/GradeHeroBanner'
 import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy'
 import { SubScoresDisplay } from '@/components/grading/SubScoresDisplay'
 import { PriceEstimateBadge } from '@/components/grading/PriceEstimateBadge'
+import { assessValueTrust } from '@/lib/pricing/valueGuard'
 
 // Slab border style — matches card detail pages exactly
 const slabBorderStyle = {
@@ -30,15 +31,23 @@ function getCardLink(card: any): string {
 
 function getEstimatedValue(card: any): number | null {
   if (card.dcm_price_estimate != null && card.dcm_price_estimate > 0) {
-    return parseFloat(card.dcm_price_estimate)
+    return guarded(card, parseFloat(card.dcm_price_estimate))
   }
   if (card.dcm_cached_prices?.estimatedValue != null && card.dcm_cached_prices.estimatedValue > 0) {
-    return parseFloat(card.dcm_cached_prices.estimatedValue)
+    return guarded(card, parseFloat(card.dcm_cached_prices.estimatedValue))
   }
   if (card.category === 'MTG' && card.scryfall_price_usd != null && card.scryfall_price_usd > 0) {
+    // Per-printing Scryfall price, so the guard does not apply.
     return parseFloat(card.scryfall_price_usd)
   }
   return null
+}
+
+// This tile is shown to the public (the Featured page and shared collections),
+// so a guarded value is not explained here, it is simply not shown: the tile
+// already falls back to its "View Market Value" link when there is no price.
+function guarded(card: any, value: number): number | null {
+  return assessValueTrust(card, value).trusted ? value : null
 }
 
 function getMatchConfidence(card: any): 'high' | 'medium' | 'low' | 'none' | null {

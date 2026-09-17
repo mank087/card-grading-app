@@ -194,6 +194,9 @@ export const DRAFT_CARD_COLUMNS = [
   'conversational_final_grade_summary', 'dvg_whole_grade', 'dvg_decimal_grade',
   'dcm_price_estimate', 'dcm_cached_prices', 'ebay_price_median',
   'scryfall_price_usd', 'scryfall_price_usd_foil',
+  // Identity inputs for the displayed-value guard (src/lib/pricing/valueGuard),
+  // so a bulk batch cannot price a card the rest of the app refuses to value.
+  'dcm_selected_product_id', 'identity_confirmed_revision',
   'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
   'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',
   'autograph_type', 'memorabilia_type', 'rookie_card', 'first_print_rookie',

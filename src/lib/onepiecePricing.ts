@@ -24,6 +24,7 @@
  */
 
 import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+import { capMatchConfidence } from './pricing/valueGuard';
 
 // PriceCharting API base URL
 const API_BASE_URL = 'https://www.pricecharting.com/api';
@@ -488,7 +489,7 @@ function scoreOnePieceProductMatch(
 /**
  * Search for One Piece card prices
  */
-export async function searchOnePieceCardPrices(
+async function searchOnePieceCardPricesUncapped(
   params: OnePieceCardSearchParams
 ): Promise<{ prices: NormalizedOnePiecePrices | null; matchConfidence: 'high' | 'medium' | 'low' | 'none'; queryUsed: string }> {
   console.log('[OnePiecePricing] === SEARCH REQUEST ===');
@@ -681,4 +682,20 @@ export async function getOnePiecePricesForProductId(
  */
 export function isOnePiecePricingEnabled(): boolean {
   return !!process.env.PRICECHARTING_API_KEY;
+}
+/**
+ * A query with no set and no year is a name-only search. It cannot tell an
+ * original from a reprint, so whatever the name scored, the match does not get
+ * to be labelled "Best Match" or "Good Match": it is capped at low. Matching
+ * itself is unchanged. See capMatchConfidence in @/lib/pricing/valueGuard.
+ */
+export async function searchOnePieceCardPrices(
+  params: OnePieceCardSearchParams
+): Promise<Awaited<ReturnType<typeof searchOnePieceCardPricesUncapped>>> {
+  const result = await searchOnePieceCardPricesUncapped(params);
+  const capped = capMatchConfidence(result.matchConfidence, { setName: params.setName, year: params.year });
+  if (capped !== result.matchConfidence) {
+    console.log(`[OnePiecePricing] Match confidence capped ${result.matchConfidence} -> ${capped}: the query had no set and no year`);
+  }
+  return { ...result, matchConfidence: capped };
 }

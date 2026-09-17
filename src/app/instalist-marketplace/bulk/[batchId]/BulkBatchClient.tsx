@@ -1828,8 +1828,12 @@ function BulkRow({
           />
         </div>
         <p className="text-[11px] text-gray-500 mt-0.5">
-          {estimate && estimate.value > 0 ? `DCM $${estimate.value.toFixed(2)}` : 'No estimate'}
-          {median ? ` · eBay $${median.toFixed(2)}` : ''}
+          {estimate && estimate.value > 0
+            ? `DCM $${estimate.value.toFixed(2)}`
+            : estimate?.source === 'withheld'
+              ? 'Confirm your card details to see a value'
+              : 'No estimate'}
+          {estimate?.source === 'withheld' ? '' : median ? ` · eBay $${median.toFixed(2)}` : ''}
         </p>
       </div>
 

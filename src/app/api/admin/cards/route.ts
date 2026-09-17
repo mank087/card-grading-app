@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
         scryfall_price_usd,
         scryfall_price_usd_foil,
         dcm_price_estimate,
-        dcm_cached_prices
+        dcm_cached_prices,
+        dcm_selected_product_id,
+        identity_confirmed_revision
       `, { count: 'exact' })
 
     // Apply category filter (consolidate sports subcategories)

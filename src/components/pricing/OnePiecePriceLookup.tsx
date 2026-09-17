@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
 import {
@@ -64,6 +65,12 @@ interface OnePiecePriceLookupProps {
   };
   dcmGrade?: number;
   isOwner?: boolean;
+  /**
+   * The card row's identity fields, for the displayed-value guard. Optional:
+   * without it the guard has nothing to judge and the value shows as before.
+   * See @/lib/pricing/valueGuard.
+   */
+  guardIdentity?: CardIdentityForGuard;
   onPriceLoad?: (data: {
     estimatedValue: number | null;
     matchConfidence: 'high' | 'medium' | 'low' | 'none';
@@ -95,7 +102,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }: OnePiecePriceLookupProps) {
+export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, guardIdentity, onPriceLoad }: OnePiecePriceLookupProps) {
   const [priceData, setPriceData] = useState<OnePiecePricingResult['data'] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -649,7 +656,14 @@ export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, onPriceLo
   const priceIncrease = getPriceIncrease();
   const marketRange = getMarketRange();
   const dcmEstimate = getDcmEstimatedValue();
-  const chartData = getChartData(dcmEstimate?.value);
+  // A large estimate resting on a card with no set or no year is not shown
+  // until the owner confirms the details. The number is not recomputed here,
+  // only hidden. See @/lib/pricing/valueGuard.
+  const valueWithheld = !!dcmEstimate && !assessValueTrust(guardIdentity || {}, dcmEstimate.value).trusted;
+  // A withheld card shows the public nothing from the matched listing either: its
+  // price range and graded-price tables belong to a product this card may not be.
+  if (valueWithheld && !isOwner) return null;
+  const chartData = getChartData(valueWithheld ? null : dcmEstimate?.value);
 
   return (
     <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200 p-4 sm:p-6 shadow-lg">
@@ -845,7 +859,20 @@ export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, onPriceLo
           )}
 
           {/* DCM Estimated Value */}
-          {dcmEstimate && dcmGrade && (
+          {/* Value withheld until the owner confirms what this card is.
+              Public viewers see nothing here at all. */}
+          {dcmEstimate && dcmGrade && valueWithheld && isOwner && (
+            <div className="bg-white rounded-xl border-2 border-slate-200 p-5 mb-4">
+              <p className="text-sm font-semibold text-gray-800">Confirm your card details to see a value</p>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                This card has no set or year on file, so the price match above may be for a
+                different printing. Add the set and year with Edit Card Details on this page, or
+                pick the right card under "See other card variants" above.
+              </p>
+            </div>
+          )}
+
+          {dcmEstimate && dcmGrade && !valueWithheld && (
             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-5 mb-4 shadow-lg text-white">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -987,7 +1014,7 @@ export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, onPriceLo
                     <div className="w-3 h-3 rounded bg-amber-500"></div>
                     <span>Raw</span>
                   </div>
-                  {dcmGrade && dcmEstimate && (
+                  {dcmGrade && dcmEstimate && !valueWithheld && (
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-violet-500"></div>
                       <span>Graded: DCM</span>

@@ -247,6 +247,7 @@ export default function CollectionScreen() {
     conversational_card_info, front_path, card_colors,
     ebay_price_median, dcm_price_estimate,
     dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
+    dcm_selected_product_id, identity_confirmed_revision,
     created_at
   `
 
@@ -792,7 +793,10 @@ export default function CollectionScreen() {
   const stats = useMemo(() => {
     const graded = cards.filter(c => c.conversational_whole_grade != null)
     const resolved = cards.map(c => ({ c, r: resolveCardValue(c) }))
-    const withPrice = resolved.filter(({ r }) => r.source !== 'none')
+    // 'withheld' is a price the displayed-value guard is hiding, so it counts
+    // as unpriced here: the total and the "priced" count must agree with the
+    // rows, which show no number. See @/lib/valueGuard.
+    const withPrice = resolved.filter(({ r }) => r.source !== 'none' && r.source !== 'withheld')
     const totalValue = withPrice.reduce((sum, { r }) => sum + r.value, 0)
     const avgGrade = graded.length > 0 ? graded.reduce((sum, c) => sum + (c.conversational_whole_grade || 0), 0) / graded.length : 0
     const complete = !!selectedBinderId || (!hasMore && (totalCount == null || cards.length >= totalCount))

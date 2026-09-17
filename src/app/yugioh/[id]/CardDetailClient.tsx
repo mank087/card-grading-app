@@ -35,6 +35,7 @@ import {
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
 import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
 import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
+import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
@@ -3475,7 +3476,27 @@ export function YugiohCardDetails() {
               })()}
 
               {/* 💰 DCM Estimated Price Callout */}
-              {dcmPriceData?.estimatedValue && (
+              {/* Value withheld: a large estimate on a card with no set or year is
+                  the shape that produced six-figure numbers on public pages. The
+                  owner is told how to release it; the public sees nothing.
+                  See @/lib/pricing/valueGuard. */}
+              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+                const session = getStoredSession();
+                const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                if (!isOwner) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                    <p className="text-sm font-semibold text-slate-800">Confirm your card details to see a value</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      This card has no set or year on file, so the matched listing may be a
+                      different printing. Add the set and year with Edit Card Details and the
+                      value will appear here.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -5504,7 +5525,7 @@ export function YugiohCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                badge={dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted ? `~$${dcmPriceData.estimatedValue}` : undefined}
                 tourId="tour-market-value"
               >
 
@@ -5515,6 +5536,7 @@ export function YugiohCardDetails() {
                   const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                   return (
                     <OtherPriceLookup
+                      guardIdentity={card as any}
                       card={{
                         id: card.id,
                         card_name: cardInfo.card_name || card.card_name,

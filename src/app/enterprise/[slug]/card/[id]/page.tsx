@@ -7,6 +7,7 @@ import { orgBrandPalette } from '../../data';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveOrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import OrgCardReport, { type OrgReportCard } from './OrgCardReport';
+import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 
 export const revalidate = 60;
 
@@ -138,6 +139,12 @@ export default async function StorefrontCardPage({
     : [brandSet[0], brandSet[0]];
   const heritagePattern = slabContent.pattern || 'diamond';
 
+  // A storefront card page is public, so a value the displayed-value guard is
+  // hiding does not get explained here: the whole pricing payload is dropped
+  // and OrgCardReport renders the page the way it already does for a card that
+  // was never priced. See @/lib/pricing/valueGuard.
+  const priceWithheld = resolveCardValue(card as any).source === 'withheld';
+
   // Only the public slice of the row crosses to the client — no user_id, no
   // owner/billing fields.
   const reportCard: OrgReportCard = {
@@ -183,18 +190,18 @@ export default async function StorefrontCardPage({
     manufacturer_name: card.manufacturer_name ?? null,
     card_number: card.card_number ?? null,
     subset: card.subset ?? null,
-    dcm_price_estimate: card.dcm_price_estimate ?? null,
-    dcm_price_raw: card.dcm_price_raw ?? null,
-    dcm_price_graded_high: card.dcm_price_graded_high ?? null,
-    dcm_price_median: card.dcm_price_median ?? null,
-    dcm_price_average: card.dcm_price_average ?? null,
-    dcm_price_match_confidence: card.dcm_price_match_confidence ?? null,
-    dcm_price_product_name: card.dcm_price_product_name ?? null,
-    dcm_price_updated_at: card.dcm_price_updated_at ?? null,
+    dcm_price_estimate: priceWithheld ? null : (card.dcm_price_estimate ?? null),
+    dcm_price_raw: priceWithheld ? null : (card.dcm_price_raw ?? null),
+    dcm_price_graded_high: priceWithheld ? null : (card.dcm_price_graded_high ?? null),
+    dcm_price_median: priceWithheld ? null : (card.dcm_price_median ?? null),
+    dcm_price_average: priceWithheld ? null : (card.dcm_price_average ?? null),
+    dcm_price_match_confidence: priceWithheld ? null : (card.dcm_price_match_confidence ?? null),
+    dcm_price_product_name: priceWithheld ? null : (card.dcm_price_product_name ?? null),
+    dcm_price_updated_at: priceWithheld ? null : (card.dcm_price_updated_at ?? null),
     // Full cached pricing payload — powers the per-grade tables, price range,
     // chart, and the exact product URL. Public-safe: market data only.
-    dcm_cached_prices: card.dcm_cached_prices ?? null,
-    dcm_prices_cached_at: card.dcm_prices_cached_at ?? null,
+    dcm_cached_prices: priceWithheld ? null : (card.dcm_cached_prices ?? null),
+    dcm_prices_cached_at: priceWithheld ? null : (card.dcm_prices_cached_at ?? null),
     scryfall_id: card.scryfall_id ?? null,
     has_user_condition_report: card.has_user_condition_report ?? null,
     user_condition_report: card.user_condition_report ?? null,

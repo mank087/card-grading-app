@@ -46,6 +46,7 @@ import { GradeReviewButton } from '@/components/grade-review/GradeReviewButton';
 import { ActionLink } from '@/components/design/Primitives';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { PokemonPriceLookup } from '@/components/pricing/PokemonPriceLookup';
+import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -3481,7 +3482,27 @@ export function PokemonCardDetails() {
               )}
 
               {/* 💰 DCM Estimated Price Callout */}
-              {dcmPriceData?.estimatedValue && (
+              {/* Value withheld: a large estimate on a card with no set or year is
+                  the shape that produced six-figure numbers on public pages. The
+                  owner is told how to release it; the public sees nothing.
+                  See @/lib/pricing/valueGuard. */}
+              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+                const session = getStoredSession();
+                const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                if (!isOwner) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                    <p className="text-sm font-semibold text-slate-800">Confirm your card details to see a value</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      This card has no set or year on file, so the matched listing may be a
+                      different printing. Add the set and year with Edit Card Details and the
+                      value will appear here.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -5403,7 +5424,7 @@ export function PokemonCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedValue ? `$${dcmPriceData.estimatedValue.toFixed(2)}` : undefined}
+                badge={dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted ? `$${dcmPriceData.estimatedValue.toFixed(2)}` : undefined}
                 tourId="tour-market-value"
               >
 
@@ -5414,6 +5435,7 @@ export function PokemonCardDetails() {
                   const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                   return (
                     <PokemonPriceLookup
+                      guardIdentity={card as any}
                       card={{
                         id: card.id,
                         player_or_character: cardInfo.player_or_character || card.featured || card.pokemon_featured,

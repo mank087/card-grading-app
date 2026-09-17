@@ -1578,6 +1578,17 @@ export default function CardDetailScreen() {
       {(() => {
         const resolved = resolveCardValue(card as any)
         if (resolved.source === 'none') return null
+        // A large value on a card with no set or year is held back until the
+        // owner confirms what the card is. The owner is told why; anyone else
+        // sees nothing. See @/lib/valueGuard.
+        if (resolved.source === 'withheld') {
+          if (!isOwner) return null
+          return (
+            <View style={s.valueCard}>
+              <Text style={s.valueLabel}>Confirm your card details to see a value</Text>
+            </View>
+          )
+        }
         return (
           <View style={s.valueCard}>
             <Text style={s.valueLabel}>DCM Estimated Value</Text>
@@ -2300,7 +2311,7 @@ export default function CardDetailScreen() {
         {/* ══════ 5. MARKET VALUE ══════ */}
         <View ref={tourRefs['market-value']} collapsable={false}>
         <CollapsibleSection
-          title={`Market Value${card.dcm_price_estimate ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`}
+          title={`Market Value${card.dcm_price_estimate && resolveCardValue(card as any).source !== 'withheld' ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`}
           icon="trending-up"
           open={!!sectionsOpen['market-value']}
           onOpenChange={(o) => handleSectionToggle('market-value', o)}
@@ -2309,7 +2320,10 @@ export default function CardDetailScreen() {
             const cached = card.dcm_cached_prices
             const prices = cached?.prices
             const raw = prices?.raw
-            const dcmEst = cached?.estimatedValue || card.dcm_price_estimate
+            // Held back by the displayed-value guard (@/lib/valueGuard): the
+            // estimate, the chart's DCM bar and the Average cell all read this.
+            const valueWithheld = resolveCardValue(card as any).source === 'withheld'
+            const dcmEst = valueWithheld ? null : (cached?.estimatedValue || card.dcm_price_estimate)
             const salesVol = prices?.salesVolume
             const matchConf = cached?.matchConfidence || card.dcm_price_match_confidence
             const prodName = prices?.productName || card.dcm_price_product_name

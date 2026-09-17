@@ -9,6 +9,18 @@ import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/grading/GradeBadge'
 import type { EligibleCard } from '@/lib/marketplaceApi'
 import { BATCH_CAP_MESSAGE } from '@/lib/ebayBulkTypes'
+import { resolveCardValue } from '@/lib/resolveCardValue'
+
+/**
+ * The row's price hint, or null when nothing can be shown. A card the
+ * displayed-value guard is hiding shows no number here either.
+ * See @/lib/valueGuard.
+ */
+function pickerValue(card: EligibleCard): number | null {
+  if (resolveCardValue(card as any).source === 'withheld') return null
+  const value = card.ebay_price_median ?? card.dcm_price_estimate
+  return value == null ? null : value
+}
 
 type SortKey = 'recent' | 'name' | 'grade' | 'value'
 
@@ -118,8 +130,8 @@ export default function CardPicker({
     else if (sort === 'grade') sorted.sort((a, b) => (b.conversational_whole_grade ?? 0) - (a.conversational_whole_grade ?? 0))
     else if (sort === 'value') {
       sorted.sort((a, b) => {
-        const av = a.ebay_price_median ?? a.dcm_price_estimate ?? 0
-        const bv = b.ebay_price_median ?? b.dcm_price_estimate ?? 0
+        const av = pickerValue(a) ?? 0
+        const bv = pickerValue(b) ?? 0
         return bv - av
       })
     }
@@ -423,9 +435,9 @@ export default function CardPicker({
                 {item.conversational_whole_grade != null && (
                   <GradeBadge grade={item.conversational_whole_grade} size="sm" />
                 )}
-                {(item.ebay_price_median ?? item.dcm_price_estimate) != null && (
+                {pickerValue(item) != null && (
                   <Text style={styles.rowPrice}>
-                    ~${((item.ebay_price_median ?? item.dcm_price_estimate) ?? 0).toFixed(2)}
+                    ~${(pickerValue(item) ?? 0).toFixed(2)}
                   </Text>
                 )}
               </View>

@@ -49,6 +49,9 @@ const CARD_COLUMNS = [
   // Pricing (resolveCardValue chain + picker value sort)
   'dcm_price_estimate', 'dcm_cached_prices', 'ebay_price_median',
   'scryfall_price_usd', 'scryfall_price_usd_foil',
+  // Identity inputs for the displayed-value guard (src/lib/pricing/valueGuard).
+  // card_set, release_date and conversational_card_info are selected below.
+  'dcm_selected_product_id', 'identity_confirmed_revision',
   // Label + item-specifics attributes
   'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
   'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',

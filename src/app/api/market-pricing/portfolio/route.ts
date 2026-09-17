@@ -20,6 +20,19 @@ function getCardValue(card: Record<string, unknown>): number {
   return resolveCardValue(card as unknown as CardForPricing).value;
 }
 
+/**
+ * The current DCM estimate, but 0 for a card the displayed-value guard is
+ * hiding. The movers chart and the grading-vs-current summary read
+ * dcm_price_estimate straight off the row, so without this a withheld card
+ * would keep appearing as a top gainer with the number the rest of the page
+ * refuses to show.
+ */
+function displayableEstimate(card: Record<string, unknown>): number {
+  const resolved = resolveCardValue(card as unknown as CardForPricing);
+  if (resolved.source === 'withheld') return 0;
+  return (card.dcm_price_estimate as number) || 0;
+}
+
 // Parse card_info from conversational_grading JSON string (fallback for older cards)
 function parseConversationalGradingName(raw: unknown): string | null {
   if (!raw || typeof raw !== 'string') return null;
@@ -84,7 +97,8 @@ export async function GET(request: NextRequest) {
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
         dcm_price_updated_at, dcm_price_match_confidence, dcm_cached_prices,
         dcm_price_at_grading, dcm_price_at_grading_date,
-        scryfall_price_usd, scryfall_price_usd_foil
+        scryfall_price_usd, scryfall_price_usd_foil,
+        release_date, dcm_selected_product_id, identity_confirmed_revision
       `)
       .eq('user_id', auth.userId)
       .order('created_at', { ascending: false });
@@ -204,7 +218,7 @@ export async function GET(request: NextRequest) {
     const changes: Array<{ card: Record<string, unknown>; changePercent: number; currentValue: number; gradingValue: number }> = [];
 
     for (const card of cards) {
-      const currentPrice = (card.dcm_price_estimate as number) || 0;
+      const currentPrice = displayableEstimate(card);
       const gradingPrice = (card.dcm_price_at_grading as number) || 0;
       if (currentPrice <= 0 || gradingPrice <= 0) continue;
 
@@ -245,7 +259,7 @@ export async function GET(request: NextRequest) {
     let cardsWithGradingPrice = 0;
     for (const card of cards) {
       const gradingPrice = (card.dcm_price_at_grading as number) || 0;
-      const currentPrice = (card.dcm_price_estimate as number) || 0;
+      const currentPrice = displayableEstimate(card);
       if (gradingPrice > 0 && currentPrice > 0) {
         totalGradingValue += gradingPrice;
         totalCurrentDcmValue += currentPrice;
@@ -380,6 +394,9 @@ export async function GET(request: NextRequest) {
       'scryfall': 'Scryfall',
       'scryfall-foil': 'Scryfall',
       'ebay-median': 'eBay',
+      // A withheld card has a price but no displayable one, so it sits with the
+      // unpriced cards rather than crediting a source for a number nobody sees.
+      'withheld': 'Unpriced',
       'none': 'Unpriced',
     };
     const sourceCounts = new Map<string, number>();
