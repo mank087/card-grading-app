@@ -427,126 +427,38 @@ export async function deductCredit(
   };
 }
 
-/**
- * Refund the grade credit for a card whose grading failed.
- *
- * Idempotent per card:
- * - Only refunds if the card was actually charged (a 'grade' transaction exists)
- * - Never refunds the same card twice (skips if a 'refund' transaction exists)
- *
- * A successful retry after a refund intentionally does NOT re-charge — the
- * grading failure was our fault, so the retry is on the house.
- */
+/** Status describes the exact charge, never the card's lifetime refund history. */
+export type GradingRefundStatus = 'refunded' | 'already_refunded' | 'not_charged' | 'invalid_charge' | 'needs_review' | 'failed';
+
 export async function refundGradeCredit(
-  userId: string,
-  cardId: string,
-  reason: string
-): Promise<{ refunded: boolean; newBalance: number; error?: string }> {
+  userId: string, cardId: string, reason: string, chargeId?: string | null,
+): Promise<{ refunded: boolean; newBalance: number; status: GradingRefundStatus; error?: string }> {
   const supabase = getServiceClient();
-
-  const credits = await getUserCredits(userId);
-  if (!credits) {
-    return { refunded: false, newBalance: 0, error: 'User credits not found' };
-  }
-
-  // Must have been charged for this card
-  const { data: charge } = await supabase
-    .from('credit_transactions')
-    .select('id, org_id')
-    .eq('card_id', cardId)
-    .eq('type', 'grade')
-    .limit(1)
-    .maybeSingle();
-  if (!charge) {
-    // If the card belongs to an org, "no charge tx" likely means the org pool
-    // WAS debited (org_deduct_credit RPC) but the grade transaction row was
-    // never recorded — in that case skipping here silently strands the org's
-    // credit. Log loudly with both ids so it can be restored manually.
-    const { data: cardRow } = await supabase
-      .from('cards')
-      .select('org_id')
-      .eq('id', cardId)
-      .maybeSingle();
-    if (cardRow?.org_id) {
-      console.error(
-        `[refundGradeCredit] CRITICAL: card ${cardId} belongs to org ${cardRow.org_id} but no 'grade' transaction was found — ` +
-        `the org pool credit (if one was deducted) was NOT restored. Verify org_deduct_credit usage for this card and restore manually.`
-      );
-    } else {
-      console.log(`[refundGradeCredit] Card ${cardId} was never charged — nothing to refund`);
+  try {
+    // Undefined means the unique initial-grade charge. Null explicitly means
+    // this attempt was uncharged (web regrades charge only after success).
+    if (chargeId === undefined) {
+      const { data, error } = await supabase.from('credit_transactions').select('id')
+        .eq('card_id', cardId).eq('user_id', userId).eq('type', 'grade').maybeSingle();
+      if (error) throw error;
+      // Initial grading is prepaid. An absent ledger row may be a historical
+      // deduction/ledger split failure, not proof that no credit was taken.
+      if (!data?.id) return { refunded: false, newBalance: 0, status: 'needs_review' };
+      chargeId = data.id;
     }
-    return { refunded: false, newBalance: credits.balance };
-  }
-
-  // Never refund twice
-  const { data: priorRefund } = await supabase
-    .from('credit_transactions')
-    .select('id')
-    .eq('card_id', cardId)
-    .eq('type', 'refund')
-    .limit(1)
-    .maybeSingle();
-  if (priorRefund) {
-    console.log(`[refundGradeCredit] Card ${cardId} already refunded (tx ${priorRefund.id}) — skipping`);
-    return { refunded: false, newBalance: credits.balance };
-  }
-
-  // Org-funded charge → the refund goes back to the store pool, not the
-  // grader's personal balance.
-  if (charge.org_id) {
-    // Policy: refunds always land in the OVERAGE bucket regardless of which
-    // bucket paid — the refunded credit is durable (never wiped by the monthly
-    // reset) and this avoids monthly_credits exceeding the allotment mid-cycle.
-    const orgBalance = await returnOrgCredits(charge.org_id, 1, 'overage');
-    if (orgBalance === null) {
-      return { refunded: false, newBalance: credits.balance, error: 'Org pool restore failed' };
-    }
-    const { error: orgRefundTxError } = await supabase.from('credit_transactions').insert({
-      user_id: userId,
-      org_id: charge.org_id,
-      type: 'refund',
-      amount: 1,
-      balance_after: orgBalance,
-      description: `Grading failed — store credit refunded (${reason})`.slice(0, 250),
-      card_id: cardId,
-      metadata: { org_credit: true, org_bucket: 'overage' },
+    if (!chargeId) return { refunded: false, newBalance: 0, status: 'not_charged' };
+    const { data, error } = await supabase.rpc('refund_grading_charge', {
+      p_user_id: userId, p_card_id: cardId, p_charge_id: chargeId, p_reason: reason,
     });
-    if (orgRefundTxError) {
-      console.error('[refundGradeCredit] Failed to record org refund transaction:', orgRefundTxError);
-    }
-    console.log(`[refundGradeCredit] ✅ Refunded 1 store credit to org ${charge.org_id} for card ${cardId}`);
-    return { refunded: true, newBalance: credits.balance };
+    if (error) throw error; // Never fall back to the old non-atomic balance writes.
+    const known: GradingRefundStatus[] = ['refunded', 'already_refunded', 'not_charged', 'invalid_charge', 'needs_review', 'failed'];
+    const status: GradingRefundStatus = known.includes(data?.status) ? data.status : 'failed';
+    return { refunded: status === 'refunded' || status === 'already_refunded',
+      newBalance: typeof data?.new_balance === 'number' ? data.new_balance : 0, status };
+  } catch (error: any) {
+    console.error('[refundGradeCredit] Atomic refund failed:', error?.message);
+    return { refunded: false, newBalance: 0, status: 'failed', error: 'Credit refund could not be confirmed' };
   }
-
-  const newBalance = credits.balance + 1;
-  const { error: updateError } = await supabase
-    .from('user_credits')
-    .update({
-      balance: newBalance,
-      total_used: Math.max(0, credits.total_used - 1),
-    })
-    .eq('user_id', userId);
-
-  if (updateError) {
-    console.error('[refundGradeCredit] Error restoring balance:', updateError);
-    return { refunded: false, newBalance: credits.balance, error: 'Database error' };
-  }
-
-  const { error: transactionError } = await supabase.from('credit_transactions').insert({
-    user_id: userId,
-    type: 'refund',
-    amount: 1,
-    balance_after: newBalance,
-    description: `Grading failed — credit refunded (${reason})`.slice(0, 250),
-    card_id: cardId,
-  });
-  if (transactionError) {
-    console.error('[refundGradeCredit] Failed to record refund transaction:', transactionError);
-    // Balance was restored; audit log incomplete but do not double-refund by retrying
-  }
-
-  console.log(`[refundGradeCredit] ✅ Refunded 1 credit to ${userId} for card ${cardId}`);
-  return { refunded: true, newBalance };
 }
 
 /**

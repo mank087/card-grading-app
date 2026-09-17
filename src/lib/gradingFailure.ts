@@ -13,7 +13,7 @@
 // - error_message:  human-readable reason for the last failure
 
 import { createClient } from '@supabase/supabase-js';
-import { refundGradeCredit } from './credits';
+import { refundGradeCredit, type GradingRefundStatus } from './credits';
 
 function getServiceClient() {
   return createClient(
@@ -35,9 +35,12 @@ export async function recordGradingFailure(opts: {
   userId: string | null | undefined;
   category: string;
   errorMessage: string;
-}): Promise<{ refunded: boolean }> {
+  /** Exact prepaid charge, undefined for first grade, null for an uncharged attempt. */
+  chargeId?: string | null;
+}): Promise<{ refunded: boolean; refundStatus: GradingRefundStatus }> {
   const { cardId, userId, category, errorMessage } = opts;
   let refunded = false;
+  let refundStatus: GradingRefundStatus = 'failed';
 
   try {
     const supabase = getServiceClient();
@@ -59,14 +62,16 @@ export async function recordGradingFailure(opts: {
 
   if (userId) {
     try {
-      const result = await refundGradeCredit(userId, cardId, `${category} grading error`);
+      const result = await refundGradeCredit(userId, cardId, `${category} grading error`, opts.chargeId);
       refunded = result.refunded;
+      refundStatus = result.status;
     } catch (e: any) {
+      refundStatus = 'failed';
       console.error(`[GradingFailure] Refund error for card ${cardId}:`, e.message);
     }
   }
 
-  return { refunded };
+  return { refunded, refundStatus };
 }
 
 /**
