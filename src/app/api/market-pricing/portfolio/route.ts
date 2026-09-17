@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         dcm_price_updated_at, dcm_price_match_confidence, dcm_cached_prices,
         dcm_price_at_grading, dcm_price_at_grading_date,
         scryfall_price_usd, scryfall_price_usd_foil,
-        release_date, dcm_selected_product_id, identity_confirmed_revision
+        release_date, dcm_selected_product_id, identity_confirmed_revision, item_type
       `)
       .eq('user_id', auth.userId)
       .order('created_at', { ascending: false });

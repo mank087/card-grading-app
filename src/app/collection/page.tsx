@@ -1,5 +1,6 @@
 'use client'
 
+import { isNonStandardItemType } from '@/lib/identification/itemType';
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -81,6 +82,7 @@ type Card = {
   dcm_selected_product_id?: string | null
   identity_confirmed_revision?: number | null
   identity_revision?: number | null
+  item_type?: string | null
   dvg_decimal_grade?: number | null
   // 🎯 Unified label data (pre-generated)
   label_data?: any
@@ -318,17 +320,28 @@ const isValueWithheld = (card: Card): boolean => {
 };
 
 const WITHHELD_VALUE_MESSAGE = 'Confirm your card details to see a value';
+const NOT_STANDARD_MESSAGE = 'Not a standard trading card, so no market value is shown';
 
 // One line of text, not a new surface. The card links to its detail page,
 // where Edit Card Details already lives.
-const WithheldValueNote = ({ compact = false }: { compact?: boolean }) => (
-  <span
-    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"
-    title={WITHHELD_VALUE_MESSAGE}
-  >
-    {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
-  </span>
-);
+const WithheldValueNote = ({ compact = false, card }: { compact?: boolean; card?: Card }) => {
+  // Two different reasons a value is hidden; say the right one.
+  if (card && resolveCardValue(card).withheldReason === 'not_standard_card') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300" title={NOT_STANDARD_MESSAGE}>
+        {compact ? 'Not a standard card' : NOT_STANDARD_MESSAGE}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"
+      title={WITHHELD_VALUE_MESSAGE}
+    >
+      {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+    </span>
+  );
+};
 
 // Owner request (Sept 17 2026): flag cards whose details the owner has not
 // confirmed yet, so they know to open the card and confirm. Same switch as the
@@ -337,6 +350,7 @@ const needsDetailsConfirmation = (card: Card): boolean => {
   if (process.env.NEXT_PUBLIC_IDENTITY_CONFIRM !== '1') return false;
   const row = card as any;
   if (row.ownership_status === 'sold') return false;
+  if (isNonStandardItemType(row.item_type)) return false;
   if (!(Number(row.conversational_whole_grade ?? row.conversational_decimal_grade ?? 0) > 0)) return false;
   const confirmed = row.identity_confirmed_revision;
   return confirmed === null || confirmed === undefined || Number(confirmed) < Number(row.identity_revision ?? 0);
@@ -3114,7 +3128,7 @@ function CollectionPageContent() {
                         if (!isValueWithheld(card) && !needsDetailsConfirmation(card)) return null;
                         return (
                           <div className="absolute -top-8 right-2">
-                            {isValueWithheld(card) ? <WithheldValueNote compact /> : <ConfirmDetailsTag />}
+                            {isValueWithheld(card) ? <WithheldValueNote compact card={card} /> : <ConfirmDetailsTag />}
                           </div>
                         );
                       }
@@ -3345,7 +3359,7 @@ function CollectionPageContent() {
                                       </span>
                                     );
                                   }
-                                  if (isValueWithheld(card)) return <WithheldValueNote />;
+                                  if (isValueWithheld(card)) return <WithheldValueNote card={card} />;
                                   return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : null;
                                 })()}
                                 {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
@@ -3641,7 +3655,7 @@ function CollectionPageContent() {
                               const isStale = isPriceStale(getPriceUpdatedAt(card));
 
                               if (!priceStr) {
-                                if (isValueWithheld(card)) return <WithheldValueNote compact />;
+                                if (isValueWithheld(card)) return <WithheldValueNote compact card={card} />;
                                 return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : <span className="text-sm text-gray-400">-</span>;
                               }
 

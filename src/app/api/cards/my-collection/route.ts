@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
         dcm_price_updated_at, dcm_price_match_confidence, dcm_price_product_id, dcm_price_product_name,
         dcm_prices_cached_at,
-        dcm_selected_product_id, identity_confirmed_revision, identity_revision,
+        dcm_selected_product_id, identity_confirmed_revision, identity_revision, item_type,
         custom_label_data,
         card_colors`;
     const OWNERSHIP_COLUMNS = `ownership_status, sold_at, sold_price, sold_channel, sold_note`;

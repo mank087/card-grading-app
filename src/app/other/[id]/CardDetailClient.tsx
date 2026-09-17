@@ -57,6 +57,7 @@ import { PostResultOffer, usePostResultOfferEligible } from '@/components/conver
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
+import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
@@ -3429,7 +3430,7 @@ export function OtherCardDetails() {
                   the shape that produced six-figure numbers on public pages. The
                   owner is told how to release it; the public sees nothing.
                   See @/lib/pricing/valueGuard. */}
-              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).reason === 'thin_identity' && (() => {
                 const session = getStoredSession();
                 const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                 if (!isOwner) return null;
@@ -3790,6 +3791,7 @@ export function OtherCardDetails() {
               {/* Owner confirmation of the card's identity (Phase 2B). One mount
                   decides between the popup, the quieter review banner and
                   nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
               <IdentityReview
                 card={card as any}
                 currentUserId={getStoredSession()?.user?.id}

@@ -30,7 +30,7 @@ const CARD_COLUMNS = `
   conversational_condition_label, conversational_card_info,
   ownership_status, sold_at, sold_price, sold_channel,
   dcm_price_estimate, ebay_price_median, scryfall_price_usd, is_foil,
-  dcm_selected_product_id, identity_confirmed_revision,
+  dcm_selected_product_id, identity_confirmed_revision, item_type,
   custom_label_data, card_colors
 `;
 // dcm_selected_product_id and identity_confirmed_revision are the displayed-value

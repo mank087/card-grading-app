@@ -196,7 +196,7 @@ export const DRAFT_CARD_COLUMNS = [
   'scryfall_price_usd', 'scryfall_price_usd_foil',
   // Identity inputs for the displayed-value guard (src/lib/pricing/valueGuard),
   // so a bulk batch cannot price a card the rest of the app refuses to value.
-  'dcm_selected_product_id', 'identity_confirmed_revision',
+  'dcm_selected_product_id', 'identity_confirmed_revision', 'item_type',
   'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
   'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',
   'autograph_type', 'memorabilia_type', 'rookie_card', 'first_print_rookie',

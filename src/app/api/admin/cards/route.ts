@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
         dcm_price_estimate,
         dcm_cached_prices,
         dcm_selected_product_id,
-        identity_confirmed_revision
+        identity_confirmed_revision,
+        item_type
       `, { count: 'exact' })
 
     // Apply category filter (consolidate sports subcategories)

@@ -77,6 +77,7 @@ import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
+import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 import { DesignationBadge } from '@/components/grading/DesignationBadge';
 import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
@@ -3503,7 +3504,7 @@ export function MTGCardDetails() {
                   the shape that produced six-figure numbers on public pages. The
                   owner is told how to release it; the public sees nothing.
                   See @/lib/pricing/valueGuard. */}
-              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).reason === 'thin_identity' && (() => {
                 const session = getStoredSession();
                 const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                 if (!isOwner) return null;
@@ -3852,6 +3853,7 @@ export function MTGCardDetails() {
               {/* Owner confirmation of the card's identity (Phase 2B). One mount
                   decides between the popup, the quieter review banner and
                   nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
               <IdentityReview
                 card={card as any}
                 currentUserId={getStoredSession()?.user?.id}

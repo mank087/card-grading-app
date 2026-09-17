@@ -1,5 +1,6 @@
 'use client';
 
+import { isNonStandardItemType } from '@/lib/identification/itemType';
 import { useState, useEffect, useRef } from 'react';
 import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
 import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
@@ -700,6 +701,8 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, guardIdentity,
   // A withheld card shows the public nothing from the matched listing either: its
   // price range and graded-price tables belong to a product this card may not be.
   if (valueWithheld && !isOwner) return null;
+  // Not a standard trading card: graded and labelled, and no market pricing for anyone.
+  if (isNonStandardItemType((guardIdentity as { item_type?: string | null } | undefined)?.item_type)) return null;
   const chartData = getChartData(valueWithheld ? null : dcmEstimate?.value);
 
   return (

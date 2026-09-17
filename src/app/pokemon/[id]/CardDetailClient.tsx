@@ -49,6 +49,7 @@ import { PokemonPriceLookup } from '@/components/pricing/PokemonPriceLookup';
 import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
+import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
@@ -3492,7 +3493,7 @@ export function PokemonCardDetails() {
                   the shape that produced six-figure numbers on public pages. The
                   owner is told how to release it; the public sees nothing.
                   See @/lib/pricing/valueGuard. */}
-              {dcmPriceData?.estimatedValue && !assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (() => {
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).reason === 'thin_identity' && (() => {
                 const session = getStoredSession();
                 const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                 if (!isOwner) return null;
@@ -3801,6 +3802,7 @@ export function PokemonCardDetails() {
               {/* Owner confirmation of the card's identity (Phase 2B). One mount
                   decides between the popup, the quieter review banner and
                   nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
               <IdentityReview
                 card={card as any}
                 currentUserId={getStoredSession()?.user?.id}
