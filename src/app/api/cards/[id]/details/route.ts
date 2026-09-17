@@ -4,6 +4,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
 import { isUuid } from "@/lib/uuid";
 import { isRecordLocked, LOCKED_RECORD_ERROR } from "@/lib/cards/ownership";
+import { saveCardIdentity, IDENTITY_CONTROL_KEYS } from "@/lib/identity/saveCardIdentity";
 
 // Fields that are protected and cannot be edited
 const PROTECTED_FIELDS = [
@@ -135,148 +136,6 @@ function validateField(field: string, value: any, category?: string): { valid: b
   }
 }
 
-// Build the database column updates
-function buildColumnUpdates(body: Record<string, any>, category?: string): Record<string, any> {
-  const columnUpdates: Record<string, any> = {};
-
-  // Map request fields to database columns
-  const fieldMapping: Record<string, string> = {
-    card_name: 'card_name',
-    featured: 'featured',
-    card_set: 'card_set',
-    card_number: 'card_number',
-    release_date: 'release_date',
-    manufacturer_name: 'manufacturer_name',
-    serial_numbering: 'serial_numbering',
-    autographed: 'autographed',
-    autograph_type: 'autograph_type',
-    rookie_card: 'rookie_card',
-    first_print_rookie: 'first_print_rookie',
-    memorabilia_type: 'memorabilia_type',
-    holofoil: 'holofoil',
-    is_foil: 'is_foil',
-    foil_type: 'foil_type',
-    mtg_rarity: 'mtg_rarity',
-    is_double_faced: 'is_double_faced',
-    mtg_set_code: 'mtg_set_code',
-    rarity_tier: 'rarity_tier',
-    rarity_description: 'rarity_description',
-    // Pokemon-specific columns
-    pokemon_type: 'pokemon_type',
-    pokemon_stage: 'pokemon_stage',
-    hp: 'hp',
-  };
-
-  for (const [requestField, dbColumn] of Object.entries(fieldMapping)) {
-    if (requestField in body) {
-      columnUpdates[dbColumn] = body[requestField] === '' ? null : body[requestField];
-    }
-  }
-
-  // Sync pokemon_featured when featured name changes for Pokemon cards
-  if (category === 'Pokemon' && 'featured' in body) {
-    columnUpdates['pokemon_featured'] = body['featured'] === '' ? null : body['featured'];
-  }
-
-  return columnUpdates;
-}
-
-// Build the JSONB updates for conversational_card_info
-function buildJsonbUpdates(body: Record<string, any>, existingInfo: Record<string, any> | null): Record<string, any> {
-  const merged = { ...(existingInfo || {}) };
-
-  // Map request fields to JSONB paths
-  const jsonbMapping: Record<string, string> = {
-    card_name: 'card_name',
-    featured: 'player_or_character',
-    card_set: 'set_name',
-    card_number: 'card_number_raw',
-    release_date: 'year',
-    manufacturer_name: 'manufacturer',
-    serial_numbering: 'serial_number',
-    autographed: 'autographed',
-    rookie_card: 'rookie_or_first',
-    memorabilia_type: 'memorabilia',
-    memorabilia_other: 'memorabilia_other',
-    facsimile_autograph: 'facsimile_autograph',
-    official_reprint: 'official_reprint',
-    holofoil: 'holofoil',
-    pokemon_type: 'pokemon_type',
-    pokemon_stage: 'pokemon_stage',
-    hp: 'hp',
-    card_type: 'card_type',
-    subset_variant: 'rarity_or_variant',
-    is_foil: 'is_foil',
-    foil_type: 'foil_type',
-    mtg_rarity: 'mtg_rarity',
-    is_double_faced: 'is_double_faced',
-    mtg_set_code: 'expansion_code',
-    ink_color: 'ink_color',
-    lorcana_card_type: 'lorcana_card_type',
-    character_version: 'character_version',
-    inkwell: 'inkwell',
-    ink_cost: 'ink_cost',
-    is_enchanted: 'is_enchanted',
-    rarity_tier: 'rarity_tier',
-    rarity_description: 'rarity_description',
-    // MTG-specific fields
-    mana_cost: 'mana_cost',
-    mtg_card_type: 'mtg_card_type',
-    creature_type: 'creature_type',
-    power_toughness: 'power_toughness',
-    color_identity: 'color_identity',
-    artist_name: 'artist_name',
-    border_color: 'border_color',
-    frame_version: 'frame_version',
-    language: 'language',
-    is_extended_art: 'is_extended_art',
-    is_showcase: 'is_showcase',
-    is_borderless: 'is_borderless',
-    is_retro_frame: 'is_retro_frame',
-    is_full_art_mtg: 'is_full_art_mtg',
-    // Pokemon special features (stored in JSONB for flexibility)
-    is_first_edition: 'is_first_edition',
-    is_shadowless: 'is_shadowless',
-    is_reverse_holo: 'is_reverse_holo',
-    is_full_art: 'is_full_art',
-    is_secret_rare: 'is_secret_rare',
-    is_promo: 'is_promo',
-    is_error_card: 'is_error_card',
-    is_illustration_rare: 'is_illustration_rare',
-    is_special_art_rare: 'is_special_art_rare',
-    is_hyper_rare: 'is_hyper_rare',
-    is_gold_rare: 'is_gold_rare',
-    // Sports-specific fields (stored in JSONB for flexibility)
-    sport: 'sport',
-    team: 'team',
-    parallel_type: 'parallel_type',
-    first_print_rookie: 'first_print_rookie',
-    is_refractor: 'is_refractor',
-    is_numbered: 'is_numbered',
-    is_patch: 'is_patch',
-    is_jersey: 'is_jersey',
-    is_game_used: 'is_game_used',
-    is_on_card_auto: 'is_on_card_auto',
-    is_sticker_auto: 'is_sticker_auto',
-    is_variation: 'is_variation',
-    is_short_print: 'is_short_print',
-    is_case_hit: 'is_case_hit',
-  };
-
-  for (const [requestField, jsonPath] of Object.entries(jsonbMapping)) {
-    if (requestField in body) {
-      merged[jsonPath] = body[requestField] === '' ? null : body[requestField];
-    }
-  }
-
-  // Special handling: subset_variant should also update 'subset' field (used by card detail page)
-  if ('subset_variant' in body) {
-    merged['subset'] = body.subset_variant === '' ? null : body.subset_variant;
-  }
-
-  return merged;
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -331,8 +190,21 @@ export async function PATCH(
       }
     }
 
-    // 5. Validate all fields
+    // 5. Validate all fields. The control keys steer the save and are never
+    // card data, so they are held out of validation and of the card-info JSON.
+    const confirm = body.confirm === true;
+    const dismiss = body.dismiss === true;
+    const expectedRevision = body.expected_identity_revision;
+    if (expectedRevision !== undefined && expectedRevision !== null
+      && (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision))) {
+      return NextResponse.json({
+        error: 'expected_identity_revision must be an integer',
+        field: 'expected_identity_revision'
+      }, { status: 400 });
+    }
+
     for (const [field, value] of Object.entries(body)) {
+      if ((IDENTITY_CONTROL_KEYS as readonly string[]).includes(field)) continue;
       const validation = validateField(field, value, card.category);
       if (!validation.valid) {
         return NextResponse.json({
@@ -342,57 +214,54 @@ export async function PATCH(
       }
     }
 
-    // 6. Build updates
-    const columnUpdates = buildColumnUpdates(body, card.category);
-    const jsonbUpdates = buildJsonbUpdates(body, card.conversational_card_info);
-
+    // 6-8. One authoritative save: identity, the original-AI snapshot, the
+    // confirmation state and the pricing invalidation commit together under a
+    // row lock that re-checks ownership and the sold lock at write time.
     console.log('[Edit Card Details] Request body:', body);
-    console.log('[Edit Card Details] Column updates:', columnUpdates);
     console.log('[Edit Card Details] Card ID:', cardId);
 
-    // 7. Preserve original AI-extracted card info on first user edit
-    // This allows reverting to AI values if needed, and tracking what the AI originally detected
-    if (!card.original_card_info && card.conversational_card_info) {
-      try {
-        await supabase
-          .from('cards')
-          .update({ original_card_info: card.conversational_card_info })
-          .eq('id', cardId);
-        console.log('[Edit Card Details] Preserved original AI card info');
-      } catch (preserveError) {
-        // Non-critical — continue even if preservation fails (column may not exist yet)
-        console.warn('[Edit Card Details] Could not preserve original card info:', preserveError);
+    const saved = await saveCardIdentity(supabase, {
+      cardId,
+      card,
+      body,
+      actorId: auth.userId,
+      actorRole: 'owner',
+      confirm,
+      dismiss,
+      expectedRevision: expectedRevision ?? null,
+    });
+
+    if (saved.status !== 'saved') {
+      switch (saved.status) {
+        case 'stale':
+          return NextResponse.json({
+            error: "Someone else updated this card while you were editing. Reload and try again.",
+            code: 'identity_revision_conflict',
+            identity_revision: saved.currentRevision,
+          }, { status: 409 });
+        case 'locked':
+          return NextResponse.json(LOCKED_RECORD_ERROR, { status: 423 });
+        case 'forbidden':
+          return NextResponse.json({ error: "You do not own this card" }, { status: 403 });
+        case 'not_found':
+          return NextResponse.json({ error: "Card not found" }, { status: 404 });
+        case 'unavailable':
+          return NextResponse.json({
+            error: saved.error || "That action is not available yet",
+          }, { status: 503 });
+        default:
+          console.error('[Edit Card Details] Save failed:', saved);
+          if (saved.serverError) {
+            return NextResponse.json({
+              error: "Failed to update card",
+              details: saved.error,
+            }, { status: 500 });
+          }
+          return NextResponse.json({
+            error: saved.error || "Failed to update card",
+            ...(saved.field ? { field: saved.field } : {}),
+          }, { status: 400 });
       }
-    }
-
-    // 8. Update database
-    const updatePayload: Record<string, any> = {
-      ...columnUpdates,
-      conversational_card_info: jsonbUpdates,
-    };
-
-    // Only include updates if there are actual changes
-    if (Object.keys(columnUpdates).length === 0 && Object.keys(jsonbUpdates).length === 0) {
-      return NextResponse.json({
-        error: "No changes to save"
-      }, { status: 400 });
-    }
-
-    console.log('[Edit Card Details] Update payload:', JSON.stringify(updatePayload, null, 2));
-
-    const { error: updateError } = await supabase
-      .from('cards')
-      .update(updatePayload)
-      .eq('id', cardId);
-
-    if (updateError) {
-      console.error('[Edit Card Details] Update error:', updateError);
-      console.error('[Edit Card Details] Column updates:', columnUpdates);
-      console.error('[Edit Card Details] JSONB updates:', jsonbUpdates);
-      return NextResponse.json({
-        error: "Failed to update card",
-        details: updateError.message || updateError.code || JSON.stringify(updateError)
-      }, { status: 500 });
     }
 
     // 9. Fetch updated card
@@ -465,6 +334,9 @@ export async function PATCH(
       success: true,
       card: updatedCard,
       label_data: labelData,
+      identity_revision: saved.identityRevision ?? null,
+      identity_confirmed: saved.confirmed === true,
+      pricing_invalidated: saved.pricingInvalidated === true,
       message: "Card details updated successfully"
     });
 
