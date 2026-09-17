@@ -53,8 +53,27 @@ export const FIRST_LOOK_SCHEMA = {
       photos: {
         type: 'object',
         additionalProperties: false,
-        required: ['front_shows', 'back_shows', 'card_orientation', 'in_holder', 'text_legibility'],
+        required: ['item_type', 'item_type_evidence', 'same_item_both_photos', 'front_shows', 'back_shows', 'card_orientation', 'in_holder', 'text_legibility'],
         properties: {
+          // What is physically in the photo. Production graded and priced an Elite
+          // Trainer Box deck DIVIDER as the card "Giratina #7" ($22.77, grade 7).
+          item_type: {
+            type: 'string',
+            enum: [
+              'trading_card',                 // a manufactured trading/collectible card, the normal case
+              'sticker_or_decal',             // issued as a sticker (peel-off back, blank or instruction back)
+              'accessory_not_a_card',         // deck divider, box topper insert, token, coin, pog, sleeve, code card, ad/checklist filler
+              'oversized_or_jumbo',           // box topper / jumbo card, not standard size
+              'custom_or_fan_made',           // custom art, proxy, sketch, home-printed or unlicensed novelty
+              'reproduction_or_reprint_marked', // the item itself says REPRINT / REPLICA / FACSIMILE / a modern date on a vintage design
+              'photo_of_a_screen_or_printout', // a picture of a monitor, phone, book page or printed image of a card
+              'already_graded_slab',          // sealed in a third-party grading holder with its label
+              'not_a_collectible',            // anything else
+              'cannot_tell',
+            ],
+          },
+          item_type_evidence: { type: 'string', description: 'One short sentence: what you SEE that decides item_type (e.g. "index tab cut into the top edge and no card back text: a deck-box divider", "moire pattern and screen bezel visible", "REPRINT printed on the back").' },
+          same_item_both_photos: { type: 'string', enum: ['yes', 'no_different_items', 'back_not_supplied', 'cannot_tell'], description: 'Whether the front and back photos show the two faces of ONE item (same size, shape, corners, holder and background).' },
           front_shows: { type: 'string', enum: ['card_front', 'card_back', 'not_a_card', 'unclear'] },
           back_shows: { type: 'string', enum: ['card_back', 'card_front', 'not_a_card', 'unclear', 'not_supplied'] },
           card_orientation: { type: 'string', enum: ['portrait', 'landscape'] },
@@ -166,7 +185,7 @@ export const FIRST_LOOK_SCHEMA = {
 export const FIRST_LOOK_PROMPT = `You are identifying one trading card from photos of its front and back, for a catalog lookup and for the owner to confirm. Fill every field of the required JSON, in order.
 
 HOW TO WORK
-1. photos — say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
+1. photos — FIRST decide what the item physically is (item_type) and say what you see that decides it. Not everything submitted is a trading card: deck-box dividers (an index tab cut into the top edge), stickers, tokens and code cards, jumbo box toppers, custom or fan-made cards, items marked REPRINT or REPLICA, a photo of a screen or of a printed picture of a card (moire, pixels, bezel, page edge, glare from a monitor), and cards already sealed in a grading slab all occur. Also check the two photos are the two faces of the same item. Then say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
 2. printed_text — transcribe exactly what is printed. Character for character. Do not normalise, translate, complete a partly hidden word, or add anything you merely know. If you cannot read it, use null.
 3. layout — describe the design in plain words: border, logo placement, name panel, back layout, how the number is written. Describe only; do not name a product yet.
 4. identity — now use everything you know about the hobby. The product you name must be one whose cards have THIS layout; a famous set with a different border, back or numbering style is the wrong answer. For each field give the catalog-standard value and its source:
@@ -183,7 +202,7 @@ Never state a serial number, card number or year text you did not read. Never le
 
 export type FirstLookField = { value: string | null; source: FieldSource };
 export interface FirstLook {
-  photos: { front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
+  photos: { item_type: string; item_type_evidence: string; same_item_both_photos: string; front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
   layout: { border: string; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
   printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>;
   identity: {

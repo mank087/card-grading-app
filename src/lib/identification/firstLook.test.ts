@@ -5,7 +5,7 @@ import { needsSearchPass } from './firstLookRunner';
 const f = (value: string | null, source: any) => ({ value, source });
 const make = (over: (v: FirstLook) => void = () => {}): FirstLook => {
   const v: FirstLook = {
-    photos: { front_shows: 'card_front', back_shows: 'card_back', card_orientation: 'landscape', in_holder: 'none', text_legibility: 'all_readable' },
+    photos: { item_type: 'trading_card', item_type_evidence: 'standard card', same_item_both_photos: 'yes', front_shows: 'card_front', back_shows: 'card_back', card_orientation: 'landscape', in_holder: 'none', text_legibility: 'all_readable' },
     printed_text: { front_title_or_name: 'The villainous Darth Vader', front_other: 'STAR WARS', back_header: null, card_number_as_printed: '7',
       copyright_line: '© 1977 20TH CENTURY-FOX FILM CORP.', serial_stamp: null, back_parallel_or_product_text: null },
     layout: { border: 'blue with white stars', logo_placement: 'starburst bottom left', name_panel: 'caption in the blue border', back_layout: 'puzzle piece, no text', numbering_style: 'numeral in the starburst' },
