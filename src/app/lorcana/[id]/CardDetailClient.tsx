@@ -76,6 +76,7 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 import { DesignationBadge } from '@/components/grading/DesignationBadge';
 import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
@@ -3509,6 +3510,7 @@ export function MTGCardDetails() {
                       different printing. Add the set and year with Edit Card Details and the
                       value will appear here.
                     </p>
+                    <ConfirmCardDetailsCalloutButton />
                   </div>
                 );
               })()}
@@ -3841,6 +3843,17 @@ export function MTGCardDetails() {
               )}
 
                   {/* Card Details Tab Content */}
+
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
 
               {/* Lorcana Card Information Section */}
               <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">

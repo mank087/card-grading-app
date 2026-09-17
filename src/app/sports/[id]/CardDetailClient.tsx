@@ -48,6 +48,7 @@ import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { PriceChartingLookup } from '@/components/pricing/PriceChartingLookup';
 import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
@@ -3473,6 +3474,7 @@ export function SportsCardDetails() {
                       different printing. Add the set and year with Edit Card Details and the
                       value will appear here.
                     </p>
+                    <ConfirmCardDetailsCalloutButton />
                   </div>
                 );
               })()}
@@ -3777,6 +3779,17 @@ export function SportsCardDetails() {
                   </div>
                 </div>
               )}
+
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
 
               {/* Card Information with Rarity Features */}
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">

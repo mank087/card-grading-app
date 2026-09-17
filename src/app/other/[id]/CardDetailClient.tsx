@@ -56,6 +56,7 @@ import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottom
 import { PostResultOffer, usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
@@ -3435,6 +3436,7 @@ export function OtherCardDetails() {
                       different printing. Add the set and year with Edit Card Details and the
                       value will appear here.
                     </p>
+                    <ConfirmCardDetailsCalloutButton />
                   </div>
                 );
               })()}
@@ -3779,6 +3781,17 @@ export function OtherCardDetails() {
                   </div>
                 </div>
               )}
+
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
 
               {/* Card Information with Rarity Features */}
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">

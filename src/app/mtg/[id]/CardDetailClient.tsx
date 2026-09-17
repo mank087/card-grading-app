@@ -56,6 +56,7 @@ import { useCredits } from '@/contexts/CreditsContext';
 import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
@@ -3504,6 +3505,7 @@ export function MTGCardDetails() {
                       different printing. Add the set and year with Edit Card Details and the
                       value will appear here.
                     </p>
+                    <ConfirmCardDetailsCalloutButton />
                   </div>
                 );
               })()}
@@ -3830,6 +3832,17 @@ export function MTGCardDetails() {
                   </div>
                 </div>
               )}
+
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
 
               {/* 1. Card Information (includes slab detection when applicable) */}
               <CollapsibleSection
