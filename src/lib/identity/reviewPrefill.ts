@@ -380,12 +380,17 @@ export function reviewEligibility(
 
   if (row.identity_review_dismissed_at) return { mode: 'banner', reason: 'dismissed' };
 
+  // Owner decision (Sept 17 2026): the popup appears the FIRST time the owner
+  // opens a card's page, for every unconfirmed card. Closing it in any way is
+  // recorded as a dismissal by the mount component, so it is first time only and
+  // the banner takes over. confirmSince is an optional brake for a staged
+  // rollout: when set, cards graded before it get the banner instead.
   const since = parsedTime(opts.confirmSince);
-  if (since === null) return { mode: 'banner', reason: 'no_rollout_date' };
-
-  const gradedAt = parsedTime(row.graded_at) ?? parsedTime(row.created_at);
-  if (gradedAt === null) return { mode: 'banner', reason: 'no_grade_date' };
-  if (gradedAt < since) return { mode: 'banner', reason: 'graded_before_rollout' };
+  if (since !== null) {
+    const gradedAt = parsedTime(row.graded_at) ?? parsedTime(row.created_at);
+    if (gradedAt === null) return { mode: 'banner', reason: 'no_grade_date' };
+    if (gradedAt < since) return { mode: 'banner', reason: 'graded_before_rollout' };
+  }
 
   return { mode: 'popup', reason: 'eligible' };
 }

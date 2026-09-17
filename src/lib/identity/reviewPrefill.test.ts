@@ -244,9 +244,11 @@ describe('reviewEligibility', () => {
     expect(reviewEligibility(graded, 'owner', since)).toEqual({ mode: 'popup', reason: 'eligible' });
   });
 
-  it('never pops up without a rollout date', () => {
-    expect(reviewEligibility(graded, 'owner', {})).toEqual({ mode: 'banner', reason: 'no_rollout_date' });
-    expect(reviewEligibility(graded, 'owner', { confirmSince: '' })).toMatchObject({ mode: 'banner' });
+  it('pops up on the first visit for every unconfirmed card when no rollout date is set', () => {
+    expect(reviewEligibility(graded, 'owner', {})).toEqual({ mode: 'popup', reason: 'eligible' });
+    expect(reviewEligibility({ ...graded, graded_at: '2026-01-01T00:00:00Z' }, 'owner', { confirmSince: '' })).toMatchObject({ mode: 'popup' });
+    // First time only: once it has been closed or deferred, the banner takes over.
+    expect(reviewEligibility({ ...graded, identity_review_dismissed_at: '2026-09-17T00:00:00Z' }, 'owner', {})).toMatchObject({ mode: 'banner' });
   });
 
   it('gives older collections the banner instead of a popup', () => {

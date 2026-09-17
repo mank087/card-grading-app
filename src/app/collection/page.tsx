@@ -80,6 +80,7 @@ type Card = {
   // 💰 Displayed-value guard inputs (see @/lib/pricing/valueGuard)
   dcm_selected_product_id?: string | null
   identity_confirmed_revision?: number | null
+  identity_revision?: number | null
   dvg_decimal_grade?: number | null
   // 🎯 Unified label data (pre-generated)
   label_data?: any
@@ -326,6 +327,27 @@ const WithheldValueNote = ({ compact = false }: { compact?: boolean }) => (
     title={WITHHELD_VALUE_MESSAGE}
   >
     {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+  </span>
+);
+
+// Owner request (Sept 17 2026): flag cards whose details the owner has not
+// confirmed yet, so they know to open the card and confirm. Same switch as the
+// confirmation dialog. A sold card's record is locked, so it is never flagged.
+const needsDetailsConfirmation = (card: Card): boolean => {
+  if (process.env.NEXT_PUBLIC_IDENTITY_CONFIRM !== '1') return false;
+  const row = card as any;
+  if (row.ownership_status === 'sold') return false;
+  if (!(Number(row.conversational_whole_grade ?? row.conversational_decimal_grade ?? 0) > 0)) return false;
+  const confirmed = row.identity_confirmed_revision;
+  return confirmed === null || confirmed === undefined || Number(confirmed) < Number(row.identity_revision ?? 0);
+};
+
+const ConfirmDetailsTag = () => (
+  <span
+    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+    title="Open this card and confirm its name, set, year and number so its value and label are right"
+  >
+    Confirm details
   </span>
 );
 
@@ -3089,10 +3111,10 @@ function CollectionPageContent() {
                       const marketValue = getMarketValue(card);
                       const priceStr = formatPrice(marketValue);
                       if (!priceStr) {
-                        if (!isValueWithheld(card)) return null;
+                        if (!isValueWithheld(card) && !needsDetailsConfirmation(card)) return null;
                         return (
                           <div className="absolute -top-8 right-2">
-                            <WithheldValueNote compact />
+                            {isValueWithheld(card) ? <WithheldValueNote compact /> : <ConfirmDetailsTag />}
                           </div>
                         );
                       }
@@ -3119,6 +3141,9 @@ function CollectionPageContent() {
                         </div>
                       );
                     })()}
+                    {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                      <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                    )}
                   </div>
 
                   {/* Sale details + actions.
@@ -3321,8 +3346,11 @@ function CollectionPageContent() {
                                     );
                                   }
                                   if (isValueWithheld(card)) return <WithheldValueNote />;
-                                  return null;
+                                  return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : null;
                                 })()}
+                                {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                                  <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                                )}
 
                                 {/* Sold badge — makes the state obvious at a
                                     glance, wherever the tile is shown */}
@@ -3614,7 +3642,7 @@ function CollectionPageContent() {
 
                               if (!priceStr) {
                                 if (isValueWithheld(card)) return <WithheldValueNote compact />;
-                                return <span className="text-sm text-gray-400">-</span>;
+                                return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : <span className="text-sm text-gray-400">-</span>;
                               }
 
                               return (
@@ -3623,6 +3651,9 @@ function CollectionPageContent() {
                                 </span>
                               );
                             })()}
+                            {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                              <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                            )}
                           </td>
                           <td className="px-3 py-3">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${

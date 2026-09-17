@@ -96,6 +96,8 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const popupUsedRef = useRef(false);
+  // True while the dialog on screen opened by itself (first visit) rather than by a click.
+  const autoOpenedRef = useRef(false);
 
   const cardId = card?.id;
   // Cheap, certain refusals only. Everything else (graded, confirmed, dismissed,
@@ -140,6 +142,7 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
       if (popupUsedRef.current) return;
       if (!anotherOverlayOpen()) {
         popupUsedRef.current = true;
+        autoOpenedRef.current = true;
         setOpen(true);
         return;
       }
@@ -157,6 +160,7 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
     if (!eligible) return;
     const openNow = () => {
       popupUsedRef.current = true;
+      autoOpenedRef.current = false;
       setOpen(true);
       if (!state) void load();
     };
@@ -198,7 +202,24 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
             frontUrl={frontUrl}
             backUrl={backUrl}
             fetchFirstLook={!state.first_look_present && firstLookOnDemandEnabled()}
-            onClose={() => setOpen(false)}
+            onClose={() => {
+              setOpen(false);
+              // First time only: a popup the owner closed has been seen. Record it the
+              // same way "Review later" does, so the next visit shows the banner, not
+              // the popup again. A dialog the owner opened themselves is just closed.
+              if (autoOpenedRef.current) {
+                autoOpenedRef.current = false;
+                setDismissed(true);
+                const session = getStoredSession();
+                if (session?.access_token) {
+                  void fetch(`/api/cards/${cardId}/details`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ dismiss: true }),
+                  }).catch(() => undefined);
+                }
+              }
+            }}
             onDismissed={() => { setDismissed(true); setOpen(false); void load(); }}
             onSaved={updated => { setOpen(false); onSaved(updated); }}
             onOpenMoreDetails={() => { setOpen(false); setMoreDetailsOpen(true); }}
