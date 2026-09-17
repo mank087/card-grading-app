@@ -47,7 +47,7 @@ export const FIRST_LOOK_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['photos', 'printed_text', 'identity', 'parallel', 'design_features', 'alternatives'],
+    required: ['photos', 'printed_text', 'layout', 'identity', 'parallel', 'design_features', 'alternatives'],
     properties: {
       // 1 — what the photos actually show, before anything is concluded from them.
       photos: {
@@ -77,7 +77,22 @@ export const FIRST_LOOK_SCHEMA = {
           back_parallel_or_product_text: { ...nullableString, description: 'Any back text naming the product line or parallel, e.g. "PRIZM", "REFRACTOR", "1st Edition". Verbatim.' },
         },
       },
-      // 3 — normalised identity, one source per field.
+      // 3 — the design, in plain words, BEFORE any product is named. Look-alike
+      // products (a bread premium vs the flagship set) differ here and nowhere
+      // else, and without this section the model named the famous set 3 runs in 4.
+      layout: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['border', 'logo_placement', 'name_panel', 'back_layout', 'numbering_style'],
+        properties: {
+          border: { type: 'string', description: 'Border colour and decoration as seen, e.g. "plain black", "blue with white stars and specks", "white", "borderless".' },
+          logo_placement: { type: 'string', description: 'Where the brand/franchise/team logo sits and how, e.g. "STAR WARS logo running vertically down the right side in a blue panel". "none" if there is none.' },
+          name_panel: { type: 'string', description: 'How the name/title is presented, e.g. "yellow panel at the bottom, character name in red with the actor name beneath it".' },
+          back_layout: { type: 'string', description: 'What the back consists of, e.g. "plain cream stock, one paragraph of story text, no stats", "puzzle piece, no text", "stat table with cartoon".' },
+          numbering_style: { type: 'string', description: 'How the card number is written and where, e.g. "spelled out as the word One, bottom left of the back", "numeral in a starburst on the front", "116/086 bottom left". "none visible" if there is none.' },
+        },
+      },
+      // 4 — normalised identity, one source per field.
       identity: {
         type: 'object',
         additionalProperties: false,
@@ -153,21 +168,23 @@ export const FIRST_LOOK_PROMPT = `You are identifying one trading card from phot
 HOW TO WORK
 1. photos — say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
 2. printed_text — transcribe exactly what is printed. Character for character. Do not normalise, translate, complete a partly hidden word, or add anything you merely know. If you cannot read it, use null.
-3. identity — now use everything you know about the hobby. For each field give the catalog-standard value and its source:
+3. layout — describe the design in plain words: border, logo placement, name panel, back layout, how the number is written. Describe only; do not name a product yet.
+4. identity — now use everything you know about the hobby. The product you name must be one whose cards have THIS layout; a famous set with a different border, back or numbering style is the wrong answer. For each field give the catalog-standard value and its source:
    - "printed": the value's characters are in your printed_text transcription.
    - "recognized": you know it from the design, artwork, layout or hobby knowledge; it is not printed on the card. (A 1977 Topps Star Wars card never says "Topps" on the front — the manufacturer is still Topps, source "recognized".)
    - "inferred": derived from another printed fact.
    - "unknown": value null. Use this rather than a guess you would not defend.
    A licensor (film studio, league, players' association) is not the manufacturer.
-4. parallel — record the observed attributes FIRST (finish, colour, pattern, autograph, relic, serial), then decide is_base and parallel_name from them. Most cards are base: ordinary glare or a glossy surface is not a parallel. If the card is clearly not base but you cannot tell which sibling parallel it is, set parallel_name to null and put the candidates in alternatives.
-5. design_features — leave EMPTY for most cards. Only printed features of this product that genuinely look like damage or a bad photo (printed wrinkles, wood grain, chart lines, specks in a border, a text-free puzzle/art back). Ordinary borders, stat tables and refractor shine do not belong here.
-6. alternatives — the other printings it could be, and what would settle it. Before finishing, CHECK YOUR SET AGAINST THE PHOTOS: does the border colour, layout, back design and numbering style you see actually match the set you named? The same subject and year usually exist in several products — the flagship set, stickers, food and retail premiums (bread, cereal, candy, fast-food issues), regional and international issues, reprints and anniversary sets. If any visible trait does not fit the set you named (e.g. a number spelled out as a word, an actor's name under the character, a different border), say so here and name the product it fits better; if that product fits better overall, put IT in identity.
+5. parallel — record the observed attributes FIRST (finish, colour, pattern, autograph, relic, serial), then decide is_base and parallel_name from them. Most cards are base: ordinary glare or a glossy surface is not a parallel. If the card is clearly not base but you cannot tell which sibling parallel it is, set parallel_name to null and put the candidates in alternatives.
+6. design_features — leave EMPTY for most cards. Only printed features of this product that genuinely look like damage or a bad photo (printed wrinkles, wood grain, chart lines, specks in a border, a text-free puzzle/art back). Ordinary borders, stat tables and refractor shine do not belong here.
+7. alternatives — the other printings it could be, and what would settle it. Before finishing, CHECK YOUR SET AGAINST THE PHOTOS: does the border colour, layout, back design and numbering style you see actually match the set you named? The same subject and year usually exist in several products — the flagship set, stickers, food and retail premiums (bread, cereal, candy, fast-food issues), regional and international issues, reprints and anniversary sets. If any visible trait does not fit the set you named (e.g. a number spelled out as a word, an actor's name under the character, a different border), say so here and name the product it fits better; if that product fits better overall, put IT in identity.
 
 Never state a serial number, card number or year text you did not read. Never leave a field out.`;
 
 export type FirstLookField = { value: string | null; source: FieldSource };
 export interface FirstLook {
   photos: { front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
+  layout: { border: string; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
   printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>;
   identity: {
     category: string;
@@ -211,7 +228,7 @@ export function normalizeFirstLook(raw: FirstLook): { value: FirstLook; repairs:
   // One fixed set_name form: no leading year/season, no trailing sport.
   const sn = v.identity.set_name.value;
   if (sn) {
-    const cleaned = sn.replace(/^s*(19|20)d{2}(-d{2})?s+/, '').replace(/s+(baseball|basketball|football|hockey|soccer|racing|golf|wrestling)s*$/i, '').trim();
+    const cleaned = sn.replace(/^\s*(19|20)\d{2}(-\d{2})?\s+/, '').replace(/\s+(baseball|basketball|football|hockey|soccer|racing|golf|wrestling)\s*$/i, '').trim();
     if (cleaned && cleaned !== sn) { repairs.push(`set_name "${sn}" → "${cleaned}" (year/sport stripped)`); v.identity.set_name.value = cleaned; }
   }
 
