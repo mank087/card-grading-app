@@ -170,3 +170,23 @@ describe('capMatchConfidence', () => {
     expect(capMatchConfidence('none', { setName: null, year: null })).toBe('none');
   });
 });
+
+describe('items that are not standard trading cards', () => {
+  it('never shows a value, at any amount, and owner confirmation does not lift it', async () => {
+    const { assessValueTrust } = await import('./valueGuard');
+    const divider = { item_type: 'accessory_not_a_card', card_set: 'Lost Origin', release_date: '2022', category: 'Pokemon' };
+    expect(assessValueTrust(divider, 22.77)).toEqual({ trusted: false, reason: 'not_standard_card' });
+    expect(assessValueTrust({ ...divider, dcm_selected_product_id: '123', identity_confirmed_revision: 3 }, 22.77).trusted).toBe(false);
+  });
+  it('leaves standard cards, unknown reads and slabbed cards alone', async () => {
+    const { assessValueTrust } = await import('./valueGuard');
+    for (const item_type of [null, undefined, 'trading_card', 'cannot_tell', 'already_graded_slab']) {
+      expect(assessValueTrust({ item_type, card_set: 'Prizm', release_date: '2023', category: 'Sports' } as any, 40).trusted).toBe(true);
+    }
+  });
+  it('uses exactly the item types the identification policy names', async () => {
+    const { NO_VALUE_ITEM_TYPES } = await import('./valueGuard');
+    const { NON_STANDARD_ITEM_TYPES } = await import('../identification/itemType');
+    expect([...NO_VALUE_ITEM_TYPES].sort()).toEqual([...NON_STANDARD_ITEM_TYPES].sort());
+  });
+});

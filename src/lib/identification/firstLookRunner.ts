@@ -23,6 +23,7 @@ import OpenAI from 'openai';
 import sharp from 'sharp';
 import { FIRST_LOOK_PROMPT, FIRST_LOOK_SCHEMA, FIRST_LOOK_VERSION, normalizeFirstLook, type FirstLook } from './firstLook';
 import { logOpenAIUsage } from '../apiUsageLogger';
+import { actionableItemType } from './itemType';
 
 const DEFAULT_MODEL = 'gpt-5.6-luna';
 const PASS_TIMEOUT_MS = 45_000;
@@ -49,6 +50,8 @@ export interface FirstLookRecord {
   result: FirstLook;
   /** Pass 1's identity when pass 2 replaced it — the comparison is the point of shadow mode. */
   contract_identity?: FirstLook['identity'];
+  /** Pass 1's item_type when pass 2 ran: acting on a non-card needs both passes to agree. */
+  contract_item_type?: string | null;
 }
 
 export function firstLookShadowEnabled(): boolean {
@@ -113,7 +116,8 @@ export async function runFirstLook(
       // The parallel is decided from the photos only: keep pass 1's.
       second.value.parallel = first.value.parallel;
       return { ...base, pass: 'contract_with_search', search_ran: true, searches, ms: Date.now() - started,
-        repairs: [...first.repairs, ...second.repairs], result: second.value, contract_identity: first.value.identity };
+        repairs: [...first.repairs, ...second.repairs], result: second.value, contract_identity: first.value.identity,
+        contract_item_type: first.value.photos.item_type };
     } catch (err: any) {
       console.warn(`[first-look] search pass failed (${err?.message || err}) — keeping the contract pass`);
       return { ...base, pass: 'contract', search_ran: true, searches: 0, ms: Date.now() - started, repairs: first.repairs, result: first.value };
@@ -132,7 +136,14 @@ export async function recordFirstLook(cardId: string | null | undefined, record:
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return false;
     const { createClient } = await import('@supabase/supabase-js');
-    const { error } = await createClient(url, key).from('cards').update({ first_look: record }).eq('id', cardId);
+    const client = createClient(url, key);
+    // item_type is a scalar copy so list pages and the value guard can read it
+    // without selecting the whole first-look JSON. null = treat as a standard card.
+    const itemType = actionableItemType(record);
+    const withItemType = { first_look: record, item_type: itemType, item_type_evidence: itemType ? String(record.result.photos.item_type_evidence || '').slice(0, 300) : null };
+    let { error } = await client.from('cards').update(withItemType).eq('id', cardId);
+    // 42703 = a column is not there yet (migration 20260918_item_type not applied): keep the JSON.
+    if (error && (error as any).code === '42703') ({ error } = await client.from('cards').update({ first_look: record }).eq('id', cardId));
     if (error && (error as any).code !== '42703') console.warn('[first-look] could not record:', error.message);
     return !error;
   } catch {

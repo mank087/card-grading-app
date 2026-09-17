@@ -30,6 +30,7 @@ export type ValueTrustReason =
   | 'ok'
   | 'below_threshold'
   | 'owner_confirmed'
+  | 'not_standard_card'
   | 'identity_unknown'
   | 'thin_identity';
 
@@ -48,6 +49,8 @@ export interface ValueTrust {
  */
 export interface CardIdentityForGuard {
   category?: string | null;
+  /** cards.item_type: null or absent means a standard trading card. */
+  item_type?: string | null;
   card_set?: string | null;
   release_date?: string | null;
   /** Owner picked the pricing product by hand (api/pricing/dcm-select). */
@@ -109,7 +112,29 @@ function yearMattersFor(category?: string | null): boolean {
  *   3. the identity is thin: no set, or no year on a category where the year
  *      is what separates an original from a reprint
  */
+/**
+ * item_type values that never show a market value, at ANY amount, and that an
+ * owner confirmation cannot lift: a deck divider or a photo of a screen must not
+ * borrow a real card's price. Kept inline because this file is copied verbatim
+ * to mobile; a test holds it equal to NON_STANDARD_ITEM_TYPES in
+ * src/lib/identification/itemType.ts.
+ */
+export const NO_VALUE_ITEM_TYPES: readonly string[] = [
+  'sticker_or_decal',
+  'accessory_not_a_card',
+  'oversized_or_jumbo',
+  'custom_or_fan_made',
+  'reproduction_or_reprint_marked',
+  'photo_of_a_screen_or_printout',
+  'not_a_collectible',
+];
+
 export function assessValueTrust(card: CardIdentityForGuard, value: number): ValueTrust {
+  // Owner policy (Sept 17 2026): graded, labelled "Not a standard trading card", no price.
+  if (typeof card.item_type === 'string' && NO_VALUE_ITEM_TYPES.includes(card.item_type)) {
+    return { trusted: false, reason: 'not_standard_card' };
+  }
+
   if (!(typeof value === 'number' && Number.isFinite(value)) || value <= VALUE_GUARD_THRESHOLD) {
     return { trusted: true, reason: 'below_threshold' };
   }
