@@ -27,6 +27,8 @@ import { ProcessedConditionReport } from '@/types/conditionReport';
 import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
+import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
+import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
@@ -2092,13 +2094,17 @@ Provide detailed analysis as markdown with all required sections.`
 
       const candidates: any[] = [];
       for (const choice of response.choices) {
+        if (!completedChoice(choice)) continue;
         const content = choice?.message?.content;
         if (!content) continue;
-        try { candidates.push(rehydrateCornersEdges(JSON.parse(content))); }
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) candidates.push(rehydrateCornersEdges(parsed));
+        }
         catch { console.warn('[CONVERSATIONAL JSON] ⚠️ Discarding unparseable ensemble completion'); }
       }
       if (candidates.length === 0) {
-        throw new Error('Failed to parse JSON response from AI');
+        throw new IncompleteInspectionError('ensemble', 'no complete parseable evaluations');
       }
       console.log(`[CONVERSATIONAL JSON] ✅ ${candidates.length}/${response.choices.length} ensemble completions parsed`);
 
@@ -2130,11 +2136,8 @@ Provide detailed analysis as markdown with all required sections.`
             edges: catScore(j, 'edges'),
             surface: catScore(j, 'surface'),
           },
-        }))
-        .filter(x => x.final != null && Object.values(x.cats).every(v => v != null));
-      if (scored.length === 0) {
-        throw new Error('No ensemble completion contained usable scores');
-      }
+        }));
+      requireCompleteEnsemble(scored);
 
       // MEDIAN-PICK: the completion whose final grade is the median becomes the displayed
       // result (identity, narratives, per-face detail). The other completions feed only
@@ -2285,8 +2288,8 @@ Provide detailed analysis as markdown with all required sections.`
 
       // Synthesize grading_passes from the REAL independent completions so every
       // downstream consumer (routes, card detail, PDFs) keeps its existing shape.
-      // Pad by repeating the base if fewer than 3 completions survived parsing.
-      const passSrc = [scored[0], scored[1] ?? base, scored[2] ?? base];
+      // Three real evaluations are required above; never duplicate a surviving pass.
+      const passSrc = [scored[0], scored[1], scored[2]];
       const finalsArr = passSrc.map(x => x.final as number);
       const medOf = (vals: number[]) => vals.slice().sort((a, b) => a - b)[1];
       const preMed = {
@@ -2460,6 +2463,9 @@ Provide detailed analysis as markdown with all required sections.`
         }
 
         const zoomAdjustments: string[] = [];
+        requireCompleteZoom(zoom);
+        jsonData.inspection_status = { status: 'complete', version: 'inspection-v1',
+          ensemble_passes: scored.length, zoom_coverage: zoom?.coverage };
         // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
         // displayed pass rows below the consensus when a cap was corroboration-limited.
@@ -3012,7 +3018,7 @@ Provide detailed analysis as markdown with all required sections.`
         // not a thin ridge) — a confirmed-pristine card graded 4 this way with every
         // pass AND zoom agreeing. Before the hard cap applies, a dedicated verifier
         // re-crops the claimed location and answers ONE question: thin physical
-        // ridge, or broad lighting band? Fail-safe: on any error the cap stands.
+        // ridge, or broad lighting band? Unavailable verification blocks publication.
         let structuralVerified = true;
         let structuralVerifyReason = '';
         if (structuralFlagged && structuralCorroborated) {
@@ -3030,7 +3036,11 @@ Provide detailed analysis as markdown with all required sections.`
           // A failed load falls back to undefined, and the verifier then fetches
           // for itself — identical behavior to before the egress fix.
           const verifierImages = await loadOriginals().catch(() => undefined);
-          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
+          let verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
+          if (!verdict.ok || verdict.confirmed === null) {
+            verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
+          }
+          if (!verdict.ok || verdict.confirmed === null) throw new IncompleteInspectionError('structural', verdict.reason);
           structuralVerified = verdict.confirmed;
           structuralVerifyReason = verdict.reason;
 
@@ -3170,6 +3180,23 @@ Provide detailed analysis as markdown with all required sections.`
         // v8.8: honest uncertainty — derived from measured signals, not the AI's self-report.
         // Components: image-confidence letter (A=0,B=1,C=2,D=3), spread between the three pass
         // finals, and whether the server had to lower the model's own average (cap/clamp fired).
+        // Out-of-frame corners: a located corner ON the photo border means part of
+        // the card is outside the picture. The model's own confidence letter does
+        // not notice (owner-verified: graded 9–10 at confidence B with a corner cut
+        // off), so the measured geometry lowers it — and the existing uncertainty
+        // gate below then refuses a 10 on it.
+        const clippedCardCorners = [
+          ...clippedCorners(zoom?.capture?.frontQuad, 'front'),
+          ...clippedCorners(zoom?.capture?.backQuad, 'back'),
+        ];
+        if (clippedCardCorners.length > 0) {
+          jsonData.image_quality = jsonData.image_quality || {};
+          jsonData.image_quality.confidence_letter = confidenceWithClipping(jsonData.image_quality.confidence_letter, clippedCardCorners);
+          jsonData.image_quality.out_of_frame = clippedCardCorners;
+          const clipNote = `Part of the card is outside the photo (${clippedCardCorners.join(', ')} corner${clippedCardCorners.length > 1 ? 's' : ''}), so that area could not be inspected.`;
+          jsonData.image_quality.notes = [clipNote, jsonData.image_quality.notes].filter(Boolean).join(' ');
+          console.log(`[CAPTURE] out-of-frame: ${clippedCardCorners.join(', ')} → image confidence ${jsonData.image_quality.confidence_letter}`);
+        }
         const confidenceLetter = (jsonData.image_quality?.confidence_letter || 'B').toUpperCase();
         const letterUncertainty = ({ A: 0, B: 1, C: 2, D: 3 } as Record<string, number>)[confidenceLetter] ?? 1;
         const passSpread = Math.max(f1, f2, f3) - Math.min(f1, f2, f3);
@@ -3932,6 +3959,12 @@ Provide detailed analysis as markdown with all required sections.`
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      // Stage-level retries belong to their inspectors. Do not rerun the whole
+      // paid ensemble for an incomplete result or turn unknown coverage into a grade.
+      if (error instanceof IncompleteInspectionError) {
+        console.warn(`[INSPECTION] ${error.stage}: ${error.reason}`);
+        throw error;
+      }
       console.error(`[CONVERSATIONAL] Attempt ${attempt}/${MAX_RETRIES} failed:`, errorMessage);
 
       // Record the failed call (no token counts available on errors)

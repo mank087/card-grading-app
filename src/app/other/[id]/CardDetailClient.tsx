@@ -1,5 +1,6 @@
 "use client";
 
+import { readIncompleteInspectionMessage } from '@/lib/grading/inspectionMessage';
 import ReportSectionNav from '@/components/design/ReportSectionNav';
 import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -1625,6 +1626,14 @@ export function OtherCardDetails() {
       console.log(`[FRONTEND DEBUG] MTG API response status: ${res.status}`);
 
       if (!res.ok) {
+        const incompleteMessage = await readIncompleteInspectionMessage(res);
+        if (incompleteMessage) {
+          setError(incompleteMessage);
+          setLoading(false);
+          setIsProcessing(false);
+          return;
+        }
+
         // Check for private card access denied (403 status)
         if (res.status === 403) {
           const errorData = await res.json();
@@ -1682,6 +1691,12 @@ export function OtherCardDetails() {
                 return;
               }
 
+              const incompleteMessage = await readIncompleteInspectionMessage(retryRes);
+              if (incompleteMessage) {
+                setError(incompleteMessage);
+                setIsProcessing(false);
+                return;
+              }
               if (retryRes.status === 429) {
                 // Still processing, continue retrying
                 await retryWithBackoff(attempt + 1);
@@ -3926,17 +3941,11 @@ export function OtherCardDetails() {
                     </div>
                   )}
 
-                  {/* Autographed */}
+                  {/* Autographed / Memorabilia: shown only when present — a "false" row is noise on cards where neither applies */}
                   {(cardInfo.autographed === true || cardInfo.autographed === 'Yes' || cardInfo.autographed === 'yes' || card.autographed === true) && (
                     <div>
                       <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
-                      <p className="text-lg text-gray-900">true</p>
-                    </div>
-                  )}
-                  {(cardInfo.autographed === false || cardInfo.autographed === 'No' || cardInfo.autographed === 'no' || (!cardInfo.autographed && card.autographed === false)) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
-                      <p className="text-lg text-gray-900">false</p>
+                      <p className="text-lg text-gray-900">Yes</p>
                     </div>
                   )}
 
@@ -3944,13 +3953,7 @@ export function OtherCardDetails() {
                   {(cardInfo.memorabilia === true || cardInfo.memorabilia === 'Yes' || cardInfo.memorabilia === 'yes' || card.memorabilia === true) && (
                     <div>
                       <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
-                      <p className="text-lg text-gray-900">true</p>
-                    </div>
-                  )}
-                  {(cardInfo.memorabilia === false || cardInfo.memorabilia === 'No' || cardInfo.memorabilia === 'no' || (!cardInfo.memorabilia && card.memorabilia === false)) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
-                      <p className="text-lg text-gray-900">false</p>
+                      <p className="text-lg text-gray-900">Yes</p>
                     </div>
                   )}
 

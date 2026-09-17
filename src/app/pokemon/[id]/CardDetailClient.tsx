@@ -1,5 +1,6 @@
 "use client";
 
+import { readIncompleteInspectionMessage } from '@/lib/grading/inspectionMessage';
 import ReportSectionNav from '@/components/design/ReportSectionNav';
 import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -1618,6 +1619,14 @@ export function PokemonCardDetails() {
       console.log(`[FRONTEND DEBUG] Pokemon API response status: ${res.status}`);
 
       if (!res.ok) {
+        const incompleteMessage = await readIncompleteInspectionMessage(res);
+        if (incompleteMessage) {
+          setError(incompleteMessage);
+          setLoading(false);
+          setIsProcessing(false);
+          return;
+        }
+
         // Check for private card access denied (403 status)
         if (res.status === 403) {
           const errorData = await res.json();
@@ -1675,6 +1684,12 @@ export function PokemonCardDetails() {
                 return;
               }
 
+              const incompleteMessage = await readIncompleteInspectionMessage(retryRes);
+              if (incompleteMessage) {
+                setError(incompleteMessage);
+                setIsProcessing(false);
+                return;
+              }
               if (retryRes.status === 429) {
                 // Still processing, continue retrying
                 await retryWithBackoff(attempt + 1);

@@ -1,3 +1,4 @@
+import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -1537,10 +1538,10 @@ EXTRACTION RULES:
         console.error(`[CONVERSATIONAL AI] ❌ Conversational grading failed:`, error.message);
         conversationalGradingResult = null;
         conversationalGradingData = null;
-        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: card.category || 'Card', errorMessage: error.message });
+        const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined, cardId, userId: card.user_id, category: card.category || 'Card', errorMessage: error.message });
         // Return error since this is now the primary grading system
         return NextResponse.json(
-          { error: `Conversational AI grading failed: ${error.message}`, grading_failed: true, credit_refunded: failure.refunded },
+          { error: `Conversational AI grading failed: ${error.message}`, ...inspectionFailureResponse(error), grading_failed: true, credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus },
           { status: 500 }
         );
       }
@@ -2413,7 +2414,7 @@ EXTRACTION RULES:
   } catch (error: any) {
     console.error(`[CONVERSATIONAL AI] Unexpected error:`, error);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: error.message || "Internal server error", ...inspectionFailureResponse(error) },
       { status: 500 }
     );
   } finally {

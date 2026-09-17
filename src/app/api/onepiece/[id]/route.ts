@@ -1,3 +1,4 @@
+import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
@@ -628,12 +629,12 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
         }
       } catch (error: any) {
         console.error(`[GET /api/onepiece/${cardId}] Conversational grading failed:`, error.message);
-        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: 'One Piece', errorMessage: error.message });
+        const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined, cardId, userId: card.user_id, category: 'One Piece', errorMessage: error.message });
         return NextResponse.json({
           error: "Failed to grade One Piece card. Please try again or contact support.",
           details: error.message,
-          grading_failed: true,
-          credit_refunded: failure.refunded
+          ...inspectionFailureResponse(error), grading_failed: true,
+          credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
         }, { status: 500 });
       }
     }
@@ -1128,7 +1129,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       console.error(`[GET /api/onepiece/${cardId}] Database update failed:`, updateError);
       // Release the lock as 'failed' and refund the credit — a save failure
       // means the user paid for a grade the DB never stored.
-      const failure = await recordGradingFailure({
+      const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: card.user_id,
         category: 'One Piece',
@@ -1137,7 +1138,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       return NextResponse.json({
         error: "Failed to save One Piece card grading results",
         grading_failed: true,
-        credit_refunded: failure.refunded
+        credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
       }, { status: 500 });
     }
 
@@ -1204,7 +1205,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
     // Only refund/mark-failed when this request actually held the grading
     // lock; errors on a cache-hit path must not touch an already-graded card.
     if (gradingAttempted) {
-      await recordGradingFailure({
+      await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: gradingOwnerId,
         category: 'One Piece',
