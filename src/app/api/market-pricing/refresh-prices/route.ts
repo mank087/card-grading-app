@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
 import {
-  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
+  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale, REFRESH_CARD_SELECT,
 } from '@/lib/pricing/batchPriceRefresh';
 
 // Vercel function timeout. Per-card cost is ~1.5-2s (300ms inter-card
@@ -70,14 +70,7 @@ export async function POST(request: NextRequest) {
 
     const { data: allCards, error: fetchError } = await supabase
       .from('cards')
-      .select(`
-        id, category,
-        conversational_card_info,
-        conversational_decimal_grade,
-        card_name, featured, pokemon_featured, card_set, card_number, release_date,
-        manufacturer_name, is_foil, foil_type, mtg_rarity,
-        dcm_price_product_id, dcm_price_updated_at
-      `)
+      .select(REFRESH_CARD_SELECT)
       .eq('user_id', auth.userId)
       .not('category', 'is', null);
 
@@ -96,10 +89,13 @@ export async function POST(request: NextRequest) {
     // staleness window for hits and misses.
     const staleCards = allCards.filter(c => isCacheStale(c.dcm_price_updated_at));
 
-    // Sort: cards with product IDs first (fast path), then the rest.
+    // Sort: cards with product IDs first (fast path), then the rest. An owner's
+    // pick is a fast path too — it is the product that gets looked up.
+    const hasFastPath = (c: { dcm_selected_product_id?: string | null; dcm_price_product_id?: string | null }) =>
+      !!(c.dcm_selected_product_id || c.dcm_price_product_id);
     staleCards.sort((a, b) => {
-      if (a.dcm_price_product_id && !b.dcm_price_product_id) return -1;
-      if (!a.dcm_price_product_id && b.dcm_price_product_id) return 1;
+      if (hasFastPath(a) && !hasFastPath(b)) return -1;
+      if (!hasFastPath(a) && hasFastPath(b)) return 1;
       return 0;
     });
 
@@ -117,7 +113,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const results: Array<{ id: string; success: boolean; estimate: number | null; source: string }> = [];
+    const results: Array<{ id: string; success: boolean; estimate: number | null; source: string; stale?: boolean }> = [];
 
     for (let i = 0; i < cardsToRefresh.length; i++) {
       const card = cardsToRefresh[i] as Record<string, unknown>;
@@ -139,8 +135,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failedCount = results.length - successCount;
+    // A stale result is a write we dropped on purpose because the owner
+    // corrected the card mid-run. It is neither a success nor a failure, and it
+    // must not be retried — the next refresh prices the corrected card.
+    const staleCount = results.filter(r => r.stale).length;
+    const successCount = results.filter(r => r.success && !r.stale).length;
+    const failedCount = results.length - successCount - staleCount;
 
     return NextResponse.json({
       success: true,
@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
       failed: failedCount,
       total: allCards.length,
       stale: staleCards.length,
+      staleWrites: staleCount,
       remaining: Math.max(0, staleCards.length - cardsToRefresh.length),
       results,
       message: `Refreshed ${successCount} of ${cardsToRefresh.length} cards`,

@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
 import {
-  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
+  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale, REFRESH_CARD_SELECT,
 } from '@/lib/pricing/batchPriceRefresh';
 import { isUuid } from '@/lib/uuid';
 
@@ -48,14 +48,7 @@ export async function POST(
     const supabase = supabaseServer();
     const { data: card, error } = await supabase
       .from('cards')
-      .select(`
-        id, user_id, category,
-        conversational_card_info,
-        conversational_decimal_grade,
-        card_name, featured, pokemon_featured, card_set, card_number, release_date,
-        manufacturer_name, is_foil, foil_type, mtg_rarity,
-        dcm_price_product_id, dcm_price_updated_at
-      `)
+      .select(`user_id, ${REFRESH_CARD_SELECT}`)
       .eq('id', cardId)
       .single();
 
@@ -84,7 +77,9 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      refreshed: result.success,
+      // A stale write is not a refresh of THIS card's identity, so it does not
+      // claim one. The detail page simply keeps showing what it has.
+      refreshed: result.success && !result.stale,
       estimate: result.estimate,
       source: result.source,
     });

@@ -26,6 +26,7 @@ import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Yu-Gi-Oh cards
 import { lookupYugiohCard } from "@/lib/yugiohCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+import { guardedPriceUpdate, readPriceRevisions } from "@/lib/pricing/guardedPriceWrite";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
@@ -1201,7 +1202,10 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
             dcm_price_product_id: result.prices.productId,
             dcm_price_product_name: result.prices.productName,
           };
-          await supabase.from("cards").update(priceUpdate).eq("id", cardId);
+          // Phase 2C: this fetch is fire-and-forget, so the owner can confirm or
+          // correct the card before it lands. Guard the write on the revisions the
+          // card row was read at; a stale write is dropped.
+          await guardedPriceUpdate(supabase, cardId, readPriceRevisions(card as Record<string, any>), priceUpdate, "yugioh");
           console.log(`[GET /api/yugioh/${cardId}] Pricing saved: $${estimatedValue} (confidence: ${result.matchConfidence})`);
         }
       } catch (priceErr: any) {

@@ -8,6 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import {
+  guardedPriceUpdate, parseRequestRevisions, PRICE_WRITE_STALE_CODE,
+  type PriceRevisions,
+} from '@/lib/pricing/guardedPriceWrite';
+import {
   searchOnePieceCardPrices,
   estimateOnePieceDcmValue,
   isOnePiecePricingEnabled,
@@ -38,6 +42,8 @@ export interface CachedOnePiecePriceData {
 
 export interface OnePiecePricingResponse {
   success: boolean;
+  /** 'price_write_stale' when the card changed mid-fetch (HTTP 409). */
+  code?: string;
   data?: CachedOnePiecePriceData;
   error?: string;
   cached?: boolean;
@@ -67,26 +73,29 @@ function getCacheAgeDays(cachedAt: string): number {
  * Save pricing data to cache
  * Saves to both dcm_cached_prices (full data) and dcm_price_* columns (for collection page display)
  */
-async function savePriceCache(cardId: string, data: CachedOnePiecePriceData): Promise<void> {
+async function savePriceCache(
+  cardId: string,
+  data: CachedOnePiecePriceData,
+  revisions: PriceRevisions | null,
+): Promise<'written' | 'stale'> {
   try {
     const supabase = supabaseServer();
     const now = new Date().toISOString();
 
-    const { error } = await supabase
-      .from('cards')
-      .update({
-        // Full cached data for detail page
-        dcm_cached_prices: data,
-        dcm_prices_cached_at: now,
-        // Individual columns for collection page display
-        dcm_price_estimate: data.estimatedValue,
-        dcm_price_raw: data.prices?.raw ?? null,
-        dcm_price_updated_at: now,
-        dcm_price_match_confidence: data.matchConfidence,
-        dcm_price_product_id: data.prices?.productId ?? null,
-        dcm_price_product_name: data.prices?.productName ?? null,
-      })
-      .eq('id', cardId);
+    const result = await guardedPriceUpdate(supabase, cardId, revisions, {
+      // Full cached data for detail page
+      dcm_cached_prices: data,
+      dcm_prices_cached_at: now,
+      // Individual columns for collection page display
+      dcm_price_estimate: data.estimatedValue,
+      dcm_price_raw: data.prices?.raw ?? null,
+      dcm_price_updated_at: now,
+      dcm_price_match_confidence: data.matchConfidence,
+      dcm_price_product_id: data.prices?.productId ?? null,
+      dcm_price_product_name: data.prices?.productName ?? null,
+    }, 'onepiece');
+    if (result.status === 'stale') return 'stale';
+    const error = result.status === 'error' ? { message: result.error } : null;
 
     if (error) {
       console.error('[OnePiecePricing Cache] Failed to save cache:', error);
@@ -96,7 +105,21 @@ async function savePriceCache(cardId: string, data: CachedOnePiecePriceData): Pr
   } catch (err) {
     console.error('[OnePiecePricing Cache] Error saving cache:', err);
   }
+  return 'written';
 }
+
+/**
+ * Phase 2C: the owner corrected this card (or changed its product pick) while
+ * these prices were being fetched, so they describe a card that no longer
+ * exists. 409 tells the client to refetch once; it is not an error state.
+ */
+function stalePriceResponse(): NextResponse<OnePiecePricingResponse> {
+  return NextResponse.json(
+    { success: false, error: 'This card was updated while its price was loading.', code: PRICE_WRITE_STALE_CODE },
+    { status: 409 },
+  );
+}
+
 
 /**
  * Get cached pricing data if fresh
@@ -142,6 +165,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<OnePieceP
 
   try {
     const body = await request.json();
+    // Phase 2C: the revisions the client rendered this card at. Absent for
+    // older bundles and the mobile app, which are written unguarded.
+    const revisions = parseRequestRevisions(body);
 
     const {
       cardName,
@@ -214,7 +240,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<OnePieceP
       };
 
       if (cardId) {
-        await savePriceCache(cardId, responseData);
+        const writeStatus = await savePriceCache(cardId, responseData, revisions);
+        if (writeStatus === 'stale') return stalePriceResponse();
       }
 
       return NextResponse.json({
@@ -290,7 +317,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<OnePieceP
 
     // Save to cache if cardId provided
     if (cardId) {
-      await savePriceCache(cardId, responseData);
+      const writeStatus = await savePriceCache(cardId, responseData, revisions);
+      if (writeStatus === 'stale') return stalePriceResponse();
     }
 
     return NextResponse.json({

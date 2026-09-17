@@ -6,6 +6,7 @@ import {
   extractMTGDisplayMetadata,
   type MTGCardInfoForVerification
 } from "@/lib/mtgApiVerification";
+import { guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT } from "@/lib/pricing/guardedPriceWrite";
 
 /**
  * POST /api/mtg/verify
@@ -59,7 +60,8 @@ export async function POST(request: NextRequest) {
         release_date,
         manufacturer_name,
         conversational_card_info,
-        mtg_api_verified
+        mtg_api_verified,
+        ${PRICE_REVISION_SELECT}
       `)
       .eq("id", card_id)
       .single();
@@ -129,14 +131,18 @@ export async function POST(request: NextRequest) {
       const updateFields = getMTGApiUpdateFields(verificationResult);
 
       if (updateFields) {
-        const { error: updateError } = await supabase
-          .from("cards")
-          .update(updateFields)
-          .eq("id", card_id);
+        // Phase 2C: this write carries identity fields AND the Scryfall prices,
+        // and it lands after a network round trip. If the owner corrected the
+        // card meanwhile, their correction wins and this write is dropped.
+        const writeResult = await guardedPriceUpdate(
+          supabase, card_id, readPriceRevisions(card as Record<string, any>), updateFields, 'MTG Verify',
+        );
 
-        if (updateError) {
-          console.error(`[MTG Verify API] Failed to update card:`, updateError);
+        if (writeResult.status === 'error') {
+          console.error(`[MTG Verify API] Failed to update card:`, writeResult.error);
           // Don't fail the request, verification was successful
+        } else if (writeResult.status === 'stale') {
+          console.log(`[MTG Verify API] Card changed during verification; Scryfall data discarded`);
         } else {
           console.log(`[MTG Verify API] Card updated with Scryfall API data`);
         }

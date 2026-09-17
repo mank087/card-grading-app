@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  guardedPriceUpdate, parseRequestRevisions, PRICE_WRITE_STALE_CODE,
+} from '@/lib/pricing/guardedPriceWrite';
 
 export interface DcmSaveRequest {
   card_id: string;
@@ -18,11 +21,21 @@ export interface DcmSaveRequest {
   match_confidence?: string;
   product_id?: string;
   product_name?: string;
+  /**
+   * Phase 2C: the revisions the page was rendered with. Sending both makes the
+   * save a compare-and-set, so a price fetched for the card as it looked before
+   * a correction cannot land on the corrected card. Omit both and the save is
+   * written unguarded, which is what older bundles and the app still do.
+   */
+  identity_revision?: number;
+  pricing_selection_revision?: number;
 }
 
 export interface DcmSaveResponse {
   success: boolean;
   error?: string;
+  /** 'price_write_stale' with HTTP 409 when the card moved on mid-fetch. */
+  code?: string;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<DcmSaveResponse>> {
@@ -79,24 +92,35 @@ export async function POST(request: NextRequest): Promise<NextResponse<DcmSaveRe
       );
     }
 
-    // Update the card with DCM price data
-    const { error: updateError } = await supabase
-      .from('cards')
-      .update({
-        dcm_price_estimate: estimate,
-        dcm_price_raw: raw ?? null,
-        dcm_price_graded_high: graded_high ?? null,
-        dcm_price_median: median ?? null,
-        dcm_price_average: average ?? null,
-        dcm_price_updated_at: new Date().toISOString(),
-        dcm_price_match_confidence: match_confidence ?? null,
-        dcm_price_product_id: product_id ?? null,
-        dcm_price_product_name: product_name ?? null,
-      })
-      .eq('id', card_id);
+    // Update the card with DCM price data, guarded on the revisions the client
+    // rendered the card at (Phase 2C).
+    const result = await guardedPriceUpdate(supabase, card_id, parseRequestRevisions(body), {
+      dcm_price_estimate: estimate,
+      dcm_price_raw: raw ?? null,
+      dcm_price_graded_high: graded_high ?? null,
+      dcm_price_median: median ?? null,
+      dcm_price_average: average ?? null,
+      dcm_price_updated_at: new Date().toISOString(),
+      dcm_price_match_confidence: match_confidence ?? null,
+      dcm_price_product_id: product_id ?? null,
+      dcm_price_product_name: product_name ?? null,
+    }, 'DCM Save');
 
-    if (updateError) {
-      console.error('[DCM Save] Error updating card:', updateError);
+    if (result.status === 'stale') {
+      // The card was corrected while this price was being fetched. The client
+      // refetches once; nothing is shown to the customer.
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This card was updated while its price was loading.',
+          code: PRICE_WRITE_STALE_CODE,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (result.status === 'error') {
+      console.error('[DCM Save] Error updating card:', result.error);
       return NextResponse.json(
         { success: false, error: 'Failed to save price data' },
         { status: 500 }

@@ -428,6 +428,11 @@ interface SportsAIGrading {
 }
 
 interface SportsCard {
+  // Phase 2C revision guard (cards.identity_revision /
+  // cards.pricing_selection_revision). The page loads with select('*'),
+  // so both arrive on the row; the price lookup sends them with every save.
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
   // Ownership lifecycle — a sold card leaves the collection but keeps this
   // page online so the buyer's slab QR still resolves.
   ownership_status?: 'owned' | 'sold' | 'archived' | null;
@@ -5259,6 +5264,9 @@ export function MTGCardDetails() {
                     is_foil: cardInfo.is_foil || card.is_foil || false,
                     dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
                     dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
+                    // Phase 2C: guard price saves against a concurrent identity correction.
+                    identity_revision: card.identity_revision as number | null | undefined,
+                    pricing_selection_revision: card.pricing_selection_revision as number | null | undefined,
                   }}
                   dcmGrade={card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade ?? undefined}
                   isOwner={(() => {

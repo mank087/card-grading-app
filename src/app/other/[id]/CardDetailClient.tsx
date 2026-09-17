@@ -408,6 +408,11 @@ interface SportsAIGrading {
 }
 
 interface SportsCard {
+  // Phase 2C revision guard (cards.identity_revision /
+  // cards.pricing_selection_revision). The page loads with select('*'),
+  // so both arrive on the row; the price lookup sends them with every save.
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
   // Ownership lifecycle — a sold card leaves the collection but keeps this
   // page online so the buyer's slab QR still resolves.
   ownership_status?: 'owned' | 'sold' | 'archived' | null;
@@ -5167,6 +5172,9 @@ export function OtherCardDetails() {
                         rarity_or_variant: cardInfo.rarity_or_variant,
                         manufacturer: cardInfo.manufacturer || card.manufacturer,
                         game_type: cardInfo.game_type || 'other',
+                        // Phase 2C: guard price saves against a concurrent identity correction.
+                        identity_revision: card.identity_revision as number | null | undefined,
+                        pricing_selection_revision: card.pricing_selection_revision as number | null | undefined,
                       }}
                       cardId={card.id}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}

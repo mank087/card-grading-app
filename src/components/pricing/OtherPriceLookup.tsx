@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
+import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
 import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
@@ -41,6 +42,8 @@ interface AvailableVariant {
 
 interface OtherPricingResult {
   success: boolean;
+  /** 'price_write_stale' when the card changed while this price loaded. */
+  code?: string;
   data?: {
     prices: NormalizedOtherPrices;
     estimatedValue: number | null;
@@ -80,6 +83,11 @@ interface OtherPriceLookupProps {
     // Saved manual selection
     dcm_selected_product_id?: string;
     dcm_selected_product_name?: string;
+    // Phase 2C: the revisions this card was rendered at. The detail pages
+    // load the card with select('*'), so both are already on the row. They
+    // make every price save below a compare-and-set.
+    identity_revision?: number | null;
+    pricing_selection_revision?: number | null;
   };
   cardId?: string;  // Alternative to card.id for caching
   dcmGrade?: number;
@@ -155,6 +163,20 @@ export function OtherPriceLookup({ card, cardId, dcmGrade, isOwner = false, guar
     return card.card_name || '';
   };
 
+  /**
+   * Phase 2C: the card's identity (or its product pick) changed while a price
+   * was loading, so the server discarded the save and answered 409. Refetch this
+   * card's price once, quietly. The customer is never shown an error, because
+   * nothing failed: their correction won the race.
+   */
+  const staleRefetchedRef = useRef(false);
+  const refetchAfterStalePrice = async () => {
+    if (staleRefetchedRef.current) return;
+    staleRefetchedRef.current = true;
+    console.log('[OtherPriceLookup] Card changed while pricing; refetching once');
+    await fetchPrices(undefined, true);
+  };
+
   // Save estimated price to database so collection/portfolio pages reflect the latest value
   const savePriceEstimate = async (data: OtherPricingResult['data']) => {
     if (!isOwner || !card.id || !data) return;
@@ -162,7 +184,7 @@ export function OtherPriceLookup({ card, cardId, dcmGrade, isOwner = false, guar
     if (!session?.access_token) return;
 
     try {
-      await fetch('/api/pricing/dcm-save', {
+      const saveResponse = await fetch('/api/pricing/dcm-save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,8 +200,12 @@ export function OtherPriceLookup({ card, cardId, dcmGrade, isOwner = false, guar
           match_confidence: data.matchConfidence,
           product_id: data.prices?.productId ?? null,
           product_name: data.prices?.productName ?? null,
+          ...priceRevisionPayload(card),
         }),
       });
+      if (saveResponse.status === 409) {
+        await refetchAfterStalePrice();
+      }
     } catch (err) {
       console.error('[OtherPriceLookup] Error saving price estimate:', err);
     }
@@ -211,10 +237,16 @@ export function OtherPriceLookup({ card, cardId, dcmGrade, isOwner = false, guar
             dcmGrade,
             cardId: effectiveCardId,
             forceRefresh,
+            ...priceRevisionPayload(card),
           }),
         });
 
         const data: OtherPricingResult = await response.json();
+
+        if (isStalePriceResponse(response, data)) {
+          await refetchAfterStalePrice();
+          return;
+        }
 
         if (!data.success) {
           if (data.useEbayFallback) {
@@ -291,10 +323,16 @@ export function OtherPriceLookup({ card, cardId, dcmGrade, isOwner = false, guar
           includeVariants: true,
           cardId: effectiveCardId,
           forceRefresh,
+          ...priceRevisionPayload(card),
         }),
       });
 
       const data: OtherPricingResult = await response.json();
+
+      if (isStalePriceResponse(response, data)) {
+        await refetchAfterStalePrice();
+        return;
+      }
 
       if (!data.success) {
         if (data.useEbayFallback) {
