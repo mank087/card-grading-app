@@ -146,9 +146,11 @@ describe('GET /api/cards/[id]/identity-review', () => {
     expect(body.fields.some((f: any) => f.key === 'parallel_type')).toBe(false);
   });
 
-  it('never pops up when no rollout date is configured', async () => {
+  it('pops up on the first visit when no rollout date is configured, and only then', async () => {
     vi.stubEnv('NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE', '');
     card();
+    expect((await (await GET(request(), context)).json()).mode).toBe('popup');
+    card({ identity_review_dismissed_at: '2026-09-17T00:00:00Z' });
     expect((await (await GET(request(), context)).json()).mode).toBe('banner');
   });
 
