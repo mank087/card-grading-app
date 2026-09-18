@@ -58,6 +58,9 @@ import { useResponsive } from '@/hooks/useResponsive'
 import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
 import { isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL } from '@/lib/itemType'
+import { useIsFocused } from '@react-navigation/native'
+import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
+import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
 
 /**
  * Resolve the grade uncertainty string for display.
@@ -200,6 +203,9 @@ export default function CardDetailScreen() {
     'insta-list': instaListRef,
   }), [])
   const [tourActive, setTourActive] = useState(false)
+  // True once the tour has decided whether to run, so the confirmation popup
+  // never races it onto the screen.
+  const [tourChecked, setTourChecked] = useState(false)
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({})
 
   const TOUR_STEPS: TourStep[] = [
@@ -235,15 +241,19 @@ export default function CardDetailScreen() {
     if (!card?.id || !session?.user?.id) return
     let cancelled = false
     ;(async () => {
-      const completed = await AsyncStorage.getItem(TOUR_COMPLETED_KEY).catch(() => null)
-      if (completed === 'true' || cancelled) return
-      const { count } = await supabase
-        .from('cards')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', session.user.id)
-        .not('conversational_whole_grade', 'is', null)
-      if (cancelled) return
-      if ((count ?? 0) <= 1) setTourActive(true)
+      try {
+        const completed = await AsyncStorage.getItem(TOUR_COMPLETED_KEY).catch(() => null)
+        if (completed === 'true' || cancelled) return
+        const { count } = await supabase
+          .from('cards')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', session.user.id)
+          .not('conversational_whole_grade', 'is', null)
+        if (cancelled) return
+        if ((count ?? 0) <= 1) setTourActive(true)
+      } catch { /* no tour */ } finally {
+        if (!cancelled) setTourChecked(true)
+      }
     })()
     return () => { cancelled = true }
   }, [card?.id, session?.user?.id])
@@ -392,6 +402,24 @@ export default function CardDetailScreen() {
   }, [id])
 
   useEffect(() => { fetchCard() }, [fetchCard])
+
+  // ---------- "Confirm your card details" (mirrors src/components/cards/IdentityReview.tsx) ----------
+  // The server decides popup / banner / nothing; this only says when the popup
+  // may appear: never over the onboarding tour, another sheet on this screen, or
+  // a screen pushed on top of this one.
+  const isFocused = useIsFocused()
+  const anotherModalOpen = !!zoomImage || reportSheetOpen || labelSheetOpen || slabOptionsOpen
+    || !!exportTask || !!positionPicker || editOpen || editLabelOpen || parallelPickerOpen || sellOpen
+  const identity = useIdentityReview({
+    cardId: card?.id,
+    eligible: !!card && !!session?.user?.id && card.user_id === session.user.id
+      && (card as any).ownership_status !== 'sold' && !(card as any).deleted_at,
+    gradeKey: `${(card as any)?.grade_status ?? ''}|${card?.conversational_whole_grade ?? ''}`,
+    blocked: !isFocused || !tourChecked || tourActive || anotherModalOpen,
+  })
+  // A confirmation that changed what the card is (or which version prices it)
+  // looks the price up again once the refreshed card is on screen.
+  const [repriceToken, setRepriceToken] = useState(0)
 
   // Binders for the picker. Both calls fail soft — pre-migration this section
   // just doesn't render rather than erroring the whole card page.
@@ -598,6 +626,15 @@ export default function CardDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.id])
 
+  // After a confirmation changed the card's identity or its version pick. Runs
+  // once the refreshed card is in state, so the lookup uses the corrected fields
+  // and the new revisions (a stale write is refused by the server).
+  useEffect(() => {
+    if (repriceToken === 0 || !card) return
+    refreshPrice(true, (card as any).dcm_selected_product_id || undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repriceToken])
+
   if (isLoading) return <View style={s.loading}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
   if (!card) return <View style={s.loading}><Text style={{ color: Colors.gray[500] }}>Card not found</Text></View>
 
@@ -654,6 +691,20 @@ export default function CardDetailScreen() {
   const confidence = card.conversational_image_confidence || ''
 
   const gradingJson = gradingJsonEarly
+
+  /** The full editor. Also the confirmation sheet's "More details". */
+  const openEditCardInfo = () => {
+    setEditForm({
+      card_name: card.card_name || ci?.card_name || '',
+      card_set: card.card_set || ci?.set_name || '',
+      card_number: card.card_number || ci?.card_number || '',
+      release_date: card.release_date || ci?.year || '',
+      player_or_character: ci?.player_or_character || '',
+      manufacturer: ci?.manufacturer || (card as any).manufacturer_name || '',
+      rarity: ci?.rarity_tier || ci?.rarity_or_variant || '',
+    })
+    setEditOpen(true)
+  }
 
   const handleShare = async () => {
     const catPath = categoryToRouteSlug(card.category)
@@ -1219,6 +1270,31 @@ export default function CardDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* "Confirm your card details". Mounted only while open so each opening
+          starts from the latest review state. */}
+      {identity.open && identity.state && (
+        <ConfirmCardDetailsSheet
+          cardId={card.id}
+          review={identity.state}
+          frontUrl={frontUrl}
+          backUrl={backUrl}
+          fetchFirstLook={!identity.state.first_look_present}
+          onClose={identity.handleClose}
+          onDismissed={identity.handleDismissed}
+          onSaved={async (_saved, info) => {
+            identity.handleSaved()
+            await fetchCard()
+            if (info.repriced) setRepriceToken(t => t + 1)
+          }}
+          onOpenMoreDetails={() => {
+            identity.closeForMoreDetails()
+            // iOS will not present a sheet while another is still animating away.
+            setTimeout(openEditCardInfo, Platform.OS === 'ios' ? 450 : 0)
+          }}
+          onReload={identity.reload}
+        />
+      )}
+
       {/* Edit Card Info Modal */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         {/* iOS uses 'padding' so the bottom sheet lifts above the keyboard.
@@ -1301,12 +1377,36 @@ export default function CardDetailScreen() {
                           release_date: editForm.release_date || '',
                           manufacturer_name: editForm.manufacturer || '',
                           rarity_tier: editForm.rarity || '',
+                          // The revision this form was opened at: a correction saved
+                          // elsewhere since (web, the confirmation sheet) answers 409
+                          // instead of being silently overwritten.
+                          ...(typeof (card as any).identity_revision === 'number'
+                            ? { expected_identity_revision: (card as any).identity_revision }
+                            : {}),
                         }),
                       })
                       const result = await res.json().catch(() => ({}))
+                      if (res.status === 409) {
+                        // Keep the sheet and what was typed; reload the card so the
+                        // next save carries the current revision.
+                        await fetchCard()
+                        Alert.alert(
+                          'This card was updated',
+                          'Someone changed this card while you were editing it. We reloaded it. Your entries are still here, so check them once more and save again.',
+                        )
+                        return
+                      }
+                      if (res.status === 423) {
+                        setEditOpen(false)
+                        Alert.alert('This card is locked', result?.error || 'This card is marked as sold, so its details are locked.')
+                        return
+                      }
                       if (!res.ok) throw new Error(result?.error || 'Could not update card.')
                       setCard((prev: any) => prev ? { ...prev, ...(result.card || {}) } : prev)
                       setEditOpen(false)
+                      // The banner and the value callout follow the saved identity.
+                      void identity.reload()
+                      if (result?.pricing_invalidated === true) setRepriceToken(t => t + 1)
                     } catch (err: any) {
                       Alert.alert('Save failed', err?.message || 'Could not update card.')
                     } finally {
@@ -1592,6 +1692,12 @@ export default function CardDetailScreen() {
       </View>{/* close twoPaneLeft */}
       <View style={isTwoPane ? s.twoPaneRight : undefined}>
 
+      {/* Owner confirmation of the card's identity: the quieter way in once
+          the first-visit popup has been seen (or could not be shown). */}
+      {identity.showBanner && (
+        <IdentityReviewBanner dismissed={identity.dismissed} onPress={identity.openSheet} />
+      )}
+
       {/* ══════ ESTIMATED VALUE + SUMMARY ══════
           Uses the shared resolveCardValue so the number here matches
           what Collection + Market Pricing show for the same card. */}
@@ -1605,6 +1711,20 @@ export default function CardDetailScreen() {
           // A non-standard item is labelled above; it has no value to confirm.
           if (resolved.withheldReason === 'not_standard_card') return null
           if (!isOwner) return null
+          // Opens the same sheet as the banner, when the server has the flow on.
+          if (identity.canOpen) {
+            return (
+              <TouchableOpacity
+                style={s.valueCard}
+                onPress={identity.openSheet}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityHint="Opens the card details check"
+              >
+                <Text style={[s.valueLabel, { textDecorationLine: 'underline' }]}>Confirm your card details to see a value</Text>
+              </TouchableOpacity>
+            )
+          }
           return (
             <View style={s.valueCard}>
               <Text style={s.valueLabel}>Confirm your card details to see a value</Text>
@@ -1888,18 +2008,7 @@ export default function CardDetailScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200] }}
-                onPress={() => {
-                  setEditForm({
-                    card_name: card.card_name || ci?.card_name || '',
-                    card_set: card.card_set || ci?.set_name || '',
-                    card_number: card.card_number || ci?.card_number || '',
-                    release_date: card.release_date || ci?.year || '',
-                    player_or_character: ci?.player_or_character || '',
-                    manufacturer: ci?.manufacturer || (card as any).manufacturer_name || '',
-                    rarity: ci?.rarity_tier || ci?.rarity_or_variant || '',
-                  })
-                  setEditOpen(true)
-                }}
+                onPress={openEditCardInfo}
               >
                 <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
                 <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>Edit Card Info</Text>

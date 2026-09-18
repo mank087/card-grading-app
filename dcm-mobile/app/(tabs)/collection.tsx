@@ -28,6 +28,10 @@ import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
 import ExportRunner, { type ExportSource } from '@/components/exports/ExportRunner'
+import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
+import { identityConfirmationPending } from '@/lib/reviewClient'
+import { isNonStandardItemType } from '@/lib/itemType'
+import { identityConfirmEnabled, loadIdentityReview, type IdentityReviewState } from '@/lib/identityReviewApi'
 
 // Star Wars was retired as a top-level category and is now an "Other" sub-category.
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
@@ -78,6 +82,21 @@ interface CardItem {
   scryfall_price_usd_foil: number | null
   is_foil: boolean | null
   visibility: string | null
+  // Confirmation flow (A1 added these to CARD_COLUMNS). Optional: binder rows
+  // come from another endpoint and may not carry them.
+  item_type?: string | null
+  identity_revision?: number | null
+  identity_confirmed_revision?: number | null
+  ownership_status?: string | null
+}
+
+/** What the "Confirm details" chip opened: the card, its review state, its photos. */
+interface ConfirmTarget {
+  cardId: string
+  state: IdentityReviewState | null
+  failed: boolean
+  frontUrl: string | null
+  backUrl: string | null
 }
 
 export default function CollectionScreen() {
@@ -489,6 +508,79 @@ export default function CollectionScreen() {
     setSheetMemberOf(new Set(ids))
   }, [])
 
+  // ---- "Confirm details" / "Not a standard card" chips ------------------
+  // Same rule as the web collection (needsDetailsConfirmation): graded, not
+  // sold, not a non-standard item, and never confirmed or confirmed at an older
+  // identity revision. The server kill switch hides the chips too.
+  const [confirmEnabled, setConfirmEnabled] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    identityConfirmEnabled().then(on => { if (!cancelled) setConfirmEnabled(on) })
+    return () => { cancelled = true }
+  }, [])
+
+  const needsDetailsConfirmation = useCallback((item: CardItem): boolean => {
+    if (!confirmEnabled) return false
+    // Rows without the identity columns (some binder payloads) cannot tell.
+    if (!('identity_revision' in item) && !('identity_confirmed_revision' in item)) return false
+    if (isNonStandardItemType(item.item_type)) return false
+    const sold = item.ownership_status === 'sold' || (item.ownership_status == null && ownershipView === 'sold')
+    if (sold) return false
+    return identityConfirmationPending(item)
+  }, [confirmEnabled, ownershipView])
+
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null)
+
+  /** Signed thumbnails of both sides (full size when a thumb is missing), for the sheet's photos. */
+  const signBothSides = useCallback(async (cardId: string): Promise<{ front: string | null; back: string | null }> => {
+    try {
+      const { data } = await supabase.from('cards').select('front_path, back_path').eq('id', cardId).maybeSingle()
+      const paths = [data?.front_path, data?.back_path].filter(Boolean) as string[]
+      if (paths.length === 0) return { front: null, back: null }
+      const wanted = paths.flatMap(p => [thumbPath(p), p])
+      const { data: urls } = await supabase.storage.from('cards').createSignedUrls(wanted, 3600)
+      const signed = new Map<string, string>()
+      urls?.forEach(u => { if (u.signedUrl && u.path && !(u as any).error) signed.set(u.path, u.signedUrl) })
+      const pick = (p?: string | null) => (p ? signed.get(thumbPath(p)) || signed.get(p) || null : null)
+      return { front: pick(data?.front_path), back: pick(data?.back_path) }
+    } catch {
+      return { front: null, back: null }
+    }
+  }, [])
+
+  /** The chip: load the review state and the photos, then open the sheet in place. */
+  const openConfirmDetails = useCallback(async (item: CardItem) => {
+    setConfirmTarget({ cardId: item.id, state: null, failed: false, frontUrl: item.front_url || null, backUrl: null })
+    const [state, photos] = await Promise.all([loadIdentityReview(item.id), signBothSides(item.id)])
+    setConfirmTarget(prev => {
+      if (!prev || prev.cardId !== item.id) return prev
+      // The kill switch went on after the chips were drawn: nothing to confirm.
+      const usable = !!state && state.reason !== 'disabled'
+      return {
+        ...prev,
+        state: usable ? state : null,
+        failed: !usable,
+        frontUrl: photos.front || prev.frontUrl,
+        backUrl: photos.back,
+      }
+    })
+  }, [signBothSides])
+
+  /** Re-read one card after a save or "Review later", in the list and in an open binder. */
+  const refreshOneCard = useCallback(async (cardId: string) => {
+    try {
+      const { data, error } = await supabase.from('cards').select(CARD_COLUMNS).eq('id', cardId).maybeSingle()
+      if (error || !data) return
+      const [row] = await attachImageUrls([data as any])
+      setCards(prev => prev.map(c => (c.id === cardId ? { ...c, ...row } : c)))
+      setBinderCards(prev => (prev ? prev.map(c => (c.id === cardId ? { ...c, ...row } : c)) : prev))
+    } catch { /* the next refresh picks it up */ }
+    // CARD_COLUMNS is a constant string rebuilt per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachImageUrls])
+
+  const closeConfirm = () => setConfirmTarget(null)
+
   const sheetToggleBinder = async (binderId: string) => {
     if (!sheetCard) return
     const inIt = sheetMemberOf.has(binderId)
@@ -807,6 +899,38 @@ export default function CollectionScreen() {
   // useCallback keeps these stable across re-renders so FlatList doesn't
   // see a new function reference on every parent render — matters for
   // scroll perf at 50+ rows.
+  /**
+   * The amber "Confirm details" chip and the grey "Not a standard card" chip.
+   * The chip is its own touchable inside the tile, so a tap on it opens the
+   * sheet in place and never reaches the tile's navigation.
+   */
+  const renderIdentityChips = useCallback((item: CardItem) => {
+    const notStandard = isNonStandardItemType(item.item_type)
+    const confirm = !selectionMode && needsDetailsConfirmation(item)
+    if (!notStandard && !confirm) return null
+    return (
+      <View style={st.chipRow}>
+        {confirm && (
+          <TouchableOpacity
+            style={st.confirmChip}
+            onPress={() => { void openConfirmDetails(item) }}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel="Confirm details"
+            accessibilityHint="Opens the card details check without leaving your collection"
+          >
+            <Text style={st.confirmChipText}>Confirm details</Text>
+          </TouchableOpacity>
+        )}
+        {notStandard && (
+          <View style={st.notStandardChip}>
+            <Text style={st.notStandardChipText}>Not a standard card</Text>
+          </View>
+        )}
+      </View>
+    )
+  }, [selectionMode, needsDetailsConfirmation, openConfirmDetails])
+
   const renderListItem = useCallback(({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
     const contextParts = getContextLine(item as any)
@@ -859,6 +983,7 @@ export default function CollectionScreen() {
             </View>
             {price ? <Text style={st.listPrice}>${price.toFixed(2)}</Text> : null}
           </View>
+          {renderIdentityChips(item)}
         </View>
         {item.conversational_whole_grade != null ? (
           <GradeBadge grade={item.conversational_whole_grade} size="sm" />
@@ -867,7 +992,7 @@ export default function CollectionScreen() {
         )}
       </TouchableOpacity>
     )
-  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, bindersAvailable, openSheet])
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, bindersAvailable, openSheet, renderIdentityChips])
 
   const renderGridItem = useCallback(({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
@@ -933,9 +1058,10 @@ export default function CollectionScreen() {
             </View>
           )}
         </View>
+        <View style={{ paddingHorizontal: 8 }}>{renderIdentityChips(item)}</View>
       </TouchableOpacity>
     )
-  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, labelStyle, colorOverrides, bindersAvailable, openSheet])
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, labelStyle, colorOverrides, bindersAvailable, openSheet, renderIdentityChips])
 
   if (isLoading) {
     return <View style={st.loadingContainer}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
@@ -1712,6 +1838,45 @@ export default function CollectionScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* "Confirm details" in place. While the card's review state loads, a
+          small overlay rather than a second Modal, so iOS never has to present
+          one sheet while another is still animating. */}
+      {confirmTarget && !confirmTarget.state && (
+        <Pressable style={st.confirmOverlay} onPress={closeConfirm} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable style={st.confirmOverlayCard} onPress={() => {}}>
+            {confirmTarget.failed ? (
+              <Text style={st.confirmOverlayText}>
+                We could not open this card just now. Please try again, or open the card to confirm its details.
+              </Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <ActivityIndicator size="small" color={Colors.purple[600]} />
+                <Text style={st.confirmOverlayText}>Opening your card details...</Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      )}
+      {confirmTarget?.state && (
+        <ConfirmCardDetailsSheet
+          cardId={confirmTarget.cardId}
+          review={confirmTarget.state}
+          frontUrl={confirmTarget.frontUrl}
+          backUrl={confirmTarget.backUrl}
+          fetchFirstLook={!confirmTarget.state.first_look_present}
+          onClose={closeConfirm}
+          onDismissed={() => { const id = confirmTarget.cardId; closeConfirm(); void refreshOneCard(id) }}
+          onSaved={() => { const id = confirmTarget.cardId; closeConfirm(); void refreshOneCard(id) }}
+          onOpenMoreDetails={() => {
+            // The card's own screen has the full editor.
+            const id = confirmTarget.cardId
+            closeConfirm()
+            setTimeout(() => router.push(`/card/${id}`), Platform.OS === 'ios' ? 350 : 0)
+          }}
+          onReload={() => loadIdentityReview(confirmTarget.cardId)}
+        />
+      )}
     </View>
   )
 }
@@ -1894,7 +2059,15 @@ const st = StyleSheet.create({
   gridItem: { flex: 1, backgroundColor: Colors.white, borderRadius: 12, margin: 4, borderWidth: 1, borderColor: Colors.gray[200], overflow: 'hidden', paddingBottom: 8 },
   gridPendingBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[500], borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, zIndex: 5 },
   gridPendingText: { fontSize: 9, fontWeight: '700', color: Colors.amber[600] },
-  gridBadgeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingTop: 8, gap: 6 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  confirmChip: { backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[300], borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  confirmChipText: { fontSize: 11, fontWeight: '700', color: Colors.amber[800] },
+  notStandardChip: { backgroundColor: Colors.gray[100], borderWidth: 1, borderColor: Colors.gray[300], borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  notStandardChipText: { fontSize: 11, fontWeight: '600', color: Colors.gray[700] },
+  confirmOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 50, elevation: 50 },
+  confirmOverlayCard: { backgroundColor: Colors.white, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 16, maxWidth: 360 },
+  confirmOverlayText: { fontSize: 14, color: Colors.gray[700] },
+  gridBadgeRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingTop: 8, gap: 6 },
   gridVisBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, borderWidth: 1.5 },
   gridVisPublic: { backgroundColor: Colors.green[50], borderColor: Colors.green[500] },
   gridVisPrivate: { backgroundColor: Colors.gray[100], borderColor: Colors.gray[300] },
