@@ -49,15 +49,15 @@
   "promptSizes": [
     {
       "file": "master_grading_rubric_v5.txt",
-      "characters": 293000,
+      "characters": 287387,
       "lines": 5614,
-      "approximateTokensCharsDiv4": 73250
+      "approximateTokensCharsDiv4": 71847
     },
     {
       "file": "sports_delta_v5.txt",
-      "characters": 42656,
+      "characters": 41919,
       "lines": 738,
-      "approximateTokensCharsDiv4": 10664
+      "approximateTokensCharsDiv4": 10480
     },
     {
       "file": "pokemon_delta_v5.txt",
@@ -67,39 +67,39 @@
     },
     {
       "file": "mtg_delta_v5.txt",
-      "characters": 22055,
+      "characters": 21583,
       "lines": 473,
-      "approximateTokensCharsDiv4": 5514
+      "approximateTokensCharsDiv4": 5396
     },
     {
       "file": "lorcana_delta_v5.txt",
-      "characters": 13553,
+      "characters": 13235,
       "lines": 319,
-      "approximateTokensCharsDiv4": 3389
+      "approximateTokensCharsDiv4": 3309
     },
     {
       "file": "onepiece_delta_v5.txt",
-      "characters": 19756,
+      "characters": 19282,
       "lines": 475,
-      "approximateTokensCharsDiv4": 4939
+      "approximateTokensCharsDiv4": 4821
     },
     {
       "file": "yugioh_delta_v5.txt",
-      "characters": 21793,
+      "characters": 21340,
       "lines": 454,
-      "approximateTokensCharsDiv4": 5449
+      "approximateTokensCharsDiv4": 5335
     },
     {
       "file": "starwars_delta_v5.txt",
-      "characters": 15029,
+      "characters": 14702,
       "lines": 328,
-      "approximateTokensCharsDiv4": 3758
+      "approximateTokensCharsDiv4": 3676
     },
     {
       "file": "other_delta_v5.txt",
-      "characters": 14172,
+      "characters": 13866,
       "lines": 307,
-      "approximateTokensCharsDiv4": 3543
+      "approximateTokensCharsDiv4": 3467
     }
   ]
 }
