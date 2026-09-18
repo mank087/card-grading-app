@@ -1140,7 +1140,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       ? {
           card_name: conversationalGradingData.card_info.card_name || null,
           card_set: conversationalGradingData.card_info.set_name || null,
-          card_number: conversationalGradingData.card_info.collector_number || null,
+          // The grader returns `card_number` for MTG as often as `collector_number`;
+          // reading only the latter left the column blank on about half of MTG cards.
+          card_number: conversationalGradingData.card_info.collector_number || conversationalGradingData.card_info.card_number || null,
           release_date: conversationalGradingData.card_info.year || null,
           manufacturer_name: conversationalGradingData.card_info.manufacturer || 'Wizards of the Coast',
           serial_numbering: conversationalGradingData.card_info.serial_number || null,

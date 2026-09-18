@@ -208,6 +208,11 @@ export function buildReviewPrefill(
       // The editor writes `rarity_or_variant`; the detail pages read `subset`.
       // Either one counts as a stored insert name.
       if (!stored && key === 'subset_variant') stored = meaningful(info.subset);
+      // Older MTG rows (and some other TCGs) never had the column written; the
+      // number the grader read still sits in the card_info JSON.
+      if (!stored && key === 'card_number') {
+        stored = meaningful(info.card_number) || meaningful(info.collector_number) || meaningful(info.card_id);
+      }
 
       const proposal = firstLookCandidate(firstLook, key);
       const base: ReviewField = {

@@ -161,6 +161,15 @@ describe('buildReviewPrefill precedence', () => {
     expect(field(prefill, 'subset_variant')).toMatchObject({ value: 'Hardwood Leaders', origin: 'from_grading' });
   });
 
+  it('fills the card number from the grader JSON when the column was never written', () => {
+    const mtg = buildReviewPrefill({ category: 'MTG', card_number: null, conversational_card_info: { card_number: '0081' } }, null);
+    expect(field(mtg, 'card_number')).toMatchObject({ value: '0081', origin: 'from_grading' });
+    const onePiece = buildReviewPrefill({ category: 'One Piece', conversational_card_info: { card_id: 'OP05-119' } }, null);
+    expect(field(onePiece, 'card_number')).toMatchObject({ value: 'OP05-119' });
+    const column = buildReviewPrefill({ category: 'MTG', card_number: '81', conversational_card_info: { card_number: '0081' } }, null);
+    expect(field(column, 'card_number').value).toBe('81');
+  });
+
   it('carries at most three alternatives through verbatim', () => {
     const alternatives = [1, 2, 3, 4].map(n => ({ differs_in: 'year', value: `199${n}`, what_would_settle_it: 'copyright line' }));
     const prefill = buildReviewPrefill({ category: 'Sports' }, look({ alternatives }));
