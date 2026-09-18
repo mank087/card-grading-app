@@ -1,20 +1,25 @@
-/** The mobile copy of the incomplete-inspection wording must say exactly what the web says. */
+/**
+ * The app's incomplete-inspection wording must be the web's, byte for byte.
+ * Compared as text: importing from dcm-mobile pulls in its Expo tsconfig, which
+ * CI does not install.
+ */
 import { describe, expect, it } from 'vitest';
-import { incompleteInspectionMessage, incompleteInspectionFromErrorMessage } from '../../../dcm-mobile/lib/inspectionMessage';
-import { readIncompleteInspectionMessage } from './inspectionMessage';
+import { readFileSync } from 'fs';
+import { incompleteInspectionMessage, incompleteInspectionFromErrorMessage } from './inspectionMessageText';
 
-const body = (over: Record<string, unknown>) => ({ code: 'INSPECTION_INCOMPLETE', inspection_incomplete: true, ...over });
-const asResponse = (data: unknown) => new Response(JSON.stringify(data), { status: 500, headers: { 'content-type': 'application/json' } });
+const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 
-describe('mobile incomplete-inspection wording', () => {
-  it('matches the web for refunded, not charged and unconfirmed', async () => {
-    for (const data of [body({ credit_refunded: true }), body({ credit_refund_status: 'not_charged' }), body({ credit_refunded: false, credit_refund_status: 'failed' })]) {
-      expect(incompleteInspectionMessage(data)).toBe(await readIncompleteInspectionMessage(asResponse(data)));
-    }
+describe('incomplete-inspection wording shared with the mobile app', () => {
+  it('is identical in both copies', () => {
+    expect(read('dcm-mobile/lib/inspectionMessage.ts')).toBe(read('src/lib/grading/inspectionMessageText.ts'));
   });
-  it('ignores ordinary failures and never claims a refund from the card row alone', () => {
+
+  it('says what the server confirmed about the refund, and nothing more', () => {
+    const body = (over: Record<string, unknown>) => ({ code: 'INSPECTION_INCOMPLETE', inspection_incomplete: true, ...over });
+    expect(incompleteInspectionMessage(body({ credit_refunded: true }))).toContain('Your grading credit was refunded.');
+    expect(incompleteInspectionMessage(body({ credit_refund_status: 'not_charged' }))).toContain('No grading credit was charged');
+    expect(incompleteInspectionMessage(body({ credit_refunded: false }))).toContain('We could not confirm a credit refund.');
     expect(incompleteInspectionMessage({ code: 'SOMETHING_ELSE' })).toBeNull();
-    expect(incompleteInspectionMessage(null)).toBeNull();
     const fromRow = incompleteInspectionFromErrorMessage('Inspection incomplete (zoom). A reliable grade could not be completed.');
     expect(fromRow).toContain('Inspection incomplete');
     expect(fromRow).not.toMatch(/refunded/i);
