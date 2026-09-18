@@ -20,34 +20,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getStoredSession } from '@/lib/directAuth';
 import {
   changedFieldPayload,
+  mergeReviewFields,
+  mergeReviewValues,
   NO_CANDIDATE,
+  parallelFromListingName,
+  REVIEW_ALTERNATIVE_FIELD as ALTERNATIVE_FIELD,
+  REVIEW_ALTERNATIVE_LABEL as ALTERNATIVE_LABEL,
+  REVIEW_MAX_LENGTH as MAX_LENGTH,
+  reviewOwnerEdited,
+  versionPickNeedsSaving,
+  type IdentityReviewState,
   type ReviewAlternative,
   type ReviewCandidate,
   type ReviewField,
-} from '@/lib/identity/reviewPrefill';
+} from '@/lib/identity/reviewClient';
 
-export interface IdentityReviewState {
-  card_id: string;
-  mode: 'popup' | 'banner' | 'none';
-  reason: string;
-  locked: boolean;
-  identity_revision: number | null;
-  identity_confirmed: boolean;
-  dismissed: boolean;
-  category: string | null;
-  is_sports: boolean;
-  fields: ReviewField[];
-  alternatives: ReviewAlternative[];
-  first_look_present: boolean;
-  candidates: ReviewCandidate[];
-  candidates_available: boolean;
-  candidates_error: boolean;
-  suggested_candidate_id: string;
-  /** The product the owner already picked, if any. Re-saving the same pick is skipped. */
-  current_product_id?: string | null;
-  /** The product Market Pricing is matched to right now, any category. null = no match. */
-  pricing_match?: { product_name: string; picked_by_owner: boolean } | null;
-}
+export type { IdentityReviewState };
 
 interface Props {
   cardId: string;
@@ -66,33 +54,6 @@ interface Props {
   /** Ask for a first look in the background when the card has none. */
   fetchFirstLook?: boolean;
 }
-
-/** Which field an alternative from first look would change. */
-const ALTERNATIVE_FIELD: Record<string, string> = {
-  set_name: 'card_set',
-  year: 'release_date',
-  parallel: 'parallel_type',
-  card_number: 'card_number',
-  insert_or_subset: 'subset_variant',
-};
-
-const ALTERNATIVE_LABEL: Record<string, string> = {
-  set_name: 'Set',
-  year: 'Year',
-  parallel: 'Parallel',
-  card_number: 'Card number',
-  insert_or_subset: 'Insert or subset',
-  language: 'Language',
-};
-
-/** Matches the details route's per-field validation so a save cannot 400 on length. */
-const MAX_LENGTH: Record<string, number> = {
-  release_date: 4,
-  serial_numbering: 20,
-  card_number: 50,
-  parallel_type: 100,
-  subset_variant: 100,
-};
 
 /** Sentinel value of the set dropdown's "not listed" row. */
 const CUSTOM_SET = '__custom__';
@@ -149,7 +110,7 @@ export default function ConfirmCardDetailsDialog({
   // only once the owner moves something away from these, and "Reset to original
   // findings" puts every box and the version pick back.
   const defaultCandidateId = review.suggested_candidate_id || NO_CANDIDATE;
-  const ownerEdited = fields.some(f => (values[f.key] ?? '') !== (f.value ?? '')) || candidateId !== defaultCandidateId;
+  const ownerEdited = reviewOwnerEdited(fields, values, candidateId, defaultCandidateId);
   const resetToFindings = () => {
     setValues(Object.fromEntries(fields.map(f => [f.key, f.value])));
     setTouched({});
@@ -190,19 +151,15 @@ export default function ConfirmCardDetailsDialog({
    * Adopt new prefill metadata, but never overwrite a box the owner has typed
    * in. A background answer arriving mid-edit must not eat their work.
    */
+  // Read `touched` through a ref: the background first-look request captures this
+  // callback when the dialog opens, so a state value here would be the empty one
+  // from that moment and a late answer would overwrite what the owner has typed.
+  const touchedRef = useRef(touched);
+  touchedRef.current = touched;
   const mergeFields = useCallback((incoming: ReviewField[]) => {
-    setFields(previous => {
-      const byKey = new Map(previous.map(f => [f.key, f]));
-      return incoming.map(next => ({ ...(byKey.get(next.key) || next), ...next }));
-    });
-    setValues(previous => {
-      const merged = { ...previous };
-      for (const next of incoming) {
-        if (!touched[next.key]) merged[next.key] = next.value;
-      }
-      return merged;
-    });
-  }, [touched]);
+    setFields(previous => mergeReviewFields(previous, incoming));
+    setValues(previous => mergeReviewValues(previous, incoming, touchedRef.current));
+  }, []);
 
   useEffect(() => {
     if (!fetchFirstLook) return;
@@ -228,10 +185,7 @@ export default function ConfirmCardDetailsDialog({
   /* ---------------- editing ---------------- */
 
   /** "Joe Mixon [Autograph Jersey Mirror Red] #214" → "Autograph Jersey Mirror Red"; a base listing → "Base". */
-  const parallelOf = (candidate: ReviewCandidate): string => {
-    const bracket = /\[([^\]]+)\]/.exec(candidate.name);
-    return bracket ? bracket[1].trim() : 'Base';
-  };
+  const parallelOf = (candidate: ReviewCandidate): string => parallelFromListingName(candidate.name);
   // Picking a version also fills the Parallel box, so Card Information shows it
   // after saving. A parallel the owner typed themselves is left alone.
   const chooseCandidate = (candidate: ReviewCandidate) => {
@@ -320,8 +274,12 @@ export default function ConfirmCardDetailsDialog({
       // Re-posting the pick the card already has would only clear and refetch its
       // prices. It is needed again only when this save changed the identity, because
       // that clears the pick.
-      const pickUnchanged = candidateId === review.current_product_id && data?.pricing_invalidated !== true;
-      if (review.is_sports && candidateId && candidateId !== NO_CANDIDATE && !pickUnchanged) {
+      if (versionPickNeedsSaving({
+        isSports: review.is_sports,
+        candidateId,
+        currentProductId: review.current_product_id,
+        pricingInvalidated: data?.pricing_invalidated === true,
+      })) {
         const candidate = candidates.find(c => c.id === candidateId);
         if (candidate) {
           try {

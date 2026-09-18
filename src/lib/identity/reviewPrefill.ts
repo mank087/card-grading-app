@@ -25,52 +25,26 @@ import { currentIdentityValue } from './saveCardIdentity';
 import { isBlankIdentityText } from '../pricing/valueGuard';
 import { isRecordLocked } from '../cards/ownership';
 import type { FieldSource, FirstLook } from '../identification/firstLook';
+import {
+  NO_CANDIDATE,
+  sameIdentityValue as sameValue,
+  type ReviewAlternative,
+  type ReviewCandidate,
+  type ReviewField,
+} from './reviewClient';
 
-/** Where the value in the box came from. */
-export type ReviewFieldOrigin =
-  /** First look transcribed it from the photo. */
-  | 'read_from_card'
-  /** First look recognized or inferred it and it filled a blank. Needs checking. */
-  | 'suggested'
-  /** The value the grading run already stored on the card. */
-  | 'from_grading'
-  /** Nothing is known. The box is empty and stays empty unless the owner types. */
-  | 'empty';
-
-export interface ReviewSuggestion {
-  value: string;
-  origin: ReviewFieldOrigin;
-  /** First look's own source for this value. */
-  source: FieldSource;
-  /** Text to show when it differs from `value`, e.g. the season "1995-96". */
-  displayValue?: string;
-}
-
-export interface ReviewField {
-  key: string;
-  label: string;
-  /** What the box is pre-filled with. '' when there is nothing to show. */
-  value: string;
-  /** What the card currently has stored. The save sends only fields that differ from this. */
-  storedValue: string;
-  origin: ReviewFieldOrigin;
-  /** Show "Please check" and never treat this as confirmed-by-default evidence. */
-  needsCheck: boolean;
-  /** True when `value` is already a change to the card, before the owner types anything. */
-  differsFromStored: boolean;
-  /** Friendlier text for display only, e.g. "1995-96" behind the stored year "1995". */
-  displayValue?: string;
-  /** Set when DCM's own catalog confirms the value in the box, e.g. "Matches the Pokémon catalog (Lost Origin)". */
-  catalogNote?: string;
-  /** First look's competing value, offered as one tap. */
-  suggestion?: ReviewSuggestion;
-}
-
-export interface ReviewAlternative {
-  differs_in: string;
-  value: string;
-  what_would_settle_it: string;
-}
+// The client-side types and helpers live in ./reviewClient (copied verbatim to
+// the mobile app). Re-exported here so every existing import keeps working.
+export {
+  changedFieldPayload,
+  NO_CANDIDATE,
+  type ReviewAlternative,
+  type ReviewCandidate,
+  type ReviewField,
+  type ReviewFieldOrigin,
+  type ReviewFieldSource,
+  type ReviewSuggestion,
+} from './reviewClient';
 
 export interface ReviewPrefill {
   fields: ReviewField[];
@@ -116,15 +90,6 @@ function text(value: unknown): string {
 function meaningful(value: unknown): string {
   const t = text(value);
   return isBlankIdentityText(t) ? '' : t;
-}
-
-/**
- * "Did this actually change?" — trimmed and case-folded, exactly what the save
- * service does. Punctuation is NOT ignored: correcting "116086" to "116/086" is
- * a real correction the owner wants written.
- */
-function sameValue(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 /**
@@ -407,22 +372,6 @@ export function reviewEligibility(
  * Catalog candidates (sports)
  * ------------------------------------------------------------------ */
 
-export interface ReviewCandidate {
-  id: string;
-  name: string;
-  setName: string;
-  hasPrice: boolean;
-  /** True for the plainest product in the family, the picker's "Base" row. */
-  isBase?: boolean;
-  /** Print run of a serial-numbered version (249 for "/249"), when the catalog knows it. */
-  serialDenominator?: number | null;
-  /** Ungraded market price, for telling versions apart in the picker. */
-  rawPrice?: number | null;
-}
-
-/** Sentinel for "None of these / not sure". Never sent to the pricing API. */
-export const NO_CANDIDATE = '__none__';
-
 const CANDIDATE_STOPWORDS = new Set(['the', 'and', 'card', 'base', 'rc', 'sp']);
 
 function tokens(value: string): string[] {
@@ -487,17 +436,4 @@ export function pickBestCandidate(
     if (base.length === 1) return base[0].id;
   }
   return NO_CANDIDATE;
-}
-
-/** The changed fields a confirmation should PATCH: prefilled value vs stored value. */
-export function changedFieldPayload(
-  fields: ReviewField[],
-  values: Record<string, string>,
-): Record<string, string> {
-  const payload: Record<string, string> = {};
-  for (const field of fields) {
-    const next = (values[field.key] ?? field.value ?? '').trim();
-    if (!sameValue(next, field.storedValue)) payload[field.key] = next;
-  }
-  return payload;
 }
