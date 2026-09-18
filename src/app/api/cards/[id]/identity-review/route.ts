@@ -111,6 +111,10 @@ export async function GET(
       candidates: candidates.candidates,
       candidates_available: candidates.available,
       candidates_error: candidates.error,
+      // What Market Pricing is matched to right now, for every category.
+      pricing_match: (card.dcm_selected_product_name || card.dcm_price_product_name)
+        ? { product_name: String(card.dcm_selected_product_name || card.dcm_price_product_name), picked_by_owner: !!card.dcm_selected_product_id }
+        : null,
       current_product_id: card.dcm_selected_product_id ? String(card.dcm_selected_product_id) : null,
       suggested_candidate_id: suggestCandidate(candidates.candidates, card, prefill),
     });

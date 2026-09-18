@@ -69,6 +69,8 @@ describe('confirmation dialog renders for a real-shaped card', () => {
     expect(html).toContain('value="Twentieth Century-Fox Film Corp."');
     expect(text).toContain('Possible manufacturer alternative: Continental Baking Company');
     expect(text).toContain('Could also be');
+    expect(text).toContain('Market pricing match');
+    expect(text).toContain('No market pricing match yet');
     expect(text).toContain('1977 Topps Star Wars Series 1');
   });
   it('has the three ways out and no em dashes or "AI" in what the owner reads', () => {

@@ -45,6 +45,8 @@ export interface IdentityReviewState {
   suggested_candidate_id: string;
   /** The product the owner already picked, if any. Re-saving the same pick is skipped. */
   current_product_id?: string | null;
+  /** The product Market Pricing is matched to right now, any category. null = no match. */
+  pricing_match?: { product_name: string; picked_by_owner: boolean } | null;
 }
 
 interface Props {
@@ -121,6 +123,19 @@ export default function ConfirmCardDetailsDialog({
   const [note, setNote] = useState<string | null>(null);
   const [savedCard, setSavedCard] = useState<unknown | null>(null);
   const [zoom, setZoom] = useState<{ url: string; label: string } | null>(null);
+
+  // Set names from DCM's internal card databases (TCG categories only), so the set
+  // is spelled the way the catalog and the price lookups spell it.
+  const [setOptions, setSetOptions] = useState<{ name: string; year: string | null }[]>([]);
+  useEffect(() => {
+    if (review.is_sports || !review.category) return;
+    let cancelled = false;
+    fetch(`/api/cards/set-options?category=${encodeURIComponent(review.category)}`)
+      .then(response => response.json())
+      .then(data => { if (!cancelled && Array.isArray(data?.sets)) setSetOptions(data.sets); })
+      .catch(() => { /* free text still works */ });
+    return () => { cancelled = true; };
+  }, [review.is_sports, review.category]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const titleId = 'confirm-card-details-title';
@@ -419,12 +434,35 @@ export default function ConfirmCardDetailsDialog({
                     id={`identity-review-${field.key}`}
                     type="text"
                     value={values[field.key] ?? ''}
-                    onChange={event => setValue(field.key, event.target.value)}
+                    onChange={event => {
+                      setValue(field.key, event.target.value);
+                      // Choosing a catalog set also fills an empty Year from that set's release date.
+                      if (field.key === 'card_set') {
+                        const picked = setOptions.find(option => option.name === event.target.value);
+                        if (picked?.year && !(values.release_date || '').trim()) setValue('release_date', picked.year);
+                      }
+                    }}
+                    list={field.key === 'card_set' && setOptions.length > 0 ? 'identity-review-set-options' : undefined}
+                    autoComplete={field.key === 'card_set' ? 'off' : undefined}
                     inputMode={field.key === 'release_date' ? 'numeric' : undefined}
                     maxLength={MAX_LENGTH[field.key] ?? 200}
                     placeholder={field.key === 'release_date' ? 'YYYY' : 'Leave blank if you are not sure'}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
                   />
+                  {field.key === 'card_set' && setOptions.length > 0 && (
+                    <>
+                      <datalist id="identity-review-set-options">
+                        {setOptions.map(option => (
+                          <option key={option.name} value={option.name}>{option.year || ''}</option>
+                        ))}
+                      </datalist>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {setOptions.some(option => option.name.toLowerCase() === (values.card_set || '').trim().toLowerCase())
+                          ? 'Matches a set in our catalog.'
+                          : 'Start typing and pick the set from the list so it matches our catalog.'}
+                      </p>
+                    </>
+                  )}
                   {field.displayValue && field.displayValue !== (values[field.key] ?? '') && (
                     <p className="mt-1 text-[11px] text-slate-500">Printed as {field.displayValue}</p>
                   )}
@@ -540,11 +578,25 @@ export default function ConfirmCardDetailsDialog({
                   </div>
                 )}
               </fieldset>
-            ) : (
-              <p className="text-xs text-slate-600">
-                To match this card to a priced product, use the Market Pricing section further down this page.
-              </p>
-            )}
+            ) : null}
+
+            {/* What Market Pricing is matched to, for every category. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-700">Market pricing match</p>
+              {review.pricing_match ? (
+                <>
+                  <p className="text-sm text-slate-900 mt-1">{review.pricing_match.product_name}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {review.pricing_match.picked_by_owner ? 'You picked this listing.' : 'Matched automatically.'}
+                    {' '}If it is not your card, {review.is_sports ? 'pick the right version above.' : 'correct the details here, then choose the right listing in Market Pricing on the card page.'}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-600 mt-1">
+                  No market pricing match yet. Make sure the card name and card number are correct, because pricing is looked up from them.
+                </p>
+              )}
+            </div>
 
             {error && (
               <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3" role="alert">{error}</p>
