@@ -1,5 +1,6 @@
 "use client";
 
+import { readIncompleteInspectionMessage } from '@/lib/grading/inspectionMessage';
 import ReportSectionNav from '@/components/design/ReportSectionNav';
 import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -55,10 +56,13 @@ import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottom
 import { PostResultOffer, usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
+import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
 import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
+import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
 import { DefectLegend } from '@/components/grading/DefectLegend';
 import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
@@ -405,6 +409,11 @@ interface SportsAIGrading {
 }
 
 interface SportsCard {
+  // Phase 2C revision guard (cards.identity_revision /
+  // cards.pricing_selection_revision). The page loads with select('*'),
+  // so both arrive on the row; the price lookup sends them with every save.
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
   // Ownership lifecycle — a sold card leaves the collection but keeps this
   // page online so the buyer's slab QR still resolves.
   ownership_status?: 'owned' | 'sold' | 'archived' | null;
@@ -1625,6 +1634,14 @@ export function OtherCardDetails() {
       console.log(`[FRONTEND DEBUG] MTG API response status: ${res.status}`);
 
       if (!res.ok) {
+        const incompleteMessage = await readIncompleteInspectionMessage(res);
+        if (incompleteMessage) {
+          setError(incompleteMessage);
+          setLoading(false);
+          setIsProcessing(false);
+          return;
+        }
+
         // Check for private card access denied (403 status)
         if (res.status === 403) {
           const errorData = await res.json();
@@ -1682,6 +1699,12 @@ export function OtherCardDetails() {
                 return;
               }
 
+              const incompleteMessage = await readIncompleteInspectionMessage(retryRes);
+              if (incompleteMessage) {
+                setError(incompleteMessage);
+                setIsProcessing(false);
+                return;
+              }
               if (retryRes.status === 429) {
                 // Still processing, continue retrying
                 await retryWithBackoff(attempt + 1);
@@ -3403,7 +3426,28 @@ export function OtherCardDetails() {
               })()}
 
               {/* 💰 DCM Estimated Price Callout */}
-              {dcmPriceData?.estimatedValue && (
+              {/* Value withheld: a large estimate on a card with no set or year is
+                  the shape that produced six-figure numbers on public pages. The
+                  owner is told how to release it; the public sees nothing.
+                  See @/lib/pricing/valueGuard. */}
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).reason === 'thin_identity' && (() => {
+                const session = getStoredSession();
+                const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                if (!isOwner) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                    <p className="text-sm font-semibold text-slate-800">Confirm your card details to see a value</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      This card has no set or year on file, so the matched listing may be a
+                      different printing. Add the set and year with Edit Card Details and the
+                      value will appear here.
+                    </p>
+                    <ConfirmCardDetailsCalloutButton />
+                  </div>
+                );
+              })()}
+
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (
                 <div className={`rounded-xl shadow-lg p-5 border-2 mt-6 ${
                   dcmPriceData.source === 'ebay'
                     ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200'
@@ -3613,6 +3657,18 @@ export function OtherCardDetails() {
               <div className="space-y-8">
 
               {/* 1. Card Information (includes slab detection when applicable) */}
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
+
               <CollapsibleSection
                 title="Card Information"
                 tourId="tour-card-info"
@@ -3926,17 +3982,11 @@ export function OtherCardDetails() {
                     </div>
                   )}
 
-                  {/* Autographed */}
+                  {/* Autographed / Memorabilia: shown only when present — a "false" row is noise on cards where neither applies */}
                   {(cardInfo.autographed === true || cardInfo.autographed === 'Yes' || cardInfo.autographed === 'yes' || card.autographed === true) && (
                     <div>
                       <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
-                      <p className="text-lg text-gray-900">true</p>
-                    </div>
-                  )}
-                  {(cardInfo.autographed === false || cardInfo.autographed === 'No' || cardInfo.autographed === 'no' || (!cardInfo.autographed && card.autographed === false)) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
-                      <p className="text-lg text-gray-900">false</p>
+                      <p className="text-lg text-gray-900">Yes</p>
                     </div>
                   )}
 
@@ -3944,13 +3994,7 @@ export function OtherCardDetails() {
                   {(cardInfo.memorabilia === true || cardInfo.memorabilia === 'Yes' || cardInfo.memorabilia === 'yes' || card.memorabilia === true) && (
                     <div>
                       <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
-                      <p className="text-lg text-gray-900">true</p>
-                    </div>
-                  )}
-                  {(cardInfo.memorabilia === false || cardInfo.memorabilia === 'No' || cardInfo.memorabilia === 'no' || (!cardInfo.memorabilia && card.memorabilia === false)) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
-                      <p className="text-lg text-gray-900">false</p>
+                      <p className="text-lg text-gray-900">Yes</p>
                     </div>
                   )}
 
@@ -5108,7 +5152,7 @@ export function OtherCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                badge={dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted ? `~$${dcmPriceData.estimatedValue}` : undefined}
                 tourId="tour-market-value"
               >
 
@@ -5119,6 +5163,7 @@ export function OtherCardDetails() {
                   const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                   return (
                     <OtherPriceLookup
+                      guardIdentity={card as any}
                       card={{
                         card_name: cardInfo.card_name || card.card_name,
                         featured: (extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured)) as string | undefined,
@@ -5129,6 +5174,9 @@ export function OtherCardDetails() {
                         rarity_or_variant: cardInfo.rarity_or_variant,
                         manufacturer: cardInfo.manufacturer || card.manufacturer,
                         game_type: cardInfo.game_type || 'other',
+                        // Phase 2C: guard price saves against a concurrent identity correction.
+                        identity_revision: card.identity_revision as number | null | undefined,
+                        pricing_selection_revision: card.pricing_selection_revision as number | null | undefined,
                       }}
                       cardId={card.id}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}

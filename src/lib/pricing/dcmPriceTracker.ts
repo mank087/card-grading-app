@@ -17,6 +17,10 @@ import {
 } from '@/lib/priceCharting';
 import { getLocalSportsProductById, productToNormalizedPrices } from '@/lib/sportsCardMatcher';
 import { estimateDcmValue as estimateDcmValueShared } from '@/lib/pricing/dcmEstimate';
+import {
+  guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT,
+  type PriceRevisions,
+} from '@/lib/pricing/guardedPriceWrite';
 
 // Types
 export interface DcmCachedPrice {
@@ -53,6 +57,13 @@ export interface CardForDcmPricing {
     card_set?: string;
     release_date?: string;
   } | null;
+  /**
+   * Phase 2C: the revisions the identity above was read at. Select them in the
+   * same query (PRICE_REVISION_SELECT) and the cache write becomes a
+   * compare-and-set. Omitted means "cannot guard" and the write is unguarded.
+   */
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
 }
 
 /**
@@ -198,8 +209,8 @@ async function saveDcmPriceCache(
     productId: string;
     productName: string;
   },
-  options: { isInitialGrading?: boolean } = {}
-): Promise<void> {
+  options: { isInitialGrading?: boolean; revisions?: PriceRevisions | null } = {}
+): Promise<'written' | 'stale'> {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
 
@@ -230,15 +241,16 @@ async function saveDcmPriceCache(
     }
   }
 
-  const { error } = await supabase
-    .from('cards')
-    .update(updateData)
-    .eq('id', cardId);
-
-  if (error) {
+  const result = await guardedPriceUpdate(
+    supabase, cardId, options.revisions ?? null, updateData, 'DcmPriceTracker',
+  );
+  if (result.status === 'stale') return 'stale';
+  if (result.status === 'error') {
+    const error = new Error(result.error || 'Failed to save DCM price cache');
     console.error(`[DcmPriceTracker] Error saving price cache for card ${cardId}:`, error);
     throw error;
   }
+  return 'written';
 }
 
 /**
@@ -349,8 +361,17 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { 
       productName: prices.productName,
     };
 
-    // Save to cache
-    await saveDcmPriceCache(card.id, cacheData, { isInitialGrading: options.isInitialGrading });
+    // Save to cache, guarded on the revisions the identity above was read at.
+    const writeStatus = await saveDcmPriceCache(card.id, cacheData, {
+      isInitialGrading: options.isInitialGrading,
+      revisions: readPriceRevisions(card as Record<string, any>),
+    });
+    if (writeStatus === 'stale') {
+      // The owner corrected this card while PriceCharting was being queried.
+      // Drop the price for the old identity; the next refresh prices the new one.
+      console.log(`[DcmPriceTracker] Dropped stale price for card ${card.id}`);
+      return null;
+    }
 
     console.log(`[DcmPriceTracker] Cached DCM price for card ${card.id}: $${cacheData.estimate} (${result.matchConfidence} match)`);
 
@@ -377,7 +398,8 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { 
 export async function refreshDcmPriceByProductId(
   cardId: string,
   productId: string,
-  dcmGrade: number
+  dcmGrade: number,
+  revisions: PriceRevisions | null = null
 ): Promise<DcmCachedPrice | null> {
   if (!isPriceChartingEnabled()) {
     console.error('[DcmPriceTracker] SportsCardsPro API is not configured');
@@ -427,7 +449,11 @@ export async function refreshDcmPriceByProductId(
     };
 
     // Save to cache
-    await saveDcmPriceCache(cardId, cacheData);
+    const writeStatus = await saveDcmPriceCache(cardId, cacheData, { revisions });
+    if (writeStatus === 'stale') {
+      console.log(`[DcmPriceTracker] Dropped stale product-ID price for card ${cardId}`);
+      return null;
+    }
 
     console.log(`[DcmPriceTracker] Refreshed DCM price for card ${cardId}: $${cacheData.estimate}`);
 
@@ -464,6 +490,11 @@ export async function getDcmPriceWithCache(
     category: string;
     conversational_decimal_grade?: number | null;
     conversational_card_info: CardForDcmPricing['conversational_card_info'];
+    /** Phase 2C: read these in the same query as the card info above. */
+    identity_revision?: number | null;
+    pricing_selection_revision?: number | null;
+    /** The product the owner picked. It wins over any automatic match. */
+    dcm_selected_product_id?: string | null;
   },
   options: { maxAgeDays?: number; forceRefresh?: boolean; forceNewSearch?: boolean } = {}
 ): Promise<DcmCachedPrice | null> {
@@ -474,15 +505,41 @@ export async function getDcmPriceWithCache(
     return null;
   }
 
+  const card: CardForDcmPricing = {
+    id: cardId,
+    category: cardData.category,
+    conversational_decimal_grade: cardData.conversational_decimal_grade,
+    conversational_card_info: cardData.conversational_card_info,
+    identity_revision: cardData.identity_revision,
+    pricing_selection_revision: cardData.pricing_selection_revision,
+  };
+  const revisions = readPriceRevisions(card as Record<string, any>);
+  const ownerProductId = cardData.dcm_selected_product_id || null;
+
+  // Owner-pick precedence: when the owner has chosen a product, that product is
+  // what gets repriced. A fresh search would match a different one and quietly
+  // override the pick, so the search paths below are skipped entirely.
+  if (ownerProductId && cardData.conversational_decimal_grade) {
+    if (!forceRefresh && !forceNewSearch) {
+      const cached = await getCachedDcmPrice(cardId);
+      if (cached && !isDcmPriceCacheStale(cached.updated_at, maxAgeDays)) {
+        console.log(`[DcmPriceTracker] Using cached DCM price for card ${cardId}`);
+        return cached;
+      }
+    }
+    try {
+      return await refreshDcmPriceByProductId(
+        cardId, ownerProductId, cardData.conversational_decimal_grade, revisions,
+      );
+    } catch (error) {
+      console.error(`[DcmPriceTracker] Owner-selected product refresh failed for ${cardId}:`, error);
+      return null;
+    }
+  }
+
   // If forcing a new search, skip all caching and go straight to fresh search
   if (forceNewSearch) {
     console.log(`[DcmPriceTracker] Force new search requested for card ${cardId}`);
-    const card: CardForDcmPricing = {
-      id: cardId,
-      category: cardData.category,
-      conversational_decimal_grade: cardData.conversational_decimal_grade,
-      conversational_card_info: cardData.conversational_card_info,
-    };
     return fetchAndCacheDcmPrice(card);
   }
 
@@ -497,7 +554,9 @@ export async function getDcmPriceWithCache(
     // If we have a cached product ID, use it for faster refresh
     if (cached?.product_id && cardData.conversational_decimal_grade) {
       try {
-        return await refreshDcmPriceByProductId(cardId, cached.product_id, cardData.conversational_decimal_grade);
+        return await refreshDcmPriceByProductId(
+          cardId, cached.product_id, cardData.conversational_decimal_grade, revisions,
+        );
       } catch (error) {
         console.error(`[DcmPriceTracker] Product ID refresh failed, falling back to search:`, error);
       }
@@ -505,13 +564,6 @@ export async function getDcmPriceWithCache(
   }
 
   // Fetch fresh prices via search
-  const card: CardForDcmPricing = {
-    id: cardId,
-    category: cardData.category,
-    conversational_decimal_grade: cardData.conversational_decimal_grade,
-    conversational_card_info: cardData.conversational_card_info,
-  };
-
   return fetchAndCacheDcmPrice(card);
 }
 
@@ -551,7 +603,9 @@ export async function batchRefreshDcmPrices(
       conversational_decimal_grade,
       conversational_card_info,
       dcm_price_updated_at,
-      dcm_price_product_id
+      dcm_price_product_id,
+      dcm_selected_product_id,
+      ${PRICE_REVISION_SELECT}
     `)
     .in('id', cardIds);
 
@@ -609,16 +663,27 @@ export async function batchRefreshDcmPrices(
         ...card,
         conversational_card_info: parsedCardInfo
       };
+      const revisions = readPriceRevisions(card as Record<string, any>);
 
+      // Owner-pick precedence: a product the owner chose is always the product
+      // repriced, even when the caller asked for a fresh search. A search would
+      // match something else and silently override the pick.
+      if (card.dcm_selected_product_id && card.conversational_decimal_grade) {
+        result = await refreshDcmPriceByProductId(
+          card.id, card.dcm_selected_product_id, card.conversational_decimal_grade, revisions,
+        );
+      }
       // If forceNewSearch is true, always do a fresh search ignoring cached product ID
       // This is useful when card info (subset/parallel) has been updated
-      if (forceNewSearch) {
+      else if (forceNewSearch) {
         console.log(`[DcmPriceTracker] Force new search for card ${card.id}`);
         result = await fetchAndCacheDcmPrice(cardWithParsedInfo);
       }
       // Otherwise, try product ID refresh first if available (faster)
       else if (card.dcm_price_product_id && card.conversational_decimal_grade) {
-        result = await refreshDcmPriceByProductId(card.id, card.dcm_price_product_id, card.conversational_decimal_grade);
+        result = await refreshDcmPriceByProductId(
+          card.id, card.dcm_price_product_id, card.conversational_decimal_grade, revisions,
+        );
       }
       // Fall back to fresh search if no cached product ID
       else {

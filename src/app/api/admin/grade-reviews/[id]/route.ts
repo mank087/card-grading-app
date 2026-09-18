@@ -70,7 +70,9 @@ export async function POST(request:NextRequest,{params}:Context){
     for(const category of ['sports','pokemon','mtg','lorcana','onepiece','yugioh','starwars','other'])revalidatePath(`/${category}/${review.card_id}`);
     revalidatePath('/collection');
     // Cached market data described the old identity; refresh it now, best-effort.
-    const pricing=detailsApplied?await refreshPricesAfterDetails(db,review.card_id):null;
+    // Every field this route can correct (name, set, year, number, manufacturer)
+    // is a material identity field, so an applied correction is always material.
+    const pricing=detailsApplied?await refreshPricesAfterDetails(db,review.card_id,{materialChange:true}):null;
     return reply({...data,details_applied:detailsApplied,pricing});
   }catch{return reply({error:'Unable to confirm the saved review. Reload before retrying; duplicate completion will not send another email.'},503);}
 }

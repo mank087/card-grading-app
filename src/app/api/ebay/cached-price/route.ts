@@ -13,6 +13,7 @@ import {
   type CachedPrice
 } from '@/lib/ebay/priceTracker';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { PRICE_REVISION_SELECT } from '@/lib/pricing/guardedPriceWrite';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest) {
         ebay_price_average,
         ebay_price_highest,
         ebay_price_listing_count,
-        ebay_price_updated_at
+        ebay_price_updated_at,
+        ${PRICE_REVISION_SELECT}
       `)
       .eq('id', cardId)
       .single();
@@ -101,6 +103,9 @@ export async function GET(request: NextRequest) {
       {
         category: card.category || 'Other',
         conversational_card_info: mergedCardInfo,
+        // Phase 2C: guard the cache write on the identity we just read.
+        identity_revision: card.identity_revision,
+        pricing_selection_revision: card.pricing_selection_revision,
       },
       { forceRefresh: true }
     );

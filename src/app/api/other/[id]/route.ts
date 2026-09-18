@@ -1,3 +1,4 @@
+import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
@@ -523,12 +524,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       } catch (error: any) {
         console.error(`[GET /api/other/${cardId}] ⚠️ Conversational grading failed:`, error.message);
         processingOtherCards.delete(cardId);
-        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: 'Other', errorMessage: error.message });
+        const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined, cardId, userId: card.user_id, category: 'Other', errorMessage: error.message });
         return NextResponse.json({
           error: "Failed to grade Other card. Please try again or contact support.",
           details: error.message,
-          grading_failed: true,
-          credit_refunded: failure.refunded
+          ...inspectionFailureResponse(error), grading_failed: true,
+          credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
         }, { status: 500 });
       }
     }
@@ -1018,7 +1019,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       // database never stored: the user was charged, saw a grade, and the card
       // stayed ungraded with no failure record. Release the lock as 'failed',
       // refund, and report the failure like every other category route.
-      const failure = await recordGradingFailure({
+      const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: card.user_id,
         category: 'Other',
@@ -1027,7 +1028,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       return NextResponse.json({
         error: "Failed to save Other card grading results",
         grading_failed: true,
-        credit_refunded: failure.refunded
+        credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
       }, { status: 500 });
     }
 
@@ -1069,7 +1070,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     // Only refund/mark-failed when this request actually held the grading
     // lock; errors on a cache-hit path must not touch an already-graded card.
     if (gradingAttempted) {
-      await recordGradingFailure({
+      await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: gradingOwnerId,
         category: 'Other',

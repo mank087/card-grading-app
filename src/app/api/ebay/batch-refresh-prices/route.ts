@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isPriceCacheStale, fetchAndCacheCardPrice } from '@/lib/ebay/priceTracker';
+import { PRICE_REVISION_SELECT } from '@/lib/pricing/guardedPriceWrite';
 
 // Max cards to refresh per request (to avoid timeout)
 const MAX_CARDS_PER_BATCH = 10;
@@ -59,7 +60,8 @@ export async function POST(request: NextRequest) {
         is_foil,
         foil_type,
         mtg_rarity,
-        ebay_price_updated_at
+        ebay_price_updated_at,
+        ${PRICE_REVISION_SELECT}
       `)
       .eq('user_id', auth.userId)
       .in('id', card_ids.slice(0, MAX_CARDS_PER_BATCH * 2)); // Fetch more to filter stale ones
@@ -179,6 +181,9 @@ export async function POST(request: NextRequest) {
           id: card.id,
           category: card.category || 'Other',
           conversational_card_info: cardInfo,
+          // Phase 2C: guard the comps write on the identity read above.
+          identity_revision: card.identity_revision,
+          pricing_selection_revision: card.pricing_selection_revision,
         });
 
         results.push({

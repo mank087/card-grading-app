@@ -16,7 +16,7 @@
  * scoring ladders — the zoom pass can only LOWER scores, never raise them.
  */
 
-import { normalizeCropRegionIds } from './normalizeCropRegionIds';
+import { completedChoice, inspectZoomBatch, validFill } from './grading/inspectionCompleteness';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
@@ -74,6 +74,7 @@ export interface ZoomResult {
   ok: boolean;
   error?: string;
   regionsInspected: number;
+  coverage?: { expected: number; inspected: number; incompleteBatches: number; validSamplesPerBatch: number[] };
   defects: ZoomDefect[];
   /** Max allowed score per `${category}_${face}` (only present when a cap applies) */
   faceCaps: Record<string, number>;
@@ -95,9 +96,9 @@ export interface ZoomResult {
    *   card_relative — fill below threshold, but corners found, so crops were
    *                   re-derived from the quad (degraded but usable)
    *   abandoned     — fill below threshold AND no usable quad; the entire
-   *                   magnified inspection was skipped and the card was graded
-   *                   from the holistic ensemble alone. The user was still
-   *                   charged. This is the number the gate exists to drive down.
+   *                   magnified inspection was skipped. The JSON grading
+   *                   pipeline now returns incomplete instead of publishing
+   *                   a holistic-only grade.
    */
   capture?: {
     frontFill: number | null;
@@ -151,20 +152,50 @@ export async function verifyStructuralClaim(
      */
     images?: CardOriginals;
   }
-): Promise<{ ok: boolean; confirmed: boolean; reason: string; strongEvidence: boolean }> {
+): Promise<{ ok: boolean; confirmed: boolean | null; reason: string; strongEvidence: boolean }> {
   try {
     // v9.8: tears are verified too — zoom crops have called sleeve edges and
     // background artifacts "tears", and tear claims used to skip verification
-    // entirely. Only claims with no type at all pass through unverified.
-    const lineClaims = findings.filter(f => ['crease', 'bend', 'fold', 'warp', 'tear'].includes(String(f.type || '').toLowerCase()));
-    if (lineClaims.length === 0) return { ok: true, confirmed: true, reason: 'untyped structural damage — no verification available', strongEvidence: false };
+    // entirely. Claims we cannot verify now return an unknown verdict.
+    const typedClaims = findings.filter(f => ['crease', 'bend', 'fold', 'warp', 'tear'].includes(String(f.type || '').toLowerCase()));
+    if (typedClaims.length === 0 || typedClaims.length !== findings.length) {
+      const unsupported = findings.filter(f => !typedClaims.includes(f)).map(f => String(f.type || 'untyped')).join(', ');
+      return { ok: false, confirmed: null, reason: `structural claim type(s) the verifier does not support: ${unsupported || 'none supplied'}`, strongEvidence: false };
+    }
+    // The holistic passes and the zoom pass both report the same physical crease,
+    // and every claim is verified from a face-quadrant crop — so claims sharing a
+    // crop are ONE verification question. Merge them instead of counting them
+    // against the four-crop request limit (a heavily creased card otherwise
+    // could never be graded).
+    const cropKey = (f: { location?: string }) => {
+      const loc = String(f.location || '').toLowerCase();
+      return [loc.includes('back') ? 'back' : 'front',
+        /(lower|bottom)/.test(loc) ? 'bottom' : /(upper|top)/.test(loc) ? 'top' : '',
+        /left/.test(loc) ? 'left' : /right/.test(loc) ? 'right' : ''].join('|');
+    };
+    const groups = new Map<string, typeof typedClaims>();
+    for (const f of typedClaims) groups.set(cropKey(f), [...(groups.get(cropKey(f)) ?? []), f]);
+    const lineClaims = [...groups.values()].map(g => ({
+      type: String(g[0].type).toLowerCase(), // stays a supported type so chunked re-entry accepts it
+      location: g[0].location,
+      description: g.map(f => `${f.type}: ${f.description || ''}`).join('; '),
+    }));
+    // More than four distinct crops: verify in requests of four. Any confirmed
+    // chunk confirms damage; otherwise any unknown chunk leaves the card unknown.
+    if (lineClaims.length > 4) {
+      const verdicts: Array<{ ok: boolean; confirmed: boolean | null; reason: string; strongEvidence: boolean }> = [];
+      for (let i = 0; i < lineClaims.length; i += 4) verdicts.push(await verifyStructuralClaim(frontImageUrl, backImageUrl, lineClaims.slice(i, i + 4), opts));
+      const hit = verdicts.find(v => v.confirmed === true);
+      if (hit) return { ...hit, strongEvidence: verdicts.some(v => v.confirmed === true && v.strongEvidence) };
+      return verdicts.find(v => v.confirmed === null) ?? verdicts[0];
+    }
 
     let bufs: Record<string, Buffer>;
     try {
       const originals = opts?.images ?? (await fetchCardOriginals(frontImageUrl, backImageUrl));
       bufs = { front: originals.front, back: originals.back };
     } catch {
-      return { ok: false, confirmed: true, reason: 'image fetch failed — cap stands (fail-safe)', strongEvidence: false };
+      return { ok: false, confirmed: null, reason: 'verification image fetch failed', strongEvidence: false };
     }
 
     // Crop the claimed area(s) at native resolution (quadrant parsed from the
@@ -187,7 +218,8 @@ export async function verifyStructuralClaim(
         .resize({ width: MAX_REGION_EDGE, height: MAX_REGION_EDGE, fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 90 })
         .toBuffer();
-      crops.push({ label: `${face} — claimed: ${f.type} at ${f.location || 'unspecified'} (${(f.description || '').slice(0, 120)})`, buf });
+      // Numbered so two claims can never share a label (verdicts are matched by label).
+      crops.push({ label: `${crops.length + 1}. ${face} — claimed: ${f.type} at ${f.location || 'unspecified'} (${(f.description || '').slice(0, 120)})`, buf });
     }
 
     const content: any[] = [{
@@ -198,6 +230,7 @@ THE DISCRIMINATOR:
 - CREASE/FOLD (damage): a THIN line or ridge — the brightness disturbance is confined to the line itself (often a paired highlight+shadow along a ridge, may break ink or show fiber). The surface tone on BOTH sides of the line MATCHES.
 - LIGHTING/REFLECTION BAND (not damage): a BROAD tonal step — one ENTIRE side of the boundary is uniformly brighter or darker than the other (glossy/metallic cards reflect room lighting as straight bands). No ridge, no ink break, no fiber.
 - PRINTED DESIGN LINE (not damage): part of the card's artwork — e.g. the light streaks and wave lines inside the swirl pattern of a Pokemon card back, comic speed-lines, borders. These follow the ARTWORK's geometry and colors, do not disturb the gloss, and are perfectly reproduced (no fiber, no ridge).
+- PRINTED TEXTURE (not damage): some card designs — especially card BACKS — print a photographic texture as artwork: crumpled or wrinkled paper, cracked stone, marble veins, torn-paper edges, wood grain, brushed metal. A printed wrinkle looks like a crease but is INK: the network of lines covers the whole design area rather than one isolated line, it stops cleanly at the design's printed border, text and stat boxes printed over it are undistorted, and the card's outline and gloss are unaffected. When the claimed line sits inside such a texture, physical_damage requires edge_deformation or matching_line_opposite_face — "ridge_shadow" and "ink_break_or_fiber" are NOT acceptable there, because a printed wrinkle reproduces both. (Owner-verified Sept 2026: a printed crumpled-paper card back was confirmed as a crease 3/3 and graded 4; the card has no crease.)
 - TEAR (damage): actual paper separation — torn fiber edge, missing material, or a jagged split in the card outline. A sleeve edge, case edge, or background boundary near the card is NOT a tear.
 - Also NOT damage: foil patterns, sleeve edges.
 
@@ -212,7 +245,8 @@ If none of these is present, physical_damage MUST be false (evidence: "none").
 
 For each claim you get the claimed area AND the corresponding area of the OPPOSITE face (left/right mirrored — a back-left crease shows front-right).
 
-Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"evidence":"ink_break_or_fiber|ridge_shadow|edge_deformation|matching_line_opposite_face|none","reason":"<one sentence>"}]}`,
+Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"evidence":"ink_break_or_fiber|ridge_shadow|edge_deformation|matching_line_opposite_face|none","reason":"<one sentence>"}]}
+Return exactly one verdict for each CLAIM. Its "claim" value is ONLY the short id shown after the word CLAIM (S1, S2, ...).`,
     }];
     // Opposite-face crops: same vertical band, horizontally MIRRORED (faces flip left/right).
     const oppositeCrops: Array<{ label: string; buf: Buffer }> = [];
@@ -235,7 +269,8 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
       oppositeCrops.push({ label: `${opp} — corresponding (mirrored) area for the claim above`, buf });
     }
     crops.forEach((c, i) => {
-      content.push({ type: 'text', text: `CLAIM — ${c.label}:` });
+      // Short ids: echoing a 150-character label verbatim failed 6/6 on a real creased card.
+      content.push({ type: 'text', text: `CLAIM — S${i + 1} — ${c.label}:` });
       content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${c.buf.toString('base64')}`, detail: IMAGE_DETAIL } });
       const o = oppositeCrops[i];
       if (o) {
@@ -256,7 +291,7 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content }],
     }, verifyModel);
-    const response = await openai.chat.completions.create(verifyConfig as any, { timeout: 60_000 });
+    const response = await openai.chat.completions.create(verifyConfig as any, { timeout: 60_000, maxRetries: 0 });
     logOpenAIUsage({
       operation: 'zoom_structural_verify',
       model: verifyModel,
@@ -279,7 +314,17 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
     const STRONG_EVIDENCE = new Set(['ink_break_or_fiber', 'edge_deformation', 'matching_line_opposite_face']);
     for (const choice of response.choices) {
       try {
+        if (!completedChoice(choice)) continue;
         const v = JSON.parse(choice.message?.content || '');
+        const claimId = (x: any) => /^S(\d+)(?!\d)/i.exec(String(x?.claim ?? '').trim())?.[1];
+        const invalid = !Array.isArray(v.verdicts) || v.verdicts.length !== crops.length
+          || new Set(v.verdicts.map(claimId)).size !== crops.length
+          || crops.some((_, i) => !v.verdicts.some((x: any) => claimId(x) === String(i + 1)))
+          || v.verdicts.some((x: any) => typeof x.physical_damage !== 'boolean'
+            || typeof x.reason !== 'string' || !x.reason.trim()
+            || !(VALID_EVIDENCE.has(x.evidence) || x.evidence === 'none')
+            || (x.physical_damage && x.evidence === 'none'));
+        if (invalid) { console.warn('[ZOOM] structural verifier response rejected:', String(choice.message?.content).slice(0, 300)); continue; }
         parsed++;
         const damaged = (v.verdicts || []).filter((x: any) => x.physical_damage === true && VALID_EVIDENCE.has(String(x.evidence || '')));
         if (damaged.length > 0) {
@@ -290,7 +335,7 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
         }
       } catch { /* skip unparseable */ }
     }
-    if (parsed === 0) return { ok: false, confirmed: true, reason: 'verification unparseable — cap stands (fail-safe)', strongEvidence: false };
+    if (parsed !== 3) return { ok: false, confirmed: null, reason: 'verification incomplete — three complete verdicts required', strongEvidence: false };
     const confirmed = opts?.requireUnanimous ? damageVotes === parsed : damageVotes >= Math.ceil(parsed / 2);
     const strongEvidence = confirmed && [...evidenceCited].some(e => STRONG_EVIDENCE.has(e));
     const reason = confirmed
@@ -299,10 +344,9 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
     console.log(`[ZOOM] structural verification: ${reason}`);
     return { ok: true, confirmed, reason, strongEvidence };
   } catch (err: any) {
-    // Fail-safe: if verification errors, the cap stands (never let an outage
-    // silently un-cap genuinely creased cards).
+    // An outage is neither confirmation nor rejection of physical damage.
     console.error('[ZOOM] structural verification failed:', err?.message);
-    return { ok: false, confirmed: true, reason: `verification error — cap stands (${err?.message})`, strongEvidence: false };
+    return { ok: false, confirmed: null, reason: 'structural verification request failed', strongEvidence: false };
   }
 }
 
@@ -556,6 +600,11 @@ function quadPlausible(quadNorm: Pt[] | undefined, minFrac = 0.10, maxFrac = 0.9
   if (!Array.isArray(quadNorm) || quadNorm.length !== 4) return false;
   if (!quadNorm.every(p => Number.isFinite(p?.x) && Number.isFinite(p?.y) && p.x >= 0 && p.x <= 1000 && p.y >= 0 && p.y <= 1000)) return false;
   const q = quadNorm;
+  // TL → TR → BR → BL must form a convex, consistently ordered polygon.
+  if (!q.every((a, i) => {
+    const b = q[(i + 1) % 4], c = q[(i + 2) % 4];
+    return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x) > 0;
+  })) return false;
   const area = Math.abs((q[0].x * (q[1].y - q[3].y) + q[1].x * (q[2].y - q[0].y) + q[2].x * (q[3].y - q[1].y) + q[3].x * (q[0].y - q[2].y)) / 2);
   const frac = area / (1000 * 1000);
   return frac >= minFrac && frac <= maxFrac;
@@ -663,14 +712,15 @@ the same scrutiny as dark-border corners.
 
 BACKGROUND CHECK FIRST (photos with wide margins): each crop may contain mostly or entirely the BACKGROUND SURFACE the card is lying on (desk, leather, cloth, mat) instead of the card. Before reporting anything, decide what part of the crop is actually CARD. Specks, dust, texture, grain or marks on the background surface are NEVER card defects — a crop that shows no card content at all is automatically clean:true.
 LIGHT BACKGROUND BEHIND A CORNER/EDGE IS NOT WHITENING: whitening is white showing ON the card's own cut surface or face. A white/cream background (felt, paper, cloth) visible BEYOND the cut line — including directly behind a corner tip — is background, not damage. On light backgrounds judge corners by GEOMETRY (sharp point vs rounded/frayed) and by fiber texture ON the card itself; stains and specks on the background surface near the card belong to the background.
+DUST AND DEBRIS ARE NOT DEFECTS: loose dust, lint and specks sit ON TOP of the card (or on a sleeve/holder) and wipe off. They show as ISOLATED, scattered bright flecks or short hairs — each one separate, randomly placed, often also present on the background around the card, and most visible on dark borders and glossy surfaces. Real edge/corner WHITENING is exposed cardstock: it FOLLOWS the cut line as a continuous or repeating run, is attached to the very edge, and makes the edge look rough or chipped. A real surface SCRATCH or SCUFF disturbs the gloss along a path; a speck does not. A handful of separate light flecks near a dark edge, or scattered specks on a glossy back, with a straight clean cut line and undisturbed gloss, is dust — the region is clean. Report whitening only when the light material is part of the edge itself; when you cannot tell a fleck from fiber, do not report it.
 NOT defects (do NOT report): holographic sparkle/patterns, printed design lines and textures, the card's border color itself, image compression noise, glare/reflection bands that have soft gradual edges, background surfaces outside the card and anything ON them, sleeve/holder edges, hand-applied autograph/signature ink.
 AUTOGRAPH INK IS A FEATURE, NOT DAMAGE: a signature written on the card — pen, paint pen, marker or sharpie, in any color, authenticated or not — is NEVER a scratch, scuff, stain, print_line, crease or dent. Its strokes, edges, sheen, pooling, smudging and any pen indentation from signing are all part of the autograph. A crop showing only signature strokes over otherwise sound card is clean. Report only genuine damage to the card AROUND or UNDERNEATH the ink (whitening, chips, a real crease that breaks the card plane, scratches in the stock).
 IMPORTANT context: crops from the SAME card — a straight uniform line at the outermost boundary is the card's cut edge, not damage. White showing AT the cut line on a dark border IS whitening.
 
 Reply ONLY with JSON (compact — clean regions are listed by id only):
 {"clean":["<region id>", ...],"findings":[{"id":"<region id>","card_area":"most|some|none","defects":[{"type":"whitening|chip|nick|softening|scratch|scuff|dent|stain|print_line|crease|bend|warp","severity":"minor|moderate|heavy","description":"<one concise sentence, location within the region>"}]}]}
-- "clean": every region with NO defects — just its id, nothing else.
-- "findings": ONLY regions with at least one defect, with full detail.
+- "clean": ONLY regions with clearly visible card material and NO defects — just its id, nothing else. Blur, glare, obstruction or background is NOT evidence of a clean region. Put uninspectable regions in findings with card_area "some" or "none" and an empty defects list; do not invent defects.
+- "findings": regions with defects, with full detail, or uninspectable regions as described above.
 - Every region id you were given MUST appear in exactly one of the two lists.
 card_area is decided FIRST for each findings entry, before its defects:
 - "most": the card (or its border/edge) fills most of this crop
@@ -702,7 +752,7 @@ export async function detectCardGeometry(
   const { config: gateConfig } = applyModelCompat({
     model: model || BASELINE_MODEL,
     temperature: 0,
-    max_completion_tokens: 400,
+    max_completion_tokens: 2000,
     response_format: { type: 'json_object' },
     messages: [
       {
@@ -728,9 +778,10 @@ export async function detectCardGeometry(
     usage: (fillRes as any).usage,
     durationMs: Date.now() - gateStart,
   });
-  const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
-  out.frontFill = Number.isFinite(Number(fill.front_fill_percent)) ? Number(fill.front_fill_percent) : null;
-  out.backFill = Number.isFinite(Number(fill.back_fill_percent)) ? Number(fill.back_fill_percent) : null;
+  if (!completedChoice(fillRes.choices[0])) throw new Error('Geometry response incomplete');
+  const fill = JSON.parse(fillRes.choices[0].message.content!);
+  out.frontFill = validFill(fill.front_fill_percent);
+  out.backFill = validFill(fill.back_fill_percent);
   if (quadPlausible(fill.front_corners)) out.front = fill.front_corners;
   if (quadPlausible(fill.back_corners)) out.back = fill.back_corners;
   return out;
@@ -781,8 +832,8 @@ export async function runZoomInspection(
       options?.images ?? (await fetchCardOriginals(frontImageUrl, backImageUrl));
 
     // v9.4.1 KILL SWITCH: set ZOOM_DISABLED=1 (Vercel env) to skip the regioned zoom
-    // entirely — grading falls back to the holistic ensemble, and the fallback is
-    // persisted in consensus_notes so affected grades are identifiable in the DB.
+    // entirely. The completeness guard now prevents publishing a JSON grade
+    // when this required inspection is disabled.
     if (process.env.ZOOM_DISABLED === '1') {
       console.log('[ZOOM] disabled via ZOOM_DISABLED env — skipping regioned inspection');
       return { ...empty, error: 'disabled via ZOOM_DISABLED env' };
@@ -809,11 +860,13 @@ export async function runZoomInspection(
     // detail:'high' on the gate images (~1.1K tok each): corner coordinates need more
     // precision than the 512px 'low' thumbnail provides.
     const MIN_FILL_PERCENT = 68;
+    // Between MIN_FILL and this, image-relative crops still run when no quad was
+    // found (as before), but a located card is always cropped card-relative.
+    const PREFER_QUAD_BELOW_PERCENT = 80;
     const geometry: { front?: Pt[]; back?: Pt[] } = {};
     const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
     // Capture-gate P0: accumulate what the gate saw so the caller can persist
-    // it. Defaults to 'full' and is narrowed below — a gate that errors leaves
-    // this as the honest "we proceeded normally, we just don't know".
+    // it. A gate failure marks capture abandoned; it never permits blind crops.
     const capture: NonNullable<ZoomResult['capture']> = {
       frontFill: null,
       backFill: null,
@@ -826,13 +879,18 @@ export async function runZoomInspection(
       // v9.13: when the caller already ran the gate (CV-centering advisory path
       // runs it BEFORE the grading ensemble), reuse its result — same single
       // gate call per grade, just earlier in the pipeline.
-      const gate = options?.precomputedGeometry
+      const gateSource = options?.precomputedGeometry
         ? options.precomputedGeometry
         : await detectCardGeometry(frontBuf, backBuf, options?.model);
+      const gate = { ...gateSource,
+        front: quadPlausible(gateSource.front) ? gateSource.front : undefined,
+        back: quadPlausible(gateSource.back) ? gateSource.back : undefined };
       if (options?.precomputedGeometry) {
         console.log('[ZOOM] geometry gate: reusing precomputed result from advisory path');
       }
-      const worst = Math.min(gate.frontFill ?? 100, gate.backFill ?? 100);
+      gate.frontFill = validFill(gate.frontFill);
+      gate.backFill = validFill(gate.backFill);
+      const worst = Math.min(gate.frontFill ?? 0, gate.backFill ?? 0);
       console.log(`[ZOOM] frame-fill: front ${gate.frontFill}% / back ${gate.backFill}%`);
       // P0: keep the reading instead of only logging it.
       capture.frontFill = gate.frontFill;
@@ -846,22 +904,37 @@ export async function runZoomInspection(
       if (gate.front) measureGeometry.front = gate.front;
       if (gate.back) measureGeometry.back = gate.back;
       if (Number.isFinite(worst) && worst < MIN_FILL_PERCENT) {
-        if (gate.front && gate.back) {
+        if (quadPlausible(gate.front) && quadPlausible(gate.back)) {
           geometry.front = gate.front;
           geometry.back = gate.back;
           capture.outcome = 'card_relative';
           console.log(`[ZOOM] card fills ~${worst}% of frame — using CARD-RELATIVE crops from detected corner quads`);
         } else {
           capture.outcome = 'abandoned';
-          console.log(`[ZOOM] card fills only ~${worst}% of frame and no plausible corner quad detected — skipping regioned inspection`);
+          const geometryReason = gate.frontFill === null || gate.backFill === null
+            ? 'frame fill is unknown and card corners could not be located'
+            : `card fills only ~${worst}% of the frame and its corners could not be located`;
+          console.log(`[ZOOM] ${geometryReason} — skipping regioned inspection`);
           // Carry `capture` out on the failure path too — this is precisely the
           // case the dataset needs most, and returning `empty` here is how the
           // measurement was being lost for the worst photos.
-          return { ...empty, capture, error: `card fills only ~${worst}% of the frame and its corners could not be located — magnified inspection needs the card closer to the camera` };
+          return { ...empty, capture, error: `${geometryReason} — magnified inspection needs clear photos of the entire card` };
         }
+      } else if (Number.isFinite(worst) && worst < PREFER_QUAD_BELOW_PERCENT && quadPlausible(gate.front) && quadPlausible(gate.back)) {
+        // Sept 17 replay: every production card that failed coverage on well-lit,
+        // well-framed photos sat in the 68–79% band. There the image-relative edge
+        // strips hug the PHOTO border and show the table, not the card edge — the
+        // model (correctly) called them "some"/"none" card. Until now those strips
+        // simply counted as clean. With corners located, crop the card itself.
+        geometry.front = gate.front;
+        geometry.back = gate.back;
+        capture.outcome = 'card_relative';
+        console.log(`[ZOOM] card fills ~${worst}% of frame — margins would put edge strips on background; using CARD-RELATIVE crops`);
       }
     } catch (e: any) {
-      console.warn(`[ZOOM] geometry gate errored (${e.message}) — proceeding with blind crops as before`);
+      capture.outcome = 'abandoned';
+      console.warn('[ZOOM] geometry unavailable — magnified coverage is unknown');
+      return { ...empty, capture, error: 'card geometry unavailable; reliable magnified inspection could not be completed' };
     }
 
     // v9.5 CV CENTERING: deterministic border measurement from the detected quad.
@@ -913,6 +986,17 @@ export async function runZoomInspection(
           text: 'YU-GI-OH SECURITY FOIL: the small square rainbow/holographic seal printed in the FRONT bottom-right corner (beside the copyright line) is a manufacturing feature on every genuine card. Its bright, speckled, multicolour sparkle is NOT a chip, NOT coating loss and NOT exposed material — never report a defect at that seal. Only report the bottom-right front corner if the CARDSTOCK outside the seal shows whitening, fiber, or a crushed tip.',
         });
       }
+      if (String(options?.cardType || '').toLowerCase() === 'onepiece') {
+        // Every One Piece card BACK prints a nautical-chart pattern: thin, straight,
+        // light-coloured lines crossing the whole blue field and intersecting at
+        // angles. At crop resolution they read as "numerous intersecting scratches":
+        // an owner-verified clean card (no defects under magnification) was capped
+        // at surface 7 on all four back quadrants in 4/4 runs, once at 5 (Sept 17 2026).
+        content.push({
+          type: 'text',
+          text: 'ONE PIECE CARD BACK: the back of every genuine card is printed with a nautical-chart design — thin, straight, pale lines that cross the entire blue background and intersect one another at angles, behind the gold compass and the ONE PIECE logo. These lines are INK. They are NOT scratches, NOT scuffs and NOT creases — never report them. They are identical on every copy, run edge to edge in straight paths, and do not disturb the gloss. On a back-surface crop, report a scratch only when it is clearly NOT part of that line network: it breaks or crosses the printed lines irregularly, is curved or ragged, catches light differently from the print, or exposes white paper.',
+        });
+      }
       if (options?.priorityNote) {
         content.push({ type: 'text', text: `PRIORITY: ${options.priorityNote}` });
       }
@@ -924,7 +1008,6 @@ export async function runZoomInspection(
         });
       }
       content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });
-      const batchStart = Date.now();
       const { config: batchConfig } = applyModelCompat({
         model: options?.model || BASELINE_MODEL,
         temperature: 0.1,
@@ -937,49 +1020,29 @@ export async function runZoomInspection(
           { role: 'user', content },
         ],
       }, options?.model || BASELINE_MODEL);
-      const response = await openai.chat.completions.create(batchConfig as any, { timeout: 90_000 });
-      logOpenAIUsage({
-        operation: 'zoom_batch',
-        model: options?.model || BASELINE_MODEL,
-        usage: (response as any).usage,
-        durationMs: Date.now() - batchStart,
-        metadata: { n: 5, regions: batch.length },
+      return inspectZoomBatch(batch.map(r => r.id), async () => {
+        const batchStart = Date.now();
+        const response = await openai.chat.completions.create(batchConfig as any, { timeout: 90_000, maxRetries: 0 });
+        logOpenAIUsage({
+          operation: 'zoom_batch',
+          model: options?.model || BASELINE_MODEL,
+          usage: (response as any).usage,
+          durationMs: Date.now() - batchStart,
+          metadata: { n: 5, regions: batch.length },
+        });
+        return response;
       });
-      const batchSamples: any[] = [];
-      for (const choice of response.choices) {
-        try {
-          if (!choice?.message?.content) continue;
-          // Sept 2026: models sometimes echo the prompt label ("REGION F-COR-TL")
-          // instead of the bare id, and the vote tally below matches on the
-          // exact id — those findings were silently dropped (1,226 of them
-          // across a 705-sample replay). Canonicalise exact "REGION "-prefixed
-          // ids; reject and report anything else rather than guess.
-          const parsed = JSON.parse(choice.message.content);
-          const { value: raw, aliases, rejected } = normalizeCropRegionIds(parsed, batch.map(r => r.id));
-          if (aliases.length > 0) console.log(`[ZOOM] canonicalised ${aliases.length} prefixed region id(s): ${aliases.map(a => `"${a.original}"`).join(', ')}`);
-          if (rejected.length > 0) console.warn(`[ZOOM] rejected ${rejected.length} unknown region id(s): ${rejected.map(r => JSON.stringify(r)).join(', ')}`);
-          // v9.5 compact format: {"clean":[ids], "findings":[{id, card_area, defects}]}.
-          // Normalize to the internal per-region list; tolerate the legacy
-          // {"regions":[...]} shape so a format-drifting sample still parses.
-          let normalized: any[];
-          if (Array.isArray(raw.findings) || Array.isArray(raw.clean)) {
-            normalized = (raw.findings ?? []).map((f: any) => ({ id: f.id, card_area: f.card_area, clean: false, defects: f.defects }));
-            const accounted = new Set([...(raw.clean ?? []), ...normalized.map((f: any) => f.id)]);
-            const missing = batch.filter(r => !accounted.has(r.id)).length;
-            if (missing > 0) console.warn(`[ZOOM] sample omitted ${missing}/${batch.length} region id(s) — treating omissions as clean`);
-          } else {
-            normalized = raw.regions ?? [];
-          }
-          batchSamples.push({ regions: normalized });
-        } catch { /* discard unparseable zoom sample */ }
-      }
-      const u: any = (response as any).usage;
-      return { batchSamples, promptTokens: u?.prompt_tokens ?? 0, completionTokens: u?.completion_tokens ?? 0 };
     }));
     // Each batch votes independently; merge every batch's samples into one list —
     // the per-(region,type) tally below only counts votes for regions a sample saw
     // (a region appears in exactly one batch, so its max vote count stays 5).
     const samples: any[] = batchResults.flatMap(b => b.batchSamples);
+    const coverage = { expected: regions.length,
+      inspected: batchResults.reduce((sum, batch) => sum + batch.covered, 0),
+      incompleteBatches: batchResults.filter(batch => !batch.complete).length,
+      validSamplesPerBatch: batchResults.map(batch => batch.batchSamples.length) };
+    if (coverage.incompleteBatches) return { ...empty, capture, coverage,
+      regionsInspected: coverage.inspected, error: 'magnified inspection has missing, invalid or unobservable regions after retry' };
     const usageTotals = batchResults.reduce((a, b) => ({ p: a.p + b.promptTokens, c: a.c + b.completionTokens }), { p: 0, c: 0 });
     const samplesPerBatch = Math.round(samples.length / Math.max(1, batches.length));
     if (samples.length === 0) throw new Error('no parseable zoom samples');
@@ -1165,7 +1228,7 @@ export async function runZoomInspection(
 
     console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
-    return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings, centering, capture };
+    return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };

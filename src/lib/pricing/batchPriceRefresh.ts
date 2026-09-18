@@ -35,8 +35,29 @@ import {
 } from '@/lib/priceCharting';
 import { calculateDcmEstimate } from '@/lib/pricing/dcmPriceTracker';
 import { fetchAndCacheCardPrice } from '@/lib/ebay/priceTracker';
+import {
+  guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT,
+  type PriceRevisions,
+} from '@/lib/pricing/guardedPriceWrite';
 
 export const CACHE_MAX_AGE_DAYS = 7;
+
+/**
+ * The select list every caller of refreshCardPrice must use. It carries the
+ * identity fields the search needs, the owner's product pick, and the two
+ * revision counters the write is guarded on (Phase 2C). Callers that build
+ * their own list will silently lose the guard, so they all share this one.
+ */
+export const REFRESH_CARD_SELECT = `
+  id, category,
+  conversational_card_info,
+  conversational_decimal_grade,
+  card_name, featured, pokemon_featured, card_set, card_number, release_date,
+  manufacturer_name, is_foil, foil_type, mtg_rarity,
+  dcm_price_product_id, dcm_price_updated_at,
+  dcm_selected_product_id, dcm_selected_product_name,
+  ${PRICE_REVISION_SELECT}
+`;
 const SPORTS_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
 
 export type CardCategory = 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'sports' | 'other';
@@ -110,25 +131,23 @@ async function savePriceToDb(
     productName: string;
     fullData: unknown;
   },
-): Promise<void> {
+  revisions: PriceRevisions | null,
+): Promise<boolean> {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('cards')
-    .update({
-      dcm_cached_prices: data.fullData,
-      dcm_prices_cached_at: now,
-      dcm_price_estimate: data.estimatedValue,
-      dcm_price_raw: data.raw,
-      dcm_price_updated_at: now,
-      dcm_price_match_confidence: data.matchConfidence,
-      dcm_price_product_id: data.productId,
-      dcm_price_product_name: data.productName,
-    })
-    .eq('id', cardId);
-  if (error) {
-    console.error(`[BatchRefresh] Failed to save price for card ${cardId}:`, error);
-  }
+  // Note: dcm_selected_* is never in this payload. An automatic refresh
+  // records which product it matched, it never replaces the owner's pick.
+  const result = await guardedPriceUpdate(supabase, cardId, revisions, {
+    dcm_cached_prices: data.fullData,
+    dcm_prices_cached_at: now,
+    dcm_price_estimate: data.estimatedValue,
+    dcm_price_raw: data.raw,
+    dcm_price_updated_at: now,
+    dcm_price_match_confidence: data.matchConfidence,
+    dcm_price_product_id: data.productId,
+    dcm_price_product_name: data.productName,
+  }, 'BatchRefresh');
+  return result.status !== 'stale';
 }
 
 /**
@@ -137,16 +156,15 @@ async function savePriceToDb(
  * isCacheStale check expires and we'll try again — fair compromise
  * between freshness and API conservation.
  */
-async function markNoMatch(cardId: string): Promise<void> {
+async function markNoMatch(cardId: string, revisions: PriceRevisions | null): Promise<void> {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
-  await supabase
-    .from('cards')
-    .update({
-      dcm_price_updated_at: now,
-      dcm_price_match_confidence: 'no-match',
-    })
-    .eq('id', cardId);
+  // Guarded too: a no-match marker written against a corrected card would
+  // suppress the refresh the correction is waiting for, for a whole week.
+  await guardedPriceUpdate(supabase, cardId, revisions, {
+    dcm_price_updated_at: now,
+    dcm_price_match_confidence: 'no-match',
+  }, 'BatchRefresh/no-match');
 }
 
 export async function refreshCardPrice(
@@ -154,9 +172,17 @@ export async function refreshCardPrice(
   cardInfo: Record<string, unknown>,
   cardType: CardCategory,
   dcmGrade: number,
-): Promise<{ success: boolean; estimate: number | null; source: string }> {
+): Promise<{ success: boolean; estimate: number | null; source: string; stale?: boolean }> {
   const cardId = card.id as string;
-  const productId = card.dcm_price_product_id as string | null;
+  // Phase 2C: the revisions this refresh is priced against. Read once, from the
+  // same row the identity came from, and carried through every await below.
+  const revisions = readPriceRevisions(card);
+  // Owner-pick precedence: a product the owner chose on the detail page beats
+  // whatever the automatic matcher last landed on. Before Phase 2C this path
+  // read dcm_price_product_id only, so an owner's pick was ignored by the cron
+  // and the manual batch refresh.
+  const ownerProductId = (card.dcm_selected_product_id as string | null) || null;
+  const productId = ownerProductId || (card.dcm_price_product_id as string | null);
 
   // ── Fast path: use cached product ID ──
   if (productId) {
@@ -197,18 +223,26 @@ export async function refreshCardPrice(
       }
 
       if (prices) {
-        await savePriceToDb(cardId, {
+        const wrote = await savePriceToDb(cardId, {
           estimatedValue,
           raw: prices.raw ?? null,
           matchConfidence: 'high',
           productId: prices.productId || productId,
           productName: prices.productName || '',
           fullData: { prices, estimatedValue, matchConfidence: 'high', queryUsed: `Product ID: ${productId}` },
-        });
+        }, revisions);
+        if (!wrote) return { success: true, estimate: null, source: 'stale-identity', stale: true };
         return { success: true, estimate: estimatedValue, source: 'pricecharting-id' };
       }
     } catch {
       console.warn(`[BatchRefresh] Product ID lookup failed for ${cardId}, falling back to search`);
+    }
+
+    // An owner's pick is authoritative. If its product has no price right now
+    // we stop here rather than searching, because the search would price a
+    // DIFFERENT product and quietly override the pick in the estimate.
+    if (ownerProductId) {
+      return { success: false, estimate: null, source: 'owner-pick-unavailable' };
     }
   }
 
@@ -247,6 +281,9 @@ export async function refreshCardPrice(
       case 'mtg': {
         const result = await searchMTGCardPrices({
           cardName: (cardName || playerOrCharacter) as string,
+          // A crossover card's flavor title is stored as the name and the printed
+          // Magic name as the character; the catalog only knows the printed one.
+          alternateName: (playerOrCharacter || undefined) as string | undefined,
           setName, collectorNumber: cardNumber, year,
           isFoil: !!cardInfo.is_foil, variant,
         });
@@ -322,6 +359,8 @@ export async function refreshCardPrice(
               id: cardId,
               category: card.category as string,
               conversational_card_info: cardInfo as any,
+              identity_revision: revisions?.identity_revision,
+              pricing_selection_revision: revisions?.pricing_selection_revision,
             });
             return { success: true, estimate: null, source: 'ebay-fallback' };
           } catch {
@@ -333,14 +372,15 @@ export async function refreshCardPrice(
     }
 
     if (prices) {
-      await savePriceToDb(cardId, {
+      const wrote = await savePriceToDb(cardId, {
         estimatedValue,
         raw: prices.raw ?? null,
         matchConfidence,
         productId: prices.productId || '',
         productName: prices.productName || '',
         fullData: { prices, estimatedValue, matchConfidence, queryUsed },
-      });
+      }, revisions);
+      if (!wrote) return { success: true, estimate: null, source: 'stale-identity', stale: true };
       return { success: true, estimate: estimatedValue, source: 'pricecharting-search' };
     }
 
@@ -350,10 +390,12 @@ export async function refreshCardPrice(
         id: cardId,
         category: card.category as string,
         conversational_card_info: cardInfo as any,
+        identity_revision: revisions?.identity_revision,
+        pricing_selection_revision: revisions?.pricing_selection_revision,
       });
       return { success: true, estimate: null, source: 'ebay-fallback' };
     } catch {
-      await markNoMatch(cardId).catch(() => {});
+      await markNoMatch(cardId, revisions).catch(() => {});
       return { success: false, estimate: null, source: 'no-match' };
     }
   } catch (error) {

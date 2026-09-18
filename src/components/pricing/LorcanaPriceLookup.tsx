@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { isNonStandardItemType } from '@/lib/identification/itemType';
+import { useState, useEffect, useRef } from 'react';
+import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
+import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
 import {
@@ -38,6 +41,8 @@ interface AvailableVariant {
 
 interface LorcanaPricingResult {
   success: boolean;
+  /** 'price_write_stale' when the card changed while this price loaded. */
+  code?: string;
   data?: {
     prices: NormalizedLorcanaPrices;
     estimatedValue: number | null;
@@ -62,9 +67,20 @@ interface LorcanaPriceLookupProps {
     // Saved manual selection
     dcm_selected_product_id?: string;
     dcm_selected_product_name?: string;
+    // Phase 2C: the revisions this card was rendered at. The detail pages
+    // load the card with select('*'), so both are already on the row. They
+    // make every price save below a compare-and-set.
+    identity_revision?: number | null;
+    pricing_selection_revision?: number | null;
   };
   dcmGrade?: number;
   isOwner?: boolean;
+  /**
+   * The card row's identity fields, for the displayed-value guard. Optional:
+   * without it the guard has nothing to judge and the value shows as before.
+   * See @/lib/pricing/valueGuard.
+   */
+  guardIdentity?: CardIdentityForGuard;
   onPriceLoad?: (data: {
     estimatedValue: number | null;
     matchConfidence: 'high' | 'medium' | 'low' | 'none';
@@ -96,7 +112,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }: LorcanaPriceLookupProps) {
+export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, guardIdentity, onPriceLoad }: LorcanaPriceLookupProps) {
   const [priceData, setPriceData] = useState<LorcanaPricingResult['data'] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +153,20 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
     return undefined;
   };
 
+  /**
+   * Phase 2C: the card's identity (or its product pick) changed while a price
+   * was loading, so the server discarded the save and answered 409. Refetch this
+   * card's price once, quietly. The customer is never shown an error, because
+   * nothing failed: their correction won the race.
+   */
+  const staleRefetchedRef = useRef(false);
+  const refetchAfterStalePrice = async () => {
+    if (staleRefetchedRef.current) return;
+    staleRefetchedRef.current = true;
+    console.log('[LorcanaPriceLookup] Card changed while pricing; refetching once');
+    await fetchPrices(undefined, true);
+  };
+
   // Save estimated price to database so collection/portfolio pages reflect the latest value
   const savePriceEstimate = async (data: LorcanaPricingResult['data']) => {
     if (!isOwner || !card.id || !data) return;
@@ -144,7 +174,7 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
     if (!session?.access_token) return;
 
     try {
-      await fetch('/api/pricing/dcm-save', {
+      const saveResponse = await fetch('/api/pricing/dcm-save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -160,8 +190,12 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
           match_confidence: data.matchConfidence,
           product_id: data.prices?.productId ?? null,
           product_name: data.prices?.productName ?? null,
+          ...priceRevisionPayload(card),
         }),
       });
+      if (saveResponse.status === 409) {
+        await refetchAfterStalePrice();
+      }
     } catch (err) {
       console.error('[LorcanaPriceLookup] Error saving price estimate:', err);
     }
@@ -193,10 +227,16 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
             dcmGrade,
             cardId: card.id,
             forceRefresh,
+            ...priceRevisionPayload(card),
           }),
         });
 
         const data: LorcanaPricingResult = await response.json();
+
+        if (isStalePriceResponse(response, data)) {
+          await refetchAfterStalePrice();
+          return;
+        }
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to fetch prices');
@@ -265,10 +305,16 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
           includeVariants: true,
           cardId: card.id,
           forceRefresh,
+          ...priceRevisionPayload(card),
         }),
       });
 
       const data: LorcanaPricingResult = await response.json();
+
+      if (isStalePriceResponse(response, data)) {
+        await refetchAfterStalePrice();
+        return;
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch prices');
@@ -644,7 +690,16 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
   const priceIncrease = getPriceIncrease();
   const marketRange = getMarketRange();
   const dcmEstimate = getDcmEstimatedValue();
-  const chartData = getChartData(dcmEstimate?.value);
+  // A large estimate resting on a card with no set or no year is not shown
+  // until the owner confirms the details. The number is not recomputed here,
+  // only hidden. See @/lib/pricing/valueGuard.
+  const valueWithheld = !!dcmEstimate && !assessValueTrust(guardIdentity || {}, dcmEstimate.value).trusted;
+  // A withheld card shows the public nothing from the matched listing either: its
+  // price range and graded-price tables belong to a product this card may not be.
+  if (valueWithheld && !isOwner) return null;
+  // Not a standard trading card: graded and labelled, and no market pricing for anyone.
+  if (isNonStandardItemType((guardIdentity as { item_type?: string | null } | undefined)?.item_type)) return null;
+  const chartData = getChartData(valueWithheld ? null : dcmEstimate?.value);
 
   return (
     <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200 p-4 sm:p-6 shadow-lg">
@@ -840,7 +895,20 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
           )}
 
           {/* DCM Estimated Value */}
-          {dcmEstimate && dcmGrade && (
+          {/* Value withheld until the owner confirms what this card is.
+              Public viewers see nothing here at all. */}
+          {dcmEstimate && dcmGrade && valueWithheld && isOwner && (
+            <div className="bg-white rounded-xl border-2 border-slate-200 p-5 mb-4">
+              <p className="text-sm font-semibold text-gray-800">Confirm your card details to see a value</p>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                This card has no set or year on file, so the price match above may be for a
+                different printing. Add the set and year with Edit Card Details on this page, or
+                pick the right card under "See other card variants" above.
+              </p>
+            </div>
+          )}
+
+          {dcmEstimate && dcmGrade && !valueWithheld && (
             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-5 mb-4 shadow-lg text-white">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -982,7 +1050,7 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoa
                     <div className="w-3 h-3 rounded bg-amber-500"></div>
                     <span>Raw</span>
                   </div>
-                  {dcmGrade && dcmEstimate && (
+                  {dcmGrade && dcmEstimate && !valueWithheld && (
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded bg-violet-500"></div>
                       <span>Graded: DCM</span>

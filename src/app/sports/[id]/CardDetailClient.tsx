@@ -1,5 +1,6 @@
 "use client";
 
+import { readIncompleteInspectionMessage } from '@/lib/grading/inspectionMessage';
 import ReportSectionNav from '@/components/design/ReportSectionNav';
 import { GRADE_10_FOIL_CSS as reportFoil } from '@/lib/labelPresets';
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -45,7 +46,10 @@ import { ActionLink } from '@/components/design/Primitives';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 // EbayPriceLookup removed - sports cards now use DCM pricing from SportsCardsPro
 import { PriceChartingLookup } from '@/components/pricing/PriceChartingLookup';
+import { assessValueTrust } from '@/lib/pricing/valueGuard';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
+import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/cards/IdentityReview';
+import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
@@ -406,6 +410,11 @@ interface SportsAIGrading {
 }
 
 interface SportsCard {
+  // Phase 2C revision guard (cards.identity_revision /
+  // cards.pricing_selection_revision). The page loads with select('*'),
+  // so both arrive on the row; the price lookup sends them with every save.
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
   // Ownership lifecycle — a sold card leaves the collection but keeps this
   // page online so the buyer's slab QR still resolves.
   ownership_status?: 'owned' | 'sold' | 'archived' | null;
@@ -1775,6 +1784,14 @@ export function SportsCardDetails() {
       console.log(`Sports API response status: ${res.status}`);
 
       if (!res.ok) {
+        const incompleteMessage = await readIncompleteInspectionMessage(res);
+        if (incompleteMessage) {
+          setError(incompleteMessage);
+          setLoading(false);
+          setIsProcessing(false);
+          return;
+        }
+
         // Check for private card access denied (403 status)
         if (res.status === 403) {
           const errorData = await res.json();
@@ -1832,6 +1849,12 @@ export function SportsCardDetails() {
                 return;
               }
 
+              const incompleteMessage = await readIncompleteInspectionMessage(retryRes);
+              if (incompleteMessage) {
+                setError(incompleteMessage);
+                setIsProcessing(false);
+                return;
+              }
               if (retryRes.status === 429) {
                 // Still processing, continue retrying
                 await retryWithBackoff(attempt + 1);
@@ -3441,7 +3464,28 @@ export function SportsCardDetails() {
               )}
 
               {/* 💰 DCM Estimated Price Callout */}
-              {dcmPriceData?.estimatedValue && (
+              {/* Value withheld: a large estimate on a card with no set or year is
+                  the shape that produced six-figure numbers on public pages. The
+                  owner is told how to release it; the public sees nothing.
+                  See @/lib/pricing/valueGuard. */}
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).reason === 'thin_identity' && (() => {
+                const session = getStoredSession();
+                const isOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                if (!isOwner) return null;
+                return (
+                  <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                    <p className="text-sm font-semibold text-slate-800">Confirm your card details to see a value</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      This card has no set or year on file, so the matched listing may be a
+                      different printing. Add the set and year with Edit Card Details and the
+                      value will appear here.
+                    </p>
+                    <ConfirmCardDetailsCalloutButton />
+                  </div>
+                );
+              })()}
+
+              {dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted && (
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -3611,6 +3655,18 @@ export function SportsCardDetails() {
               <div className="space-y-8">
 
               {/* 1. Card Information (includes slab detection when applicable) */}
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
+
               <CollapsibleSection
                 title="Card Information"
                 tourId="tour-card-info"
@@ -5039,7 +5095,7 @@ export function SportsCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                badge={dcmPriceData?.estimatedValue && assessValueTrust(card as any, dcmPriceData.estimatedValue).trusted ? `~$${dcmPriceData.estimatedValue}` : undefined}
                 tourId="tour-market-value"
               >
 
@@ -5050,6 +5106,7 @@ export function SportsCardDetails() {
                 const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                 return (
                   <PriceChartingLookup
+                    guardIdentity={card as any}
                     card={{
                       id: card.id,  // Card ID for saving manual parallel selection
                       player_or_character: cardInfo.player_or_character || card.featured,
@@ -5066,6 +5123,9 @@ export function SportsCardDetails() {
                       // Saved manual parallel selection
                       dcm_selected_product_id: card.dcm_selected_product_id ?? undefined,
                       dcm_selected_product_name: card.dcm_selected_product_name ?? undefined,
+                      // Phase 2C: guard price saves against a concurrent identity correction.
+                      identity_revision: card.identity_revision as number | null | undefined,
+                      pricing_selection_revision: card.pricing_selection_revision as number | null | undefined,
                     }}
                     dcmGrade={card.conversational_decimal_grade ?? undefined}
                     isOwner={isPricingOwner}

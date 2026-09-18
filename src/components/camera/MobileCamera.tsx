@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { recordLocalCaptureAudit } from '@/lib/localCaptureAudit';
 import { useCamera } from '@/hooks/useCamera';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
@@ -53,6 +54,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const toast = useToast();
+  const auditCaptureId = useRef('');
 
   // Start camera on mount and when facingMode changes
   useEffect(() => {
@@ -111,10 +113,16 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     if (isProcessing) return;
 
     setIsProcessing(true);
+    const captureId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    auditCaptureId.current = captureId;
+    const shutterRect = videoRef.current?.getBoundingClientRect();
+    recordLocalCaptureAudit({ captureId, stage: 'shutter', side, orientation,
+      viewport: shutterRect ? { width: shutterRect.width, height: shutterRect.height } : undefined });
 
     try {
       const captured = await captureImage();
       if (!captured) {
+        recordLocalCaptureAudit({ captureId, stage: 'failed', side, orientation });
         toast.error('Failed to capture image. Please try again.');
         setIsProcessing(false);
         return;
@@ -123,6 +131,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       let previewUrl: string;
       let file: File;
       let qualityCanvas: HTMLCanvasElement;
+      recordLocalCaptureAudit({ captureId, stage: 'frame', side, orientation,
+        frame: { width: captured.canvas.width, height: captured.canvas.height },
+        stream: captured.streamSize, transform: captured.streamTransform, source: captured.captureSource });
 
       try {
         // v9.10 geometry-aware crop: measure the real video element and guide
@@ -157,12 +168,20 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         previewUrl = cropResult.croppedDataUrl;
         file = cropResult.croppedFile;
         qualityCanvas = cropResult.croppedCanvas;
+        recordLocalCaptureAudit({ captureId, stage: 'crop', side, orientation,
+          viewport: rect ? { width: rect.width, height: rect.height } : undefined,
+          guide: viewContext ? { width: viewContext.guideW, height: viewContext.guideH,
+            centerOffsetY: viewContext.guideCenterOffsetY } : undefined,
+          geometry: viewContext ? 'viewport' : 'legacy', crop: cropResult.cropArea,
+          output: cropResult.croppedSize });
       } catch (err) {
         console.warn('[MobileCamera] Crop failed, using full frame:', err);
         const fallback = await canvasToJpegFile(captured.canvas, { quality: 0.9, maxDimension: 3000 });
         previewUrl = fallback.previewUrl;
         file = fallback.file;
         qualityCanvas = fallback.canvas;
+        recordLocalCaptureAudit({ captureId, stage: 'fallback', side, orientation,
+          output: { width: fallback.canvas.width, height: fallback.canvas.height } });
       }
 
       setCapturedImageUrl(previewUrl);
@@ -185,19 +204,22 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         console.warn('[MobileCamera] Quality validation failed:', err);
       }
     } catch (err) {
+      recordLocalCaptureAudit({ captureId, stage: 'failed', side, orientation });
       console.error('Capture error:', err);
       toast.error('Failed to capture image. Please try again.');
       setIsProcessing(false);
     }
-  }, [captureImage, orientation, isProcessing, toast]);
+  }, [captureImage, orientation, isProcessing, toast, side, videoRef]);
 
   const handleConfirm = () => {
     if (capturedFile) {
+      recordLocalCaptureAudit({ captureId: auditCaptureId.current, stage: 'accepted', side, orientation });
       onCapture(capturedFile, { captureMethod });
     }
   };
 
   const handleRetake = () => {
+    recordLocalCaptureAudit({ captureId: auditCaptureId.current, stage: 'retake', side, orientation });
     if (capturedImageUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(capturedImageUrl);
     }

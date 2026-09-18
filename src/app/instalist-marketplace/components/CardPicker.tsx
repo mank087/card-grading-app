@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getStoredSession } from '@/lib/directAuth';
 import type { MarketplaceCard } from '../types';
+import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
+
+/**
+ * The row's "~$12.00" hint, or null when there is nothing displayable. A card
+ * the displayed-value guard is hiding shows no number here either, so the
+ * picker cannot be the one place a suppressed value leaks out.
+ * See @/lib/pricing/valueGuard.
+ */
+function pickerValue(card: MarketplaceCard): number | null {
+  if (resolveCardValue(card).source === 'withheld') return null;
+  const value = card.ebay_price_median ?? card.dcm_price_estimate;
+  return value == null ? null : value;
+}
 
 type SortKey = 'recent' | 'name' | 'grade' | 'value';
 
@@ -123,8 +136,8 @@ export default function CardPicker({
     else if (sort === 'grade') sorted.sort((a, b) => (b.conversational_whole_grade ?? 0) - (a.conversational_whole_grade ?? 0));
     else if (sort === 'value') {
       sorted.sort((a, b) => {
-        const av = a.ebay_price_median ?? a.dcm_price_estimate ?? 0;
-        const bv = b.ebay_price_median ?? b.dcm_price_estimate ?? 0;
+        const av = pickerValue(a) ?? 0;
+        const bv = pickerValue(b) ?? 0;
         return bv - av;
       });
     } // 'recent' = default order from the API
@@ -317,9 +330,9 @@ export default function CardPicker({
                         Grade {card.conversational_whole_grade}
                       </span>
                     )}
-                    {(card.ebay_price_median ?? card.dcm_price_estimate) != null && (
+                    {pickerValue(card) != null && (
                       <span className="text-xs text-gray-600">
-                        ~${(card.ebay_price_median ?? card.dcm_price_estimate ?? 0).toFixed(2)}
+                        ~${(pickerValue(card) ?? 0).toFixed(2)}
                       </span>
                     )}
                   </div>

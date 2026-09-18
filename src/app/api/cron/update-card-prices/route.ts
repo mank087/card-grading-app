@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
-  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
+  refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale, REFRESH_CARD_SELECT,
 } from '@/lib/pricing/batchPriceRefresh';
 import { requireCron } from '@/lib/cronAuth';
 
@@ -48,14 +48,7 @@ export async function GET(request: NextRequest) {
     // the top — they need pricing more urgently than 8-day-old cards.
     const { data: cards, error: fetchErr } = await supabaseAdmin
       .from('cards')
-      .select(`
-        id, category,
-        conversational_card_info,
-        conversational_decimal_grade,
-        card_name, featured, pokemon_featured, card_set, card_number, release_date,
-        manufacturer_name, is_foil, foil_type, mtg_rarity,
-        dcm_price_product_id, dcm_price_updated_at
-      `)
+      .select(REFRESH_CARD_SELECT)
       .not('category', 'is', null)
       .order('dcm_price_updated_at', { ascending: true, nullsFirst: true })
       .limit(MAX_CARDS_PER_RUN);
@@ -93,10 +86,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Cards with product IDs first (fast path).
+    // Cards with a product ID first (fast path) — the owner's pick counts as
+    // one, since that is the product refreshCardPrice will look up.
+    const hasFastPath = (c: { dcm_selected_product_id?: string | null; dcm_price_product_id?: string | null }) =>
+      !!(c.dcm_selected_product_id || c.dcm_price_product_id);
     staleCards.sort((a, b) => {
-      if (a.dcm_price_product_id && !b.dcm_price_product_id) return -1;
-      if (!a.dcm_price_product_id && b.dcm_price_product_id) return 1;
+      if (hasFastPath(a) && !hasFastPath(b)) return -1;
+      if (!hasFastPath(a) && hasFastPath(b)) return 1;
       return 0;
     });
 
@@ -105,6 +101,9 @@ export async function GET(request: NextRequest) {
     let skipped = 0;
     let processed = 0;
     let timedOut = false;
+    // Cards whose identity was corrected mid-run. Not a failure: the write was
+    // dropped on purpose, and the next run prices the corrected card.
+    let staleWrites = 0;
 
     for (const card of staleCards) {
       if (Date.now() - startedAt > MAX_DURATION_MS) {
@@ -129,7 +128,8 @@ export async function GET(request: NextRequest) {
           cardType,
           dcmGrade,
         );
-        if (result.success) succeeded++;
+        if (result.stale) staleWrites++;
+        else if (result.success) succeeded++;
         else failed++;
       } catch (err) {
         console.error('[Price Cron] refresh threw:', err);
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
 
     const durationMs = Date.now() - startedAt;
     console.log(
-      `[Price Cron] Done in ${durationMs}ms — processed=${processed} succeeded=${succeeded} failed=${failed} skipped=${skipped} timedOut=${timedOut}`,
+      `[Price Cron] Done in ${durationMs}ms — processed=${processed} succeeded=${succeeded} failed=${failed} skipped=${skipped} staleWrites=${staleWrites} timedOut=${timedOut}`,
     );
 
     return NextResponse.json({
@@ -151,6 +151,7 @@ export async function GET(request: NextRequest) {
       succeeded,
       failed,
       skipped,
+      staleWrites,
       timedOut,
       remaining: Math.max(0, staleCards.length - processed),
       durationMs,

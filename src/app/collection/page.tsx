@@ -1,5 +1,7 @@
 'use client'
 
+import CollectionConfirmDetailsHost, { requestConfirmDetails } from '@/components/cards/CollectionConfirmDetailsHost';
+import { isNonStandardItemType } from '@/lib/identification/itemType';
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -77,6 +79,11 @@ type Card = {
   conversational_image_confidence?: string | null
   conversational_condition_label?: string | null
   conversational_card_info?: any  // JSON field containing card details
+  // 💰 Displayed-value guard inputs (see @/lib/pricing/valueGuard)
+  dcm_selected_product_id?: string | null
+  identity_confirmed_revision?: number | null
+  identity_revision?: number | null
+  item_type?: string | null
   dvg_decimal_grade?: number | null
   // 🎯 Unified label data (pre-generated)
   label_data?: any
@@ -302,8 +309,81 @@ const usesDcmPricing = (card: Card): boolean => {
 // preserve the existing UI semantics that distinguish "no price" from "$0".
 const getMarketValue = (card: Card): number | null => {
   const { value, source } = resolveCardValue(card);
-  return source === 'none' ? null : value;
+  return source === 'none' || source === 'withheld' ? null : value;
 };
+
+// 💰 Helper: true when a price exists but the displayed-value guard is hiding
+// it (a large number on a card with no set or no year). See
+// @/lib/pricing/valueGuard. Totals already ignore these because getMarketValue
+// returns null; this is what lets the tile say why instead of going blank.
+const isValueWithheld = (card: Card): boolean => {
+  return resolveCardValue(card).source === 'withheld';
+};
+
+const WITHHELD_VALUE_MESSAGE = 'Confirm your card details to see a value';
+const NOT_STANDARD_MESSAGE = 'Not a standard trading card, so no market value is shown';
+
+// One line of text, not a new surface. The card links to its detail page,
+// where Edit Card Details already lives.
+const WithheldValueNote = ({ compact = false, card }: { compact?: boolean; card?: Card }) => {
+  // Two different reasons a value is hidden; say the right one.
+  if (card && resolveCardValue(card).withheldReason === 'not_standard_card') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300" title={NOT_STANDARD_MESSAGE}>
+        {compact ? 'Not a standard card' : NOT_STANDARD_MESSAGE}
+      </span>
+    );
+  }
+  if (!card) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200" title={WITHHELD_VALUE_MESSAGE}>
+        {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={event => openConfirmDetails(event, card.id)}
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 cursor-pointer"
+      title={WITHHELD_VALUE_MESSAGE}
+    >
+      {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+    </button>
+  );
+};
+
+// Owner request (Sept 17 2026): flag cards whose details the owner has not
+// confirmed yet, so they know to open the card and confirm. Same switch as the
+// confirmation dialog. A sold card's record is locked, so it is never flagged.
+const needsDetailsConfirmation = (card: Card): boolean => {
+  if (process.env.NEXT_PUBLIC_IDENTITY_CONFIRM !== '1') return false;
+  const row = card as any;
+  if (row.ownership_status === 'sold') return false;
+  if (isNonStandardItemType(row.item_type)) return false;
+  if (!(Number(row.conversational_whole_grade ?? row.conversational_decimal_grade ?? 0) > 0)) return false;
+  const confirmed = row.identity_confirmed_revision;
+  return confirmed === null || confirmed === undefined || Number(confirmed) < Number(row.identity_revision ?? 0);
+};
+
+// A real button: the tag sits inside links and clickable tiles, so it stops the
+// click there and asks the page-level host to open the confirmation dialog in place.
+const openConfirmDetails = (event: { preventDefault: () => void; stopPropagation: () => void }, cardId: string) => {
+  event.preventDefault();
+  event.stopPropagation();
+  requestConfirmDetails(cardId);
+};
+
+const ConfirmDetailsTag = ({ card }: { card: Card }) => (
+  <button
+    type="button"
+    onClick={event => openConfirmDetails(event, card.id)}
+    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 cursor-pointer"
+    title="Confirm this card's name, set, year and number so its value and label are right"
+  >
+    Confirm details
+  </button>
+);
 
 // 💰 Helper: Check if price data is stale (> 7 days)
 const isPriceStale = (updatedAt: string | null | undefined): boolean => {
@@ -2317,6 +2397,12 @@ function CollectionPageContent() {
 
   return (
     <div className="dcm-brand dcm-collection-page flex min-h-screen flex-col items-center p-4 sm:p-8">
+      {/* Confirm a card's details in place: the "Confirm details" tags open this. */}
+      <CollectionConfirmDetailsHost
+        cards={[...cards, ...(binderCards ?? [])]}
+        onChanged={() => setRefreshKey(k => k + 1)}
+        hrefFor={id => { const found = [...cards, ...(binderCards ?? [])].find(c => c.id === id); return found ? getCardLink(found) : null; }}
+      />
       <div className="w-full max-w-6xl">
         {batchBanner}
         <div className="dcm-collection-header flex flex-col gap-4 mb-6">
@@ -3064,7 +3150,14 @@ function CollectionPageContent() {
                     {(() => {
                       const marketValue = getMarketValue(card);
                       const priceStr = formatPrice(marketValue);
-                      if (!priceStr) return null;
+                      if (!priceStr) {
+                        if (!isValueWithheld(card) && !needsDetailsConfirmation(card)) return null;
+                        return (
+                          <div className="absolute -top-8 right-2">
+                            {isValueWithheld(card) ? <WithheldValueNote compact card={card} /> : <ConfirmDetailsTag card={card} />}
+                          </div>
+                        );
+                      }
 
                       const isStale = isPriceStale(getPriceUpdatedAt(card));
                       // Determine price source label
@@ -3088,6 +3181,9 @@ function CollectionPageContent() {
                         </div>
                       );
                     })()}
+                    {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                      <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
+                    )}
                   </div>
 
                   {/* Sale details + actions.
@@ -3289,8 +3385,12 @@ function CollectionPageContent() {
                                       </span>
                                     );
                                   }
-                                  return null;
+                                  if (isValueWithheld(card)) return <WithheldValueNote card={card} />;
+                                  return needsDetailsConfirmation(card) ? <ConfirmDetailsTag card={card} /> : null;
                                 })()}
+                                {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                                  <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
+                                )}
 
                                 {/* Sold badge — makes the state obvious at a
                                     glance, wherever the tile is shown */}
@@ -3581,7 +3681,8 @@ function CollectionPageContent() {
                               const isStale = isPriceStale(getPriceUpdatedAt(card));
 
                               if (!priceStr) {
-                                return <span className="text-sm text-gray-400">-</span>;
+                                if (isValueWithheld(card)) return <WithheldValueNote compact card={card} />;
+                                return needsDetailsConfirmation(card) ? <ConfirmDetailsTag card={card} /> : <span className="text-sm text-gray-400">-</span>;
                               }
 
                               return (
@@ -3590,6 +3691,9 @@ function CollectionPageContent() {
                                 </span>
                               );
                             })()}
+                            {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
+                              <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
+                            )}
                           </td>
                           <td className="px-3 py-3">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${

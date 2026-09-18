@@ -19,6 +19,9 @@ import {
   type OtherCardQueryOptions,
 } from './browseApi';
 import { EBAY_CATEGORIES } from './constants';
+import {
+  guardedPriceUpdate, readPriceRevisions, type PriceRevisions,
+} from '@/lib/pricing/guardedPriceWrite';
 
 // Types
 export interface PriceSnapshot {
@@ -49,6 +52,15 @@ export interface CardForPricing {
   id: string;
   category: string;
   dcm_price_estimate?: number | null;
+  /**
+   * Phase 2C: the revisions this card's identity was read at. Select them
+   * alongside conversational_card_info (PRICE_REVISION_SELECT) and the cache
+   * write becomes a compare-and-set, so an identity correction that lands while
+   * eBay is being queried is not overwritten. Omitted means "cannot guard" and
+   * the write happens as it did before.
+   */
+  identity_revision?: number | null;
+  pricing_selection_revision?: number | null;
   conversational_card_info: {
     // Primary fields (from conversational grading)
     player_or_character?: string;
@@ -285,7 +297,9 @@ export async function getCardsNeedingPriceUpdate(
   // Also fetch dcm_price_estimate so we can snapshot PriceCharting prices
   let query = supabase
     .from('cards')
-    .select('id, category, conversational_card_info, dcm_price_estimate')
+    // The two revision columns ride along so anything this batch later hands to
+    // fetchAndCacheCardPrice can guard its write (Phase 2C).
+    .select('id, category, conversational_card_info, dcm_price_estimate, identity_revision, pricing_selection_revision')
     .not('conversational_card_info', 'is', null)
     .limit(limit);
 
@@ -581,26 +595,26 @@ async function savePriceCache(
     average: number | null;
     highest: number | null;
     listingCount: number;
-  }
-): Promise<void> {
+  },
+  revisions: PriceRevisions | null
+): Promise<'written' | 'stale'> {
   const supabase = supabaseServer();
 
-  const { error } = await supabase
-    .from('cards')
-    .update({
-      ebay_price_lowest: prices.lowest,
-      ebay_price_median: prices.median,
-      ebay_price_average: prices.average,
-      ebay_price_highest: prices.highest,
-      ebay_price_listing_count: prices.listingCount,
-      ebay_price_updated_at: new Date().toISOString(),
-    })
-    .eq('id', cardId);
+  const result = await guardedPriceUpdate(supabase, cardId, revisions, {
+    ebay_price_lowest: prices.lowest,
+    ebay_price_median: prices.median,
+    ebay_price_average: prices.average,
+    ebay_price_highest: prices.highest,
+    ebay_price_listing_count: prices.listingCount,
+    ebay_price_updated_at: new Date().toISOString(),
+  }, 'PriceTracker');
 
-  if (error) {
-    console.error(`[PriceTracker] Error saving price cache for card ${cardId}:`, error);
-    throw error;
+  if (result.status === 'stale') return 'stale';
+  if (result.status === 'error') {
+    // Callers treated a failed cache write as fatal before Phase 2C; keep that.
+    throw new Error(result.error || 'Failed to save eBay price cache');
   }
+  return 'written';
 }
 
 /**
@@ -742,8 +756,15 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
       listingCount: result.total,
     };
 
-    // Save to cards table cache
-    await savePriceCache(card.id, prices);
+    // Save to cards table cache, guarded on the revisions this card was read at.
+    const writeStatus = await savePriceCache(card.id, prices, readPriceRevisions(card));
+    if (writeStatus === 'stale') {
+      // The card's identity or product pick moved while eBay was being queried.
+      // These comps describe the old card, so they are dropped and no history
+      // snapshot is written either. The next refresh prices the corrected card.
+      console.log(`[PriceTracker] Dropped stale eBay comps for card ${card.id}`);
+      return null;
+    }
 
     // Also save initial price snapshot to history table so Market Pricing
     // shows data immediately instead of waiting for the next weekly cron
@@ -802,6 +823,9 @@ export async function getCardPriceWithCache(
   cardData: {
     category: string;
     conversational_card_info: CardForPricing['conversational_card_info'];
+    /** Phase 2C: pass these from the same row the card info was read from. */
+    identity_revision?: number | null;
+    pricing_selection_revision?: number | null;
   },
   options: { maxAgeDays?: number; forceRefresh?: boolean } = {}
 ): Promise<CachedPrice | null> {
@@ -821,6 +845,8 @@ export async function getCardPriceWithCache(
     id: cardId,
     category: cardData.category,
     conversational_card_info: cardData.conversational_card_info,
+    identity_revision: cardData.identity_revision,
+    pricing_selection_revision: cardData.pricing_selection_revision,
   };
 
   return fetchAndCacheCardPrice(card);

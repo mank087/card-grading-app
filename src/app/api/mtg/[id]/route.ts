@@ -1,3 +1,4 @@
+import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
@@ -705,7 +706,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       } catch (error: any) {
         console.error(`[GET /api/mtg/${cardId}] ⚠️ Conversational grading failed:`, error.message);
         // Mark the card as failed (releases the grading lock) and refund the credit
-        const failure = await recordGradingFailure({
+        const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
           cardId,
           userId: card.user_id,
           category: 'MTG',
@@ -714,8 +715,8 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         return NextResponse.json({
           error: "Failed to grade MTG card. Please try again or contact support.",
           details: error.message,
-          grading_failed: true,
-          credit_refunded: failure.refunded
+          ...inspectionFailureResponse(error), grading_failed: true,
+          credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
         }, { status: 500 });
       }
     }
@@ -1324,7 +1325,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     if (updateError) {
       console.error(`[GET /api/mtg/${cardId}] Database update failed:`, updateError);
       // Releases the grading lock (grade_status='failed') and refunds the credit
-      const failure = await recordGradingFailure({
+      const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: card.user_id,
         category: 'MTG',
@@ -1333,7 +1334,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       return NextResponse.json({
         error: "Failed to save MTG card grading results",
         grading_failed: true,
-        credit_refunded: failure.refunded
+        credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
       }, { status: 500 });
     }
 
@@ -1409,7 +1410,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     // Without this the lock stayed 'processing:<ISO>' and every retry 429'd
     // for the full 6-minute stale window.
     if (gradingAttempted) {
-      await recordGradingFailure({
+      await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: gradingOwnerId,
         category: 'MTG',

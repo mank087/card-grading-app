@@ -23,6 +23,7 @@ export async function loadFeaturedCards(limit: number, category: string | null, 
         autographed, autograph_type, memorabilia_type,
         rookie_card, first_print_rookie,
         dcm_price_estimate, scryfall_price_usd,
+        dcm_selected_product_id, identity_confirmed_revision, item_type,
         card_colors, label_data
       `)
       .eq('visibility', 'public')

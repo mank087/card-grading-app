@@ -27,7 +27,7 @@
 import type { ZoomResult } from '../zoomInspection';
 
 /** Bump when the measurement's meaning changes, so thresholds stay attributable. */
-export const CAPTURE_QUALITY_VERSION = 'cq-1';
+export const CAPTURE_QUALITY_VERSION = 'cq-2';
 
 export interface CaptureQualityRecord {
   measured_at: string;
@@ -45,6 +45,8 @@ export interface CaptureQualityRecord {
   zoom_outcome: 'full' | 'card_relative' | 'abandoned';
   /** Present when the zoom pass was skipped or failed, verbatim. */
   zoom_error?: string;
+  zoom_inspection_status: 'complete' | 'incomplete';
+  zoom_coverage?: ZoomResult['coverage'];
 }
 
 /** Build the record from a zoom result. Returns null when nothing was measured. */
@@ -58,6 +60,8 @@ export function buildCaptureQualityRecord(zoom: ZoomResult | null): CaptureQuali
     front: { fill_percent: c.frontFill, quad: c.frontQuad },
     back: { fill_percent: c.backFill, quad: c.backQuad },
     zoom_outcome: c.outcome,
+    zoom_inspection_status: zoom.ok ? 'complete' : 'incomplete',
+    ...(zoom.coverage ? { zoom_coverage: zoom.coverage } : {}),
     ...(zoom.error ? { zoom_error: String(zoom.error).slice(0, 300) } : {}),
   };
 }

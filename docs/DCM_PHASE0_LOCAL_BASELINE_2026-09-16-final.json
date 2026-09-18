@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-16T14:56:37.582Z",
+  "kind": "offline-source-baseline",
+  "limitations": [
+    "Not a deployed configuration attestation or an actual API request trace.",
+    "No camera device, customer image, grading accuracy, or API compatibility verification.",
+    "Request template is the audited main ensemble only; retries and other passes may differ.",
+    "Matching frozen probes preserves known defects; it does not assert correct behavior."
+  ],
+  "git": {
+    "head": "c3ff3f81a4f1cb518c68db4b93e2edde10ffa5db",
+    "scopedStatus": [
+      "M src/components/camera/MobileCamera.tsx",
+      "?? docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json",
+      "?? docs/dcm-accuracy-audit-2026-09-16-probes.cjs",
+      "?? scripts/accuracy-phase0.cjs",
+      "?? src/lib/localCaptureAudit.ts"
+    ]
+  },
+  "configSource": "local Next development environment (shell precedence); deployed settings unverified",
+  "configured": {
+    "GRADING_BASELINE_MODEL": null,
+    "GRADING_CANARY_MODEL": null,
+    "GRADING_CANARY_PERCENT": null,
+    "GRADING_CANARY_KILL": null,
+    "GRADING_CANARY_REASONING_EFFORT": null,
+    "GRADING_CANARY_CACHE_RETENTION": null,
+    "GRADING_IMAGE_DETAIL": null,
+    "IDENTIFICATION_MODEL": null,
+    "GRADING_MODEL": null,
+    "IDENTIFICATION_PASS_ENABLED": null,
+    "CV_CENTERING_ADVISORY": null,
+    "CV_CENTERING_MODE": null,
+    "CENTERING_POLICY": null,
+    "CENTERING_R0": null,
+    "ZOOM_DISABLED": null,
+    "YEAR_EVIDENCE_REQUIRED": null,
+    "CARD_NUMBER_EVIDENCE_REQUIRED": null,
+    "SPORTS_CHECKLIST_ENABLED": null,
+    "GRADE_REVIEW_CAPTURE_ENABLED": null
+  },
+  "declaredPromptVersion": "DCM_Grading_v9.25",
+  "localEffective": {
+    "noRoutingKey": {
+      "model": "gpt-5.6-luna",
+      "isCanary": false,
+      "bucket": null,
+      "percent": 0,
+      "killed": false
+    },
+    "syntheticRoutingKey": {
+      "model": "gpt-5.6-luna",
+      "isCanary": false,
+      "bucket": null,
+      "percent": 0,
+      "killed": false
+    },
+    "baselineMainRequestTemplate": {
+      "config": {
+        "model": "gpt-5.6-luna",
+        "max_tokens": 16000,
+        "seed": 7,
+        "n": 3,
+        "response_format": {
+          "type": "json_object"
+        },
+        "reasoning_effort": "low",
+        "prompt_cache_retention": "24h"
+      },
+      "stripped": [
+        "temperature",
+        "top_p"
+      ],
+      "reasoningEffort": "low"
+    },
+    "canaryMainRequestTemplate": {
+      "config": {
+        "model": "gpt-5.6-luna",
+        "max_tokens": 16000,
+        "seed": 7,
+        "n": 3,
+        "response_format": {
+          "type": "json_object"
+        },
+        "reasoning_effort": "low",
+        "prompt_cache_retention": "24h"
+      },
+      "stripped": [
+        "temperature",
+        "top_p"
+      ],
+      "reasoningEffort": "low"
+    },
+    "gradingImageDetail": "high",
+    "identificationModel": "gpt-5.6-luna"
+  },
+  "sourceHashes": {
+    "dcm-mobile/app/grade/capture.tsx": "1be6bf587a472bc3e6a91d608d187f3f47c9a9e6aea7cf9db99ad1fe2ac56b23",
+    "dcm-mobile/lib/imageUtils.ts": "916950cc174e19b59e97785af9c997457bdd0861625c7e7326b71044313b8706",
+    "docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json": "1df2f45e0fe8a63ea288108636c1d98c55d517c76f058287607fef94ef997562",
+    "docs/dcm-accuracy-audit-2026-09-16-probes.cjs": "7285fc6464bcfdd4ec7b3801281ee205e5399a92a31935a036673afdabacbdde",
+    "prompts/lorcana_delta_v5.txt": "1adfb8b6e7889190a5b8d90d308c341bf1c754125cb0cc8ce3766482d1fb0940",
+    "prompts/master_grading_rubric_v5.txt": "b9cf1f287da07cc8aa0935474b17a931ea9b00e2aca281f4b8124db9a9bde5d3",
+    "prompts/mtg_delta_v5.txt": "16c53038f654c4db159f60a273bb73144d6c90ecde659c8c95d31dd411066f75",
+    "prompts/onepiece_delta_v5.txt": "eadc05c5b3295d0088a51fd92efb1c86f59107d336e1f3fb652113ad97ec6106",
+    "prompts/other_delta_v5.txt": "ebd20559a9fe445b2258fb6c184d110f42b9788c7d8c8134736c7c8247f4a735",
+    "prompts/pokemon_delta_v5.txt": "192057eccebb925fcde2bc37fdc10d6f094c8ae6ddbc434b7b31a369d4b83c9f",
+    "prompts/sports_delta_v5.txt": "425810446438ab2d622c1d8606ff87b3cfdcc832af797092dec8b1df23bfdf3e",
+    "prompts/starwars_delta_v5.txt": "9633d79231b3c1fc3ff1f891ee2165ab958e52cf939668f344c244774ac3803f",
+    "prompts/yugioh_delta_v5.txt": "69491f62966fd875ebeb0b3cd220d01d49dbcfa0a0f4f9d4f6bd671cc6860a5e",
+    "scripts/accuracy-phase0.cjs": "520d992b476ad53889d0207038d4f064a00647e4a93e4b42a387b96d1a53d8a1",
+    "src/app/upload/page.tsx": "af12e8282789379f8bd3147cf394b098ed5fb19cbfc389b3aec91426d697d076",
+    "src/components/camera/MobileCamera.tsx": "dd6a43e8d06f2e9843625b508078f925162dc7353d1751c3caa3ceb7746908d3",
+    "src/hooks/useCamera.ts": "f792e55f1c0afcb3aeab9e2972d992c8628e4ae42999aa1b1ef2cc78f0668882",
+    "src/lib/grading/imageDetail.ts": "462db3eb10f0f9e26fce6d2313bd03ae76cc31a3e003816aedc6390e7cdd7e57",
+    "src/lib/grading/modelRouter.ts": "04ffa88ace5145ec47fc81c40909e7d7dc53c3c8868f39433bd7e8391cdf6d7a",
+    "src/lib/identification/identifyCard.ts": "7600f0274a3ba6ea0216759037fbee33aee18e7f3e870edbea3bed4dbdbdef8d",
+    "src/lib/identification/reconcile.ts": "d6f1031b7c8da9958b877cd27d46e4ff0554de4fa4fececbbd7c4bbfc57d5973",
+    "src/lib/identity/nameAgreement.ts": "5a6e671e585cbe06654874f54dad00bc3e8af960e91364a8ef50a2bdb566579f",
+    "src/lib/localCaptureAudit.ts": "504b01c44fde48b04fa45ddc3855bbe4754116e04a15bd7922b349192148e308",
+    "src/lib/promptLoader_v5.ts": "7f7639b1c73f814f4d7e2b169608695379eae09f02e8b80941f2e67a3ee4f158",
+    "src/lib/visionGrader.ts": "768627872281be81416d65ca30e5b8e8ffa49f14e322ba754afa00659aa576f6",
+    "src/utils/cameraGuideGeometry.ts": "1e4e659ec04c59b85612ae8eb1e53c3598419e6d6d558175f4318f213769c605",
+    "src/utils/guideCrop.ts": "f72471b4c937d7ff82b8b53ac11ac4ad545335cb4fb202394fe237c2d43043cb"
+  },
+  "probes": {
+    "matchesFrozenBaseline": true,
+    "observed": {
+      "reconciliation": {
+        "differentJapaneseNamesAgree": true,
+        "mewAndMewtwoAgree": true,
+        "missingEvidenceConfidence": "high"
+      },
+      "catalogNames": {
+        "differentJapanese": {
+          "agrees": true,
+          "similarity": 1,
+          "reason": "no AI name to check",
+          "aiKey": "",
+          "dbKey": ""
+        },
+        "differentMegaForms": {
+          "agrees": true,
+          "similarity": 1,
+          "reason": "species match",
+          "aiKey": "charizard",
+          "dbKey": "charizard"
+        }
+      },
+      "mobileGuide": [
+        {
+          "viewport": [
+            390,
+            600
+          ],
+          "fraction": 0.8571428571428571,
+          "guideHeight": 468,
+          "exceedsViewport": false
+        },
+        {
+          "viewport": [
+            800,
+            350
+          ],
+          "fraction": 0.6,
+          "guideHeight": 672,
+          "exceedsViewport": true
+        }
+      ],
+      "webPortraitCrop": {
+        "cropX": 1388,
+        "cropY": 281,
+        "cropW": 1065,
+        "cropH": 1491
+      },
+      "promptSizes": [
+        {
+          "file": "master_grading_rubric_v5.txt",
+          "characters": 293000,
+          "lines": 5614,
+          "approximateTokensCharsDiv4": 73250
+        },
+        {
+          "file": "sports_delta_v5.txt",
+          "characters": 42656,
+          "lines": 738,
+          "approximateTokensCharsDiv4": 10664
+        },
+        {
+          "file": "pokemon_delta_v5.txt",
+          "characters": 32250,
+          "lines": 648,
+          "approximateTokensCharsDiv4": 8063
+        },
+        {
+          "file": "mtg_delta_v5.txt",
+          "characters": 22055,
+          "lines": 473,
+          "approximateTokensCharsDiv4": 5514
+        },
+        {
+          "file": "lorcana_delta_v5.txt",
+          "characters": 13553,
+          "lines": 319,
+          "approximateTokensCharsDiv4": 3389
+        },
+        {
+          "file": "onepiece_delta_v5.txt",
+          "characters": 19756,
+          "lines": 475,
+          "approximateTokensCharsDiv4": 4939
+        },
+        {
+          "file": "yugioh_delta_v5.txt",
+          "characters": 21793,
+          "lines": 454,
+          "approximateTokensCharsDiv4": 5449
+        },
+        {
+          "file": "starwars_delta_v5.txt",
+          "characters": 15029,
+          "lines": 328,
+          "approximateTokensCharsDiv4": 3758
+        },
+        {
+          "file": "other_delta_v5.txt",
+          "characters": 14172,
+          "lines": 307,
+          "approximateTokensCharsDiv4": 3543
+        }
+      ]
+    }
+  }
+}

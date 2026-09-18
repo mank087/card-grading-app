@@ -27,6 +27,7 @@ import {
   type DcmCachedPrice,
 } from '@/lib/pricing/dcmPriceTracker';
 import { mapPricingErrorToHttpStatus } from '@/lib/pricingFetch';
+import { PRICE_REVISION_SELECT } from '@/lib/pricing/guardedPriceWrite';
 
 export interface DcmCachedPriceResponse {
   success: boolean;
@@ -66,7 +67,9 @@ export async function GET(request: NextRequest): Promise<NextResponse<DcmCachedP
         category,
         conversational_decimal_grade,
         conversational_card_info,
-        dcm_price_updated_at
+        dcm_price_updated_at,
+        dcm_selected_product_id,
+        ${PRICE_REVISION_SELECT}
       `)
       .eq('id', cardId)
       .single();
@@ -98,14 +101,22 @@ export async function GET(request: NextRequest): Promise<NextResponse<DcmCachedP
       );
     }
 
+    // One input for every refresh path below. It carries the two revision
+    // counters (so the write is a compare-and-set against the identity we just
+    // read) and the owner's product pick (which outranks automatic matching).
+    const pricingInput = {
+      category: card.category,
+      conversational_decimal_grade: card.conversational_decimal_grade,
+      conversational_card_info: card.conversational_card_info,
+      identity_revision: card.identity_revision,
+      pricing_selection_revision: card.pricing_selection_revision,
+      dcm_selected_product_id: card.dcm_selected_product_id,
+    };
+
     // If forcing a new search, skip cache entirely and do fresh search
     if (forceNewSearch) {
       console.log(`[DCM API] Force new search requested for card ${cardId}`);
-      const freshPrice = await getDcmPriceWithCache(cardId, {
-        category: card.category,
-        conversational_decimal_grade: card.conversational_decimal_grade,
-        conversational_card_info: card.conversational_card_info,
-      }, { forceNewSearch: true });
+      const freshPrice = await getDcmPriceWithCache(cardId, pricingInput, { forceNewSearch: true });
 
       if (!freshPrice) {
         return NextResponse.json({
@@ -141,11 +152,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DcmCachedP
       // If stale but exists, try to refresh in background and return stale data
       if (cached && isStale) {
         // Start refresh in background (don't await)
-        getDcmPriceWithCache(cardId, {
-          category: card.category,
-          conversational_decimal_grade: card.conversational_decimal_grade,
-          conversational_card_info: card.conversational_card_info,
-        }, { forceRefresh: true }).catch(err => {
+        getDcmPriceWithCache(cardId, pricingInput, { forceRefresh: true }).catch(err => {
           console.error(`[DCM API] Background refresh failed for ${cardId}:`, err);
         });
 
@@ -159,11 +166,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DcmCachedP
     }
 
     // Fetch fresh price
-    const freshPrice = await getDcmPriceWithCache(cardId, {
-      category: card.category,
-      conversational_decimal_grade: card.conversational_decimal_grade,
-      conversational_card_info: card.conversational_card_info,
-    }, { forceRefresh: true });
+    const freshPrice = await getDcmPriceWithCache(cardId, pricingInput, { forceRefresh: true });
 
     if (!freshPrice) {
       return NextResponse.json({

@@ -25,6 +25,7 @@
  */
 
 import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+import { capMatchConfidence } from './pricing/valueGuard';
 
 // PriceCharting API base URL
 const API_BASE_URL = 'https://www.pricecharting.com/api';
@@ -97,6 +98,8 @@ export interface MTGCardSearchParams {
   year?: string;
   isFoil?: boolean;
   variant?: string;  // e.g., "Foil", "Borderless", "Extended Art", "Showcase"
+  /** The printed Magic card name when `cardName` is a crossover flavor title. */
+  alternateName?: string;
 }
 
 /**
@@ -524,7 +527,7 @@ function scoreMTGProductMatch(
 /**
  * Search for MTG card prices
  */
-export async function searchMTGCardPrices(
+async function searchMTGCardPricesUncapped(
   params: MTGCardSearchParams
 ): Promise<{ prices: NormalizedMTGPrices | null; matchConfidence: 'high' | 'medium' | 'low' | 'none'; queryUsed: string }> {
   console.log('[MTGPricing] === SEARCH REQUEST ===');
@@ -677,6 +680,21 @@ export async function searchMTGCardPrices(
     }
   }
 
+  // Universes Beyond / crossover cards print a FLAVOR title in large type with the
+  // real Magic card name in small italics beneath it ("Splinter of the Shadows" /
+  // "Ashcoat of the Shadow Swarm"). The catalog lists the real name, so a search on
+  // the flavor title finds nothing. The grader stores the title as card_name and the
+  // real name as `featured`, so callers pass it as alternateName and we retry with it.
+  // Owner test, Sept 18 2026: that card searched as the title returned nothing; the
+  // same set and number under the real name returned a high-confidence $4.15 match.
+  if (params.alternateName && params.alternateName.trim()
+    && params.alternateName.trim().toLowerCase() !== params.cardName.trim().toLowerCase()) {
+    console.log(`[MTGPricing] Nothing under "${params.cardName}". Retrying with the printed card name "${params.alternateName}".`);
+    await pricingDelay();
+    const alternate = await searchMTGCardPricesUncapped({ ...params, cardName: params.alternateName, alternateName: undefined });
+    if (alternate.matchConfidence !== 'none') return alternate;
+  }
+
   console.log('[MTGPricing] No matching products found');
   return {
     prices: null,
@@ -770,4 +788,20 @@ export async function getMTGPricesForProductId(
  */
 export function isMTGPricingEnabled(): boolean {
   return !!process.env.PRICECHARTING_API_KEY;
+}
+/**
+ * A query with no set and no year is a name-only search. It cannot tell an
+ * original from a reprint, so whatever the name scored, the match does not get
+ * to be labelled "Best Match" or "Good Match": it is capped at low. Matching
+ * itself is unchanged. See capMatchConfidence in @/lib/pricing/valueGuard.
+ */
+export async function searchMTGCardPrices(
+  params: MTGCardSearchParams
+): Promise<Awaited<ReturnType<typeof searchMTGCardPricesUncapped>>> {
+  const result = await searchMTGCardPricesUncapped(params);
+  const capped = capMatchConfidence(result.matchConfidence, { setName: params.setName, year: params.year });
+  if (capped !== result.matchConfidence) {
+    console.log(`[MTGPricing] Match confidence capped ${result.matchConfidence} -> ${capped}: the query had no set and no year`);
+  }
+  return { ...result, matchConfidence: capped };
 }

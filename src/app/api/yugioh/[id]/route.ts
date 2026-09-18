@@ -1,3 +1,4 @@
+import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
@@ -25,6 +26,7 @@ import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Yu-Gi-Oh cards
 import { lookupYugiohCard } from "@/lib/yugiohCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+import { guardedPriceUpdate, readPriceRevisions } from "@/lib/pricing/guardedPriceWrite";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
@@ -633,12 +635,12 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
         }
       } catch (error: any) {
         console.error(`[GET /api/yugioh/${cardId}] Conversational grading failed:`, error.message);
-        const failure = await recordGradingFailure({ cardId, userId: card.user_id, category: 'Yu-Gi-Oh', errorMessage: error.message });
+        const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined, cardId, userId: card.user_id, category: 'Yu-Gi-Oh', errorMessage: error.message });
         return NextResponse.json({
           error: "Failed to grade Yu-Gi-Oh card. Please try again or contact support.",
           details: error.message,
-          grading_failed: true,
-          credit_refunded: failure.refunded
+          ...inspectionFailureResponse(error), grading_failed: true,
+          credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
         }, { status: 500 });
       }
     }
@@ -1143,7 +1145,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       console.error(`[GET /api/yugioh/${cardId}] Database update failed:`, updateError);
       // Release the lock as 'failed' and refund the credit — a save failure
       // means the user paid for a grade the DB never stored.
-      const failure = await recordGradingFailure({
+      const failure = await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: card.user_id,
         category: 'Yu-Gi-Oh',
@@ -1152,7 +1154,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       return NextResponse.json({
         error: "Failed to save Yu-Gi-Oh card grading results",
         grading_failed: true,
-        credit_refunded: failure.refunded
+        credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
       }, { status: 500 });
     }
 
@@ -1200,7 +1202,10 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
             dcm_price_product_id: result.prices.productId,
             dcm_price_product_name: result.prices.productName,
           };
-          await supabase.from("cards").update(priceUpdate).eq("id", cardId);
+          // Phase 2C: this fetch is fire-and-forget, so the owner can confirm or
+          // correct the card before it lands. Guard the write on the revisions the
+          // card row was read at; a stale write is dropped.
+          await guardedPriceUpdate(supabase, cardId, readPriceRevisions(card as Record<string, any>), priceUpdate, "yugioh");
           console.log(`[GET /api/yugioh/${cardId}] Pricing saved: $${estimatedValue} (confidence: ${result.matchConfidence})`);
         }
       } catch (priceErr: any) {
@@ -1258,7 +1263,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
     // Only refund/mark-failed when this request actually held the grading
     // lock; errors on a cache-hit path must not touch an already-graded card.
     if (gradingAttempted) {
-      await recordGradingFailure({
+      await recordGradingFailure({ chargeId: forceRegrade ? null : undefined,
         cardId,
         userId: gradingOwnerId,
         category: 'Yu-Gi-Oh',

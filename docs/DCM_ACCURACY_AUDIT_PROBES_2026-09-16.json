@@ -1,0 +1,105 @@
+{
+  "reconciliation": {
+    "differentJapaneseNamesAgree": true,
+    "mewAndMewtwoAgree": true,
+    "missingEvidenceConfidence": "high"
+  },
+  "catalogNames": {
+    "differentJapanese": {
+      "agrees": true,
+      "similarity": 1,
+      "reason": "no AI name to check",
+      "aiKey": "",
+      "dbKey": ""
+    },
+    "differentMegaForms": {
+      "agrees": true,
+      "similarity": 1,
+      "reason": "species match",
+      "aiKey": "charizard",
+      "dbKey": "charizard"
+    }
+  },
+  "mobileGuide": [
+    {
+      "viewport": [
+        390,
+        600
+      ],
+      "fraction": 0.8571428571428571,
+      "guideHeight": 468,
+      "exceedsViewport": false
+    },
+    {
+      "viewport": [
+        800,
+        350
+      ],
+      "fraction": 0.6,
+      "guideHeight": 672,
+      "exceedsViewport": true
+    }
+  ],
+  "webPortraitCrop": {
+    "cropX": 1388,
+    "cropY": 281,
+    "cropW": 1065,
+    "cropH": 1491
+  },
+  "promptSizes": [
+    {
+      "file": "master_grading_rubric_v5.txt",
+      "characters": 293000,
+      "lines": 5614,
+      "approximateTokensCharsDiv4": 73250
+    },
+    {
+      "file": "sports_delta_v5.txt",
+      "characters": 42656,
+      "lines": 738,
+      "approximateTokensCharsDiv4": 10664
+    },
+    {
+      "file": "pokemon_delta_v5.txt",
+      "characters": 32250,
+      "lines": 648,
+      "approximateTokensCharsDiv4": 8063
+    },
+    {
+      "file": "mtg_delta_v5.txt",
+      "characters": 22055,
+      "lines": 473,
+      "approximateTokensCharsDiv4": 5514
+    },
+    {
+      "file": "lorcana_delta_v5.txt",
+      "characters": 13553,
+      "lines": 319,
+      "approximateTokensCharsDiv4": 3389
+    },
+    {
+      "file": "onepiece_delta_v5.txt",
+      "characters": 19756,
+      "lines": 475,
+      "approximateTokensCharsDiv4": 4939
+    },
+    {
+      "file": "yugioh_delta_v5.txt",
+      "characters": 21793,
+      "lines": 454,
+      "approximateTokensCharsDiv4": 5449
+    },
+    {
+      "file": "starwars_delta_v5.txt",
+      "characters": 15029,
+      "lines": 328,
+      "approximateTokensCharsDiv4": 3758
+    },
+    {
+      "file": "other_delta_v5.txt",
+      "characters": 14172,
+      "lines": 307,
+      "approximateTokensCharsDiv4": 3543
+    }
+  ]
+}
