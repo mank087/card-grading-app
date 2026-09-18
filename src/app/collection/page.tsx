@@ -3151,10 +3151,10 @@ function CollectionPageContent() {
                       const marketValue = getMarketValue(card);
                       const priceStr = formatPrice(marketValue);
                       if (!priceStr) {
-                        if (!isValueWithheld(card) && !needsDetailsConfirmation(card)) return null;
+                        if (!isValueWithheld(card)) return null;
                         return (
                           <div className="absolute -top-8 right-2">
-                            {isValueWithheld(card) ? <WithheldValueNote compact card={card} /> : <ConfirmDetailsTag card={card} />}
+                            <WithheldValueNote compact card={card} />
                           </div>
                         );
                       }
@@ -3181,9 +3181,6 @@ function CollectionPageContent() {
                         </div>
                       );
                     })()}
-                    {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
-                      <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
-                    )}
                   </div>
 
                   {/* Sale details + actions.
@@ -3191,6 +3188,15 @@ function CollectionPageContent() {
                       originally only reached the list and table renderers,
                       so "Still mine" was invisible to most people. */}
                   <div className="p-3 space-y-2">
+                    {needsDetailsConfirmation(card) && !isValueWithheld(card) && (
+                      <button
+                        type="button"
+                        onClick={event => openConfirmDetails(event, card.id)}
+                        className="w-full rounded-md bg-amber-50 border border-amber-300 px-2 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                      >
+                        Confirm details
+                      </button>
+                    )}
                     {card.ownership_status === 'sold' && (
                       <div className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-1.5 text-xs text-emerald-900">
                         <div className="flex items-center justify-between gap-2">

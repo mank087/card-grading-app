@@ -126,12 +126,18 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
     }
   }, [cardId]);
 
+  // Re-read the review state when the grade lands. A freshly graded card is
+  // opened while grading is still running, when the server answers "none"
+  // (grade_processing); without this the first visit never got its popup.
+  // Owner report, Sept 18 2026: a new grade on mobile web showed no popup.
+  const gradeKey = `${(card as any)?.grade_status ?? ''}|${(card as any)?.conversational_whole_grade ?? ''}`;
+
   useEffect(() => {
     if (!eligible) return;
     let cancelled = false;
     load().then(data => { if (!cancelled && data) setDismissed(data.dismissed); });
     return () => { cancelled = true; };
-  }, [eligible, load]);
+  }, [eligible, load, gradeKey]);
 
   /* The popup, at most once per page load and never over another modal. */
   useEffect(() => {
