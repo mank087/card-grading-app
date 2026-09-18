@@ -12,6 +12,8 @@ import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
+import { anniversarySetIds } from "@/lib/pokemonAnniversary";
+import { verifyPokemonCard } from "@/lib/pokemonApiVerification";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { preserveIdentityOnRegrade } from "@/lib/grading/preserveIdentity";
@@ -1101,6 +1103,29 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
 
         // 🇯🇵 JAPANESE DATABASE VALIDATION: Query pokemon_cards_ja for Japanese cards
         let dbValidationApplied = false;
+        const anniversaryScope = !isJapaneseCard && cardInfo ? anniversarySetIds(cardInfo) : null;
+        if (anniversaryScope && cardInfo) {
+          try {
+            const checked = await verifyPokemonCard(cardInfo);
+            const matched = checked.verified ? checked.pokemon_api_data : null;
+            if (matched) {
+              cardInfo.set_name = matched.set.name;
+              cardInfo.set_id = matched.set.id;
+              cardInfo.card_number = matched.number;
+              cardInfo.card_number_raw = matched.printedNumber || matched.number;
+              cardInfo.set_total = matched.printedNumber?.split('/')[1] || null;
+              cardInfo.year = matched.set.releaseDate.match(/^\d{4}/)?.[0] || cardInfo.year;
+              cardInfo.rarity_or_variant = matched.rarity;
+              cardInfo.validated_source = 'pokemon_cards';
+              cardInfo.needs_api_lookup = false;
+              dbValidationApplied = true;
+            } else {
+              console.warn(`[GET /api/pokemon/${cardId}] Anniversary identity retained: ${checked.error}`);
+            }
+          } catch (anniversaryError) {
+            console.warn(`[GET /api/pokemon/${cardId}] Anniversary lookup failed; retaining observed identity`, anniversaryError);
+          }
+        }
         if (isJapaneseCard && cardInfo?.card_number) {
           try {
             const cardName = cardInfo.card_name || cardInfo.player_or_character;
@@ -1195,7 +1220,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
         // Skip if already validated as Japanese card
         // 🔒 CRITICAL: Use OCR-derived set_total to filter database (prevents finding wrong set)
-        if (!dbValidationApplied && !isJapaneseCard && cardInfo?.player_or_character && cardInfo?.card_number) {
+        if (!dbValidationApplied && !isJapaneseCard && !anniversaryScope && cardInfo?.player_or_character && cardInfo?.card_number) {
           try {
             const pokemonName = cardInfo.player_or_character;
             const cardNumber = cardInfo.card_number; // Numerator only, e.g., "4"
@@ -1364,7 +1389,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         }
 
         // Skip API lookup for Japanese cards (they use TCGdex, not Pokemon TCG API)
-        const needsApiLookup = !isJapaneseCard && (
+        const needsApiLookup = !isJapaneseCard && !anniversaryScope && (
                                cardInfo?.needs_api_lookup === true ||
                                ((!cardInfo?.set_name || cardInfo?.set_name === null) && !!cardInfo?.card_number));
 

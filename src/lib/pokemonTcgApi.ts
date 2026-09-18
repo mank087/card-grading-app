@@ -4,6 +4,7 @@
 // The DISABLE_EXTERNAL_API flag controls whether external Pokemon TCG API calls are allowed
 
 import { createClient } from '@supabase/supabase-js';
+import { anniversaryNumber, pokemonPrintedNumber } from './pokemonAnniversary';
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
 // Get API key from environment variable - NO HARDCODED FALLBACKS
@@ -49,6 +50,7 @@ export interface PokemonCard {
   };
 
   number: string;                // "4"
+  printedNumber?: string;        // Actual printed fraction, including reprints and R/RGB
   rarity: string;                // "Rare Holo"
   artist?: string;               // "Mitsuhiro Arita"
 
@@ -162,6 +164,7 @@ function convertLocalCardToApiFormat(card: LocalCardResult): PokemonCard {
       }
     },
     number: card.number,
+    printedNumber: pokemonPrintedNumber(card.id, card.number, card.set_printed_total || 0),
     rarity: card.rarity || '',
     artist: card.artist || undefined,
     images: {
@@ -543,6 +546,8 @@ export type CardNumberFormat =
  */
 export function normalizeCardNumber(cardNumber: string, format: CardNumberFormat): string[] {
   if (!cardNumber) return [];
+  const rgb = anniversaryNumber(cardNumber);
+  if (rgb) return [rgb];
 
   const variations: string[] = [];
 
@@ -660,6 +665,7 @@ export function detectCardNumberFormat(cardNumberRaw: string): CardNumberFormat 
   if (!cardNumberRaw) return 'none';
 
   const raw = cardNumberRaw.trim().toUpperCase();
+  if (anniversaryNumber(raw)) return raw.includes('/') ? 'fraction' : 'single';
 
   // Check for SWSH promo format: SWSH###
   if (/^SWSH\d+$/i.test(raw)) {

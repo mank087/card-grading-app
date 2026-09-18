@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createScrydexClient, date as scrydexDate } from '@/lib/scrydexPokemon.cjs';
 
 export const maxDuration = 120;
 
@@ -123,8 +124,23 @@ async function checkYugioh(issues: string[], summary: string[]) {
   summary.push(`Yu-Gi-Oh: internal ${internal} vs external ${externalTotal}`);
 }
 
-/** Pokemon EN: newest 6 pokemontcg.io sets must have cards internally */
+/** Pokemon EN: Scrydex physical expansions, including growing promo sets. */
 async function checkPokemon(issues: string[], summary: string[]) {
+  if (process.env.SCRYDEX_API_KEY && process.env.SCRYDEX_TEAM_ID) {
+    const sets = await createScrydexClient().list('/expansions');
+    const today = new Date().toISOString().slice(0, 10);
+    const released = sets.filter(s => s.language_code?.toUpperCase() === 'EN' &&
+      s.is_online_only === false && s.total > 0 && s.release_date && scrydexDate(s.release_date)! <= today);
+    const newest = released.sort((a, b) => scrydexDate(b.release_date)!.localeCompare(scrydexDate(a.release_date)!)).slice(0, 10);
+    const selected = [...new Map([...newest, ...released.filter(s => /promo/i.test(s.name))].map(s => [s.id, s])).values()];
+    for (const set of selected) {
+      const count = await internalCount('pokemon_cards', q => q.eq('set_id', set.id));
+      if (count < set.total) issues.push(`Pokemon: "${set.name}" (${set.id}) ${count === 0 ? 'MISSING' : 'PARTIAL'} — ${count}/${set.total} cards → run: node scripts/import-pokemon-scrydex.js --set=${set.id} --write`);
+    }
+    summary.push(`Pokemon: checked ${selected.length} Scrydex expansions (latest releases and promos)`);
+    return;
+  }
+  summary.push('Pokemon: Scrydex is not configured; the legacy feed check cannot establish current release coverage. Anniversary cards were imported separately.');
   const apiKey = process.env.POKEMON_TCG_API_KEY || '';
   const sets = await fetchJson(
     'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate&pageSize=6',

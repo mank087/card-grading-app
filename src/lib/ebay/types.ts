@@ -59,6 +59,7 @@ export interface EbayListing {
   payment_policy_id: string | null;
   return_policy_id: string | null;
   ebay_image_urls: string[];
+  ebay_photo_uploads?: import('./imageHosting').HostedListingImage[] | null;
   status: EbayListingStatus;
   listing_url: string | null;
   error_message: string | null;
