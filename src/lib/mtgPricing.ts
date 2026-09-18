@@ -98,6 +98,8 @@ export interface MTGCardSearchParams {
   year?: string;
   isFoil?: boolean;
   variant?: string;  // e.g., "Foil", "Borderless", "Extended Art", "Showcase"
+  /** The printed Magic card name when `cardName` is a crossover flavor title. */
+  alternateName?: string;
 }
 
 /**
@@ -676,6 +678,21 @@ async function searchMTGCardPricesUncapped(
         }
       }
     }
+  }
+
+  // Universes Beyond / crossover cards print a FLAVOR title in large type with the
+  // real Magic card name in small italics beneath it ("Splinter of the Shadows" /
+  // "Ashcoat of the Shadow Swarm"). The catalog lists the real name, so a search on
+  // the flavor title finds nothing. The grader stores the title as card_name and the
+  // real name as `featured`, so callers pass it as alternateName and we retry with it.
+  // Owner test, Sept 18 2026: that card searched as the title returned nothing; the
+  // same set and number under the real name returned a high-confidence $4.15 match.
+  if (params.alternateName && params.alternateName.trim()
+    && params.alternateName.trim().toLowerCase() !== params.cardName.trim().toLowerCase()) {
+    console.log(`[MTGPricing] Nothing under "${params.cardName}". Retrying with the printed card name "${params.alternateName}".`);
+    await pricingDelay();
+    const alternate = await searchMTGCardPricesUncapped({ ...params, cardName: params.alternateName, alternateName: undefined });
+    if (alternate.matchConfidence !== 'none') return alternate;
   }
 
   console.log('[MTGPricing] No matching products found');

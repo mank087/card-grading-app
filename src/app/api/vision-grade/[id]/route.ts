@@ -2131,6 +2131,9 @@ EXTRACTION RULES:
                 console.log(`[PRICECHARTING] Fetching MTG pricing for card ${cardId}`);
                 const result = await searchMTGCardPrices({
                   cardName,
+                  // A crossover card's flavor title is stored as the name and the
+                  // printed Magic name as the character; the catalog knows the latter.
+                  alternateName: playerOrCharacter,
                   setName,
                   collectorNumber: cardNumber,
                   year,

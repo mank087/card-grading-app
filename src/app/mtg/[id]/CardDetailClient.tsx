@@ -5442,6 +5442,7 @@ export function MTGCardDetails() {
                       card={{
                         id: card.id,
                         card_name: cardInfo.card_name || card.card_name,
+                        player_or_character: (cardInfo as any).player_or_character || card.featured || undefined,
                         set_name: cardInfo.set_name || card.card_set,
                         collector_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
                         expansion_code: cardInfo.expansion_code || card.expansion_code || undefined,

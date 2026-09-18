@@ -171,6 +171,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<MTGPricin
 
     const {
       cardName,
+      // The printed Magic name when cardName is a crossover flavor title.
+      alternateName,
       setName,
       collectorNumber,
       expansionCode,
@@ -277,6 +279,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<MTGPricin
     // Search for prices
     const result = await searchMTGCardPrices({
       cardName,
+      alternateName,
       setName,
       collectorNumber,
       expansionCode,
@@ -357,6 +360,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const searchParams = request.nextUrl.searchParams;
   const cardName = searchParams.get('card');
+  const alternateName = searchParams.get('altName') || undefined;
   const setName = searchParams.get('set');
   const collectorNumber = searchParams.get('number');
   const isFoil = searchParams.get('foil') === 'true';
@@ -374,6 +378,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const result = await searchMTGCardPrices({
       cardName,
+      alternateName,
       setName: setName || undefined,
       collectorNumber: collectorNumber || undefined,
       isFoil,

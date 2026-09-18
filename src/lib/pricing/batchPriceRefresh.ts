@@ -281,6 +281,9 @@ export async function refreshCardPrice(
       case 'mtg': {
         const result = await searchMTGCardPrices({
           cardName: (cardName || playerOrCharacter) as string,
+          // A crossover card's flavor title is stored as the name and the printed
+          // Magic name as the character; the catalog only knows the printed one.
+          alternateName: (playerOrCharacter || undefined) as string | undefined,
           setName, collectorNumber: cardNumber, year,
           isFoil: !!cardInfo.is_foil, variant,
         });

@@ -59,6 +59,8 @@ interface MTGPriceLookupProps {
   card: {
     id?: string;
     card_name?: string;
+    /** The printed Magic name when card_name is a crossover flavor title. */
+    player_or_character?: string;
     set_name?: string;
     collector_number?: string;
     expansion_code?: string;
@@ -138,6 +140,14 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, guardIdentity,
   // Get card name
   const getCardName = () => {
     return card.card_name || '';
+  };
+
+  // Universes Beyond / crossover cards print a flavor title in large type with the
+  // real Magic name in small italics beneath. The catalog only lists the real name,
+  // which the grader stores as the character, so send it as a second chance.
+  const getAlternateName = () => {
+    const alternate = (card.player_or_character || '').trim();
+    return alternate && alternate.toLowerCase() !== getCardName().trim().toLowerCase() ? alternate : undefined;
   };
 
   // Detect variant from card fields
@@ -299,6 +309,7 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, guardIdentity,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cardName,
+          alternateName: getAlternateName(),
           setName: card.set_name,
           collectorNumber: card.collector_number,
           expansionCode: card.expansion_code,
