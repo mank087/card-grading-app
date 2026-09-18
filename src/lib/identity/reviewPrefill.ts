@@ -60,6 +60,8 @@ export interface ReviewField {
   differsFromStored: boolean;
   /** Friendlier text for display only, e.g. "1995-96" behind the stored year "1995". */
   displayValue?: string;
+  /** Set when DCM's own catalog confirms the value in the box, e.g. "Matches the Pokémon catalog (Lost Origin)". */
+  catalogNote?: string;
   /** First look's competing value, offered as one tap. */
   suggestion?: ReviewSuggestion;
 }
@@ -286,6 +288,9 @@ export function buildReviewPrefill(
       if (sameValue(proposal.value, stored)) return base;
       return {
         ...base,
+        // Two independent reads of the printed text disagree: flag the field so
+        // the owner actually looks (Gengar: grading "086", the card "066/196").
+        needsCheck: proposal.source === 'printed',
         suggestion: {
           value: proposal.value,
           origin: 'suggested',

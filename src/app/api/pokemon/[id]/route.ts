@@ -1677,6 +1677,15 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       updateData.conversational_card_info = conversationalGradingData?.card_info || null;
     }
 
+    // Store the card number the way it is printed: the full fraction with its
+    // leading zeros ("066/196"), not the bare numerator ("66"). Owner request,
+    // Sept 18 2026. card_info.card_number stays the numerator because the lookups
+    // above key on it; pricing and the label both accept the full form.
+    const printedFraction = String(conversationalGradingData?.card_info?.card_number_raw || '').trim();
+    if (/^[A-Za-z]{0,6}\d+[A-Za-z]?\s*\/\s*[A-Za-z]{0,6}\d+$/.test(printedFraction)) {
+      (updateData as any).card_number = printedFraction.replace(/\s+/g, '');
+    }
+
     console.log(`[GET /api/pokemon/${cardId}] Updating database with extracted Pokemon fields:`, {
       card_name: cardFields.card_name,
       card_set: cardFields.card_set,

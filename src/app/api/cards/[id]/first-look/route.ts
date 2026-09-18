@@ -32,6 +32,7 @@ import { createSignedImageMap } from '@/lib/signedUrlBatch';
 import { firstLookOnDemandEnabled, firstLookInFlight } from '@/lib/identification/firstLookOnDemand';
 
 import { resolveSetCodesInFields } from '@/lib/identity/setOptions';
+import { settlePokemonNumber } from '@/lib/identity/pokemonNumberCheck';
 export const dynamic = 'force-dynamic';
 /** The search pass can take 20-35s; the contract pass alone is a few seconds. */
 export const maxDuration = 60;
@@ -66,7 +67,9 @@ export async function POST(
     if (stored) {
       return json({
         first_look: card.first_look,
-        fields: await resolveSetCodesInFields(buildReviewPrefill(card, stored).fields, card.category).catch(() => buildReviewPrefill(card, stored).fields),
+        fields: await resolveSetCodesInFields(buildReviewPrefill(card, stored).fields, card.category)
+          .then(fields => settlePokemonNumber(fields, card.category))
+          .catch(() => buildReviewPrefill(card, stored).fields),
         reused: true,
       });
     }
@@ -93,7 +96,9 @@ export async function POST(
       await recordFirstLook(cardId, record);
       return json({
         first_look: record,
-        fields: await resolveSetCodesInFields(buildReviewPrefill(card, record.result).fields, card.category).catch(() => buildReviewPrefill(card, record.result).fields),
+        fields: await resolveSetCodesInFields(buildReviewPrefill(card, record.result).fields, card.category)
+          .then(fields => settlePokemonNumber(fields, card.category))
+          .catch(() => buildReviewPrefill(card, record.result).fields),
         reused: false,
       });
     } finally {

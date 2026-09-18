@@ -511,6 +511,9 @@ export default function ConfirmCardDetailsDialog({
                         : (values.card_set ? 'This set is not in our catalog, so pricing may not find a match.' : `${setOptions.length.toLocaleString()} sets to choose from.`)}
                     </p>
                   )}
+                  {field.catalogNote && (values[field.key] ?? '') === field.value && (
+                    <p className="mt-1 text-[11px] font-medium text-emerald-700">{field.catalogNote}</p>
+                  )}
                   {field.displayValue && field.displayValue !== (values[field.key] ?? '') && (
                     <p className="mt-1 text-[11px] text-slate-500">Printed as {field.displayValue}</p>
                   )}

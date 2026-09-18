@@ -33,6 +33,7 @@ import {
 } from '@/lib/identity/reviewPrefill';
 import { loadReviewCandidates, serialDenominatorOf } from '@/lib/identity/reviewCandidates';
 import { resolveSetCodesInFields } from '@/lib/identity/setOptions';
+import { settlePokemonNumber } from '@/lib/identity/pokemonNumberCheck';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,8 @@ export async function GET(
     const prefill = buildReviewPrefill(card, firstLookResultOf(card.first_look));
     // A printed set code ("PZA") becomes the catalog's set name before anything uses it.
     try { prefill.fields = await resolveSetCodesInFields(prefill.fields, card.category); } catch { /* keep the raw read */ }
+    // Pokémon: when the grading call and first look read different numbers, the catalog decides.
+    try { prefill.fields = await settlePokemonNumber(prefill.fields, card.category); } catch { /* keep as built */ }
     const eligibility = reviewEligibility(card, auth.userId, {
       confirmSince: process.env.NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE || null,
     });
