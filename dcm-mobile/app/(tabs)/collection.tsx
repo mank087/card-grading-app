@@ -248,6 +248,7 @@ export default function CollectionScreen() {
     ebay_price_median, dcm_price_estimate,
     dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
     dcm_selected_product_id, identity_confirmed_revision,
+    identity_revision, pricing_selection_revision, item_type,
     created_at
   `
 

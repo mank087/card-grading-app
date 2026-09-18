@@ -57,7 +57,7 @@ const LISTING_CARD_COLUMNS = [
   'dcm_price_estimate', 'dcm_cached_prices', 'ebay_price_median',
   'scryfall_price_usd', 'scryfall_price_usd_foil',
   // Identity inputs for the displayed-value guard (@/lib/valueGuard).
-  'dcm_selected_product_id', 'identity_confirmed_revision',
+  'dcm_selected_product_id', 'identity_confirmed_revision', 'item_type',
   'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
   'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',
   'autograph_type', 'memorabilia_type', 'rookie_card', 'first_print_rookie',

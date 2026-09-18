@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
 import { isUuid } from '@/lib/uuid'
 import { useGradingJob, refreshGradingJobs } from '@/lib/gradingJob'
+import { supabase } from '@/lib/supabase'
+import { incompleteInspectionMessage, incompleteInspectionFromErrorMessage } from '@/lib/inspectionMessage'
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
@@ -45,6 +47,16 @@ export default function ProcessingScreen() {
   const { state: jobState, grade } = useGradingJob(params.cardId, uploadedAtRef.current)
   const isComplete = jobState === 'completed'
   const gradingError = jobState === 'failed'
+  useEffect(() => {
+    if (!gradingError || !isUuid(params.cardId)) return
+    let cancelled = false
+    supabase.from('cards').select('error_message').eq('id', params.cardId).maybeSingle()
+      .then(({ data }) => {
+        const message = incompleteInspectionFromErrorMessage((data as any)?.error_message)
+        if (!cancelled && message) setInspectionFailure(prev => prev ?? message)
+      })
+    return () => { cancelled = true }
+  }, [gradingError, params.cardId])
   const isDelayed = jobState === 'delayed'
 
   // Scanning animation
@@ -93,6 +105,10 @@ export default function ProcessingScreen() {
   // picks up the card via a separate worker — but we surface a banner so
   // the user knows something looked off and can re-fire the trigger.
   const [triggerFailed, setTriggerFailed] = useState(false)
+  // Set when the server stopped the grade because the inspection could not be
+  // completed (INSPECTION_INCOMPLETE). The message says whether the credit was
+  // refunded, and never offers a retry: that is a support conversation.
+  const [inspectionFailure, setInspectionFailure] = useState<string | null>(null)
   const [triggerNonce, setTriggerNonce] = useState(0)
 
   // Trigger grading API (fire-and-forget — don't await)
@@ -104,9 +120,13 @@ export default function ProcessingScreen() {
     if (__DEV__) console.log('[Processing] Triggering grading API:', url)
     setTriggerFailed(false)
     fetch(url)
-      .then(r => {
+      .then(async r => {
         if (__DEV__) console.log('[Processing] Grading API response:', r.status)
-        if (!r.ok) setTriggerFailed(true)
+        if (r.ok) return
+        const body = await r.json().catch(() => null)
+        const message = incompleteInspectionMessage(body)
+        if (message) { setInspectionFailure(message); return }
+        setTriggerFailed(true)
       })
       .catch(err => {
         if (__DEV__) console.warn('[Processing] Grading API error (will poll anyway):', err?.message)
@@ -248,7 +268,7 @@ export default function ProcessingScreen() {
 
       {/* Trigger-failure banner — polling continues but warn the user
           something looked off + offer to re-fire the trigger. */}
-      {!isComplete && !gradingError && triggerFailed && (
+      {!isComplete && !gradingError && !inspectionFailure && triggerFailed && (
         <View style={styles.warnContainer}>
           <Ionicons name="warning" size={20} color={Colors.amber[400]} />
           <Text style={styles.warnText}>
@@ -276,14 +296,23 @@ export default function ProcessingScreen() {
       )}
 
       {/* Timing info */}
-      {!isComplete && !gradingError && !isDelayed && (
+      {!isComplete && !gradingError && !inspectionFailure && !isDelayed && (
         <Text style={styles.timingText}>
           This typically takes 1-2 minutes. You can grade another card or view your collection while waiting.
         </Text>
       )}
 
       {/* Timeout / Error state */}
-      {gradingError && (
+      {inspectionFailure && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={32} color={Colors.amber[500]} />
+          <Text style={styles.errorTitle}>Inspection incomplete</Text>
+          <Text style={styles.errorText}>{inspectionFailure}</Text>
+          <Button title="Contact Support" onPress={() => router.push('/pages/contact')} style={{ marginTop: 12 }} />
+          <Button title="Go to Collection" variant="secondary" onPress={() => router.replace('/(tabs)/collection')} style={{ marginTop: 8 }} />
+        </View>
+      )}
+      {gradingError && !inspectionFailure && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={32} color={Colors.amber[500]} />
           <Text style={styles.errorTitle}>Grading is taking longer than expected</Text>

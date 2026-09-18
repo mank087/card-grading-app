@@ -57,6 +57,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
+import { isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL } from '@/lib/itemType'
 
 /**
  * Resolve the grade uncertainty string for display.
@@ -433,7 +434,18 @@ export default function CardDetailScreen() {
     const year = c.release_date || ci?.year || ''
     const dcmGrade = c.conversational_whole_grade ? Math.round(c.conversational_whole_grade) : undefined
     const variant = ci?.variant || ci?.parallel || undefined
-    const baseFields = { setName, cardNumber, year, variant, dcmGrade, cardId: c.id, forceRefresh: true }
+    // The revisions this card was loaded at: the server writes the price only if
+    // the card has not been corrected or re-picked since (compare-and-set). A
+    // request without them is still accepted, unguarded.
+    const revisions = {
+      identity_revision: (c as any).identity_revision ?? undefined,
+      pricing_selection_revision: (c as any).pricing_selection_revision ?? undefined,
+    }
+    const baseFields = { setName, cardNumber, year, variant, dcmGrade, cardId: c.id, forceRefresh: true, ...revisions }
+    // Magic crossover cards print a flavor title with the real card name in
+    // italics beneath it; the catalog lists only the real name, which grading
+    // stores as the character. The route retries with it when the title finds nothing.
+    const mtgAlternateName = ci?.player_or_character || c.featured || undefined
     switch (cat) {
       case 'Sports':
         return {
@@ -457,7 +469,8 @@ export default function CardDetailScreen() {
             isReverseHolo: ci?.is_reverse_holo || undefined,
           },
         }
-      case 'MTG': return { path: '/api/pricing/mtg', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
+      // The MTG route reads collectorNumber, not cardNumber.
+      case 'MTG': return { path: '/api/pricing/mtg', body: { ...baseFields, collectorNumber: cardNumber, alternateName: mtgAlternateName, cardName: c.card_name || ci?.card_name || '' } }
       case 'Lorcana': return { path: '/api/pricing/lorcana', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
       case 'One Piece': return { path: '/api/pricing/onepiece', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
       default: return { path: '/api/pricing/other', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
@@ -489,7 +502,7 @@ export default function CardDetailScreen() {
           },
         }
       case 'MTG':
-        return { path: '/api/pricing/mtg', body: { cardName, setName, collectorNumber: cardNumber, year: c.release_date || ci?.year || '' } }
+        return { path: '/api/pricing/mtg', body: { cardName, alternateName: ci?.player_or_character || c.featured || undefined, setName, collectorNumber: cardNumber, year: c.release_date || ci?.year || '' } }
       case 'Lorcana':
         return { path: '/api/pricing/lorcana', body: { cardName, setName, collectorNumber: cardNumber } }
       case 'One Piece':
@@ -518,6 +531,13 @@ export default function CardDetailScreen() {
         headers,
         body: JSON.stringify(req.body),
       })
+      // 409 price_write_stale: the card was corrected elsewhere (on the web, or in
+      // the confirmation sheet) while this price was being looked up. The stale
+      // price was dropped on purpose; reload the card quietly instead of alarming anyone.
+      if (res.status === 409) {
+        await fetchCard()
+        return
+      }
       if (!res.ok) {
         const text = await res.text().catch(() => '')
         console.warn('[refreshPrice] non-OK:', res.status, text)
@@ -1582,6 +1602,8 @@ export default function CardDetailScreen() {
         // owner confirms what the card is. The owner is told why; anyone else
         // sees nothing. See @/lib/valueGuard.
         if (resolved.source === 'withheld') {
+          // A non-standard item is labelled above; it has no value to confirm.
+          if (resolved.withheldReason === 'not_standard_card') return null
           if (!isOwner) return null
           return (
             <View style={s.valueCard}>
@@ -1824,6 +1846,16 @@ export default function CardDetailScreen() {
             </View>
             {card.slab_cert_number && <Text style={{ fontSize: 9, color: Colors.gray[500], marginTop: 6 }}>Cert #: {card.slab_cert_number}</Text>}
             <Text style={{ fontSize: 8, color: Colors.gray[400], marginTop: 4 }}>DCM analysis grade is provided as independent verification of the professional grade.</Text>
+          </View>
+        )}
+
+        {/* Not a standard trading card (deck divider, sticker, jumbo, custom,
+            marked reprint, photo of a screen): graded for condition, labelled,
+            and never priced. Shown to everyone. See @/lib/itemType. */}
+        {isNonStandardItemType((card as any).item_type) && (
+          <View style={s.notStandardCard}>
+            <Text style={s.notStandardTitle}>{NOT_STANDARD_CARD_LABEL}</Text>
+            <Text style={s.notStandardText}>{nonStandardExplanation((card as any).item_type)}</Text>
           </View>
         )}
 
@@ -2308,7 +2340,9 @@ export default function CardDetailScreen() {
         </CollapsibleSection>
         </View>
 
-        {/* ══════ 5. MARKET VALUE ══════ */}
+        {/* ══════ 5. MARKET VALUE ══════
+            Not shown for an item that is not a standard trading card: it has no market value here. */}
+        {!isNonStandardItemType((card as any).item_type) && (
         <View ref={tourRefs['market-value']} collapsable={false}>
         <CollapsibleSection
           title={`Market Value${card.dcm_price_estimate && resolveCardValue(card as any).source !== 'withheld' ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`}
@@ -2631,6 +2665,7 @@ export default function CardDetailScreen() {
           })()}
         </CollapsibleSection>
         </View>
+        )}
 
         {/* ══════ 6. ESTIMATED MAIL-AWAY GRADES ══════ */}
         {card.estimated_professional_grades && (
@@ -3258,6 +3293,9 @@ const s = StyleSheet.create({
   subBoxLabel: { fontSize: 12, color: Colors.gray[600], marginTop: 4, fontWeight: '600' },
 
   // Value
+  notStandardCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.gray[50], borderRadius: 12, padding: 14, borderWidth: 2, borderColor: Colors.gray[300] },
+  notStandardTitle: { fontSize: 14, fontWeight: '700', color: Colors.gray[900] },
+  notStandardText: { fontSize: 12, color: Colors.gray[600], marginTop: 4, lineHeight: 17 },
   valueCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.green[50], borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.green[500] },
   valueLabel: { fontSize: 13, fontWeight: '600', color: Colors.green[600] },
   valueAmount: { fontSize: 28, fontWeight: '800', color: Colors.green[600], marginTop: 4 },
