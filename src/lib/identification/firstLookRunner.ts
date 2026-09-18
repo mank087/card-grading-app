@@ -1,9 +1,10 @@
 /**
  * Runs the first-look contract (firstLook.ts) and records the answer.
  *
- * SHADOW MODE: nothing here feeds the grade, the stored identity, labels or
- * pricing. The result is written to cards.first_look so a week of production
- * answers can be compared with owner corrections before anything relies on it.
+ * It PROPOSES. The result is written to cards.first_look; the owner confirmation
+ * dialog pre-fills from it and the owner decides. It never writes the card's
+ * identity, grade or price by itself. The one thing it decides alone is
+ * item_type, and that needs both passes to agree plus no official copyright line.
  *
  * Two passes, both on the full-resolution photos:
  *   1. the contract alone (~7K input tokens);
@@ -48,14 +49,20 @@ export interface FirstLookRecord {
   ms: number;
   repairs: string[];
   result: FirstLook;
-  /** Pass 1's identity when pass 2 replaced it — the comparison is the point of shadow mode. */
+  /** Pass 1's identity when pass 2 replaced it, so the two can be compared. */
   contract_identity?: FirstLook['identity'];
   /** Pass 1's item_type when pass 2 ran: acting on a non-card needs both passes to agree. */
   contract_item_type?: string | null;
 }
 
-export function firstLookShadowEnabled(): boolean {
-  return process.env.FIRST_LOOK_SHADOW === '1';
+/**
+ * FIRST_LOOK_ENABLED=1 runs first look during grading. Named FIRST_LOOK_SHADOW
+ * until Sept 18 2026, when its answer started pre-filling the owner confirmation
+ * dialog and deciding item_type: it is no longer a shadow. The old name is still
+ * honoured so an environment that has not been updated keeps working.
+ */
+export function firstLookEnabled(): boolean {
+  return process.env.FIRST_LOOK_ENABLED === '1' || process.env.FIRST_LOOK_SHADOW === '1';
 }
 
 /** Search is worth its cost only when the card does not name its own product. */

@@ -28,7 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
-import { firstLookShadowEnabled, runFirstLook, recordFirstLook } from './identification/firstLookRunner';
+import { firstLookEnabled, runFirstLook, recordFirstLook } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
@@ -1859,19 +1859,21 @@ export async function gradeCardConversational(
       { category: categoryHint || cardType }
     );
   };
-  // ── FIRST LOOK, SHADOW MODE (see identification/firstLookRunner.ts) ───────
+  // ── FIRST LOOK (see identification/firstLookRunner.ts) ────────────────────
   // Proposes an identity from the full-resolution photos and records it on the
-  // card row for comparison. Feeds NOTHING: not the grade, not the stored
-  // identity, not pricing. Starts with the originals so it overlaps the
-  // ensemble call; it records its own result and can never reject.
-  let firstLookShadow: Promise<unknown> | null = null;
-  const startFirstLookShadow = (images: CardOriginals) => {
-    if (firstLookShadow || !firstLookShadowEnabled() || !options?.routingKey) return;
-    firstLookShadow = runFirstLook({ front: images.front, back: images.back })
+  // card row. It never writes the card's identity, grade or price: the owner
+  // confirmation dialog pre-fills from it, and only its item_type acts on its
+  // own (both passes must agree, and an official copyright line vetoes it).
+  // Starts with the originals so it overlaps the ensemble call; it records its
+  // own result and can never reject.
+  let firstLookRun: Promise<unknown> | null = null;
+  const startFirstLook = (images: CardOriginals) => {
+    if (firstLookRun || !firstLookEnabled() || !options?.routingKey) return;
+    firstLookRun = runFirstLook({ front: images.front, back: images.back })
       .then(record => recordFirstLook(options?.routingKey, record))
       .catch(() => undefined);
   };
-  const pendingFirstLookShadow = (): Promise<unknown> | null => firstLookShadow;
+  const pendingFirstLook = (): Promise<unknown> | null => firstLookRun;
   /** Read through a function: TS narrows a `let` assigned only inside a closure
    *  down to `null` at every use site, which would type the awaited value as
    *  `never`. A function body reads the declared type. */
@@ -1885,7 +1887,7 @@ export async function gradeCardConversational(
       const originals = await loadOriginals();
       requestThumbnails(originals);
       startIdentification(originals);
-      startFirstLookShadow(originals);
+      startFirstLook(originals);
       {
         const frontBuf = originals.front;
         const backBuf = originals.back;
@@ -1930,7 +1932,7 @@ export async function gradeCardConversational(
           .then((images) => {
             requestThumbnails(images);
             startIdentification(images);
-            startFirstLookShadow(images);
+            startFirstLook(images);
             return runZoomInspection(frontImageUrl, backImageUrl, { model, precomputedGeometry: advisoryGeometry, priorityNote: zoomOwnerContext, cardType, images });
           })
           // A download failure used to be swallowed inside runZoomInspection and
@@ -3196,11 +3198,11 @@ Provide detailed analysis as markdown with all required sections.`
         // v8.8: honest uncertainty — derived from measured signals, not the AI's self-report.
         // Components: image-confidence letter (A=0,B=1,C=2,D=3), spread between the three pass
         // finals, and whether the server had to lower the model's own average (cap/clamp fired).
-        // Give the shadow first look a short grace period to finish its write: a
+        // Give first look a short grace period to finish its write: a
         // serverless function may be frozen the moment the grade returns. Capped,
         // so a slow search pass is dropped rather than delaying the customer.
-        const shadowPending = pendingFirstLookShadow();
-        if (shadowPending) await Promise.race([shadowPending, new Promise(resolve => setTimeout(resolve, 6000))]);
+        const firstLookPending = pendingFirstLook();
+        if (firstLookPending) await Promise.race([firstLookPending, new Promise(resolve => setTimeout(resolve, 6000))]);
 
         // Out-of-frame corners: a located corner ON the photo border means part of
         // the card is outside the picture. The model's own confidence letter does

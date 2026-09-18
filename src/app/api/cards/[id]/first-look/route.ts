@@ -1,8 +1,8 @@
 /**
  * POST /api/cards/[id]/first-look — Phase 2B, on demand.
  *
- * Most cards have no `cards.first_look`: shadow mode only fills it at grading
- * time behind FIRST_LOOK_SHADOW=1. This endpoint lets the confirmation dialog
+ * Most cards have no `cards.first_look`: it is only filled at grading time, and
+ * only for cards graded since first look was turned on. This endpoint lets the dialog
  * ask for one while the owner is looking at the card, so the prefill can improve
  * for an older card too.
  *

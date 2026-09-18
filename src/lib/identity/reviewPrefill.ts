@@ -220,7 +220,7 @@ export function firstLookCandidate(look: FirstLook | null | undefined, key: stri
  *
  * `card` is a cards row (or the client's copy of one). `firstLook` is the
  * `result` of a FirstLookRecord, or null when the card has none — most existing
- * cards do not, because shadow mode only filled it behind FIRST_LOOK_SHADOW=1.
+ * cards do not, because it is only filled at grading time when first look is on.
  */
 export function buildReviewPrefill(
   card: Record<string, any> | null | undefined,
