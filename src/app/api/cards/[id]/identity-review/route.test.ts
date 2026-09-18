@@ -190,3 +190,15 @@ describe('GET /api/cards/[id]/identity-review', () => {
     expect(body.alternatives).toHaveLength(1);
   });
 });
+
+describe('server kill switch', () => {
+  it('answers "none" for every card when IDENTITY_CONFIRM_DISABLED=1, and normally otherwise', async () => {
+    vi.stubEnv('NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE', '');
+    vi.stubEnv('IDENTITY_CONFIRM_DISABLED', '1');
+    card();
+    expect((await (await GET(request(), context)).json())).toMatchObject({ mode: 'none', reason: 'disabled' });
+    vi.stubEnv('IDENTITY_CONFIRM_DISABLED', '');
+    card();
+    expect((await (await GET(request(), context)).json()).mode).toBe('popup');
+  });
+});

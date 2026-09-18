@@ -89,9 +89,15 @@ export async function GET(
     try { prefill.fields = await resolveSetCodesInFields(prefill.fields, card.category); } catch { /* keep the raw read */ }
     // Pokémon: when the grading call and first look read different numbers, the catalog decides.
     try { prefill.fields = await settlePokemonNumber(prefill.fields, card.category); } catch { /* keep as built */ }
-    const eligibility = reviewEligibility(card, auth.userId, {
-      confirmSince: process.env.NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE || null,
-    });
+    // Server-side kill switch. The mobile app's flags are frozen into each OTA
+    // bundle, so turning the confirmation flow off must not need a new app update:
+    // IDENTITY_CONFIRM_DISABLED=1 in Vercel stops the popup and the banner on the
+    // web and on both phones at once. Opt-out, so production needs no new setting.
+    const eligibility = process.env.IDENTITY_CONFIRM_DISABLED === '1'
+      ? { mode: 'none' as const, reason: 'disabled' }
+      : reviewEligibility(card, auth.userId, {
+        confirmSince: process.env.NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE || null,
+      });
 
     const candidates = prefill.isSports
       ? await loadReviewCandidates(prefill, card)
