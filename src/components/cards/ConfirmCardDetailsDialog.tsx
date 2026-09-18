@@ -126,7 +126,17 @@ export default function ConfirmCardDetailsDialog({
   const titleId = 'confirm-card-details-title';
 
   const changed = useMemo(() => changedFieldPayload(fields, values), [fields, values]);
-  const hasChanges = Object.keys(changed).length > 0;
+  // What the dialog opened with (DCM's findings). The button reads "Update details"
+  // only once the owner moves something away from these, and "Reset to original
+  // findings" puts every box and the version pick back.
+  const defaultCandidateId = review.suggested_candidate_id || NO_CANDIDATE;
+  const ownerEdited = fields.some(f => (values[f.key] ?? '') !== (f.value ?? '')) || candidateId !== defaultCandidateId;
+  const resetToFindings = () => {
+    setValues(Object.fromEntries(fields.map(f => [f.key, f.value])));
+    setTouched({});
+    setCandidateId(defaultCandidateId);
+    setError(null);
+  };
 
   /* ---------------- keyboard, focus and scroll ---------------- */
 
@@ -197,6 +207,32 @@ export default function ConfirmCardDetailsDialog({
   }, [cardId, fetchFirstLook]);
 
   /* ---------------- editing ---------------- */
+
+  /** "Joe Mixon [Autograph Jersey Mirror Red] #214" → "Autograph Jersey Mirror Red"; a base listing → "Base". */
+  const parallelOf = (candidate: ReviewCandidate): string => {
+    const bracket = /\[([^\]]+)\]/.exec(candidate.name);
+    return bracket ? bracket[1].trim() : 'Base';
+  };
+  // Picking a version also fills the Parallel box, so Card Information shows it
+  // after saving. A parallel the owner typed themselves is left alone.
+  const chooseCandidate = (candidate: ReviewCandidate) => {
+    setCandidateId(candidate.id);
+    if (fields.some(f => f.key === 'parallel_type') && !touched.parallel_type) {
+      setValues(previous => ({ ...previous, parallel_type: parallelOf(candidate) }));
+    }
+  };
+
+  // The owner already picked a version for pricing but the card has no parallel on
+  // file: start the Parallel box from that pick, as part of the findings (so the
+  // button still reads "Looks correct" and saving records it on the card).
+  useEffect(() => {
+    const picked = review.current_product_id ? review.candidates.find(c => c.id === review.current_product_id) : null;
+    if (!picked) return;
+    const derived = parallelOf(picked);
+    setFields(previous => previous.map(f => (f.key === 'parallel_type' && !f.value ? { ...f, value: derived, origin: 'suggested' as const } : f)));
+    setValues(previous => (previous.parallel_type ? previous : { ...previous, parallel_type: derived }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setValue = (key: string, value: string) => {
     setValues(previous => ({ ...previous, [key]: value }));
@@ -409,7 +445,7 @@ export default function ConfirmCardDetailsDialog({
                   )}
                   {field.suggestion && field.suggestion.value !== (values[field.key] ?? '') && (
                     <p className="mt-1 text-[11px] text-slate-600">
-                      {field.suggestion.source === 'printed' ? 'We read this on the card: ' : 'Suggested: '}{field.suggestion.displayValue || field.suggestion.value}
+                      Possible {field.label.toLowerCase()} alternative: {field.suggestion.displayValue || field.suggestion.value}
                       {' · '}
                       <button
                         type="button"
@@ -455,6 +491,12 @@ export default function ConfirmCardDetailsDialog({
             {review.is_sports ? (
               <fieldset className="rounded-lg border border-slate-200 p-3">
                 <legend className="text-xs font-semibold text-slate-700 px-1">Which version is it?</legend>
+                {candidates.length > 0 && (values.serial_numbering || '').includes('/') && (
+                  <p className="text-xs text-slate-600 mb-2">
+                    Your card is numbered <span className="font-semibold text-slate-800">{values.serial_numbering}</span>. Pick the version with that print run (/{(values.serial_numbering || '').split('/').pop()}).
+                    {candidates.every(c => !c.serialDenominator) ? ' The catalog does not list print runs for these versions, so go by the name and colour.' : ''}
+                  </p>
+                )}
                 {candidates.length === 0 ? (
                   <p className="text-xs text-slate-600">
                     {review.candidates_error
@@ -470,7 +512,7 @@ export default function ConfirmCardDetailsDialog({
                           name="identity-review-candidate"
                           value={candidate.id}
                           checked={candidateId === candidate.id}
-                          onChange={() => setCandidateId(candidate.id)}
+                          onChange={() => chooseCandidate(candidate)}
                           className="mt-0.5"
                         />
                         <span>
@@ -530,7 +572,7 @@ export default function ConfirmCardDetailsDialog({
                     disabled={saving || dismissing}
                     className="flex-1 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
                   >
-                    {saving ? 'Saving...' : hasChanges ? 'Save and confirm' : 'Looks correct'}
+                    {saving ? 'Saving...' : ownerEdited ? 'Update details' : 'Looks correct'}
                   </button>
                   <button
                     type="button"
@@ -541,7 +583,15 @@ export default function ConfirmCardDetailsDialog({
                     {dismissing ? 'Saving...' : 'Review later'}
                   </button>
                 </div>
-                <div className="mt-2 text-center">
+                <div className="mt-2 flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={resetToFindings}
+                    disabled={!ownerEdited || saving || dismissing}
+                    className="text-xs text-slate-600 underline disabled:opacity-40 disabled:no-underline"
+                  >
+                    Reset to original findings
+                  </button>
                   <button
                     type="button"
                     onClick={onOpenMoreDetails}

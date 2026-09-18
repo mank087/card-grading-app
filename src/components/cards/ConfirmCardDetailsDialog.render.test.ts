@@ -67,12 +67,13 @@ describe('confirmation dialog renders for a real-shaped card', () => {
   it('never silently drops what was on file, and offers the look-alike product', () => {
     // The stored maker (a film studio) is non-blank, so it stays and first look's maker is a suggestion.
     expect(html).toContain('value="Twentieth Century-Fox Film Corp."');
-    expect(text).toContain('Suggested: Continental Baking Company');
+    expect(text).toContain('Possible manufacturer alternative: Continental Baking Company');
     expect(text).toContain('Could also be');
     expect(text).toContain('1977 Topps Star Wars Series 1');
   });
   it('has the three ways out and no em dashes or "AI" in what the owner reads', () => {
-    expect(text).toMatch(/Looks correct|Save and confirm/);
+    expect(text).toMatch(/Looks correct|Update details/);
+    expect(text).toContain('Reset to original findings');
     expect(text).toContain('Review later');
     expect(text).toContain('More details');
     expect(text).not.toContain('—');
