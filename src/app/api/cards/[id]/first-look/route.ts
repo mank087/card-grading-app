@@ -29,28 +29,14 @@ import { runFirstLook, recordFirstLook } from '@/lib/identification/firstLookRun
 import { fetchCardOriginals } from '@/lib/images/originalImages';
 import { createSignedImageMap } from '@/lib/signedUrlBatch';
 
+import { firstLookOnDemandEnabled, firstLookInFlight } from '@/lib/identification/firstLookOnDemand';
+
 export const dynamic = 'force-dynamic';
 /** The search pass can take 20-35s; the contract pass alone is a few seconds. */
 export const maxDuration = 60;
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { 'cache-control': 'private, no-store' } });
-
-export function firstLookOnDemandEnabled(): boolean {
-  return process.env.FIRST_LOOK_ON_DEMAND === '1';
-}
-
-/**
- * Cards with a run in flight in THIS instance. It is not a distributed lock —
- * two lambdas can still both run one — but it stops the common case: a dialog
- * that mounts twice, or an owner who reopens it before the first answer lands.
- */
-const inFlight = new Set<string>();
-
-/** Test seam. */
-export function __clearFirstLookGuard(): void {
-  inFlight.clear();
-}
 
 export async function POST(
   request: NextRequest,
@@ -85,8 +71,8 @@ export async function POST(
     }
 
     if (!card.front_path || !card.back_path) return json({ first_look: null, fields: null });
-    if (inFlight.has(cardId)) return json({ first_look: null, fields: null, running: true }, 202);
-    inFlight.add(cardId);
+    if (firstLookInFlight.has(cardId)) return json({ first_look: null, fields: null, running: true }, 202);
+    firstLookInFlight.add(cardId);
     try {
       const signed = await createSignedImageMap(supabase.storage, 'cards', [card.front_path, card.back_path], {
         expiresIn: 300,
@@ -110,7 +96,7 @@ export async function POST(
         reused: false,
       });
     } finally {
-      inFlight.delete(cardId);
+      firstLookInFlight.delete(cardId);
     }
   } catch (err: any) {
     // Never surfaced as an error: the dialog must stay usable with stored values.

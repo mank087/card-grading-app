@@ -77,15 +77,21 @@ describe('buildReviewPrefill precedence', () => {
     expect(prefill.firstLookPresent).toBe(false);
   });
 
-  it('lets a value read off the card win over the stored one, and flags it as a pending change', () => {
+  it('keeps what is on file when first look read something else, and offers the read as a suggestion', () => {
+    // Owner test, Sept 18 2026: a serial stored correctly as 047/249 was transcribed as 041/249.
     const prefill = buildReviewPrefill(
       { category: 'Sports', card_set: 'Topps' },
       look({ identity: { set_name: printed('Wonder Bread') } }),
     );
     expect(field(prefill, 'card_set')).toMatchObject({
-      value: 'Wonder Bread', storedValue: 'Topps', origin: 'read_from_card',
-      needsCheck: false, differsFromStored: true,
+      value: 'Topps', storedValue: 'Topps', origin: 'from_grading', differsFromStored: false,
+      suggestion: { value: 'Wonder Bread', source: 'printed' },
     });
+  });
+
+  it('lets a value read off the card fill a blank as "Read from card"', () => {
+    const prefill = buildReviewPrefill({ category: 'Sports', card_set: 'Unknown' }, look({ identity: { set_name: printed('Wonder Bread') } }));
+    expect(field(prefill, 'card_set')).toMatchObject({ value: 'Wonder Bread', origin: 'read_from_card', needsCheck: false });
   });
 
   it('does not call a case-only difference a change', () => {

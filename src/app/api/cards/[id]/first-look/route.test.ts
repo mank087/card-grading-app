@@ -18,7 +18,8 @@ vi.mock('@/lib/identification/firstLookRunner', () => ({
   runFirstLook: mocks.run,
   recordFirstLook: mocks.record,
 }));
-import { POST, __clearFirstLookGuard } from './route';
+import { POST } from './route';
+import { __clearFirstLookGuard } from '@/lib/identification/firstLookOnDemand';
 
 const cardId = '6b292489-42d8-41d4-a00a-d9c9b267d66b';
 const context = { params: Promise.resolve({ id: cardId }) };

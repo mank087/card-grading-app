@@ -1,5 +1,6 @@
 'use client'
 
+import CollectionConfirmDetailsHost, { requestConfirmDetails } from '@/components/cards/CollectionConfirmDetailsHost';
 import { isNonStandardItemType } from '@/lib/identification/itemType';
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -333,13 +334,22 @@ const WithheldValueNote = ({ compact = false, card }: { compact?: boolean; card?
       </span>
     );
   }
+  if (!card) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200" title={WITHHELD_VALUE_MESSAGE}>
+        {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
+      </span>
+    );
+  }
   return (
-    <span
-      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"
+    <button
+      type="button"
+      onClick={event => openConfirmDetails(event, card.id)}
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 cursor-pointer"
       title={WITHHELD_VALUE_MESSAGE}
     >
       {compact ? 'Confirm details' : WITHHELD_VALUE_MESSAGE}
-    </span>
+    </button>
   );
 };
 
@@ -356,13 +366,23 @@ const needsDetailsConfirmation = (card: Card): boolean => {
   return confirmed === null || confirmed === undefined || Number(confirmed) < Number(row.identity_revision ?? 0);
 };
 
-const ConfirmDetailsTag = () => (
-  <span
-    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-    title="Open this card and confirm its name, set, year and number so its value and label are right"
+// A real button: the tag sits inside links and clickable tiles, so it stops the
+// click there and asks the page-level host to open the confirmation dialog in place.
+const openConfirmDetails = (event: { preventDefault: () => void; stopPropagation: () => void }, cardId: string) => {
+  event.preventDefault();
+  event.stopPropagation();
+  requestConfirmDetails(cardId);
+};
+
+const ConfirmDetailsTag = ({ card }: { card: Card }) => (
+  <button
+    type="button"
+    onClick={event => openConfirmDetails(event, card.id)}
+    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 cursor-pointer"
+    title="Confirm this card's name, set, year and number so its value and label are right"
   >
     Confirm details
-  </span>
+  </button>
 );
 
 // 💰 Helper: Check if price data is stale (> 7 days)
@@ -2377,6 +2397,12 @@ function CollectionPageContent() {
 
   return (
     <div className="dcm-brand dcm-collection-page flex min-h-screen flex-col items-center p-4 sm:p-8">
+      {/* Confirm a card's details in place: the "Confirm details" tags open this. */}
+      <CollectionConfirmDetailsHost
+        cards={[...cards, ...(binderCards ?? [])]}
+        onChanged={() => setRefreshKey(k => k + 1)}
+        hrefFor={id => { const found = [...cards, ...(binderCards ?? [])].find(c => c.id === id); return found ? getCardLink(found) : null; }}
+      />
       <div className="w-full max-w-6xl">
         {batchBanner}
         <div className="dcm-collection-header flex flex-col gap-4 mb-6">
@@ -3128,7 +3154,7 @@ function CollectionPageContent() {
                         if (!isValueWithheld(card) && !needsDetailsConfirmation(card)) return null;
                         return (
                           <div className="absolute -top-8 right-2">
-                            {isValueWithheld(card) ? <WithheldValueNote compact card={card} /> : <ConfirmDetailsTag />}
+                            {isValueWithheld(card) ? <WithheldValueNote compact card={card} /> : <ConfirmDetailsTag card={card} />}
                           </div>
                         );
                       }
@@ -3156,7 +3182,7 @@ function CollectionPageContent() {
                       );
                     })()}
                     {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
-                      <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                      <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
                     )}
                   </div>
 
@@ -3360,10 +3386,10 @@ function CollectionPageContent() {
                                     );
                                   }
                                   if (isValueWithheld(card)) return <WithheldValueNote card={card} />;
-                                  return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : null;
+                                  return needsDetailsConfirmation(card) ? <ConfirmDetailsTag card={card} /> : null;
                                 })()}
                                 {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
-                                  <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                                  <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
                                 )}
 
                                 {/* Sold badge — makes the state obvious at a
@@ -3656,7 +3682,7 @@ function CollectionPageContent() {
 
                               if (!priceStr) {
                                 if (isValueWithheld(card)) return <WithheldValueNote compact card={card} />;
-                                return needsDetailsConfirmation(card) ? <ConfirmDetailsTag /> : <span className="text-sm text-gray-400">-</span>;
+                                return needsDetailsConfirmation(card) ? <ConfirmDetailsTag card={card} /> : <span className="text-sm text-gray-400">-</span>;
                               }
 
                               return (
@@ -3666,7 +3692,7 @@ function CollectionPageContent() {
                               );
                             })()}
                             {formatPrice(getMarketValue(card)) && needsDetailsConfirmation(card) && (
-                              <span className="ml-1 align-middle"><ConfirmDetailsTag /></span>
+                              <span className="ml-1 align-middle"><ConfirmDetailsTag card={card} /></span>
                             )}
                           </td>
                           <td className="px-3 py-3">

@@ -43,6 +43,8 @@ export interface IdentityReviewState {
   candidates_available: boolean;
   candidates_error: boolean;
   suggested_candidate_id: string;
+  /** The product the owner already picked, if any. Re-saving the same pick is skipped. */
+  current_product_id?: string | null;
 }
 
 interface Props {
@@ -243,7 +245,11 @@ export default function ConfirmCardDetailsDialog({
 
       // The identity is saved. A pricing failure from here on is reported
       // softly: it must never look like the correction was lost.
-      if (review.is_sports && candidateId && candidateId !== NO_CANDIDATE) {
+      // Re-posting the pick the card already has would only clear and refetch its
+      // prices. It is needed again only when this save changed the identity, because
+      // that clears the pick.
+      const pickUnchanged = candidateId === review.current_product_id && data?.pricing_invalidated !== true;
+      if (review.is_sports && candidateId && candidateId !== NO_CANDIDATE && !pickUnchanged) {
         const candidate = candidates.find(c => c.id === candidateId);
         if (candidate) {
           try {
@@ -403,7 +409,7 @@ export default function ConfirmCardDetailsDialog({
                   )}
                   {field.suggestion && field.suggestion.value !== (values[field.key] ?? '') && (
                     <p className="mt-1 text-[11px] text-slate-600">
-                      Suggested: {field.suggestion.displayValue || field.suggestion.value}
+                      {field.suggestion.source === 'printed' ? 'We read this on the card: ' : 'Suggested: '}{field.suggestion.displayValue || field.suggestion.value}
                       {' · '}
                       <button
                         type="button"
@@ -471,7 +477,11 @@ export default function ConfirmCardDetailsDialog({
                           <span className="font-medium text-slate-800">
                             {candidate.name}{candidate.isBase ? ' (Base)' : ''}
                           </span>
-                          {candidate.setName && <span className="block text-slate-500">{candidate.setName}</span>}
+                          {(candidate.setName || candidate.serialDenominator || candidate.rawPrice) && (
+                            <span className="block text-slate-500">
+                              {[candidate.setName, candidate.serialDenominator ? `Numbered /${candidate.serialDenominator}` : null, candidate.rawPrice ? `about ${candidate.rawPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} ungraded` : null].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
                         </span>
                       </label>
                     ))}

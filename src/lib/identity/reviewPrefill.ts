@@ -255,8 +255,11 @@ export function buildReviewPrefill(
 
       if (!proposal) return base;
 
-      // 1. A value first look READ off the card wins outright.
-      if (proposal.source === 'printed') {
+      // 1. A value first look READ off the card fills a blank as "Read from card".
+      //    It never replaces a value already on file: owner test, Sept 18 2026 —
+      //    a serial stamp stored correctly as 047/249 was transcribed as 041/249.
+      //    A disagreement falls through to rule 3 and is offered as a suggestion.
+      if (proposal.source === 'printed' && (!stored || sameValue(proposal.value, stored))) {
         return {
           ...base,
           value: proposal.value,
@@ -406,6 +409,10 @@ export interface ReviewCandidate {
   hasPrice: boolean;
   /** True for the plainest product in the family, the picker's "Base" row. */
   isBase?: boolean;
+  /** Print run of a serial-numbered version (249 for "/249"), when the catalog knows it. */
+  serialDenominator?: number | null;
+  /** Ungraded market price, for telling versions apart in the picker. */
+  rawPrice?: number | null;
 }
 
 /** Sentinel for "None of these / not sure". Never sent to the pricing API. */

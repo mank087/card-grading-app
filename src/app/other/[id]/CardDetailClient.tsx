@@ -3657,6 +3657,18 @@ export function OtherCardDetails() {
               <div className="space-y-8">
 
               {/* 1. Card Information (includes slab detection when applicable) */}
+              {/* Owner confirmation of the card's identity (Phase 2B). One mount
+                  decides between the popup, the quieter review banner and
+                  nothing at all; the callout above opens the same dialog. */}
+              <NotStandardCardNotice card={card as any} className="mb-4" />
+              <IdentityReview
+                card={card as any}
+                currentUserId={getStoredSession()?.user?.id}
+                frontUrl={card.front_url}
+                backUrl={card.back_url}
+                onSaved={() => window.location.reload()}
+              />
+
               <CollapsibleSection
                 title="Card Information"
                 tourId="tour-card-info"
@@ -3787,18 +3799,6 @@ export function OtherCardDetails() {
                   </div>
                 </div>
               )}
-
-              {/* Owner confirmation of the card's identity (Phase 2B). One mount
-                  decides between the popup, the quieter review banner and
-                  nothing at all; the callout above opens the same dialog. */}
-              <NotStandardCardNotice card={card as any} className="mb-4" />
-              <IdentityReview
-                card={card as any}
-                currentUserId={getStoredSession()?.user?.id}
-                frontUrl={card.front_url}
-                backUrl={card.back_url}
-                onSaved={() => window.location.reload()}
-              />
 
               {/* Card Information with Rarity Features */}
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">

@@ -25,13 +25,13 @@ import { isRecordLocked } from '@/lib/cards/ownership';
 import {
   buildReviewPrefill,
   firstLookResultOf,
-  markBaseCandidate,
+  NO_CANDIDATE,
   pickBestCandidate,
   reviewEligibility,
   type ReviewCandidate,
   type ReviewPrefill,
 } from '@/lib/identity/reviewPrefill';
-import { getAvailableParallels, isPriceChartingEnabled } from '@/lib/priceCharting';
+import { loadReviewCandidates, serialDenominatorOf } from '@/lib/identity/reviewCandidates';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,33 +43,20 @@ function valueOf(prefill: ReviewPrefill, key: string): string {
 }
 
 /**
- * Look the card up in the catalog with the values the owner is ABOUT to
- * confirm, not the stale stored ones — the whole point of the prefill is that it
- * may already carry a corrected set or year.
+ * Which row the picker opens on. The owner's own earlier pick always wins; then
+ * the best textual match among versions with the card's serial run; then the
+ * product pricing is using today; then "None of these".
  */
-export async function loadCandidates(
-  prefill: ReviewPrefill,
-  category: string | null,
-): Promise<{ candidates: ReviewCandidate[]; available: boolean; error: boolean }> {
-  const playerName = valueOf(prefill, 'featured') || valueOf(prefill, 'card_name');
-  if (!playerName || !isPriceChartingEnabled()) {
-    return { candidates: [], available: false, error: false };
-  }
-  try {
-    const found = await getAvailableParallels({
-      playerName,
-      year: valueOf(prefill, 'release_date') || undefined,
-      setName: valueOf(prefill, 'card_set') || undefined,
-      cardNumber: valueOf(prefill, 'card_number') || undefined,
-      subset: valueOf(prefill, 'subset_variant') || undefined,
-      serialNumbering: valueOf(prefill, 'serial_numbering') || undefined,
-      sport: category || undefined,
-    });
-    return { candidates: markBaseCandidate(found), available: true, error: false };
-  } catch (err) {
-    console.warn('[identity-review] candidate lookup failed:', err instanceof Error ? err.message : err);
-    return { candidates: [], available: false, error: true };
-  }
+function suggestCandidate(candidates: ReviewCandidate[], card: Record<string, any>, prefill: ReviewPrefill): string {
+  const has = (id: unknown) => !!id && candidates.some(c => c.id === String(id));
+  if (has(card.dcm_selected_product_id)) return String(card.dcm_selected_product_id);
+  const hints = { parallel: valueOf(prefill, 'parallel_type'), serial: valueOf(prefill, 'serial_numbering'), subset: valueOf(prefill, 'subset_variant') };
+  const run = serialDenominatorOf(hints.serial);
+  const sameRun = run ? candidates.filter(c => c.serialDenominator === run) : [];
+  if (sameRun.length === 1) return sameRun[0].id;
+  const best = pickBestCandidate(sameRun.length ? sameRun : candidates, hints);
+  if (best !== NO_CANDIDATE) return best;
+  return has(card.dcm_price_product_id) ? String(card.dcm_price_product_id) : NO_CANDIDATE;
 }
 
 export async function GET(
@@ -101,7 +88,7 @@ export async function GET(
     });
 
     const candidates = prefill.isSports
-      ? await loadCandidates(prefill, card.category ?? null)
+      ? await loadReviewCandidates(prefill, card)
       : { candidates: [] as ReviewCandidate[], available: false, error: false };
 
     return json({
@@ -124,11 +111,8 @@ export async function GET(
       candidates: candidates.candidates,
       candidates_available: candidates.available,
       candidates_error: candidates.error,
-      suggested_candidate_id: pickBestCandidate(candidates.candidates, {
-        parallel: valueOf(prefill, 'parallel_type'),
-        serial: valueOf(prefill, 'serial_numbering'),
-        subset: valueOf(prefill, 'subset_variant'),
-      }),
+      current_product_id: card.dcm_selected_product_id ? String(card.dcm_selected_product_id) : null,
+      suggested_candidate_id: suggestCandidate(candidates.candidates, card, prefill),
     });
   } catch (err: any) {
     console.error('[identity-review] unexpected error:', err);

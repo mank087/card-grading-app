@@ -14,6 +14,12 @@ vi.mock('@/lib/priceCharting', () => ({
   getAvailableParallels: mocks.parallels,
   isPriceChartingEnabled: mocks.priceChartingEnabled,
 }));
+// The local parallel family is the first source; these tests exercise the live-search fallback.
+vi.mock('@/lib/sportsCardMatcher', () => ({
+  isSportsLocalDbAvailable: vi.fn(async () => false),
+  getLocalSportsFamily: vi.fn(async () => []),
+  matchSportsCardLocal: vi.fn(async () => ({ product: null, family: [] })),
+}));
 import { GET } from './route';
 
 const cardId = '6b292489-42d8-41d4-a00a-d9c9b267d66b';
@@ -154,7 +160,7 @@ describe('GET /api/cards/[id]/identity-review', () => {
     expect((await (await GET(request(), context)).json()).mode).toBe('banner');
   });
 
-  it('prefers what first look read off the card over the stored set', async () => {
+  it('offers what first look read off the card without replacing the stored set', async () => {
     card({
       first_look: {
         version: 'first-look-v1',
@@ -176,10 +182,11 @@ describe('GET /api/cards/[id]/identity-review', () => {
     });
     const body = await (await GET(request(), context)).json();
     expect(body.first_look_present).toBe(true);
+    // What is on file stays in the box; what first look read is one tap away.
     expect(body.fields.find((f: any) => f.key === 'card_set')).toMatchObject({
-      value: 'Wonder Bread', storedValue: 'Flair', origin: 'read_from_card', differsFromStored: true,
+      value: 'Flair', storedValue: 'Flair', suggestion: { value: 'Wonder Bread', source: 'printed' },
     });
-    expect(body.fields.find((f: any) => f.key === 'card_number')).toMatchObject({ value: '116/086' });
+    expect(body.fields.find((f: any) => f.key === 'card_number')).toMatchObject({ value: '116', suggestion: { value: '116/086' } });
     expect(body.alternatives).toHaveLength(1);
   });
 });
