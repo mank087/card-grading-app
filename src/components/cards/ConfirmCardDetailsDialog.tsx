@@ -94,6 +94,9 @@ const MAX_LENGTH: Record<string, number> = {
   subset_variant: 100,
 };
 
+/** Sentinel value of the set dropdown's "not listed" row. */
+const CUSTOM_SET = '__custom__';
+
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 export default function ConfirmCardDetailsDialog({
@@ -127,6 +130,7 @@ export default function ConfirmCardDetailsDialog({
   // Set names from DCM's internal card databases (TCG categories only), so the set
   // is spelled the way the catalog and the price lookups spell it.
   const [setOptions, setSetOptions] = useState<{ name: string; year: string | null }[]>([]);
+  const [customSet, setCustomSet] = useState(false);
   useEffect(() => {
     if (review.is_sports || !review.category) return;
     let cancelled = false;
@@ -248,6 +252,23 @@ export default function ConfirmCardDetailsDialog({
     setValues(previous => (previous.parallel_type ? previous : { ...previous, parallel_type: derived }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * The set dropdown. Picking a catalog set also fills an empty Year from that
+   * set's release date; "Type a set that is not listed" opens a free-text box so a
+   * brand new release or a promo can still be confirmed.
+   */
+  const chooseSet = (choice: string) => {
+    if (choice === CUSTOM_SET) {
+      setCustomSet(true);
+      setValue('card_set', '');
+      return;
+    }
+    setCustomSet(false);
+    setValue('card_set', choice);
+    const picked = setOptions.find(option => option.name === choice);
+    if (picked?.year && !(values.release_date || '').trim()) setValue('release_date', picked.year);
+  };
 
   const setValue = (key: string, value: string) => {
     setValues(previous => ({ ...previous, [key]: value }));
@@ -430,6 +451,39 @@ export default function ConfirmCardDetailsDialog({
                     </label>
                     {marker(field)}
                   </div>
+                  {/* TCG categories get a real list of that game's sets, from DCM's own
+                      set tables, so a confirmed set is spelled the way the catalog and
+                      the price lookups spell it. "Type a set that is not listed" keeps a
+                      brand new release or a promo confirmable. */}
+                  {field.key === 'card_set' && setOptions.length > 0 ? (
+                    <>
+                      <select
+                        id={`identity-review-${field.key}`}
+                        value={customSet ? CUSTOM_SET : (setOptions.some(o => o.name === values.card_set) ? values.card_set : (values.card_set ? CUSTOM_SET : ''))}
+                        onChange={event => chooseSet(event.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                      >
+                        <option value="">Not sure</option>
+                        {setOptions.map(option => (
+                          <option key={option.name} value={option.name}>
+                            {option.name}{option.year ? ` (${option.year})` : ''}
+                          </option>
+                        ))}
+                        <option value={CUSTOM_SET}>Type a set that is not listed</option>
+                      </select>
+                      {(customSet || (!!values.card_set && !setOptions.some(o => o.name === values.card_set))) && (
+                        <input
+                          type="text"
+                          value={values.card_set ?? ''}
+                          onChange={event => setValue('card_set', event.target.value)}
+                          maxLength={200}
+                          placeholder="Type the set name"
+                          aria-label="Set name that is not in the list"
+                          className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        />
+                      )}
+                    </>
+                  ) : (
                   <input
                     id={`identity-review-${field.key}`}
                     type="text"
@@ -449,19 +503,13 @@ export default function ConfirmCardDetailsDialog({
                     placeholder={field.key === 'release_date' ? 'YYYY' : 'Leave blank if you are not sure'}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
                   />
+                  )}
                   {field.key === 'card_set' && setOptions.length > 0 && (
-                    <>
-                      <datalist id="identity-review-set-options">
-                        {setOptions.map(option => (
-                          <option key={option.name} value={option.name}>{option.year || ''}</option>
-                        ))}
-                      </datalist>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        {setOptions.some(option => option.name.toLowerCase() === (values.card_set || '').trim().toLowerCase())
-                          ? 'Matches a set in our catalog.'
-                          : 'Start typing and pick the set from the list so it matches our catalog.'}
-                      </p>
-                    </>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {setOptions.some(option => option.name === (values.card_set || ''))
+                        ? 'This set is in our catalog.'
+                        : (values.card_set ? 'This set is not in our catalog, so pricing may not find a match.' : `${setOptions.length.toLocaleString()} sets to choose from.`)}
+                    </p>
                   )}
                   {field.displayValue && field.displayValue !== (values[field.key] ?? '') && (
                     <p className="mt-1 text-[11px] text-slate-500">Printed as {field.displayValue}</p>

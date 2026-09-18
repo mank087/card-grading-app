@@ -83,3 +83,29 @@ describe('confirmation dialog renders for a real-shaped card', () => {
   });
   it('prints the visible text for a human to read in the test log', () => { console.log('\nDIALOG TEXT:\n' + text + '\n'); });
 });
+
+describe('set dropdown for a TCG card', () => {
+  const tcgReview = (): IdentityReviewState => {
+    const base = reviewState();
+    return { ...base, category: 'MTG', is_sports: false,
+      fields: base.fields.map(f => (f.key === 'card_set' ? { ...f, value: 'Dissension', storedValue: 'Dissension', origin: 'from_grading' as const, suggestion: undefined } : f)) };
+  };
+  const render = (state: IdentityReviewState) => renderToStaticMarkup(createElement(ConfirmCardDetailsDialog as any, {
+    cardId: card.id, review: state, frontUrl: null, backUrl: null,
+    onClose: () => {}, onDismissed: () => {}, onSaved: () => {}, onOpenMoreDetails: () => {}, onReload: async () => null, fetchFirstLook: false,
+  }));
+
+  it('is a plain text box until the set list has loaded', () => {
+    // The list is fetched client side, so a server render has none yet.
+    const html = render(tcgReview());
+    expect(html).toContain('id="identity-review-card_set"');
+    expect(html).toContain('value="Dissension"');
+    expect(html).not.toContain('Type a set that is not listed');
+  });
+
+  it('keeps every other field a text box', () => {
+    const html = render(tcgReview());
+    expect(html).toContain('id="identity-review-release_date"');
+    expect(html).toContain('id="identity-review-card_number"');
+  });
+});
