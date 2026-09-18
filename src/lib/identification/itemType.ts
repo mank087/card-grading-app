@@ -34,6 +34,13 @@ const PLAIN_WORDS: Record<string, string> = {
   not_a_collectible: 'not a collectible card',
 };
 
+const OFFICIAL_PUBLISHERS = /wizards of the coast|pok[eé]mon|nintendo|creatures inc|game ?freak|topps|panini|upper deck|fleer|donruss|bowman|leaf trading|skybox|score|konami|bandai|ravensburger|disney|fantasy flight|lucasfilm|marvel|dc comics|viacom|nba properties|nfl|mlb|nhl/i;
+
+/** True when the transcribed legal line carries a © (or TM) and names a real publisher or licensor. */
+export function hasOfficialCopyright(line: unknown): boolean {
+  return typeof line === 'string' && /©|\(c\)|™|\bTM\b/i.test(line) && OFFICIAL_PUBLISHERS.test(line);
+}
+
 export function isNonStandardItemType(itemType: unknown): boolean {
   return typeof itemType === 'string' && (NON_STANDARD_ITEM_TYPES as readonly string[]).includes(itemType);
 }
@@ -54,10 +61,16 @@ export function nonStandardExplanation(itemType: unknown): string | null {
  * Returns null when the item should be treated as a standard card.
  */
 export function actionableItemType(record: {
-  result?: { photos?: { item_type?: string | null } | null } | null;
+  result?: { photos?: { item_type?: string | null } | null; printed_text?: { copyright_line?: string | null } | null } | null;
   contract_item_type?: string | null;
 } | null | undefined): string | null {
   const finalType = record?.result?.photos?.item_type ?? null;
+  // Owner test, Sept 18 2026: a genuine 2026 Magic "Source Material" borderless
+  // mythic (comic-art treatment, "TM & © 2026 Wizards of the Coast" printed on it)
+  // was called custom_or_fan_made, which hid its market pricing. A card that prints
+  // an official publisher's copyright is not fan made, whatever the art looks like.
+  if ((finalType === 'custom_or_fan_made' || finalType === 'not_a_collectible')
+    && hasOfficialCopyright(record?.result?.printed_text?.copyright_line)) return null;
   const firstType = record?.contract_item_type;
   if (firstType === undefined || firstType === null) return isNonStandardItemType(finalType) ? (finalType as string) : null;
   if (isNonStandardItemType(firstType) && isNonStandardItemType(finalType)) return firstType;

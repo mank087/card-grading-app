@@ -32,6 +32,7 @@ import {
   type ReviewPrefill,
 } from '@/lib/identity/reviewPrefill';
 import { loadReviewCandidates, serialDenominatorOf } from '@/lib/identity/reviewCandidates';
+import { resolveSetCodesInFields } from '@/lib/identity/setOptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,8 @@ export async function GET(
     if (!card || card.user_id !== auth.userId || card.deleted_at) return json({ error: 'Card not found' }, 404);
 
     const prefill = buildReviewPrefill(card, firstLookResultOf(card.first_look));
+    // A printed set code ("PZA") becomes the catalog's set name before anything uses it.
+    try { prefill.fields = await resolveSetCodesInFields(prefill.fields, card.category); } catch { /* keep the raw read */ }
     const eligibility = reviewEligibility(card, auth.userId, {
       confirmSince: process.env.NEXT_PUBLIC_IDENTITY_CONFIRM_SINCE || null,
     });

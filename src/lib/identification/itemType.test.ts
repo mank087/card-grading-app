@@ -32,3 +32,19 @@ describe('non-standard item policy', () => {
     if (mobile !== null) expect(mobile.replace(/\r\n/g, '\n')).toBe(readFileSync('src/lib/identification/itemType.ts', 'utf8').replace(/\r\n/g, '\n'));
   });
 });
+
+describe('a fan-made call is vetoed by an official copyright line', () => {
+  it('does not label the genuine 2026 Magic Source Material card the owner tested', async () => {
+    const { actionableItemType, hasOfficialCopyright } = await import('./itemType');
+    const line = '© 2026 Viacom. | TM & © 2026 Wizards of the Coast';
+    expect(hasOfficialCopyright(line)).toBe(true);
+    expect(actionableItemType({ result: { photos: { item_type: 'custom_or_fan_made' }, printed_text: { copyright_line: line } } })).toBeNull();
+  });
+  it('still labels a custom card with no official legal line, and a divider regardless', async () => {
+    const { actionableItemType, hasOfficialCopyright } = await import('./itemType');
+    expect(hasOfficialCopyright('Art by Jane 2026')).toBe(false);
+    expect(hasOfficialCopyright(null)).toBe(false);
+    expect(actionableItemType({ result: { photos: { item_type: 'custom_or_fan_made' }, printed_text: { copyright_line: null } } })).toBe('custom_or_fan_made');
+    expect(actionableItemType({ result: { photos: { item_type: 'accessory_not_a_card' }, printed_text: { copyright_line: '© 2022 Pokémon' } } })).toBe('accessory_not_a_card');
+  });
+});
