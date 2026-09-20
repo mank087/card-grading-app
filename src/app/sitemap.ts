@@ -277,7 +277,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const additionalPages: MetadataRoute.Sitemap = [
     'vip', 'enterprise', 'enterprise/terms', 'affiliates', 'instalist-marketplace', 'shop',
-    'sports-database', 'starwars-database', 'yugioh-database', 'labels',
+    'sports-database', 'yugioh-database', 'labels',
   ].map(path => ({ url: `${baseUrl}/${path}`, changeFrequency: 'monthly', priority: 0.6 }));
 
   // Discover only active, explicitly enabled public storefronts and owners

@@ -281,7 +281,7 @@ export default function YuGiOhDatabasePage() {
 
   return (
     <main className="dcm-brand dcm-editorial dcm-directory min-h-screen bg-gray-900">
-      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database">Pokémon</Link><Link href="/sports-database">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database" aria-current="page">Yu-Gi-Oh!</Link><Link href="/starwars-database">Star Wars</Link></div>
+      <div role="navigation" aria-label="Card databases" className="dcm-database-nav"><Link href="/pokemon-database">Pokémon</Link><Link href="/sports-database">Sports</Link><Link href="/mtg-database">Magic</Link><Link href="/lorcana-database">Lorcana</Link><Link href="/onepiece-database">One Piece</Link><Link href="/yugioh-database" aria-current="page">Yu-Gi-Oh!</Link></div>
       {/* Hero Section */}
       <section className="dcm-directory-hero py-12">
         <div className="container mx-auto px-4">

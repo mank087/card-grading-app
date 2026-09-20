@@ -29,7 +29,9 @@ describe('canonical public sitemap', () => {
   it('does not invent static update dates or include account routes', async () => {
     const entries = await sitemap()
     expect(entries.find(e => e.url === 'https://dcmgrading.com')?.lastModified).toBeUndefined()
-    for (const route of ['vip', 'enterprise', 'instalist-marketplace', 'sports-database', 'starwars-database']) expect(entries.some(e => e.url.endsWith('/' + route))).toBe(true)
+    for (const route of ['vip', 'enterprise', 'instalist-marketplace', 'sports-database']) expect(entries.some(e => e.url.endsWith('/' + route))).toBe(true)
+    // Retired Sept 2026: the page now permanently redirects, so it must not be advertised.
+    expect(entries.some(e => e.url.endsWith('/starwars-database'))).toBe(false)
     expect(entries.some(e => /\/(?:login|account|upload|admin|dev)(?:\/|$)/.test(e.url))).toBe(false)
     expect(new Set(entries.map(e => e.url)).size).toBe(entries.length)
   })
