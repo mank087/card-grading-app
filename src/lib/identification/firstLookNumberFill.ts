@@ -44,6 +44,11 @@ const squash = (value: unknown) => String(value ?? '').toLowerCase().replace(/[^
  * the card counts; its own contract marks that as `source: 'printed'`.
  */
 export function printedNumberFromFirstLook(look: FirstLook | null | undefined): string | null {
+  return printedNumberEvidence(look)?.value ?? null;
+}
+
+/** The usable number together with the characters first look actually transcribed. */
+function printedNumberEvidence(look: FirstLook | null | undefined): { value: string; textSeen: string } | null {
   if (!look) return null;
   // Two different items photographed as front and back: nothing about the back
   // (where most numbers are printed) can be trusted to describe this card.
@@ -58,7 +63,7 @@ export function printedNumberFromFirstLook(look: FirstLook | null | undefined): 
   // back identical, the "number" is the stamp ("23/99"), and that is not an identity.
   const stamp = look.printed_text?.serial_stamp;
   if (!isBlank(stamp) && squash(stamp) === squash(value)) return null;
-  return value;
+  return { value, textSeen: raw };
 }
 
 /** On unless FIRST_LOOK_NUMBER_FILL=0, so it can be switched off in Vercel without a deploy. */
@@ -82,10 +87,16 @@ export function fillBlankNumberFromFirstLook(
 ): NumberFill {
   if (!cardInfo || typeof cardInfo !== 'object') return { filled: false };
   if (NUMBER_KEYS.some(key => !isBlank(cardInfo[key]))) return { filled: false };
-  const value = printedNumberFromFirstLook(look);
-  if (!value) return { filled: false };
-  cardInfo.card_number = value;
-  cardInfo.card_number_raw = value;
+  const evidence = printedNumberEvidence(look);
+  if (!evidence) return { filled: false };
+  cardInfo.card_number = evidence.value;
+  cardInfo.card_number_raw = evidence.value;
+  // The sports, other, Star Wars and Yu-Gi-Oh routes run cardNumberGuard AFTER the
+  // grader returns, and it drops any number that arrives without a transcription or
+  // with a source it does not know. Without these two fields the fill is silently
+  // undone on exactly the categories that need it most (caught Sept 20 2026, before
+  // shipping). The guard still applies its whole-token and serial checks to it.
+  cardInfo.card_number_text_seen = evidence.textSeen;
   cardInfo.card_number_source = 'first_look';
-  return { filled: true, value };
+  return { filled: true, value: evidence.value };
 }

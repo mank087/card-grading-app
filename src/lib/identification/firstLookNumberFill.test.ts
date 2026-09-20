@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fillBlankNumberFromFirstLook, numberFillEnabled, printedNumberFromFirstLook, stripNumberLabel } from './firstLookNumberFill';
 import type { FirstLook } from './firstLook';
+import { applyCardNumberGuard } from '../cardNumberGuard';
 
 /** Just the parts of a first look the fill reads. */
 function look(over: { printed?: string | null; source?: string; stamp?: string | null; sameItem?: string } = {}): FirstLook {
@@ -76,6 +77,33 @@ describe('filling a blank number at grading time', () => {
     expect(fillBlankNumberFromFirstLook(info, null).filled).toBe(false);
     expect(fillBlankNumberFromFirstLook(null, look()).filled).toBe(false);
     expect(info).toEqual({ card_number: null });
+  });
+});
+
+describe('surviving the card number guard the routes run afterwards', () => {
+  // The sports, other, Star Wars and Yu-Gi-Oh routes call applyCardNumberGuard on the
+  // grader's card_info. The first version of the fill set a source the guard did not
+  // know and no transcription, so the guard silently dropped every filled number.
+  it.each(['Sports', 'Other', 'Star Wars', 'Yu-Gi-Oh'])('keeps a filled number on a %s card', category => {
+    const info: Record<string, any> = { card_name: 'Bobby Orr', card_number: null };
+    fillBlankNumberFromFirstLook(info, look({ printed: 'No. 336' }));
+    expect(info).toMatchObject({ card_number: '336', card_number_text_seen: 'No. 336', card_number_source: 'first_look' });
+    const guard = applyCardNumberGuard(info, 'test', { category });
+    expect(guard.outcome).toBe('kept');
+    expect(info.card_number).toBe('336');
+  });
+
+  it('still lets the guard refuse print-run numbering on a sports card', () => {
+    const info: Record<string, any> = { card_number: null };
+    fillBlankNumberFromFirstLook(info, look({ printed: '047/249' }));
+    expect(applyCardNumberGuard(info, 'test', { category: 'Sports' }).outcome).toBe('dropped_serial');
+    expect(info.card_number).toBeNull();
+  });
+
+  it('keeps a TCG fraction, where the same shape is the printed set number', () => {
+    const info: Record<string, any> = { card_number: null };
+    fillBlankNumberFromFirstLook(info, look({ printed: '099/084' }));
+    expect(applyCardNumberGuard(info, 'test', { category: 'Pokemon' }).outcome).toBe('kept');
   });
 });
 

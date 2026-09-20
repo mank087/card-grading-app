@@ -32,6 +32,10 @@ const TRUSTED_NUMBER_SOURCES = new Set([
   'front_number',      // printed on the card face
   'back_number',       // printed on the back, incl. the "N OF M" line
   'insert_numbering',  // explicit "8 OF 12" / "8/12" style marking
+  // Filled from first look's printed transcription when the grading call returned no
+  // number (identification/firstLookNumberFill.ts). An independent read, quoted in
+  // card_number_text_seen like the others, so it faces the same whole-token check.
+  'first_look',
 ]);
 
 /** Explicit "I could not read it" marker. */

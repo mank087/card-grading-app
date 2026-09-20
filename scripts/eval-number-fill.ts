@@ -10,7 +10,19 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) dotenv.config({ path: '../../.env.local' });
 import { createClient } from '@supabase/supabase-js';
-import { fillBlankNumberFromFirstLook } from '../src/lib/identification/firstLookNumberFill';
+import { fillBlankNumberFromFirstLook as rawFill } from '../src/lib/identification/firstLookNumberFill';
+import { applyCardNumberGuard } from '../src/lib/cardNumberGuard';
+
+/** Fill, then the guard the sports/other/Star Wars/Yu-Gi-Oh routes run afterwards: what a route would KEEP. */
+const GUARDED = new Set(['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Other', 'Star Wars', 'Yu-Gi-Oh']);
+let currentCategory = '';
+const quiet = <T,>(fn: () => T): T => { const w = console.warn, l = console.log; console.warn = console.log = () => {}; try { return fn(); } finally { console.warn = w; console.log = l; } };
+function fillBlankNumberFromFirstLook(info: Record<string, any>, look: any) {
+  const fill = rawFill(info, look);
+  if (!fill.filled || !GUARDED.has(currentCategory)) return fill;
+  quiet(() => applyCardNumberGuard(info, 'replay', { category: currentCategory }));
+  return info.card_number ? fill : { filled: false };
+}
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const blank = (v: any) => !String(v ?? '').trim() || /^(unknown|n\/a|none|null)$/i.test(String(v).trim());
@@ -32,6 +44,7 @@ const pct = (n: number, d: number) => `${n}/${d} (${d ? Math.round(100 * n / d) 
     const { data, error: e } = await db.from('cards').select(`id, category, ${FL}`).in('id', ids.slice(i, i + 40));
     if (e) throw new Error(e.message);
     for (const c of data || []) {
+      currentCategory = String((c as any).category || '');
       const info: Record<string, any> = { card_number: null };
       const fill = fillBlankNumberFromFirstLook(info, lookOf(c));
       if (!fill.filled) continue;
@@ -49,7 +62,7 @@ const pct = (n: number, d: number) => `${n}/${d} (${d ? Math.round(100 * n / d) 
   if (e2) throw new Error(e2.message);
   const untouched = (recent || []).filter((r: any) => r.identity_revision === 0);
   const noNumber = untouched.filter((r: any) => blank(r.card_number));
-  const rescued = noNumber.filter((r: any) => fillBlankNumberFromFirstLook({ card_number: null }, lookOf(r)).filled);
+  const rescued = noNumber.filter((r: any) => { currentCategory = String(r.category || ''); return fillBlankNumberFromFirstLook({ card_number: null }, lookOf(r)).filled; });
   console.log(`\nB. last 96h, cards nobody has edited: ${untouched.length}; with NO card number: ${pct(noNumber.length, untouched.length)}`);
   console.log(`   the fill gives a number to ${pct(rescued.length, noNumber.length)} of those`);
   const byCat: Record<string, number> = {}; for (const r of rescued as any[]) byCat[r.category] = (byCat[r.category] || 0) + 1;
