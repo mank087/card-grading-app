@@ -9,6 +9,8 @@ function load(relative, extras = '') {
   const mod = { exports: {} };
   new Function('require', 'module', 'exports', js)((id) => {
     if (id === 'expo-image-manipulator' || id === 'expo-crypto') return {};
+    // imageUtils re-exports the guide geometry from its own file so the web can share it.
+    if (id === './captureGeometry') return load('dcm-mobile/lib/captureGeometry.ts');
     throw Error(`Unexpected dependency: ${id}`);
   }, mod, mod.exports);
   return mod.exports;

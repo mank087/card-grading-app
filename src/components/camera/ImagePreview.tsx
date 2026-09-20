@@ -7,6 +7,9 @@ interface ImagePreviewProps {
   imageUrl: string;
   side: 'front' | 'back';
   qualityValidation?: ImageQualityValidation | null;
+  onRotate?: () => void;
+  busy?: boolean;
+  framingWarning?: string | null;
   onConfirm: () => void;
   onRetake: () => void;
 }
@@ -16,7 +19,7 @@ export default function ImagePreview({
   side,
   qualityValidation,
   onConfirm,
-  onRetake
+  onRetake, onRotate, busy = false, framingWarning,
 }: ImagePreviewProps) {
   const hasQualityIssues = qualityValidation && !qualityValidation.isValid;
 
@@ -116,6 +119,8 @@ export default function ImagePreview({
         </div>
       )}
 
+      {framingWarning && <p role="alert" className="bg-amber-950 text-amber-100 px-4 py-3 text-sm">{framingWarning}</p>}
+      {onRotate && <button type="button" disabled={busy} onClick={onRotate} className="bg-gray-800 text-white px-4 py-3">{busy ? 'Rotating…' : 'Rotate photo 90°'}</button>}
       {/* Action Buttons */}
       <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 space-y-3">
         {/* isValid can now actually be false — focus and lighting are hard
@@ -133,12 +138,14 @@ export default function ImagePreview({
         <div className="flex gap-3">
           <button
             onClick={onRetake}
+            disabled={busy}
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors"
           >
             🔄 Retake
           </button>
           <button
             onClick={onConfirm}
+            disabled={busy}
             className={`flex-1 px-6 py-4 rounded-lg font-semibold transition-colors ${
               qualityValidation?.isValid
                 ? 'bg-green-600 hover:bg-green-700 text-white'

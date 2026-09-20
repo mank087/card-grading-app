@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { buildManifest } = require('../scripts/accuracy-phase0.cjs');
 
@@ -13,7 +14,19 @@ describe('offline Phase 0 baseline', () => {
     expect(manifest.localEffective.baselineMainRequestTemplate.config).not.toHaveProperty('temperature');
     expect(manifest.sourceHashes['src/lib/visionGrader.ts']).toMatch(/^[a-f0-9]{64}$/);
     // The fixture records known failures, not desired behavior. Do not silently regenerate it.
-    expect(manifest.probes.matchesFrozenBaseline).toBe(true);
+    // One of those failures is now repaired: in a wide, short viewport (800x350) the capture
+    // guide used to be clamped to 60% of the width and came out 672px tall in a 350px space.
+    // The historical fixture stays as it was, so the repair is asserted exactly: EVERYTHING
+    // else still matches it, and the guide now fits. A blanket "differs from the baseline"
+    // would let any future regression through.
+    const frozen = JSON.parse(readFileSync('docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json', 'utf8'));
+    const { mobileGuide: frozenGuide, ...frozenRest } = frozen;
+    const { mobileGuide, ...observedRest } = manifest.probes.observed;
+    expect(observedRest).toEqual(frozenRest);
+    expect(frozenGuide.some((g: any) => g.exceedsViewport)).toBe(true);
+    expect(mobileGuide.every((g: any) => !g.exceedsViewport)).toBe(true);
+    // The portrait phone case, which is what nearly every capture uses, is unchanged.
+    expect(mobileGuide[0]).toEqual(frozenGuide[0]);
   });
   it('uses the router kill switch and compatibility settings from the supplied environment', () => {
     const manifest = buildManifest({ GRADING_CANARY_PERCENT: '100', GRADING_CANARY_KILL: '1',

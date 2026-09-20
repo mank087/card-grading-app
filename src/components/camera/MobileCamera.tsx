@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { rotateCaptureCanvas } from '@/utils/rotateCaptureCanvas';
 import { recordLocalCaptureAudit } from '@/lib/localCaptureAudit';
 import { useCamera } from '@/hooks/useCamera';
 import CameraGuideOverlay from './CameraGuideOverlay';
@@ -55,6 +56,23 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [torchOn, setTorchOn] = useState(false);
   const toast = useToast();
   const auditCaptureId = useRef('');
+  const captureCanvas = useRef<HTMLCanvasElement | null>(null);
+  const quarterTurns = useRef(0);
+  const [framingWarning, setFramingWarning] = useState<string | null>(null);
+
+  const rotatePreview = async () => {
+    if (!captureCanvas.current || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      const turns = (quarterTurns.current + 1) % 4;
+      const encoded = await canvasToJpegFile(rotateCaptureCanvas(captureCanvas.current, turns), { quality: 0.9, maxDimension: 3000 });
+      if (capturedImageUrl?.startsWith('blob:')) URL.revokeObjectURL(capturedImageUrl);
+      quarterTurns.current = turns;
+      setCapturedImageUrl(encoded.previewUrl);
+      setCapturedFile(encoded.file);
+    } catch { toast.error('Could not rotate this photo. Please try again.'); }
+    finally { setIsProcessing(false); }
+  };
 
   // Start camera on mount and when facingMode changes
   useEffect(() => {
@@ -113,6 +131,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     if (isProcessing) return;
 
     setIsProcessing(true);
+    setFramingWarning(null);
     const captureId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     auditCaptureId.current = captureId;
     const shutterRect = videoRef.current?.getBoundingClientRect();
@@ -176,6 +195,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           output: cropResult.croppedSize });
       } catch (err) {
         console.warn('[MobileCamera] Crop failed, using full frame:', err);
+        setFramingWarning('The full camera frame was saved. Check that the card is upright, fills the photo, and all four corners are visible before continuing.');
         const fallback = await canvasToJpegFile(captured.canvas, { quality: 0.9, maxDimension: 3000 });
         previewUrl = fallback.previewUrl;
         file = fallback.file;
@@ -184,6 +204,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           output: { width: fallback.canvas.width, height: fallback.canvas.height } });
       }
 
+      captureCanvas.current = qualityCanvas;
+      quarterTurns.current = 0;
       setCapturedImageUrl(previewUrl);
       setCapturedFile(file);
       setCaptureMethod(captured.captureSource === 'photo' ? 'image_capture_still' : 'video_frame_grab');
@@ -212,7 +234,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   }, [captureImage, orientation, isProcessing, toast, side, videoRef]);
 
   const handleConfirm = () => {
-    if (capturedFile) {
+    if (capturedFile && !isProcessing) {
       recordLocalCaptureAudit({ captureId: auditCaptureId.current, stage: 'accepted', side, orientation });
       onCapture(capturedFile, { captureMethod });
     }
@@ -247,6 +269,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         qualityValidation={qualityValidation}
         onConfirm={handleConfirm}
         onRetake={handleRetake}
+        onRotate={rotatePreview}
+        busy={isProcessing}
+        framingWarning={framingWarning}
       />
     );
   }

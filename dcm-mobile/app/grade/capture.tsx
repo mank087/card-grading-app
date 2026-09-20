@@ -1,3 +1,4 @@
+import * as ImageManipulator from 'expo-image-manipulator'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Image, Alert, Platform, ScrollView, useWindowDimensions } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -98,6 +99,8 @@ export default function CaptureScreen() {
   // Preview state
   const insets = useSafeAreaInsets()
   const { height: windowHeight } = useWindowDimensions()
+  const rotationSource = useRef<CompressedImage | null>(null)
+  const rotationTurns = useRef(0)
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -172,6 +175,8 @@ export default function CaptureScreen() {
       // one off the sensor. Null (measurement failed) means "no opinion".
       const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
 
+      rotationSource.current = compressed
+      rotationTurns.current = 0
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
       setPreviewIsSoft(sharpness?.isSoft === true)
@@ -390,6 +395,8 @@ export default function CaptureScreen() {
       // treat as sharp; see lib/blurCheck.ts.
       const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
 
+      rotationSource.current = compressed
+      rotationTurns.current = 0
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
       setPreviewIsSoft(sharpness?.isSoft === true)
@@ -431,6 +438,30 @@ export default function CaptureScreen() {
       setIsCapturing(false)
       setIsProcessing(false)
     }
+  }
+
+  // Every turn starts from the same capture, rather than recompressing the last turn.
+  const rotatePreview = async () => {
+    if (isProcessing || !rotationSource.current) return
+    setIsProcessing(true)
+    try {
+      const turns = (rotationTurns.current + 1) % 4
+      const source = rotationSource.current
+      const result = turns === 0 ? source : await ImageManipulator.manipulateAsync(
+        source.uri, [{ rotate: turns * 90 }], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG })
+      const compressed = { ...result, fileSize: Math.round(result.width * result.height * 0.15) }
+      const hash = await hashImage(compressed.uri)
+      const quality = assessQuality(compressed)
+      rotationTurns.current = turns
+      setPreviewUri(compressed.uri)
+      setPreviewQuality(quality)
+      if (currentSide === 'front') {
+        setFrontUri(compressed.uri); setFrontCompressed(compressed); setFrontQuality(quality); setFrontHash(hash)
+      } else {
+        setBackUri(compressed.uri); setBackCompressed(compressed); setBackQuality(quality); setBackHash(hash)
+      }
+    } catch { Alert.alert('Could not rotate', 'Please try rotating the photo again.') }
+    finally { setIsProcessing(false) }
   }
 
   const handleUseImage = () => {
@@ -602,9 +633,13 @@ export default function CaptureScreen() {
           </View>
         </ScrollView>
 
+        <TouchableOpacity disabled={isProcessing} onPress={rotatePreview} accessibilityRole="button" accessibilityLabel="Rotate photo 90 degrees" style={{ padding: 12, alignItems: 'center' }}>
+          <Text style={{ color: Colors.white }}>{isProcessing ? 'Rotating…' : 'Rotate photo 90°'}</Text>
+        </TouchableOpacity>
         <View style={[styles.previewActions, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
             style={styles.retakeButton}
+            disabled={isProcessing}
             onPress={handleRetake}
             accessibilityLabel="Retake photo"
             accessibilityRole="button"
@@ -614,6 +649,7 @@ export default function CaptureScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.useButton, { backgroundColor: previewIsSoft ? Colors.gray[600] : Colors.blue[500] }]}
+            disabled={isProcessing}
             onPress={handleUseImage}
             accessibilityLabel={
               previewIsSoft
