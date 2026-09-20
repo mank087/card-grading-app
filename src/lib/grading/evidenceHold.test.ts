@@ -1,35 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { explainUncertaintyHold, holderPresent, letterUncertainty } from './evidenceHold';
+import { explainUncertaintyHold, holderBlocksTen, holderPresent, letterUncertainty } from './evidenceHold';
 
 const complete = { zoomComplete: true, clippedCorners: [] as string[], caseType: 'none' };
 
-describe('when the confidence letter may hold a grade', () => {
+describe('the override is off by default', () => {
+  it('leaves a C holding the grade exactly as before, even with a complete inspection', () => {
+    // Checked by eye, Sept 20 2026: most of the cards it would have moved were photographed
+    // too poorly to support a 10. See the STATUS note in evidenceHold.ts.
+    expect(letterUncertainty({ ...complete, letter: 'C' })).toEqual({ value: 2, coverageOverrodeLetter: false });
+    expect(letterUncertainty({ ...complete, letter: 'C', caseType: 'penny_sleeve' }).value).toBe(2);
+  });
+});
+
+describe('when the confidence letter may hold a grade (GRADING_EVIDENCE_V2)', () => {
   it('lets a C through when every magnified region was inspected, nothing is clipped and there is no holder', () => {
-    expect(letterUncertainty({ ...complete, letter: 'C' })).toEqual({ value: 1, coverageOverrodeLetter: true });
+    expect(letterUncertainty({ ...complete, letter: 'C' }, true)).toEqual({ value: 1, coverageOverrodeLetter: true });
   });
 
   it('keeps C holding the grade when the inspection did not complete', () => {
-    expect(letterUncertainty({ ...complete, letter: 'C', zoomComplete: false })).toEqual({ value: 2, coverageOverrodeLetter: false });
+    expect(letterUncertainty({ ...complete, letter: 'C', zoomComplete: false }, true)).toEqual({ value: 2, coverageOverrodeLetter: false });
   });
 
   it('keeps C holding the grade when a corner is out of frame', () => {
-    expect(letterUncertainty({ ...complete, letter: 'C', clippedCorners: ['front top-left'] }).value).toBe(2);
+    expect(letterUncertainty({ ...complete, letter: 'C', clippedCorners: ['front top-left'] }, true).value).toBe(2);
   });
 
-  it('leaves holders exactly as they were: that policy is the owner\'s to change', () => {
-    for (const caseType of ['penny_sleeve', 'top_loader', 'semi_rigid', 'slab', 'one_touch']) {
-      expect(letterUncertainty({ ...complete, letter: 'C', caseType }).value).toBe(2);
+  it('lets a card in a penny sleeve earn a 10 (owner decision, Sept 20 2026)', () => {
+    expect(letterUncertainty({ ...complete, letter: 'C', caseType: 'penny_sleeve' }, true)).toEqual({ value: 1, coverageOverrodeLetter: true });
+    expect(holderBlocksTen('penny_sleeve')).toBe(false);
+  });
+
+  it('still holds a card in a top loader, semi-rigid, slab or any holder it does not recognise', () => {
+    for (const caseType of ['top_loader', 'semi_rigid', 'slab', 'one_touch', 'magnetic']) {
+      expect(letterUncertainty({ ...complete, letter: 'C', caseType }, true).value).toBe(2);
+      expect(holderBlocksTen(caseType)).toBe(true);
     }
   });
 
   it('never softens a D, whatever the coverage', () => {
-    expect(letterUncertainty({ ...complete, letter: 'D' })).toEqual({ value: 3, coverageOverrodeLetter: false });
+    expect(letterUncertainty({ ...complete, letter: 'D' }, true)).toEqual({ value: 3, coverageOverrodeLetter: false });
   });
 
   it('does not change A or B, and treats a missing letter as B', () => {
-    expect(letterUncertainty({ ...complete, letter: 'A' }).value).toBe(0);
-    expect(letterUncertainty({ ...complete, letter: 'b' }).value).toBe(1);
-    expect(letterUncertainty({ ...complete, letter: null }).value).toBe(1);
+    expect(letterUncertainty({ ...complete, letter: 'A' }, true).value).toBe(0);
+    expect(letterUncertainty({ ...complete, letter: 'b' }, true).value).toBe(1);
+    expect(letterUncertainty({ ...complete, letter: null }, true).value).toBe(1);
   });
 
   it('reads "none", "unknown" and blank as no holder', () => {
@@ -58,10 +73,14 @@ describe('saying why a grade was held', () => {
     expect(explainUncertaintyHold({ ...base, structuralUncertainty: 2, caseType: 'penny_sleeve' }).cause).toBe('possible_damage_unconfirmed');
   });
 
-  it('blames the sleeve, not the photos, for a sleeved card', () => {
-    const hold = explainUncertaintyHold({ ...base, caseType: 'penny_sleeve' });
+  it('blames a rigid holder, not the photos, and says a penny sleeve is fine', () => {
+    const hold = explainUncertaintyHold({ ...base, caseType: 'top_loader' });
     expect(hold.cause).toBe('holder');
-    expect(hold.advice).toMatch(/outside the sleeve or holder/);
+    expect(hold.advice).toContain('A penny sleeve is fine');
+  });
+
+  it('never blames a penny sleeve: a sleeved card held for soft photos says so', () => {
+    expect(explainUncertaintyHold({ ...base, letter: 'D', caseType: 'penny_sleeve' }).cause).toBe('image_quality');
   });
 
   it('falls back to image quality only when nothing more specific applies', () => {

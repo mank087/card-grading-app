@@ -183,7 +183,7 @@ export default ThreePassSummary;
 
 const HOLD_TITLES: Record<GradeHold['cause'], string> = {
   clipped_corner: 'Held at 9: part of the card is outside the photo',
-  holder: 'Held at 9: photographed in a sleeve or holder',
+  holder: 'Held at 9: photographed in a holder',
   rigid_holder: 'Held at 9: photographed in a rigid holder',
   possible_damage_unconfirmed: 'Held at 9: a possible crease was not confirmed',
   evaluations_disagree: 'Held at 9: the evaluations did not agree closely enough',

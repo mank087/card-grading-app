@@ -51,8 +51,26 @@ function distanceTo(side: Side, p: QuadPoint): number {
 const valid = (p: QuadPoint | null | undefined): p is QuadPoint =>
   !!p && typeof p.x === 'number' && typeof p.y === 'number';
 
-export function clippedCorners(quad: QuadPoint[] | null | undefined, face: 'front' | 'back'): string[] {
+/** The first rule: any corner within 0.6% of the border. Still the one in force. */
+const LEGACY_TOLERANCE = 6;
+
+/**
+ * `shapeRule` selects the revised rule described above. It is OFF unless
+ * GRADING_EVIDENCE_V2=1. The revised rule only ever removes flags, but of four cards it
+ * would release that were checked by eye, three had a corner touching the frame edge, and
+ * the card outline itself comes from a model and is only accurate to a few percent. It
+ * waits for the same measured-quality work as the letter override.
+ */
+export function clippedCorners(
+  quad: QuadPoint[] | null | undefined,
+  face: 'front' | 'back',
+  shapeRule: boolean = process.env.GRADING_EVIDENCE_V2 === '1',
+): string[] {
   if (!Array.isArray(quad) || quad.length !== 4 || !quad.every(valid)) return [];
+  if (!shapeRule) {
+    return quad.flatMap((p, i) => (['left', 'right', 'top', 'bottom'] as Side[]).some(side => distanceTo(side, p) <= LEGACY_TOLERANCE)
+      ? [`${face} ${CORNER_NAMES[i]}`] : []);
+  }
   const clipped = new Set<number>();
 
   quad.forEach((p, i) => {

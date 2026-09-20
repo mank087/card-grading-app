@@ -1,5 +1,5 @@
 /**
- * Replay the v9.26 evidence rule over production grades. READ-ONLY, no model calls.
+ * Replay the GRADING_EVIDENCE_V2 rules (off in production) over production grades. READ-ONLY, no model calls.
  *
  * The hold is pure server logic applied to stored evaluation scores, so its effect can be
  * recomputed exactly for the clear case: all three evaluations at 10, held at 9 only by the
@@ -14,7 +14,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) dotenv.config({ path: '../../.env.loc
 import { createClient } from '@supabase/supabase-js';
 import { mkdirSync, writeFileSync } from 'fs';
 import { clippedCorners } from '../src/lib/grading/frameClipping';
-import { holderPresent, letterUncertainty } from '../src/lib/grading/evidenceHold';
+import { holderBlocksTen, letterUncertainty } from '../src/lib/grading/evidenceHold';
 
 const DAYS = Number(process.argv[2] || 14);
 const OUT = '../../grading-work/confidence-review/';
@@ -53,7 +53,7 @@ const PATH: Record<string, string> = { Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 
       const tens = finals.filter(f => f === 10).length;
       if (tens < 2) { bump('evaluations scored it 9 or lower'); continue; }
       const spread = Math.max(...finals) - Math.min(...finals);
-      const clippedNow = [...clippedCorners(c.fq, 'front'), ...clippedCorners(c.bq, 'back')];
+      const clippedNow = [...clippedCorners(c.fq, 'front', true), ...clippedCorners(c.bq, 'back', true)];
       const wasClipFlagged = Array.isArray(iq.out_of_frame) && iq.out_of_frame.length > 0;
       // A clip flag overwrote the model's own letter. If the new rule releases the clip, fall back to
       // what the model's notes imply: quality complaints mean it was C on its own merits, else B.
@@ -64,12 +64,12 @@ const PATH: Record<string, string> = { Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 
       const zoomComplete = c.zs === 'complete' && !!c.zc && c.zc.incompleteBatches === 0 && c.zc.inspected >= c.zc.expected;
       const structural = j.structural_damage?.detected === true || j.structural_damage?.flagged === true;
       if (clippedNow.length) { bump('corner still out of frame'); continue; }
-      if (holderPresent(caseType)) { bump('in a sleeve or holder (policy unchanged)'); continue; }
+      if (holderBlocksTen(caseType)) { bump('in a top loader, semi-rigid or slab'); continue; }
       if (letter === 'D') { bump('confidence D'); continue; }
       if (!zoomComplete) { bump('magnified inspection not recorded complete'); continue; }
       if (structural) { bump('possible damage flagged'); continue; }
       if (spread >= 2) { bump('evaluations 2+ apart'); continue; }
-      if (letterUncertainty({ letter, zoomComplete, clippedCorners: clippedNow, caseType }).value >= 2) { bump('letter still holds'); continue; }
+      if (letterUncertainty({ letter, zoomComplete, clippedCorners: clippedNow, caseType }, true).value >= 2) { bump('letter still holds'); continue; }
       const item = { id: row.id, category: c.category, url: `https://dcmgrading.com/${PATH[c.category] || 'sports'}/${row.id}`, finals, released_clip: wasClipFlagged, notes: ownNotes.trim().slice(0, 220) };
       (tens === 3 ? flips : possible).push(item);
     }

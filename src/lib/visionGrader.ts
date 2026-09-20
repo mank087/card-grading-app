@@ -60,7 +60,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.26'; // v9.26: a C image-confidence letter no longer blocks a 10 when the magnified inspection completed (no clip, no holder); held grades record their true cause in grade_hold; out-of-frame rule no longer flags tight framing
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.26'; // v9.26: a held grade records its TRUE cause in grade_hold (clipped corner, holder, possible damage, disagreement, dissent, image quality) and the report shows it as a hold. No grade moves: the letter override and the revised out-of-frame rule exist but are OFF (GRADING_EVIDENCE_V2), having failed a by-eye review
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3233,8 +3233,8 @@ Provide detailed analysis as markdown with all required sections.`
           console.log(`[CAPTURE] out-of-frame: ${clippedCardCorners.join(', ')} → image confidence ${jsonData.image_quality.confidence_letter}`);
         }
         const confidenceLetter = (jsonData.image_quality?.confidence_letter || 'B').toUpperCase();
-        // v9.26: a C letter no longer blocks a 10 when the magnified inspection completed,
-        // no corner is out of frame and the card is not in a holder (grading/evidenceHold.ts).
+        // v9.26: the evidence inputs feed the true-cause hold reason below. The letter override
+        // inside letterUncertaintyFromEvidence is OFF unless GRADING_EVIDENCE_V2=1 (see evidenceHold.ts).
         const evidenceInputs = {
           letter: confidenceLetter,
           zoomComplete: !!zoom?.ok && !!zoom.coverage && zoom.coverage.incompleteBatches === 0 && zoom.coverage.inspected >= zoom.coverage.expected,

@@ -25,9 +25,9 @@ describe('held-grade notice', () => {
   });
 
   it('names the real cause instead of blaming the photos', () => {
-    const out = html(hold({ cause: 'holder', reason: 'it was photographed inside a sleeve or holder, which limits how closely the surface and edges can be inspected', advice: 'For Gem Mint consideration, re-submit with the card photographed outside the sleeve or holder.' }));
-    expect(out).toContain('photographed in a sleeve or holder');
-    expect(out).toContain('outside the sleeve or holder');
+    const out = html(hold({ cause: 'holder', reason: 'it was photographed inside a holder, which limits how closely the surface and edges can be inspected', advice: 'For Gem Mint consideration, re-submit with the card photographed outside the holder. A penny sleeve is fine.' }));
+    expect(out).toContain('photographed in a holder');
+    expect(out).toContain('A penny sleeve is fine');
     expect(out).not.toContain('not clear enough');
   });
 

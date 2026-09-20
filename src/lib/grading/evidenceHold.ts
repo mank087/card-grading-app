@@ -15,14 +15,35 @@
  * overruling the more specific one.
  *
  * THE RULE. When the magnified inspection completed, no corner is out of frame and
- * the card is not in a holder, a C letter no longer blocks a 10. It still blocks one
+ * the card is not in a rigid holder, a C letter no longer blocks a 10. It still blocks one
  * when any of those is not true, and D always does. Nothing else about uncertainty
  * changes: disagreement between evaluations and unconfirmed damage still count.
  *
- * Holders are deliberately left as they were. Half of the affected cards were in a
- * sleeve or holder, and whether a sleeved card can earn a 10 is the owner's decision,
- * not a side effect of this change.
+ * HOLDERS. Owner's decision, Sept 20 2026: "a card can still 10 if in a penny sleeve."
+ * A soft sleeve lies flat against the card and the magnified inspection sees through
+ * it. Top loaders, semi-rigids and slabs still hold the grade: they stand off the card,
+ * add their own glare and scratches, and have their own gate in the grader as well.
+ *
+ * STATUS: THE OVERRIDE IS OFF (GRADING_EVIDENCE_V2 is not '1'), AND SHOULD STAY OFF.
+ * It was replayed and then checked by eye on the 34 cards it would have moved from 9 to
+ * 10 (Sept 20 2026). About 5 of the 28 examined were photographed well enough to support
+ * a 10. Most were not: dim rooms, soft focus, motion blur, hand-held shots, a back face
+ * out of focus. The C letter was mostly RIGHT. The premise above is the part that failed:
+ * the magnified inspection reported complete coverage on photos far too blurred to show
+ * a corner ding, so "every region was inspected" is not evidence that a flaw would have
+ * been seen. One photographer accounted for about 14 of the 34.
+ *
+ * What would make this safe is a MEASURED, per-region image-quality check (sharpness and
+ * exposure on the card itself, robust to sensor grain and holo texture) rather than the
+ * inspection's own say-so. A simple Laplacian on corner crops was tried and did not
+ * separate good from poor cleanly. Until that exists, the letter keeps its veto.
+ * The true-cause hold reasons below are unaffected and always on.
  */
+
+/** Off unless GRADING_EVIDENCE_V2=1. See STATUS above before turning it on. */
+export function evidenceV2Enabled(): boolean {
+  return process.env.GRADING_EVIDENCE_V2 === '1';
+}
 
 export interface EvidenceInputs {
   /** Image confidence letter AFTER any out-of-frame adjustment. */
@@ -37,9 +58,17 @@ export interface EvidenceInputs {
 
 const LETTER_UNCERTAINTY: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
 
+/** Holder types that keep a card from a 10. A penny sleeve is not one of them. */
+const SOFT_SLEEVES = new Set(['penny_sleeve']);
+
 export function holderPresent(caseType: string | null | undefined): boolean {
   const type = String(caseType ?? '').trim().toLowerCase();
   return !!type && type !== 'none' && type !== 'unknown';
+}
+
+/** True for a top loader, semi-rigid, slab, or any holder type this file does not know. */
+export function holderBlocksTen(caseType: string | null | undefined): boolean {
+  return holderPresent(caseType) && !SOFT_SLEEVES.has(String(caseType).trim().toLowerCase());
 }
 
 export interface LetterUncertainty {
@@ -48,10 +77,11 @@ export interface LetterUncertainty {
   coverageOverrodeLetter: boolean;
 }
 
-export function letterUncertainty(input: EvidenceInputs): LetterUncertainty {
+export function letterUncertainty(input: EvidenceInputs, enabled: boolean = evidenceV2Enabled()): LetterUncertainty {
   const letter = String(input.letter || 'B').toUpperCase();
   const value = LETTER_UNCERTAINTY[letter] ?? 1;
-  const supported = input.zoomComplete && input.clippedCorners.length === 0 && !holderPresent(input.caseType);
+  if (!enabled) return { value, coverageOverrodeLetter: false };
+  const supported = input.zoomComplete && input.clippedCorners.length === 0 && !holderBlocksTen(input.caseType);
   if (letter === 'C' && supported) return { value: 1, coverageOverrodeLetter: true };
   return { value, coverageOverrodeLetter: false };
 }
@@ -103,11 +133,11 @@ export function explainUncertaintyHold(input: EvidenceInputs & {
       advice: null,
     };
   }
-  if (holderPresent(input.caseType)) {
+  if (holderBlocksTen(input.caseType)) {
     return {
       cause: 'holder',
-      reason: 'it was photographed inside a sleeve or holder, which limits how closely the surface and edges can be inspected',
-      advice: 'For Gem Mint consideration, re-submit with the card photographed outside the sleeve or holder.',
+      reason: 'it was photographed inside a holder, which limits how closely the surface and edges can be inspected',
+      advice: 'For Gem Mint consideration, re-submit with the card photographed outside the holder. A penny sleeve is fine.',
     };
   }
   return {
