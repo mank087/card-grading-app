@@ -28,7 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
-import { firstLookEnabled, runFirstLook, recordFirstLook } from './identification/firstLookRunner';
+import { firstLookEnabled, runFirstLook, recordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
@@ -44,6 +44,7 @@ import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { reconcileIdentity } from './identification/reconcile';
+import { fillBlankNumberFromFirstLook, numberFillEnabled } from './identification/firstLookNumberFill';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -1867,10 +1868,13 @@ export async function gradeCardConversational(
   // Starts with the originals so it overlaps the ensemble call; it records its
   // own result and can never reject.
   let firstLookRun: Promise<unknown> | null = null;
+  // Kept so a blank card number can be filled from it once the grade is assembled.
+  let firstLookRecord: FirstLookRecord | null = null;
+  const completedFirstLook = (): FirstLookRecord | null => firstLookRecord;
   const startFirstLook = (images: CardOriginals) => {
     if (firstLookRun || !firstLookEnabled() || !options?.routingKey) return;
     firstLookRun = runFirstLook({ front: images.front, back: images.back })
-      .then(record => recordFirstLook(options?.routingKey, record))
+      .then(record => { firstLookRecord = record; return recordFirstLook(options?.routingKey, record); })
       .catch(() => undefined);
   };
   const pendingFirstLook = (): Promise<unknown> | null => firstLookRun;
@@ -3203,6 +3207,12 @@ Provide detailed analysis as markdown with all required sections.`
         // so a slow search pass is dropped rather than delaying the customer.
         const firstLookPending = pendingFirstLook();
         if (firstLookPending) await Promise.race([firstLookPending, new Promise(resolve => setTimeout(resolve, 6000))]);
+        // A grading call that returned no card number takes the one first look READ off
+        // the card. Blanks only, never an overwrite (see identification/firstLookNumberFill.ts).
+        if (numberFillEnabled()) {
+          const fill = fillBlankNumberFromFirstLook(jsonData?.card_info, completedFirstLook()?.result);
+          if (fill.filled) console.log(`[first-look] filled a blank card number from the printed read: ${JSON.stringify(fill.value)}`);
+        }
 
         // Out-of-frame corners: a located corner ON the photo border means part of
         // the card is outside the picture. The model's own confidence letter does
