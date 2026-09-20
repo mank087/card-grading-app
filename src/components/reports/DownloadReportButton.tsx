@@ -438,7 +438,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           // letter — this did not, so the same card could read "±1" on screen
           // and "± 3" in its PDF. The old '±0.25' fallback was not even a value
           // on the scale (rubric: A=±0, B=±1, C=±2, D=±3).
-          const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence);
+          const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence, card.conversational_whole_grade);
           const match = uncertaintyStr.match(/±\s*([\d.]+)/);
           const uncertaintyValue = match ? match[1] : '1';
           return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;

@@ -326,7 +326,7 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
         // detail page and with single-card reports — see the note in
         // DownloadReportButton. The stored string disagrees with the letter on
         // ~11% of cards.
-        const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence);
+        const uncertaintyStr = getUncertaintyFromConfidence(card.conversational_image_confidence, card.conversational_whole_grade);
         const match = uncertaintyStr.match(/±\s*([\d.]+)/);
         const uncertaintyValue = match ? match[1] : '1';
         return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { GradingPasses } from '@/types/card';
+import { GradeHold, GradingPasses } from '@/types/card';
 
 interface ThreePassSummaryProps {
   gradingPasses: GradingPasses;
@@ -80,6 +80,8 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
       <p className="text-sm text-gray-600 mb-4">
         DCM Optic™ performs three independent evaluations of each card — each incorporating a magnified zoom inspection of the corners, edges, and surfaces — and takes the median as the consensus grade.
       </p>
+
+      <GradeHoldNotice hold={gradingPasses.grade_hold} />
 
       {/* Scores Table */}
       <div className="overflow-x-auto mb-6">
@@ -178,3 +180,39 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
 }
 
 export default ThreePassSummary;
+
+const HOLD_TITLES: Record<GradeHold['cause'], string> = {
+  clipped_corner: 'Held at 9: part of the card is outside the photo',
+  holder: 'Held at 9: photographed in a sleeve or holder',
+  rigid_holder: 'Held at 9: photographed in a rigid holder',
+  possible_damage_unconfirmed: 'Held at 9: a possible crease was not confirmed',
+  evaluations_disagree: 'Held at 9: the evaluations did not agree closely enough',
+  evaluation_dissent: 'Held at 9: one evaluation scored it lower',
+  image_quality: 'Held at 9: the photos limit what could be confirmed',
+};
+
+/**
+ * Says plainly that a grade was HELD for evidence, not lowered for condition. The
+ * subgrade tiles follow the final grade (labels and listings rely on that), so without
+ * this a held card reads as four separate deductions that no evaluation ever made.
+ */
+export function GradeHoldNotice({ hold }: { hold?: GradeHold }) {
+  if (!hold?.held) return null;
+  const { pass_1, pass_2, pass_3 } = hold.evaluations || ({} as GradeHold['evaluations']);
+  const unanimous = [pass_1, pass_2, pass_3].every(score => score === hold.from);
+  return (
+    <div role="note" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-900">{HOLD_TITLES[hold.cause] || `Held at ${hold.to}`}</p>
+      <p className="mt-1 text-sm text-amber-900">
+        {unanimous
+          ? `All three evaluations scored this card ${hold.from}. No condition flaw lowered it.`
+          : `The evaluations scored this card ${pass_1}, ${pass_2} and ${pass_3}.`}{' '}
+        The final grade is held at {hold.to} because {hold.reason}.
+      </p>
+      {hold.advice && <p className="mt-2 text-sm text-amber-800">{hold.advice}</p>}
+      <p className="mt-2 text-xs text-amber-700">
+        The consensus row below shows {hold.to} in every category because a final grade is never higher than its lowest category. They are not four separate deductions.
+      </p>
+    </div>
+  );
+}

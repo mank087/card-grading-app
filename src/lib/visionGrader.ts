@@ -28,6 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
+import { explainUncertaintyHold, letterUncertainty as letterUncertaintyFromEvidence } from './grading/evidenceHold';
 import { firstLookEnabled, runFirstLook, recordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
@@ -59,7 +60,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.25'; // v9.25: non-standard designs are no longer capped at centering 9; face-level clamps are folded into the pass rows and explained
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.26'; // v9.26: a C image-confidence letter no longer blocks a 10 when the magnified inspection completed (no clip, no holder); held grades record their true cause in grade_hold; out-of-frame rule no longer flags tight framing
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3232,7 +3233,21 @@ Provide detailed analysis as markdown with all required sections.`
           console.log(`[CAPTURE] out-of-frame: ${clippedCardCorners.join(', ')} → image confidence ${jsonData.image_quality.confidence_letter}`);
         }
         const confidenceLetter = (jsonData.image_quality?.confidence_letter || 'B').toUpperCase();
-        const letterUncertainty = ({ A: 0, B: 1, C: 2, D: 3 } as Record<string, number>)[confidenceLetter] ?? 1;
+        // v9.26: a C letter no longer blocks a 10 when the magnified inspection completed,
+        // no corner is out of frame and the card is not in a holder (grading/evidenceHold.ts).
+        const evidenceInputs = {
+          letter: confidenceLetter,
+          zoomComplete: !!zoom?.ok && !!zoom.coverage && zoom.coverage.incompleteBatches === 0 && zoom.coverage.inspected >= zoom.coverage.expected,
+          clippedCorners: clippedCardCorners,
+          caseType: jsonData.case_detection?.case_type ?? null,
+        };
+        const letterEvidence = letterUncertaintyFromEvidence(evidenceInputs);
+        const letterUncertainty = letterEvidence.value;
+        if (letterEvidence.coverageOverrodeLetter) {
+          jsonData.image_quality = jsonData.image_quality || {};
+          jsonData.image_quality.coverage_supports_grade = true;
+          console.log(`[GRADE RECALC] image confidence C, but all ${zoom?.coverage?.inspected} magnified regions were inspected - the letter does not hold the grade`);
+        }
         const passSpread = Math.max(f1, f2, f3) - Math.min(f1, f2, f3);
         const clampLowered = finalGrade < Math.round(boostedAvg.final) ? 1 : 0;
         // v8.9: structural disagreement between ensemble completions = genuine uncertainty.
@@ -3386,12 +3401,22 @@ Provide detailed analysis as markdown with all required sections.`
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uncertaintyValue >= 2) {
-            gradeCapReason = 'the photos are not clear enough to confirm a 10';
-            gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9.`;
+            // v9.26: say the TRUE reason. This used to read "the photos are not clear enough"
+            // even when the cause was a clipped corner, a holder or disagreeing evaluations.
+            const hold = explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread, imageNotes: jsonData.image_quality?.notes });
+            gradeCapReason = hold.reason;
+            gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9.${hold.advice ? ' ' + hold.advice : ''}`;
+            jsonData.grade_hold = { held: true, from: 10, to: 9, cause: hold.cause, reason: hold.reason, advice: hold.advice,
+              evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
+            (threePassData as any).grade_hold = jsonData.grade_hold;
             console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
           } else if (rigidCase) {
             gradeCapReason = 'it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection';
             gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
+            jsonData.grade_hold = { held: true, from: 10, to: 9, cause: 'rigid_holder', reason: gradeCapReason,
+              advice: 'For Gem Mint consideration, re-submit with the card photographed outside the holder.',
+              evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
+            (threePassData as any).grade_hold = jsonData.grade_hold;
             console.log(`[GRADE RECALC] ⚖️ case gate: 10 → 9 (case_type=${caseInfo.case_type}, impact=${caseInfo.impact_level})`);
           } else {
             // v9.9 DISSENT REFLECTION: don't show four 10 tiles under a 9 — surface
@@ -3430,6 +3455,13 @@ Provide detailed analysis as markdown with all required sections.`
               gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
             }
             console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}; dissent shown in: ${dissentCats.join(',') || 'none identified'})`);
+            // v9.26: recorded like the other holds so the report can show it as one.
+            jsonData.grade_hold = { held: true, from: 10, to: 9, cause: 'evaluation_dissent',
+              reason: dissentCats.length
+                ? `one of the three independent evaluations scored the ${dissentCats.join(' and ')} lower, and Gem Mint requires the evaluations to confirm each other`
+                : 'not every independent evaluation confirmed a 10, and Gem Mint requires the evaluations to confirm each other',
+              advice: null, evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
+            (threePassData as any).grade_hold = jsonData.grade_hold;
           }
         }
 
@@ -3494,6 +3526,10 @@ Provide detailed analysis as markdown with all required sections.`
               }
             }
             threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+            // v9.26: the tiles still follow the final grade, because labels, listings and a
+            // dozen stored columns rely on final = lowest subgrade. What the evaluations
+            // actually scored, and the true reason for the hold, travel with the passes so
+            // the report can say plainly that this is a held grade, not four deductions.
             // v9.25: EXPLAIN the drag. The gates above wrote their reason into the
             // summary, but the tiles moved silently - serial 626654 carried
             // averaged 9/10/10/10 and averaged_rounded 9/9/9/9, so three categories

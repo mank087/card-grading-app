@@ -1079,7 +1079,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         // of cards, and the old '±0.5' fallback was not a value on the rubric's
         // scale (A=±0, B=±1, C=±2, D=±3) — a listing is public, so it is the
         // worst place to state an uncertainty the grade report contradicts.
-        gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence),
+        gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence, card.conversational_whole_grade),
         // Professional grades
         heritage: (() => {
           const sel = resolveHeritageSelection(labelStyle, customLabelConfig);

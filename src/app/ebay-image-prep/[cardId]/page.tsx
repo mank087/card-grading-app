@@ -406,7 +406,7 @@ export default function EbayImagePrepPage() {
             // Derived from the confidence letter, like the web listing modal
             // and the PDF reports. '±0.5' was not a value on the rubric's
             // scale (A=±0, B=±1, C=±2, D=±3), and this image is public.
-            gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence),
+            gradeRange: getUncertaintyFromConfidence(card.conversational_image_confidence, card.conversational_whole_grade),
             heritage: heritageSel.active
               ? { pattern: heritageSel.pattern, bandColors: heritageSel.bandColors ?? resolveHeritageBandColors(card.card_colors), gradeColors: heritageSel.gradeColors }
               : undefined,

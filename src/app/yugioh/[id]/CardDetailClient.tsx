@@ -745,10 +745,12 @@ const formatGrade = (grade: number | null) => {
 };
 
 // Helper: Map confidence score to uncertainty value (v7.4: whole number system)
-const getUncertaintyFromConfidence = (confidence: string | null | undefined): string => {
+const getUncertaintyFromConfidence = (confidence: string | null | undefined, grade?: number | string | null): string => {
   if (!confidence) return '±1'; // Default to B confidence
 
   const conf = confidence.toUpperCase().trim();
+  // v9.26: a 10 is never shown with +/-2. A C-letter card only reaches 10 when every magnified region was inspected.
+  if (conf === 'C' && Math.round(Number(grade)) === 10) return '±1';
   switch (conf) {
     case 'A': return '±0';
     case 'B': return '±1';
@@ -3327,7 +3329,7 @@ export function YugiohCardDetails() {
                 <div className="mt-4 flex justify-center space-x-4 flex-wrap gap-2">
                   {/* 🎯 v3.2: Uncertainty badge - always derived from confidence letter */}
                   <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
-                    Uncertainty: {getUncertaintyFromConfidence(card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade)}
+                    Uncertainty: {getUncertaintyFromConfidence(card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade, card.conversational_whole_grade)}
                   </span>
 
                   {/* 🎯 v3.2: Image Confidence Badge (A/B/C/D) */}
@@ -5190,7 +5192,7 @@ export function YugiohCardDetails() {
                         </div>
                         <div className="flex justify-between items-center mt-2">
                           <p className="text-sm font-semibold text-gray-700">Confidence Level: {confidence.level}</p>
-                          <p className="text-sm font-semibold text-gray-600">Grade Uncertainty: {getUncertaintyFromConfidence(imageGrade)}</p>
+                          <p className="text-sm font-semibold text-gray-600">Grade Uncertainty: {getUncertaintyFromConfidence(imageGrade, card.conversational_whole_grade)}</p>
                         </div>
                       </div>
 

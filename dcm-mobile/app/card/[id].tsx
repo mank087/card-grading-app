@@ -82,7 +82,11 @@ import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/u
 function resolveUncertainty(
   serverValue: string | null | undefined,
   confidenceLetter: string | null | undefined,
+  grade?: number | string | null,
 ): string {
+  // v9.26: a 10 is never shown with +/-2. A C-letter card only reaches 10 when every
+  // magnified region was inspected. Mirrors src/lib/gradeDisplayUtils.ts.
+  if ((confidenceLetter || '').toUpperCase().trim() === 'C' && Math.round(Number(grade)) === 10) return '±1'
   switch ((confidenceLetter || '').toUpperCase().trim()) {
     case 'A': return '±0'
     case 'B': return '±1'
@@ -1632,7 +1636,7 @@ export default function CardDetailScreen() {
       <View ref={tourRefs['grade-score']} collapsable={false} style={s.gradeArea}>
         <GradeBadge grade={grade} size="lg" showLabel isAuthentic={checkAlteredAuthentic(card as any)} />
         <View style={s.gradeMetaRow}>
-          <Text style={s.metaText}>Uncertainty: {resolveUncertainty(card.conversational_grade_uncertainty, confidence)}</Text>
+          <Text style={s.metaText}>Uncertainty: {resolveUncertainty(card.conversational_grade_uncertainty, confidence, card.conversational_whole_grade)}</Text>
           <Text style={s.metaText}>Confidence Score: {confidence}</Text>
         </View>
         {/* Retake CTA — image confidence C/D means photo quality (blur,
@@ -2429,7 +2433,7 @@ export default function CardDetailScreen() {
           </View>
           <Text style={s.confDescription}>
             {(() => {
-              const u = resolveUncertainty(card.conversational_grade_uncertainty, confidence)
+              const u = resolveUncertainty(card.conversational_grade_uncertainty, confidence, card.conversational_whole_grade)
               return confidence === 'A'
                 ? `Excellent image quality. Grade uncertainty ${u} — the assigned grade is highly reliable.`
                 : confidence === 'B'
@@ -3073,7 +3077,7 @@ export default function CardDetailScreen() {
                   {gradingJson.final_grade.decimal_grade != null && (
                     <InfoRow label="Decimal Grade" value={String(gradingJson.final_grade.decimal_grade)} />
                   )}
-                  <InfoRow label="Grade Range" value={resolveUncertainty(card.conversational_grade_uncertainty, confidence)} />
+                  <InfoRow label="Grade Range" value={resolveUncertainty(card.conversational_grade_uncertainty, confidence, card.conversational_whole_grade)} />
                 </View>
               </View>
               {gradingJson.final_grade.summary && (

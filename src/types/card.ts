@@ -153,6 +153,20 @@ export interface GradingPasses {
   variance: number;                      // MAX - MIN of final grades
   consistency: 'high' | 'moderate' | 'low';
   consensus_notes: string[];             // Notes about 1/3 pass defects
+  /** v9.26: present when a Gem Mint result was held at 9 for evidence, not condition. */
+  grade_hold?: GradeHold;
+}
+
+/** Why a 10 was held at 9, and what the evaluations scored before the tiles followed the final grade. */
+export interface GradeHold {
+  held: true;
+  from: number;
+  to: number;
+  cause: 'clipped_corner' | 'holder' | 'rigid_holder' | 'possible_damage_unconfirmed' | 'evaluations_disagree' | 'evaluation_dissent' | 'image_quality';
+  reason: string;
+  advice: string | null;
+  evaluations: { pass_1: number; pass_2: number; pass_3: number };
+  scored: { centering?: number; corners?: number; edges?: number; surface?: number; final?: number };
 }
 
 // Complete card type (matches database schema)

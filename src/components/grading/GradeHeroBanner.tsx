@@ -49,7 +49,7 @@ export function GradeHeroBanner({
       )}
       <div className={`${compact ? 'mt-2' : 'mt-4'} flex justify-center space-x-3 flex-wrap gap-1`}>
         <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
-          Uncertainty: {getUncertaintyFromConfidence(imageConfidence)}
+          Uncertainty: {getUncertaintyFromConfidence(imageConfidence, grade)}
         </span>
         <span className={`text-xs px-3 py-1 rounded-full font-semibold ${getConfidenceBadgeColor(imageConfidence)}`}>
           Confidence: {imageConfidence?.toUpperCase() || 'B'}

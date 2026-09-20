@@ -12,9 +12,11 @@ export function formatGrade(grade: number | null | undefined): string {
 }
 
 /** Map confidence letter (A/B/C/D) to uncertainty string */
-export function getUncertaintyFromConfidence(confidence: string | null | undefined): string {
+export function getUncertaintyFromConfidence(confidence: string | null | undefined, grade?: number | string | null): string {
   if (!confidence) return '\u00B11' // ±1 default (B confidence)
   const conf = confidence.toUpperCase().trim()
+  // v9.26: a 10 is never shown with +/-2. A C-letter card only reaches 10 when every magnified region was inspected.
+  if (conf === 'C' && Math.round(Number(grade)) === 10) return '±1'
   switch (conf) {
     case 'A': return '\u00B10'
     case 'B': return '\u00B11'
