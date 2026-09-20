@@ -73,6 +73,16 @@ function strictMode(): boolean {
   return process.env.CARD_NUMBER_EVIDENCE_REQUIRED === '1';
 }
 
+/** Index is the value. Upper case because normalize() upper-cases. Twenty covers the sets seen so far. */
+const NUMBER_WORDS = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN',
+  'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN', 'TWENTY'];
+
+/** "Five" -> "5" for a card number that is nothing but a number word; anything else unchanged. */
+export function spelledNumberToDigits(value: string): string {
+  const index = NUMBER_WORDS.indexOf(String(value).trim().toUpperCase());
+  return index > 0 ? String(index) : value;
+}
+
 /** Comparable form: strip separators and case so "RC-25" matches "RC 25". */
 function normalize(s: string): string {
   return String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -139,6 +149,17 @@ function numberAppearsInText(original: string, textSeen: string): boolean {
 
   // 1. Whole-token equality: "350" in "No. 350", "7" in "#7".
   if (norms.includes(want)) return true;
+
+  // 1b. The card spells its number out. The 1977 Wonder Bread Star Wars cards print
+  //     "One" to "Sixteen"; the grading call reports "1", and the quote says "One".
+  //     Without this the guard dropped a correct number on every such card: 8 of the
+  //     13 drops in a 96-hour window were one owner's run of these, typed back in by
+  //     hand (measured Sept 20 2026). A number word matches only its own digits and
+  //     only as a whole token: "One" vouches for "1", never for "10" or "21". Like
+  //     rule 1 it trusts that the quote is the number's own text, not nearby prose.
+  const spelled = NUMBER_WORDS.indexOf(want);
+  if (/^\d+$/.test(want) && NUMBER_WORDS[Number(want)] && norms.includes(NUMBER_WORDS[Number(want)])) return true;
+  if (spelled > 0 && norms.includes(String(spelled))) return true;
 
   // 2. Numerator of a fraction token: "4" in "4/102", "8" in "8 OF 12".
   for (const token of tokens) {
@@ -349,6 +370,14 @@ export function applyCardNumberGuard(
   }
 
   const result = checkCardNumberEvidence(cardInfo, options);
+
+  // A kept number the card spells out is stored as digits: that is what owners type
+  // ("Fifteen" -> "15" was 5 of 40 owner corrections, Sept 20 2026) and what price
+  // matching expects. card_number_text_seen keeps the printed word as the evidence.
+  if (result.outcome.startsWith('kept') && typeof cardInfo.card_number === 'string') {
+    const digits = spelledNumberToDigits(cardInfo.card_number);
+    if (digits !== cardInfo.card_number) { cardInfo.card_number = digits; result.cardNumber = digits; }
+  }
 
   if (result.outcome.startsWith('dropped_')) {
     console.warn(

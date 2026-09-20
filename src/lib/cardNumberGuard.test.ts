@@ -236,3 +236,46 @@ describe('source/text shape agreement', () => {
     expect(r.outcome).toBe('kept');
   });
 });
+
+describe('numbers the card spells out', () => {
+  const spelledOut = (card_number: string, card_number_text_seen: string) =>
+    checkCardNumberEvidence({ card_number, card_number_text_seen, card_number_source: 'back_number' }, { category: 'Other' });
+
+  it('keeps "1" when the 1977 Wonder Bread card prints "One"', () => {
+    // End-to-end run, Sept 20 2026: Luke Skywalker #1 and Han Solo #4 both lost a
+    // correct number to dropped_mismatch because the quote read "One" / "Four".
+    expect(spelledOut('1', 'One').outcome).toBe('kept');
+    expect(spelledOut('4', 'Four').outcome).toBe('kept');
+    expect(spelledOut('16', 'SIXTEEN').outcome).toBe('kept');
+  });
+
+  it('keeps the word when the grading call answered with the word', () => {
+    expect(spelledOut('Five', 'Five').outcome).toBe('kept');
+    expect(spelledOut('Five', '5').outcome).toBe('kept');
+  });
+
+  it('does not let a number word vouch for a different number', () => {
+    expect(spelledOut('10', 'One').outcome).toBe('dropped_mismatch');
+    expect(spelledOut('21', 'One').outcome).toBe('dropped_mismatch');
+    expect(spelledOut('2', 'One').outcome).toBe('dropped_mismatch');
+    expect(spelledOut('1', 'Eleven').outcome).toBe('dropped_mismatch');
+  });
+});
+
+describe('storing a spelled-out number as digits', () => {
+  it('turns a kept "Five" into "5" and leaves the printed word as the evidence', () => {
+    const info: Record<string, any> = { card_number: 'Five', card_number_text_seen: 'Five', card_number_source: 'back_number' };
+    const result = applyCardNumberGuard(info, 'test', { category: 'Other' });
+    expect(result.outcome).toBe('kept');
+    expect(info.card_number).toBe('5');
+    expect(info.card_number_text_seen).toBe('Five');
+  });
+
+  it('leaves ordinary numbers and codes alone', () => {
+    for (const number of ['5', 'OP05-119', 'ROY-6', 'One-Shot 7']) {
+      const info: Record<string, any> = { card_number: number, card_number_text_seen: number, card_number_source: 'back_number' };
+      applyCardNumberGuard(info, 'test', { category: 'Other' });
+      expect(info.card_number).toBe(number);
+    }
+  });
+});
