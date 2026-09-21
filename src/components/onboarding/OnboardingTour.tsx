@@ -187,7 +187,7 @@ export function OnboardingTour({ isActive, onComplete, onBeforeStep }: Onboardin
     }
 
     // After any expand, wait for DOM to settle before scrolling
-    const doScroll = () => {
+    const doScroll = (allowRescroll = true) => {
       const rect = targetEl.getBoundingClientRect()
       const elementTop = window.scrollY + rect.top
       const gap = 16
@@ -199,11 +199,25 @@ export function OnboardingTour({ isActive, onComplete, onBeforeStep }: Onboardin
       })
 
       // Update highlight after scroll settles
-      setTimeout(updateHighlight, 400)
+      setTimeout(() => {
+        updateHighlight()
+        // The target can move AFTER the scroll was computed: content above it
+        // that only gets its height once it is on screen (a chart in a tab that
+        // has just been revealed) pushes it down. If it has ended up outside the
+        // visible area under the caption, scroll to it once more. One retry
+        // only, so a target taller than the screen cannot loop.
+        if (allowRescroll) {
+          const settled = targetEl.getBoundingClientRect()
+          const visibleTop = cardRef.current?.getBoundingClientRect().bottom ?? 0
+          if (settled.top > window.innerHeight - 80 || settled.top < visibleTop - 8) {
+            doScroll(false)
+          }
+        }
+      }, 400)
     }
 
     if (didExpand) {
-      setTimeout(doScroll, 150)
+      setTimeout(() => doScroll(), 150)
     } else {
       doScroll()
     }

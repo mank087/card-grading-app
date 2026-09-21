@@ -465,6 +465,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
   return (
     <main className="dcm-brand dcm-card-detail" data-mobile-bar={showMobileBar}>
+      {/* The tour's caption card is fixed to the top of the screen and the tour
+          scrolls each target to just below it. The first targets (visibility
+          row, card images) sit at the very top of the page, where there is no
+          scroll distance to give, so they ended up underneath the caption.
+          This spacer gives the page that distance while the tour runs. */}
+      {showOnboardingTour && <div className="cd-tour-spacer" aria-hidden="true" />}
       <div className="cd-container">
         {/* ── breadcrumb ─────────────────────────────────────────────── */}
         <div className="cd-breadcrumb">

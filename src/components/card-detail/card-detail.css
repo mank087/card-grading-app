@@ -1433,3 +1433,7 @@
     padding: 8px;
   }
 }
+
+/* Room for the onboarding tour's fixed caption card; see CardDetailShell. */
+.dcm-card-detail .cd-tour-spacer { height: 320px; }
+@media (max-width: 760px) { .dcm-card-detail .cd-tour-spacer { height: 380px; } }
