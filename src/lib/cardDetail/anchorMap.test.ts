@@ -16,6 +16,7 @@ import {
   LEGACY_ANCHOR_SECTIONS,
   resolveHashTarget,
   sectionForAnchor,
+  V2_ANCHOR_IDS,
 } from './anchorMap';
 
 const SRC = path.resolve(__dirname, '../..');
@@ -89,6 +90,17 @@ describe('legacy anchor map', () => {
     for (const [anchor, owner] of Object.entries(LEGACY_ANCHOR_SECTIONS)) {
       expect(allowed.has(owner), `${anchor} -> ${owner}`).toBe(true);
     }
+  });
+
+  it('resolves the V2-native evidence anchors to the grade section', () => {
+    for (const id of V2_ANCHOR_IDS) {
+      expect(sectionForAnchor(id)).toBe('grade');
+      expect(LEGACY_ANCHOR_IDS).not.toContain(id);
+    }
+    expect(resolveHashTarget('#cd-evidence-corners')).toEqual({
+      section: 'grade',
+      anchorId: 'cd-evidence-corners',
+    });
   });
 
   it('does not claim ids that are not legacy anchors', () => {

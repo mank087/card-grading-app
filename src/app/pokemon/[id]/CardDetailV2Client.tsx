@@ -23,11 +23,16 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Script from 'next/script';
 
 import { useCardDetail } from '@/components/card-detail/useCardDetail';
 import { buildCardDetailViewModel } from '@/lib/cardDetail/viewModel';
-import { extractConditionSummary, stripMarkdown } from '@/lib/cardDetail/parsers';
+import { extractConditionSummary } from '@/lib/cardDetail/parsers';
+import { buildCardInfo } from '@/lib/cardDetail/cardInfo';
+import { buildCardStructuredData } from '@/lib/cardDetail/structuredData';
 import CardDetailShell from '@/components/card-detail/CardDetailShell';
+import PokemonCardInfo from '@/components/card-detail/categories/PokemonCardInfo';
+import ProEstimatesPanel from '@/components/card-detail/sections/ProEstimatesPanel';
 
 import { getStoredSession } from '@/lib/directAuth';
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
@@ -100,45 +105,12 @@ export function PokemonCardDetailsV2() {
     [card, sessionUserId, detail.isProcessing]
   );
 
-  /** The Pokemon identity precedence the pricing component and links expect. */
-  const cardInfo = useMemo(() => {
-    const c: any = card ?? {};
-    const dvg = c.dvg_grading || {};
-    const setNameRaw =
-      c.card_set || stripMarkdown(c.conversational_card_info?.set_name) || dvg.card_info?.set_name;
-    const subsetRaw =
-      stripMarkdown(c.conversational_card_info?.subset) || c.subset || dvg.card_info?.subset;
-    const releaseYear = typeof c.release_date === 'string' ? c.release_date.slice(0, 4) : null;
-    return {
-      card_name:
-        c.card_name ||
-        stripMarkdown(c.conversational_card_info?.card_name) ||
-        dvg.card_info?.card_name,
-      player_or_character:
-        c.pokemon_featured ||
-        c.featured ||
-        stripMarkdown(c.conversational_card_info?.player_or_character) ||
-        dvg.card_info?.player_or_character,
-      set_name: subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw,
-      set_era: stripMarkdown(c.conversational_card_info?.set_era) || dvg.card_info?.set_era,
-      year: releaseYear || stripMarkdown(c.conversational_card_info?.year) || dvg.card_info?.year,
-      card_number:
-        c.card_number ||
-        stripMarkdown(c.conversational_card_info?.card_number_raw) ||
-        stripMarkdown(c.conversational_card_info?.card_number) ||
-        dvg.card_info?.card_number,
-      subset: subsetRaw,
-      rarity_tier:
-        c.rarity_tier ||
-        c.rarity_description ||
-        stripMarkdown(c.conversational_card_info?.rarity_tier) ||
-        dvg.card_info?.rarity_tier,
-      rarity_or_variant: c.conversational_card_info?.rarity_or_variant,
-      holofoil: c.conversational_card_info?.holofoil ?? c.holofoil,
-      first_edition: c.conversational_card_info?.first_edition,
-      reverse_holo: c.conversational_card_info?.reverse_holo,
-    };
-  }, [card]);
+  /**
+   * The legacy `cardInfo` object (CardDetailClient.tsx 2568-2626), now built
+   * by the shared `buildCardInfo` so the Card Information block, the price
+   * lookup and the marketplace links all read one copy of the precedence.
+   */
+  const cardInfo = useMemo(() => buildCardInfo(card), [card]);
 
   // Legacy's rule, verbatim in intent (CardDetailClient.tsx 3498-3520): only a
   // TRUSTED estimate is shown. A thin-identity card shows the correction
@@ -204,10 +176,19 @@ export function PokemonCardDetailsV2() {
       card_number: cardInfo.card_number || c.card_number,
     } as CardData;
 
+    // Legacy 5592-5613: the PriceCharting product page when the lookup found
+    // one, otherwise a search on the name and number.
+    const priceChartingUrl =
+      dcmPriceData?.priceChartingUrl ||
+      `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+        [pokemonName, cardInfo.card_number || c.card_number].filter(Boolean).join(' ')
+      )}&type=prices`;
+
     const links: Array<[string, string, string]> = [
       ['TCGPlayer', tcgplayerUrl, setName && setName !== 'Unknown' ? setName : 'Search listings'],
       ['eBay', generatePokemonEbaySearchUrl(ebaySearchCard), 'Active listings'],
       ['eBay sold', generatePokemonEbaySoldListingsUrl(ebaySearchCard), 'Recent sold prices'],
+      ['PriceCharting', priceChartingUrl, 'Market data'],
     ];
 
     return (
@@ -229,13 +210,38 @@ export function PokemonCardDetailsV2() {
     );
   };
 
+  // JSON-LD, built and mounted as the legacy client does (once the card has
+  // loaded). It only renders after the client fetch, so window is available.
+  const structuredData = card
+    ? buildCardStructuredData(
+        card,
+        `${typeof window !== 'undefined' ? window.location.origin : 'https://dcmgrading.com'}/pokemon/${cardId}`,
+        {
+          fallbackBrand: 'Pokemon',
+          productCategory: 'Pokemon Trading Cards',
+          breadcrumbName: 'Pokemon Cards',
+          breadcrumbUrl: 'https://dcmgrading.com/upload/pokemon',
+          fallbackCardName: 'Pokemon Card',
+        },
+      )
+    : null;
+
   return (
+    <>
+    {structuredData && (
+      <Script
+        id="structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+    )}
     <CardDetailShell
       category="pokemon"
       categoryLabel="Pokémon"
       cardId={cardId}
       backHref="/collection"
       uploadHref="/upload/pokemon"
+      retakeHref="/upload?category=Pokemon"
       ebayCardType="pokemon"
       detail={detail}
       vm={vm}
@@ -292,6 +298,19 @@ export function PokemonCardDetailsV2() {
         ) : null
       }
       renderMarketplaceLinks={marketplaceLinks}
+      renderProEstimates={() => (
+        <ProEstimatesPanel estimates={(card as any)?.estimated_professional_grades ?? null} />
+      )}
+      renderCategoryCardInfo={(ctx) => (
+        <PokemonCardInfo
+          card={ctx.card}
+          cardInfo={cardInfo}
+          currentUserId={ctx.currentUserId}
+          isOwner={ctx.isOwner}
+          onEdited={ctx.onEdited}
+        />
+      )}
     />
+    </>
   );
 }

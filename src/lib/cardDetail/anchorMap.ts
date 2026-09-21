@@ -69,13 +69,31 @@ export const LEGACY_ANCHOR_SECTIONS: Record<string, AnchorOwner> = {
 /** Every legacy anchor id V2 must keep alive, in no particular order. */
 export const LEGACY_ANCHOR_IDS = Object.keys(LEGACY_ANCHOR_SECTIONS);
 
+/**
+ * Anchors V2 introduces that have no legacy counterpart.
+ *
+ * The grade section splits its findings into four evidence blocks so the hero
+ * subgrade buttons can land on the matching one. Centering already had a
+ * legacy anchor (`tour-centering`); the other three are new and live here so
+ * `LEGACY_ANCHOR_IDS` stays exactly the fifteen ids the Phase 0 inventory
+ * pinned. They still resolve from the hash, so a link to
+ * `#cd-evidence-corners` opens Grade details and scrolls, same as a legacy one.
+ */
+export const V2_ANCHOR_SECTIONS: Record<string, AnchorOwner> = {
+  'cd-evidence-corners': 'grade',
+  'cd-evidence-edges': 'grade',
+  'cd-evidence-surface': 'grade',
+};
+
+export const V2_ANCHOR_IDS = Object.keys(V2_ANCHOR_SECTIONS);
+
 export function isCardDetailSectionId(value: string): value is CardDetailSectionId {
   return (CARD_DETAIL_SECTIONS as readonly string[]).includes(value);
 }
 
-/** The section that owns an anchor, or null when the id is not a legacy anchor. */
+/** The section that owns an anchor, or null when V2 does not know the id. */
 export function sectionForAnchor(anchorId: string): AnchorOwner | null {
-  return LEGACY_ANCHOR_SECTIONS[anchorId] ?? null;
+  return LEGACY_ANCHOR_SECTIONS[anchorId] ?? V2_ANCHOR_SECTIONS[anchorId] ?? null;
 }
 
 export interface ResolvedHashTarget {

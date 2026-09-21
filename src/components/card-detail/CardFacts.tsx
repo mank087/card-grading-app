@@ -1,16 +1,29 @@
 'use client';
 
 /**
- * "The card behind the grade" — the identity grid for the Overview section.
+ * Card Information — the identity block for the Overview section.
  *
- * Every field comes from the view model's `identity`, which is built from
+ * The grid comes from the view model's `identity`, which is built from
  * `getCardLabelData` — the same text the printed label and the PDF use. The
  * legacy page builds a second `cardInfo` object with a different precedence
  * per category, which is exactly the divergence the view model exists to end;
- * nothing category-specific is read here.
+ * nothing category-specific is read for the grid.
+ *
+ * Everything else in legacy's "Card Information" collapsible
+ * (CardDetailClient.tsx 3685-4390 [sports 3592-4297]) is reproduced around it:
+ *
+ *   3689-3814   the detected holder  → ./DetectedSlabPanel
+ *   3816-3839   the heading and the owner's edit button (`tour-edit-details`)
+ *   4224-4388   special features, feature tags, card description
+ *               → ./SpecialFeatures
+ *
+ * The category-specific remainder — bilingual naming and Type/Stage/HP/card
+ * text for Pokemon, Manufacturer/Sport/Team/Parallel for sports — arrives
+ * through `categorySlot`, supplied by the adapter. Nothing in this file knows
+ * which category it is rendering.
  *
  * The owner affordances are the existing ones, mounted the way the legacy
- * pokemon client mounts them (CardDetailClient.tsx 3676-3690, 3827-3836):
+ * pokemon client mounts them (3676-3690, 3827-3836):
  *   - `NotStandardCardNotice` and `IdentityReview` above the grid. One
  *     `IdentityReview` mount decides between the popup, the quiet banner and
  *     nothing, and it also answers `ConfirmCardDetailsCalloutButton` in the
@@ -18,11 +31,16 @@
  *   - `EditCardDetailsButton` in the panel heading, inside `#tour-edit-details`.
  */
 
+import type { ReactNode } from 'react';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import IdentityReview from '@/components/cards/IdentityReview';
 import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import OrgBrandingBadge from '@/components/org/OrgBrandingBadge';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
+import { buildCardInfo } from '@/lib/cardDetail/cardInfo';
+import { readDvgGrading } from '@/lib/cardDetail/gradeDetails';
+import DetectedSlabPanel from './DetectedSlabPanel';
+import SpecialFeatures from './SpecialFeatures';
 
 export interface CardFactsProps {
   vm: CardDetailViewModel;
@@ -31,10 +49,24 @@ export interface CardFactsProps {
   isOwner: boolean;
   /** Legacy reloads the page after an identity edit; the shell decides how. */
   onEdited: () => void;
+  /** The category's own fields, rendered under the shared grid. */
+  categorySlot?: ReactNode;
+  /** The category's own special-feature badges. */
+  categoryBadges?: ReactNode;
 }
 
-export function CardFacts({ vm, card, currentUserId, isOwner, onEdited }: CardFactsProps) {
+export function CardFacts({
+  vm,
+  card,
+  currentUserId,
+  isOwner,
+  onEdited,
+  categorySlot,
+  categoryBadges,
+}: CardFactsProps) {
   const { identity } = vm;
+  const cardInfo = buildCardInfo(card);
+  const dvgGrading = readDvgGrading(card);
 
   const facts: Array<[string, string | null]> = [
     ['Set', identity.setName],
@@ -47,49 +79,62 @@ export function CardFacts({ vm, card, currentUserId, isOwner, onEdited }: CardFa
   ];
 
   return (
-    <section className="cd-panel">
-      {/* Org-graded cards carry the store's badge with their identity. */}
-      {vm.permissions.isOrgBranded && <OrgBrandingBadge cardId={vm.id} />}
+    <div className="cd-card-info">
+      <DetectedSlabPanel card={card} />
 
-      <NotStandardCardNotice card={card} className="mb-4" />
-      <IdentityReview
-        card={card}
-        currentUserId={currentUserId}
-        frontUrl={vm.images.front.url}
-        backUrl={vm.images.back.url}
-        onSaved={onEdited}
-      />
+      <section className="cd-panel">
+        {/* Org-graded cards carry the store's badge with their identity. */}
+        {vm.permissions.isOrgBranded && <OrgBrandingBadge cardId={vm.id} />}
 
-      <div className="cd-panel-heading">
-        <h3>The card behind the grade</h3>
-        {isOwner && (
-          <div id="tour-edit-details">
-            <EditCardDetailsButton
-              card={card}
-              currentUserId={currentUserId ?? undefined}
-              onEditComplete={onEdited}
-              variant="icon-only"
-            />
-          </div>
+        <NotStandardCardNotice card={card} className="mb-4" />
+        <IdentityReview
+          card={card}
+          currentUserId={currentUserId}
+          frontUrl={vm.images.front.url}
+          backUrl={vm.images.back.url}
+          onSaved={onEdited}
+        />
+
+        <div className="cd-panel-heading">
+          <h3>The card behind the grade</h3>
+          {isOwner && (
+            <div id="tour-edit-details">
+              <EditCardDetailsButton
+                card={card}
+                currentUserId={currentUserId ?? undefined}
+                onEditComplete={onEdited}
+                variant="icon-only"
+              />
+            </div>
+          )}
+        </div>
+
+        <dl id="tour-card-info" className="cd-facts">
+          {facts.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              {/* An em dash for a field the record does not carry. */}
+              <dd>{value ?? '—'}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {identity.featuresLine && (
+          <p className="cd-caption" style={{ marginTop: 14 }}>
+            Features: {identity.featuresLine}
+          </p>
         )}
-      </div>
 
-      <dl id="tour-card-info" className="cd-facts">
-        {facts.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            {/* An em dash for a field the record does not carry. */}
-            <dd>{value ?? '—'}</dd>
-          </div>
-        ))}
-      </dl>
+        {categorySlot}
+      </section>
 
-      {identity.featuresLine && (
-        <p className="cd-caption" style={{ marginTop: 14 }}>
-          Features: {identity.featuresLine}
-        </p>
-      )}
-    </section>
+      <SpecialFeatures
+        card={card}
+        cardInfo={cardInfo}
+        dvgGrading={dvgGrading}
+        extraBadges={categoryBadges}
+      />
+    </div>
   );
 }
 

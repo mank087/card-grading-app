@@ -16,6 +16,7 @@
   --cd-radius: 14px;
   --cd-panel-bg: #fff;
   --cd-panel-border: var(--dcm-border, #dfe3eb);
+  --cd-panel-tint: #f6f5f9;
   --cd-mobile-bar-height: 0px;
   padding-bottom: var(--cd-mobile-bar-height);
 }
@@ -577,6 +578,328 @@
   gap: 12px;
 }
 
+/* ---------- grade details (slice 1C-ii) ---------- */
+
+.dcm-card-detail .cd-card-info {
+  display: grid;
+  gap: var(--cd-gap);
+  align-content: start;
+}
+
+/* Inspection photo beside the findings, as the mockup has it. */
+.dcm-card-detail .cd-evidence-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: var(--cd-gap);
+  align-items: start;
+}
+
+.dcm-card-detail .cd-inspection {
+  display: grid;
+  gap: 14px;
+}
+
+.dcm-card-detail .cd-inspection-face {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.dcm-card-detail .cd-inspection-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 12px;
+  /* Reserve a trading card's shape so the page does not grow under a
+     scroll-into-view while the signed image URL is still loading. */
+  aspect-ratio: 5 / 7;
+}
+
+.dcm-card-detail .cd-inspection-frame img {
+  height: 100%;
+  object-fit: contain;
+}
+
+.dcm-card-detail .cd-inspection-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dcm-card-detail .cd-evidence-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dcm-card-detail .cd-evidence-tabs button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--dcm-muted, #566174);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 999px;
+  min-height: 40px;
+}
+
+.dcm-card-detail .cd-evidence-tabs button[aria-selected='true'] {
+  color: #fff;
+  background: var(--dcm-purple, #9810fa);
+  border-color: transparent;
+}
+
+.dcm-card-detail .cd-faces {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--cd-gap);
+  align-items: start;
+}
+
+.dcm-card-detail .cd-face {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-face-score {
+  font-size: 18px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.dcm-card-detail .cd-ratios,
+.dcm-card-detail .cd-findings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.dcm-card-detail .cd-ratios dt,
+.dcm-card-detail .cd-findings dt {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dcm-muted, #566174);
+}
+
+.dcm-card-detail .cd-ratios dd,
+.dcm-card-detail .cd-findings dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dcm-card-detail .cd-finding-prose {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.dcm-card-detail .cd-defect-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dcm-card-detail .cd-defect {
+  padding: 10px 12px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 10px;
+}
+
+.dcm-card-detail .cd-defect-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Expanders: the summary is the keyboard control, so it must look like one. */
+.dcm-card-detail .cd-expander {
+  margin-top: 16px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 12px;
+}
+
+.dcm-card-detail .cd-expander > summary {
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 12px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.dcm-card-detail .cd-expander > summary:focus-visible {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 2px;
+}
+
+.dcm-card-detail .cd-expander-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+/* Confidence meter. */
+.dcm-card-detail .cd-meter {
+  height: 24px;
+  overflow: hidden;
+  background: var(--cd-panel-border);
+  border-radius: 999px;
+}
+
+.dcm-card-detail .cd-meter-fill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #16a34a;
+  border-radius: 999px;
+}
+
+.dcm-card-detail .cd-meter[data-tone='moderate'] .cd-meter-fill {
+  background: #ca8a04;
+}
+
+.dcm-card-detail .cd-meter[data-tone='low'] .cd-meter-fill {
+  background: #dc2626;
+}
+
+.dcm-card-detail .cd-meter-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* Special features and report chips. */
+.dcm-card-detail .cd-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.dcm-card-detail .cd-badge {
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 650;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.dcm-card-detail .cd-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+
+.dcm-card-detail .cd-chip-list li {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 999px;
+}
+
+.dcm-card-detail .cd-score-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 999px;
+}
+
+.dcm-card-detail .cd-pre {
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 12px;
+  background: var(--cd-panel-tint, #f6f5f9);
+  border-radius: 10px;
+}
+
+.dcm-card-detail .cd-report {
+  display: grid;
+  gap: 20px;
+}
+
+.dcm-card-detail .cd-report-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cd-panel-border);
+}
+
+.dcm-card-detail .cd-report-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dcm-card-detail .cd-report-section h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.dcm-card-detail .cd-card-text {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+/* Mail-away estimates. */
+.dcm-card-detail .cd-estimate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.dcm-card-detail .cd-estimate {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 12px;
+}
+
+.dcm-card-detail .cd-estimate h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.dcm-card-detail .cd-estimate-grade {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
 /* ---------- mobile bottom bar ---------- */
 
 .dcm-card-detail .cd-mobile-bar {
@@ -594,7 +917,9 @@
   }
 
   .dcm-card-detail .cd-hero,
-  .dcm-card-detail .cd-two-col {
+  .dcm-card-detail .cd-two-col,
+  .dcm-card-detail .cd-evidence-grid,
+  .dcm-card-detail .cd-faces {
     grid-template-columns: minmax(0, 1fr);
   }
 

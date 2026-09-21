@@ -51,6 +51,7 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { PostResultOffer, usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
+import { ActionLink } from '@/components/design/Primitives';
 import { useCredits } from '@/contexts/CreditsContext';
 import { getStoredSession } from '@/lib/directAuth';
 
@@ -68,6 +69,14 @@ import {
 import './card-detail.css';
 
 type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+
+/** What an adapter needs to render its own Card Information fields. */
+export interface CategoryCardInfoContext {
+  card: any;
+  currentUserId: string | null | undefined;
+  isOwner: boolean;
+  onEdited: () => void;
+}
 
 export interface CardDetailShellProps {
   category: CardDetailCategory;
@@ -96,8 +105,22 @@ export interface CardDetailShellProps {
   renderDownloadButton: () => ReactNode;
   renderPricing: () => ReactNode;
   renderMarketplaceLinks: () => ReactNode;
-  /** The PSA/BGS/CGC estimates block; null until slice 1C-ii ports it. */
+  /** The PSA/BGS/SGC/CGC mail-away estimates, mounted in the Market section. */
   renderProEstimates?: () => ReactNode;
+  /**
+   * The category's own Card Information fields, rendered inside the shared
+   * `CardFacts` panel. Pokemon supplies `PokemonCardInfo` here.
+   */
+  renderCategoryCardInfo?: (ctx: CategoryCardInfoContext) => ReactNode;
+  /** The category's own Special Features badges. */
+  renderCategoryBadges?: () => ReactNode;
+
+  /**
+   * Where "retake your photos" goes. Legacy pokemon uses
+   * `/upload?category=Pokemon`, which is not `uploadHref`. Defaults to
+   * `uploadHref` when an adapter has nothing more specific.
+   */
+  retakeHref?: string;
 
   /** A trusted live estimate, already through `assessValueTrust`. */
   liveEstimate: number | null;
@@ -149,6 +172,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
     renderPricing,
     renderMarketplaceLinks,
     renderProEstimates,
+    renderCategoryCardInfo,
+    renderCategoryBadges,
+    retakeHref,
     liveEstimate,
     conditionSummary,
     shareData,
@@ -168,6 +194,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  // The anchor the page was last asked to jump to. Grade details reads it to
+  // select the matching evidence tab; `replaceState` fires no hashchange, so
+  // handing it over directly is the only way the section learns.
+  const [jumpAnchor, setJumpAnchor] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Same rule as legacy: one ask per page for an empty balance.
@@ -301,6 +331,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     setZoom({ isOpen: true, imageUrl, alt, title });
 
   const jumpTo = (id: CardDetailSectionId, anchorId?: string) => {
+    setJumpAnchor(anchorId ?? null);
     routing.selectSection(id, anchorId);
   };
 
@@ -605,6 +636,13 @@ export function CardDetailShell(props: CardDetailShellProps) {
                   currentUserId={getStoredSession()?.user?.id}
                   isOwner={isOwner}
                   onEdited={refreshAfterEdit}
+                  categorySlot={renderCategoryCardInfo?.({
+                    card,
+                    currentUserId: getStoredSession()?.user?.id,
+                    isOwner,
+                    onEdited: refreshAfterEdit,
+                  })}
+                  categoryBadges={renderCategoryBadges?.()}
                 />
                 <section className="cd-panel">
                   <p className="cd-eyebrow">The whole picture</p>
@@ -695,8 +733,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
                   renderProEstimates()
                 ) : (
                   <p className="cd-caption" style={{ marginTop: 8 }}>
-                    The PSA, BGS and CGC estimates have not been ported to this page yet — open{' '}
-                    <a href={`/${category}/${vm.id}?v=1`}>the current card page</a> for them.
+                    No mail-away estimates were produced for this card.
                   </p>
                 )}
               </section>
@@ -707,7 +744,17 @@ export function CardDetailShell(props: CardDetailShellProps) {
               </div>
             </div>
           }
-          grade={<GradeDetailsSection card={card} vm={vm} category={category} />}
+          grade={
+            <GradeDetailsSection
+              card={card}
+              vm={vm}
+              category={category}
+              uploadHref={uploadHref}
+              retakeHref={retakeHref ?? uploadHref}
+              focusAnchor={jumpAnchor}
+              onZoom={openZoom}
+            />
+          }
           reports={
             <div className="cd-section">
               <div className="cd-section-title">
@@ -735,6 +782,29 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
         {/* Owner actions that legacy keeps at the foot of the page. */}
         <div style={{ paddingBottom: 40 }}>
+          {/* "Grade another card" (legacy 6918-6940). The happy path used to
+              end here with no next step, so most first-time graders stopped
+              after one card; the onboarding-funnel work added this and it is
+              not something V2 may quietly drop. */}
+          {isOwner && (
+            <div style={{ textAlign: 'center', paddingBlock: 24 }}>
+              <ActionLink
+                href={!creditsLoading && balance === 0 ? '/credits' : (retakeHref ?? uploadHref)}
+                variant="primary"
+              >
+                {!creditsLoading && balance === 0
+                  ? 'Get credits to grade more'
+                  : 'Grade another card'}
+              </ActionLink>
+              {!creditsLoading && (
+                <p className="cd-caption" style={{ marginTop: 8 }}>
+                  {balance === 0
+                    ? 'Your free grades are used up.'
+                    : `You have ${balance} credit${balance === 1 ? '' : 's'} left.`}
+                </p>
+              )}
+            </div>
+          )}
           <PostResultOffer
             ownerId={card?.user_id ?? null}
             gradeComplete={!loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0}

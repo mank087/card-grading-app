@@ -33,11 +33,17 @@ export interface GradeSummaryProps {
   onJumpToGrade: (anchorId?: string) => void;
 }
 
+/**
+ * Each subgrade jumps to its own evidence block in the grade section. The
+ * anchor ids are `EVIDENCE_TABS` in `sections/GradeDetailsSection`; centering
+ * keeps the legacy `tour-centering` id, the other three are V2-native and are
+ * registered in `anchorMap.ts` so a hash naming one still resolves.
+ */
 const SUBGRADE_ORDER = [
   { key: 'centering', label: 'Centering', anchor: 'tour-centering' },
-  { key: 'corners', label: 'Corners', anchor: undefined },
-  { key: 'edges', label: 'Edges', anchor: undefined },
-  { key: 'surface', label: 'Surface', anchor: undefined },
+  { key: 'corners', label: 'Corners', anchor: 'cd-evidence-corners' },
+  { key: 'edges', label: 'Edges', anchor: 'cd-evidence-edges' },
+  { key: 'surface', label: 'Surface', anchor: 'cd-evidence-surface' },
 ] as const;
 
 /** The headline under the number, per status. Never invents a grade. */
