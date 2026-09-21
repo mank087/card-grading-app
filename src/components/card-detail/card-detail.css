@@ -1020,15 +1020,31 @@
   color: var(--dcm-ink);
 }
 .dcm-card-detail .cd-confidence-chip {
-  font-size: 12px;
-  font-weight: 650;
-  padding: 5px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--dcm-border);
   background: var(--dcm-surface);
   color: var(--dcm-muted);
   white-space: nowrap;
+  cursor: pointer;
 }
+.dcm-card-detail .cd-confidence-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dcm-card-detail .cd-confidence-chip strong {
+  font-family: var(--font-dcm-display), Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1;
+}
+.dcm-card-detail .cd-confidence-uncertainty { font-size: 12px; font-weight: 600; opacity: 0.85; }
 .dcm-card-detail .cd-confidence-chip.cd-tone-strong,
 .dcm-card-detail .cd-confidence-chip.cd-tone-good { background: #ecf7f1; border-color: #c4e5d3; color: #1f6b47; }
 .dcm-card-detail .cd-confidence-chip.cd-tone-moderate { background: #fdf6e3; border-color: #f0dca3; color: #7a5a0b; }
