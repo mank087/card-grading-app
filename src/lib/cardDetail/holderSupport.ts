@@ -114,7 +114,27 @@ export function holderStyleSupport(
   return { status: 'adapted', note: notes.join(' ') };
 }
 
-/** Physical stock a holder's primary download actually produces. */
+/**
+ * The NAME of the stock a holder's primary download prints on, without a size.
+ *
+ * The size is no longer a constant: a saved custom slot can carry its own
+ * dimensions, so it comes from `resolveEffectiveLabelSize` (lib/cardDetail/
+ * labelSize.ts) and the card prints "<stock> · <size>".
+ */
+export const HOLDER_LABEL_STOCK: Record<CardHolderId, string> = {
+  slab: 'Slab insert',
+  toploader: 'Avery 8167',
+  onetouch: 'Avery 6871 fold-over',
+};
+
+/**
+ * Physical stock a holder's primary download actually produces.
+ *
+ * SUPERSEDED for the slab by `resolveEffectiveLabelSize`, which reads the real
+ * dimensions out of the active config instead of assuming the standard insert.
+ * Kept because the size is right for the two fixed Avery formats and the
+ * strings are still a useful one-line description.
+ */
 export const HOLDER_FORMATS: Record<CardHolderId, string> = {
   // labelPresets.ts:774-792 — LABEL_TYPES 'slab-modern' / 'slab-traditional'.
   slab: '2.8″ × 0.8″ slab insert',

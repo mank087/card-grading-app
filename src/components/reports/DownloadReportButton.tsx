@@ -70,6 +70,29 @@ interface DownloadReportButtonProps {
   holderDownloadLabel?: string;
   /** Extra classes for the `holderDownload` trigger. */
   holderDownloadClassName?: string;
+  /**
+   * ADDITIVE (card detail V2, finding 4). A counter the caller increments to
+   * OPEN THE LABELS MENU from outside. The mobile action bar's "Download
+   * label" used to scroll the reader down to this button and focus its first
+   * child; now one tap opens the chooser itself.
+   *
+   * Absent (or unchanged) and nothing happens, so existing callers — the eight
+   * legacy card clients and Label Studio — behave exactly as before.
+   */
+  openLabelsSignal?: number;
+  /**
+   * ADDITIVE. Tells the caller whether either dropdown is currently open, so a
+   * page that has its own fixed chrome (the mobile action bar) can get out of
+   * the menu's way.
+   */
+  onMenuOpenChange?: (open: boolean) => void;
+  /**
+   * ADDITIVE. Below 760px, render the two dropdown panels as a full-width
+   * bottom sheet instead of a panel anchored under its trigger. Anchored is
+   * correct on a desktop page; opened from a fixed bar at the bottom of a
+   * phone it lands off-screen. Default false — anchored, as today.
+   */
+  sheetOnMobile?: boolean;
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
@@ -85,6 +108,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   holderDownload,
   holderDownloadLabel,
   holderDownloadClassName,
+  openLabelsSignal,
+  onMenuOpenChange,
+  sheetOnMobile = false,
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
@@ -110,6 +136,50 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // ── ADDITIVE: imperative open + open-state reporting + mobile sheet ──────
+  // All three are no-ops unless the new props are supplied.
+
+  // The ref starts at 0, not at the incoming value, on purpose: this
+  // component is loaded lazily on the V2 page, so the FIRST tap both loads the
+  // chunk and asks for the menu. Mounting with a signal already above 0 must
+  // therefore open it, which is what the reader just asked for.
+  const lastOpenLabelsSignal = React.useRef(0);
+  React.useEffect(() => {
+    if (!openLabelsSignal || openLabelsSignal === lastOpenLabelsSignal.current) return;
+    lastOpenLabelsSignal.current = openLabelsSignal;
+    setIsReportsDropdownOpen(false);
+    setIsLabelsDropdownOpen(true);
+    if (!sheetOnMobile) {
+      // Anchored panel: make sure its trigger is on screen before it opens,
+      // otherwise the panel is rendered below the fold.
+      labelsDropdownRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
+  }, [openLabelsSignal, sheetOnMobile]);
+
+  const anyDropdownOpen = isLabelsDropdownOpen || isReportsDropdownOpen;
+  React.useEffect(() => {
+    onMenuOpenChange?.(anyDropdownOpen);
+  }, [anyDropdownOpen, onMenuOpenChange]);
+
+  // Escape closes either panel — a bottom sheet with no visible anchor needs a
+  // keyboard way out, and the mousedown handler alone does not provide one.
+  React.useEffect(() => {
+    if (!anyDropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsLabelsDropdownOpen(false);
+      setIsReportsDropdownOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [anyDropdownOpen]);
+
+  /** Anchored panel classes, or the mobile bottom-sheet variant. */
+  const dropdownPanelClass = (anchored: string) =>
+    sheetOnMobile
+      ? `dcm-download-sheet ${anchored}`
+      : anchored;
 
   /**
    * Extract centering summary from card data
@@ -1709,7 +1779,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
         {/* Labels Dropdown Menu */}
         {isLabelsDropdownOpen && !isGenerating && (
-          <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+          <div className={dropdownPanelClass('absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden')}>
             {showLabelStudioLink && (
               <a
                 href={labelStudioUrl}
@@ -1762,7 +1832,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
         {/* Reports Dropdown Menu */}
         {isReportsDropdownOpen && !isGenerating && (
-          <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+          <div className={dropdownPanelClass('absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden')}>
             {reportsMenuItems.map((item) => (
               <button
                 key={item.id}

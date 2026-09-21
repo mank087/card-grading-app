@@ -11,24 +11,63 @@ export interface MarketRange {
   median: number;
   average: number;
   salesVolume?: any;
+  /**
+   * WHICH quote produced `low` / `high` — "Raw", "PSA 10", "BGS 9.5".
+   *
+   * ADDITIVE (card detail V2 review finding 2). The three numbers pool a raw
+   * copy with every graded tier, so "Low $704 · High $3,538" read as a sale
+   * range for THIS card unless the ends are named. Null when the source is not
+   * identifiable (it never is for an empty pool, which returns null anyway).
+   */
+  lowLabel: string | null;
+  highLabel: string | null;
+}
+
+/** 'psa' -> 'PSA'. The four graders the lookup returns. */
+const TIER_LABELS: Record<string, string> = {
+  psa: 'PSA',
+  bgs: 'BGS',
+  sgc: 'SGC',
+  cgc: 'CGC',
+};
+
+interface Quote {
+  price: number;
+  label: string;
+}
+
+/**
+ * Every priced quote in the match, each carrying the name of the tier it came
+ * from. Order is raw first, then PSA/BGS/SGC/CGC in the order the tier object
+ * enumerates its grades — the same set `computeMarketRange` has always pooled.
+ */
+function collectQuotes(prices: any): Quote[] {
+  const quotes: Quote[] = [];
+  if (prices?.raw && prices.raw > 0) quotes.push({ price: prices.raw, label: 'Raw' });
+  for (const key of ['psa', 'bgs', 'sgc', 'cgc'] as const) {
+    const tier = prices?.[key];
+    if (!tier) continue;
+    for (const [grade, price] of Object.entries(tier)) {
+      if (typeof price === 'number' && price > 0) {
+        quotes.push({ price, label: `${TIER_LABELS[key]} ${grade}` });
+      }
+    }
+  }
+  return quotes;
 }
 
 export function computeMarketRange(prices: any): MarketRange | null {
   if (!prices) return null;
-  const raw = prices.raw;
 
-  const allPrices: number[] = [];
-  if (raw && raw > 0) allPrices.push(raw);
-  for (const tier of [prices.psa, prices.bgs, prices.sgc, prices.cgc]) {
-    if (!tier) continue;
-    Object.values(tier).forEach((price: any) => { if (price && price > 0) allPrices.push(price); });
-  }
+  const quotes = collectQuotes(prices);
+  if (quotes.length === 0) return null;
 
-  if (allPrices.length === 0) return null;
+  const allPrices = quotes.map((q) => q.price);
+  const sortedQuotes = [...quotes].sort((a, b) => a.price - b.price);
+  const sortedPrices = sortedQuotes.map((q) => q.price);
 
-  const sortedPrices = [...allPrices].sort((a, b) => a - b);
-  const low = sortedPrices[0];
-  const high = sortedPrices[sortedPrices.length - 1];
+  const lowQuote = sortedQuotes[0];
+  const highQuote = sortedQuotes[sortedQuotes.length - 1];
   const mid = Math.floor(sortedPrices.length / 2);
   const median = sortedPrices.length % 2 !== 0
     ? sortedPrices[mid]
@@ -36,10 +75,12 @@ export function computeMarketRange(prices: any): MarketRange | null {
   const average = allPrices.reduce((sum, p) => sum + p, 0) / allPrices.length;
 
   return {
-    low: Math.round(low * 100) / 100,
-    high: Math.round(high * 100) / 100,
+    low: Math.round(lowQuote.price * 100) / 100,
+    high: Math.round(highQuote.price * 100) / 100,
     median: Math.round(median * 100) / 100,
     average: Math.round(average * 100) / 100,
     salesVolume: prices.salesVolume,
+    lowLabel: lowQuote.label,
+    highLabel: highQuote.label,
   };
 }

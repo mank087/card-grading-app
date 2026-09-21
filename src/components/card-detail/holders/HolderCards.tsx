@@ -26,12 +26,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   CARD_HOLDERS,
   HOLDER_NAMES,
-  HOLDER_FORMATS,
+  HOLDER_LABEL_STOCK,
   HOLDER_SHOP_LINKS,
   holderStyleSupport,
   type CardHolderId,
 } from '@/lib/cardDetail/holderSupport';
+import { resolveEffectiveLabelSize } from '@/lib/cardDetail/labelSize';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
+
+/** The DOM id a holder's card carries, so the hero strip can jump to it. */
+export const holderCardAnchorId = (holder: CardHolderId) => `cd-holder-${holder}`;
 
 /** Mounts its children once they are within 300px of the viewport. */
 function WhenNear({ children, minHeight }: { children: ReactNode; minHeight: number }) {
@@ -77,6 +81,8 @@ export interface HolderCardsProps {
   /** "detail" names each shop product and adds the Label Studio entry. */
   variant?: 'compact' | 'detail';
   cardWidth?: number;
+  /** Opens this holder's composition in the shell's enlarge modal. */
+  onEnlarge?: (holder: CardHolderId) => void;
 }
 
 export function HolderCards({
@@ -87,24 +93,42 @@ export function HolderCards({
   customizeHref,
   variant = 'compact',
   cardWidth = 160,
+  onEnlarge,
 }: HolderCardsProps) {
   return (
     <div className="cd-holder-cards">
       {CARD_HOLDERS.map((holder) => {
         const support = holderStyleSupport(holder, labelStyle, activeConfig);
+        // The size the holder's download ACTUALLY produces for this style —
+        // not a fixed 2.8" x 0.8" for every slab. See lib/cardDetail/labelSize.
+        const size = resolveEffectiveLabelSize(holder, labelStyle, activeConfig);
         return (
-          <section key={holder} className="cd-holder-card" aria-label={HOLDER_NAMES[holder]}>
+          <section
+            key={holder}
+            id={holderCardAnchorId(holder)}
+            className="cd-holder-card"
+            aria-label={HOLDER_NAMES[holder]}
+            tabIndex={-1}
+          >
             <WhenNear minHeight={Math.round(cardWidth * 1.75)}>
               {renderComposition(holder, cardWidth)}
             </WhenNear>
 
             {/* Never imply the card physically sits in this holder. */}
             <p className="cd-holder-tag">
-              <span>Holder preview</span>
+              <span>Digital holder preview</span>
             </p>
 
             <h4 className="cd-holder-card-name">{HOLDER_NAMES[holder]}</h4>
-            <p className="cd-caption">{HOLDER_FORMATS[holder]}</p>
+            <p className="cd-caption">
+              {HOLDER_LABEL_STOCK[holder]} &middot; {size.formatted}
+            </p>
+
+            {size.note && (
+              <p className="cd-support-note" data-status={size.status} role="note">
+                {size.note}
+              </p>
+            )}
 
             {support.note && (
               <p className="cd-support-note" data-status={support.status} role="note">
@@ -113,6 +137,15 @@ export function HolderCards({
             )}
 
             <div className="dcm-actions cd-holder-card-actions">
+              {onEnlarge && (
+                <button
+                  type="button"
+                  className="cd-quiet"
+                  onClick={() => onEnlarge(holder)}
+                >
+                  Enlarge
+                </button>
+              )}
               {renderDownload?.(holder)}
               {variant === 'detail' && customizeHref && (
                 <a className="cd-quiet" href={customizeHref(holder)}>

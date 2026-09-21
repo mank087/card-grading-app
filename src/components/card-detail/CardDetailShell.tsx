@@ -17,14 +17,20 @@
  * load: legacy returns `null` (a blank page); this renders a small skeleton,
  * because a blank white page is not an acceptable first paint for a redesign.
  *
+ * ROOT ELEMENT: a `<div>`, not a `<main>`. The app layout already renders
+ * `<main id="main-content">` around every page (src/app/layout.tsx:153), and a
+ * second main nested inside it gives the document two main landmarks.
+ *
+ * LABEL STYLE is a LOCAL PREVIEW here — see ./useLabelPreview. Every label on
+ * the page reads `preview.style`, including the downloads; saving a default is
+ * an explicit owner action.
+ *
  * OWNERSHIP is the legacy client-side check, reproduced and not widened. It is
  * open code-audit gap G6 and this page adds no new owner-only surface that
- * lacks a server check — `MarkAsSoldButton`, `CardBinderPicker`, the delete
- * and visibility endpoints and `DownloadReportButton` all authenticate
- * themselves.
+ * lacks a server check.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
@@ -33,13 +39,9 @@ import type { UseCardDetailResult } from './useCardDetail';
 import type { CardDetailSectionId } from '@/lib/cardDetail/anchorMap';
 import type { SavedCustomStyle, CustomLabelConfig } from '@/lib/labelPresets';
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
+import type { MarketRange } from '@/lib/pricing/marketRange';
+import type { LiveValuationInput } from '@/lib/cardDetail/valuation';
 import type { CardSharingData } from '@/lib/socialUtils';
-import {
-  generateFacebookShareUrl,
-  generateTwitterShareUrl,
-  openSocialShare,
-  copyToClipboard,
-} from '@/lib/socialUtils';
 
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import ImageZoomModal from '@/app/pokemon/[id]/ImageZoomModal';
@@ -47,7 +49,6 @@ import { SoldBanner } from '@/components/cards/SoldBanner';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
-import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
@@ -61,8 +62,22 @@ import {
   LabelsHoldersSection,
   OverviewHoldersBand,
 } from './holders/HolderSections';
-import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
+import HolderEntryStrip from './holders/HolderEntryStrip';
+import HolderEnlargeModal from './holders/HolderEnlargeModal';
+import { holderCardAnchorId } from './holders/HolderCards';
+import {
+  HOLDER_LABEL_STOCK,
+  holderStyleSupport,
+  type CardHolderId,
+} from '@/lib/cardDetail/holderSupport';
+import { resolveEffectiveLabelSize } from '@/lib/cardDetail/labelSize';
 import { buildLabelStudioHref } from '@/lib/cardDetail/labelStudioLink';
+import { useLabelPreview } from './useLabelPreview';
+import LabelPreviewControls from './LabelPreviewControls';
+import { useInstaListStatus } from './useInstaListStatus';
+import CardDetailBreadcrumb from './CardDetailBreadcrumb';
+import CardDetailMobileBar from './CardDetailMobileBar';
+import CardDetailModals from './CardDetailModals';
 
 /**
  * The hero's label + card piece. It pulls in every label renderer (the
@@ -89,7 +104,7 @@ import CardValueSummary from './CardValueSummary';
 import InstaListPanel from './InstaListPanel';
 import GradeHighlights from './GradeHighlights';
 import CardFacts from './CardFacts';
-import GradeDetailsSection from './sections/GradeDetailsSection';
+import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
 import {
   CardDetailSectionNav,
   CardDetailSections,
@@ -107,6 +122,19 @@ export interface CategoryCardInfoContext {
   onEdited: () => void;
 }
 
+/**
+ * What a download slot must render with. The PREVIEWED style, so a download
+ * produces the label the reader is looking at rather than the account default.
+ */
+export interface DownloadSlotContext {
+  labelStyle: LabelStyleId;
+  customLabelConfig: CustomLabelConfig | null;
+  /** Additive DownloadReportButton props, for the hero instance only. */
+  openLabelsSignal?: number;
+  onMenuOpenChange?: (open: boolean) => void;
+  sheetOnMobile?: boolean;
+}
+
 export interface CardDetailShellProps {
   category: CardDetailCategory;
   /** "Pokémon" — how the breadcrumb and the copy name this category. */
@@ -122,16 +150,17 @@ export interface CardDetailShellProps {
   /** Null until the card has loaded. */
   vm: CardDetailViewModel | null;
 
-  /* Label style — `useCustomLabelStyleWithOrg(card.org_id)` in the adapter. */
+  /* Label style. `labelStyle` is the SAVED default (account, or the org house
+     style when one applies); the page previews on top of it. */
   labelStyle: LabelStyleId;
   customStyles: SavedCustomStyle[];
-  activeConfig: CustomLabelConfig | null;
-  colorOverrides: unknown;
-  heritageBandColors: string[];
-  onSwitchStyle: (id: LabelStyleId) => void;
+  /** The org locks the design: read-only selector, no preview. */
+  orgHouseStyleLocked: boolean;
+  /** Resolves to whether the account default was actually written. */
+  onSwitchStyle: (id: LabelStyleId) => Promise<boolean>;
 
   /* Category slots. Functions, not nodes, because several mount twice. */
-  renderDownloadButton: () => ReactNode;
+  renderDownloadButton: (ctx: DownloadSlotContext) => ReactNode;
   renderPricing: () => ReactNode;
   renderMarketplaceLinks: () => ReactNode;
   /** The PSA/BGS/SGC/CGC mail-away estimates, mounted in the Market section. */
@@ -144,11 +173,10 @@ export interface CardDetailShellProps {
   /** The category's own Special Features badges. */
   renderCategoryBadges?: () => ReactNode;
   /**
-   * PHASE 2. One trigger that opens ONE holder's existing download flow
-   * (`DownloadReportButton`'s additive `holderDownload` prop). Owner-only, as
-   * legacy. Without it the hero falls back to the full download menu.
+   * One trigger that opens ONE holder's existing download flow
+   * (`DownloadReportButton`'s additive `holderDownload` prop). Owner-only.
    */
-  renderHolderDownload?: (holder: CardHolderId) => ReactNode;
+  renderHolderDownload?: (holder: CardHolderId, ctx: DownloadSlotContext) => ReactNode;
 
   /**
    * Where "retake your photos" goes. Legacy pokemon uses
@@ -157,27 +185,30 @@ export interface CardDetailShellProps {
    */
   retakeHref?: string;
 
-  /** A trusted live estimate, already through `assessValueTrust`. */
-  liveEstimate: number | null;
+  /**
+   * The live price lookup's result: the trusted amount AND the freshness that
+   * belongs to it. Null until the pricing component reports one.
+   */
+  live: LiveValuationInput | null;
   /** Low / median / high from the live price match; null until it reports. */
-  marketRange?: { low: number; median: number; high: number } | null;
+  marketRange?: MarketRange | null;
   /** `extractConditionSummary(card.conversational_grading)`, or null. */
   conditionSummary: string | null;
   shareData: CardSharingData;
 }
 
+function PageShell({ children }: { children: ReactNode }) {
+  return <div className="dcm-brand dcm-card-detail">{children}</div>;
+}
+
 function LoadingSkeleton() {
   return (
-    <main className="dcm-brand dcm-card-detail">
+    <PageShell>
       <div className="cd-container" style={{ paddingBlock: 48 }}>
         <p role="status" aria-live="polite" className="cd-caption">
           Loading this card…
         </p>
-        <div
-          aria-hidden="true"
-          className="cd-hero"
-          style={{ marginTop: 24 }}
-        >
+        <div aria-hidden="true" className="cd-hero" style={{ marginTop: 24 }}>
           <div className="cd-showcase" style={{ minHeight: 420 }} />
           <div className="cd-hero-summary">
             <div className="cd-panel" style={{ minHeight: 120 }} />
@@ -185,7 +216,7 @@ function LoadingSkeleton() {
           </div>
         </div>
       </div>
-    </main>
+    </PageShell>
   );
 }
 
@@ -201,9 +232,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     vm,
     labelStyle,
     customStyles,
-    activeConfig,
-    colorOverrides,
-    heritageBandColors,
+    orgHouseStyleLocked,
     onSwitchStyle,
     renderDownloadButton,
     renderPricing,
@@ -213,7 +242,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     renderCategoryBadges,
     renderHolderDownload,
     retakeHref,
-    liveEstimate,
+    live,
     marketRange,
     conditionSummary,
     shareData,
@@ -225,19 +254,52 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const routing = useCardDetailSectionRouting();
   const [side, setSide] = useState<CardSide>('front');
   const [zoom, setZoom] = useState({ isOpen: false, imageUrl: '', alt: '', title: '' });
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const [enlargedHolder, setEnlargedHolder] = useState<CardHolderId | null>(null);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [listingModalOpen, setListingModalOpen] = useState(false);
+  // Counters the mobile bar bumps to perform an action in place. See
+  // DownloadReportButton.openLabelsSignal and EbayListingButton.openSignal.
+  const [openDownloadsSignal, setOpenDownloadsSignal] = useState(0);
+  const [openListingSignal, setOpenListingSignal] = useState(0);
   // The anchor the page was last asked to jump to. Grade details reads it to
   // select the matching evidence tab; `replaceState` fires no hashchange, so
   // handing it over directly is the only way the section learns.
   const [jumpAnchor, setJumpAnchor] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Grade details' inspection context, lifted here (review item D).
+   *
+   * `CardDetailSections` unmounts an inactive section — deliberately, and that
+   * mounting strategy is unchanged — so the selected evidence tab and the open
+   * expanders used to reset every time the reader looked at Market and came
+   * back. Holding them at this level survives the unmount without changing how
+   * anything mounts.
+   */
+  const [evidenceTab, setEvidenceTab] = useState<EvidenceKey>('centering');
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [confidenceOpen, setConfidenceOpen] = useState(false);
+  const [userReportOpen, setUserReportOpen] = useState(false);
+
+  const viewerSignedIn = !!getStoredSession()?.user?.id;
+
+  const preview = useLabelPreview({
+    savedStyle: labelStyle,
+    customStyles,
+    orgLocked: orgHouseStyleLocked,
+    cardColors: (card as { card_colors?: unknown } | null)?.card_colors ?? null,
+    switchStyle: onSwitchStyle,
+  });
+
+  const instaList = useInstaListStatus(cardId, {
+    isOwner: detail.isOwner,
+    isSold: !!vm?.permissions.isSold,
+  });
 
   // Same rule as legacy: one ask per page for an empty balance.
   const postResultOfferEligible = usePostResultOfferEligible({
@@ -256,22 +318,40 @@ export function CardDetailShell(props: CardDetailShellProps) {
     }
   }, [card, loading, balance, postResultOfferEligible]);
 
-  // Close the more-actions menu on an outside click or Escape.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
+  const jumpTo = useCallback(
+    (id: CardDetailSectionId, anchorId?: string) => {
+      setJumpAnchor(anchorId ?? null);
+      routing.selectSection(id, anchorId);
+    },
+    [routing],
+  );
+
+  /**
+   * The hero's holder strip: open the Overview section, scroll to that
+   * holder's card and mark it briefly so the reader's eye lands on it. The
+   * highlight is a CSS animation and is suppressed under reduced motion.
+   */
+  const goToHolder = useCallback(
+    (holder: CardHolderId) => {
+      jumpTo('overview');
+      const anchorId = holderCardAnchorId(holder);
+      const reduce =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      // A timer, not requestAnimationFrame: rAF is throttled to a standstill in
+      // a background tab, and this must still land when the reader comes back
+      // to one. 60ms is enough for React to have mounted the band.
+      window.setTimeout(() => {
+        const el = document.getElementById(anchorId);
+        if (!el) return;
+        el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+        el.focus({ preventScroll: true });
+        el.setAttribute('data-arrived', 'true');
+        window.setTimeout(() => el.removeAttribute('data-arrived'), 1600);
+      }, 60);
+    },
+    [jumpTo],
+  );
 
   // ── States, in the legacy order ────────────────────────────────────────
 
@@ -290,7 +370,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   if (error) {
     if (error === 'PRIVATE_CARD') {
       return (
-        <main className="dcm-brand dcm-card-detail">
+        <PageShell>
           <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
             <h1 style={{ fontSize: 34, fontWeight: 750, letterSpacing: '-.03em' }}>
               This card is private
@@ -310,12 +390,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
               </Link>
             </div>
           </div>
-        </main>
+        </PageShell>
       );
     }
 
     return (
-      <main className="dcm-brand dcm-card-detail">
+      <PageShell>
         <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
           <h1 style={{ fontSize: 30, fontWeight: 750, letterSpacing: '-.03em' }}>
             Card not available
@@ -324,21 +404,27 @@ export function CardDetailShell(props: CardDetailShellProps) {
             This card no longer exists or is not viewable at this moment.
           </p>
           <div className="dcm-actions" style={{ marginTop: 28 }}>
-            <Link className="dcm-button dcm-button--primary" href="/collection">
-              My collection
-            </Link>
+            {viewerSignedIn ? (
+              <Link className="dcm-button dcm-button--primary" href="/collection">
+                My collection
+              </Link>
+            ) : (
+              <Link className="dcm-button dcm-button--primary" href="/">
+                Back to DCM Grading
+              </Link>
+            )}
             <Link className="dcm-button dcm-button--secondary" href={uploadHref}>
               Grade a card
             </Link>
           </div>
         </div>
-      </main>
+      </PageShell>
     );
   }
 
   if (!card || !vm) {
     return (
-      <main className="dcm-brand dcm-card-detail">
+      <PageShell>
         <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
           <h1 style={{ fontSize: 30, fontWeight: 750 }}>{categoryLabel} card not found</h1>
           <div className="dcm-actions" style={{ marginTop: 24 }}>
@@ -347,7 +433,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
             </Link>
           </div>
         </div>
-      </main>
+      </PageShell>
     );
   }
 
@@ -357,7 +443,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const isSold = vm.permissions.isSold;
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
 
-  // ── holder showcase (Phase 2) ──────────────────────────────────────────
   /** The QR / verify destination, built exactly as legacy does (2680). */
   const verifyUrl =
     typeof window !== 'undefined'
@@ -378,9 +463,15 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const labelStudioHref = (forHolder?: CardHolderId) =>
     buildLabelStudioHref(vm.identity.serial, {
       holder: forHolder,
-      style: labelStyle,
+      style: preview.style,
       returnPath,
     });
+
+  /** Every download renders the PREVIEWED design, not the account default. */
+  const downloadContext: DownloadSlotContext = {
+    labelStyle: preview.style,
+    customLabelConfig: preview.activeConfig,
+  };
 
   /** Shared by the hero piece and the three holder compositions. */
   const artworkProps = {
@@ -389,31 +480,46 @@ export function CardDetailShell(props: CardDetailShellProps) {
     backUrl: vm.images.back.url,
     cardName: vm.identity.displayName,
     labelData: vm.labelData,
-    labelStyle,
-    activeConfig,
-    colorOverrides: colorOverrides as never,
-    heritageBandColors,
+    labelStyle: preview.style,
+    activeConfig: preview.activeConfig,
+    colorOverrides: preview.colorOverrides as never,
+    heritageBandColors: preview.heritageBandColors,
     orgLogos: detail.orgLogos,
     subScores: labelSubScores,
     emblems: detail.emblems,
     verifyUrl,
   };
 
+  const renderComposition = (which: CardHolderId, maxWidth: number) => (
+    <HolderComposition {...artworkProps} holder={which} maxWidth={maxWidth} />
+  );
+
   /**
    * Everything the two holder sections need, assembled once. There is no
-   * holder SELECTION state: nothing in the hero depends on a holder any more,
-   * so each card is self-contained and the mockup owns its own front/back.
+   * holder SELECTION state: nothing in the hero depends on a holder, so each
+   * card is self-contained and the mockup owns its own front/back.
    */
   const holderSectionProps = {
-    labelStyle,
-    activeConfig,
+    labelStyle: preview.style,
+    activeConfig: preview.activeConfig,
     isOwner,
     labelStudioHref,
-    renderHolderDownload,
-    renderComposition: (which: CardHolderId, maxWidth: number) => (
-      <HolderComposition {...artworkProps} holder={which} maxWidth={maxWidth} />
-    ),
+    renderHolderDownload: renderHolderDownload
+      ? (holder: CardHolderId) => renderHolderDownload(holder, downloadContext)
+      : undefined,
+    renderComposition,
+    onEnlarge: setEnlargedHolder,
   };
+
+  const enlargedSize = enlargedHolder
+    ? resolveEffectiveLabelSize(enlargedHolder, preview.style, preview.activeConfig)
+    : null;
+  const enlargedSupport = enlargedHolder
+    ? holderStyleSupport(enlargedHolder, preview.style, preview.activeConfig)
+    : null;
+
+  // The mobile bar must never sit on top of an open overlay — including the
+  // download menu and the listing modal, which are owned by shared components.
   const anyModalOpen =
     zoom.isOpen ||
     showDeleteModal ||
@@ -421,24 +527,20 @@ export function CardDetailShell(props: CardDetailShellProps) {
     showInsufficientCredits ||
     showEditLabelModal ||
     showFirstGradeModal ||
-    showOnboardingTour;
+    showOnboardingTour ||
+    enlargedHolder !== null ||
+    downloadMenuOpen ||
+    listingModalOpen;
   const showMobileBar = isOwner && !anyModalOpen;
 
   const openZoom = (imageUrl: string, alt: string, title: string) =>
     setZoom({ isOpen: true, imageUrl, alt, title });
-
-  const jumpTo = (id: CardDetailSectionId, anchorId?: string) => {
-    setJumpAnchor(anchorId ?? null);
-    routing.selectSection(id, anchorId);
-  };
 
   // No menu item calls this, on purpose. The legacy clients keep the re-grade
   // handler and modals but removed the button, so V2 offers no re-grade entry
   // point either. Wiring one up is a product decision, not a parity fix.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRegradeClick = () => {
-    setMenuOpen(false);
-    // Legacy's gate: under one credit, offer the top-up instead of the confirm.
     if (!detail.canRegrade) {
       setShowInsufficientCredits(true);
       return;
@@ -463,8 +565,39 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
   const refreshAfterEdit = () => window.location.reload();
 
+  /** One tap on "InstaList" does what the current state means. */
+  const onInstaListAction = () => {
+    if (instaList.state === 'listed' && instaList.listing?.listing_url) {
+      window.open(instaList.listing.listing_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (instaList.state === 'unverified') {
+      instaList.refresh();
+      return;
+    }
+    // 'unlisted' — open the existing connect-or-create flow where we stand.
+    setOpenListingSignal((n) => n + 1);
+  };
+
+  const styleControls = (compact: boolean, idleNote?: string) => (
+    <LabelPreviewControls
+      preview={preview}
+      customStyles={customStyles}
+      isOwner={isOwner}
+      viewerSignedIn={viewerSignedIn}
+      compact={compact}
+      idleNote={idleNote}
+    />
+  );
+
   return (
-    <main className="dcm-brand dcm-card-detail" data-mobile-bar={showMobileBar}>
+    <div
+      className="dcm-brand dcm-card-detail"
+      data-mobile-bar={showMobileBar}
+      // The tour positions its targets with its own maths; the page's scroll
+      // offsets are stood down while it runs so the two cannot compound.
+      data-tour-active={showOnboardingTour}
+    >
       {/* The tour's caption card is fixed to the top of the screen and the tour
           scrolls each target to just below it. The first targets (visibility
           row, card images) sit at the very top of the page, where there is no
@@ -472,183 +605,23 @@ export function CardDetailShell(props: CardDetailShellProps) {
           This spacer gives the page that distance while the tour runs. */}
       {showOnboardingTour && <div className="cd-tour-spacer" aria-hidden="true" />}
       <div className="cd-container">
-        {/* ── breadcrumb ─────────────────────────────────────────────── */}
-        <div className="cd-breadcrumb">
-          <Link className="dcm-button dcm-button--text" href={backHref}>
-            ← My collection
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span>{categoryLabel}</span>
-          <span aria-hidden="true">/</span>
-          <span className="cd-crumb-name">{vm.identity.displayName}</span>
-
-          <div className="cd-record-actions" id="tour-visibility-toggle">
-            {isOwner ? (
-              <button
-                type="button"
-                className="cd-quiet"
-                onClick={handleVisibilityClick}
-                disabled={detail.isTogglingVisibility}
-                title={
-                  detail.visibility === 'public'
-                    ? 'This card is public (click to make private)'
-                    : 'This card is private (click to make public)'
-                }
-              >
-                <span
-                  className="cd-status-dot"
-                  data-private={detail.visibility !== 'public'}
-                  aria-hidden="true"
-                />
-                {detail.isTogglingVisibility
-                  ? 'Updating…'
-                  : detail.visibility === 'public'
-                    ? 'Public card'
-                    : 'Private card'}
-              </button>
-            ) : (
-              <span className="cd-caption">
-                {detail.visibility === 'public' ? 'Public card' : 'Private card'}
-              </span>
-            )}
-
-            {/* The compact style switcher legacy keeps in this same row. */}
-            {isOwner && (
-              <LabelStyleDropdown
-                labelStyle={labelStyle}
-                customStyles={customStyles}
-                onSwitch={onSwitchStyle}
-                compact
-              />
-            )}
-
-            {/* Legacy keeps this in the page header; it is not owner-gated. */}
-            <button
-              type="button"
-              className="cd-quiet"
-              title="Take a guided tour of this page"
-              onClick={() => {
-                try {
-                  localStorage.removeItem('dcm_onboarding_tour_completed');
-                  localStorage.removeItem('dcm_onboarding_tour_started');
-                } catch {
-                  /* Private mode: the tour still runs, it just re-offers later. */
-                }
-                setShowOnboardingTour(true);
-              }}
-            >
-              Page tour
-            </button>
-
-            <div className="cd-menu-wrap">
-              <button
-                type="button"
-                className="cd-quiet"
-                aria-expanded={shareOpen}
-                aria-haspopup="menu"
-                onClick={() => {
-                  setShareOpen((v) => !v);
-                  setMenuOpen(false);
-                }}
-              >
-                Share
-              </button>
-              {shareOpen && (
-                <div className="cd-menu" role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="cd-menu-item"
-                    onClick={() => {
-                      openSocialShare(generateFacebookShareUrl(shareData, isOwner));
-                      setShareOpen(false);
-                    }}
-                  >
-                    Share on Facebook
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="cd-menu-item"
-                    onClick={() => {
-                      openSocialShare(generateTwitterShareUrl(shareData, isOwner));
-                      setShareOpen(false);
-                    }}
-                  >
-                    Share on X
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="cd-menu-item"
-                    onClick={async () => {
-                      const ok = await copyToClipboard(currentUrl);
-                      window.alert(ok ? '✅ Link copied to clipboard!' : '❌ Failed to copy link. Please try again.');
-                      setShareOpen(false);
-                    }}
-                  >
-                    Copy link
-                  </button>
-                  <p className="cd-menu-note">DCM serial {vm.identity.serial}</p>
-                </div>
-              )}
-            </div>
-
-            {isOwner && (
-              <div className="cd-menu-wrap" ref={menuRef}>
-                <button
-                  type="button"
-                  className="cd-quiet"
-                  aria-expanded={menuOpen}
-                  aria-haspopup="menu"
-                  aria-label="More card actions"
-                  onClick={() => {
-                    setMenuOpen((v) => !v);
-                    setShareOpen(false);
-                  }}
-                >
-                  •••
-                </button>
-                {menuOpen && (
-                  <div className="cd-menu" role="menu">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="cd-menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setShowEditLabelModal(true);
-                      }}
-                    >
-                      Edit card label
-                    </button>
-                    <a
-                      role="menuitem"
-                      className="cd-menu-item"
-                      href={`/labels?card=${encodeURIComponent(vm.identity.serial)}`}
-                    >
-                      Customize in Label Studio
-                    </a>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="cd-menu-item cd-menu-item--danger"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setShowDeleteModal(true);
-                      }}
-                    >
-                      Delete card from collection
-                    </button>
-                    <p className="cd-menu-note">
-                      Mark as sold and binder actions sit at the foot of the page.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <CardDetailBreadcrumb
+          categoryLabel={categoryLabel}
+          displayName={vm.identity.displayName}
+          serial={vm.identity.serial}
+          backHref={backHref}
+          isOwner={isOwner}
+          viewerSignedIn={viewerSignedIn}
+          visibility={detail.visibility}
+          isTogglingVisibility={detail.isTogglingVisibility}
+          onToggleVisibility={handleVisibilityClick}
+          onStartTour={() => setShowOnboardingTour(true)}
+          shareData={shareData}
+          currentUrl={currentUrl}
+          onEditLabel={() => setShowEditLabelModal(true)}
+          onDelete={() => setShowDeleteModal(true)}
+          labelStudioHref={`/labels?card=${encodeURIComponent(vm.identity.serial)}`}
+        />
 
         {/* Sold: the record is locked and stays online for the buyer. */}
         {isSold && (
@@ -669,10 +642,14 @@ export function CardDetailShell(props: CardDetailShellProps) {
             side={side}
             onSideChange={setSide}
             onZoom={openZoom}
-            labelStyle={labelStyle}
-            customStyles={customStyles}
-            onSwitchStyle={onSwitchStyle}
-            downloadAction={renderDownloadButton()}
+            styleControl={styleControls(false)}
+            holderEntry={<HolderEntryStrip onGoToHolder={goToHolder} />}
+            downloadAction={renderDownloadButton({
+              ...downloadContext,
+              openLabelsSignal: openDownloadsSignal,
+              onMenuOpenChange: setDownloadMenuOpen,
+              sheetOnMobile: true,
+            })}
             onEditLabel={() => setShowEditLabelModal(true)}
             isOwner={isOwner}
             customizeHref={labelStudioHref()}
@@ -725,7 +702,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
             <CardValueSummary
               value={vm.value}
-              liveEstimate={liveEstimate}
+              live={live}
               marketRange={marketRange ?? null}
               isOwner={isOwner}
               onJumpToMarket={() => jumpTo('market')}
@@ -733,13 +710,14 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
             <InstaListPanel
               card={card}
-              cardId={cardId}
               cardType={ebayCardType}
               isOwner={isOwner}
-              isSold={isSold}
               showFounderEmblem={detail.emblems.showFounderEmblem}
-              labelStyle={labelStyle}
-              customLabelConfig={activeConfig}
+              labelStyle={preview.style}
+              customLabelConfig={preview.activeConfig}
+              status={instaList}
+              openSignal={openListingSignal}
+              onModalOpenChange={setListingModalOpen}
             />
           </div>
         </div>
@@ -783,7 +761,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
                   <p className="cd-eyebrow">The whole picture</p>
                   <h3 style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>Your grade, explained.</h3>
                   <p className="cd-caption" style={{ marginTop: 8 }}>
-                    Explore the front-to-back findings, or keep a report with your collection.
+                    Read the front-to-back findings, or take a report away with you.
                   </p>
                   <div className="dcm-actions" style={{ marginTop: 16 }}>
                     <button type="button" className="cd-quiet" onClick={() => jumpTo('grade')}>
@@ -800,8 +778,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
           labels={
             <LabelsHoldersSection
               {...holderSectionProps}
-              customStyles={customStyles}
-              onSwitchStyle={onSwitchStyle}
+              styleControl={styleControls(false)}
+              viewerSignedIn={viewerSignedIn}
               onEditLabelText={() => setShowEditLabelModal(true)}
             />
           }
@@ -835,11 +813,13 @@ export function CardDetailShell(props: CardDetailShellProps) {
                   </p>
                 )}
               </section>
-              <div className="dcm-actions">
-                <a className="cd-quiet" href="/market-pricing">
-                  View in portfolio
-                </a>
-              </div>
+              {isOwner && (
+                <div className="dcm-actions">
+                  <a className="cd-quiet" href="/market-pricing">
+                    View in portfolio
+                  </a>
+                </div>
+              )}
             </div>
           }
           grade={
@@ -849,6 +829,14 @@ export function CardDetailShell(props: CardDetailShellProps) {
               category={category}
               focusAnchor={jumpAnchor}
               onZoom={openZoom}
+              evidence={evidenceTab}
+              onEvidenceChange={setEvidenceTab}
+              analysisOpen={analysisOpen}
+              onAnalysisOpenChange={setAnalysisOpen}
+              confidenceOpen={confidenceOpen}
+              onConfidenceOpenChange={setConfidenceOpen}
+              userReportOpen={userReportOpen}
+              onUserReportOpenChange={setUserReportOpen}
             />
           }
           reports={
@@ -856,7 +844,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
               <div className="cd-section-title">
                 <p className="cd-eyebrow">Keep it. Share it. Show it.</p>
                 <h2>Your card, ready to go.</h2>
-                <p>Reports, labels and images — all from the existing generators.</p>
+                <p>Reports, labels and card images to download.</p>
               </div>
               <section id="tour-download-buttons" className="cd-panel">
                 <div className="cd-showcase-row">
@@ -864,7 +852,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
                     DCM serial <strong className="cd-serial">{vm.identity.serial}</strong>
                   </span>
                   {isOwner ? (
-                    renderDownloadButton()
+                    renderDownloadButton(downloadContext)
                   ) : (
                     <span className="cd-caption">
                       Reports and labels are available to the card&rsquo;s owner.
@@ -919,36 +907,18 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
       {/* ── mobile bottom action bar (≤760px) ───────────────────────── */}
       {showMobileBar && (
-        <div className="cd-mobile-bar">
-          {/* The GENERAL download menu (labels + reports), not a holder flow:
-              the hero no longer selects a holder. */}
-          <button
-            type="button"
-            className="dcm-button dcm-button--primary"
-            onClick={() => {
-              const target = document.getElementById('tour-holder-download');
-              if (target) {
-                target.scrollIntoView({ block: 'center' });
-                target.querySelector('button')?.focus();
-              } else {
-                jumpTo('reports', 'tour-download-buttons');
-              }
-            }}
-          >
-            Download label
-          </button>
-          {!isSold && (
-            <button
-              type="button"
-              className="dcm-button dcm-button--secondary"
-              onClick={() => {
-                document.getElementById('tour-insta-list')?.scrollIntoView({ block: 'start' });
-              }}
-            >
-              InstaList
-            </button>
-          )}
-        </div>
+        <CardDetailMobileBar
+          onOpenDownloads={() => setOpenDownloadsSignal((n) => n + 1)}
+          instaList={
+            isSold
+              ? null
+              : {
+                  state: instaList.state,
+                  listingUrl: instaList.listing?.listing_url,
+                  onAct: onInstaListAction,
+                }
+          }
+        />
       )}
 
       {/* ── modals ─────────────────────────────────────────────────── */}
@@ -960,114 +930,43 @@ export function CardDetailShell(props: CardDetailShellProps) {
         title={zoom.title}
       />
 
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-              Delete card from collection
-            </h3>
-            <p className="text-sm text-gray-600 text-center mb-4">
-              This permanently removes the card and all associated data from the system.
-            </p>
-            <p className="text-xs text-red-600 text-center mb-6 font-medium">
-              ⚠️ This action is non-reversible
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={detail.isDeleting}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={detail.deleteCard}
-                disabled={detail.isDeleting}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {detail.isDeleting ? 'Deleting…' : 'Delete card'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <HolderEnlargeModal
+        holder={enlargedHolder}
+        onClose={() => setEnlargedHolder(null)}
+        renderComposition={renderComposition}
+        formatLine={
+          enlargedHolder && enlargedSize
+            ? `${HOLDER_LABEL_STOCK[enlargedHolder]} · ${enlargedSize.formatted}`
+            : undefined
+        }
+        note={enlargedSize?.note ?? enlargedSupport?.note ?? null}
+      />
 
-      {showRegradeConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-              Re-grade this card?
-            </h3>
-            <p className="text-sm text-gray-600 text-center mb-4">
-              This re-analyses the card using the <strong>same uploaded images</strong> with the
-              latest DCM Optic™ grading system. The new grade <strong>replaces</strong> the
-              current one.
-            </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-amber-800 text-center font-medium">
-                This will use 1 credit from your balance.
-              </p>
-              <p className="text-xs text-amber-600 text-center mt-1">
-                Current balance: {balance} credit{balance !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowRegradeConfirm(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowRegradeConfirm(false);
-                  detail.regradeCard();
-                }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                Re-grade card (1 credit)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showInsufficientCredits && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Insufficient credits</h2>
-            <p className="text-gray-600 mb-4">You need 1 credit to re-grade this card.</p>
-            <div className="bg-gray-100 rounded-lg p-3 mb-4">
-              <p className="text-sm text-gray-600">Current balance</p>
-              <p className="text-2xl font-bold text-gray-900">{balance} credits</p>
-            </div>
-            <div className="space-y-2">
-              <Link
-                href="/credits"
-                className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-6 rounded-xl"
-              >
-                Purchase credits
-              </Link>
-              <button
-                onClick={() => setShowInsufficientCredits(false)}
-                className="block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CardDetailModals
+        showDelete={showDeleteModal}
+        onCloseDelete={() => setShowDeleteModal(false)}
+        onConfirmDelete={detail.deleteCard}
+        isDeleting={detail.isDeleting}
+        showRegradeConfirm={showRegradeConfirm}
+        onCloseRegrade={() => setShowRegradeConfirm(false)}
+        onConfirmRegrade={() => {
+          setShowRegradeConfirm(false);
+          detail.regradeCard();
+        }}
+        showInsufficientCredits={showInsufficientCredits}
+        onCloseInsufficientCredits={() => setShowInsufficientCredits(false)}
+        balance={balance}
+      />
 
       <EditCardLabelModal
         isOpen={showEditLabelModal}
         onClose={() => setShowEditLabelModal(false)}
         cardId={card.id}
         labelData={vm.labelData}
-        labelStyle={labelStyle}
-        activeConfig={activeConfig}
-        heritageBandColors={heritageBandColors}
-        colorOverrides={colorOverrides as never}
+        labelStyle={preview.style}
+        activeConfig={preview.activeConfig}
+        heritageBandColors={preview.heritageBandColors}
+        colorOverrides={preview.colorOverrides as never}
         hasCustomLabel={!!card.custom_label_data}
         onSaved={detail.refetch}
       />
@@ -1099,7 +998,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
           loading={creditsLoading}
         />
       )}
-    </main>
+    </div>
   );
 }
 

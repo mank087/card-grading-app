@@ -9,6 +9,22 @@ interface LabelStyleDropdownProps {
   customStyles: SavedCustomStyle[]
   onSwitch: (id: LabelStyleId) => void
   compact?: boolean
+  /**
+   * ADDITIVE (card detail V2). Show the current style but refuse to open — for
+   * an org house style, which the member cannot change from a card page. The
+   * caller supplies the one-line explanation beside it. Default false: the
+   * dropdown behaves exactly as before.
+   */
+  readOnly?: boolean
+  /**
+   * ADDITIVE (card detail V2). Hide the saved custom slots and the "Create in
+   * Label Studio" entry, leaving the three built-ins. A logged-out visitor has
+   * no saved slots to render and no Studio to reach, so offering them is
+   * offering a control that cannot work. Default false.
+   */
+  builtInsOnly?: boolean
+  /** ADDITIVE. Overrides the "Label Style:" prefix on the trigger. */
+  triggerLabel?: string
 }
 
 export function LabelStyleDropdown({
@@ -16,6 +32,9 @@ export function LabelStyleDropdown({
   customStyles,
   onSwitch,
   compact = false,
+  readOnly = false,
+  builtInsOnly = false,
+  triggerLabel,
 }: LabelStyleDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -60,24 +79,30 @@ export function LabelStyleDropdown({
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors text-left ${
-          compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'
-        }`}
+        type="button"
+        onClick={() => { if (!readOnly) setOpen(!open) }}
+        disabled={readOnly}
+        aria-expanded={readOnly ? undefined : open}
+        aria-haspopup={readOnly ? undefined : 'listbox'}
+        className={`flex items-center gap-2 rounded-lg border border-gray-300 bg-white transition-colors text-left ${
+          readOnly ? 'cursor-default opacity-90' : 'hover:bg-gray-50'
+        } ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
       >
-        <span className="text-gray-500 font-medium">Label Style:</span>
+        <span className="text-gray-500 font-medium">{triggerLabel ?? 'Label Style:'}</span>
         <span className="font-semibold text-gray-900">{getDisplayName(labelStyle)}</span>
-        <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {!readOnly && (
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </button>
 
-      {open && (
+      {open && !readOnly && (
         // max-h + scroll: with 12 saved-design slots the list can hit 15
         // entries, which would overflow past a modal's bottom edge.
         <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-80 overflow-y-auto">
@@ -129,7 +154,7 @@ export function LabelStyleDropdown({
           </button>
 
           {/* Custom styles section */}
-          {customStyles.length > 0 && (
+          {!builtInsOnly && customStyles.length > 0 && (
             <>
               <div className="border-t border-gray-200 mx-3" />
               {customStyles.map((style) => (
@@ -153,7 +178,7 @@ export function LabelStyleDropdown({
           )}
 
           {/* Create in Label Studio link */}
-          {customStyles.length < 4 && (
+          {!builtInsOnly && customStyles.length < 4 && (
             <>
               <div className="border-t border-gray-200 mx-3" />
               <a

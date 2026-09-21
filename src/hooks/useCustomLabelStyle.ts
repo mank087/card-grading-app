@@ -16,7 +16,16 @@ interface UseCustomLabelStyleReturn {
   activeConfig: CustomLabelConfig | null;
   colorOverrides: LabelColorOverrides | undefined;
   loading: boolean;
-  switchStyle: (id: LabelStyleId) => Promise<void>;
+  /**
+   * Writes the ACCOUNT-WIDE default label style.
+   *
+   * ADDITIVE (card detail V2 review finding C): it now RESOLVES to whether the
+   * save actually landed — `false` when there is no session, when the POST was
+   * rejected, or when the request threw. It used to resolve to `undefined` in
+   * all three cases, so a logged-out click and a failed save were both silent.
+   * Every existing caller ignores the result and is unaffected.
+   */
+  switchStyle: (id: LabelStyleId) => Promise<boolean>;
   saveCustomStyle: (style: { id?: string; name: string; config: CustomLabelConfig }) => Promise<SavedCustomStyle | null>;
   deleteCustomStyle: (id: string) => Promise<void>;
   renameCustomStyle: (id: string, name: string) => Promise<void>;
@@ -61,19 +70,23 @@ export function useCustomLabelStyle(): UseCustomLabelStyleReturn {
   const activeConfig = customStyles.find(s => s.id === labelStyle)?.config || null;
   const colorOverrides = extractColorOverrides(activeConfig);
 
-  const switchStyle = useCallback(async (id: LabelStyleId) => {
+  const switchStyle = useCallback(async (id: LabelStyleId): Promise<boolean> => {
     const headers = getAuthHeaders();
-    if (!headers) return;
+    // No session: nothing can be saved. Returning false lets the caller say so
+    // instead of leaving the click with no visible effect.
+    if (!headers) return false;
 
     setLabelStyle(id);
     try {
-      await fetch('/api/user/label-style', {
+      const res = await fetch('/api/user/label-style', {
         method: 'POST',
         headers,
         body: JSON.stringify({ labelStyle: id }),
       });
+      return res.ok;
     } catch (err) {
       console.error('Failed to switch label style:', err);
+      return false;
     }
   }, [getAuthHeaders]);
 

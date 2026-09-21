@@ -26,9 +26,6 @@
  */
 
 import type { ReactNode } from 'react';
-import type { SavedCustomStyle } from '@/lib/labelPresets';
-import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
-import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 
 export type CardSide = 'front' | 'back';
@@ -40,14 +37,15 @@ export interface CardLabelShowcaseProps {
   /** Opens the shared ImageZoomModal the shell owns, on the ORIGINAL photo. */
   onZoom: (imageUrl: string, alt: string, title: string) => void;
 
-  /* Label style — the SAME props and persistence semantics as legacy:
-     `useCustomLabelStyleWithOrg(card.org_id)` in the shell's caller, whose
-     `switchStyle` writes the account-wide preference. Previewing a style on
-     this page changes the account style exactly as it does today; per-card
-     persistence is explicitly out of scope. */
-  labelStyle: LabelStyleId;
-  customStyles: SavedCustomStyle[];
-  onSwitchStyle: (id: LabelStyleId) => void;
+  /**
+   * The shared label-style control, built by the shell (`LabelPreviewControls`).
+   * It PREVIEWS: changing it re-renders every label on this page and writes
+   * nothing to the account. Saving a default is a separate action inside it,
+   * and only an owner sees that.
+   */
+  styleControl: ReactNode;
+  /** The "see it in a holder" entry strip, rendered under the showcase. */
+  holderEntry?: ReactNode;
 
   /** The composed label + card piece for the selected side. */
   renderCardPiece: (context: { side: CardSide }) => ReactNode;
@@ -70,9 +68,8 @@ export function CardLabelShowcase({
   side,
   onSideChange,
   onZoom,
-  labelStyle,
-  customStyles,
-  onSwitchStyle,
+  styleControl,
+  holderEntry,
   renderCardPiece,
   downloadAction,
   onEditLabel,
@@ -126,25 +123,16 @@ export function CardLabelShowcase({
         )}
       </div>
 
-      {/* Same component, same props and same persistence as the legacy header. */}
       <div className="cd-showcase-row">
-        <div>
-          <p className="cd-eyebrow" style={{ marginBottom: 6 }}>
-            Label design
-          </p>
-          <LabelStyleDropdown
-            labelStyle={labelStyle}
-            customStyles={customStyles}
-            onSwitch={onSwitchStyle}
-          />
-        </div>
+        <div>{styleControl}</div>
         <div className="dcm-actions" style={{ gap: 8 }}>
           {isOwner && onEditLabel && (
             <button type="button" className="cd-quiet" onClick={onEditLabel}>
               Edit card label
             </button>
           )}
-          {customizeHref && (
+          {/* Label Studio is a signed-in surface; only offer it to an owner. */}
+          {isOwner && customizeHref && (
             <a className="cd-quiet" href={customizeHref}>
               Customize
             </a>
@@ -155,9 +143,14 @@ export function CardLabelShowcase({
       {isOwner && <div id="tour-holder-download">{downloadAction}</div>}
 
       <div className="cd-showcase-row">
+        {/* Only the owner has a download menu on this page, so only the owner
+            is told where it is. A visitor was being pointed at a control that
+            was not rendered for them at all. */}
         <span className="cd-caption">
           {formatNote ??
-            'Printable slab, toploader and One-Touch labels are in the download menu.'}
+            (isOwner
+              ? 'Printable slab, toploader and One-Touch labels are in the download menu above.'
+              : 'Slab, toploader and One-Touch label designs are shown further down the page.')}
         </span>
         <a
           className="dcm-button dcm-button--text"
@@ -168,6 +161,8 @@ export function CardLabelShowcase({
           Shop holders &amp; labels
         </a>
       </div>
+
+      {holderEntry}
     </div>
   );
 }

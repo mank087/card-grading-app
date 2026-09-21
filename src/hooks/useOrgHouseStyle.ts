@@ -74,7 +74,18 @@ function useMemberOrgId(enabled: boolean): string | null | undefined {
   return orgId;
 }
 
-export function useCustomLabelStyleWithOrg(orgId?: string | null): ReturnType<typeof useCustomLabelStyle> {
+/**
+ * ADDITIVE (card detail V2): `isOrgHouseStyle` says whether the returned style
+ * is the STORE'S locked design rather than the viewer's own. A card page needs
+ * it to present the selector read-only instead of offering a preview and a
+ * "make this my default" the member cannot act on. Existing callers destructure
+ * the fields they already used and are unaffected.
+ */
+export type OrgAwareLabelStyle = ReturnType<typeof useCustomLabelStyle> & {
+  isOrgHouseStyle: boolean;
+};
+
+export function useCustomLabelStyleWithOrg(orgId?: string | null): OrgAwareLabelStyle {
   const personal = useCustomLabelStyle();
   const { membership } = useOrgContext();
 
@@ -84,15 +95,21 @@ export function useCustomLabelStyleWithOrg(orgId?: string | null): ReturnType<ty
   const needsIdCheck = !!orgId && orgId !== 'org';
   const memberOrgId = useMemberOrgId(needsIdCheck && !!membership && !!slab);
 
-  if (!orgId || !membership || !slab) return personal;
+  if (!orgId || !membership || !slab) return { ...personal, isOrgHouseStyle: false };
   // Another store's card (or the member org id is still resolving / unknown):
   // keep the personal style rather than mis-branding.
-  if (needsIdCheck && memberOrgId !== orgId) return personal;
+  if (needsIdCheck && memberOrgId !== orgId) return { ...personal, isOrgHouseStyle: false };
 
   if (slab.labelStyle === 'modern') {
     // House modern = the standard DCM modern formatting (no custom overrides);
     // org identity comes from the logo slot.
-    return { ...personal, labelStyle: 'modern', activeConfig: null, colorOverrides: undefined };
+    return {
+      ...personal,
+      labelStyle: 'modern',
+      activeConfig: null,
+      colorOverrides: undefined,
+      isOrgHouseStyle: true,
+    };
   }
 
   // House heritage: synthesize the minimal config the heritage resolution
@@ -115,5 +132,6 @@ export function useCustomLabelStyleWithOrg(orgId?: string | null): ReturnType<ty
     labelStyle: 'heritage',
     activeConfig,
     colorOverrides: extractColorOverrides(activeConfig),
+    isOrgHouseStyle: true,
   };
 }

@@ -92,6 +92,17 @@ interface PokemonPriceLookupProps {
     priceChartingUrl?: string;
     /** Same range the Market Value panel prints. Null when the match has no prices. */
     marketRange?: MarketRange | null;
+    /**
+     * ADDITIVE (card detail V2, finding 5). The freshness OF THIS RESULT, as
+     * the lookup genuinely knows it: `/api/pokemon-pricing` reports whether it
+     * served a cached match and, when it did, how old that cache is in days.
+     * A caller may then describe the number it is showing instead of reaching
+     * for the stored row's unrelated `dcm_price_updated_at`. No timestamp is
+     * invented for a fresh fetch — `isCached: false` is the whole of what is
+     * known, and it is the caller's business what to say about it.
+     */
+    isCached?: boolean;
+    cacheAgeDays?: number | null;
   }) => void;
 }
 
@@ -276,6 +287,8 @@ export function PokemonPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
             productName: data.data.prices?.productName || null,
             priceChartingUrl,
             marketRange: computeMarketRange(data.data.prices),
+            isCached: data.cached || false,
+            cacheAgeDays: data.cacheAge ?? null,
           });
         }
         // Persist estimated price to database for collection/portfolio pages
@@ -357,6 +370,8 @@ export function PokemonPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
           productName: data.data.prices?.productName || null,
           priceChartingUrl,
           marketRange: computeMarketRange(data.data.prices),
+          isCached: data.cached || false,
+          cacheAgeDays: data.cacheAge ?? null,
         });
       }
 

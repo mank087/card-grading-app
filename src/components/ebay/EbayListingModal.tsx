@@ -75,6 +75,13 @@ interface EbayListingModalProps {
   labelStyle?: string;
   /** Active saved style config — needed to detect a Heritage custom style. */
   customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null;
+  /**
+   * ADDITIVE (card detail V2, finding F). Fired once, when eBay accepts the
+   * listing, so a caller holding "is this card listed?" state can re-check
+   * rather than keep showing "Unlisted" behind the modal. It changes nothing
+   * about the flow; callers that omit it behave exactly as before.
+   */
+  onListed?: (result: { listingId?: string; listingUrl?: string; sku?: string }) => void;
 }
 
 type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
@@ -91,6 +98,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   showFounderEmblem = false,
   labelStyle = 'modern',
   customLabelConfig = null,
+  onListed,
 }) => {
   const [step, setStep] = useState<ListingStep>('images');
   const [isLoading, setIsLoading] = useState(false);
@@ -1334,6 +1342,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         sku: data.sku,
       });
       setStep('success');
+      // ADDITIVE: let the caller invalidate its listing state.
+      onListed?.({ listingId: data.listingId, listingUrl: data.listingUrl, sku: data.sku });
     } catch (err) {
       console.error('[eBay Listing] Failed to create listing:', err);
       setError(err instanceof Error ? err.message : 'Failed to create listing');

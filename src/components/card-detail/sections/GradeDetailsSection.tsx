@@ -31,7 +31,7 @@
  * all select the right tab and land on it.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
@@ -89,6 +89,23 @@ export interface GradeDetailsSectionProps {
   focusAnchor?: string | null;
   /** Opens the shared image zoom modal. */
   onZoom?: (imageUrl: string, alt: string, title: string) => void;
+
+  /**
+   * CONTROLLED INSPECTION CONTEXT (review item D).
+   *
+   * `CardDetailSections` unmounts an inactive section, so holding the selected
+   * evidence tab and the expander states locally meant they reset every time
+   * the reader looked at Market and came back. The shell holds them instead;
+   * the mounting strategy is unchanged.
+   */
+  evidence: EvidenceKey;
+  onEvidenceChange: (key: EvidenceKey) => void;
+  analysisOpen: boolean;
+  onAnalysisOpenChange: (open: boolean) => void;
+  confidenceOpen: boolean;
+  onConfidenceOpenChange: (open: boolean) => void;
+  userReportOpen: boolean;
+  onUserReportOpenChange: (open: boolean) => void;
 }
 
 /** `conversational_grading` is JSON in v4.0+ and markdown before it. */
@@ -108,10 +125,18 @@ export function GradeDetailsSection({
   category,
   focusAnchor,
   onZoom,
+  evidence,
+  onEvidenceChange,
+  analysisOpen,
+  onAnalysisOpenChange,
+  confidenceOpen,
+  onConfidenceOpenChange,
+  userReportOpen,
+  onUserReportOpenChange,
 }: GradeDetailsSectionProps) {
-  const [evidence, setEvidence] = useState<EvidenceKey>('centering');
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [confidenceOpen, setConfidenceOpen] = useState(false);
+  const setEvidence = onEvidenceChange;
+  const setAnalysisOpen = onAnalysisOpenChange;
+  const setConfidenceOpen = onConfidenceOpenChange;
   /**
    * The shell fires its own scroll two frames after it switches section, which
    * is a frame too early for a tab this component has not selected yet — the
@@ -157,7 +182,7 @@ export function GradeDetailsSection({
       pendingScroll.current = true;
     }
     if (anchorId === 'tour-optic-score') setConfidenceOpen(true);
-  }, []);
+  }, [setEvidence, setConfidenceOpen]);
 
   useEffect(() => {
     applyHash();
@@ -174,7 +199,7 @@ export function GradeDetailsSection({
       pendingScroll.current = true;
     }
     if (focusAnchor === 'tour-optic-score') setConfidenceOpen(true);
-  }, [focusAnchor]);
+  }, [focusAnchor, setEvidence, setConfidenceOpen]);
 
   const gradingPasses = readGradingPasses(card);
   const structuralNote = readStructuralUnconfirmedNote(card);
@@ -284,7 +309,11 @@ export function GradeDetailsSection({
             </div>
           </details>
 
-          <details className="cd-expander">
+          <details
+            className="cd-expander"
+            open={userReportOpen}
+            onToggle={(e) => onUserReportOpenChange((e.target as HTMLDetailsElement).open)}
+          >
             <summary>User-reported condition</summary>
             <div className="cd-expander-body">
               {hasUserReport ? (
@@ -317,6 +346,7 @@ export function GradeDetailsSection({
       <section className="cd-panel">
         <details
           className="cd-expander cd-expander--flush"
+          open={analysisOpen}
           onToggle={(e) => setAnalysisOpen((e.target as HTMLDetailsElement).open)}
         >
           <summary>Full DCM Optic&trade; analysis</summary>

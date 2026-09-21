@@ -282,7 +282,9 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
               onTextEdit={(cardId, edits) => setTextEdits((prev) => ({ ...prev, [cardId]: edits }))}
               onSaveDesign={(name, id) => saveCustomStyle({ id, name, config: state.config })}
               onDeleteDesign={deleteCustomStyle}
-              onSetDefault={(id: LabelStyleId) => switchStyle(id)}
+              // `switchStyle` now resolves to whether the save landed; this
+              // call site does not use the result, so it is discarded here.
+              onSetDefault={async (id: LabelStyleId) => { await switchStyle(id); }}
               orgLogoColor={orgLogoColor}
               onTextSaved={(cardId, fields) => setCardPatches((prev) => ({ ...prev, [cardId]: fields }))}
               slabSize={state.slabSize}

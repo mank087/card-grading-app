@@ -27,7 +27,7 @@
  * activating the owning section (anchorMap.ts) and then scrolling.
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import {
   CARD_DETAIL_SECTIONS,
@@ -114,8 +114,32 @@ export interface CardDetailSectionNavProps {
 }
 
 export function CardDetailSectionNav({ active, onSelect }: CardDetailSectionNavProps) {
+  const listRef = useRef<HTMLElement>(null);
+
+  /**
+   * The row scrolls horizontally on a phone, so the active item can sit off
+   * the right edge after a jump from somewhere else on the page (a hero
+   * subgrade, a hash link, the tour). Bring it back into view whenever the
+   * active section changes.
+   *
+   * `inline: 'nearest'` so an item that is already visible does not slide, and
+   * `block: 'nearest'` so this never scrolls the PAGE — only the row.
+   */
+  useEffect(() => {
+    const row = listRef.current;
+    if (!row) return;
+    const current = row.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!current) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    current.scrollIntoView({
+      behavior: reduce ? 'auto' : 'smooth',
+      inline: 'nearest',
+      block: 'nearest',
+    });
+  }, [active]);
+
   return (
-    <nav className="cd-section-nav" aria-label="Card detail sections">
+    <nav ref={listRef} className="cd-section-nav" aria-label="Card detail sections">
       {CARD_DETAIL_SECTIONS.map((id) => (
         <button
           key={id}

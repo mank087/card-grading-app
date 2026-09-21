@@ -22,6 +22,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import Script from 'next/script';
 
@@ -36,11 +37,27 @@ import ProEstimatesPanel from '@/components/card-detail/sections/ProEstimatesPan
 
 import { getStoredSession } from '@/lib/directAuth';
 import { useCustomLabelStyleWithOrg } from '@/hooks/useOrgHouseStyle';
-import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
-import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { assessValueTrust } from '@/lib/pricing/valueGuard';
-import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { PokemonPriceLookup } from '@/components/pricing/PokemonPriceLookup';
+import type { MarketRange } from '@/lib/pricing/marketRange';
+
+/**
+ * ITEM H. `DownloadReportButton` statically imports `@react-pdf/renderer` and
+ * the whole export stack. Loading it with `next/dynamic` keeps that out of the
+ * page's first chunk; the placeholder reserves the trigger's height so the
+ * hero does not jump when it lands. `ssr: false` because everything it does is
+ * browser-only anyway.
+ *
+ * Its additive `openLabelsSignal` survives this: the signal is a counter and
+ * the component opens on mount when it arrives above zero, so the reader's
+ * FIRST tap loads the chunk and then opens the menu.
+ *
+ * The eight legacy clients keep their static import and are untouched.
+ */
+const DownloadReportButton = dynamic(
+  () => import('@/components/reports/DownloadReportButton').then((m) => m.DownloadReportButton),
+  { ssr: false, loading: () => <div className="cd-download-placeholder" aria-hidden="true" /> },
+);
 import {
   generatePokemonEbaySearchUrl,
   generatePokemonEbaySoldListingsUrl,
@@ -68,7 +85,10 @@ interface DcmPriceData {
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
   productName: string | null;
   priceChartingUrl?: string;
-  marketRange?: { low: number; median: number; high: number } | null;
+  marketRange?: MarketRange | null;
+  /** The freshness OF THIS RESULT, as the lookup reports it. */
+  isCached?: boolean;
+  cacheAgeDays?: number | null;
 }
 
 export function PokemonCardDetailsV2() {
@@ -83,13 +103,10 @@ export function PokemonCardDetailsV2() {
   const [dcmPriceData, setDcmPriceData] = useState<DcmPriceData | null>(null);
 
   // Org-graded cards render the store's house design; otherwise the viewer's
-  // own Label Studio style. Same hook, same account-wide persistence as legacy.
-  const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } =
+  // own Label Studio style. This is the SAVED default: the shell previews on
+  // top of it and only writes it through the explicit owner action.
+  const { labelStyle, customStyles, switchStyle, isOrgHouseStyle } =
     useCustomLabelStyleWithOrg((card as any)?.org_id);
-  const heritageSel = resolveHeritageSelection(labelStyle, activeConfig);
-  const heritageBandColors = heritageSel.active
-    ? (heritageSel.bandColors ?? resolveHeritageBandColors((card as any)?.card_colors))
-    : [];
 
   const sessionUserId = getStoredSession()?.user?.id ?? null;
 
@@ -125,6 +142,21 @@ export function PokemonCardDetailsV2() {
   // The range belongs to the matched listing, so it is shown only when the
   // estimate from that same match was trusted — the lookup applies the same rule.
   const marketRange = liveEstimate !== null ? dcmPriceData?.marketRange ?? null : null;
+
+  // One object: the trusted amount and the freshness that belongs to it. The
+  // panel prints the two together and cannot mix them with the stored row's
+  // unrelated timestamp any more (review finding 5).
+  const live = useMemo(
+    () =>
+      liveEstimate === null
+        ? null
+        : {
+            amount: liveEstimate,
+            isCached: dcmPriceData?.isCached ?? false,
+            cacheAgeDays: dcmPriceData?.cacheAgeDays ?? null,
+          },
+    [liveEstimate, dcmPriceData],
+  );
 
   const conditionSummary = useMemo(
     () => extractConditionSummary((card as any)?.conversational_grading),
@@ -252,15 +284,13 @@ export function PokemonCardDetailsV2() {
       vm={vm}
       labelStyle={labelStyle}
       customStyles={customStyles}
-      activeConfig={activeConfig ?? null}
-      colorOverrides={colorOverrides}
-      heritageBandColors={heritageBandColors}
+      orgHouseStyleLocked={isOrgHouseStyle}
       onSwitchStyle={switchStyle}
-      liveEstimate={liveEstimate}
+      live={live}
       marketRange={marketRange}
       conditionSummary={conditionSummary}
       shareData={shareData}
-      renderDownloadButton={() =>
+      renderDownloadButton={(ctx) =>
         card ? (
           <DownloadReportButton
             card={card}
@@ -268,12 +298,16 @@ export function PokemonCardDetailsV2() {
             showFounderEmblem={detail.emblems.showFounderEmblem}
             showVipEmblem={detail.emblems.showVipEmblem}
             showCardLoversEmblem={detail.emblems.showCardLoversEmblem}
-            labelStyle={labelStyle}
-            customLabelConfig={activeConfig}
+            // The PREVIEWED design, so a download is the label on screen.
+            labelStyle={ctx.labelStyle}
+            customLabelConfig={ctx.customLabelConfig}
+            openLabelsSignal={ctx.openLabelsSignal}
+            onMenuOpenChange={ctx.onMenuOpenChange}
+            sheetOnMobile={ctx.sheetOnMobile}
           />
         ) : null
       }
-      renderHolderDownload={(holder) =>
+      renderHolderDownload={(holder, ctx) =>
         card ? (
           <DownloadReportButton
             card={card}
@@ -281,8 +315,8 @@ export function PokemonCardDetailsV2() {
             showFounderEmblem={detail.emblems.showFounderEmblem}
             showVipEmblem={detail.emblems.showVipEmblem}
             showCardLoversEmblem={detail.emblems.showCardLoversEmblem}
-            labelStyle={labelStyle}
-            customLabelConfig={activeConfig}
+            labelStyle={ctx.labelStyle}
+            customLabelConfig={ctx.customLabelConfig}
             holderDownload={holder}
           />
         ) : null

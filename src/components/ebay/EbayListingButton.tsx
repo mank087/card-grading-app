@@ -12,6 +12,34 @@ interface EbayListingButtonProps {
   customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null;
   variant?: 'default' | 'compact' | 'icon';
   className?: string;
+  /**
+   * ADDITIVE (card detail V2, finding 4/F). A counter the caller increments to
+   * perform this button's own action from outside — the mobile action bar taps
+   * "InstaList" and the connect-or-create flow opens right there, instead of
+   * scrolling the reader to a second button to tap. It runs the SAME
+   * `handleClick`: redirect to /ebay/connect when disconnected, open
+   * `EbayListingModal` when connected.
+   *
+   * Absent (or 0) and nothing happens: existing callers are unaffected.
+   */
+  openSignal?: number;
+  /**
+   * ADDITIVE. Fired when the modal reports a listing was published, so a
+   * caller holding listing state can re-check instead of going stale.
+   */
+  onListed?: () => void;
+  /**
+   * ADDITIVE. Render nothing but keep the modal and the `openSignal` handler
+   * mounted — for a caller that shows its own trigger (the mobile bar) and
+   * only wants this component's flow.
+   */
+  triggerHidden?: boolean;
+  /**
+   * ADDITIVE. Reports whether the listing modal is open, so a page with its
+   * own fixed chrome (the card detail mobile action bar) can get out of its
+   * way. Existing callers omit it and nothing changes.
+   */
+  onModalOpenChange?: (open: boolean) => void;
 }
 
 export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
@@ -22,6 +50,10 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
   customLabelConfig = null,
   variant = 'default',
   className = '',
+  openSignal,
+  onListed,
+  triggerHidden = false,
+  onModalOpenChange,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ebayStatus, setEbayStatus] = useState<{
@@ -66,7 +98,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
     checkEbayStatus();
   }, []);
 
-  const handleClick = () => {
+  const handleClick = React.useCallback(() => {
     if (!ebayStatus.connected) {
       // Redirect to eBay connect page with current URL as redirect
       const currentUrl = window.location.pathname + window.location.search;
@@ -74,11 +106,47 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
       return;
     }
     setIsModalOpen(true);
-  };
+  }, [ebayStatus.connected]);
+
+  // ADDITIVE: perform this button's action when the caller bumps the signal.
+  // The first render is skipped so mounting with a non-zero value does not
+  // open anything by itself.
+  const lastOpenSignal = React.useRef(0);
+  React.useEffect(() => {
+    if (!openSignal || openSignal === lastOpenSignal.current) return;
+    lastOpenSignal.current = openSignal;
+    // While the connection status is still loading, handleClick would read
+    // `connected: false` and redirect to /ebay/connect for an account that IS
+    // connected. Wait for the status instead.
+    if (ebayStatus.loading) return;
+    handleClick();
+  }, [openSignal, ebayStatus.loading, handleClick]);
+
+  React.useEffect(() => {
+    onModalOpenChange?.(isModalOpen);
+  }, [isModalOpen, onModalOpenChange]);
+
+  const modal = (
+    <EbayListingModal
+      isOpen={isModalOpen}
+      onClose={() => setIsModalOpen(false)}
+      card={card}
+      cardType={cardType}
+      showFounderEmblem={showFounderEmblem}
+      labelStyle={labelStyle}
+      customLabelConfig={customLabelConfig}
+      onListed={onListed}
+    />
+  );
 
   // Loading state
   if (ebayStatus.loading) {
     return null;
+  }
+
+  // ADDITIVE: no trigger of our own, but the flow stays reachable via openSignal.
+  if (triggerHidden) {
+    return modal;
   }
 
   // Icon variant (for use in card actions)
@@ -95,15 +163,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
           </svg>
         </button>
 
-        <EbayListingModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          card={card}
-          cardType={cardType}
-          showFounderEmblem={showFounderEmblem}
-          labelStyle={labelStyle}
-          customLabelConfig={customLabelConfig}
-        />
+        {modal}
       </>
     );
   }
@@ -122,15 +182,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
           {ebayStatus.connected ? 'List on eBay' : 'Connect eBay'}
         </button>
 
-        <EbayListingModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          card={card}
-          cardType={cardType}
-          showFounderEmblem={showFounderEmblem}
-          labelStyle={labelStyle}
-          customLabelConfig={customLabelConfig}
-        />
+        {modal}
       </>
     );
   }
@@ -154,15 +206,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
         <span>{ebayStatus.connected ? 'List on eBay' : 'Connect eBay to List'}</span>
       </button>
 
-      <EbayListingModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        card={card}
-        cardType={cardType}
-        showFounderEmblem={showFounderEmblem}
-        labelStyle={labelStyle}
-          customLabelConfig={customLabelConfig}
-      />
+        {modal}
     </>
   );
 };

@@ -14,8 +14,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
-import type { SavedCustomStyle, CustomLabelConfig } from '@/lib/labelPresets';
+import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
 import HolderCards from './HolderCards';
@@ -29,6 +28,8 @@ export interface HolderSectionCommonProps {
   renderHolderDownload?: (holder: CardHolderId) => ReactNode;
   /** Injected by the shell so this file never imports next/dynamic itself. */
   renderComposition: (holder: CardHolderId, maxWidth: number) => ReactNode;
+  /** Opens the shell's enlarge modal on one holder. */
+  onEnlarge: (holder: CardHolderId) => void;
 }
 
 function cardsFor(
@@ -49,6 +50,7 @@ function cardsFor(
       customizeHref={(which) => props.labelStudioHref(which)}
       variant={variant}
       cardWidth={cardWidth}
+      onEnlarge={props.onEnlarge}
     />
   );
 }
@@ -68,19 +70,20 @@ export function OverviewHoldersBand(
         </button>
       </div>
       <p className="cd-caption" style={{ marginTop: 8 }}>
-        Previews built from your own photos and your saved label design &mdash; not a claim about
-        where the card is kept.
+        Built from this card&rsquo;s photos and the label design shown above. Enlarge any of them
+        for a closer look.
       </p>
-      {cardsFor(props, 'compact', 160)}
+      {cardsFor(props, 'compact', 230)}
     </section>
   );
 }
 
 export function LabelsHoldersSection(
   props: HolderSectionCommonProps & {
-    customStyles: SavedCustomStyle[];
-    onSwitchStyle: (id: LabelStyleId) => void;
+    /** The shared preview selector, rendered by the shell. */
+    styleControl: ReactNode;
     onEditLabelText: () => void;
+    viewerSignedIn: boolean;
   },
 ) {
   return (
@@ -88,23 +91,13 @@ export function LabelsHoldersSection(
       <div className="cd-section-title">
         <p className="cd-eyebrow">Designed to go with your card</p>
         <h2>Pick a design. Print your label.</h2>
-        <p>
-          Your saved style follows the card everywhere it is printed. Each holder below shows what
-          it can actually reproduce.
-        </p>
+        <p>Each holder below shows what it can actually reproduce, and at what size.</p>
       </div>
 
+      {/* One panel: the design chooser and what it applies to. The selector
+          previews; saving a default is its own explicit action inside it. */}
       <section className="cd-panel">
-        <p className="cd-eyebrow">Label design</p>
-        <LabelStyleDropdown
-          labelStyle={props.labelStyle}
-          customStyles={props.customStyles}
-          onSwitch={props.onSwitchStyle}
-        />
-        <p className="cd-caption" style={{ marginTop: 12 }}>
-          Switching here updates your account&rsquo;s label style, exactly as the current page
-          does. It does not claim this card sits in any particular holder.
-        </p>
+        {props.styleControl}
         <div className="dcm-actions" style={{ marginTop: 16 }}>
           {props.isOwner && (
             <button type="button" className="cd-quiet" onClick={props.onEditLabelText}>
@@ -113,22 +106,24 @@ export function LabelsHoldersSection(
           )}
           {/* Label Studio preselects by SERIAL, not by card id (gap G3);
               holder / style / return are the new optional params. */}
-          <a className="cd-quiet" href={props.labelStudioHref()}>
-            Customize in Label Studio
-          </a>
+          {props.viewerSignedIn && (
+            <a className="cd-quiet" href={props.labelStudioHref()}>
+              Customize in Label Studio
+            </a>
+          )}
         </div>
       </section>
 
       <section className="cd-panel" style={{ marginTop: 16 }}>
-        <p className="cd-eyebrow">Holder previews</p>
+        <p className="cd-eyebrow">Digital holder previews</p>
         <h3 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 4px' }}>
           Your card in each holder.
         </h3>
         <p className="cd-caption" style={{ marginBottom: 14 }}>
-          Compositions of your own photos and label. Each one names the print format it produces,
-          and says so when a holder cannot reproduce your design exactly.
+          Each one names the stock and the size it prints at, and says so when a holder cannot
+          reproduce the design exactly.
         </p>
-        {cardsFor(props, 'detail', 190)}
+        {cardsFor(props, 'detail', 260)}
       </section>
     </div>
   );

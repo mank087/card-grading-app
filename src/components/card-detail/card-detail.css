@@ -18,7 +18,42 @@
   --cd-panel-border: var(--dcm-border, #dfe3eb);
   --cd-panel-tint: #f6f5f9;
   --cd-mobile-bar-height: 0px;
+  /*
+   * The real site header: `.dcm-site-nav` in src/app/ui/Navigation.tsx is
+   * `sticky top-0 z-50` around a `h-16` (64px) row with a 1px bottom border.
+   * Measured, not guessed — and the only thing above the page content.
+   */
+  --cd-header-h: 65px;
+  /* The sticky section nav, below 760px only. Its buttons are min-height 48px
+     plus the row's 2px bottom padding and 1px rule. */
+  --cd-nav-h: 0px;
+  --cd-scroll-offset: calc(var(--cd-header-h) + var(--cd-nav-h) + 12px);
   padding-bottom: var(--cd-mobile-bar-height);
+}
+
+/*
+ * ANCHOR OFFSETS (review item D).
+ *
+ * Every jump on this page is a `scrollIntoView({ block: 'start' })` — the
+ * section routing, the hero subgrade links, `#market`, `#tour-centering` from
+ * an old shared report, a QR destination. Without this the target lands at the
+ * very top of the viewport, underneath the fixed site header (and, on a phone,
+ * underneath the sticky section nav as well).
+ *
+ * `:where()` keeps the specificity at zero, so any rule that wants a different
+ * offset for a particular element still wins.
+ */
+.dcm-card-detail :where([id]) {
+  scroll-margin-top: var(--cd-scroll-offset);
+}
+
+/*
+ * The onboarding tour positions each target with its own arithmetic against
+ * its fixed caption card. Stand the page's offsets down while it runs so the
+ * two cannot compound into a target scrolled twice as far as either intended.
+ */
+.dcm-card-detail[data-tour-active='true'] :where([id]) {
+  scroll-margin-top: 0;
 }
 
 .dcm-card-detail .cd-container {
@@ -958,6 +993,34 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* ---------- sticky section nav (review item D) ---------- */
+  /*
+   * The row used to scroll away with the page, so a reader part-way down a
+   * long grading section had no way back to the other sections without
+   * scrolling to the top. It now parks directly under the site header.
+   */
+  .dcm-card-detail {
+    --cd-nav-h: 51px;
+  }
+
+  .dcm-card-detail .cd-section-nav {
+    position: sticky;
+    top: var(--cd-header-h);
+    z-index: 30;
+    margin-top: 20px;
+    background: var(--dcm-page-bg, #f9fafb);
+    /* Bleed to the viewport edges so the row reads as a bar, not a card. */
+    margin-inline: -16px;
+    padding-inline: 16px;
+    scroll-behavior: smooth;
+  }
+
+  /* The tour measures elements against its own fixed caption; a second sticky
+     layer underneath it competes for the same strip of screen. */
+  .dcm-card-detail[data-tour-active='true'] .cd-section-nav {
+    position: static;
+  }
+
   .dcm-card-detail .cd-mobile-bar {
     position: fixed;
     inset-inline: 0;
@@ -1437,3 +1500,162 @@
 /* Room for the onboarding tour's fixed caption card; see CardDetailShell. */
 .dcm-card-detail .cd-tour-spacer { height: 320px; }
 @media (max-width: 760px) { .dcm-card-detail .cd-tour-spacer { height: 380px; } }
+
+
+/* ---------- label style preview (review findings 1 and C) ---------- */
+
+.dcm-card-detail .cd-label-preview {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.dcm-card-detail .cd-label-preview .cd-caption {
+  margin: 0;
+}
+
+.dcm-card-detail .cd-preview-note {
+  font-weight: 650;
+  color: var(--dcm-purple-text, #7624b5);
+}
+
+.dcm-card-detail .cd-preview-actions {
+  gap: 8px;
+}
+
+/* Reserve nothing when there is nothing to announce, but keep the live region
+   in the DOM so a screen reader is already observing it when it changes. */
+.dcm-card-detail .cd-save-state:empty {
+  display: none;
+}
+
+/* ---------- deferred export bundle placeholder (item H) ---------- */
+
+.dcm-card-detail .cd-download-placeholder {
+  min-height: 48px;
+  min-width: 220px;
+  border-radius: 10px;
+  background: var(--cd-panel-tint);
+}
+
+/* ---------- download menu as a bottom sheet on a phone ---------- */
+/*
+ * Only inside this page, and only where the mobile action bar can open it:
+ * the menu is anchored under its trigger everywhere else, which is right on a
+ * desktop page and useless when the trigger is off-screen above a fixed bar.
+ */
+@media (width <= 760px) {
+  .dcm-card-detail .dcm-download-sheet {
+    position: fixed;
+    inset-inline: 0;
+    inset-block: auto 0;
+    top: auto;
+    width: auto;
+    max-height: 70vh;
+    overflow-y: auto;
+    margin: 0;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 60;
+    box-shadow: 0 -10px 40px rgb(11 18 32 / 24%);
+  }
+}
+
+/* ---------- "see it in a holder" entry strip (item G) ---------- */
+
+.dcm-card-detail .cd-holder-entry {
+  margin-top: 4px;
+  display: grid;
+  gap: 8px;
+}
+
+.dcm-card-detail .cd-holder-entry-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dcm-card-detail .cd-holder-entry-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 999px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dcm-card-detail .cd-holder-entry-button:hover {
+  border-color: var(--dcm-purple, #9810fa);
+}
+
+.dcm-card-detail .cd-holder-entry-thumb {
+  width: 22px;
+  height: 30px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--dcm-purple, #9810fa) 0 26%, #e9e6f2 26% 100%);
+  border: 1px solid var(--cd-panel-border);
+}
+
+.dcm-card-detail .cd-holder-entry-thumb[data-holder='toploader'] {
+  background: linear-gradient(180deg, #e9e6f2 0 14%, var(--dcm-purple, #9810fa) 14% 22%, #e9e6f2 22% 100%);
+}
+
+.dcm-card-detail .cd-holder-entry-thumb[data-holder='onetouch'] {
+  background: linear-gradient(180deg, var(--dcm-purple, #9810fa) 0 18%, #e9e6f2 18% 100%);
+  border-width: 2px;
+}
+
+/* The holder card the entry strip just took the reader to. */
+.dcm-card-detail .cd-holder-card[data-arrived='true'] {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 4px;
+  border-radius: var(--cd-radius);
+  animation: cd-arrive 1.6s ease-out;
+}
+
+.dcm-card-detail .cd-holder-card:focus-visible {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 4px;
+}
+
+@keyframes cd-arrive {
+  from { background: color-mix(in srgb, var(--dcm-purple, #9810fa) 10%, transparent); }
+  to { background: transparent; }
+}
+
+/* ---------- enlarge modal (item G) ---------- */
+
+.dcm-card-detail .cd-enlarge-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(11 18 32 / 62%);
+}
+
+.dcm-card-detail .cd-enlarge-dialog {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border-radius: var(--cd-radius);
+  background: #fff;
+}
+
+.dcm-card-detail .cd-enlarge-stage {
+  display: flex;
+  justify-content: center;
+}
