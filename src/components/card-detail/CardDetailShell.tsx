@@ -59,6 +59,7 @@ import CardHolderShowcase, { type CardSide } from './CardHolderShowcase';
 import GradeSummary from './GradeSummary';
 import CardValueSummary from './CardValueSummary';
 import InstaListPanel from './InstaListPanel';
+import GradeHighlights from './GradeHighlights';
 import CardFacts from './CardFacts';
 import GradeDetailsSection from './sections/GradeDetailsSection';
 import {
@@ -625,11 +626,17 @@ export function CardDetailShell(props: CardDetailShellProps) {
           overview={
             <div className="cd-section">
               <div className="cd-section-title">
-                <p className="cd-eyebrow">Beyond the grade</p>
-                <h2>One card. Make it yours.</h2>
-                <p>The record behind the label, and where to find the rest of it.</p>
+                <p className="cd-eyebrow">The grade, at a glance</p>
+                <h2>What we found on your card.</h2>
+                <p>The findings behind each subgrade, then the record behind the label.</p>
               </div>
-              <div className="cd-two-col">
+              <GradeHighlights
+                vm={vm}
+                card={card}
+                conditionSummary={conditionSummary}
+                onJumpToGrade={(anchorId) => jumpTo('grade', anchorId)}
+              />
+              <div className="cd-two-col" style={{ marginTop: 20 }}>
                 <CardFacts
                   vm={vm}
                   card={card}

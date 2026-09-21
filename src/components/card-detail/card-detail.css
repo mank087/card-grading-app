@@ -1003,3 +1003,114 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Grade highlights (lead block of the Overview) ───────────────────────── */
+.dcm-card-detail .cd-highlights-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.dcm-card-detail .cd-highlights-head h3 {
+  margin: 2px 0 0;
+  font-size: 26px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: var(--dcm-ink);
+}
+.dcm-card-detail .cd-confidence-chip {
+  font-size: 12px;
+  font-weight: 650;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--dcm-border);
+  background: var(--dcm-surface);
+  color: var(--dcm-muted);
+  white-space: nowrap;
+}
+.dcm-card-detail .cd-confidence-chip.cd-tone-strong,
+.dcm-card-detail .cd-confidence-chip.cd-tone-good { background: #ecf7f1; border-color: #c4e5d3; color: #1f6b47; }
+.dcm-card-detail .cd-confidence-chip.cd-tone-moderate { background: #fdf6e3; border-color: #f0dca3; color: #7a5a0b; }
+.dcm-card-detail .cd-confidence-chip.cd-tone-low { background: #fdeeee; border-color: #f2c4c4; color: #8f2424; }
+.dcm-card-detail .cd-highlights-summary {
+  margin: 14px 0 0;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--dcm-ink);
+  max-width: 78ch;
+}
+.dcm-card-detail .cd-highlights-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.dcm-card-detail .cd-highlight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 44px;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid var(--dcm-border);
+  border-radius: 12px;
+  background: var(--dcm-surface);
+  cursor: pointer;
+  transition: border-color 150ms, background-color 150ms;
+}
+.dcm-card-detail .cd-highlight-card:hover { border-color: #9856c9; background: #f7f1fc; }
+.dcm-card-detail .cd-highlight-card.is-limiting { border-color: #c9a2e8; background: #faf5fe; }
+.dcm-card-detail .cd-highlight-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dcm-card-detail .cd-highlight-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dcm-muted);
+}
+.dcm-card-detail .cd-highlight-top strong {
+  font-family: var(--font-dcm-display), Arial, sans-serif;
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1;
+  color: var(--dcm-purple-text);
+}
+.dcm-card-detail .cd-highlight-split { font-size: 12px; line-height: 1.55; color: var(--dcm-muted); }
+.dcm-card-detail .cd-highlight-finding {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dcm-ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  overflow: hidden;
+}
+.dcm-card-detail .cd-highlight-flag {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ead9f8;
+  color: #5d1f93;
+}
+.dcm-card-detail .cd-highlight-more {
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--dcm-purple-text);
+}
+@media (max-width: 1050px) {
+  .dcm-card-detail .cd-highlights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .dcm-card-detail .cd-highlights-grid { grid-template-columns: 1fr; }
+}
