@@ -53,6 +53,30 @@ interface LabelMockupProps {
    * Only honoured by the One-Touch and Toploader mockups.
    */
   labelImages?: { front?: string | null; back?: string | null } | null
+  /**
+   * ADDITIVE (card detail V2, Phase 2). Label nodes for the SLAB slot,
+   * supplied by the caller instead of the built-in `SlabFrontLabel` /
+   * `SlabBackLabel` this file draws — which only know modern and classic, so
+   * a Heritage or saved-custom slab could not be composited before (plan G1).
+   *
+   * The holder photo and the slot geometry stay HERE, so there is still one
+   * source of truth for where the label sits. When this is absent every
+   * mockup renders exactly what it always did.
+   */
+  slabLabel?: { front: React.ReactNode; back: React.ReactNode } | null
+  /**
+   * ADDITIVE. Makes front/back a CONTROLLED value so a caller that already
+   * owns a side toggle drives the mockup from it. When supplied the mockup's
+   * own `SideToggle` is not rendered (the caller's is the one on screen);
+   * when omitted the internal state and the toggle behave as before.
+   */
+  side?: 'front' | 'back'
+  /**
+   * ADDITIVE. Overrides the 200px cap each mockup applies to itself, so a
+   * hero-sized composition can use the same geometry as a gallery thumbnail.
+   * Omitted = the historic `max-w-[200px]`.
+   */
+  maxWidth?: number
 }
 
 /**
@@ -418,19 +442,24 @@ function SlabBackLabel({ labelProps, backLabelProps, style }: {
 //    Card window: top ~21%, left ~11%, width ~78%, height ~73%
 // ============================================================================
 
-function GradedSlabMockup({ card, labelProps, backLabelProps, style }: {
+function GradedSlabMockup({ card, labelProps, backLabelProps, style, slabLabel, controlledSide, maxWidth }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
   backLabelProps: LabelMockupProps['backLabelProps']
   style: 'modern' | 'traditional'
+  slabLabel?: LabelMockupProps['slabLabel']
+  controlledSide?: LabelMockupProps['side']
+  maxWidth?: LabelMockupProps['maxWidth']
 }) {
-  const [side, setSide] = useState<'front' | 'back'>('front')
+  const [internalSide, setInternalSide] = useState<'front' | 'back'>('front')
+  const side = controlledSide ?? internalSide
+  const setSide = setInternalSide
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const isModern = style === 'modern'
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '280 / 460' }}>
+      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '280 / 460', ...(maxWidth ? { maxWidth } : {}) }}>
         {/* Slab case photo background */}
         <img
           src="/labels/graded-card-slab.png"
@@ -442,10 +471,12 @@ function GradedSlabMockup({ card, labelProps, backLabelProps, style }: {
             Slot in photo: ~224×58px (ratio ~3.86:1). Label is 3.5:1.
             At width 73%, label height = 73%/3.5 ≈ 20.9% of width ≈ 12.7% of slab height.
             Slot height is ~12.6% — fits perfectly. Centered horizontally. */}
-        <div className="absolute" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
-          {side === 'front'
-            ? <SlabFrontLabel labelProps={labelProps} style={isModern ? 'modern' : 'traditional'} />
-            : <SlabBackLabel labelProps={labelProps} backLabelProps={backLabelProps} style={isModern ? 'modern' : 'traditional'} />
+        <div className={`absolute${slabLabel ? ' overflow-hidden' : ''}`} style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
+          {slabLabel
+            ? (side === 'front' ? slabLabel.front : slabLabel.back)
+            : side === 'front'
+              ? <SlabFrontLabel labelProps={labelProps} style={isModern ? 'modern' : 'traditional'} />
+              : <SlabBackLabel labelProps={labelProps} backLabelProps={backLabelProps} style={isModern ? 'modern' : 'traditional'} />
           }
         </div>
 
@@ -465,7 +496,7 @@ function GradedSlabMockup({ card, labelProps, backLabelProps, style }: {
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }} />
       </div>
-      <SideToggle side={side} onToggle={setSide} />
+      {controlledSide === undefined && <SideToggle side={side} onToggle={setSide} />}
     </div>
   )
 }
@@ -479,15 +510,19 @@ function GradedSlabMockup({ card, labelProps, backLabelProps, style }: {
 //    Label sits at the very top edge, centered
 // ============================================================================
 
-function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages }: {
+function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages, controlledSide, maxWidth }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
   variant: 'front-back' | 'foldover'
   /** Real QR data URL — falls back to the placeholder glyph when absent. */
   qrCodeUrl?: string
   labelImages?: LabelMockupProps['labelImages']
+  controlledSide?: LabelMockupProps['side']
+  maxWidth?: LabelMockupProps['maxWidth']
 }) {
-  const [side, setSide] = useState<'front' | 'back'>('front')
+  const [internalSide, setInternalSide] = useState<'front' | 'back'>('front')
+  const side = controlledSide ?? internalSide
+  const setSide = setInternalSide
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const grade = gradeStr(labelProps.grade, labelProps.isAlteredAuthentic)
   const supplied = labelImages ? (side === 'front' ? labelImages.front : labelImages.back) : null
@@ -495,7 +530,7 @@ function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages }: 
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Container matching the toploader photo aspect ratio */}
-      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '451 / 588' }}>
+      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '451 / 588', ...(maxWidth ? { maxWidth } : {}) }}>
         {/* Toploader photo background */}
         <img
           src="/labels/top-loader-dcm.png"
@@ -610,7 +645,7 @@ function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages }: 
           </div>
         )}
       </div>
-      <SideToggle side={side} onToggle={setSide} />
+      {controlledSide === undefined && <SideToggle side={side} onToggle={setSide} />}
     </div>
   )
 }
@@ -625,14 +660,18 @@ function ToploaderMockup({ card, labelProps, variant, qrCodeUrl, labelImages }: 
 //    Label width relative to case: ~79% (2.375 / 3.0)
 // ============================================================================
 
-function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages }: {
+function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages, controlledSide, maxWidth }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
   /** Real QR data URL — falls back to the placeholder glyph when absent. */
   qrCodeUrl?: string
   labelImages?: LabelMockupProps['labelImages']
+  controlledSide?: LabelMockupProps['side']
+  maxWidth?: LabelMockupProps['maxWidth']
 }) {
-  const [side, setSide] = useState<'front' | 'back'>('front')
+  const [internalSide, setInternalSide] = useState<'front' | 'back'>('front')
+  const side = controlledSide ?? internalSide
+  const setSide = setInternalSide
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const grade = gradeStr(labelProps.grade, labelProps.isAlteredAuthentic)
   const supplied = labelImages ? (side === 'front' ? labelImages.front : labelImages.back) : null
@@ -644,7 +683,7 @@ function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages }: {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '314 / 457' }}>
+      <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '314 / 457', ...(maxWidth ? { maxWidth } : {}) }}>
         {/* One-touch photo background */}
         <img
           src="/labels/mag-one-touch-DCM.png"
@@ -708,7 +747,7 @@ function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages }: {
           </div>
         </div>
       </div>
-      <SideToggle side={side} onToggle={setSide} />
+      {controlledSide === undefined && <SideToggle side={side} onToggle={setSide} />}
     </div>
   )
 }
@@ -719,13 +758,18 @@ function OneTouchMockup({ card, labelProps, qrCodeUrl, labelImages }: {
 //    Label:card ratio = 220:1100 = 1:5
 // ============================================================================
 
-function CardImageMockup({ card, labelProps, backLabelProps, style }: {
+function CardImageMockup({ card, labelProps, backLabelProps, style, slabLabel, controlledSide, maxWidth }: {
   card: LabelMockupProps['card']
   labelProps: LabelMockupProps['labelProps']
   backLabelProps: LabelMockupProps['backLabelProps']
   style: 'modern' | 'traditional'
+  slabLabel?: LabelMockupProps['slabLabel']
+  controlledSide?: LabelMockupProps['side']
+  maxWidth?: LabelMockupProps['maxWidth']
 }) {
-  const [side, setSide] = useState<'front' | 'back'>('front')
+  const [internalSide, setInternalSide] = useState<'front' | 'back'>('front')
+  const side = controlledSide ?? internalSide
+  const setSide = setInternalSide
   const cardImage = side === 'front' ? card.front_url : card.back_url
   const isModern = style === 'modern'
 
@@ -733,6 +777,7 @@ function CardImageMockup({ card, labelProps, backLabelProps, style }: {
     <div className="flex flex-col items-center gap-2">
       <div className="w-full max-w-[200px] rounded-[6px] overflow-hidden"
         style={{
+          ...(maxWidth ? { maxWidth } : {}),
           padding: '3px',
           background: isModern
             ? 'linear-gradient(180deg, #1a1625, #2d1f47, #1a1625)'
@@ -742,9 +787,11 @@ function CardImageMockup({ card, labelProps, backLabelProps, style }: {
         <div className="rounded-[4px] overflow-hidden flex flex-col">
           {/* Label — forced to 3.5:1 */}
           <div className="w-full overflow-hidden flex-shrink-0">
-            {side === 'front'
-              ? <SlabFrontLabel labelProps={labelProps} style={isModern ? 'modern' : 'traditional'} />
-              : <SlabBackLabel labelProps={labelProps} backLabelProps={backLabelProps} style={isModern ? 'modern' : 'traditional'} />
+            {slabLabel
+              ? (side === 'front' ? slabLabel.front : slabLabel.back)
+              : side === 'front'
+                ? <SlabFrontLabel labelProps={labelProps} style={isModern ? 'modern' : 'traditional'} />
+                : <SlabBackLabel labelProps={labelProps} backLabelProps={backLabelProps} style={isModern ? 'modern' : 'traditional'} />
             }
           </div>
           {/* Separator */}
@@ -769,7 +816,7 @@ function CardImageMockup({ card, labelProps, backLabelProps, style }: {
           </div>
         </div>
       </div>
-      <SideToggle side={side} onToggle={setSide} />
+      {controlledSide === undefined && <SideToggle side={side} onToggle={setSide} />}
     </div>
   )
 }
@@ -797,17 +844,17 @@ function SideToggle({ side, onToggle }: { side: 'front' | 'back'; onToggle: (s: 
 // MAIN EXPORT
 // ============================================================================
 
-export function LabelMockup({ card, labelType, labelProps, backLabelProps, labelImages }: LabelMockupProps) {
+export function LabelMockup({ card, labelType, labelProps, backLabelProps, labelImages, slabLabel, side, maxWidth }: LabelMockupProps) {
   const style = labelType.style || 'modern'
   switch (labelType.category) {
     case 'slab':
-      return <GradedSlabMockup card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} />
+      return <GradedSlabMockup maxWidth={maxWidth} card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} slabLabel={slabLabel} controlledSide={side} />
     case 'onetouch':
-      return <OneTouchMockup card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} />
+      return <OneTouchMockup maxWidth={maxWidth} card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} controlledSide={side} />
     case 'toploader':
-      return <ToploaderMockup card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} variant={labelType.downloadType === 'foldover' ? 'foldover' : 'front-back'} />
+      return <ToploaderMockup maxWidth={maxWidth} card={card} labelProps={labelProps} qrCodeUrl={backLabelProps?.qrCodeUrl} labelImages={labelImages} variant={labelType.downloadType === 'foldover' ? 'foldover' : 'front-back'} controlledSide={side} />
     case 'digital':
-      return <CardImageMockup card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} />
+      return <CardImageMockup maxWidth={maxWidth} card={card} labelProps={labelProps} backLabelProps={backLabelProps} style={style} slabLabel={slabLabel} controlledSide={side} />
     default:
       return null
   }

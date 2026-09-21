@@ -273,6 +273,20 @@ export function PokemonCardDetailsV2() {
           />
         ) : null
       }
+      renderHolderDownload={(holder) =>
+        card ? (
+          <DownloadReportButton
+            card={card}
+            cardType="pokemon"
+            showFounderEmblem={detail.emblems.showFounderEmblem}
+            showVipEmblem={detail.emblems.showVipEmblem}
+            showCardLoversEmblem={detail.emblems.showCardLoversEmblem}
+            labelStyle={labelStyle}
+            customLabelConfig={activeConfig}
+            holderDownload={holder}
+          />
+        ) : null
+      }
       renderPricing={() =>
         card ? (
           <PokemonPriceLookup

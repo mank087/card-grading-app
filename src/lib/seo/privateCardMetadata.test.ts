@@ -3,6 +3,9 @@ const mock = vi.hoisted(() => ({ row: { visibility: 'private', card_name: 'PRIVA
 vi.mock('@/lib/supabaseServer', () => ({ supabaseServer: () => ({ from: () => ({ select: () => ({ eq: () => ({ is: () => ({ single: async () => ({ data: mock.row, error: null }) }), single: async () => ({ data: mock.row, error: null }) }) }) }) }) }))
 vi.mock('@/lib/seo/cardMetadataImage', () => ({ getCardOgImageUrl: mock.image }))
 vi.mock('@/app/pokemon/[id]/CardDetailClient', () => ({ PokemonCardDetails: () => null }))
+// Phase 1 added a V2 sibling that page.tsx also imports; without this the
+// suite pulls the real data hook and its Supabase client into the module graph.
+vi.mock('@/app/pokemon/[id]/CardDetailV2Client', () => ({ PokemonCardDetailsV2: () => null }))
 vi.mock('@/app/sports/[id]/CardDetailClient', () => ({ SportsCardDetails: () => null }))
 vi.mock('@/app/mtg/[id]/CardDetailClient', () => ({ default: () => null }))
 vi.mock('@/app/lorcana/[id]/CardDetailClient', () => ({ default: () => null }))

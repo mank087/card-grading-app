@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
@@ -55,7 +56,34 @@ import { ActionLink } from '@/components/design/Primitives';
 import { useCredits } from '@/contexts/CreditsContext';
 import { getStoredSession } from '@/lib/directAuth';
 
-import CardHolderShowcase, { type CardSide } from './CardHolderShowcase';
+import CardLabelShowcase, { type CardSide } from './CardLabelShowcase';
+import {
+  LabelsHoldersSection,
+  OverviewHoldersBand,
+} from './holders/HolderSections';
+import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
+import { buildLabelStudioHref } from '@/lib/cardDetail/labelStudioLink';
+
+/**
+ * The hero's label + card piece. It pulls in every label renderer (the
+ * Heritage and Classic SVGs, the Modern DOM labels), so it loads on demand;
+ * `ssr: false` because the Heritage QR effect and ScaleToFit measure the DOM.
+ */
+const CardLabelPiece = dynamic(() => import('./holders/CardLabelPiece'), {
+  ssr: false,
+  loading: () => <div className="cd-label-piece cd-label-piece--loading" />,
+});
+
+/**
+ * The holder compositions, which additionally pull in the holder photos and
+ * (for Heritage) the compact canvas renderers. They sit well below the fold
+ * and must never block the hero's first paint, so they load on demand too and
+ * each card mounts only when it is near the viewport (HolderCards).
+ */
+const HolderComposition = dynamic(() => import('./holders/HolderComposition'), {
+  ssr: false,
+  loading: () => <div className="cd-holder-composition cd-holder-composition--loading" />,
+});
 import GradeSummary from './GradeSummary';
 import CardValueSummary from './CardValueSummary';
 import InstaListPanel from './InstaListPanel';
@@ -115,6 +143,12 @@ export interface CardDetailShellProps {
   renderCategoryCardInfo?: (ctx: CategoryCardInfoContext) => ReactNode;
   /** The category's own Special Features badges. */
   renderCategoryBadges?: () => ReactNode;
+  /**
+   * PHASE 2. One trigger that opens ONE holder's existing download flow
+   * (`DownloadReportButton`'s additive `holderDownload` prop). Owner-only, as
+   * legacy. Without it the hero falls back to the full download menu.
+   */
+  renderHolderDownload?: (holder: CardHolderId) => ReactNode;
 
   /**
    * Where "retake your photos" goes. Legacy pokemon uses
@@ -177,6 +211,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     renderProEstimates,
     renderCategoryCardInfo,
     renderCategoryBadges,
+    renderHolderDownload,
     retakeHref,
     liveEstimate,
     marketRange,
@@ -321,6 +356,64 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const isOwner = detail.isOwner;
   const isSold = vm.permissions.isSold;
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  // ── holder showcase (Phase 2) ──────────────────────────────────────────
+  /** The QR / verify destination, built exactly as legacy does (2680). */
+  const verifyUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/${category}/${cardId}`
+      : `https://dcmgrading.com/${category}/${cardId}`;
+
+  /** Legacy's own rule for the on-screen back label (3075-3080). */
+  const labelSubScores = card.conversational_sub_scores
+    ? {
+        centering: card.conversational_sub_scores.centering?.weighted ?? 0,
+        corners: card.conversational_sub_scores.corners?.weighted ?? 0,
+        edges: card.conversational_sub_scores.edges?.weighted ?? 0,
+        surface: card.conversational_sub_scores.surface?.weighted ?? 0,
+      }
+    : null;
+
+  const returnPath = `/${category}/${cardId}`;
+  const labelStudioHref = (forHolder?: CardHolderId) =>
+    buildLabelStudioHref(vm.identity.serial, {
+      holder: forHolder,
+      style: labelStyle,
+      returnPath,
+    });
+
+  /** Shared by the hero piece and the three holder compositions. */
+  const artworkProps = {
+    card,
+    frontUrl: vm.images.front.url,
+    backUrl: vm.images.back.url,
+    cardName: vm.identity.displayName,
+    labelData: vm.labelData,
+    labelStyle,
+    activeConfig,
+    colorOverrides: colorOverrides as never,
+    heritageBandColors,
+    orgLogos: detail.orgLogos,
+    subScores: labelSubScores,
+    emblems: detail.emblems,
+    verifyUrl,
+  };
+
+  /**
+   * Everything the two holder sections need, assembled once. There is no
+   * holder SELECTION state: nothing in the hero depends on a holder any more,
+   * so each card is self-contained and the mockup owns its own front/back.
+   */
+  const holderSectionProps = {
+    labelStyle,
+    activeConfig,
+    isOwner,
+    labelStudioHref,
+    renderHolderDownload,
+    renderComposition: (which: CardHolderId, maxWidth: number) => (
+      <HolderComposition {...artworkProps} holder={which} maxWidth={maxWidth} />
+    ),
+  };
   const anyModalOpen =
     zoom.isOpen ||
     showDeleteModal ||
@@ -565,7 +658,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
         {/* ── hero ───────────────────────────────────────────────────── */}
         <div className="cd-hero">
-          <CardHolderShowcase
+          <CardLabelShowcase
             vm={vm}
             side={side}
             onSideChange={setSide}
@@ -576,6 +669,29 @@ export function CardDetailShell(props: CardDetailShellProps) {
             downloadAction={renderDownloadButton()}
             onEditLabel={() => setShowEditLabelModal(true)}
             isOwner={isOwner}
+            customizeHref={labelStudioHref()}
+            renderCardPiece={({ side: pieceSide }) => (
+              <CardLabelPiece
+                {...artworkProps}
+                side={pieceSide}
+                imageUrl={
+                  pieceSide === 'front' ? vm.images.front.url : vm.images.back.url
+                }
+                imageAlt={`${vm.identity.displayName} card ${pieceSide}`}
+                priority={pieceSide === 'front'}
+                onZoom={() => {
+                  const img = pieceSide === 'front' ? vm.images.front : vm.images.back;
+                  if (img.present && img.url) {
+                    // ALWAYS the original photo, never the composition.
+                    openZoom(
+                      img.url,
+                      `${vm.identity.displayName} card ${pieceSide}`,
+                      `Card ${pieceSide === 'front' ? 'Front' : 'Back'} — full size`,
+                    );
+                  }
+                }}
+              />
+            )}
           />
 
           <div className="cd-hero-summary">
@@ -640,6 +756,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
                 conditionSummary={conditionSummary}
                 onJumpToGrade={(anchorId) => jumpTo('grade', anchorId)}
               />
+              <OverviewHoldersBand {...holderSectionProps} onSeeAll={() => jumpTo('labels')} />
+
               <div className="cd-two-col" style={{ marginTop: 20 }}>
                 <CardFacts
                   vm={vm}
@@ -674,49 +792,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
             </div>
           }
           labels={
-            <div className="cd-section">
-              <div className="cd-section-title">
-                <p className="cd-eyebrow">Designed to go with your card</p>
-                <h2>Pick a design. Print your label.</h2>
-                <p>
-                  Your saved style follows the card everywhere it is printed. Holder previews
-                  arrive in the next phase.
-                </p>
-              </div>
-              <section className="cd-panel">
-                <p className="cd-eyebrow">Label design</p>
-                <LabelStyleDropdown
-                  labelStyle={labelStyle}
-                  customStyles={customStyles}
-                  onSwitch={onSwitchStyle}
-                />
-                <p className="cd-caption" style={{ marginTop: 12 }}>
-                  Switching here updates your account&rsquo;s label style, exactly as the current
-                  page does. It does not claim this card sits in any particular holder.
-                </p>
-                <div className="dcm-actions" style={{ marginTop: 16 }}>
-                  {isOwner && (
-                    <button
-                      type="button"
-                      className="cd-quiet"
-                      onClick={() => setShowEditLabelModal(true)}
-                    >
-                      Edit this card&rsquo;s label text
-                    </button>
-                  )}
-                  {/* Label Studio preselects by SERIAL, not by card id (gap G3). */}
-                  <a
-                    className="cd-quiet"
-                    href={`/labels?card=${encodeURIComponent(vm.identity.serial)}`}
-                  >
-                    Customize in Label Studio
-                  </a>
-                  <a className="cd-quiet" href="/shop" target="_blank" rel="noopener noreferrer">
-                    Shop holders &amp; labels
-                  </a>
-                </div>
-              </section>
-            </div>
+            <LabelsHoldersSection
+              {...holderSectionProps}
+              customStyles={customStyles}
+              onSwitchStyle={onSwitchStyle}
+              onEditLabelText={() => setShowEditLabelModal(true)}
+            />
           }
           market={
             <div className="cd-section">
@@ -833,7 +914,21 @@ export function CardDetailShell(props: CardDetailShellProps) {
       {/* ── mobile bottom action bar (≤760px) ───────────────────────── */}
       {showMobileBar && (
         <div className="cd-mobile-bar">
-          <button type="button" className="dcm-button dcm-button--primary" onClick={() => jumpTo('reports', 'tour-download-buttons')}>
+          {/* The GENERAL download menu (labels + reports), not a holder flow:
+              the hero no longer selects a holder. */}
+          <button
+            type="button"
+            className="dcm-button dcm-button--primary"
+            onClick={() => {
+              const target = document.getElementById('tour-holder-download');
+              if (target) {
+                target.scrollIntoView({ block: 'center' });
+                target.querySelector('button')?.focus();
+              } else {
+                jumpTo('reports', 'tour-download-buttons');
+              }
+            }}
+          >
             Download label
           </button>
           {!isSold && (

@@ -1283,3 +1283,153 @@
 .dcm-card-detail .cd-range-legend > div:nth-child(1) dd { color: #16a34a; }
 .dcm-card-detail .cd-range-legend > div:nth-child(2) dd { color: #2563eb; }
 .dcm-card-detail .cd-range-legend > div:nth-child(3) dd { color: #9333ea; }
+
+/* ==========================================================================
+   Phase 2 — the hero's label + card piece, and the holder previews below it.
+
+   The pieces themselves come from legacy (`CardLabelPiece`, which keeps the
+   legacy inline styles) and from `LabelMockup`, which is Tailwind-styled and
+   self-sizing. Nothing here restyles either: this is only the frame around
+   them, the "Holder preview" tag, the support note and the card grid.
+   ========================================================================== */
+
+.dcm-card-detail .cd-stage--piece {
+  padding: 12px;
+}
+
+.dcm-card-detail .cd-label-piece {
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-label-piece--loading {
+  aspect-ratio: 2.5 / 3.9;
+  border-radius: 12px;
+  background: var(--dcm-surface, #f6f7fa);
+}
+
+.dcm-card-detail .cd-label-piece-photo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.dcm-card-detail .cd-holder-composition {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-holder-composition > div {
+  width: 100%;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-holder-composition--loading {
+  aspect-ratio: 280 / 460;
+  width: 100%;
+  max-width: 200px;
+  border-radius: 10px;
+  background: var(--dcm-surface, #f6f7fa);
+}
+
+.dcm-card-detail .cd-holder-tag {
+  margin: 0;
+}
+
+.dcm-card-detail .cd-holder-tag > span {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dcm-muted, #566174);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dcm-card-detail .cd-support-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #f0dca3;
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: #fdf6e3;
+  color: #7a5a0b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dcm-card-detail .cd-support-note[data-status='unsupported'] {
+  border-color: #f2c4c4;
+  background: #fdeeee;
+  color: #8f2424;
+}
+
+/* ---------- holder cards ---------- */
+
+.dcm-card-detail .cd-holder-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.dcm-card-detail .cd-holder-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dcm-card-detail .cd-holder-card > div:first-child {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-holder-card-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--dcm-ink, #0b1220);
+}
+
+.dcm-card-detail .cd-holder-card .cd-caption,
+.dcm-card-detail .cd-holder-card .cd-support-note {
+  width: 100%;
+}
+
+.dcm-card-detail .cd-holder-card-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.dcm-card-detail .cd-holder-card-actions > * {
+  font-size: 12px;
+}
+
+@media (width <= 760px) {
+  .dcm-card-detail .cd-holder-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dcm-card-detail .cd-stage--piece {
+    padding: 8px;
+  }
+}

@@ -13,6 +13,7 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { readCardReturnPath, readHolderParam } from '@/lib/cardDetail/labelStudioLink'
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle'
 import {
   initialWizardState,
@@ -69,6 +70,32 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards])
 
+  /**
+   * ADDITIVE (card detail V2, Phase 2 / plan gap G3). Two OPTIONAL params
+   * beside the existing `?card=<serial>`, which is unchanged:
+   *
+   *   holder  — preselects the Holder step, because this wizard HAS a single
+   *             current holder to preselect (SET_HOLDER, step 2). Applied
+   *             only alongside a `card` that actually resolved, so the wizard
+   *             never opens on step 3 with nothing chosen.
+   *   return  — a "Back to card" link. Validated as a same-origin card path;
+   *             anything else is ignored outright.
+   *
+   * `style` is deliberately NOT applied: the wizard's style step writes the
+   * account-wide preference through `switchStyle`, and honouring a style from
+   * a query string would silently change what every other card prints.
+   */
+  const returnToCard = readCardReturnPath(searchParams.get('return'))
+  useEffect(() => {
+    const holder = readHolderParam(searchParams.get('holder'))
+    const serial = searchParams.get('card')
+    if (!holder || !serial) return
+    if (!cards.some((c) => String(c.serial) === serial)) return
+    dispatch({ type: 'SET_HOLDER', holder })
+    // Run once per mount, with the cards the page delivered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards])
+
   // Mobile: Continue sits at the bottom of the page, so a step change would
   // otherwise land the user mid-scroll on the next step. Always start each
   // step at the top (covers Continue, Back, stepper jumps, and the holder
@@ -117,12 +144,23 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
             <h1 className="text-2xl font-bold text-gray-900">Label Studio</h1>
             <p className="text-sm text-gray-500">Design labels for up to {MAX_WIZARD_CARDS} cards in five quick steps.</p>
           </div>
-          <Link
-            href="/labels/classic"
-            className="text-sm text-gray-500 hover:text-purple-700 underline underline-offset-2"
-          >
-            Classic design mode
-          </Link>
+          <div className="flex items-center gap-4">
+            {/* Only ever a validated same-origin card path. */}
+            {returnToCard && (
+              <Link
+                href={returnToCard}
+                className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+              >
+                Back to card
+              </Link>
+            )}
+            <Link
+              href="/labels/classic"
+              className="text-sm text-gray-500 hover:text-purple-700 underline underline-offset-2"
+            >
+              Classic design mode
+            </Link>
+          </div>
         </div>
 
         {/* Stepper */}

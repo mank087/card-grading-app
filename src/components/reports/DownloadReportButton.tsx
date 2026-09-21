@@ -52,6 +52,24 @@ interface DownloadReportButtonProps {
    * pages, where slab printing belongs to the store, not the visitor).
    */
   publicMenu?: boolean;
+  /**
+   * ADDITIVE (card detail V2, Phase 2). Render ONE trigger for ONE holder's
+   * EXISTING download flow instead of the two dropdowns — the card detail
+   * hero and the holder tiles want a single holder-specific action, not a
+   * menu. It opens the same handler and the same position/calibration modal
+   * the menu item opens; no new generator, no copied generator code:
+   *
+   *   'slab'      -> handleDownloadSlabLabel  -> the print-format modal
+   *   'onetouch'  -> handleOpenAveryModal     -> AveryLabelModal (6871)
+   *   'toploader' -> handleOpenAvery8167Modal -> Avery8167LabelModal
+   *
+   * With this absent the component renders and behaves exactly as before.
+   */
+  holderDownload?: 'slab' | 'toploader' | 'onetouch';
+  /** Button text for `holderDownload`. Defaults per holder. */
+  holderDownloadLabel?: string;
+  /** Extra classes for the `holderDownload` trigger. */
+  holderDownloadClassName?: string;
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
@@ -64,6 +82,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   labelStyle = 'modern',
   customLabelConfig = null,
   publicMenu = false,
+  holderDownload,
+  holderDownloadLabel,
+  holderDownloadClassName,
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
@@ -1451,6 +1472,88 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       onClick: handleDownloadMiniJpg,
     },
   ];
+
+  // ── Holder-specific single trigger (additive; see `holderDownload`) ──
+  // Opens one of the flows above directly. The modals below are the same
+  // component instances the menus use, with the same handlers.
+  if (holderDownload) {
+    const HOLDER_TRIGGER: Record<'slab' | 'toploader' | 'onetouch', { label: string; onClick: () => void; busy: boolean }> = {
+      slab: {
+        label: 'Download slab label',
+        onClick: handleDownloadSlabLabel,
+        busy: isGenerating && generatingType === 'label',
+      },
+      toploader: {
+        label: 'Download top loader label',
+        onClick: handleOpenAvery8167Modal,
+        busy: isGenerating && generatingType === 'avery8167',
+      },
+      onetouch: {
+        label: 'Download One-Touch label',
+        onClick: handleOpenAveryModal,
+        busy: isGenerating && generatingType === 'avery',
+      },
+    };
+    const trigger = HOLDER_TRIGGER[holderDownload];
+    return (
+      <>
+        <button
+          type="button"
+          onClick={trigger.onClick}
+          disabled={trigger.busy}
+          className={holderDownloadClassName ?? 'dcm-button dcm-button--primary'}
+        >
+          {trigger.busy ? 'Generating…' : (holderDownloadLabel ?? trigger.label)}
+        </button>
+
+        <AveryLabelModal
+          isOpen={isAveryModalOpen}
+          onClose={() => setIsAveryModalOpen(false)}
+          onConfirm={handleDownloadAveryLabel}
+          isGenerating={isGenerating && generatingType === 'avery'}
+        />
+        <Avery8167LabelModal
+          isOpen={isAvery8167ModalOpen}
+          onClose={() => setIsAvery8167ModalOpen(false)}
+          onConfirm={handleDownloadAvery8167Label}
+          isGenerating={isGenerating && generatingType === 'avery8167'}
+        />
+        <FoldOverLabelModal
+          isOpen={isFoldOverModalOpen}
+          onClose={() => setIsFoldOverModalOpen(false)}
+          onConfirm={handleDownloadFoldOverLabel}
+          isGenerating={isGenerating && generatingType === 'foldover'}
+        />
+        {showPrintFormatChoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowPrintFormatChoice(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Print Format</h3>
+              <p className="text-sm text-gray-500 mb-4">Choose how you&apos;d like to print your slab label</p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleSlabDownload('duplex')}
+                  className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all"
+                >
+                  <p className="font-semibold text-gray-900 text-sm">Front + Back (Duplex)</p>
+                  <p className="text-xs text-gray-500">2-page PDF &mdash; requires double-sided printing</p>
+                </button>
+                <button
+                  onClick={() => handleSlabDownload('foldover')}
+                  className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all"
+                >
+                  <p className="font-semibold text-gray-900 text-sm">Fold-Over (Single-Sided)</p>
+                  <p className="text-xs text-gray-500">1-page PDF &mdash; cut and fold, no duplex needed</p>
+                </button>
+              </div>
+              <button onClick={() => setShowPrintFormatChoice(false)} className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700 py-2">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   // Compact variant (smaller buttons)
   if (variant === 'compact') {

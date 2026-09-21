@@ -30,6 +30,7 @@ import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
+import { readCardReturnPath, readHolderParam } from '@/lib/cardDetail/labelStudioLink'
 import type { SavedCustomStyle } from '@/lib/labelPresets'
 
 interface Props {
@@ -2978,6 +2979,27 @@ function SavedStylesManager({
 export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
   const searchParams = useSearchParams()
   const preselectedSerial = searchParams.get('card')
+  /**
+   * ADDITIVE (card detail V2, Phase 2 / plan gap G3). Three OPTIONAL params
+   * alongside the existing `?card=<serial>` contract, which is unchanged.
+   * With none of them present this component behaves exactly as before.
+   *
+   *   return  — a "Back to card" link. VALIDATED as a same-origin card path
+   *             by `readCardReturnPath`; anything else is ignored outright.
+   *   holder  — which holder the reader came from. NOT APPLIED: this classic
+   *             studio has no single "current holder" to preselect — the
+   *             Label Gallery renders all seven LABEL_TYPES at once (see the
+   *             gallery section above), so there is nowhere to put it. It is
+   *             read here so the link shape is honoured and so a future
+   *             gallery that does scroll to a type has the value already.
+   *   style   — the label style id. NOT APPLIED either: the studio's style is
+   *             the signed-in account's own saved preference, fetched by
+   *             `useCustomLabelStyle`, and honouring an override from a query
+   *             string would silently disagree with what the account prints.
+   */
+  const returnToCard = readCardReturnPath(searchParams.get('return'))
+  const preselectedHolder = readHolderParam(searchParams.get('holder'))
+  void preselectedHolder
 
   const [selectedCard, setSelectedCardRaw] = useState<any | null>(() => {
     if (preselectedSerial) {
@@ -3237,14 +3259,25 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
               <h1 className="text-xl font-bold text-gray-900">Label Studio · Classic</h1>
               <p className="text-sm text-gray-500">Design, preview, and download labels for any case</p>
             </div>
-            {isAuthenticated && (
-              <Link
-                href="/collection"
-                className="text-sm text-purple-600 hover:text-purple-800 font-medium"
-              >
-                Back to Collection
-              </Link>
-            )}
+            <div className="flex items-center gap-4">
+              {/* Only ever a validated same-origin card path. */}
+              {returnToCard && (
+                <Link
+                  href={returnToCard}
+                  className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  Back to card
+                </Link>
+              )}
+              {isAuthenticated && (
+                <Link
+                  href="/collection"
+                  className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  Back to Collection
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Guest banner */}
