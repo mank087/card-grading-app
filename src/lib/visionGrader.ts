@@ -28,6 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
+import { verifyClippedCorners } from './grading/frameEdgeCheck';
 import { explainUncertaintyHold, letterUncertainty as letterUncertaintyFromEvidence } from './grading/evidenceHold';
 import { firstLookEnabled, runFirstLook, recordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
@@ -60,7 +61,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.26'; // v9.26: a held grade records its TRUE cause in grade_hold (clipped corner, holder, possible damage, disagreement, dissent, image quality) and the report shows it as a hold. No grade moves: the letter override and the revised out-of-frame rule exist but are OFF (GRADING_EVIDENCE_V2), having failed a by-eye review
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.27'; // v9.27: an out-of-frame flag is checked against the photo's actual edge pixels before it lowers image confidence (grading/frameEdgeCheck.ts); it can only clear a flag. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3220,10 +3221,30 @@ Provide detailed analysis as markdown with all required sections.`
         // not notice (owner-verified: graded 9–10 at confidence B with a corner cut
         // off), so the measured geometry lowers it — and the existing uncertainty
         // gate below then refuses a 10 on it.
-        const clippedCardCorners = [
+        let clippedCardCorners = [
           ...clippedCorners(zoom?.capture?.frontQuad, 'front'),
           ...clippedCorners(zoom?.capture?.backQuad, 'back'),
         ];
+        // The outline that flagged those corners is a model's estimate, good to a few percent.
+        // Before it costs a card its grade, look at the pixels along that edge of the photo:
+        // background there means the card is complete (grading/frameEdgeCheck.ts). It can only
+        // clear a flag, never add one, and never throws. CLIP_PIXEL_CHECK=0 switches it off.
+        if (clippedCardCorners.length > 0 && process.env.CLIP_PIXEL_CHECK !== '0') {
+          try {
+            const originals = await loadOriginals();
+            const front = await verifyClippedCorners(originals.front, zoom?.capture?.frontQuad, 'front', clippedCardCorners);
+            const back = await verifyClippedCorners(originals.back, zoom?.capture?.backQuad, 'back', clippedCardCorners);
+            const cleared = [...front.cleared, ...back.cleared];
+            if (cleared.length > 0) {
+              console.log(`[CAPTURE] out-of-frame flag cleared by the pixel check: ${cleared.join(', ')}`);
+              jsonData.image_quality = jsonData.image_quality || {};
+              jsonData.image_quality.out_of_frame_cleared = cleared;
+              clippedCardCorners = [...front.clipped, ...back.clipped];
+            }
+          } catch (e: any) {
+            console.warn('[CAPTURE] pixel edge check skipped (non-blocking):', e?.message || e);
+          }
+        }
         if (clippedCardCorners.length > 0) {
           jsonData.image_quality = jsonData.image_quality || {};
           jsonData.image_quality.confidence_letter = confidenceWithClipping(jsonData.image_quality.confidence_letter, clippedCardCorners);
