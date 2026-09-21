@@ -19,6 +19,7 @@
  *     is never mixed into the DCM number.
  */
 
+import GradeChip from './GradeChip';
 import type { CardDetailViewModel, GradeStatus } from '@/lib/cardDetail/viewModel';
 
 export interface GradeSummaryProps {
@@ -80,13 +81,23 @@ export function GradeSummary({ vm, conditionSummary, onJumpToGrade }: GradeSumma
       </div>
 
       <div id="tour-grade-score" className="cd-grade-main" data-report-grade={grade.gradeFormatted}>
-        <div className="cd-grade-number" data-status={grade.status}>
-          {grade.gradeFormatted}
-          {grade.status === 'graded' && <span>/ 10</span>}
-        </div>
+        {grade.status === 'graded' || grade.status === 'altered-authentic' ? (
+          <GradeChip
+            gradeFormatted={grade.gradeFormatted}
+            grade={grade.grade}
+            condition={grade.condition}
+          />
+        ) : (
+          <div className="cd-grade-number" data-status={grade.status}>
+            {grade.gradeFormatted}
+          </div>
+        )}
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>
-            {statusHeadline(grade.status, grade.condition)}
+            {/* The chip already carries the condition label; say the scale instead. */}
+            {grade.status === 'graded' && grade.grade !== null
+              ? `Grade ${grade.gradeFormatted} of 10`
+              : statusHeadline(grade.status, grade.condition)}
           </h2>
           {grade.designation && (
             <p className="cd-caption" style={{ marginTop: 4, fontWeight: 650 }}>

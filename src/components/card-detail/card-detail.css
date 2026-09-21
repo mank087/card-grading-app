@@ -1181,3 +1181,51 @@
 .dcm-card-detail .cd-expander--flush > .cd-expander-body {
   padding: 8px 0 0;
 }
+
+/* ── Grade chip: the Heritage label's chip, on the page ───────────────────── */
+.dcm-card-detail .cd-grade-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 2px solid var(--cd-chip-ink);
+  background: var(--cd-chip-plate);
+  box-shadow: 0 8px 24px #14233b1f;
+}
+.dcm-card-detail .cd-grade-chip--hero { min-width: 116px; padding: 14px 18px 12px; }
+.dcm-card-detail .cd-grade-chip--compact { min-width: 84px; padding: 10px 14px 9px; border-radius: 12px; }
+.dcm-card-detail .cd-grade-chip-numeral {
+  font-family: var(--font-dcm-display), Arial, sans-serif;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--cd-chip-ink);
+}
+.dcm-card-detail .cd-grade-chip--hero .cd-grade-chip-numeral { font-size: 64px; }
+.dcm-card-detail .cd-grade-chip--compact .cd-grade-chip-numeral { font-size: 40px; }
+.dcm-card-detail .cd-grade-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.125em;
+  color: #f4efe4;
+  white-space: nowrap;
+}
+.dcm-card-detail .cd-grade-chip--compact .cd-grade-chip-label { font-size: 9px; }
+/* Grade 10: foil numeral and foil keyline, as the label renders it. */
+.dcm-card-detail .cd-grade-chip.is-foil {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--cd-chip-plate), var(--cd-chip-plate)) padding-box,
+    var(--cd-chip-foil) border-box;
+}
+.dcm-card-detail .cd-grade-chip.is-foil .cd-grade-chip-numeral {
+  background: var(--cd-chip-foil);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dcm-card-detail .cd-highlights-title { display: flex; align-items: center; gap: 16px; }
+.dcm-card-detail .cd-highlights-head h3 { font-size: 20px; }

@@ -20,6 +20,7 @@ import {
   readImageGrade,
   hasCenteringData,
 } from '@/lib/cardDetail/gradeDetails';
+import GradeChip from './GradeChip';
 import { getUncertaintyFromConfidence } from '@/lib/cardDetail/parsers';
 
 export interface GradeHighlightsProps {
@@ -74,12 +75,17 @@ export function GradeHighlights({ vm, card, conditionSummary, onJumpToGrade }: G
   return (
     <section className="cd-panel cd-highlights" aria-labelledby="cd-highlights-heading">
       <div className="cd-highlights-head">
-        <div>
-          <p className="cd-eyebrow">Why this grade</p>
-          <h3 id="cd-highlights-heading">
-            {vm.grade.gradeFormatted}
-            {vm.grade.condition ? ` · ${vm.grade.condition}` : ''}
-          </h3>
+        <div className="cd-highlights-title">
+          <GradeChip
+            gradeFormatted={vm.grade.gradeFormatted}
+            grade={vm.grade.grade}
+            condition={vm.grade.condition}
+            size="compact"
+          />
+          <div>
+            <p className="cd-eyebrow">Why this grade</p>
+            <h3 id="cd-highlights-heading">The findings behind each subgrade</h3>
+          </div>
         </div>
         {/* The score itself (the A-D letter legacy prints beside the grade) and
             the grade uncertainty that follows from it. Opens the explanation. */}
