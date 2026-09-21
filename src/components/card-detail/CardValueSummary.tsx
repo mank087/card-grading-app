@@ -37,6 +37,12 @@ export interface CardValueSummaryProps {
    * and found trustworthy. Null until the pricing component reports one.
    */
   liveEstimate: number | null;
+  /**
+   * Low / median / high from the live price match — the same three numbers the
+   * Market Value panel prints. Null until the lookup reports, and the adapter
+   * only passes it when the estimate from that match was trusted.
+   */
+  marketRange?: { low: number; median: number; high: number } | null;
   isOwner: boolean;
   /** Activate the Market & portfolio section. */
   onJumpToMarket: () => void;
@@ -72,9 +78,58 @@ function formatFreshness(iso: string): string | null {
   return `Updated ${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+/**
+ * Low / median / high at a glance, with a marker for where the DCM estimate
+ * sits. The track is positioned on a log scale: the range runs from a raw copy
+ * to the top graded tier, often 50x apart, and on a linear track every
+ * ordinary card would be pinned against the left edge.
+ */
+function MarketRangeStrip({
+  range,
+  estimate,
+}: {
+  range: { low: number; median: number; high: number };
+  estimate: number;
+}) {
+  const position = (amount: number) => {
+    const clamped = Math.min(Math.max(amount, range.low), range.high);
+    const span = Math.log(range.high) - Math.log(range.low);
+    return span > 0 ? ((Math.log(clamped) - Math.log(range.low)) / span) * 100 : 50;
+  };
+  const where = position(estimate);
+
+  return (
+    <div
+      className="cd-range"
+      role="img"
+      aria-label={`Market range: low ${formatMoney(range.low)}, median ${formatMoney(range.median)}, high ${formatMoney(range.high)}. The DCM estimate is ${formatMoney(estimate)}.`}
+    >
+      <div className="cd-range-track" aria-hidden="true">
+        <span className="cd-range-median" style={{ left: `${position(range.median)}%` }} />
+        <span className="cd-range-marker" style={{ left: `${where}%` }} />
+      </div>
+      <dl className="cd-range-legend" aria-hidden="true">
+        <div>
+          <dt>Low</dt>
+          <dd>{formatMoney(range.low)}</dd>
+        </div>
+        <div>
+          <dt>Median</dt>
+          <dd>{formatMoney(range.median)}</dd>
+        </div>
+        <div>
+          <dt>High</dt>
+          <dd>{formatMoney(range.high)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function CardValueSummary({
   value,
   liveEstimate,
+  marketRange = null,
   isOwner,
   onJumpToMarket,
 }: CardValueSummaryProps) {
@@ -117,6 +172,10 @@ export function CardValueSummary({
       ) : (
         // Never $0. "Unavailable" is the honest word for no usable price.
         <p className="cd-price cd-price--unavailable">Unavailable</p>
+      )}
+
+      {shownAmount !== null && marketRange && marketRange.high > marketRange.low && (
+        <MarketRangeStrip range={marketRange} estimate={shownAmount} />
       )}
 
       <div className="cd-value-footer">

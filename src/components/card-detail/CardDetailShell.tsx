@@ -125,6 +125,8 @@ export interface CardDetailShellProps {
 
   /** A trusted live estimate, already through `assessValueTrust`. */
   liveEstimate: number | null;
+  /** Low / median / high from the live price match; null until it reports. */
+  marketRange?: { low: number; median: number; high: number } | null;
   /** `extractConditionSummary(card.conversational_grading)`, or null. */
   conditionSummary: string | null;
   shareData: CardSharingData;
@@ -177,6 +179,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     renderCategoryBadges,
     retakeHref,
     liveEstimate,
+    marketRange,
     conditionSummary,
     shareData,
   } = props;
@@ -601,6 +604,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
             <CardValueSummary
               value={vm.value}
               liveEstimate={liveEstimate}
+              marketRange={marketRange ?? null}
               isOwner={isOwner}
               onJumpToMarket={() => jumpTo('market')}
             />

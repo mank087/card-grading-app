@@ -1,6 +1,7 @@
 'use client';
 
 import { isNonStandardItemType } from '@/lib/identification/itemType';
+import { computeMarketRange, type MarketRange } from '@/lib/pricing/marketRange';
 import { useState, useEffect, useRef } from 'react';
 import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
 import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
@@ -89,6 +90,8 @@ interface PokemonPriceLookupProps {
     matchConfidence: 'high' | 'medium' | 'low' | 'none';
     productName: string | null;
     priceChartingUrl?: string;
+    /** Same range the Market Value panel prints. Null when the match has no prices. */
+    marketRange?: MarketRange | null;
   }) => void;
 }
 
@@ -272,6 +275,7 @@ export function PokemonPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
             matchConfidence: data.data.matchConfidence,
             productName: data.data.prices?.productName || null,
             priceChartingUrl,
+            marketRange: computeMarketRange(data.data.prices),
           });
         }
         // Persist estimated price to database for collection/portfolio pages
@@ -352,6 +356,7 @@ export function PokemonPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
           matchConfidence: data.data.matchConfidence,
           productName: data.data.prices?.productName || null,
           priceChartingUrl,
+          marketRange: computeMarketRange(data.data.prices),
         });
       }
 
@@ -603,38 +608,7 @@ export function PokemonPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
   };
 
   // Get market range
-  const getMarketRange = () => {
-    if (!priceData?.prices) return null;
-    const raw = priceData.prices.raw;
-
-    const allPrices: number[] = [];
-    if (raw && raw > 0) allPrices.push(raw);
-    Object.values(priceData.prices.psa).forEach(price => { if (price && price > 0) allPrices.push(price); });
-    Object.values(priceData.prices.bgs).forEach(price => { if (price && price > 0) allPrices.push(price); });
-    Object.values(priceData.prices.sgc).forEach(price => { if (price && price > 0) allPrices.push(price); });
-    if (priceData.prices.cgc) {
-      Object.values(priceData.prices.cgc).forEach(price => { if (price && price > 0) allPrices.push(price); });
-    }
-
-    if (allPrices.length === 0) return null;
-
-    const sortedPrices = [...allPrices].sort((a, b) => a - b);
-    const low = sortedPrices[0];
-    const high = sortedPrices[sortedPrices.length - 1];
-    const mid = Math.floor(sortedPrices.length / 2);
-    const median = sortedPrices.length % 2 !== 0
-      ? sortedPrices[mid]
-      : (sortedPrices[mid - 1] + sortedPrices[mid]) / 2;
-    const average = allPrices.reduce((sum, p) => sum + p, 0) / allPrices.length;
-
-    return {
-      low: Math.round(low * 100) / 100,
-      high: Math.round(high * 100) / 100,
-      median: Math.round(median * 100) / 100,
-      average: Math.round(average * 100) / 100,
-      salesVolume: priceData.prices.salesVolume,
-    };
-  };
+  const getMarketRange = () => computeMarketRange(priceData?.prices);
 
   // Get DCM estimated value
   const getDcmEstimatedValue = () => {

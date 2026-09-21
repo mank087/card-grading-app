@@ -68,6 +68,7 @@ interface DcmPriceData {
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
   productName: string | null;
   priceChartingUrl?: string;
+  marketRange?: { low: number; median: number; high: number } | null;
 }
 
 export function PokemonCardDetailsV2() {
@@ -120,6 +121,10 @@ export function PokemonCardDetailsV2() {
     if (!card || typeof value !== 'number' || !Number.isFinite(value)) return null;
     return assessValueTrust(card as any, value).trusted ? value : null;
   }, [card, dcmPriceData]);
+
+  // The range belongs to the matched listing, so it is shown only when the
+  // estimate from that same match was trusted — the lookup applies the same rule.
+  const marketRange = liveEstimate !== null ? dcmPriceData?.marketRange ?? null : null;
 
   const conditionSummary = useMemo(
     () => extractConditionSummary((card as any)?.conversational_grading),
@@ -252,6 +257,7 @@ export function PokemonCardDetailsV2() {
       heritageBandColors={heritageBandColors}
       onSwitchStyle={switchStyle}
       liveEstimate={liveEstimate}
+      marketRange={marketRange}
       conditionSummary={conditionSummary}
       shareData={shareData}
       renderDownloadButton={() =>

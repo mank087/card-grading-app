@@ -1229,3 +1229,57 @@
 }
 .dcm-card-detail .cd-highlights-title { display: flex; align-items: center; gap: 16px; }
 .dcm-card-detail .cd-highlights-head h3 { font-size: 20px; }
+
+/* ── Market range strip in the hero value panel ───────────────────────────── */
+.dcm-card-detail .cd-range { margin-top: 14px; }
+.dcm-card-detail .cd-range-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a33, #2563eb33 50%, #9333ea33);
+}
+.dcm-card-detail .cd-range-median {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  background: #2563eb;
+  opacity: 0.55;
+}
+.dcm-card-detail .cd-range-marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--dcm-ink);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px #14233b40;
+}
+.dcm-card-detail .cd-range-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.dcm-card-detail .cd-range-legend > div:nth-child(2) { text-align: center; }
+.dcm-card-detail .cd-range-legend > div:nth-child(3) { text-align: right; }
+.dcm-card-detail .cd-range-legend dt {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dcm-muted);
+}
+.dcm-card-detail .cd-range-legend dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* The Market Value panel's own colours, so the two read as the same numbers. */
+.dcm-card-detail .cd-range-legend > div:nth-child(1) dd { color: #16a34a; }
+.dcm-card-detail .cd-range-legend > div:nth-child(2) dd { color: #2563eb; }
+.dcm-card-detail .cd-range-legend > div:nth-child(3) dd { color: #9333ea; }
