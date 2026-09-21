@@ -6,7 +6,7 @@ import { buildManualResult, manualVerdictSchema } from '@/lib/gradeReview/manual
 import { buildDetailsPatch, currentDetails, detailsCorrectionSchema } from '@/lib/gradeReview/cardDetails';
 import { refreshPricesAfterDetails } from '@/lib/gradeReview/detailsPricing';
 import { revalidatePath } from 'next/cache';
-const DETAILS_SELECT='id,category,serial,card_name,card_set,card_number,release_date,featured,manufacturer_name';
+const DETAILS_SELECT='id,category,serial,card_name,card_set,card_number,release_date,featured,manufacturer_name,serial_numbering';
 const reply=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
 type Context={params:Promise<{id:string}>};
 async function adminOf(request:NextRequest){const token=request.cookies.get('admin_token')?.value;return token?verifyAdminSession(token):null;}

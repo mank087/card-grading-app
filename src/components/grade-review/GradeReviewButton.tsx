@@ -18,7 +18,7 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
   const gradeAllowed = Boolean(state?.eligible);
   const detailsAllowed = Boolean(state?.detailsEligible);
   const lowConfidence = state?.identificationConfidence === 'low' && !state?.review;
-  const [claim, setClaim] = useState<Record<string, string>>({ card_name: '', set_name: '', year: '', card_number: '', other: '' });
+  const [claim, setClaim] = useState<Record<string, string>>({ card_name: '', set_name: '', year: '', card_number: '', serial_number: '', other: '' });
   const claimFilled = Object.values(claim).some(v => v.trim());
   const canSubmit = (reviewGrade && gradeAllowed) || (disputeDetails && claimFilled);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -168,7 +168,7 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
             {state.review.details_changes && state.review.details_changes.length > 0 && (
               <div className="rounded-lg bg-green-50 p-3 text-sm">
                 <p className="font-semibold text-green-900">Card details corrected</p>
-                <ul className="mt-1 list-disc pl-5">{state.review.details_changes.map(c => <li key={c.field}>{detailsFieldLabels[c.field] ?? c.field}: {c.from ?? '(blank)'} → {c.to}</li>)}</ul>
+                <ul className="mt-1 list-disc pl-5">{state.review.details_changes.map(c => <li key={c.field}>{detailsFieldLabels[c.field] ?? c.field}: {c.from ?? '(blank)'} → {c.to ?? '(none)'}</li>)}</ul>
               </div>
             )}
             {state.review.proposed_grade == null ? (
@@ -211,13 +211,13 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
             <fieldset disabled={busy} className="space-y-3">
               <legend className="mb-2 text-sm font-semibold">What would you like reviewed?</legend>
               <label className={`flex items-start gap-2 text-sm ${gradeAllowed ? '' : 'opacity-60'}`}><input type="checkbox" checked={reviewGrade && gradeAllowed} disabled={!gradeAllowed} onChange={e => setReviewGrade(e.target.checked)} className="mt-1" /><span><span className="font-medium">The grade</span><br /><span className="text-gray-600">{gradeAllowed ? 'All four subgrades on both sides are re-checked.' : 'Grade reviews are available to VIP purchasers and active Card Lovers members.'}</span></span></label>
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={disputeDetails} onChange={e => setDisputeDetails(e.target.checked)} className="mt-1" /><span><span className="font-medium">The card details</span><br /><span className="text-gray-600">Wrong name, set, year or card number. Corrections also refresh the market value.</span></span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={disputeDetails} onChange={e => setDisputeDetails(e.target.checked)} className="mt-1" /><span><span className="font-medium">The card details</span><br /><span className="text-gray-600">Wrong name, set, year, card number or serial number. Corrections also refresh the market value.</span></span></label>
               {disputeDetails && (
                 <div className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-2">
                   <p className="text-xs text-gray-600 sm:col-span-2">Enter the correct value for anything that is wrong. Leave the rest blank.</p>
-                  {(['card_name', 'set_name', 'year', 'card_number', 'other'] as const).map(f => (
+                  {(['card_name', 'set_name', 'year', 'card_number', 'serial_number', 'other'] as const).map(f => (
                     <label key={f} className={`text-xs font-medium ${f === 'other' ? 'sm:col-span-2' : ''}`}>{detailsClaimLabels[f]}
-                      <input type="text" maxLength={200} value={claim[f]} onChange={e => setClaim(v => ({ ...v, [f]: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-sm font-normal" placeholder={f === 'year' ? 'e.g. 1960' : f === 'card_number' ? 'e.g. 350' : ''} />
+                      <input type="text" maxLength={200} value={claim[f]} onChange={e => setClaim(v => ({ ...v, [f]: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-sm font-normal" placeholder={f === 'year' ? 'e.g. 1960' : f === 'card_number' ? 'e.g. 350' : f === 'serial_number' ? 'e.g. 325/825' : ''} />
                     </label>
                   ))}
                 </div>

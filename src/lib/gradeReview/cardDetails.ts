@@ -7,6 +7,7 @@ export const detailsClaimSchema = z.object({
   set_name: z.string().trim().max(200).optional(),
   year: z.string().trim().max(200).optional(),
   card_number: z.string().trim().max(200).optional(),
+  serial_number: z.string().trim().max(200).optional(),
   other: z.string().trim().max(200).optional(),
 }).strict();
 export type DetailsClaim = z.infer<typeof detailsClaimSchema>;
@@ -18,13 +19,19 @@ export const detailsCorrectionSchema = z.object({
   year: z.string().trim().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/, 'Year must be YYYY').optional(),
   card_number: z.string().trim().min(1).max(40).optional(),
   manufacturer: z.string().trim().min(1).max(120).optional(),
+  /** Print-run serial ("32/325"). "none" (and its synonyms) clears a serial the grader invented. */
+  serial_number: z.string().trim().min(1).max(40).optional(),
 }).strict();
 export type DetailsCorrection = z.infer<typeof detailsCorrectionSchema>;
 
-export interface DetailsChange { field: 'card_name' | 'set_name' | 'year' | 'card_number' | 'manufacturer'; from: string | null; to: string }
+export const DETAILS_FIELDS = ['card_name', 'set_name', 'year', 'card_number', 'manufacturer', 'serial_number'] as const;
+export interface DetailsChange { field: typeof DETAILS_FIELDS[number]; from: string | null; to: string | null }
+
+/** Admin input meaning "this card is not serialized"; stored as null, not as text. */
+const NO_SERIAL = /^(none|no|n\/a|na|-|--|no serial|not serialized|not numbered|not present)$/i;
 
 export const DETAILS_COLUMNS = ['card_name', 'card_set', 'card_number', 'release_date', 'featured', 'manufacturer_name',
-  'conversational_card_info', 'conversational_grading', 'ai_grading', 'label_data', 'original_label_data'] as const;
+  'serial_numbering', 'conversational_card_info', 'conversational_grading', 'ai_grading', 'label_data', 'original_label_data'] as const;
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Record<string, unknown>) } : {};
 const parseMaybe = (v: unknown): Record<string, unknown> | null => {
@@ -43,6 +50,7 @@ export function currentDetails(card: Record<string, unknown>) {
     year: str(card.release_date) ?? str(info.year),
     card_number: str(card.card_number) ?? str(info.card_number),
     manufacturer: str(card.manufacturer_name) ?? str(info.manufacturer),
+    serial_number: str(card.serial_numbering) ?? str(info.serial_number),
   };
 }
 
@@ -58,12 +66,14 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
   if (card.conversational_grading !== snapshotReport) throw Error('stale_review');
   const before = currentDetails(card);
   const changes: DetailsChange[] = [];
-  for (const field of ['card_name', 'set_name', 'year', 'card_number', 'manufacturer'] as const) {
-    const to = input[field];
-    if (to !== undefined && to !== before[field]) changes.push({ field, from: before[field], to });
+  for (const field of DETAILS_FIELDS) {
+    const raw = input[field];
+    if (raw === undefined) continue;
+    const to = field === 'serial_number' && NO_SERIAL.test(raw) ? null : raw;
+    if (to !== before[field]) changes.push({ field, from: before[field], to });
   }
   if (changes.length === 0) throw Error('no_change');
-  const applied = Object.fromEntries(changes.map(c => [c.field, c.to])) as Partial<Record<DetailsChange['field'], string>>;
+  const applied = Object.fromEntries(changes.map(c => [c.field, c.to])) as Partial<Record<DetailsChange['field'], string | null>>;
 
   const columns: Record<string, unknown> = {};
   if (applied.card_name !== undefined) {
@@ -75,6 +85,7 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
   if (applied.year !== undefined) columns.release_date = applied.year;
   if (applied.card_number !== undefined) columns.card_number = applied.card_number;
   if (applied.manufacturer !== undefined) columns.manufacturer_name = applied.manufacturer;
+  if (applied.serial_number !== undefined) columns.serial_numbering = applied.serial_number;
 
   const note = `Manual correction by the DCM team (review ${reviewId}).`;
   const fixInfo = (raw: Record<string, unknown> | null) => {
@@ -86,6 +97,12 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
       info._year_guard = { ...obj(raw._year_guard), outcome: 'manually_corrected', source: 'manual_correction', text_seen: null, original_year: str(raw.year), reason: note }; }
     if (applied.card_number !== undefined) { info.card_number = applied.card_number; info.card_number_raw = applied.card_number; info.card_number_text_seen = applied.card_number; info.card_number_source = 'manual_correction'; }
     if (applied.manufacturer !== undefined) info.manufacturer = applied.manufacturer;
+    if (applied.serial_number !== undefined) {
+      info.serial_number = applied.serial_number;
+      // Some older blobs carry the title-cased key instead; correct it wherever it exists.
+      if ('Serial Numbering' in info) info['Serial Numbering'] = applied.serial_number;
+      info.serial_number_source = 'manual_correction';
+    }
     info.manual_details_correction = { review_id: reviewId, changes };
     return info;
   };
@@ -113,7 +130,8 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
 
 export const detailsFieldLabels: Record<DetailsChange['field'], string> = {
   card_name: 'Card name', set_name: 'Set', year: 'Year', card_number: 'Card number', manufacturer: 'Manufacturer',
+  serial_number: 'Serial number',
 };
 export const detailsClaimLabels: Record<keyof DetailsClaim, string> = {
-  card_name: 'Card name', set_name: 'Set', year: 'Year', card_number: 'Card number', other: 'Other',
+  card_name: 'Card name', set_name: 'Set', year: 'Year', card_number: 'Card number', serial_number: 'Serial number', other: 'Other',
 };
