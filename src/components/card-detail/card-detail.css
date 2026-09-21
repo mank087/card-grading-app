@@ -1130,3 +1130,54 @@
 @media (max-width: 480px) {
   .dcm-card-detail .cd-highlights-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Full report containment ──────────────────────────────────────────────
+   A grid item's default min-width is its content's min-content width, so one
+   wide table stretched .cd-report past its panel and scrolled the whole page.
+   Pin every report grid to the available width and let wide content scroll
+   inside its own box instead. */
+.dcm-card-detail .cd-report,
+.dcm-card-detail .cd-report-section,
+.dcm-card-detail .cd-card-text {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.dcm-card-detail .cd-panel,
+.dcm-card-detail .cd-expander,
+.dcm-card-detail .cd-expander-body {
+  min-width: 0;
+}
+.dcm-card-detail .cd-report-section > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.dcm-card-detail .cd-report :is(p, li, dd, h4, h5) {
+  overflow-wrap: anywhere;
+}
+.dcm-card-detail .cd-report :is(pre, code) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dcm-card-detail .cd-report .overflow-x-auto,
+.dcm-card-detail .cd-report-section > div:has(> table) {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.dcm-card-detail .cd-report table {
+  max-width: none;
+}
+.dcm-card-detail .cd-expander-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* The expander is the panel's only child, so the panel supplies the frame. */
+.dcm-card-detail .cd-expander--flush {
+  margin-top: 0;
+  border: 0;
+}
+.dcm-card-detail .cd-expander--flush > summary {
+  padding-inline: 0;
+  font-size: 16px;
+}
+.dcm-card-detail .cd-expander--flush > .cd-expander-body {
+  padding: 8px 0 0;
+}

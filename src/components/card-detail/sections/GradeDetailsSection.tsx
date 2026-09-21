@@ -309,21 +309,26 @@ export function GradeDetailsSection({
             </div>
           </details>
 
-          <details
-            className="cd-expander"
-            onToggle={(e) => setAnalysisOpen((e.target as HTMLDetailsElement).open)}
-          >
-            <summary>Full DCM Optic&trade; analysis</summary>
-            <div className="cd-expander-body">
-              {card?.conversational_grading ? (
-                analysisOpen && <FullAnalysisReport card={card} />
-              ) : (
-                <p className="cd-caption">No analysis report was saved with this grade.</p>
-              )}
-            </div>
-          </details>
         </section>
       </div>
+
+      {/* Full width, outside the evidence grid: the report is a long document
+          with tables, and the half-width column beside the photo clipped it. */}
+      <section className="cd-panel">
+        <details
+          className="cd-expander cd-expander--flush"
+          onToggle={(e) => setAnalysisOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary>Full DCM Optic&trade; analysis</summary>
+          <div className="cd-expander-body">
+            {card?.conversational_grading ? (
+              analysisOpen && <FullAnalysisReport card={card} />
+            ) : (
+              <p className="cd-caption">No analysis report was saved with this grade.</p>
+            )}
+          </div>
+        </details>
+      </section>
 
       {gradingPasses && (
         <section className="cd-panel">
