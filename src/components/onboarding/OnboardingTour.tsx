@@ -93,9 +93,17 @@ const TOUR_COMPLETED_KEY = 'dcm_onboarding_tour_completed'
 interface OnboardingTourProps {
   isActive: boolean
   onComplete: () => void
+  /**
+   * Called with a step's target id BEFORE the tour looks the element up.
+   * The V2 card detail page uses it to open the section that owns the anchor;
+   * the legacy pages pass nothing and behave exactly as before. If the element
+   * is not in the DOM yet when this returns, the existing retry loop below
+   * picks it up on the next pass.
+   */
+  onBeforeStep?: (targetId: string) => void
 }
 
-export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
+export function OnboardingTour({ isActive, onComplete, onBeforeStep }: OnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
   const [showFinalModal, setShowFinalModal] = useState(false)
@@ -140,6 +148,8 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   // Scroll to the target element, positioning it below the fixed tour card
   const scrollToTarget = useCallback(() => {
     if (!step) return
+
+    onBeforeStep?.(step.targetId)
 
     const targetEl = document.getElementById(step.targetId)
     if (!targetEl) {
@@ -197,7 +207,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     } else {
       doScroll()
     }
-  }, [step, currentStep, collapseExpandedSection, setCollapsibleOpen, updateHighlight])
+  }, [step, currentStep, collapseExpandedSection, setCollapsibleOpen, updateHighlight, onBeforeStep])
 
   // Reset tour state when re-activated
   useEffect(() => {
