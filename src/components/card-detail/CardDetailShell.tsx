@@ -756,8 +756,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
               card={card}
               vm={vm}
               category={category}
-              uploadHref={uploadHref}
-              retakeHref={retakeHref ?? uploadHref}
               focusAnchor={jumpAnchor}
               onZoom={openZoom}
             />

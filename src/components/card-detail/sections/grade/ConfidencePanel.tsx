@@ -21,7 +21,6 @@
  *   3335-3339   the `dvg_reshoot_required` notice
  */
 
-import Link from 'next/link';
 import {
   confidenceLevelFor,
   imageQualityInfoFor,
@@ -33,13 +32,9 @@ import { getUncertaintyFromConfidence } from '@/lib/cardDetail/parsers';
 
 export interface ConfidencePanelProps {
   card: any;
-  /** The category's upload route — legacy's "Upload New Photos" target. */
-  uploadHref: string;
-  /** The category's retake route. Legacy uses `/upload?category=Pokemon`. */
-  retakeHref: string;
 }
 
-export function ConfidencePanel({ card, uploadHref, retakeHref }: ConfidencePanelProps) {
+export function ConfidencePanel({ card }: ConfidencePanelProps) {
   const imageGrade = readImageGrade(card);
   const confidence = confidenceLevelFor(imageGrade);
   const gradeInfo = imageQualityInfoFor(imageGrade);
@@ -82,40 +77,19 @@ export function ConfidencePanel({ card, uploadHref, retakeHref }: ConfidencePane
         <p className="cd-caption">{gradeInfo.description}</p>
       </div>
 
-      {gradeInfo.recommendNewPhotos && (
+      {/* One note, deliberately. Legacy stacks three prompts here ("New photos
+          recommended / Upload new photos", "retake your photos for a more
+          accurate result / Retake photos", "Reshoot recommended"), which read
+          as an offer to re-evaluate the card for free. Grading again is a new
+          grade, so the note says so. */}
+      {(gradeInfo.recommendNewPhotos || letter === 'C' || letter === 'D' || card?.dvg_reshoot_required) && (
         <div className="cd-callout">
-          <p>
-            <span aria-hidden="true">📷 </span>
-            <strong>New photos recommended</strong>
+          <p className="cd-caption" style={{ margin: 0 }}>
+            Image quality limited the confidence in this grade. For a more reliable result,
+            we recommend submitting new, clearer photos and grading the card again as a new
+            grade.
           </p>
-          <p className="cd-caption">
-            The image quality affects grading accuracy. For the most reliable results,
-            consider uploading clearer photos with better lighting and no obstructions.
-          </p>
-          <Link className="cd-quiet" href={uploadHref}>
-            Upload new photos
-          </Link>
         </div>
-      )}
-
-      {(letter === 'C' || letter === 'D') && (
-        <div className="cd-callout">
-          <p>
-            <strong>
-              Image quality limited this grade — retake your photos for a more accurate
-              result
-            </strong>
-          </p>
-          <Link className="cd-quiet" href={retakeHref}>
-            Retake photos
-          </Link>
-        </div>
-      )}
-
-      {card?.dvg_reshoot_required && (
-        <p className="cd-callout">
-          <strong>Reshoot recommended</strong>
-        </p>
       )}
 
       {slab && (

@@ -82,10 +82,6 @@ export interface GradeDetailsSectionProps {
   card: any;
   vm: CardDetailViewModel;
   category: CardDetailCategory;
-  /** The category's upload route, for the retake prompts. */
-  uploadHref: string;
-  /** The category's retake route; legacy pokemon uses `/upload?category=Pokemon`. */
-  retakeHref: string;
   /**
    * The anchor the shell was last asked to jump to. When it names an evidence
    * block, that tab is selected before the shell scrolls.
@@ -110,8 +106,6 @@ export function GradeDetailsSection({
   card,
   vm,
   category,
-  uploadHref,
-  retakeHref,
   focusAnchor,
   onZoom,
 }: GradeDetailsSectionProps) {
@@ -286,7 +280,7 @@ export function GradeDetailsSection({
           >
             <summary>Confidence &amp; image quality</summary>
             <div className="cd-expander-body">
-              <ConfidencePanel card={card} uploadHref={uploadHref} retakeHref={retakeHref} />
+              <ConfidencePanel card={card} />
             </div>
           </details>
 
