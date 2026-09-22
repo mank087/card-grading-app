@@ -266,6 +266,25 @@ export function renderDescriptionTemplate(
 }
 
 /**
+ * The description's opening line: the listing TITLE, repeated as plain text.
+ *
+ * Exported because it has TWO callers that must agree byte for byte. The
+ * standard layout below renders it as part of the whole description; the card
+ * detail InstaList tab re-renders JUST this line when the owner edits the title
+ * of a description they have already hand-edited, so the heading keeps matching
+ * the title without discarding their other changes
+ * (see lib/ebay/listingSeed.ts `retitleDescriptionHtml`).
+ *
+ * Returns '' for an empty title, which is how a description with no headline
+ * is expressed — the same as before this was a named function.
+ */
+export function buildListingHeadline(title: string | null | undefined): string {
+  const text = stripBlockedGraders(stripLinks(title || '')).trim();
+  if (!text) return '';
+  return `<p style="font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.4;">${escapeHtml(text)}</p>`;
+}
+
+/**
  * Standard listing description layout. Consumer: DCM purple + DCM naming.
  * Org: brand color + store naming + DCM Optic attribution. No URLs anywhere
  * (eBay links policy).
@@ -340,10 +359,7 @@ export function generateHtmlDescription(
 
   // Headline: the plain-text line the "search in description" index and screen
   // readers see first. Kept as text, never a heading image or a link.
-  const headlineText = stripBlockedGraders(stripLinks(data.title || '')).trim();
-  const headline = headlineText
-    ? `<p style="font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.4;">${escapeHtml(headlineText)}</p>`
-    : '';
+  const headline = buildListingHeadline(data.title);
 
   // Sub-grade cells. An area with no sub-grade is OMITTED — an Authentic card
   // with no numeric grade used to print "0 0 0 0", which reads as four failing

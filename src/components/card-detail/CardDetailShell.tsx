@@ -46,14 +46,11 @@ import type { CardSharingData } from '@/lib/socialUtils';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import ImageZoomModal from '@/app/pokemon/[id]/ImageZoomModal';
 import { SoldBanner } from '@/components/cards/SoldBanner';
-import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
-import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
-import { PostResultOffer, usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
-import { ActionLink } from '@/components/design/Primitives';
+import { usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { useCredits } from '@/contexts/CreditsContext';
 import { getStoredSession } from '@/lib/directAuth';
 
@@ -74,10 +71,11 @@ import { resolveEffectiveLabelSize } from '@/lib/cardDetail/labelSize';
 import { buildLabelStudioHref } from '@/lib/cardDetail/labelStudioLink';
 import { useLabelPreview } from './useLabelPreview';
 import LabelPreviewControls from './LabelPreviewControls';
-import { useInstaListStatus } from './useInstaListStatus';
+import { useCardDetailInstaList } from './useCardDetailInstaList';
 import CardDetailBreadcrumb from './CardDetailBreadcrumb';
 import CardDetailMobileBar from './CardDetailMobileBar';
 import CardDetailModals from './CardDetailModals';
+import CardDetailFooterActions from './CardDetailFooterActions';
 
 /**
  * The hero's label + card piece. It pulls in every label renderer (the
@@ -107,6 +105,7 @@ import CardFacts from './CardFacts';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
 import MarketSection from './sections/MarketSection';
 import ReportsSection from './sections/ReportsSection';
+import InstaListSection from './sections/InstaListSection';
 import type { ReportDownloadKind } from '@/components/reports/DownloadReportButton';
 import {
   CardDetailSectionNav,
@@ -275,7 +274,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const { card, loading, isProcessing, error, regradingImageUrl } = detail;
   const { balance, isFirstPurchase, isLoading: creditsLoading } = useCredits();
 
-  const routing = useCardDetailSectionRouting();
+  const routing = useCardDetailSectionRouting(detail.isOwner);
   const [side, setSide] = useState<CardSide>('front');
   const [zoom, setZoom] = useState({ isOpen: false, imageUrl: '', alt: '', title: '' });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -286,11 +285,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   const [enlargedHolder, setEnlargedHolder] = useState<CardHolderId | null>(null);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
-  const [listingModalOpen, setListingModalOpen] = useState(false);
-  // Counters the mobile bar bumps to perform an action in place. See
-  // DownloadReportButton.openLabelsSignal and EbayListingButton.openSignal.
+  // Counter the mobile bar bumps to open the download menu in place. See
+  // DownloadReportButton.openLabelsSignal. The listing flow's own counter is
+  // held by `insta` below, beside the rest of the listing state.
   const [openDownloadsSignal, setOpenDownloadsSignal] = useState(0);
-  const [openListingSignal, setOpenListingSignal] = useState(0);
   // The anchor the page was last asked to jump to. Grade details reads it to
   // select the matching evidence tab; `replaceState` fires no hashchange, so
   // handing it over directly is the only way the section learns.
@@ -321,9 +319,18 @@ export function CardDetailShell(props: CardDetailShellProps) {
     switchStyle: onSwitchStyle,
   });
 
-  const instaList = useInstaListStatus(cardId, {
+  /**
+   * Listing status + the session-only pre-listing draft, in one hook shared by
+   * the hero panel, the mobile bar and the InstaList tab. See that file for why
+   * there is exactly one `/api/ebay/listing/check` per page view.
+   */
+  const insta = useCardDetailInstaList({
+    cardId,
+    card,
+    cardType: ebayCardType,
     isOwner: detail.isOwner,
     isSold: !!vm?.permissions.isSold,
+    instaListActive: routing.active === 'instalist',
   });
 
   // Same rule as legacy: one ask per page for an empty balance.
@@ -555,7 +562,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     showOnboardingTour ||
     enlargedHolder !== null ||
     downloadMenuOpen ||
-    listingModalOpen;
+    insta.modalOpen;
   const showMobileBar = isOwner && !anyModalOpen;
 
   const openZoom = (imageUrl: string, alt: string, title: string) =>
@@ -591,19 +598,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const refreshAfterEdit = () => window.location.reload();
 
   /** One tap on "InstaList" does what the current state means. */
-  const onInstaListAction = () => {
-    if (instaList.state === 'listed' && instaList.listing?.listing_url) {
-      window.open(instaList.listing.listing_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    if (instaList.state === 'unverified') {
-      instaList.refresh();
-      return;
-    }
-    // 'unlisted' — open the existing connect-or-create flow where we stand.
-    setOpenListingSignal((n) => n + 1);
-  };
-
   const styleControls = (compact: boolean, idleNote?: string) => (
     <LabelPreviewControls
       preview={preview}
@@ -740,15 +734,21 @@ export function CardDetailShell(props: CardDetailShellProps) {
               showFounderEmblem={detail.emblems.showFounderEmblem}
               labelStyle={preview.style}
               customLabelConfig={preview.activeConfig}
-              status={instaList}
-              openSignal={openListingSignal}
-              onModalOpenChange={setListingModalOpen}
+              status={insta.status}
+              openSignal={insta.openSignal}
+              onModalOpenChange={insta.setModalOpen}
+              initialDraft={insta.draft.initialDraft}
+              onConnectionChange={insta.setEbayConnected}
             />
           </div>
         </div>
 
         {/* ── sections ───────────────────────────────────────────────── */}
-        <CardDetailSectionNav active={routing.active} onSelect={(id) => jumpTo(id)} />
+        <CardDetailSectionNav
+          active={routing.active}
+          onSelect={(id) => jumpTo(id)}
+          isOwner={isOwner}
+        />
 
         <CardDetailSections
           active={routing.active}
@@ -845,47 +845,30 @@ export function CardDetailShell(props: CardDetailShellProps) {
               }
             />
           }
+          /* Owner-only: `sectionForViewer` makes 'instalist' unreachable for a
+             visitor, so this element is created but never mounted for one. */
+          instalist={
+            <InstaListSection
+              card={card}
+              cardType={ebayCardType}
+              labelStyle={preview.style}
+              customLabelConfig={preview.activeConfig}
+              showFounderEmblem={detail.emblems.showFounderEmblem}
+              insta={insta}
+            />
+          }
         />
 
-        {/* Owner actions that legacy keeps at the foot of the page. */}
-        <div style={{ paddingBottom: 40 }}>
-          {/* "Grade another card" (legacy 6918-6940). The happy path used to
-              end here with no next step, so most first-time graders stopped
-              after one card; the onboarding-funnel work added this and it is
-              not something V2 may quietly drop. */}
-          {isOwner && (
-            <div style={{ textAlign: 'center', paddingBlock: 24 }}>
-              <ActionLink
-                href={!creditsLoading && balance === 0 ? '/credits' : (retakeHref ?? uploadHref)}
-                variant="primary"
-              >
-                {!creditsLoading && balance === 0
-                  ? 'Get credits to grade more'
-                  : 'Grade another card'}
-              </ActionLink>
-              {!creditsLoading && (
-                <p className="cd-caption" style={{ marginTop: 8 }}>
-                  {balance === 0
-                    ? 'Your free grades are used up.'
-                    : `You have ${balance} credit${balance === 1 ? '' : 's'} left.`}
-                </p>
-              )}
-            </div>
-          )}
-          <PostResultOffer
-            ownerId={card?.user_id ?? null}
-            gradeComplete={!loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0}
-            orgId={(card as { org_id?: string | null } | null)?.org_id ?? null}
-          />
-          <MarkAsSoldButton
-            cardId={card.id}
-            cardName={vm.identity.displayName}
-            serial={card.serial}
-            ownershipStatus={card.ownership_status}
-            isOwner={isOwner}
-          />
-          <CardBinderPicker cardId={card.id} isOwner={isOwner} />
-        </div>
+        <CardDetailFooterActions
+          card={card}
+          cardName={vm.identity.displayName}
+          isOwner={isOwner}
+          loading={loading}
+          balance={balance}
+          creditsLoading={creditsLoading}
+          retakeHref={retakeHref}
+          uploadHref={uploadHref}
+        />
       </div>
 
       {/* ── mobile bottom action bar (≤760px) ───────────────────────── */}
@@ -896,9 +879,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
             isSold
               ? null
               : {
-                  state: instaList.state,
-                  listingUrl: instaList.listing?.listing_url,
-                  onAct: onInstaListAction,
+                  state: insta.status.state,
+                  listingUrl: insta.status.listing?.listing_url,
+                  onAct: insta.onAct,
                 }
           }
         />

@@ -1790,3 +1790,203 @@
   padding: 0;
   text-align: left;
 }
+
+/* ==========================================================================
+   INSTALIST TAB (pre-listing workbench, owner-only)
+   The photos, title, description, specifics and price that go to eBay, shown
+   and edited before the listing flow opens. Same card frame as the Reports
+   tab so the two read as one page.
+   ========================================================================== */
+
+.dcm-card-detail .cd-instalist-section {
+  display: grid;
+  gap: 16px;
+}
+
+.dcm-card-detail .cd-instalist-h3 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.dcm-card-detail .cd-instalist-status-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.dcm-card-detail .cd-instalist-status-line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dcm-card-detail .cd-instalist-lock-note {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--cd-radius);
+  background: color-mix(in srgb, var(--dcm-purple, #9810fa) 8%, transparent);
+  font-weight: 600;
+}
+
+/* ---------- the five listing photos ---------- */
+
+.dcm-card-detail .cd-instalist-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dcm-card-detail .cd-instalist-image {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.dcm-card-detail .cd-instalist-image img,
+.dcm-card-detail .cd-instalist-image-skeleton {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 5%);
+}
+
+.dcm-card-detail .cd-instalist-image-skeleton {
+  animation: cd-instalist-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cd-instalist-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dcm-card-detail .cd-instalist-image-skeleton { animation: none; }
+}
+
+/* ---------- the editable fields ---------- */
+
+.dcm-card-detail .cd-instalist-fields {
+  display: grid;
+  gap: 16px;
+}
+
+/* Locked (listed or sold): greyed, and every control is already `disabled`,
+   so this is presentation only and never the thing stopping an edit. */
+.dcm-card-detail .cd-instalist-fields[aria-disabled='true'] {
+  opacity: 0.55;
+}
+
+.dcm-card-detail .cd-instalist-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dcm-card-detail .cd-instalist-label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.dcm-card-detail .cd-instalist-input,
+.dcm-card-detail .cd-instalist-textarea {
+  width: 100%;
+  /* 44px targets: the accessibility floor for a touch control. */
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgb(15 23 42 / 15%);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+  color: inherit;
+}
+
+.dcm-card-detail .cd-instalist-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.dcm-card-detail .cd-instalist-input:focus-visible,
+.dcm-card-detail .cd-instalist-textarea:focus-visible {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 2px;
+}
+
+.dcm-card-detail .cd-instalist-input:disabled,
+.dcm-card-detail .cd-instalist-textarea:disabled {
+  background: rgb(15 23 42 / 4%);
+  cursor: not-allowed;
+}
+
+.dcm-card-detail .cd-instalist-input--price {
+  max-width: 200px;
+}
+
+.dcm-card-detail .cd-instalist-required {
+  color: #dc2626;
+}
+
+/* The eBay description is author-written HTML; it must not be able to break
+   the page's own layout, so it is boxed and allowed to scroll on its own. */
+.dcm-card-detail .cd-instalist-preview {
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 10px;
+  background: rgb(15 23 42 / 3%);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.dcm-card-detail .cd-instalist-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.dcm-card-detail .cd-instalist-preview table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.dcm-card-detail .cd-instalist-specifics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dcm-card-detail .cd-instalist-specific {
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-instalist-reset {
+  margin-top: 10px;
+}
+
+.dcm-card-detail .cd-instalist-begin {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dcm-card-detail .cd-instalist-error {
+  font-weight: 600;
+}

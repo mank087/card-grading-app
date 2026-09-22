@@ -13,9 +13,16 @@ import { type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import {
   buildListingDraft,
   mergeAspectsIntoSpecifics,
-  resolveActiveDefaults,
   type ListingDefaultsPayload,
 } from '@/lib/ebay/listingDraft';
+import {
+  applyInitialDraft,
+  resolveSeedDefaults,
+  seedListingPrice,
+  EBAY_TITLE_MAX_LENGTH,
+  type InitialListingDraft,
+} from '@/lib/ebay/listingSeed';
+import { fetchListingSeedContext } from '@/lib/ebay/listingSeedFetch';
 import {
   prepareListingImages,
   uploadListingImages,
@@ -26,12 +33,9 @@ import {
 } from '@/lib/ebay/prepareListingImages';
 import {
   resolveListingFields,
-  buildKeywordSentence,
   isMeaningfulValue,
 } from '@/lib/ebay/listingFields';
-import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES, DEFAULT_DOMESTIC_SHIPPING_SERVICE, normalizeDomesticService } from '@/lib/ebay/tradingApi';
-import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 import { humanizeEnum } from '@/lib/ebay/listingLabels';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 import {
@@ -82,6 +86,20 @@ interface EbayListingModalProps {
    * about the flow; callers that omit it behave exactly as before.
    */
   onListed?: (result: { listingId?: string; listingUrl?: string; sku?: string }) => void;
+  /**
+   * ADDITIVE (card detail V2, InstaList tab). Fields the caller has ALREADY
+   * edited, which override this modal's own seed for those fields only.
+   *
+   * The card-detail InstaList tab renders the same seed this modal does and
+   * lets the owner edit it before the modal is ever opened; it passes back only
+   * the fields they actually changed. A field left out keeps this modal's
+   * default in full — including the parts the tab cannot see, like the shipping
+   * summary the shipping step folds into the description.
+   *
+   * With the prop absent, `applyInitialDraft` returns the defaults unchanged
+   * and this modal behaves exactly as it did before the prop existed.
+   */
+  initialDraft?: InitialListingDraft | null;
 }
 
 type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
@@ -99,6 +117,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   labelStyle = 'modern',
   customLabelConfig = null,
   onListed,
+  initialDraft = null,
 }) => {
   const [step, setStep] = useState<ListingStep>('images');
   const [isLoading, setIsLoading] = useState(false);
@@ -377,21 +396,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setGradingReportDocId(null);
       setDefaultsError(null);
 
-      // Seed the asking price from the shared value resolver — the same
-      // number the collection/portfolio surfaces show for this card. Only
-      // when we actually have a value; otherwise leave blank for the user.
-      // Runs once per open/card (this effect), so it never clobbers a
-      // price the user has typed mid-flow.
-      const { value: suggestedValue, source: valueSource } = resolveCardValue(card);
-      setPrice(suggestedValue > 0 ? suggestedValue.toFixed(2) : '');
-      setSeededPriceLabel(
-        suggestedValue > 0
-          ? valueSource === 'ebay-median'
-            ? 'Suggested from recent eBay sales'
-            : 'Suggested from your portfolio value'
-          : null
-      );
-
       // Default title + description + specifics: one pure assembly shared with
       // the bulk review list (see listingDraft.ts). The title uses the
       // per-category token order fed by the shared field resolver, so the
@@ -404,55 +408,75 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const draft = buildListingDraft(card, { cardType });
       const { titleInput, fields } = draft;
       const defaultTitle = draft.title;
-      setTitle(defaultTitle);
+      const seededDescription = draft.descriptionHtml;
+
+      // The asking price comes from the shared value resolver — the same
+      // number the collection/portfolio surfaces show for this card. Only
+      // when we actually have a value; otherwise leave blank for the user.
+      // Runs once per open/card (this effect), so it never clobbers a
+      // price the user has typed mid-flow. `seedListingPrice` is that rule,
+      // lifted so the card-detail InstaList tab seeds the same figure.
+      const seededPrice = seedListingPrice(card);
+
+      // ADDITIVE: a caller (the InstaList tab) may hand over fields the owner
+      // has already edited. Absent — the normal case — this returns the
+      // defaults above untouched, so the seed below is byte-for-byte what it
+      // has always been. See listingSeed.ts for the precedence rule.
+      const seed = applyInitialDraft({
+        defaultTitle,
+        defaultDescriptionHtml: seededDescription,
+        defaultItemSpecifics: draft.itemSpecifics,
+        defaultPrice: seededPrice.price,
+        defaultPriceLabel: seededPrice.label,
+        initialDraft,
+      });
+
+      setPrice(seed.price);
+      setSeededPriceLabel(seed.priceLabel);
+      setTitle(seed.title);
 
       // Description: branding (org name/color for enterprise cards) + any
       // saved template resolve asynchronously; standard DCM layout renders
       // immediately so the field is never blank.
       setDescriptionFields(draft.descriptionFields);
-      const seededDescription = draft.descriptionHtml;
-      setDescription(seededDescription);
+      setDescription(seed.descriptionHtml);
+      // autoDescriptionRef holds the last description WE generated — the
+      // GENERATED one, never the caller's. When a caller supplied its own, the
+      // two differ, which is exactly how the regeneration effect below learns
+      // to treat it as hand-edited and leave it alone.
       autoDescriptionRef.current = seededDescription;
 
       let cancelled = false;
       (async () => {
-        const session = getStoredSession();
-        setSessionToken(session?.access_token ?? null);
-        const [logos, defaultsRes] = await Promise.all([
-          card.org_id ? loadLogosForCard(card.id).catch(() => null) : Promise.resolve(null),
-          session?.access_token
-            ? fetch('/api/ebay/listing-defaults', { headers: { Authorization: `Bearer ${session.access_token}` } })
-                .then(r => (r.ok ? r.json() : null))
-                .catch(() => null)
-            : Promise.resolve(null),
-        ]);
+        // Both halves of the async seed — org branding and the saved listing
+        // defaults — now come from one shared helper, so the InstaList tab
+        // fetches and folds them identically. Same two requests, same
+        // catch-to-null, as this effect always made inline.
+        const { branding, defaults: defaultsRes, sessionToken: token } =
+          await fetchListingSeedContext(card);
         if (cancelled) return;
+        setSessionToken(token);
 
-        const branding: ListingBranding | null = logos?.branding
-          ? { name: logos.branding.name, brandColor: logos.branding.brandColor || null }
-          : null;
         setListingBranding(branding);
         if (defaultsRes) setListingDefaults(defaultsRes);
 
         // Template resolution: org template only when the caller's org IS the
-        // card's org; else personal.
-        const activeDefaults = resolveActiveDefaults(card, defaultsRes as ListingDefaultsPayload | null);
-        const template = activeDefaults?.descriptionTemplate || null;
-        setActiveTemplate(template);
+        // card's org; else personal. Grade label for titles: an enterprise
+        // store's brand name, resolved with the same org → personal → built-in
+        // precedence (and the same cross-org guard) as the template. Both are
+        // the shared fold in listingSeed.ts.
+        const resolution = resolveSeedDefaults(card, defaultsRes, { titleInput, fields });
+        const activeDefaults = resolution.activeDefaults;
+        setActiveTemplate(resolution.template);
 
-        // Grade label for titles: an enterprise store's brand name, resolved
-        // with the same org → personal → built-in precedence (and the same
-        // cross-org guard) as the template. Only re-render the title if the
-        // user hasn't touched it.
-        const gradeLabel = activeDefaults?.titleGradeLabel || null;
-        if (gradeLabel) {
-          const relabelled = buildEbayTitle({ ...titleInput, gradeLabel });
+        // Only re-render the title if the user hasn't touched it — which also
+        // protects a title an `initialDraft` caller supplied, because such a
+        // title is, by construction, not `defaultTitle`.
+        if (resolution.relabelledTitle && resolution.descriptionFieldsPatch) {
+          const relabelled = resolution.relabelledTitle;
+          const patch = resolution.descriptionFieldsPatch;
           setTitle(prev => (prev === defaultTitle ? relabelled : prev));
-          setDescriptionFields(prev =>
-            prev
-              ? { ...prev, gradeLabel, keywords: buildKeywordSentence(fields, gradeLabel, fields.grade) }
-              : prev
-          );
+          setDescriptionFields(prev => (prev ? { ...prev, ...patch } : prev));
         }
 
         // NOTE: this block deliberately does NOT render the description. The
@@ -493,13 +517,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         }
       })();
 
-      // Initialize item specifics + category from the same draft
+      // Initialize item specifics + category from the same draft (or the
+      // caller's edited set — `seed.itemSpecifics` IS `draft.itemSpecifics`
+      // when no caller supplied one). The category is never overridable: it is
+      // derived from the card type and drives eBay's aspect fetch.
       setCategoryId(draft.categoryId);
-      setItemSpecifics(draft.itemSpecifics);
+      setItemSpecifics(seed.itemSpecifics);
 
       return () => { cancelled = true; };
     }
-  }, [isOpen, card, cardType]);
+  }, [isOpen, card, cardType, initialDraft]);
 
   // Single owner of the generated description.
   //
@@ -2182,11 +2209,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value.substring(0, 80))}
+                  onChange={(e) => setTitle(e.target.value.substring(0, EBAY_TITLE_MAX_LENGTH))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  maxLength={80}
+                  maxLength={EBAY_TITLE_MAX_LENGTH}
                 />
-                <p className="mt-1 text-xs text-gray-500">{title.length}/80 characters</p>
+                <p className="mt-1 text-xs text-gray-500">{title.length}/{EBAY_TITLE_MAX_LENGTH} characters</p>
               </div>
 
               <div>

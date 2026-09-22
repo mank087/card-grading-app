@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { EbayListingModal } from './EbayListingModal';
 import { getStoredSession } from '@/lib/directAuth';
+import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
 
 interface EbayListingButtonProps {
   card: any;
@@ -40,6 +41,27 @@ interface EbayListingButtonProps {
    * way. Existing callers omit it and nothing changes.
    */
   onModalOpenChange?: (open: boolean) => void;
+  /**
+   * ADDITIVE (card detail V2, InstaList tab). Passed straight through to
+   * `EbayListingModal.initialDraft`: the fields the caller's own pre-listing
+   * editor has ALREADY changed, which override the modal's seed for those
+   * fields only. Omitted, the modal seeds exactly as before.
+   *
+   * This also covers the mobile action bar for free: the bar bumps `openSignal`
+   * on this same instance, so a phone user who edited the InstaList tab opens
+   * the modal with their edits.
+   */
+  initialDraft?: InitialListingDraft | null;
+  /**
+   * ADDITIVE (card detail V2, InstaList tab). Reports whether this account has
+   * an eBay connection, once the status check has answered.
+   *
+   * It exists so a caller can LABEL its own trigger ("Begin listing" vs
+   * "Connect eBay to continue") without re-fetching `/api/ebay/status` or
+   * re-deriving the `/ebay/connect?redirect=…` hop. The action itself stays
+   * here: the caller bumps `openSignal` and `handleClick` decides.
+   */
+  onConnectionChange?: (connected: boolean) => void;
 }
 
 export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
@@ -54,6 +76,8 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
   onListed,
   triggerHidden = false,
   onModalOpenChange,
+  initialDraft = null,
+  onConnectionChange,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ebayStatus, setEbayStatus] = useState<{
@@ -126,6 +150,14 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
     onModalOpenChange?.(isModalOpen);
   }, [isModalOpen, onModalOpenChange]);
 
+  // ADDITIVE: only once the check has answered, so a caller never labels its
+  // trigger "Connect eBay" for a connected account on the strength of the
+  // loading default.
+  React.useEffect(() => {
+    if (ebayStatus.loading) return;
+    onConnectionChange?.(ebayStatus.connected);
+  }, [ebayStatus.loading, ebayStatus.connected, onConnectionChange]);
+
   const modal = (
     <EbayListingModal
       isOpen={isModalOpen}
@@ -136,6 +168,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
       labelStyle={labelStyle}
       customLabelConfig={customLabelConfig}
       onListed={onListed}
+      initialDraft={initialDraft}
     />
   );
 

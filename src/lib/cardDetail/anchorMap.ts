@@ -6,7 +6,7 @@
  * links them, QR codes and old shared report links point at them, and the
  * legacy page opens the containing `CollapsibleSection` when the tour asks.
  *
- * V2 replaces that scroll with five tab-like sections, so an anchor is no
+ * V2 replaces that scroll with six tab-like sections, so an anchor is no
  * longer guaranteed to be in the DOM when someone arrives at it. This map is
  * the compatibility contract: every legacy anchor names the V2 section that
  * OWNS it, so the page can activate that section first and scroll second.
@@ -22,16 +22,44 @@
  * rendering side is a review item.
  */
 
-/** The five URL-addressable sections of the V2 page. */
+/** The six URL-addressable sections of the V2 page. */
 export const CARD_DETAIL_SECTIONS = [
   'overview',
   'labels',
   'market',
   'grade',
   'reports',
+  'instalist',
 ] as const;
 
 export type CardDetailSectionId = (typeof CARD_DETAIL_SECTIONS)[number];
+
+/**
+ * Sections only the card's owner may see.
+ *
+ * InstaList is the pre-listing workbench: the owner's photos, their asking
+ * price and the description that will go out under their name. A visitor must
+ * not see it in the nav, and a visitor arriving on `#instalist` — from a shared
+ * link, a stale bookmark, a back button — lands on Overview instead of an empty
+ * tab. This is a PRESENTATION rule; the data behind it is owner-gated by the
+ * same client-side ownership check the rest of the page uses (open audit gap
+ * G6), and nothing here is a substitute for the API's own auth.
+ */
+export const OWNER_ONLY_SECTIONS: readonly CardDetailSectionId[] = ['instalist'];
+
+export function isOwnerOnlySection(id: CardDetailSectionId): boolean {
+  return OWNER_ONLY_SECTIONS.includes(id);
+}
+
+/** The sections this viewer may reach, in nav order. */
+export function visibleCardDetailSections(isOwner: boolean): CardDetailSectionId[] {
+  return CARD_DETAIL_SECTIONS.filter((id) => isOwner || !isOwnerOnlySection(id));
+}
+
+/** The section a viewer actually gets: an owner-only one falls back to Overview. */
+export function sectionForViewer(id: CardDetailSectionId, isOwner: boolean): CardDetailSectionId {
+  return isOwner || !isOwnerOnlySection(id) ? id : 'overview';
+}
 
 /**
  * Where an anchor lives. `hero` means the anchor is in the always-visible
@@ -46,6 +74,9 @@ export const LEGACY_ANCHOR_SECTIONS: Record<string, AnchorOwner> = {
   'tour-grade-score': 'hero',
   'tour-subgrades': 'hero',
   'tour-market-value': 'hero',
+  // STAYS on the hero even though there is now an InstaList SECTION: the tour
+  // step points at the hero panel, which is what an owner sees first and what
+  // the mobile bar acts on. Moving it would make the step open a tab.
   'tour-insta-list': 'hero',
 
   // Overview — the card facts grid and its edit affordance.

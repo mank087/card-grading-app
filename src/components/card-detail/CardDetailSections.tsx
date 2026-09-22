@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The five URL-addressable sections and the nav that switches between them.
+ * The six URL-addressable sections and the nav that switches between them.
  *
  * ── WHAT IS MOUNTED ───────────────────────────────────────────────────────
  * Inactive sections are unmounted, with ONE exception: Market stays mounted
@@ -30,9 +30,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  CARD_DETAIL_SECTIONS,
   resolveHashTarget,
   sectionForAnchor,
+  sectionForViewer,
+  visibleCardDetailSections,
   type CardDetailSectionId,
 } from '@/lib/cardDetail/anchorMap';
 
@@ -42,6 +43,7 @@ const SECTION_LABELS: Record<CardDetailSectionId, string> = {
   market: 'Market & portfolio',
   grade: 'Grade details',
   reports: 'Reports',
+  instalist: 'InstaList',
 };
 
 function prefersReducedMotion(): boolean {
@@ -71,15 +73,22 @@ export interface SectionRouting {
   revealAnchor: (anchorId: string) => void;
 }
 
-export function useCardDetailSectionRouting(): SectionRouting {
+/**
+ * `isOwner` gates the owner-only sections (InstaList). It is not a security
+ * boundary — it decides what the nav offers and where `#instalist` lands for a
+ * visitor, which `sectionForViewer` answers in one place.
+ */
+export function useCardDetailSectionRouting(isOwner: boolean): SectionRouting {
   const [active, setActive] = useState<CardDetailSectionId>('overview');
 
   const applyHash = useCallback(() => {
     const target = resolveHashTarget(window.location.hash);
     if (!target) return;
-    if (target.section) setActive(target.section);
+    // A visitor on `#instalist` gets Overview, and is not scrolled to a tab
+    // that is not there.
+    if (target.section) setActive(sectionForViewer(target.section, isOwner));
     if (target.anchorId) scrollToWhenReady(target.anchorId);
-  }, []);
+  }, [isOwner]);
 
   // On load and on every hash change, including back/forward.
   useEffect(() => {
@@ -88,7 +97,8 @@ export function useCardDetailSectionRouting(): SectionRouting {
     return () => window.removeEventListener('hashchange', applyHash);
   }, [applyHash]);
 
-  const selectSection = useCallback((id: CardDetailSectionId, anchorId?: string) => {
+  const selectSection = useCallback((rawId: CardDetailSectionId, anchorId?: string) => {
+    const id = sectionForViewer(rawId, isOwner);
     setActive(id);
     const hash = `#${anchorId ?? id}`;
     try {
@@ -97,13 +107,13 @@ export function useCardDetailSectionRouting(): SectionRouting {
       /* replaceState can throw in sandboxed frames; the tab still switches. */
     }
     scrollToWhenReady(anchorId ?? id);
-  }, []);
+  }, [isOwner]);
 
   const revealAnchor = useCallback((anchorId: string) => {
     const owner = sectionForAnchor(anchorId);
     // Synchronous on purpose: the tour reads the DOM immediately after this.
-    if (owner && owner !== 'hero') flushSync(() => setActive(owner));
-  }, []);
+    if (owner && owner !== 'hero') flushSync(() => setActive(sectionForViewer(owner, isOwner)));
+  }, [isOwner]);
 
   return { active, selectSection, revealAnchor };
 }
@@ -111,9 +121,11 @@ export function useCardDetailSectionRouting(): SectionRouting {
 export interface CardDetailSectionNavProps {
   active: CardDetailSectionId;
   onSelect: (id: CardDetailSectionId) => void;
+  /** Owner-only sections are absent from a visitor's nav entirely. */
+  isOwner: boolean;
 }
 
-export function CardDetailSectionNav({ active, onSelect }: CardDetailSectionNavProps) {
+export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSectionNavProps) {
   const listRef = useRef<HTMLElement>(null);
 
   /**
@@ -140,7 +152,7 @@ export function CardDetailSectionNav({ active, onSelect }: CardDetailSectionNavP
 
   return (
     <nav ref={listRef} className="cd-section-nav" aria-label="Card detail sections">
-      {CARD_DETAIL_SECTIONS.map((id) => (
+      {visibleCardDetailSections(isOwner).map((id) => (
         <button
           key={id}
           type="button"
@@ -163,6 +175,8 @@ export interface CardDetailSectionsProps {
   market: ReactNode;
   grade: ReactNode;
   reports: ReactNode;
+  /** Owner-only; null for a visitor, who can never make it active anyway. */
+  instalist: ReactNode;
 }
 
 export function CardDetailSections({
@@ -172,12 +186,18 @@ export function CardDetailSections({
   market,
   grade,
   reports,
+  instalist,
 }: CardDetailSectionsProps) {
+  // InstaList joins the unmounted-when-inactive set deliberately: its five
+  // listing photos are canvas renders holding object URLs, and keeping them
+  // alive behind another tab would pin that memory for the whole visit. The
+  // draft itself is held by the shell, so nothing the owner typed is lost.
   const unmountedWhenInactive: Record<Exclude<CardDetailSectionId, 'market'>, ReactNode> = {
     overview,
     labels,
     grade,
     reports,
+    instalist,
   };
 
   return (

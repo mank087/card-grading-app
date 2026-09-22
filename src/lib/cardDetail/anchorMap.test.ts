@@ -14,9 +14,12 @@ import {
   CARD_DETAIL_SECTIONS,
   LEGACY_ANCHOR_IDS,
   LEGACY_ANCHOR_SECTIONS,
+  OWNER_ONLY_SECTIONS,
   resolveHashTarget,
   sectionForAnchor,
+  sectionForViewer,
   V2_ANCHOR_IDS,
+  visibleCardDetailSections,
 } from './anchorMap';
 
 const SRC = path.resolve(__dirname, '../..');
@@ -138,5 +141,37 @@ describe('resolveHashTarget', () => {
       section: null,
       anchorId: 'tour-subgrades',
     });
+  });
+
+  it('resolves the InstaList tab as a section of its own', () => {
+    expect(resolveHashTarget('#instalist')).toEqual({ section: 'instalist', anchorId: null });
+  });
+});
+
+describe('owner-only sections', () => {
+  it('keeps InstaList out of a visitor’s nav and in the owner’s', () => {
+    expect(visibleCardDetailSections(false)).not.toContain('instalist');
+    expect(visibleCardDetailSections(true)).toContain('instalist');
+    // Order is the nav order, and the owner-only tab is last.
+    expect(visibleCardDetailSections(true).at(-1)).toBe('instalist');
+  });
+
+  it('lands a visitor on Overview instead of an owner-only section', () => {
+    expect(sectionForViewer('instalist', false)).toBe('overview');
+    expect(sectionForViewer('instalist', true)).toBe('instalist');
+  });
+
+  it('leaves every public section alone for both', () => {
+    for (const id of CARD_DETAIL_SECTIONS) {
+      if (OWNER_ONLY_SECTIONS.includes(id)) continue;
+      expect(sectionForViewer(id, false)).toBe(id);
+      expect(sectionForViewer(id, true)).toBe(id);
+    }
+  });
+
+  it('keeps `tour-insta-list` on the HERO, not on the new tab', () => {
+    // The onboarding step points at the hero panel. Moving it would make the
+    // step open a tab the reader did not ask for.
+    expect(sectionForAnchor('tour-insta-list')).toBe('hero');
   });
 });

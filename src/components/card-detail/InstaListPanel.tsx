@@ -26,6 +26,7 @@
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { InstaListStatus } from './useInstaListStatus';
+import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
 
 type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
 
@@ -42,6 +43,14 @@ export interface InstaListPanelProps {
   openSignal?: number;
   /** So the shell can hide the mobile bar behind the listing modal. */
   onModalOpenChange?: (open: boolean) => void;
+  /**
+   * The fields the owner edited in the InstaList TAB, carried into the modal
+   * this panel mounts. Only edited fields are present, so an untouched draft
+   * leaves the modal's own seeding exactly as it was.
+   */
+  initialDraft?: InitialListingDraft | null;
+  /** Reports the eBay connection so the tab can label its own button. */
+  onConnectionChange?: (connected: boolean) => void;
 }
 
 export function InstaListPanel({
@@ -54,6 +63,8 @@ export function InstaListPanel({
   status,
   openSignal,
   onModalOpenChange,
+  initialDraft,
+  onConnectionChange,
 }: InstaListPanelProps) {
   if (!isOwner) return null;
 
@@ -69,6 +80,8 @@ export function InstaListPanel({
       openSignal={openSignal}
       onListed={refresh}
       onModalOpenChange={onModalOpenChange}
+      initialDraft={initialDraft}
+      onConnectionChange={onConnectionChange}
     />
   );
 
@@ -93,6 +106,8 @@ export function InstaListPanel({
           <p style={{ margin: 0, fontSize: 14 }}>Checking whether this card is already listed…</p>
         )}
 
+        {/* The SAME `listing.listing_url` the InstaList tab links to — one
+            state object, read twice, so the two can never point apart. */}
         {state === 'listed' && (
           <>
             {listing?.listing_url ? (
