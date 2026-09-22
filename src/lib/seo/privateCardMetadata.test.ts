@@ -9,10 +9,15 @@ vi.mock('@/app/pokemon/[id]/CardDetailV2Client', () => ({ PokemonCardDetailsV2: 
 vi.mock('@/app/sports/[id]/CardDetailClient', () => ({ SportsCardDetails: () => null }))
 vi.mock('@/app/sports/[id]/CardDetailV2Client', () => ({ SportsCardDetailsV2: () => null }))
 vi.mock('@/app/mtg/[id]/CardDetailClient', () => ({ default: () => null }))
+vi.mock('@/app/mtg/[id]/CardDetailV2Client', () => ({ MTGCardDetailsV2: () => null }))
 vi.mock('@/app/lorcana/[id]/CardDetailClient', () => ({ default: () => null }))
+vi.mock('@/app/lorcana/[id]/CardDetailV2Client', () => ({ LorcanaCardDetailsV2: () => null }))
 vi.mock('@/app/onepiece/[id]/CardDetailClient', () => ({ default: () => null }))
+vi.mock('@/app/onepiece/[id]/CardDetailV2Client', () => ({ OnePieceCardDetailsV2: () => null }))
 vi.mock('@/app/other/[id]/CardDetailClient', () => ({ default: () => null }))
+vi.mock('@/app/other/[id]/CardDetailV2Client', () => ({ OtherCardDetailsV2: () => null }))
 vi.mock('@/app/yugioh/[id]/CardDetailClient', () => ({ default: () => null }))
+vi.mock('@/app/yugioh/[id]/CardDetailV2Client', () => ({ YugiohCardDetailsV2: () => null }))
 import { generateMetadata as pokemon } from '@/app/pokemon/[id]/page'
 import { generateMetadata as sports } from '@/app/sports/[id]/page'
 import { generateMetadata as mtg } from '@/app/mtg/[id]/page'

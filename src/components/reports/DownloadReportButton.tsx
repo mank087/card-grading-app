@@ -43,7 +43,25 @@ export type ReportDownloadKind = 'report' | 'mini-pdf' | 'mini-jpg' | 'card-imag
 interface DownloadReportButtonProps {
   card: any; // Card data from database
   variant?: 'default' | 'compact';
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other'; // For URL generation
+  /**
+   * The route segment the report's QR code points at: `/{cardType}/{id}`.
+   *
+   * ADDITIVE (card detail V2, Phase 3): the union now lists all EIGHT
+   * categories, matching `EbayListingButton`'s. It listed five, so the legacy
+   * onepiece, yugioh and starwars clients each pass their own value through
+   * `as any` (onepiece 3573, yugioh 3610, starwars 3583) — the value was
+   * always correct, only the type was short. Widening a prop union accepts
+   * more and rejects nothing, so no existing caller changes.
+   */
+  cardType?:
+    | 'pokemon'
+    | 'sports'
+    | 'mtg'
+    | 'lorcana'
+    | 'onepiece'
+    | 'yugioh'
+    | 'starwars'
+    | 'other';
   showFounderEmblem?: boolean; // Show founder emblem on back label of card images
   showVipEmblem?: boolean; // Show VIP emblem on back label of card images
   showCardLoversEmblem?: boolean; // Show Card Lovers emblem on back label of card images

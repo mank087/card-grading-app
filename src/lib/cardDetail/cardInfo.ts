@@ -21,6 +21,13 @@
 
 import { stripMarkdown } from './parsers';
 import { categoryUsesRarityBuckets, pickRarity } from '@/lib/rarityBuckets';
+import {
+  TCG_DEFAULT_MANUFACTURER,
+  buildTcgCardInfo,
+  buildLorcanaCardInfo,
+  buildOtherCardInfo,
+  normalizeCategoryKey,
+} from './cardInfoCategories';
 
 export interface LegacyCardInfo {
   card_name: any;
@@ -53,6 +60,90 @@ export interface LegacyCardInfo {
   holofoil?: any;
   first_edition?: any;
   reverse_holo?: any;
+
+  /* Shared by the four JSON-first TCG categories (mtg, onepiece, yugioh,
+     starwars) and, where marked, by lorcana. Only the matching adapter and
+     `<Cat>CardInfo` read them; they are undefined elsewhere. */
+  expansion_code?: any;
+  collector_number?: any;
+  artist_name?: any;
+  language?: any;
+  border_color?: any;
+  keywords?: any;
+  foil_type?: any;
+  is_foil?: boolean;
+  is_promo?: boolean;
+  is_parallel?: boolean;
+  is_manga_art?: boolean;
+  is_alternate_art?: boolean;
+  is_sp?: boolean;
+  scryfall_price_usd?: any;
+  scryfall_price_usd_foil?: any;
+
+  /* MTG-only (mtg CardDetailClient.tsx 2644-2698). */
+  flavor_name?: any;
+  mana_cost?: any;
+  color_identity?: any;
+  mtg_card_type?: any;
+  creature_type?: any;
+  power_toughness?: any;
+  frame_version?: any;
+  is_double_faced?: boolean;
+  is_extended_art?: boolean;
+  is_showcase?: boolean;
+  is_borderless?: boolean;
+  is_retro_frame?: boolean;
+  is_full_art_mtg?: boolean;
+
+  /* One Piece-only (onepiece CardDetailClient.tsx 2595-2650). */
+  op_card_type?: any;
+  op_card_color?: any;
+  op_card_power?: any;
+  op_card_cost?: any;
+  op_life?: any;
+  op_counter?: any;
+  op_attribute?: any;
+  op_sub_types?: any;
+  op_variant_type?: any;
+
+  /* Yu-Gi-Oh-only (yugioh CardDetailClient.tsx 2632-2687). */
+  ygo_card_type?: any;
+  ygo_attribute?: any;
+  ygo_atk?: any;
+  ygo_def?: any;
+  ygo_level?: any;
+  ygo_scale?: any;
+  ygo_race?: any;
+  ygo_archetype?: any;
+  ygo_frame_type?: any;
+
+  /* Star Wars-only (starwars CardDetailClient.tsx 2608-2662). */
+  sw_faction?: any;
+  sw_era?: any;
+  sw_rarity?: any;
+  sw_card_type?: any;
+
+  /* Lorcana-only (lorcana CardDetailClient.tsx 2634-2680). */
+  ink_color?: any;
+  lorcana_card_type?: any;
+  character_version?: any;
+  inkwell?: any;
+  ink_cost?: any;
+  strength?: any;
+  willpower?: any;
+  lore_value?: any;
+  move_cost?: any;
+  quest_value?: any;
+  classifications?: any;
+  abilities?: any;
+  flavor_text?: any;
+  is_enchanted?: boolean;
+  franchise?: any;
+
+  /* Other-only (other CardDetailClient.tsx 2595-2632). */
+  card_date?: any;
+  front_text?: any;
+  back_text?: any;
 
   /* Sports-only (sports CardDetailClient.tsx 2561-2652). Only the sports
      adapter and `SportsCardInfo` read these; they are undefined elsewhere. */
@@ -104,6 +195,13 @@ export function buildCardInfo(card: any, category?: string): LegacyCardInfo {
   // same alias list that decides the rarity question answers this one.
   if (categoryUsesRarityBuckets(resolvedCategory)) {
     return buildSportsCardInfo(c, conv, dvgCardInfo);
+  }
+
+  const key = normalizeCategoryKey(resolvedCategory);
+  if (key === 'lorcana') return buildLorcanaCardInfo(c, conv, dvgCardInfo);
+  if (key === 'other') return buildOtherCardInfo(c, conv, dvgCardInfo);
+  if (key in TCG_DEFAULT_MANUFACTURER) {
+    return buildTcgCardInfo(c, conv, dvgCardInfo, key);
   }
 
   const setNameRaw = c.card_set || stripMarkdown(conv?.set_name) || dvgCardInfo?.set_name;

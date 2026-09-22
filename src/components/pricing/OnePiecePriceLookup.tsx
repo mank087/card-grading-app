@@ -6,6 +6,7 @@ import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/value
 import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
+import { computeMarketRange, type MarketRange } from '@/lib/pricing/marketRange';
 import {
   BarChart,
   Bar,
@@ -85,6 +86,24 @@ interface OnePiecePriceLookupProps {
     matchConfidence: 'high' | 'medium' | 'low' | 'none';
     productName: string | null;
     priceChartingUrl?: string;
+    /**
+     * ADDITIVE (card detail V2, One Piece adapter). The same three-number range
+     * the Market Value panel below prints, so a caller can show it beside the
+     * estimate instead of recomputing it. Null when the match carried no
+     * prices. Mirrors `PokemonPriceLookup`'s field of the same name and is
+     * built by the same `computeMarketRange`.
+     */
+    marketRange?: MarketRange | null;
+    /**
+     * ADDITIVE (card detail V2, finding 5). The freshness OF THIS RESULT, as
+     * the lookup genuinely knows it: the pricing API reports whether it served
+     * a cached match and, when it did, how old that cache is in days. A caller
+     * may then describe the number it is showing instead of reaching for the
+     * stored row's unrelated `dcm_price_updated_at`. No timestamp is invented
+     * for a fresh fetch — `isCached: false` is the whole of what is known.
+     */
+    isCached?: boolean;
+    cacheAgeDays?: number | null;
   }) => void;
 }
 
@@ -274,6 +293,9 @@ export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, guardIden
             matchConfidence: data.data.matchConfidence,
             productName: data.data.prices?.productName || null,
             priceChartingUrl,
+            marketRange: computeMarketRange(data.data.prices),
+            isCached: data.cached || false,
+            cacheAgeDays: data.cacheAge ?? null,
           });
         }
         // Persist estimated price to database for collection/portfolio pages
@@ -350,6 +372,9 @@ export function OnePiecePriceLookup({ card, dcmGrade, isOwner = false, guardIden
           matchConfidence: data.data.matchConfidence,
           productName: data.data.prices?.productName || null,
           priceChartingUrl,
+          marketRange: computeMarketRange(data.data.prices),
+          isCached: data.cached || false,
+          cacheAgeDays: data.cacheAge ?? null,
         });
       }
 
