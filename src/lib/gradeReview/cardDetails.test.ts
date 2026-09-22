@@ -16,7 +16,31 @@ function fixture() {
 
 describe('card details correction', () => {
   it('reads the current identity from the live columns', () => {
-    expect(currentDetails(fixture().card)).toEqual({ card_name: 'Mickey Mantle', set_name: 'Topps', year: '1957', card_number: '35', manufacturer: 'Topps' });
+    expect(currentDetails(fixture().card)).toEqual({ card_name: 'Mickey Mantle', set_name: 'Topps', year: '1957', card_number: '35', manufacturer: 'Topps', serial_number: null });
+  });
+  it('corrects the print-run serial across the row, card info and label', () => {
+    const { card } = fixture();
+    const serialCard = { ...card, serial_numbering: '32/325', conversational_card_info: { ...card.conversational_card_info, serial_number: '32/325' } };
+    expect(currentDetails(serialCard).serial_number).toBe('32/325');
+    const result = buildDetailsPatch(serialCard, serialCard.conversational_grading, { serial_number: '325/825' }, 'review-serial');
+    expect(result.changes).toEqual([{ field: 'serial_number', from: '32/325', to: '325/825' }]);
+    expect(result.patch.serial_numbering).toBe('325/825');
+    expect(result.expected.serial_numbering).toBe('32/325');
+    expect(result.patch.conversational_card_info).toMatchObject({ serial_number: '325/825', serial_number_source: 'manual_correction' });
+    expect(JSON.parse(String(result.patch.conversational_grading)).card_info.serial_number).toBe('325/825');
+    expect((result.patch.ai_grading as Record<string, Record<string, unknown>>)['Card Information']).toMatchObject({ serial_number: '325/825' });
+  });
+  it('clears a serial the grader invented when the admin types "none"', () => {
+    const { card } = fixture();
+    const serialCard = { ...card, serial_numbering: '32/325', conversational_card_info: { ...card.conversational_card_info, serial_number: '32/325' } };
+    const result = buildDetailsPatch(serialCard, serialCard.conversational_grading, { serial_number: 'none' }, 'review-serial');
+    expect(result.changes).toEqual([{ field: 'serial_number', from: '32/325', to: null }]);
+    expect(result.patch.serial_numbering).toBeNull();
+    expect(result.patch.conversational_card_info).toMatchObject({ serial_number: null });
+  });
+  it('accepts a slashed serial and rejects an empty one', () => {
+    expect(detailsCorrectionSchema.safeParse({ serial_number: '325/825' }).success).toBe(true);
+    expect(detailsCorrectionSchema.safeParse({ serial_number: '  ' }).success).toBe(false);
   });
   it('rewrites every identity surface for the changed fields only', () => {
     const { card } = fixture();

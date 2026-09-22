@@ -4,10 +4,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 const categories=['centering','corners','edges','surface'];
 const fields=categories.flatMap(c=>[`${c}_front`,`${c}_back`]);
-const detailFields=['card_name','set_name','year','card_number','manufacturer'] as const;
-const detailLabels:Record<string,string>={card_name:'Card name',set_name:'Set',year:'Year',card_number:'Card number',manufacturer:'Manufacturer',other:'Other'};
+const detailFields=['card_name','set_name','year','card_number','manufacturer','serial_number'] as const;
+const detailLabels:Record<string,string>={card_name:'Card name',set_name:'Set',year:'Year',card_number:'Card number',manufacturer:'Manufacturer',serial_number:'Serial number',other:'Other'};
+// The print-run serial is free text; "none" clears one the grader invented.
+const detailHints:Partial<Record<typeof detailFields[number],string>>={serial_number:'Print-run serial, e.g. 325/825. Type "none" if the card is not serialized.'};
 type Detail={review:{review_mode:string;admin_reviewed_at:string|null;admin_notes:string|null;status:string;note:string;customer_result:string|null;concerns:{category:string;side:string}[]};snapshot:{report:string;grade:number};isCurrent:boolean;photos:{side:string;url:string|null}[];notifications:{kind:string;sent_at:string|null;failed_at:string|null;last_error:string|null}[];
-  details?:{current:Record<string,string|null>;claim:Record<string,string>|null;changes:{field:string;from:string|null;to:string}[]|null;applied_at:string|null;category:string}};
+  details?:{current:Record<string,string|null>;claim:Record<string,string>|null;changes:{field:string;from:string|null;to:string|null}[]|null;applied_at:string|null;category:string}};
 export default function ManualGradeReviewPage(){
   const {id}=useParams<{id:string}>(),[data,setData]=useState<Detail|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
   const [verdict,setVerdict]=useState('confirm'),[notes,setNotes]=useState(''),[scores,setScores]=useState<Record<string,string>>({}),[cap,setCap]=useState(''),[structural,setStructural]=useState(false);
@@ -32,9 +34,9 @@ export default function ManualGradeReviewPage(){
       {data.details?.claim&&<div className="mt-3 rounded bg-amber-50 p-3 text-sm"><p className="font-semibold">Customer says the card details are wrong:</p><ul className="mt-1 list-disc pl-5">{Object.entries(data.details.claim).map(([k,v])=><li key={k}>{detailLabels[k]??k}: {v}</li>)}</ul></div>}
     </section>
     <section className="rounded border bg-white p-4"><h2 className="font-bold">Card details</h2>
-      {data.details?.applied_at?<div className="text-sm"><p className="font-semibold text-green-800">Corrected {new Date(data.details.applied_at).toLocaleString()}</p><ul className="mt-1 list-disc pl-5">{(data.details.changes??[]).map(c=><li key={c.field}>{detailLabels[c.field]??c.field}: {c.from??'(blank)'} → {c.to}</li>)}</ul></div>
+      {data.details?.applied_at?<div className="text-sm"><p className="font-semibold text-green-800">Corrected {new Date(data.details.applied_at).toLocaleString()}</p><ul className="mt-1 list-disc pl-5">{(data.details.changes??[]).map(c=><li key={c.field}>{detailLabels[c.field]??c.field}: {c.from??'(blank)'} → {c.to??'(none)'}</li>)}</ul></div>
       :<><p className="text-sm text-gray-600">Current identification on the card. Edit any field to correct it; the correction applies as soon as you complete the review and refreshes the market price.</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">{detailFields.map(f=><label key={f} className="text-sm">{detailLabels[f]}<input type="text" value={details[f]??''} onChange={e=>setDetails(v=>({...v,[f]:e.target.value}))} placeholder={data.details?.current?.[f]??''} className="mt-1 block w-full rounded border p-2" disabled={!!data.review.admin_reviewed_at}/></label>)}</div></>}
+        <div className="mt-3 grid gap-3 md:grid-cols-2">{detailFields.map(f=><label key={f} className="text-sm">{detailLabels[f]}<input type="text" value={details[f]??''} onChange={e=>setDetails(v=>({...v,[f]:e.target.value}))} placeholder={data.details?.current?.[f]??''} className="mt-1 block w-full rounded border p-2" disabled={!!data.review.admin_reviewed_at}/>{detailHints[f]&&<span className="mt-1 block text-xs font-normal text-gray-500">{detailHints[f]}</span>}</label>)}</div></>}
       {saved?.details_applied&&<p className="mt-3 text-sm text-green-800">Details applied. Market price refreshed: DCM {saved.pricing?.dcm??'n/a'}, eBay median {saved.pricing?.ebayMedian??'n/a'}{saved.pricing?.errors?.length?` (${saved.pricing.errors.join('; ')})`:''}.</p>}
     </section>
     <section className="grid gap-4 md:grid-cols-2">{data.photos.map(photo=><div key={photo.side}><h2 className="font-bold capitalize">{photo.side}</h2>{photo.url?<a href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt={`Original ${photo.side} photo`} className="max-h-[650px] w-full object-contain"/></a>:<p>Original photo unavailable.</p>}</div>)}</section>

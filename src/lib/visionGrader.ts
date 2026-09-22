@@ -28,6 +28,8 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
+import { verifyClippedCorners } from './grading/frameEdgeCheck';
+import { caseConsensus } from './grading/caseConsensus';
 import { explainUncertaintyHold, letterUncertainty as letterUncertaintyFromEvidence } from './grading/evidenceHold';
 import { firstLookEnabled, runFirstLook, recordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
@@ -60,7 +62,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.26'; // v9.26: a held grade records its TRUE cause in grade_hold (clipped corner, holder, possible damage, disagreement, dissent, image quality) and the report shows it as a hold. No grade moves: the letter override and the revised out-of-frame rule exist but are OFF (GRADING_EVIDENCE_V2), having failed a by-eye review
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.28'; // v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -2187,6 +2189,15 @@ Provide detailed analysis as markdown with all required sections.`
         console.log(`[CONVERSATIONAL JSON] structural flagged by ${structuralDetectors.length}/${scored.length} (not majority) — keeping median-pick; cap decision deferred to corroboration check`);
       }
       const jsonData: any = base.j;
+      // v9.28: whether the card is in a rigid holder is decided by a MAJORITY of the
+      // evaluations, not by whichever one the median pick happened to choose
+      // (grading/caseConsensus.ts). One evaluation imagining a top loader on a flatbed
+      // scan was holding unanimous 10s at 9.
+      const holderConsensus = caseConsensus(scored.map(x => x.j?.case_detection), jsonData.case_detection);
+      if (holderConsensus.overruledBase) {
+        console.log(`[GRADE RECALC] holder consensus: base evaluation said case_type=${jsonData.case_detection?.case_type}, but ${holderConsensus.votes}/${holderConsensus.total} evaluations report a rigid holder - using the majority view`);
+        jsonData.case_detection = holderConsensus.detection;
+      }
       console.log(`[CONVERSATIONAL JSON] Ensemble finals: [${scored.map(x => x.final).join(', ')}] → base=${base.final}${structuralDetectors.length ? ` (structural detections: ${structuralDetectors.length})` : ''}`);
 
       // ── IDENTITY RECONCILIATION ────────────────────────────────────────
@@ -2504,9 +2515,7 @@ Provide detailed analysis as markdown with all required sections.`
         // Skip COSMETIC caps for cased cards; structural findings still merge below,
         // and the Gem gate independently holds cased cards at ≤9.
         const caseInfoForZoom = jsonData.case_detection || {};
-        const rigidCaseForZoom =
-          ['top_loader', 'semi_rigid', 'slab'].includes(caseInfoForZoom.case_type) ||
-          ['moderate', 'high'].includes(caseInfoForZoom.impact_level);
+        const rigidCaseForZoom = holderConsensus.rigid;
         if (zoom?.ok && rigidCaseForZoom && Object.keys(zoom.faceCaps).length > 0) {
           console.log(`[GRADE RECALC] 🔎 zoom cosmetic caps SKIPPED (rigid case: ${caseInfoForZoom.case_type}) — structural findings still apply`);
           zoom.faceCaps = {};
@@ -3220,10 +3229,30 @@ Provide detailed analysis as markdown with all required sections.`
         // not notice (owner-verified: graded 9–10 at confidence B with a corner cut
         // off), so the measured geometry lowers it — and the existing uncertainty
         // gate below then refuses a 10 on it.
-        const clippedCardCorners = [
+        let clippedCardCorners = [
           ...clippedCorners(zoom?.capture?.frontQuad, 'front'),
           ...clippedCorners(zoom?.capture?.backQuad, 'back'),
         ];
+        // The outline that flagged those corners is a model's estimate, good to a few percent.
+        // Before it costs a card its grade, look at the pixels along that edge of the photo:
+        // background there means the card is complete (grading/frameEdgeCheck.ts). It can only
+        // clear a flag, never add one, and never throws. CLIP_PIXEL_CHECK=0 switches it off.
+        if (clippedCardCorners.length > 0 && process.env.CLIP_PIXEL_CHECK !== '0') {
+          try {
+            const originals = await loadOriginals();
+            const front = await verifyClippedCorners(originals.front, zoom?.capture?.frontQuad, 'front', clippedCardCorners);
+            const back = await verifyClippedCorners(originals.back, zoom?.capture?.backQuad, 'back', clippedCardCorners);
+            const cleared = [...front.cleared, ...back.cleared];
+            if (cleared.length > 0) {
+              console.log(`[CAPTURE] out-of-frame flag cleared by the pixel check: ${cleared.join(', ')}`);
+              jsonData.image_quality = jsonData.image_quality || {};
+              jsonData.image_quality.out_of_frame_cleared = cleared;
+              clippedCardCorners = [...front.clipped, ...back.clipped];
+            }
+          } catch (e: any) {
+            console.warn('[CAPTURE] pixel edge check skipped (non-blocking):', e?.message || e);
+          }
+        }
         if (clippedCardCorners.length > 0) {
           jsonData.image_quality = jsonData.image_quality || {};
           jsonData.image_quality.confidence_letter = confidenceWithClipping(jsonData.image_quality.confidence_letter, clippedCardCorners);
@@ -3304,9 +3333,7 @@ Provide detailed analysis as markdown with all required sections.`
         const tileDraggedCats = new Map<'centering' | 'corners' | 'edges' | 'surface', number>();
         const unanimous10 = Math.min(f1, f2, f3) >= 10;
         const caseInfo = jsonData.case_detection || {};
-        const rigidCase =
-          ['top_loader', 'semi_rigid', 'slab'].includes(caseInfo.case_type) ||
-          ['moderate', 'high'].includes(caseInfo.impact_level);
+        const rigidCase = holderConsensus.rigid;
 
         // v9.14: does a 2-of-3 majority at 10 survive the evidence check?
         // (pass1/2/3 category values are post-fold, but at finalGrade===10 no
