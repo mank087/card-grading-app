@@ -9,10 +9,15 @@
  * caller does not control `side`), which costs nothing extra.
  *
  * Each card carries, in order:
- *   the composition · a "Holder preview" tag · the holder name · the real
- *   physical label format · the `holderStyleSupport` note when the status is
- *   not `supported` · the holder's download (owner only, opening the EXISTING
- *   DownloadReportButton flow) · Label Studio · the shop links.
+ *   the composition · an "Enlarge" text link under the mockup's own Front/Back
+ *   toggle · the holder name · the real physical label format · the
+ *   `holderStyleSupport` note when the status is not `supported` · the
+ *   holder's download (owner only, opening the EXISTING DownloadReportButton
+ *   flow) · the shop link · Label Studio (detail variant only).
+ *
+ * NO "Digital holder preview" TAG (owner review, 2026-09-22 item 11). The
+ * section's own one-line lead-in already says where these pictures come from;
+ * a badge on every card repeated it three times over.
  *
  * CHEAP BY CONSTRUCTION
  *  - a card's composition mounts only once it is near the viewport
@@ -114,61 +119,58 @@ export function HolderCards({
               {renderComposition(holder, cardWidth)}
             </WhenNear>
 
-            {/* Never imply the card physically sits in this holder. */}
-            <p className="cd-holder-tag">
-              <span>Digital holder preview</span>
-            </p>
-
-            <h4 className="cd-holder-card-name">{HOLDER_NAMES[holder]}</h4>
-            <p className="cd-caption">
-              {HOLDER_LABEL_STOCK[holder]} &middot; {size.formatted}
-            </p>
-
-            {size.note && (
-              <p className="cd-support-note" data-status={size.status} role="note">
-                {size.note}
-              </p>
+            {/* Directly under the mockup's own Front/Back toggle, and a text
+                link rather than a button: enlarging is a second look, not an
+                action that competes with download and shop. */}
+            {onEnlarge && (
+              <button
+                type="button"
+                className="cd-enlarge-link"
+                onClick={() => onEnlarge(holder)}
+              >
+                Enlarge
+              </button>
             )}
 
-            {support.note && (
-              <p className="cd-support-note" data-status={support.status} role="note">
-                {support.note}
+            <div className="cd-holder-card-body">
+              <h4 className="cd-holder-card-name">{HOLDER_NAMES[holder]}</h4>
+              <p className="cd-caption">
+                {HOLDER_LABEL_STOCK[holder]} &middot; {size.formatted}
               </p>
-            )}
+
+              {size.note && (
+                <p className="cd-support-note" data-status={size.status} role="note">
+                  {size.note}
+                </p>
+              )}
+
+              {support.note && (
+                <p className="cd-support-note" data-status={support.status} role="note">
+                  {support.note}
+                </p>
+              )}
+            </div>
 
             <div className="dcm-actions cd-holder-card-actions">
-              {onEnlarge && (
-                <button
-                  type="button"
-                  className="cd-quiet"
-                  onClick={() => onEnlarge(holder)}
-                >
-                  Enlarge
-                </button>
-              )}
               {renderDownload?.(holder)}
-              {variant === 'detail' && customizeHref && (
-                <a className="cd-quiet" href={customizeHref(holder)}>
-                  Customize in Label Studio
-                </a>
-              )}
-              {/* One entry on the compact card; the detail card names each
-                  product, because One-Touch needs two (the holder and its
-                  Avery 6871 stock) and two identical links read as a mistake. */}
-              {(variant === 'detail'
-                ? HOLDER_SHOP_LINKS[holder]
-                : HOLDER_SHOP_LINKS[holder].slice(0, 1)
-              ).map((link) => (
+              {/* One shop entry per holder, with the wording the owner asked
+                  for, in BOTH the Overview band and the Labels & holders tab. */}
+              {HOLDER_SHOP_LINKS[holder].map((link) => (
                 <a
                   key={link.href}
-                  className="cd-quiet"
+                  className="cd-holder-shop-link"
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {variant === 'detail' ? link.label : 'Shop this holder & labels'}
+                  {link.label}
                 </a>
               ))}
+              {variant === 'detail' && customizeHref && (
+                <a className="cd-quiet cd-holder-customize" href={customizeHref(holder)}>
+                  Customize in Label Studio
+                </a>
+              )}
             </div>
           </section>
         );

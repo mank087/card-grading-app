@@ -32,7 +32,18 @@ import type { CustomLabelConfig, LabelColorOverrides } from '@/lib/labelPresets'
 import type { LabelData } from '@/lib/labelDataGenerator';
 import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
 import LabelArtwork, { type LabelArtworkOrgLogos } from './LabelArtwork';
+import ScaleUpBox from './ScaleUpBox';
 import { useHolderCompactImages, type CompactFormat } from './useHolderCompactImages';
+
+/**
+ * The width `LabelMockup` is drawn for (`w-full max-w-[200px]` on all three
+ * mockups). The SLAB mockup takes real artwork in its label slot and is
+ * resolution-independent, so it simply takes a bigger `maxWidth`. The two
+ * COMPACT mockups draw their label with fixed pixel type, so widening them
+ * alone leaves a five-pixel label inside a doubled box (review item 5): they
+ * are magnified as a whole instead, via ScaleUpBox.
+ */
+const MOCKUP_DESIGN_WIDTH = 200;
 
 export interface HolderCompositionProps {
   holder: CardHolderId;
@@ -147,13 +158,14 @@ export function HolderComposition({
     ],
   );
 
-  return (
-    <div className="cd-holder-composition">
+  const magnify = !isSlab && typeof maxWidth === 'number' && maxWidth > MOCKUP_DESIGN_WIDTH;
+
+  const mockup = (
       <LabelMockup
         card={{ front_url: frontUrl, back_url: backUrl, card_name: cardName }}
         labelType={labelType}
         side={side}
-        maxWidth={maxWidth}
+        maxWidth={magnify ? undefined : maxWidth}
         slabLabel={slabLabel}
         labelImages={compactImages}
         labelProps={{
@@ -177,6 +189,21 @@ export function HolderComposition({
           showCardLoversEmblem: emblems?.showCardLoversEmblem,
         }}
       />
+  );
+
+  return (
+    <div className="cd-holder-composition">
+      {magnify ? (
+        <ScaleUpBox
+          className="cd-holder-scalebox"
+          designWidth={MOCKUP_DESIGN_WIDTH}
+          targetWidth={maxWidth as number}
+        >
+          {mockup}
+        </ScaleUpBox>
+      ) : (
+        mockup
+      )}
     </div>
   );
 }

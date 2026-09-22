@@ -37,6 +37,9 @@ import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
  * Now includes dropdown for Full Report and Foldable Label options
  */
 
+/** The report exports a single trigger can open. See `reportDownload`. */
+export type ReportDownloadKind = 'report' | 'mini-pdf' | 'mini-jpg' | 'card-images';
+
 interface DownloadReportButtonProps {
   card: any; // Card data from database
   variant?: 'default' | 'compact';
@@ -70,6 +73,25 @@ interface DownloadReportButtonProps {
   holderDownloadLabel?: string;
   /** Extra classes for the `holderDownload` trigger. */
   holderDownloadClassName?: string;
+  /**
+   * ADDITIVE (card detail V2, owner review item 7). Render ONE trigger for ONE
+   * REPORT export instead of the two dropdowns, so a page can lay the reports
+   * out as cards and still open the existing flow. Same handlers, same
+   * generators, nothing duplicated:
+   *
+   *   'report'      -> handleDownloadReport     (full grading report PDF)
+   *   'mini-pdf'    -> handleDownloadLabel      (mini-report PDF)
+   *   'mini-jpg'    -> handleDownloadMiniJpg    (mini-report image)
+   *   'card-images' -> handleDownloadCardImages (front & back with the label)
+   *
+   * With this absent the component renders and behaves exactly as before.
+   * `holderDownload` wins if both are somehow supplied.
+   */
+  reportDownload?: ReportDownloadKind;
+  /** Button text for `reportDownload`. Defaults per kind. */
+  reportDownloadLabel?: string;
+  /** Extra classes for the `reportDownload` trigger. */
+  reportDownloadClassName?: string;
   /**
    * ADDITIVE (card detail V2, finding 4). A counter the caller increments to
    * OPEN THE LABELS MENU from outside. The mobile action bar's "Download
@@ -108,6 +130,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   holderDownload,
   holderDownloadLabel,
   holderDownloadClassName,
+  reportDownload,
+  reportDownloadLabel,
+  reportDownloadClassName,
   openLabelsSignal,
   onMenuOpenChange,
   sheetOnMobile = false,
@@ -1542,6 +1567,45 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       onClick: handleDownloadMiniJpg,
     },
   ];
+
+  // ── Report-specific single trigger (additive; see `reportDownload`) ──
+  // One button per report export, opening the EXISTING handler. None of the
+  // four opens a modal, so nothing else has to be mounted here.
+  if (reportDownload && !holderDownload) {
+    const REPORT_TRIGGER: Record<ReportDownloadKind, { label: string; onClick: () => void; busy: boolean }> = {
+      report: {
+        label: 'Download full report',
+        onClick: handleDownloadReport,
+        busy: isGenerating && generatingType === 'report',
+      },
+      'mini-pdf': {
+        label: 'Download mini-report',
+        onClick: handleDownloadLabel,
+        busy: isGenerating && generatingType === 'label',
+      },
+      'mini-jpg': {
+        label: 'Download mini-report image',
+        onClick: handleDownloadMiniJpg,
+        busy: isGenerating && generatingType === 'mini-jpg',
+      },
+      'card-images': {
+        label: 'Download card images',
+        onClick: handleDownloadCardImages,
+        busy: isGenerating && generatingType === 'card-images',
+      },
+    };
+    const trigger = REPORT_TRIGGER[reportDownload];
+    return (
+      <button
+        type="button"
+        onClick={trigger.onClick}
+        disabled={trigger.busy}
+        className={reportDownloadClassName ?? 'dcm-button dcm-button--primary'}
+      >
+        {trigger.busy ? 'Generating…' : (reportDownloadLabel ?? trigger.label)}
+      </button>
+    );
+  }
 
   // ── Holder-specific single trigger (additive; see `holderDownload`) ──
   // Opens one of the flows above directly. The modals below are the same

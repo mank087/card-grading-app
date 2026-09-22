@@ -316,3 +316,37 @@ describe('extras', () => {
     expect(vm.category).toBe('pokemon');
   });
 });
+
+/**
+ * Owner review 2026-09-22, item 12. `cards.rarity_tier` holds the grader's
+ * classification bucket, not the rarity: see src/lib/rarityBuckets.ts.
+ */
+describe('rarityOrVariant vs the classification bucket', () => {
+  it('falls past the bucket to the printed rarity for a Pokemon card', () => {
+    const vm = build({
+      rarity_tier: 'Parallel / Insert Variant',
+      conversational_card_info: { rarity_tier: 'Secret Rare' },
+    } as never);
+    expect(vm.identity.rarityOrVariant).toBe('Secret Rare');
+  });
+
+  it('shows no rarity rather than the bucket', () => {
+    const vm = build({
+      rarity_tier: 'Parallel / Insert Variant',
+      rarity_description: null,
+      conversational_card_info: {},
+    } as never);
+    expect(vm.identity.rarityOrVariant).toBeNull();
+  });
+
+  it('keeps the bucket for a sports card', () => {
+    const vm = build(
+      {
+        rarity_tier: 'Parallel / Insert Variant',
+        conversational_card_info: { rarity_tier: 'Secret Rare' },
+      } as never,
+      { category: 'sports' },
+    );
+    expect(vm.identity.rarityOrVariant).toBe('Parallel / Insert Variant');
+  });
+});

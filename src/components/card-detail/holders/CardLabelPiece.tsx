@@ -83,6 +83,7 @@ export function CardLabelPiece({
               aria-label={`Zoom ${imageAlt}`}
             >
               <Image
+                className="cd-piece-photo"
                 src={imageUrl}
                 alt={imageAlt}
                 width={400}
@@ -93,6 +94,7 @@ export function CardLabelPiece({
             </button>
           ) : (
             <Image
+              className="cd-piece-photo"
               src={imageUrl}
               alt={imageAlt}
               width={400}

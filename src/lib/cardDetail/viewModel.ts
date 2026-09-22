@@ -35,6 +35,7 @@
  */
 
 import { getCardLabelData } from '@/lib/useLabelData';
+import { pickRarity } from '@/lib/rarityBuckets';
 import type { LabelData } from '@/lib/labelDataGenerator';
 import { resolveCardValue, type PriceSource, type CardForPricing } from '@/lib/pricing/resolveCardValue';
 import type { ValueTrustReason } from '@/lib/pricing/valueGuard';
@@ -392,7 +393,15 @@ export function buildCardDetailViewModel({
     year: labelData.year,
     cardNumber: labelData.cardNumber,
     cardNumberFormatted: labelData.formattedCardNumber ?? null,
-    rarityOrVariant: firstString(
+    /**
+     * `cards.rarity_tier` is the grader's CLASSIFICATION BUCKET, not a rarity
+     * name, and for Pokemon it is almost always 'Parallel / Insert Variant'
+     * (see lib/rarityBuckets.ts). Outside sports a bucket is skipped so the
+     * chain falls through to the printed rarity, and a card with nothing but
+     * buckets shows no rarity at all rather than the wrong one.
+     */
+    rarityOrVariant: pickRarity(
+      category,
       card.rarity_tier,
       card.rarity_description,
       card.conversational_card_info?.rarity_tier,

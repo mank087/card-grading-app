@@ -128,7 +128,7 @@ export function PokemonCardDetailsV2() {
    * by the shared `buildCardInfo` so the Card Information block, the price
    * lookup and the marketplace links all read one copy of the precedence.
    */
-  const cardInfo = useMemo(() => buildCardInfo(card), [card]);
+  const cardInfo = useMemo(() => buildCardInfo(card, 'pokemon'), [card]);
 
   // Legacy's rule, verbatim in intent (CardDetailClient.tsx 3498-3520): only a
   // TRUSTED estimate is shown. A thin-identity card shows the correction
@@ -355,6 +355,25 @@ export function PokemonCardDetailsV2() {
       renderProEstimates={() => (
         <ProEstimatesPanel estimates={(card as any)?.estimated_professional_grades ?? null} />
       )}
+      // The panel draws nothing when the column is null, so the shell drops the
+      // heading instead of leaving one over an empty block.
+      hasProEstimates={!!(card as any)?.estimated_professional_grades}
+      renderReportDownload={(kind, ctx, label) =>
+        card ? (
+          <DownloadReportButton
+            card={card}
+            cardType="pokemon"
+            showFounderEmblem={detail.emblems.showFounderEmblem}
+            showVipEmblem={detail.emblems.showVipEmblem}
+            showCardLoversEmblem={detail.emblems.showCardLoversEmblem}
+            labelStyle={ctx.labelStyle}
+            customLabelConfig={ctx.customLabelConfig}
+            reportDownload={kind}
+            reportDownloadLabel={label}
+            reportDownloadClassName="cd-quiet"
+          />
+        ) : null
+      }
       renderCategoryCardInfo={(ctx) => (
         <PokemonCardInfo
           card={ctx.card}

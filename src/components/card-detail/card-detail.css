@@ -274,12 +274,39 @@
 
 .dcm-card-detail .cd-showcase {
   display: grid;
+  /* An explicit 1fr column, not the implicit max-content one: a single wide
+     child (the download row below) would otherwise size the whole showcase
+     and push the page sideways on a phone. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   padding: 18px;
   border: 1px solid var(--cd-panel-border);
   border-radius: var(--cd-radius);
   background: var(--dcm-surface, #f6f7fa);
   min-width: 0;
+}
+
+/*
+ * The hero's download menu is `DownloadReportButton`'s default variant: two
+ * wide triggers ("Download Labels", "Download Reports") in a `flex gap-3` row
+ * that does not wrap. At 390px that row is 347px wide and it was the one
+ * thing making the whole page scroll sideways. The component is shared and
+ * unchanged; this only lets its row wrap, and only inside this page.
+ */
+@media (width <= 480px) {
+  .dcm-card-detail #tour-holder-download > div {
+    flex-wrap: wrap;
+  }
+
+  .dcm-card-detail #tour-holder-download > div > div {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .dcm-card-detail #tour-holder-download > div > div > button {
+    width: 100%;
+    padding-inline: 12px;
+  }
 }
 
 .dcm-card-detail .cd-stage {
@@ -292,7 +319,15 @@
   min-height: 220px;
 }
 
-.dcm-card-detail .cd-stage img {
+/* The card PHOTO inside the hero stage — and ONLY the photo.
+   A bare `.cd-stage img` also matched the DCM mark inside the Modern and
+   Traditional label artwork: the mark took `width: 100%` (capped at 380px)
+   with `height: auto`, rendered 380x380, and squeezed the label's text
+   column to zero width, so every word wrapped letter by letter and the
+   label read as a tall dark box. Scoped to the photo, the label's own
+   sizing (`h-10 w-auto`, `h-14 w-auto`) survives. */
+.dcm-card-detail .cd-stage > img,
+.dcm-card-detail .cd-piece-photo {
   width: 100%;
   max-width: 380px;
   height: auto;
@@ -1393,6 +1428,12 @@
   min-width: 0;
 }
 
+/* ScaleUpBox sizes itself: designWidth x scale. See holders/ScaleUpBox.tsx. */
+.dcm-card-detail .cd-holder-composition > .cd-holder-scalebox {
+  width: auto;
+  flex: none;
+}
+
 .dcm-card-detail .cd-holder-composition--loading {
   aspect-ratio: 280 / 460;
   width: 100%;
@@ -1446,9 +1487,9 @@
 }
 
 .dcm-card-detail .cd-holder-card {
-  display: grid;
-  align-content: start;
-  justify-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
   padding: 14px;
@@ -1464,6 +1505,11 @@
   min-width: 0;
 }
 
+/* The three cards in a row stay the same height, and their actions line up. */
+.dcm-card-detail .cd-holder-cards > .cd-holder-card {
+  height: 100%;
+}
+
 .dcm-card-detail .cd-holder-card-name {
   margin: 0;
   font-size: 15px;
@@ -1476,15 +1522,80 @@
   width: 100%;
 }
 
-.dcm-card-detail .cd-holder-card-actions {
-  flex-wrap: wrap;
-  gap: 8px;
+/* Everything between the preview and the actions, as one evenly spaced
+   block, so the three cards line their actions up whatever their notes say. */
+.dcm-card-detail .cd-holder-card-body {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
   width: 100%;
-  margin-top: 2px;
+  min-width: 0;
 }
 
-.dcm-card-detail .cd-holder-card-actions > * {
+/* Item 6: "Enlarge" is a text link directly under the mockup's Front/Back
+   toggle, not a third button competing with download and shop. Small type,
+   but a 24px hit area and a real focus ring. */
+.dcm-card-detail .cd-enlarge-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin: -2px 0 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dcm-accent, #6d28d9);
+  font: inherit;
   font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.dcm-card-detail .cd-enlarge-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.dcm-card-detail .cd-holder-card-actions {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+/* Every action is a full-width row inside the card: three cards side by side
+   at 230-260px cannot fit two wrapped pills on one line without ragged
+   heights, and a phone gets one tap target per line either way. */
+.dcm-card-detail .cd-holder-card-actions > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.dcm-card-detail .cd-holder-shop-link {
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--dcm-ink, #0b1220);
+  font-weight: 650;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.dcm-card-detail .cd-holder-shop-link:hover {
+  background: var(--dcm-surface, #f6f7fa);
+}
+
+.dcm-card-detail .cd-holder-customize {
+  font-weight: 600;
 }
 
 @media (width <= 760px) {
@@ -1658,4 +1769,24 @@
 .dcm-card-detail .cd-enlarge-stage {
   display: flex;
   justify-content: center;
+}
+
+/* ==========================================================================
+   REPORTS TAB (owner review item 7)
+   Reports only — labels live in "Labels & holders". The cards reuse the
+   holder card's frame so the two tabs read as one page.
+   ========================================================================== */
+
+.dcm-card-detail .cd-report-cards {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* The visitor's sign-in line is text, not a control: it must not take the
+   button sizing the other children of this row get. */
+.dcm-card-detail .cd-holder-card-actions > .cd-report-locked {
+  justify-content: flex-start;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  text-align: left;
 }

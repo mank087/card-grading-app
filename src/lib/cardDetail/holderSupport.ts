@@ -28,9 +28,22 @@
  * straight through to the one fixed generator
  * (`generateAveryLabel` / `generateAvery8167Label` / `generateFoldOverLabel8167`,
  * DownloadReportButton.tsx:1006-1110, 1121-1199, 1209-1270), which take only
- * `getCardLabelData(card)`, a QR and a logo. They never read `labelStyle` or
- * `customLabelConfig`. So Modern, Traditional/Classic and every saved custom
- * design print DCM's standard compact label at this size.
+ * `getCardLabelData(card)`, a QR and a logo.
+ *
+ * ── WHAT THAT FIXED GENERATOR ACTUALLY DRAWS (owner review, 2026-09-22) ───
+ * It is not a fallback — it IS the DCM standard compact label: a white field
+ * with a purple border, the purple "Dynamic Collectibles Management" bar at
+ * the fold, the DCM mark, the card name / set line / features / serial, and
+ * the purple grade with its rule and condition
+ * (averyLabelGenerator.ts:45-58, 152-330; avery8167LabelGenerator.ts).
+ * `LabelMockup`'s One-Touch and Toploader previews draw the same thing
+ * (LabelMockup.tsx:612-630, 712-740), so preview and print agree.
+ *
+ * The owner's decision is that MODERN AND TRADITIONAL SHARE THAT ONE COMPACT
+ * DESIGN. They are therefore `supported` on the compact holders — nothing the
+ * reader chose is being dropped, so there is nothing to warn about. Heritage
+ * keeps its own compact panels, and only a SAVED CUSTOM SLOT (its own colours,
+ * or its own physical dimensions) is genuinely adapted here.
  *
  * Nothing is ever silently substituted: an `adapted` status must be shown to
  * the reader, and `note` is the sentence to show.
@@ -71,8 +84,13 @@ function isNonStandardSize(config?: ConfigLike | null): boolean {
   return Math.abs(w - STANDARD_W) > 0.001 || Math.abs(h - STANDARD_H) > 0.001;
 }
 
-const COMPACT_GENERIC_NOTE =
-  'The Avery sheet prints DCM’s standard compact label. Your colours and layout stay on the slab insert — they do not fit this size.';
+/**
+ * Only a SAVED CUSTOM design loses anything on the compact sheets: the Avery
+ * label is the standard DCM compact design, which Modern and Traditional both
+ * print, so a custom slot's own colours stay behind on the slab insert.
+ */
+const COMPACT_CUSTOM_NOTE =
+  'This sheet prints the standard DCM compact label. The colours you saved stay on the slab insert.';
 
 const COMPACT_HERITAGE_NOTE =
   'Heritage prints here with its pattern and band colours. The per-grade chip colours you chose stay on the slab insert.';
@@ -109,7 +127,13 @@ export function holderStyleSupport(
     return { status: 'supported', note: null };
   }
 
-  const notes = [COMPACT_GENERIC_NOTE];
+  // Built-in Modern / Traditional / Classic: the compact sheet IS their design.
+  // No saved config means nothing of the reader's own was set aside.
+  if (!activeConfig) {
+    return { status: 'supported', note: null };
+  }
+
+  const notes = [COMPACT_CUSTOM_NOTE];
   if (isNonStandardSize(activeConfig)) notes.push(COMPACT_SIZE_NOTE);
   return { status: 'adapted', note: notes.join(' ') };
 }
@@ -163,10 +187,11 @@ export const HOLDER_NAMES: Record<CardHolderId, string> = {
  * `/shop#<id>` already lands on the card.
  */
 export const HOLDER_SHOP_LINKS: Record<CardHolderId, Array<{ label: string; href: string }>> = {
-  slab: [{ label: 'Shop graded slabs', href: '/shop#traditional-graded-slabs' }],
-  toploader: [{ label: 'Shop Avery 8167 labels', href: '/shop#avery-8167' }],
-  onetouch: [
-    { label: 'Shop Zion MagPro holders', href: '/shop#zion-magpro' },
-    { label: 'Shop Avery 6871 labels', href: '/shop#avery-6871' },
-  ],
+  // The shop's "02 / Card holders" section (src/app/shop/page.tsx:15) is the
+  // slabs-and-cases area: magnetic slabs, traditional graded slabs, Zion MagPro.
+  slab: [{ label: 'See Recommended Slabs and Cases', href: '/shop#holders' }],
+  // The label stock lives in "03 / Printing & trimming", which now also
+  // answers to `#labels` (an alias anchor added to the shop page for this).
+  toploader: [{ label: 'Shop Labels', href: '/shop#labels' }],
+  onetouch: [{ label: 'Shop Labels', href: '/shop#labels' }],
 };

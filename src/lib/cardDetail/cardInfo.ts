@@ -15,6 +15,7 @@
  */
 
 import { stripMarkdown } from './parsers';
+import { pickRarity } from '@/lib/rarityBuckets';
 
 export interface LegacyCardInfo {
   card_name: any;
@@ -53,6 +54,11 @@ export interface LegacyCardInfo {
  * Build the object the legacy Card Information block, the price lookup and the
  * marketplace links all read.
  *
+ * ONE DELIBERATE DEPARTURE from legacy (owner review 2026-09-22, item 12):
+ * `rarity_tier` no longer prints the grader's classification bucket for a
+ * non-sports card. See `src/lib/rarityBuckets.ts`. The frozen legacy clients
+ * still show the bucket (pokemon CardDetailClient.tsx:2616, 3980).
+ *
  * Two legacy quirks are preserved deliberately:
  *   - `memorabilia` is `card.memorabilia_type !== 'none' || …`, so a row whose
  *     `memorabilia_type` is NULL evaluates TRUE. See the report.
@@ -60,8 +66,11 @@ export interface LegacyCardInfo {
  *     separately, so a card with a subset prints it twice (once inside Set
  *     Name, once as Subset/Variant).
  */
-export function buildCardInfo(card: any): LegacyCardInfo {
+export function buildCardInfo(card: any, category?: string): LegacyCardInfo {
   const c = card ?? {};
+  // The DCM category decides whether `rarity_tier` is a rarity or a bucket.
+  // The caller may name it; otherwise the row's own column answers.
+  const resolvedCategory = category ?? c.category;
   const dvgCardInfo = c.dvg_grading?.card_info;
   const conv = c.conversational_card_info;
 
@@ -95,11 +104,19 @@ export function buildCardInfo(card: any): LegacyCardInfo {
       c.serial_numbering || stripMarkdown(conv?.serial_number) || dvgCardInfo?.serial_number,
     rookie_or_first: c.rookie_card || conv?.rookie_or_first || dvgCardInfo?.rookie_or_first,
     subset: subsetRaw,
+    // `cards.rarity_tier` is the grader's CLASSIFICATION BUCKET, and for
+    // Pokemon it is almost always 'Parallel / Insert Variant' whatever the
+    // card actually is (see lib/rarityBuckets.ts). Outside sports a bucket is
+    // skipped so the printed rarity wins; with nothing but buckets on offer
+    // this is undefined rather than wrong.
     rarity_tier:
-      c.rarity_tier ||
-      c.rarity_description ||
-      stripMarkdown(conv?.rarity_tier) ||
-      dvgCardInfo?.rarity_tier,
+      pickRarity(
+        resolvedCategory,
+        c.rarity_tier,
+        c.rarity_description,
+        stripMarkdown(conv?.rarity_tier),
+        dvgCardInfo?.rarity_tier,
+      ) ?? undefined,
     autographed:
       c.autographed === true || c.autograph_type === 'authentic' || conv?.autographed === true,
     // Legacy: `card.memorabilia_type !== 'none'`. NULL !== 'none' is true.

@@ -106,3 +106,46 @@ describe('hasAutograph', () => {
     expect(hasAutograph({ autographed: false } as never, {})).toBe(false);
   });
 });
+
+/**
+ * Owner review 2026-09-22, item 12: `cards.rarity_tier` is the grader's
+ * classification bucket ('Parallel / Insert Variant' on nearly every Pokemon
+ * card), not the rarity. See src/lib/rarityBuckets.ts.
+ */
+describe('rarity_tier vs the classification bucket', () => {
+  it('skips the bucket and uses the printed rarity for a Pokemon card', () => {
+    const info = buildCardInfo(
+      {
+        rarity_tier: 'Parallel / Insert Variant',
+        conversational_card_info: { rarity_tier: 'Secret Rare' },
+      },
+      'pokemon',
+    );
+    expect(info.rarity_tier).toBe('Secret Rare');
+  });
+
+  it('shows nothing rather than the bucket when there is no other source', () => {
+    const info = buildCardInfo({ rarity_tier: 'Parallel / Insert Variant' }, 'pokemon');
+    expect(info.rarity_tier).toBeUndefined();
+  });
+
+  it('keeps the bucket for sports, where it is the description', () => {
+    const info = buildCardInfo(
+      {
+        rarity_tier: 'Parallel / Insert Variant',
+        conversational_card_info: { rarity_tier: 'Secret Rare' },
+      },
+      'sports',
+    );
+    expect(info.rarity_tier).toBe('Parallel / Insert Variant');
+  });
+
+  it('falls back to the row’s own category column when none is passed', () => {
+    expect(
+      buildCardInfo({ category: 'Baseball', rarity_tier: 'Short Print (SP)' }).rarity_tier,
+    ).toBe('Short Print (SP)');
+    expect(
+      buildCardInfo({ category: 'Pokemon', rarity_tier: 'Short Print (SP)' }).rarity_tier,
+    ).toBeUndefined();
+  });
+});

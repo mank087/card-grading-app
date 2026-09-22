@@ -22,6 +22,7 @@ import {
   hasUnverifiedAutographDesignation,
   UNVERIFIED_AUTOGRAPH_DESIGNATION,
 } from '@/lib/grading/autographPolicy';
+import { pickRarity } from '@/lib/rarityBuckets';
 
 export type ListingCategory =
   | 'sports'
@@ -377,7 +378,25 @@ export function resolveListingFields(card: any, cardType?: string): ListingField
   if (!finish && truthyFlag(card?.is_foil, ci.foil)) finish = 'Foil';
   if (truthyFlag(card?.is_enchanted, ci.enchanted)) finish = 'Enchanted';
 
-  const rarity = firstOf(ci.rarity, card?.mtg_rarity, card?.rarity_description, card?.rarity_tier);
+  /**
+   * Rarity. `cards.rarity_tier` is the grader's CLASSIFICATION BUCKET, not a
+   * rarity name — and for Pokemon it is almost always
+   * 'Parallel / Insert Variant' whatever the card is, because visionGrader
+   * stamps that bucket whenever card_info carries a `subset` and the model
+   * puts the rarity name there. Outside sports the buckets are skipped and
+   * the printed rarity (`conversational_card_info.rarity_tier`) is used
+   * instead; for sports the buckets ARE the description and nothing changes.
+   * See lib/rarityBuckets.ts.
+   */
+  const rarity =
+    pickRarity(
+      category,
+      ci.rarity,
+      card?.mtg_rarity,
+      card?.rarity_description,
+      ci.rarity_tier,
+      card?.rarity_tier,
+    ) ?? '';
 
   // v9.23 designation. It is a NOTATION, never a grade suppressor: an
   // unverified-autograph card keeps its full numeric grade (Bob's card is a

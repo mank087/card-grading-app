@@ -115,7 +115,7 @@ export function LabelsHoldersSection(
       </section>
 
       <section className="cd-panel" style={{ marginTop: 16 }}>
-        <p className="cd-eyebrow">Digital holder previews</p>
+        <p className="cd-eyebrow">Every holder we print for</p>
         <h3 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 4px' }}>
           Your card in each holder.
         </h3>

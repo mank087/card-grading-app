@@ -105,6 +105,9 @@ import InstaListPanel from './InstaListPanel';
 import GradeHighlights from './GradeHighlights';
 import CardFacts from './CardFacts';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
+import MarketSection from './sections/MarketSection';
+import ReportsSection from './sections/ReportsSection';
+import type { ReportDownloadKind } from '@/components/reports/DownloadReportButton';
 import {
   CardDetailSectionNav,
   CardDetailSections,
@@ -166,6 +169,14 @@ export interface CardDetailShellProps {
   /** The PSA/BGS/SGC/CGC mail-away estimates, mounted in the Market section. */
   renderProEstimates?: () => ReactNode;
   /**
+   * Whether `renderProEstimates` has anything to draw. The panel renders
+   * NOTHING when `estimated_professional_grades` is null (which is the honest
+   * answer for a card graded before the two-stage system wrote that column),
+   * and a heading with nothing under it reads as a section that broke. The
+   * adapter holds the column, so it answers. Omitted: assume there is.
+   */
+  hasProEstimates?: boolean;
+  /**
    * The category's own Card Information fields, rendered inside the shared
    * `CardFacts` panel. Pokemon supplies `PokemonCardInfo` here.
    */
@@ -177,6 +188,17 @@ export interface CardDetailShellProps {
    * (`DownloadReportButton`'s additive `holderDownload` prop). Owner-only.
    */
   renderHolderDownload?: (holder: CardHolderId, ctx: DownloadSlotContext) => ReactNode;
+
+  /**
+   * One trigger that opens ONE REPORT export's existing download flow
+   * (`DownloadReportButton`'s additive `reportDownload` prop). Owner-only;
+   * the Reports tab shows a sign-in line instead when it is absent.
+   */
+  renderReportDownload?: (
+    kind: ReportDownloadKind,
+    ctx: DownloadSlotContext,
+    label: string,
+  ) => ReactNode;
 
   /**
    * Where "retake your photos" goes. Legacy pokemon uses
@@ -238,9 +260,11 @@ export function CardDetailShell(props: CardDetailShellProps) {
     renderPricing,
     renderMarketplaceLinks,
     renderProEstimates,
+    hasProEstimates: hasProEstimatesProp,
     renderCategoryCardInfo,
     renderCategoryBadges,
     renderHolderDownload,
+    renderReportDownload,
     retakeHref,
     live,
     marketRange,
@@ -287,6 +311,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [userReportOpen, setUserReportOpen] = useState(false);
 
   const viewerSignedIn = !!getStoredSession()?.user?.id;
+  const hasProEstimates = !!renderProEstimates && (hasProEstimatesProp ?? true);
 
   const preview = useLabelPreview({
     savedStyle: labelStyle,
@@ -784,43 +809,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
             />
           }
           market={
-            <div className="cd-section">
-              <div className="cd-section-title">
-                <p className="cd-eyebrow">Know what you hold</p>
-                <h2>Your card in the market.</h2>
-                <p>Estimates, not sale guarantees.</p>
-              </div>
-              {/* Mounted exactly as legacy mounts it, including onPriceLoad. */}
-              <div id="tour-live-market-pricing">{renderPricing()}</div>
-              <section id="tour-market-pricing" className="cd-panel">
-                <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px' }}>
-                  Find and price this card or similar
-                </h3>
-                <p className="cd-caption" style={{ marginBottom: 14 }}>
-                  Search the marketplaces for comparable listings.
-                </p>
-                <div className="cd-link-grid">{renderMarketplaceLinks()}</div>
-              </section>
-              <section id="tour-pro-estimates" className="cd-panel">
-                <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-                  Estimated mail-away grades
-                </h3>
-                {renderProEstimates ? (
-                  renderProEstimates()
-                ) : (
-                  <p className="cd-caption" style={{ marginTop: 8 }}>
-                    No mail-away estimates were produced for this card.
-                  </p>
-                )}
-              </section>
-              {isOwner && (
-                <div className="dcm-actions">
-                  <a className="cd-quiet" href="/market-pricing">
-                    View in portfolio
-                  </a>
-                </div>
-              )}
-            </div>
+            <MarketSection
+              pricing={renderPricing()}
+              marketplaceLinks={renderMarketplaceLinks()}
+              proEstimates={hasProEstimates ? renderProEstimates!() : null}
+              isOwner={isOwner}
+            />
           }
           grade={
             <GradeDetailsSection
@@ -840,27 +834,16 @@ export function CardDetailShell(props: CardDetailShellProps) {
             />
           }
           reports={
-            <div className="cd-section">
-              <div className="cd-section-title">
-                <p className="cd-eyebrow">Keep it. Share it. Show it.</p>
-                <h2>Your card, ready to go.</h2>
-                <p>Reports, labels and card images to download.</p>
-              </div>
-              <section id="tour-download-buttons" className="cd-panel">
-                <div className="cd-showcase-row">
-                  <span className="cd-caption">
-                    DCM serial <strong className="cd-serial">{vm.identity.serial}</strong>
-                  </span>
-                  {isOwner ? (
-                    renderDownloadButton(downloadContext)
-                  ) : (
-                    <span className="cd-caption">
-                      Reports and labels are available to the card&rsquo;s owner.
-                    </span>
-                  )}
-                </div>
-              </section>
-            </div>
+            <ReportsSection
+              serial={vm.identity.serial}
+              isOwner={isOwner}
+              viewerSignedIn={viewerSignedIn}
+              renderReportDownload={
+                renderReportDownload
+                  ? (kind, label) => renderReportDownload(kind, downloadContext, label)
+                  : undefined
+              }
+            />
           }
         />
 

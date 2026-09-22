@@ -98,7 +98,7 @@ export function HolderEnlargeModal({
       >
         <div className="cd-showcase-row">
           <h2 id="cd-enlarge-title" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-            {HOLDER_NAMES[holder]} — digital holder preview
+            {HOLDER_NAMES[holder]}
           </h2>
           <button ref={closeRef} type="button" className="cd-quiet" onClick={onClose}>
             Close
