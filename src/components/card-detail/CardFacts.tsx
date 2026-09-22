@@ -24,8 +24,9 @@
  *
  * The owner affordances are the existing ones, mounted the way the legacy
  * pokemon client mounts them (3676-3690, 3827-3836):
- *   - `NotStandardCardNotice` and `IdentityReview` above the grid. One
- *     `IdentityReview` mount decides between the popup, the quiet banner and
+ *   - `NotStandardCardNotice` above the grid. (`IdentityReview` is mounted by
+ *     the shell, outside the tabs, so it is present on every tab.) It decides
+ *     between the popup, the quiet banner and
  *     nothing, and it also answers `ConfirmCardDetailsCalloutButton` in the
  *     hero value panel, which fires a window event at it.
  *   - `EditCardDetailsButton` in the panel heading, inside `#tour-edit-details`.
@@ -33,7 +34,6 @@
 
 import type { ReactNode } from 'react';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
-import IdentityReview from '@/components/cards/IdentityReview';
 import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import OrgBrandingBadge from '@/components/org/OrgBrandingBadge';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
@@ -87,14 +87,6 @@ export function CardFacts({
         {vm.permissions.isOrgBranded && <OrgBrandingBadge cardId={vm.id} />}
 
         <NotStandardCardNotice card={card} className="mb-4" />
-        <IdentityReview
-          card={card}
-          currentUserId={currentUserId}
-          frontUrl={vm.images.front.url}
-          backUrl={vm.images.back.url}
-          onSaved={onEdited}
-        />
-
         <div className="cd-panel-heading">
           <h3>The card behind the grade</h3>
           {isOwner && (

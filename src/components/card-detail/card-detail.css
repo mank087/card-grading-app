@@ -2106,3 +2106,5 @@
   object-fit: contain;
   border-radius: 10px;
 }
+
+.dcm-card-detail .cd-identity-review:not(:empty) { margin-top: 20px; }

@@ -103,6 +103,7 @@ import CardValueSummary from './CardValueSummary';
 import InstaListPanel from './InstaListPanel';
 import GradeHighlights from './GradeHighlights';
 import CardFacts from './CardFacts';
+import IdentityReview from '@/components/cards/IdentityReview';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
 import MarketSection from './sections/MarketSection';
 import ReportsSection from './sections/ReportsSection';
@@ -745,6 +746,22 @@ export function CardDetailShell(props: CardDetailShellProps) {
               onConnectionChange={insta.setEbayConnected}
             />
           </div>
+        </div>
+
+        {/* The "confirm your card details" popup and banner. Mounted HERE, outside
+            the tabbed sections, so it is present on every tab: it decides for
+            itself whether to open (owner, flag, server "popup" mode, no other
+            overlay), and it must pop at most once per page load. Inside the
+            Overview tab it would be unmounted whenever another tab was active
+            — never showing for a deep link, and popping again on every return. */}
+        <div className="cd-identity-review">
+          <IdentityReview
+            card={card}
+            currentUserId={getStoredSession()?.user?.id}
+            frontUrl={vm.images.front.url}
+            backUrl={vm.images.back.url}
+            onSaved={refreshAfterEdit}
+          />
         </div>
 
         {/* ── sections ───────────────────────────────────────────────── */}
