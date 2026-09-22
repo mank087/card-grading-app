@@ -6,6 +6,8 @@ import { getCardMetadataRow, requireCardMetadataRow } from '@/lib/seo/cardMetada
 import { isUuid } from '@/lib/uuid';
 import { getCardOgImageUrl, type CardMetadataRow } from '@/lib/seo/cardMetadataImage';
 import { SportsCardDetails } from './CardDetailClient';
+import { SportsCardDetailsV2 } from './CardDetailV2Client';
+import { resolveCardDetailVersion } from '@/lib/featureFlags/cardDetailV2';
 
 // Only the columns the title/description/keywords/OG tags actually read.
 // Avoids pulling the ~42 KB whole row (conversational_grading, ai_grading, etc.)
@@ -38,6 +40,7 @@ const METADATA_COLUMNS = [
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Helper: Strip markdown formatting
@@ -565,9 +568,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
-// Server component that renders the client component
-export default async function Page({ params }: PageProps) {
+// Server component that renders the client component.
+//
+// Which client it renders is decided per request from the CARD_DETAIL_V2 server
+// env var (see src/lib/featureFlags/cardDetailV2.ts). The legacy client below is
+// untouched by the redesign, so setting CARD_DETAIL_V2=off is a complete
+// rollback with no deploy and no revert commit.
+export default async function Page({ params, searchParams }: PageProps) {
   const { id } = await params;
   await requireCardMetadataRow(id, METADATA_COLUMNS);
-  return <SportsCardDetails />;
+
+  const version = resolveCardDetailVersion({
+    category: 'sports',
+    override: (await searchParams)?.v,
+  });
+
+  return version === 2 ? <SportsCardDetailsV2 /> : <SportsCardDetails />;
 }

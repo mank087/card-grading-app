@@ -49,10 +49,19 @@ export interface CardFactsProps {
   isOwner: boolean;
   /** Legacy reloads the page after an identity edit; the shell decides how. */
   onEdited: () => void;
+  /**
+   * The route's category, so `buildCardInfo` picks the right precedence.
+   * Omitted: the row's own `category` column answers, as it always has.
+   */
+  category?: string;
   /** The category's own fields, rendered under the shared grid. */
   categorySlot?: ReactNode;
   /** The category's own special-feature badges. */
   categoryBadges?: ReactNode;
+  /** Replaces the shared "Variant" badge. See `SpecialFeatures`. */
+  categoryVariantBadge?: ReactNode;
+  /** Extra reasons to show Special features at all. See `SpecialFeatures`. */
+  categoryFeaturesVisible?: boolean;
 }
 
 export function CardFacts({
@@ -61,11 +70,14 @@ export function CardFacts({
   currentUserId,
   isOwner,
   onEdited,
+  category,
   categorySlot,
   categoryBadges,
+  categoryVariantBadge,
+  categoryFeaturesVisible,
 }: CardFactsProps) {
   const { identity } = vm;
-  const cardInfo = buildCardInfo(card);
+  const cardInfo = buildCardInfo(card, category);
   const dvgGrading = readDvgGrading(card);
 
   const facts: Array<[string, string | null]> = [
@@ -125,6 +137,8 @@ export function CardFacts({
         cardInfo={cardInfo}
         dvgGrading={dvgGrading}
         extraBadges={categoryBadges}
+        variantBadge={categoryVariantBadge}
+        extraVisible={categoryFeaturesVisible}
       />
     </div>
   );

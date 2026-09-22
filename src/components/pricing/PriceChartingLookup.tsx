@@ -7,6 +7,7 @@ import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/client
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
 import { estimateDcmValue as sharedEstimateDcmValue } from '@/lib/pricing/dcmEstimate';
+import { computeMarketRange, type MarketRange } from '@/lib/pricing/marketRange';
 import {
   BarChart,
   Bar,
@@ -98,6 +99,24 @@ interface PriceChartingLookupProps {
     matchConfidence: 'high' | 'medium' | 'low' | 'none';
     productName: string | null;
     sportsCardsProUrl?: string;
+    /**
+     * ADDITIVE (card detail V2, sports adapter). The same three-number range
+     * the Market Value panel below prints, so a caller can show it beside the
+     * estimate instead of recomputing it. Null when the match carried no
+     * prices. Mirrors `PokemonPriceLookup`'s field of the same name and is
+     * built by the same `computeMarketRange`.
+     */
+    marketRange?: MarketRange | null;
+    /**
+     * ADDITIVE (card detail V2, finding 5). The freshness OF THIS RESULT, as
+     * the lookup genuinely knows it: the pricing API reports whether it served
+     * a cached match and, when it did, how old that cache is in days. A caller
+     * may then describe the number it is showing instead of reaching for the
+     * stored row's unrelated `dcm_price_updated_at`. No timestamp is invented
+     * for a fresh fetch — `isCached: false` is the whole of what is known.
+     */
+    isCached?: boolean;
+    cacheAgeDays?: number | null;
   }) => void;  // Callback when price data is loaded
 }
 
@@ -291,6 +310,9 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, guardIden
             matchConfidence: data.data.matchConfidence,
             productName: data.data.prices?.productName || null,
             sportsCardsProUrl,
+            marketRange: computeMarketRange(data.data.prices),
+            isCached: data.cached || false,
+            cacheAgeDays: data.cacheAge ?? null,
           });
         }
         // Persist estimated price to database for collection/portfolio pages
@@ -400,6 +422,9 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, guardIden
           matchConfidence: data.data.matchConfidence,
           productName: data.data.prices?.productName || null,
           sportsCardsProUrl,
+          marketRange: computeMarketRange(data.data.prices),
+          isCached: data.cached || false,
+          cacheAgeDays: data.cacheAge ?? null,
         });
       }
 

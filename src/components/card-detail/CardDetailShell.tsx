@@ -185,6 +185,17 @@ export interface CardDetailShellProps {
   /** The category's own Special Features badges. */
   renderCategoryBadges?: () => ReactNode;
   /**
+   * The category's own "Variant" badge, when the shared one does not say what
+   * this category means by it (sports prints a PARALLEL). See
+   * `SpecialFeatures.variantBadge`: returning null draws nothing there.
+   */
+  renderCategoryVariantBadge?: () => ReactNode;
+  /**
+   * Whether the category's own badges are reason enough to show the Special
+   * features panel when none of the shared fields is present.
+   */
+  hasCategoryFeatures?: boolean;
+  /**
    * One trigger that opens ONE holder's existing download flow
    * (`DownloadReportButton`'s additive `holderDownload` prop). Owner-only.
    */
@@ -264,6 +275,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
     hasProEstimates: hasProEstimatesProp,
     renderCategoryCardInfo,
     renderCategoryBadges,
+    renderCategoryVariantBadge,
+    hasCategoryFeatures,
     renderHolderDownload,
     renderReportDownload,
     retakeHref,
@@ -801,7 +814,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
                     isOwner,
                     onEdited: refreshAfterEdit,
                   })}
+                  category={category}
                   categoryBadges={renderCategoryBadges?.()}
+                  categoryVariantBadge={renderCategoryVariantBadge?.()}
+                  categoryFeaturesVisible={hasCategoryFeatures}
                 />
                 <section className="cd-panel">
                   <p className="cd-eyebrow">The whole picture</p>

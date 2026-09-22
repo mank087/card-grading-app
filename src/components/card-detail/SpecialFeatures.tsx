@@ -37,6 +37,21 @@ export interface SpecialFeaturesProps {
   dvgGrading: any;
   /** Category-specific badges, appended after the shared ones. */
   extraBadges?: ReactNode;
+  /**
+   * Replaces the shared "Variant" badge. Categories do not agree on what that
+   * slot says: Pokemon prints `rarity_or_variant` straight (4305-4310), while
+   * sports prints a PARALLEL name chosen from four fields and filtered against
+   * a list of generic tiers (sports 3974-4013). An adapter that owns the slot
+   * passes its own node here — or `null` to draw nothing there at all.
+   * Omitted (undefined): the shared badge, exactly as before.
+   */
+  variantBadge?: ReactNode;
+  /**
+   * Additional reasons to show the section at all, OR-ed onto the shared
+   * condition. The shared list is legacy Pokemon's (4225); sports adds its
+   * eleven relic/parallel flags, which can be the only thing a card carries.
+   */
+  extraVisible?: boolean;
 }
 
 function Badge({ label, children }: { label: string; children: ReactNode }) {
@@ -53,6 +68,8 @@ export function SpecialFeatures({
   cardInfo,
   dvgGrading,
   extraBadges,
+  variantBadge,
+  extraVisible = false,
 }: SpecialFeaturesProps) {
   const visible = !!(
     dvgGrading?.rarity_features ||
@@ -61,7 +78,8 @@ export function SpecialFeatures({
     dvgGrading?.autograph ||
     cardInfo.subset ||
     cardInfo.autographed ||
-    cardInfo.memorabilia
+    cardInfo.memorabilia ||
+    extraVisible
   );
 
   const serialNumber = cardInfo.serial_number || dvgGrading?.rarity_features?.serial_number;
@@ -109,9 +127,11 @@ export function SpecialFeatures({
                 </span>
               </Badge>
             )}
-            {cardInfo.rarity_or_variant && (
-              <Badge label="Variant">{cardInfo.rarity_or_variant}</Badge>
-            )}
+            {variantBadge === undefined
+              ? cardInfo.rarity_or_variant && (
+                  <Badge label="Variant">{cardInfo.rarity_or_variant}</Badge>
+                )
+              : variantBadge}
             {typeof cardInfo.authentic === 'boolean' && (
               <Badge label="Authentic">{cardInfo.authentic ? 'Licensed' : 'Unlicensed'}</Badge>
             )}

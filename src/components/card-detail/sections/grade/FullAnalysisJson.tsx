@@ -210,6 +210,13 @@ export function FullAnalysisJson({
             <Field label="Card Number" value={info.card_number} />
             <Field label="Authentic" value={info.authentic} />
             <Field label="Player Or Character" value={info.player_or_character} />
+            {/* Every category's identity fields are listed together and `Field`
+                draws nothing for one the record does not carry, so this grid is
+                category-driven by the data rather than by a prop. Sport and Team
+                are the two the sports client prints (sports 5993-5997) and the
+                Pokemon port had dropped. */}
+            <Field label="Sport" value={info.sport} />
+            <Field label="Team" value={info.team} />
             <Field label="Pokemon Stage" value={info.pokemon_stage} />
             <Field label="Pokemon Type" value={info.pokemon_type} />
             <Field label="HP" value={info.hp} />

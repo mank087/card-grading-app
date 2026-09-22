@@ -7,6 +7,7 @@ vi.mock('@/app/pokemon/[id]/CardDetailClient', () => ({ PokemonCardDetails: () =
 // suite pulls the real data hook and its Supabase client into the module graph.
 vi.mock('@/app/pokemon/[id]/CardDetailV2Client', () => ({ PokemonCardDetailsV2: () => null }))
 vi.mock('@/app/sports/[id]/CardDetailClient', () => ({ SportsCardDetails: () => null }))
+vi.mock('@/app/sports/[id]/CardDetailV2Client', () => ({ SportsCardDetailsV2: () => null }))
 vi.mock('@/app/mtg/[id]/CardDetailClient', () => ({ default: () => null }))
 vi.mock('@/app/lorcana/[id]/CardDetailClient', () => ({ default: () => null }))
 vi.mock('@/app/onepiece/[id]/CardDetailClient', () => ({ default: () => null }))

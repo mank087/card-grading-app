@@ -10,12 +10,17 @@
  * The shared half of the shape is what every category fills in. The Pokemon
  * half (`pokemon_type`, `pokemon_stage`, `hp`, `card_type`, the card-text
  * blocks) is read only by `PokemonCardInfo`; sports fills a different set
- * (`team`, `parallel_type`, the relic flags) which the sports adapter will add
- * when that category lands.
+ * (`team`, `parallel_type`, the relic flags) read only by `SportsCardInfo`.
+ *
+ * SPORTS HAS THE OPPOSITE PRECEDENCE — model JSON first, database columns
+ * second — and always has. `buildSportsCardInfo` below carries that chain
+ * verbatim from `src/app/sports/[id]/CardDetailClient.tsx` 2561-2652; the two
+ * are not reconciled here, because both frozen pages must keep printing what
+ * they print today.
  */
 
 import { stripMarkdown } from './parsers';
-import { pickRarity } from '@/lib/rarityBuckets';
+import { categoryUsesRarityBuckets, pickRarity } from '@/lib/rarityBuckets';
 
 export interface LegacyCardInfo {
   card_name: any;
@@ -48,6 +53,27 @@ export interface LegacyCardInfo {
   holofoil?: any;
   first_edition?: any;
   reverse_holo?: any;
+
+  /* Sports-only (sports CardDetailClient.tsx 2561-2652). Only the sports
+     adapter and `SportsCardInfo` read these; they are undefined elsewhere. */
+  team?: any;
+  parallel_type?: any;
+  memorabilia_other?: any;
+  subset_insert_name?: any;
+  is_refractor?: boolean;
+  is_numbered?: boolean;
+  is_patch?: boolean;
+  is_jersey?: boolean;
+  is_game_used?: boolean;
+  is_on_card_auto?: boolean;
+  is_sticker_auto?: boolean;
+  is_variation?: boolean;
+  is_short_print?: boolean;
+  is_case_hit?: boolean;
+  first_print_rookie?: boolean;
+  facsimile_autograph?: boolean;
+  official_reprint?: boolean;
+  special_features?: any;
 }
 
 /**
@@ -73,6 +99,12 @@ export function buildCardInfo(card: any, category?: string): LegacyCardInfo {
   const resolvedCategory = category ?? c.category;
   const dvgCardInfo = c.dvg_grading?.card_info;
   const conv = c.conversational_card_info;
+
+  // `cards.category` on a sports row holds the SPORT ("Baseball"), so the
+  // same alias list that decides the rarity question answers this one.
+  if (categoryUsesRarityBuckets(resolvedCategory)) {
+    return buildSportsCardInfo(c, conv, dvgCardInfo);
+  }
 
   const setNameRaw = c.card_set || stripMarkdown(conv?.set_name) || dvgCardInfo?.set_name;
   const subsetRaw = stripMarkdown(conv?.subset) || c.subset || dvgCardInfo?.subset;
@@ -134,6 +166,108 @@ export function buildCardInfo(card: any, category?: string): LegacyCardInfo {
     holofoil: conv?.holofoil ?? c.holofoil,
     first_edition: conv?.first_edition,
     reverse_holo: conv?.reverse_holo,
+  };
+}
+
+/**
+ * The SPORTS half of the same object.
+ *
+ * EXTRACTED FROM `src/app/sports/[id]/CardDetailClient.tsx` 2561-2652.
+ *
+ * The precedence is the OPPOSITE of Pokemon's and that is deliberate: the
+ * sports page has always read `conversational_card_info` FIRST and only then
+ * fallen back to the database columns (its own comment: "v3.2: Use
+ * conversational_card_info first, then database fields, then DVG fallback").
+ * Phase 1 recorded this divergence; it is reproduced, not reconciled, because
+ * the frozen legacy sports page must keep printing what it prints today.
+ *
+ * Three further sports-only departures from the Pokemon chain, all legacy's:
+ *   - `year` is NOT sliced to four characters — sports prints `release_date`
+ *     as the row holds it.
+ *   - `sport_or_category` reads `conversational_card_info.sport` (the manual
+ *     edit) before `.sport_or_category` (the model), and only then `card.sport`.
+ *     It never reads `cards.category`.
+ *   - `autographed` / `memorabilia` require the column to be present AND not
+ *     'none'/'false', so sports does NOT carry the Pokemon page's quirk where
+ *     a NULL `memorabilia_type` reads as true.
+ */
+function buildSportsCardInfo(c: any, conv: any, dvgCardInfo: any): LegacyCardInfo {
+  const setNameRaw = stripMarkdown(conv?.set_name) || c.card_set || dvgCardInfo?.set_name;
+  const subsetRaw = stripMarkdown(conv?.subset) || c.subset || dvgCardInfo?.subset;
+  const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
+
+  /** Legacy's column test: present, and neither of the two "no" spellings. */
+  const columnSaysYes = (value: any) =>
+    !!(value && value !== 'none' && value !== 'false');
+  /** Legacy's JSON test: the boolean or either capitalisation of "yes". */
+  const jsonSaysYes = (value: any) => value === true || value === 'Yes' || value === 'yes';
+
+  return {
+    card_name: stripMarkdown(conv?.card_name) || c.card_name || dvgCardInfo?.card_name,
+    player_or_character:
+      stripMarkdown(conv?.player_or_character) || c.featured || dvgCardInfo?.player_or_character,
+    set_name: setNameWithSubset,
+    // Sports has no set-era concept; kept so the shape is one type.
+    set_era: stripMarkdown(conv?.set_era) || dvgCardInfo?.set_era,
+    year: stripMarkdown(conv?.year) || c.release_date || dvgCardInfo?.year,
+    manufacturer:
+      stripMarkdown(conv?.manufacturer) || c.manufacturer_name || dvgCardInfo?.manufacturer,
+    card_number:
+      stripMarkdown(conv?.card_number_raw) ||
+      stripMarkdown(conv?.card_number) ||
+      c.card_number ||
+      dvgCardInfo?.card_number,
+    sport_or_category:
+      stripMarkdown(conv?.sport) ||
+      stripMarkdown(conv?.sport_or_category) ||
+      c.sport ||
+      dvgCardInfo?.sport_or_category,
+    serial_number:
+      stripMarkdown(conv?.serial_number) || c.serial_numbering || dvgCardInfo?.serial_number,
+    rookie_or_first: conv?.rookie_or_first || c.rookie_card || dvgCardInfo?.rookie_or_first,
+    subset: subsetRaw,
+    // For sports the grader's buckets ARE the description, so pickRarity
+    // passes every candidate through untouched. See lib/rarityBuckets.ts.
+    rarity_tier:
+      pickRarity('sports', stripMarkdown(conv?.rarity_tier), c.rarity_tier, dvgCardInfo?.rarity_tier) ??
+      undefined,
+    autographed: jsonSaysYes(conv?.autographed) || columnSaysYes(c.autograph_type),
+    memorabilia: jsonSaysYes(conv?.memorabilia) || columnSaysYes(c.memorabilia_type),
+    card_front_text: conv?.card_front_text || dvgCardInfo?.card_front_text,
+    card_back_text: conv?.card_back_text || dvgCardInfo?.card_back_text,
+
+    /* Pokemon-only fields, absent on a sports row. */
+    pokemon_type: null,
+    pokemon_stage: null,
+    hp: null,
+    card_type: c.card_type || stripMarkdown(conv?.card_type) || null,
+
+    // Legacy: rarity_or_variant, then the parallel colour, then the column.
+    rarity_or_variant:
+      stripMarkdown(conv?.rarity_or_variant) ||
+      stripMarkdown(conv?.parallel_type) ||
+      c.rarity_description ||
+      dvgCardInfo?.rarity_or_variant,
+    authentic: conv?.authentic,
+
+    team: stripMarkdown(conv?.team) || null,
+    parallel_type: stripMarkdown(conv?.parallel_type) || null,
+    memorabilia_other: stripMarkdown(conv?.memorabilia_other) || null,
+    subset_insert_name: stripMarkdown(conv?.subset_insert_name) || c.subset_insert_name || null,
+    is_refractor: conv?.is_refractor || false,
+    is_numbered: conv?.is_numbered || false,
+    is_patch: conv?.is_patch || false,
+    is_jersey: conv?.is_jersey || false,
+    is_game_used: conv?.is_game_used || false,
+    is_on_card_auto: conv?.is_on_card_auto || false,
+    is_sticker_auto: conv?.is_sticker_auto || false,
+    is_variation: conv?.is_variation || false,
+    is_short_print: conv?.is_short_print || false,
+    is_case_hit: conv?.is_case_hit || false,
+    first_print_rookie: conv?.first_print_rookie || false,
+    facsimile_autograph: conv?.facsimile_autograph || false,
+    official_reprint: conv?.official_reprint || false,
+    special_features: conv?.special_features || null,
   };
 }
 
