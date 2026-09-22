@@ -74,6 +74,22 @@ function formatSetNameForTCGPlayer(setName: string, cardNumber?: string): string
  * Generate TCGPlayer search URL for Pokemon and MTG cards
  * Automatically detects card category and routes appropriately
  */
+
+/**
+ * TCGPlayer product lines for the categories that are NOT Magic or Lorcana.
+ * Before this map every other category fell through to the Pokemon product
+ * line, so a One Piece or Yu-Gi-Oh search opened TCGPlayer's Pokemon catalogue.
+ * Matched loosely on the category string the detail pages pass ('One Piece',
+ * 'onepiece', 'Yu-Gi-Oh', 'yugioh'). Anything unlisted keeps the Pokemon line,
+ * which is the historical behaviour for Pokemon itself.
+ */
+function otherProductLine(category: string | undefined): { slug: string; name: string } | null {
+  const key = (category || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (key === 'onepiece') return { slug: 'one-piece-card-game', name: 'one-piece-card-game' };
+  if (key === 'yugioh') return { slug: 'yugioh', name: 'yugioh' };
+  return null;
+}
+
 export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
   const searchTerms: string[] = [];
 
@@ -160,10 +176,11 @@ export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
   // Build search query (simpler is better for TCGPlayer)
   const searchQuery = searchTerms.join(' ');
 
-  // TCGPlayer URL structure for Pokemon
-  const baseUrl = 'https://www.tcgplayer.com/search/pokemon/product';
+  // TCGPlayer URL structure for Pokemon (or another product line, see otherProductLine)
+  const line = otherProductLine(cardData.category);
+  const baseUrl = `https://www.tcgplayer.com/search/${line?.slug ?? 'pokemon'}/product`;
   const params = new URLSearchParams({
-    productLineName: 'pokemon',
+    productLineName: line?.name ?? 'pokemon',
     q: searchQuery,
     view: 'grid',
     productTypeName: 'Cards'
@@ -180,6 +197,12 @@ export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
  */
 export function generateTCGPlayerSetSearchUrl(cardData: MTGCardData): string | null {
   if (!cardData.card_set || cardData.card_set === 'Unknown') {
+    return null;
+  }
+
+  // One Piece and Yu-Gi-Oh have no set-slug URL scheme here; the caller
+  // falls back to the product search, which now uses the right product line.
+  if (otherProductLine(cardData.category)) {
     return null;
   }
 

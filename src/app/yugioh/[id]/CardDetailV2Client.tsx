@@ -54,8 +54,8 @@ const DownloadReportButton = dynamic(
 /** YUGIOH: legacy imports the ONE PIECE eBay builders (yugioh 25) — the file
  *  is a copy of the One Piece client. Kept, so both pages build one URL. */
 import {
-  generateOnePieceEbaySearchUrl,
-  generateOnePieceEbaySoldListingsUrl,
+  generateYugiohEbaySearchUrl,
+  generateYugiohEbaySoldListingsUrl,
   type CardData,
 } from '@/lib/ebayUtils';
 import {
@@ -172,7 +172,8 @@ export function YugiohCardDetailsV2() {
   }, [card]);
 
   /**
-   * YUGIOH: four links, the One Piece set with `category: 'Yu-Gi-Oh'` on the
+   * YUGIOH: four links. Legacy borrowed the One Piece eBay builders (there
+   * was no Yu-Gi-Oh one); V2 uses generateYugiohEbay*, with `category: 'Yu-Gi-Oh'` on the
    * TCGPlayer payload (5606-5615). The two eBay links call the ONE PIECE
    * builders with only name, character and number (5645-5675) — legacy's, kept
    * so both pages build one URL — and the PriceCharting fallback is the
@@ -224,8 +225,8 @@ export function YugiohCardDetailsV2() {
 
     const links: Array<[string, string, string]> = [
       ['TCGPlayer', tcgplayerUrl, setName && setName !== 'Unknown' ? setName : 'Search listings'],
-      ['eBay', generateOnePieceEbaySearchUrl(ebaySearchCard), 'Active listings'],
-      ['eBay sold', generateOnePieceEbaySoldListingsUrl(ebaySearchCard), 'Price history'],
+      ['eBay', generateYugiohEbaySearchUrl(ebaySearchCard), 'Active listings'],
+      ['eBay sold', generateYugiohEbaySoldListingsUrl(ebaySearchCard), 'Price history'],
       ['PriceCharting', priceChartingUrl, 'Market data'],
     ];
 

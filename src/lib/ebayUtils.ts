@@ -343,6 +343,80 @@ export function generateOnePieceEbaySoldListingsUrl(cardData: CardData): string 
 }
 
 /**
+ * Generate eBay search URL for Yu-Gi-Oh! TCG cards
+ * Simplified: Card Name + Card Number only for more accurate searches
+ */
+export function generateYugiohEbaySearchUrl(cardData: CardData): string {
+  const searchTerms: string[] = [];
+
+  // 1. Card/Character name (primary identifier)
+  if (cardData.card_name) {
+    searchTerms.push(cardData.card_name);
+  } else if (cardData.featured) {
+    searchTerms.push(cardData.featured);
+  }
+
+  // 2. Card number (for precise identification) - Yu-Gi-Oh uses format like "PHRE-EN039"
+  if (cardData.card_number) {
+    searchTerms.push(cardData.card_number);
+  }
+
+  // 3. Add "Yu-Gi-Oh" keyword for better search results
+  searchTerms.push('Yu-Gi-Oh');
+
+  const searchQuery = searchTerms.join(' ');
+
+  // eBay search URL with Yu-Gi-Oh! Individual Cards category
+  const baseUrl = 'https://www.ebay.com/sch/i.html';
+  const params = new URLSearchParams({
+    _nkw: searchQuery,
+    _sacat: '31395', // Yu-Gi-Oh! Individual Cards category
+    LH_TitleDesc: '0', // Search title only
+    _udlo: '1', // Minimum price $1
+    _sop: '16', // Sort by: Best Match
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Generate eBay sold listings URL for Yu-Gi-Oh! TCG cards
+ * Simplified: Card Name + Card Number only for more accurate searches
+ */
+export function generateYugiohEbaySoldListingsUrl(cardData: CardData): string {
+  const searchTerms: string[] = [];
+
+  // 1. Card/Character name (primary identifier)
+  if (cardData.card_name) {
+    searchTerms.push(cardData.card_name);
+  } else if (cardData.featured) {
+    searchTerms.push(cardData.featured);
+  }
+
+  // 2. Card number (for precise identification)
+  if (cardData.card_number) {
+    searchTerms.push(cardData.card_number);
+  }
+
+  // 3. Add "Yu-Gi-Oh" keyword for better search results
+  searchTerms.push('Yu-Gi-Oh');
+
+  const searchQuery = searchTerms.join(' ');
+
+  const baseUrl = 'https://www.ebay.com/sch/i.html';
+  const params = new URLSearchParams({
+    _nkw: searchQuery,
+    _sacat: '31395', // Yu-Gi-Oh! Individual Cards category
+    LH_Sold: '1', // Sold listings only
+    LH_Complete: '1', // Completed listings
+    _udlo: '1', // Minimum price $1
+    _sop: '13', // Sort by: Price + Shipping: lowest first
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
  * Generate eBay search URL for Lorcana cards
  * Simplified: Card Name + Card Number only for more accurate searches
  */
