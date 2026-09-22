@@ -14,17 +14,33 @@
  * the only thing that may put bytes on eBay's servers is the publish step
  * inside the modal.
  *
- * Object URLs are revoked on unmount. The section is unmounted whenever
- * another tab is active (CardDetailSections), so five canvas renders' worth of
- * blobs do not sit in memory for the whole visit.
+ * THREE THINGS THE 2026-09-22 REVIEW ASKED FOR:
+ *  - ENLARGE. A 5-across grid of listing photos is a contact sheet, not a look
+ *    at the picture. Each one opens in the same dialog pattern the holder
+ *    previews use (Escape, focus trap, focus returned).
+ *  - TRY AGAIN. `prepareListingImages` reads images over the network and
+ *    re-encodes them through a canvas; when it throws, the tab used to end at
+ *    a sentence with nothing to press.
+ *  - A SESSION CACHE. The section is unmounted whenever another tab is active
+ *    (CardDetailSections), so every return re-rendered five canvases. They only
+ *    change when the card or the design changes, which is exactly what
+ *    `listingImageKey` names.
+ *
+ * WHAT THE CACHE MEANS FOR OBJECT URLs. A cached set's URLs must stay alive, so
+ * this no longer revokes on unmount — it revokes when an entry is EVICTED, and
+ * only entries are evicted that nothing is rendering any more. The cache is a
+ * module-level map: it lives as long as the JavaScript context, which is one
+ * page session, and a full reload starts empty.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   prepareListingImages,
   SYSTEM_IMAGE_LABELS,
   type PreparedListingImages,
 } from '@/lib/ebay/prepareListingImages';
+import { listingImageKey } from '@/lib/cardDetail/listingImageKey';
+import ListingImageDialog from './ListingImageDialog';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 
 export interface InstaListImagesProps {
@@ -38,6 +54,30 @@ export interface InstaListImagesProps {
 
 const PLACEHOLDER_KEYS = ['front', 'back', 'rawFront', 'rawBack', 'miniReport'] as const;
 
+/**
+ * The rendered sets for this page session, newest last. Small on purpose: an
+ * owner tries a handful of designs at most, and each entry holds five blobs.
+ */
+const CACHE_LIMIT = 4;
+const renderedCache = new Map<string, PreparedListingImages>();
+
+function readCache(key: string): PreparedListingImages | null {
+  return renderedCache.get(key) ?? null;
+}
+
+function writeCache(key: string, value: PreparedListingImages) {
+  renderedCache.set(key, value);
+  while (renderedCache.size > CACHE_LIMIT) {
+    const oldestKey = renderedCache.keys().next().value as string | undefined;
+    if (oldestKey === undefined) break;
+    const evicted = renderedCache.get(oldestKey);
+    renderedCache.delete(oldestKey);
+    // Nothing is rendering an evicted set: the only reader is this component,
+    // and it re-reads the cache by key on every mount.
+    if (evicted) for (const img of evicted.images) URL.revokeObjectURL(img.objectUrl);
+  }
+}
+
 export function InstaListImages({
   card,
   cardType,
@@ -45,24 +85,47 @@ export function InstaListImages({
   customLabelConfig,
   showFounderEmblem,
 }: InstaListImagesProps) {
-  const [prepared, setPrepared] = useState<PreparedListingImages | null>(null);
+  const cacheKey = listingImageKey({
+    cardId: card?.id,
+    cardType,
+    labelStyle,
+    customLabelConfig,
+    showFounderEmblem,
+  });
+
+  const [prepared, setPrepared] = useState<PreparedListingImages | null>(() => readCache(cacheKey));
   const [error, setError] = useState<string | null>(null);
-  const liveUrls = useRef<string[]>([]);
+  const [attempt, setAttempt] = useState(0);
+  const [enlarged, setEnlarged] = useState<{ src: string; label: string } | null>(null);
+  const cardRef = useRef(card);
+  cardRef.current = card;
 
   useEffect(() => {
+    const cached = readCache(cacheKey);
+    if (cached && attempt === 0) {
+      setPrepared(cached);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     setPrepared(null);
     setError(null);
 
-    prepareListingImages(card, { cardType, labelStyle, customLabelConfig, showFounderEmblem })
+    prepareListingImages(cardRef.current, {
+      cardType,
+      labelStyle,
+      customLabelConfig,
+      showFounderEmblem,
+    })
       .then((result) => {
         if (cancelled) {
-          // Rendered after we were torn down: revoke immediately rather than
-          // leak the five blobs.
-          for (const img of result.images) URL.revokeObjectURL(img.objectUrl);
+          // Rendered after we were torn down. Keep it — the reader is one tab
+          // away and this is exactly what the cache is for. Eviction revokes.
+          writeCache(cacheKey, result);
           return;
         }
-        liveUrls.current = result.images.map((i) => i.objectUrl);
+        writeCache(cacheKey, result);
         setPrepared(result);
       })
       .catch((e: unknown) => {
@@ -72,10 +135,15 @@ export function InstaListImages({
 
     return () => {
       cancelled = true;
-      for (const url of liveUrls.current) URL.revokeObjectURL(url);
-      liveUrls.current = [];
     };
-  }, [card, cardType, labelStyle, customLabelConfig, showFounderEmblem]);
+    // `card` is read through a ref: a row refetched with an identical identity
+    // must not re-render five canvases. The cache key carries what matters.
+  }, [cacheKey, cardType, labelStyle, customLabelConfig, showFounderEmblem, attempt]);
+
+  const retry = useCallback(() => {
+    renderedCache.delete(cacheKey);
+    setAttempt((n) => n + 1);
+  }, [cacheKey]);
 
   return (
     <section className="cd-panel cd-instalist-images" aria-labelledby="cd-il-images-heading">
@@ -84,35 +152,58 @@ export function InstaListImages({
         Five images, already made.
       </h3>
       <p className="cd-caption">
-        The same five the listing uploads, in the design you are previewing. Nothing is sent
-        anywhere from this tab.
+        The same five the listing uploads, in the design you are previewing. Select one to see it
+        full size. Nothing is sent anywhere from this tab.
       </p>
 
       {error ? (
-        <p className="cd-caption cd-instalist-error" role="status">
-          {error}
-        </p>
+        <div className="cd-instalist-error" role="status">
+          <p className="cd-caption">{error}</p>
+          <button type="button" className="dcm-button dcm-button--secondary" onClick={retry}>
+            Try again
+          </button>
+        </div>
       ) : (
         <ul className="cd-instalist-image-grid">
-          {(prepared ? prepared.images : PLACEHOLDER_KEYS.map((key) => ({ key, label: SYSTEM_IMAGE_LABELS[key], objectUrl: '' }))).map(
-            (img) => (
-              <li key={img.key} className="cd-instalist-image">
-                {img.objectUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+          {(prepared
+            ? prepared.images
+            : PLACEHOLDER_KEYS.map((key) => ({
+                key,
+                label: SYSTEM_IMAGE_LABELS[key],
+                objectUrl: '',
+              }))
+          ).map((img) => (
+            <li key={img.key} className="cd-instalist-image">
+              {img.objectUrl ? (
+                <button
+                  type="button"
+                  className="cd-instalist-image-button"
+                  onClick={() => setEnlarged({ src: img.objectUrl, label: img.label })}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.objectUrl} alt={`${img.label} listing photo`} loading="lazy" />
-                ) : (
-                  <div className="cd-instalist-image-skeleton" aria-hidden="true" />
-                )}
-                <span className="cd-caption">{img.label}</span>
-              </li>
-            ),
-          )}
+                  <span className="cd-instalist-image-zoom" aria-hidden="true">
+                    Enlarge
+                  </span>
+                </button>
+              ) : (
+                <div className="cd-instalist-image-skeleton" aria-hidden="true" />
+              )}
+              <span className="cd-caption">{img.label}</span>
+            </li>
+          ))}
         </ul>
       )}
 
       <p className="cd-caption" role="status" aria-live="polite">
         {error ? '' : prepared ? 'Photos ready.' : 'Rendering the listing photos…'}
       </p>
+
+      <ListingImageDialog
+        src={enlarged?.src ?? null}
+        label={enlarged?.label ?? ''}
+        onClose={() => setEnlarged(null)}
+      />
     </section>
   );
 }

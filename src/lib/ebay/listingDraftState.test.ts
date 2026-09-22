@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { ItemSpecific } from './itemSpecifics';
 import {
+  changedDraftFields,
   createListingDraftState,
   dirtyDraftValues,
   isListingDraftDirty,
+  listingEditGate,
   listingLockFor,
   rebaseListingDraftDefaults,
   resetListingDraftField,
@@ -128,11 +130,57 @@ describe('title ↔ description headline', () => {
     expect(s.values.descriptionHtml).toBe(sync.render('New title'));
     expect(s.values.descriptionHtml).toContain(HEAD('New title'));
     expect(s.dirty.title).toBe(true);
-    // Both travel to the modal together, already consistent.
-    expect(dirtyDraftValues(s)).toEqual({
-      title: 'New title',
-      descriptionHtml: sync.render('New title'),
-    });
+  });
+
+  /* ── finding 4, 2026-09-22 ─────────────────────────────────────────────
+     A title-only edit must NOT hand the modal an HTML body. Doing so made the
+     modal treat the description as hand-authored and freeze it: no shipping
+     summary, no later title changes, no `{shippingSummary}` in a template. */
+  it('carries the TITLE ONLY when the owner never touched the body', () => {
+    const s = setListingDraftTitle(createListingDraftState(start), 'New title', sync);
+    expect(s.bodyEdited).toBe(false);
+    expect(dirtyDraftValues(s)).toEqual({ title: 'New title' });
+    expect(dirtyDraftValues(s).descriptionHtml).toBeUndefined();
+  });
+
+  it('carries both when the body IS hand-edited, with the headline swapped', () => {
+    let s = createListingDraftState(start);
+    s = setListingDraftField(s, 'descriptionHtml', `${HEAD('Default title')}<div>MINE</div>`);
+    s = setListingDraftTitle(s, 'New title', sync);
+    expect(s.bodyEdited).toBe(true);
+    const carried = dirtyDraftValues(s);
+    expect(carried.title).toBe('New title');
+    expect(carried.descriptionHtml).toBe(`${HEAD('New title')}<div>MINE</div>`);
+  });
+
+  it('gives up authorship when the body is reset, and stops carrying it', () => {
+    let s = createListingDraftState(start);
+    s = setListingDraftField(s, 'descriptionHtml', '<div>MINE</div>');
+    s = setListingDraftField(s, 'title', 'New title');
+    expect(s.bodyEdited).toBe(true);
+    s = resetListingDraftField(s, 'descriptionHtml');
+    expect(s.bodyEdited).toBe(false);
+    expect(dirtyDraftValues(s).descriptionHtml).toBeUndefined();
+  });
+
+  it('gives up authorship when the body is typed back to its default', () => {
+    let s = createListingDraftState(start);
+    s = setListingDraftField(s, 'descriptionHtml', '<div>MINE</div>');
+    s = setListingDraftField(s, 'descriptionHtml', start.descriptionHtml);
+    expect(s.bodyEdited).toBe(false);
+    expect(dirtyDraftValues(s)).toEqual({});
+  });
+
+  it('re-renders a clean description for an edited title when late defaults land', () => {
+    const later: ListingDraftValues = { ...start, descriptionHtml: '<p>store template</p>' };
+    let s = setListingDraftTitle(createListingDraftState(start), 'New title', sync);
+    s = rebaseListingDraftDefaults(s, later, sync);
+    // The template arrived; the headline is still the owner's title, not the
+    // default one the template was rendered with.
+    expect(s.values.title).toBe('New title');
+    expect(s.values.descriptionHtml).toBe(sync.render('New title'));
+    expect(s.bodyEdited).toBe(false);
+    expect(dirtyDraftValues(s)).toEqual({ title: 'New title' });
   });
 
   it('keeps a hand-edited description and still updates its heading', () => {
@@ -213,5 +261,50 @@ describe('listingLockFor — one rule for the whole tab', () => {
 
   it('gives a non-owner nothing', () => {
     expect(listingLockFor('not-owner')).toEqual({ locked: true, note: null, canBegin: false });
+  });
+});
+
+describe('listingEditGate — connect before editing (finding 2)', () => {
+  it('locks the fields for a disconnected owner and asks them to connect first', () => {
+    const gate = listingEditGate('unlisted', false);
+    expect(gate.needsConnect).toBe(true);
+    expect(gate.locked).toBe(true);
+    // The flow itself is still offered — pressing it is what starts the connect.
+    expect(gate.canBegin).toBe(true);
+  });
+
+  it('does not lock while the connection status is still unknown', () => {
+    const gate = listingEditGate('unlisted', null);
+    expect(gate.needsConnect).toBe(false);
+    expect(gate.locked).toBe(false);
+  });
+
+  it('is exactly listingLockFor once connected', () => {
+    for (const state of ['unlisted', 'unverified', 'checking', 'listed', 'sold'] as const) {
+      expect(listingEditGate(state, true)).toEqual({
+        ...listingLockFor(state),
+        needsConnect: false,
+      });
+    }
+  });
+
+  it('keeps the listed/sold note rather than replacing it with a connect prompt', () => {
+    const gate = listingEditGate('listed', false);
+    expect(gate.needsConnect).toBe(false);
+    expect(gate.note).toContain('live on eBay');
+  });
+});
+
+describe('changedDraftFields', () => {
+  it('names only the fields that actually differ', () => {
+    expect(changedDraftFields(defaults, defaults)).toEqual([]);
+    expect(changedDraftFields(defaults, { ...defaults, title: 'Other' })).toEqual(['title']);
+    expect(
+      changedDraftFields(defaults, { ...defaults, title: 'Other', price: '12.00' }),
+    ).toEqual(['title', 'price']);
+  });
+
+  it('compares specifics by content', () => {
+    expect(changedDraftFields(defaults, { ...defaults, itemSpecifics: specifics.map((x) => ({ ...x })) })).toEqual([]);
   });
 });

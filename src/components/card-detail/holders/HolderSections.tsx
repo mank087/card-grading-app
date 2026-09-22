@@ -90,8 +90,15 @@ export function LabelsHoldersSection(
     <div className="cd-section">
       <div className="cd-section-title">
         <p className="cd-eyebrow">Designed to go with your card</p>
-        <h2>Pick a design. Print your label.</h2>
-        <p>Each holder below shows what it can actually reproduce, and at what size.</p>
+        {/* A visitor is not being offered a print: there is no download control
+            for them anywhere on this tab, and a heading that says "print your
+            label" with nothing to press is a dead end. One line says whose
+            label it is instead (review 2026-09-22). */}
+        <h2>{props.isOwner ? 'Pick a design. Print your label.' : 'Pick a design.'}</h2>
+        <p>Each design below is shown in every holder we print for, at the size it prints.</p>
+        {!props.isOwner && (
+          <p className="cd-caption">Only the card&rsquo;s owner can download this label.</p>
+        )}
       </div>
 
       {/* One panel: the design chooser and what it applies to. The selector
@@ -121,7 +128,7 @@ export function LabelsHoldersSection(
         </h3>
         <p className="cd-caption" style={{ marginBottom: 14 }}>
           Each one names the stock and the size it prints at, and says so when a holder cannot
-          reproduce the design exactly.
+          show the design exactly.
         </p>
         {cardsFor(props, 'detail', 260)}
       </section>

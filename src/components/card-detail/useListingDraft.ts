@@ -42,6 +42,7 @@ import {
 } from '@/lib/ebay/listingSeed';
 import { fetchListingSeedContext } from '@/lib/ebay/listingSeedFetch';
 import {
+  changedDraftFields,
   createListingDraftState,
   dirtyDraftValues,
   isListingDraftDirty,
@@ -55,6 +56,7 @@ import {
   type ListingDraftState,
   type ListingDraftValues,
 } from '@/lib/ebay/listingDraftState';
+import { cardIdentityKey } from '@/lib/ebay/cardIdentityKey';
 import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
 import type { ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import type { ListingBranding, ListingDescriptionFields } from '@/lib/ebay/listingDescription';
@@ -67,6 +69,13 @@ export interface UseListingDraftResult {
   priceLabel: string | null;
   /** True while the saved-defaults fetch is in flight. */
   loadingDefaults: boolean;
+  /**
+   * Set when a correction to the CARD moved a field the owner had not edited —
+   * so the tab can say "Updated from card details" rather than silently
+   * swapping the title under them. Cleared by `dismissRebaseNote`.
+   */
+  rebasedFromCard: boolean;
+  dismissRebaseNote: () => void;
   setField: <K extends ListingDraftField>(field: K, value: ListingDraftValues[K]) => void;
   resetField: (field: ListingDraftField) => void;
   /** Only the edited fields — what `EbayListingModal.initialDraft` takes. */
@@ -112,61 +121,6 @@ export function useListingDraft(
     branding: ListingBranding | null;
   }>({ fields: baseDraft?.descriptionFields ?? null, template: null, branding: null });
 
-  // A different card means a different draft. Editing card A and navigating to
-  // card B must not carry A's title across.
-  const seededFor = useRef<string | undefined>(cardId);
-  const defaultsFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (seededFor.current === cardId) return;
-    seededFor.current = cardId;
-    defaultsFor.current = null;
-    descContext.current = {
-      fields: baseDraft?.descriptionFields ?? null,
-      template: null,
-      branding: null,
-    };
-    setState(createListingDraftState(seedValues()));
-  }, [cardId, seedValues, baseDraft]);
-
-  /** Stage 2. Once per card, and only after the tab has been opened. */
-  useEffect(() => {
-    if (!enabled || !card || !baseDraft) return;
-    if (defaultsFor.current === cardId) return;
-    defaultsFor.current = cardId ?? null;
-
-    let cancelled = false;
-    setLoadingDefaults(true);
-    fetchListingSeedContext(card)
-      .then(({ branding, defaults }) => {
-        if (cancelled) return;
-        const resolution = resolveSeedDefaults(card, defaults, baseDraft);
-        const seeded = buildSeededDefaults(baseDraft, resolution, branding);
-        descContext.current = {
-          fields: seeded.descriptionFields,
-          template: resolution.template,
-          branding,
-        };
-        setState((prev) =>
-          rebaseListingDraftDefaults(prev, {
-            ...prev.defaults,
-            title: seeded.title,
-            descriptionHtml: seeded.descriptionHtml,
-          }),
-        );
-      })
-      .catch(() => {
-        // The built-in DCM defaults already on screen are the right fallback,
-        // and they are what the modal would fall back to as well.
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDefaults(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, card, cardId, baseDraft]);
-
   /**
    * Rebuilding the description for a title, and patching the headline of one
    * the owner already wrote. Both go through the shared builders, so the tab
@@ -183,6 +137,127 @@ export function useListingDraft(
     }),
     [],
   );
+
+  /**
+   * THE CARD'S IDENTITY, not just its id (review 2026-09-22, finding 5).
+   *
+   * The draft used to reseed only when the card ID changed — but an owner can
+   * correct the card WITHOUT leaving the page ("Edit card details", "Edit this
+   * card's label text"), and the page then refetches the same id. The draft sat
+   * there with the old name, the old set and the old specifics, and the
+   * once-per-id defaults flag meant the saved template was never re-resolved
+   * for the corrected card either. `cardIdentityKey` names everything a listing
+   * is actually built from, and deliberately excludes `updated_at` so a price
+   * refresh does not count as a correction.
+   */
+  const identityKey = useMemo(() => cardIdentityKey(card), [card]);
+  const [rebasedFromCard, setRebasedFromCard] = useState(false);
+  const dismissRebaseNote = useCallback(() => setRebasedFromCard(false), []);
+
+  // A different card means a different draft. Editing card A and navigating to
+  // card B must not carry A's title across. The SAME card, corrected, is the
+  // second branch: edits are kept, everything clean follows the correction.
+  const seededFor = useRef<string | undefined>(cardId);
+  const identityFor = useRef<string>(identityKey);
+  /** Requested, but not necessarily applied — the two are tracked apart. */
+  const defaultsRequestedFor = useRef<string | null>(null);
+  /** Applied. Only this suppresses a repeat. */
+  const defaultsAppliedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (seededFor.current !== cardId) {
+      seededFor.current = cardId;
+      identityFor.current = identityKey;
+      defaultsRequestedFor.current = null;
+      defaultsAppliedFor.current = null;
+      setRebasedFromCard(false);
+      descContext.current = {
+        fields: baseDraft?.descriptionFields ?? null,
+        template: null,
+        branding: null,
+      };
+      setState(createListingDraftState(seedValues()));
+      return;
+    }
+
+    if (identityFor.current === identityKey) return;
+    identityFor.current = identityKey;
+    // The saved template and grade label were resolved against the OLD card,
+    // so let stage 2 run again for the corrected one.
+    defaultsRequestedFor.current = null;
+    defaultsAppliedFor.current = null;
+    descContext.current = {
+      fields: baseDraft?.descriptionFields ?? null,
+      template: descContext.current.template,
+      branding: descContext.current.branding,
+    };
+    // Rebase rather than reset: a title the owner wrote survives a correction
+    // to the card's set or number; everything they did not touch follows it.
+    setState((prev) => {
+      const next = rebaseListingDraftDefaults(prev, seedValues(), titleSync);
+      if (changedDraftFields(prev.values, next.values).length > 0) setRebasedFromCard(true);
+      return next;
+    });
+  }, [cardId, identityKey, seedValues, baseDraft, titleSync]);
+
+  /**
+   * Stage 2. Once per card IDENTITY, and only after the tab has been opened.
+   *
+   * REQUESTED vs APPLIED. The flag used to be set before the fetch and never
+   * cleared, so a request cancelled by the cleanup (a refresh landing while it
+   * was in flight) left the draft on the built-in defaults for good, with the
+   * once-per-id flag blocking any replacement. Now the cleanup releases a
+   * request that never applied, and only an applied one suppresses a repeat.
+   */
+  useEffect(() => {
+    if (!enabled || !card || !baseDraft) return;
+    const key = `${cardId ?? ''}::${identityKey}`;
+    if (defaultsAppliedFor.current === key) return;
+    if (defaultsRequestedFor.current === key) return;
+    defaultsRequestedFor.current = key;
+
+    let cancelled = false;
+    setLoadingDefaults(true);
+    fetchListingSeedContext(card)
+      .then(({ branding, defaults }) => {
+        if (cancelled) return;
+        const resolution = resolveSeedDefaults(card, defaults, baseDraft);
+        const seeded = buildSeededDefaults(baseDraft, resolution, branding);
+        descContext.current = {
+          fields: seeded.descriptionFields,
+          template: resolution.template,
+          branding,
+        };
+        defaultsAppliedFor.current = key;
+        setState((prev) =>
+          rebaseListingDraftDefaults(
+            prev,
+            {
+              ...prev.defaults,
+              title: seeded.title,
+              descriptionHtml: seeded.descriptionHtml,
+            },
+            // So a clean description follows an edited TITLE rather than
+            // re-appearing under the default headline.
+            titleSync,
+          ),
+        );
+      })
+      .catch(() => {
+        // The built-in DCM defaults already on screen are the right fallback,
+        // and they are what the modal would fall back to as well. The request
+        // flag is released so a later identity change can try again.
+        if (!cancelled) defaultsRequestedFor.current = null;
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDefaults(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (defaultsAppliedFor.current !== key) defaultsRequestedFor.current = null;
+    };
+  }, [enabled, card, cardId, identityKey, baseDraft, titleSync]);
 
   const setField = useCallback(
     <K extends ListingDraftField>(field: K, value: ListingDraftValues[K]) => {
@@ -216,6 +291,8 @@ export function useListingDraft(
     anyDirty: isListingDraftDirty(state),
     priceLabel: basePrice.label,
     loadingDefaults,
+    rebasedFromCard,
+    dismissRebaseNote,
     setField,
     resetField,
     initialDraft,

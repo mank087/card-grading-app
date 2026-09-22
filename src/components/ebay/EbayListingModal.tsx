@@ -136,6 +136,25 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
    * i.e. only while the user hasn't hand-edited it.
    */
   const autoDescriptionRef = useRef<string>('');
+
+  /**
+   * THE CALLER'S DRAFT, SNAPSHOT ONCE PER OPEN (review 2026-09-22, finding 3).
+   *
+   * `initialDraft` is a live object on the card-detail InstaList tab: it is
+   * rebuilt whenever that tab's draft state changes, and that includes its
+   * saved-defaults fetch landing a second or two AFTER this modal was opened.
+   * With `initialDraft` in the seed effect's dependency list, such a late
+   * change re-ran the whole initialisation and overwrote a title, a price or a
+   * description the seller was already typing in here.
+   *
+   * So the seed effect takes a copy on the false → true transition of `isOpen`
+   * (and on a card change, which re-runs it) and reads only that copy for the
+   * rest of the open. Legacy callers pass nothing and are unaffected: the
+   * snapshot of null is null.
+   */
+  const liveInitialDraftRef = useRef<InitialListingDraft | null>(initialDraft ?? null);
+  liveInitialDraftRef.current = initialDraft ?? null;
+  const openedInitialDraftRef = useRef<InitialListingDraft | null>(null);
   const [savingDefaults, setSavingDefaults] = useState<null | 'shipping' | 'template'>(null);
   const [defaultsSavedFlash, setDefaultsSavedFlash] = useState<string | null>(null);
   const [defaultsError, setDefaultsError] = useState<string | null>(null);
@@ -357,6 +376,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
+      // ONE snapshot for this open. Everything below reads it, never the prop.
+      openedInitialDraftRef.current = liveInitialDraftRef.current;
       setStep('images');
       setError(null);
       setImageUrls({});
@@ -428,7 +449,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         defaultItemSpecifics: draft.itemSpecifics,
         defaultPrice: seededPrice.price,
         defaultPriceLabel: seededPrice.label,
-        initialDraft,
+        initialDraft: openedInitialDraftRef.current,
       });
 
       setPrice(seed.price);
@@ -526,7 +547,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       return () => { cancelled = true; };
     }
-  }, [isOpen, card, cardType, initialDraft]);
+    // `initialDraft` is DELIBERATELY not a dependency: see
+    // `openedInitialDraftRef` above. Re-seeding on a background change to it is
+    // the bug this list omits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, card, cardType]);
 
   // Single owner of the generated description.
   //

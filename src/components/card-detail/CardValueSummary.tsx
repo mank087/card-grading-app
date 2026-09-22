@@ -168,10 +168,8 @@ export function CardValueSummary({
       )}
 
       <div className="cd-value-footer">
-        <span>
-          {valuation.sourceLabel}
-          {valuation.freshnessLabel ? ` · ${valuation.freshnessLabel}` : ''}
-        </span>
+        {/* ONE status, not three: see `Valuation.statusLabel`. */}
+        <span>{valuation.statusLabel}</span>
         <button type="button" className="dcm-button dcm-button--text" onClick={onJumpToMarket}>
           Pricing &amp; portfolio
         </button>

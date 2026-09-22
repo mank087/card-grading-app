@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildValuation, formatStoredFreshness } from './valuation';
+import { buildValuation, formatStoredDate, formatStoredFreshness } from './valuation';
 
 const NOW = Date.parse('2026-09-21T12:00:00.000Z');
 const THREE_DAYS_AGO = '2026-09-18T12:00:00.000Z';
@@ -98,5 +98,67 @@ describe('formatStoredFreshness', () => {
   it('returns null for unparseable and future timestamps', () => {
     expect(formatStoredFreshness('not a date', NOW)).toBeNull();
     expect(formatStoredFreshness('2026-09-22T12:00:00.000Z', NOW)).toBeNull();
+  });
+});
+
+/**
+ * ONE status line for the hero (review 2026-09-22, polish). The panel used to
+ * print "DCM estimate (live lookup) · Cached · updated 4 days ago" — three
+ * statuses for one number, two of which disagree.
+ */
+describe('statusLabel — the single line the hero prints', () => {
+  it('says the prices are fresh when the lookup actually fetched', () => {
+    expect(buildValuation(stored, { amount: 1658.62, isCached: false }, NOW).statusLabel).toBe(
+      'DCM estimate · fresh prices',
+    );
+  });
+
+  it('says cached, once, with the age', () => {
+    expect(
+      buildValuation(stored, { amount: 900, isCached: true, cacheAgeDays: 4 }, NOW).statusLabel,
+    ).toBe('DCM estimate · from cached prices, 4 days old');
+    expect(
+      buildValuation(stored, { amount: 900, isCached: true, cacheAgeDays: 1 }, NOW).statusLabel,
+    ).toBe('DCM estimate · from cached prices, 1 day old');
+    expect(
+      buildValuation(stored, { amount: 900, isCached: true, cacheAgeDays: 0.2 }, NOW).statusLabel,
+    ).toBe('DCM estimate · from cached prices, updated today');
+    expect(
+      buildValuation(stored, { amount: 900, isCached: true }, NOW).statusLabel,
+    ).toBe('DCM estimate · from cached prices');
+  });
+
+  it('gives the stored value an actual date, not a relative age', () => {
+    expect(buildValuation(stored, null, NOW).statusLabel).toBe(
+      'DCM estimate · stored value, updated Sep 18, 2026',
+    );
+  });
+
+  it('prints no freshness at all when the row was never stamped', () => {
+    expect(buildValuation({ ...stored, updatedAt: null }, null, NOW).statusLabel).toBe(
+      'DCM estimate',
+    );
+  });
+
+  it('never invents a source for a card with no price', () => {
+    expect(
+      buildValuation({ ...stored, amount: null, source: 'none' }, null, NOW).statusLabel,
+    ).toBe('No price source for this card yet');
+  });
+
+  it('never prints the word "live lookup" beside a cached price', () => {
+    const v = buildValuation(stored, { amount: 900, isCached: true, cacheAgeDays: 4 }, NOW);
+    expect(v.statusLabel).not.toContain('live lookup');
+  });
+});
+
+describe('formatStoredDate', () => {
+  it('writes the month out and is independent of the runtime locale data', () => {
+    expect(formatStoredDate('2026-09-18T12:00:00.000Z')).toBe('Sep 18, 2026');
+    expect(formatStoredDate('2026-01-01T00:00:00.000Z')).toBe('Jan 1, 2026');
+  });
+
+  it('is null for anything unparseable', () => {
+    expect(formatStoredDate('not a date')).toBeNull();
   });
 });

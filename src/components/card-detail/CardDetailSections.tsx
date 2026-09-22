@@ -36,6 +36,7 @@ import {
   visibleCardDetailSections,
   type CardDetailSectionId,
 } from '@/lib/cardDetail/anchorMap';
+import { nextNavScrollLeft } from '@/lib/cardDetail/navScroll';
 
 const SECTION_LABELS: Record<CardDetailSectionId, string> = {
   overview: 'Overview',
@@ -134,20 +135,44 @@ export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSe
    * subgrade, a hash link, the tour). Bring it back into view whenever the
    * active section changes.
    *
-   * `inline: 'nearest'` so an item that is already visible does not slide, and
-   * `block: 'nearest'` so this never scrolls the PAGE — only the row.
+   * NOT `scrollIntoView` (review 2026-09-22, finding 1). `block: 'nearest'`
+   * does not mean "do not move the page": when the row is below the fold, the
+   * nearest document position is one that brings the row into view, so the
+   * browser scrolled the whole page — opening a card landed at scrollY 537 on
+   * desktop and ~1300 on a phone, past the label and the top of the card,
+   * before the reader had touched anything.
+   *
+   * Instead the row's OWN `scrollLeft` is written, from arithmetic on the
+   * active button's `offsetLeft`/`offsetWidth` (lib/cardDetail/navScroll.ts).
+   * Writing a scroll container's `scrollLeft` cannot move the document.
+   *
+   * And it is skipped entirely on the FIRST run: on arrival the row has never
+   * been scrolled, so there is nothing to correct — every reason this effect
+   * exists is a LATER change of section.
    */
+  const hasSettled = useRef(false);
   useEffect(() => {
+    if (!hasSettled.current) {
+      hasSettled.current = true;
+      return;
+    }
     const row = listRef.current;
     if (!row) return;
     const current = row.querySelector<HTMLElement>('[aria-current="page"]');
     if (!current) return;
+
+    const next = nextNavScrollLeft(
+      { scrollLeft: row.scrollLeft, clientWidth: row.clientWidth, scrollWidth: row.scrollWidth },
+      { offsetLeft: current.offsetLeft, offsetWidth: current.offsetWidth },
+    );
+    if (next === null) return;
+
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    current.scrollIntoView({
-      behavior: reduce ? 'auto' : 'smooth',
-      inline: 'nearest',
-      block: 'nearest',
-    });
+    if (typeof row.scrollTo === 'function') {
+      row.scrollTo({ left: next, behavior: reduce ? 'auto' : 'smooth' });
+    } else {
+      row.scrollLeft = next;
+    }
   }, [active]);
 
   return (

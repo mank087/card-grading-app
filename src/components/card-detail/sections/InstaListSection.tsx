@@ -26,7 +26,7 @@
 
 import InstaListImages from './InstaListImages';
 import InstaListFields from './InstaListFields';
-import { listingLockFor } from '@/lib/ebay/listingDraftState';
+import { CONNECT_TO_EDIT_NOTE, listingEditGate } from '@/lib/ebay/listingDraftState';
 import type { InstaListStatus } from '../useInstaListStatus';
 import type { CardDetailInstaList } from '../useCardDetailInstaList';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
@@ -42,11 +42,13 @@ export interface InstaListSectionProps {
    * mobile bar read, the session-only draft, the open signal, and whether eBay
    * is connected.
    *
-   * NOT-CONNECTED is not handled here. `beginListing` bumps
-   * `EbayListingButton`'s `openSignal`, and that component's own `handleClick`
-   * hops to `/ebay/connect?redirect=<current path>` when disconnected — the
-   * redirect exists once, there. `ebayConnected` only decides what this
-   * button SAYS.
+   * NOT-CONNECTED: the redirect itself still exists exactly once, in
+   * `EbayListingButton.handleClick` — `beginListing` bumps its `openSignal`
+   * and that component hops to `/ebay/connect?redirect=<here, fragment and
+   * all>`. What this file adds is the ORDER (review 2026-09-22, finding 2):
+   * with no connection the connect step comes first and the fields are
+   * read-only, because that redirect is a full-page navigation and the draft
+   * is React state — anything typed before it would be silently discarded.
    */
   insta: CardDetailInstaList;
 }
@@ -77,11 +79,38 @@ export function InstaListSection({
   insta,
 }: InstaListSectionProps) {
   const { status, draft, ebayConnected, beginListing: onBeginListing } = insta;
-  const lock = listingLockFor(status.state);
+  // Locked/sold FIRST, then the connection. A disconnected owner gets the
+  // fields read-only, because pressing the button sends the whole page to
+  // /ebay/connect and the draft is React state — see `listingEditGate`.
+  const lock = listingEditGate(status.state, ebayConnected);
   const listingUrl = status.listing?.listing_url ?? null;
 
   const beginLabel =
     ebayConnected === false ? 'Connect eBay to continue' : 'Begin listing on eBay';
+
+  /** The connect step, shown FIRST when there is no connection yet. */
+  const connectStep = lock.needsConnect ? (
+    <section className="cd-panel cd-instalist-connect" aria-labelledby="cd-il-connect-h">
+      <p className="cd-eyebrow">First, the connection</p>
+      <h3 id="cd-il-connect-h" className="cd-instalist-h3">
+        Connect your eBay account.
+      </h3>
+      <p className="cd-caption">
+        {CONNECT_TO_EDIT_NOTE} Connecting opens eBay in this tab and brings you straight back
+        here. Everything below is already prepared — you can look at all of it first.
+      </p>
+      <div className="dcm-actions" style={{ marginTop: 14 }}>
+        <button
+          type="button"
+          className="dcm-button dcm-button--primary"
+          disabled={!lock.canBegin}
+          onClick={onBeginListing}
+        >
+          Connect eBay
+        </button>
+      </div>
+    </section>
+  ) : null;
 
   return (
     <div className="cd-section cd-instalist-section" id="instalist-panel">
@@ -89,8 +118,10 @@ export function InstaListSection({
         <p className="cd-eyebrow">Ready for its next collector?</p>
         <h2>Your listing, before you list it.</h2>
         <p>
-          The photos, the title, the description and the specifics that will go to eBay. Edit
-          anything here and it carries into the listing flow. Edits last for this visit only.
+          The photos, the title, the description and the specifics that will go to eBay.
+          {lock.needsConnect
+            ? ' Connect eBay to edit any of it — editing is unlocked once connected.'
+            : ' Edit anything here and it carries into the listing flow. Edits last for this visit only.'}
         </p>
       </div>
 
@@ -128,6 +159,8 @@ export function InstaListSection({
         </p>
       )}
 
+      {connectStep}
+
       <InstaListImages
         card={card}
         cardType={cardType}
@@ -136,11 +169,15 @@ export function InstaListSection({
         showFounderEmblem={showFounderEmblem}
       />
 
-      <InstaListFields draft={draft} locked={lock.locked} />
+      <InstaListFields
+        draft={draft}
+        locked={lock.locked}
+        readOnlyNote={lock.needsConnect ? CONNECT_TO_EDIT_NOTE : null}
+      />
 
       {/* ── begin ─────────────────────────────────────────────────────── */}
       <div className="dcm-actions cd-instalist-begin">
-        {lock.locked ? (
+        {lock.locked && !lock.needsConnect ? (
           listingUrl ? (
             <a
               className="dcm-button dcm-button--primary"

@@ -27,8 +27,14 @@ import type { UseListingDraftResult } from '../useListingDraft';
 
 export interface InstaListFieldsProps {
   draft: UseListingDraftResult;
-  /** Listed or sold: everything is greyed and read-only. */
+  /** Listed, sold, or not connected yet: everything is greyed and read-only. */
   locked: boolean;
+  /**
+   * Why the fields are read-only, when the reason is something the owner can
+   * act on — today, only "connect eBay first" (review 2026-09-22, finding 2).
+   * Null for the listed/sold locks, which carry their own note above.
+   */
+  readOnlyNote?: string | null;
 }
 
 function specificValueText(value: ItemSpecific['value']): string {
@@ -59,7 +65,7 @@ function ResetLink({
   );
 }
 
-export function InstaListFields({ draft, locked }: InstaListFieldsProps) {
+export function InstaListFields({ draft, locked, readOnlyNote = null }: InstaListFieldsProps) {
   const [showSource, setShowSource] = useState(false);
   const ids = useId();
   const titleId = `cd-il-title-${ids}`;
@@ -78,6 +84,21 @@ export function InstaListFields({ draft, locked }: InstaListFieldsProps) {
 
   return (
     <div className="cd-instalist-fields" aria-disabled={locked || undefined}>
+      {readOnlyNote && (
+        <p className="cd-caption cd-instalist-readonly-note" role="note">
+          {readOnlyNote}
+        </p>
+      )}
+
+      {/* A correction to the card itself moved the fields nobody had edited. */}
+      {draft.rebasedFromCard && !locked && (
+        <p className="cd-instalist-rebase-note" role="status">
+          <span>Updated from card details.</span>
+          <button type="button" className="cd-quiet" onClick={draft.dismissRebaseNote}>
+            Dismiss
+          </button>
+        </p>
+      )}
       {/* ── title ─────────────────────────────────────────────────────── */}
       <section className="cd-panel" aria-labelledby={`${titleId}-h`}>
         <p className="cd-eyebrow">What buyers search</p>

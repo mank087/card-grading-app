@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { EbayListingModal } from './EbayListingModal';
 import { getStoredSession } from '@/lib/directAuth';
 import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
+import { buildEbayConnectHref } from '@/lib/ebay/connectRedirect';
 
 interface EbayListingButtonProps {
   card: any;
@@ -122,13 +123,32 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
     checkEbayStatus();
   }, []);
 
+  /**
+   * ADDITIVE (review 2026-09-22, finding 3). The draft is SNAPSHOT at the
+   * moment the flow is begun, and that snapshot is what the modal receives for
+   * the whole of this open.
+   *
+   * `initialDraft` is a live memo in the card-detail tab: it is recomputed
+   * whenever the draft state changes, including when the tab's saved-defaults
+   * fetch lands a second or two after the modal was opened. Passing the live
+   * value through meant a late background change could reach the modal's seed.
+   * A caller that passes nothing still gets null, exactly as before.
+   */
+  const liveInitialDraft = React.useRef<InitialListingDraft | null>(initialDraft);
+  liveInitialDraft.current = initialDraft;
+  const [openedDraft, setOpenedDraft] = useState<InitialListingDraft | null>(null);
+
   const handleClick = React.useCallback(() => {
     if (!ebayStatus.connected) {
-      // Redirect to eBay connect page with current URL as redirect
-      const currentUrl = window.location.pathname + window.location.search;
-      window.location.href = `/ebay/connect?redirect=${encodeURIComponent(currentUrl)}`;
+      // Redirect to the eBay connect page, and come back to exactly where the
+      // seller was standing — including the FRAGMENT, which is what names the
+      // InstaList tab on the card detail page. See lib/ebay/connectRedirect.ts
+      // for the round trip through /api/ebay/auth and /api/ebay/callback; a
+      // page with no fragment builds the identical URL it always did.
+      window.location.href = buildEbayConnectHref(window.location);
       return;
     }
+    setOpenedDraft(liveInitialDraft.current ?? null);
     setIsModalOpen(true);
   }, [ebayStatus.connected]);
 
@@ -168,7 +188,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
       labelStyle={labelStyle}
       customLabelConfig={customLabelConfig}
       onListed={onListed}
-      initialDraft={initialDraft}
+      initialDraft={openedDraft}
     />
   );
 

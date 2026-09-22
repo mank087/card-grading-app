@@ -73,6 +73,7 @@ import { useLabelPreview } from './useLabelPreview';
 import LabelPreviewControls from './LabelPreviewControls';
 import { useCardDetailInstaList } from './useCardDetailInstaList';
 import CardDetailBreadcrumb from './CardDetailBreadcrumb';
+import CardDetailMobileHeading from './CardDetailMobileHeading';
 import CardDetailMobileBar from './CardDetailMobileBar';
 import CardDetailModals from './CardDetailModals';
 import CardDetailFooterActions from './CardDetailFooterActions';
@@ -491,6 +492,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
       }
     : null;
 
+  /** Number · rarity · language. One line, shared by the hero and the phone heading. */
+  const identitySubtitle =
+    [vm.identity.cardNumberFormatted, vm.identity.rarityOrVariant, vm.identity.language]
+      .filter(Boolean)
+      .join(' · ') || null;
+
   const returnPath = `/${category}/${cardId}`;
   const labelStudioHref = (forHolder?: CardHolderId) =>
     buildLabelStudioHref(vm.identity.serial, {
@@ -654,6 +661,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
           />
         )}
 
+        {/* Phones only: the name before the photograph. See the component. */}
+        <CardDetailMobileHeading name={vm.identity.displayName} subtitle={identitySubtitle} />
+
         {/* ── hero ───────────────────────────────────────────────────── */}
         <div className="cd-hero">
           <CardLabelShowcase
@@ -704,13 +714,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
                 <span className="cd-serial">#{vm.identity.serial}</span>
               </div>
               <h1>{vm.identity.displayName}</h1>
-              {(vm.identity.cardNumberFormatted || vm.identity.language || vm.identity.rarityOrVariant) && (
-                <p className="cd-subtitle">
-                  {[vm.identity.cardNumberFormatted, vm.identity.rarityOrVariant, vm.identity.language]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-              )}
+              {identitySubtitle && <p className="cd-subtitle">{identitySubtitle}</p>}
             </div>
 
             <GradeSummary

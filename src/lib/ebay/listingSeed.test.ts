@@ -282,3 +282,81 @@ describe('applyInitialDraft — the override precedence', () => {
     expect(r.itemSpecifics).toBe(base.defaultItemSpecifics);
   });
 });
+
+/**
+ * SEED PRECEDENCE ACROSS ONE OPEN (review 2026-09-22, finding 3).
+ *
+ * `EbayListingModal` snapshots `initialDraft` on the false → true transition of
+ * `isOpen` (and on a card change) and seeds from that copy for the rest of the
+ * open, instead of keeping the prop in the seed effect's dependency list. The
+ * unit runner is node-environment with no React renderer, so the ref logic is
+ * mirrored here exactly and the precedence is asserted through the same
+ * `applyInitialDraft` the modal calls.
+ *
+ * What it protects: the InstaList tab's `initialDraft` is a live memo, and its
+ * saved-defaults fetch can land a second after the modal was opened. Before the
+ * snapshot, that late change re-ran initialisation over a form being typed in.
+ */
+describe('a late initialDraft does not re-seed an open modal', () => {
+  const defaults = {
+    defaultTitle: 'Default title',
+    defaultDescriptionHtml: '<p>default</p>',
+    defaultItemSpecifics: [],
+    defaultPrice: '10.00',
+    defaultPriceLabel: 'Suggested from your portfolio value',
+  };
+
+  /** The modal's two refs, as plain variables. */
+  function modalOpenLifecycle() {
+    let live: any = null;
+    let opened: any = null;
+    return {
+      /** Every render writes the prop to the live ref. */
+      setProp(next: any) {
+        live = next;
+      },
+      /** The seed effect body: runs on open, and on a card change. */
+      seed() {
+        opened = live;
+        return applyInitialDraft({ ...defaults, initialDraft: opened });
+      },
+      /** What a re-seed WOULD produce if one were triggered today. */
+      reseedIfDepsChanged() {
+        return applyInitialDraft({ ...defaults, initialDraft: opened });
+      },
+    };
+  }
+
+  it('seeds from the snapshot taken at open, not from a later value', () => {
+    const modal = modalOpenLifecycle();
+    modal.setProp({ title: 'Owner title' });
+    const seeded = modal.seed();
+    expect(seeded.title).toBe('Owner title');
+
+    // The tab's defaults fetch lands and rebuilds its memo…
+    modal.setProp({ title: 'KINGS 9 Owner title', price: '99.00' });
+    // …and nothing the modal seeds from has changed.
+    const after = modal.reseedIfDepsChanged();
+    expect(after.title).toBe('Owner title');
+    expect(after.price).toBe('10.00');
+  });
+
+  it('takes a fresh snapshot for the next open', () => {
+    const modal = modalOpenLifecycle();
+    modal.setProp({ title: 'First' });
+    expect(modal.seed().title).toBe('First');
+    modal.setProp({ title: 'Second' });
+    expect(modal.seed().title).toBe('Second');
+  });
+
+  it('is unchanged for a legacy caller that passes nothing', () => {
+    const modal = modalOpenLifecycle();
+    modal.setProp(null);
+    const seeded = modal.seed();
+    expect(seeded.title).toBe('Default title');
+    expect(seeded.descriptionHtml).toBe('<p>default</p>');
+    expect(seeded.price).toBe('10.00');
+    expect(seeded.priceLabel).toBe('Suggested from your portfolio value');
+    expect(seeded.descriptionIsUserEdited).toBe(false);
+  });
+});

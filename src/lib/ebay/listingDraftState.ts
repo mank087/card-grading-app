@@ -37,6 +37,23 @@ export interface ListingDraftState {
   /** What a Reset returns a field to. Replaced when the async defaults land. */
   defaults: ListingDraftValues;
   dirty: Record<ListingDraftField, boolean>;
+  /**
+   * TRUE ONLY WHEN THE OWNER WROTE THE DESCRIPTION BODY THEMSELVES.
+   *
+   * `dirty.descriptionHtml` answers "does this differ from the default?", which
+   * a TITLE edit also makes true — the headline repeats the title, so the
+   * rendered HTML changes even though nobody touched the body. Handing that
+   * HTML to the modal made it look hand-authored, and the modal's regeneration
+   * guard then froze the description for the rest of the flow: later title
+   * changes, the shipping/returns summary and a template's `{shippingSummary}`
+   * all stopped following (review 2026-09-22, finding 4).
+   *
+   * So authorship is tracked separately from difference. Only a write to the
+   * description field itself sets this, and only a state carrying it hands the
+   * modal an HTML body. A title-only edit carries the TITLE, and the modal
+   * regenerates the description from it through its normal path.
+   */
+  bodyEdited: boolean;
 }
 
 function sameSpecifics(a: ItemSpecific[], b: ItemSpecific[]): boolean {
@@ -62,6 +79,7 @@ export function createListingDraftState(defaults: ListingDraftValues): ListingDr
     values: defaults,
     defaults,
     dirty: { title: false, descriptionHtml: false, itemSpecifics: false, price: false },
+    bodyEdited: false,
   };
 }
 
@@ -76,10 +94,14 @@ export function setListingDraftField<K extends ListingDraftField>(
   value: ListingDraftValues[K],
 ): ListingDraftState {
   const values = { ...state.values, [field]: value } as ListingDraftValues;
+  const differs = !sameValue(field, values, state.defaults);
   return {
     ...state,
     values,
-    dirty: { ...state.dirty, [field]: !sameValue(field, values, state.defaults) },
+    dirty: { ...state.dirty, [field]: differs },
+    // A write to the description field IS authorship — and typing it back to
+    // the default un-authors it, exactly as the dirty flag un-sets.
+    bodyEdited: field === 'descriptionHtml' ? differs : state.bodyEdited,
   };
 }
 
@@ -108,9 +130,12 @@ export interface TitleSync {
  *  - HAND-EDITED description: only the headline element is swapped. Everything
  *    else they wrote survives, which is the whole point.
  *
- * A title edit therefore usually makes the DESCRIPTION dirty too — deliberately.
- * The pair is carried into the modal together and is already consistent, rather
- * than the modal re-seeding a description that names the old title.
+ * WHAT A TITLE EDIT DOES **NOT** DO: it does not make the description
+ * hand-authored. The tab's own preview is re-rendered so the reader sees the
+ * new headline, but `bodyEdited` stays false, so `dirtyDraftValues` carries the
+ * TITLE alone and the modal regenerates the description itself — with the
+ * shipping summary and the saved template that only the modal knows about
+ * (review 2026-09-22, finding 4).
  */
 export function setListingDraftTitle(
   state: ListingDraftState,
@@ -120,7 +145,7 @@ export function setListingDraftTitle(
   const previousTitle = state.values.title;
   if (previousTitle === nextTitle) return state;
 
-  const descriptionHtml = state.dirty.descriptionHtml
+  const descriptionHtml = state.bodyEdited
     ? sync.retitle(state.values.descriptionHtml, previousTitle, nextTitle)
     : sync.render(nextTitle);
 
@@ -131,6 +156,9 @@ export function setListingDraftTitle(
     dirty: {
       ...state.dirty,
       title: values.title !== state.defaults.title,
+      // Still derived by comparison, so a title typed back to the default
+      // renders the default description again and the field goes clean. It is
+      // `bodyEdited`, not this flag, that decides what the modal receives.
       descriptionHtml: values.descriptionHtml !== state.defaults.descriptionHtml,
     },
   };
@@ -159,6 +187,8 @@ export function resetListingDraftField(
     ...state,
     values: { ...state.values, [field]: state.defaults[field] } as ListingDraftValues,
     dirty: { ...state.dirty, [field]: false },
+    // Putting the body back to its default gives up authorship of it.
+    bodyEdited: field === 'descriptionHtml' ? false : state.bodyEdited,
   };
 }
 
@@ -174,16 +204,41 @@ export function resetListingDraftField(
 export function rebaseListingDraftDefaults(
   state: ListingDraftState,
   defaults: ListingDraftValues,
+  /**
+   * Optional, and the reason it exists: when the owner has edited the TITLE but
+   * not the body, the description is clean and therefore follows the new
+   * default — which is rendered with the DEFAULT title. Without this the tab's
+   * preview would show the new template under the old headline. Given the sync,
+   * the clean description is re-rendered for the title actually in the field.
+   * Callers that pass nothing get the previous behaviour exactly.
+   */
+  sync?: TitleSync,
 ): ListingDraftState {
   const values = { ...state.values };
   for (const field of LISTING_DRAFT_FIELDS) {
     if (!state.dirty[field]) (values as Record<string, unknown>)[field] = defaults[field];
   }
+  if (sync && !state.bodyEdited && values.title !== defaults.title) {
+    values.descriptionHtml = sync.render(values.title);
+  }
   const dirty = { ...state.dirty };
   for (const field of LISTING_DRAFT_FIELDS) {
     dirty[field] = state.dirty[field] && !sameValue(field, values, defaults);
   }
-  return { values, defaults, dirty };
+  // A description re-rendered for a dirty title differs from the new default
+  // without being hand-authored; say so, so a Reset is still offered.
+  dirty.descriptionHtml = state.bodyEdited
+    ? dirty.descriptionHtml
+    : values.descriptionHtml !== defaults.descriptionHtml;
+  return { values, defaults, dirty, bodyEdited: state.bodyEdited };
+}
+
+/** Which fields differ between two draft states. Used to word a rebase note. */
+export function changedDraftFields(
+  before: ListingDraftValues,
+  after: ListingDraftValues,
+): ListingDraftField[] {
+  return LISTING_DRAFT_FIELDS.filter((field) => !sameValue(field, before, after));
 }
 
 export function isListingDraftDirty(state: ListingDraftState): boolean {
@@ -197,11 +252,18 @@ export function isListingDraftDirty(state: ListingDraftState): boolean {
  * default for it. This is the whole additive contract: an owner who opens the
  * tab, looks, and presses "Begin listing" hands over `{}`, and the modal seeds
  * byte-for-byte as it did before the tab existed.
+ *
+ * THE DESCRIPTION IS GATED ON AUTHORSHIP, not on difference (finding 4): a body
+ * the owner wrote is carried and the modal leaves it alone; a body that merely
+ * followed a title edit is NOT carried, so the modal rebuilds it from the
+ * carried title with its own shipping summary and template.
  */
 export function dirtyDraftValues(state: ListingDraftState): InitialListingDraft {
   const out: InitialListingDraft = {};
   if (state.dirty.title) out.title = state.values.title;
-  if (state.dirty.descriptionHtml) out.descriptionHtml = state.values.descriptionHtml;
+  if (state.bodyEdited && state.dirty.descriptionHtml) {
+    out.descriptionHtml = state.values.descriptionHtml;
+  }
   if (state.dirty.itemSpecifics) out.itemSpecifics = state.values.itemSpecifics;
   if (state.dirty.price) out.price = state.values.price;
   return out;
@@ -232,6 +294,41 @@ const SOLD_NOTE = 'This card is marked as sold. Listing details are locked.';
  * (EbayListingModal.tsx:627-671) — the same reasoning `InstaListPanel` already
  * documents for the hero.
  */
+/**
+ * The same rule, plus the eBay connection (review 2026-09-22, finding 2).
+ *
+ * WHY EDITING IS GATED ON CONNECTING. "Begin listing" for a disconnected
+ * account does not open the modal: `EbayListingButton` sends the whole page to
+ * `/ebay/connect`, and the draft is React state, so everything typed here is
+ * gone the moment that navigation starts. Nothing can carry it across — the
+ * design is session-only by decision, with no column and no localStorage — so
+ * the honest move is to not invite the typing in the first place.
+ *
+ * So a disconnected owner gets the fields READ-ONLY, under one line that says
+ * why and what unlocks them. The photos and the seeded preview still render;
+ * there is nothing to lose in looking.
+ *
+ * `connected` is null while `/api/ebay/status` is still answering. Null does
+ * NOT lock: a connected owner must never watch their own editor flash
+ * read-only on every page view.
+ */
+export function listingEditGate(state: InstaListState, connected: boolean | null): ListingLock & {
+  /** Show the connect step first, above the photos and the fields. */
+  needsConnect: boolean;
+} {
+  const lock = listingLockFor(state);
+  if (lock.locked || connected !== false) return { ...lock, needsConnect: false };
+  return {
+    locked: true,
+    note: null,
+    canBegin: lock.canBegin,
+    needsConnect: true,
+  };
+}
+
+export const CONNECT_TO_EDIT_NOTE =
+  'Connect eBay to edit and list — editing is unlocked once connected.';
+
 export function listingLockFor(state: InstaListState): ListingLock {
   switch (state) {
     case 'listed':

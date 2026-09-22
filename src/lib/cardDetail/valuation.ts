@@ -54,6 +54,19 @@ export interface Valuation {
   sourceLabel: string;
   /** "Cached · updated 3 days ago", a stored timestamp's wording, or null to print nothing. */
   freshnessLabel: string | null;
+  /**
+   * THE ONE LINE THE HERO PRINTS (review 2026-09-22, polish).
+   *
+   * The panel used to concatenate `sourceLabel` and `freshnessLabel`, which
+   * read "DCM estimate (live lookup) · Cached · updated 4 days ago" — three
+   * status words for one number, two of which contradict each other. This says
+   * it once: "DCM estimate · from cached prices, 4 days old", "DCM estimate ·
+   * fresh prices", "DCM estimate · stored value, updated Sep 18, 2026".
+   *
+   * The two fields above are kept because they are the tested primitives this
+   * is assembled from; nothing renders them separately any more.
+   */
+  statusLabel: string;
   basis: ValuationBasis;
   /** The stored value is withheld and no live number replaced it. */
   isWithheld: boolean;
@@ -89,6 +102,32 @@ export function formatStoredFreshness(iso: string, now: number = Date.now()): st
   return `Updated ${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/**
+ * "Sep 18, 2026" — an actual date, not "4 days ago", for the stored value.
+ *
+ * Written out rather than left to `toLocaleDateString` so the string does not
+ * depend on which ICU data the runtime shipped with. Null for anything
+ * unparseable, which prints no date at all rather than "Invalid Date".
+ */
+export function formatStoredDate(iso: string): string | null {
+  const then = new Date(iso);
+  if (!Number.isFinite(then.getTime())) return null;
+  return `${MONTHS[then.getUTCMonth()]} ${then.getUTCDate()}, ${then.getUTCFullYear()}`;
+}
+
+/** "from cached prices, 4 days old" / "…, updated today". */
+function cachedWording(days: number | null): string {
+  if (days === null) return 'from cached prices';
+  if (days < 1) return 'from cached prices, updated today';
+  const whole = Math.round(days);
+  return `from cached prices, ${whole} day${whole === 1 ? '' : 's'} old`;
+}
+
 export function buildValuation(
   stored: StoredValuationInput,
   live: LiveValuationInput | null,
@@ -105,6 +144,7 @@ export function buildValuation(
         amount: live.amount,
         sourceLabel: 'DCM estimate (live lookup)',
         freshnessLabel: days === null ? 'Cached price' : cacheAgeWording(days),
+        statusLabel: `DCM estimate · ${cachedWording(days)}`,
         basis: 'live-cached',
         isWithheld: false,
       };
@@ -113,21 +153,31 @@ export function buildValuation(
       amount: live.amount,
       sourceLabel: 'DCM estimate (live lookup)',
       freshnessLabel: null,
+      statusLabel: 'DCM estimate · fresh prices',
       basis: 'live',
       isWithheld: false,
     };
   }
 
   const isWithheld = stored.status === 'withheld';
+  const sourceLabel =
+    stored.amount !== null
+      ? SOURCE_LABEL[stored.source] ?? 'No source'
+      : 'No price source for this card yet';
+  const storedDate =
+    stored.amount !== null && stored.updatedAt ? formatStoredDate(stored.updatedAt) : null;
+
   return {
     amount: stored.amount,
-    sourceLabel: stored.amount !== null
-      ? SOURCE_LABEL[stored.source] ?? 'No source'
-      : 'No price source for this card yet',
+    sourceLabel,
     freshnessLabel:
       stored.amount !== null && stored.updatedAt
         ? formatStoredFreshness(stored.updatedAt, now)
         : null,
+    // No date on file means UNKNOWN, not stale (the eBay-fallback path never
+    // stamps ~21k rows), so the line stops after the source rather than
+    // inventing a freshness for it.
+    statusLabel: storedDate ? `${sourceLabel} · stored value, updated ${storedDate}` : sourceLabel,
     basis: 'stored',
     isWithheld,
   };
