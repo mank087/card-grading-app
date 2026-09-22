@@ -73,8 +73,8 @@ import { useLabelPreview } from './useLabelPreview';
 import LabelPreviewControls from './LabelPreviewControls';
 import { useCardDetailInstaList } from './useCardDetailInstaList';
 import CardDetailBreadcrumb from './CardDetailBreadcrumb';
-import CardDetailMobileHeading from './CardDetailMobileHeading';
 import CardDetailMobileBar from './CardDetailMobileBar';
+import { useNarrowViewport, useScrollLock } from './useScrollLock';
 import CardDetailModals from './CardDetailModals';
 import CardDetailFooterActions from './CardDetailFooterActions';
 
@@ -355,6 +355,29 @@ export function CardDetailShell(props: CardDetailShellProps) {
     orgId: (card as { org_id?: string | null } | null)?.org_id ?? null,
   });
 
+  /*
+   * The genuinely MODAL dialogs — read twice: here to hold the page still
+   * behind them (audit item A3), and far below to stand the mobile action bar
+   * down. The tour is absent because it scrolls the page from step to step;
+   * the download menu because it is only a fixed sheet on a phone (below).
+   */
+  const modalOpen =
+    zoom.isOpen ||
+    showDeleteModal ||
+    showRegradeConfirm ||
+    showInsufficientCredits ||
+    showEditLabelModal ||
+    showFirstGradeModal ||
+    enlargedHolder !== null ||
+    insta.modalOpen;
+
+  /* Above the loading and error returns on purpose: a hook below an early
+     return runs on some renders and not others. The download menu locks only
+     on a phone, where it is `position: fixed`; its desktop form is anchored
+     to the document, which a fixed body would move under it. */
+  const narrowViewport = useNarrowViewport();
+  useScrollLock(modalOpen || (downloadMenuOpen && narrowViewport));
+
   // Owner only, balance 0, and not already covered by the post-result offer.
   useEffect(() => {
     if (card && !loading && balance === 0 && !postResultOfferEligible) {
@@ -506,7 +529,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
       }
     : null;
 
-  /** Number · rarity · language. One line, shared by the hero and the phone heading. */
+  /** Number · rarity · language. One line, under the hero's <h1>. */
   const identitySubtitle =
     [vm.identity.cardNumberFormatted, vm.identity.rarityOrVariant, vm.identity.language]
       .filter(Boolean)
@@ -571,19 +594,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
     ? holderStyleSupport(enlargedHolder, preview.style, preview.activeConfig)
     : null;
 
-  // The mobile bar must never sit on top of an open overlay — including the
-  // download menu and the listing modal, which are owned by shared components.
-  const anyModalOpen =
-    zoom.isOpen ||
-    showDeleteModal ||
-    showRegradeConfirm ||
-    showInsufficientCredits ||
-    showEditLabelModal ||
-    showFirstGradeModal ||
-    showOnboardingTour ||
-    enlargedHolder !== null ||
-    downloadMenuOpen ||
-    insta.modalOpen;
+  // The mobile bar must never sit on top of an open overlay — `modalOpen`
+  // above, plus the two surfaces that do not lock the page but do cover it:
+  // the tour, and the download menu at any width.
+  const anyModalOpen = modalOpen || showOnboardingTour || downloadMenuOpen;
   const showMobileBar = isOwner && !anyModalOpen;
 
   const openZoom = (imageUrl: string, alt: string, title: string) =>
@@ -674,9 +688,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
             isOwner={isOwner}
           />
         )}
-
-        {/* Phones only: the name before the photograph. See the component. */}
-        <CardDetailMobileHeading name={vm.identity.displayName} subtitle={identitySubtitle} />
 
         {/* ── hero ───────────────────────────────────────────────────── */}
         <div className="cd-hero">

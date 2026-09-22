@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { useScrollLock } from '../useScrollLock';
 
 export interface ListingImageDialogProps {
   /** The object URL to show. Null closes the dialog. */
@@ -23,6 +24,11 @@ export function ListingImageDialog({ src, label, onClose }: ListingImageDialogPr
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreTo = useRef<HTMLElement | null>(null);
+
+  // This dialog's open state is its caller's (`InstaListImages`), not the
+  // shell's, so it locks the page for itself. See useScrollLock — the lock is
+  // reference counted, so opening this over anything else is safe.
+  useScrollLock(src !== null);
 
   const focusables = useCallback((): HTMLElement[] => {
     if (!dialogRef.current) return [];

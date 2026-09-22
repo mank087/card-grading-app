@@ -18,6 +18,7 @@
  * Extracted from `CardDetailShell` so the shell stays composition only.
  */
 
+import { useEffect, useRef } from 'react';
 import type { InstaListState } from './useInstaListStatus';
 
 export interface CardDetailMobileBarProps {
@@ -49,9 +50,36 @@ function instaListLabel(state: InstaListState): { text: string; disabled: boolea
 
 export function CardDetailMobileBar({ onOpenDownloads, instaList }: CardDetailMobileBarProps) {
   const insta = instaList ? instaListLabel(instaList.state) : null;
+  const barRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Publish the bar's height to the document root while it is on screen.
+   *
+   * The help bubble is `position: fixed; bottom: 1.5rem` on every page and
+   * knows nothing about this bar, so on a phone the bar covered it and the
+   * chat button could not be tapped (owner report, Sept 22). Floating site
+   * chrome offsets itself by `--dcm-fixed-bar-height` (see globals.css); the
+   * variable only exists while a bar is mounted, so every other page is
+   * untouched. Measured rather than hard-coded, because the bar's height
+   * includes the safe-area inset and grows if a label wraps.
+   */
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const apply = () =>
+      root.style.setProperty('--dcm-fixed-bar-height', `${Math.round(el.getBoundingClientRect().height)}px`);
+    apply();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
+    observer?.observe(el);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty('--dcm-fixed-bar-height');
+    };
+  }, []);
 
   return (
-    <div className="cd-mobile-bar">
+    <div className="cd-mobile-bar" ref={barRef}>
       <button
         type="button"
         className="dcm-button dcm-button--primary"

@@ -47,6 +47,18 @@ const SECTION_LABELS: Record<CardDetailSectionId, string> = {
   instalist: 'InstaList',
 };
 
+/**
+ * Phone-only tab wording. The nav's content is 650px wide in a 390px viewport,
+ * so the two longest labels are shortened below 760px — visually only. The
+ * button's `aria-label` stays the full `SECTION_LABELS` wording, so nothing a
+ * screen reader or a test queries by accessible name changes, and desktop
+ * keeps the full words (mobile-web audit, item B3).
+ */
+const SECTION_LABELS_SHORT: Partial<Record<CardDetailSectionId, string>> = {
+  labels: 'Labels',
+  market: 'Market',
+};
+
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -150,6 +162,40 @@ export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSe
    * been scrolled, so there is nothing to correct — every reason this effect
    * exists is a LATER change of section.
    */
+  /**
+   * Whether there is more of the row off the left and off the right, which the
+   * wrapper turns into an edge fade. Without it the row simply ends mid-word
+   * with no hint that four more tabs exist — and iOS paints no scrollbar at
+   * all, so there is nothing else to notice (mobile-web audit, item B3).
+   *
+   * Recomputed on the row's own `scroll`, on resize, and whenever the active
+   * section changes (the effect below moves `scrollLeft`).
+   */
+  const [overflow, setOverflow] = useState({ start: false, end: false });
+  const measureOverflow = useCallback(() => {
+    const row = listRef.current;
+    if (!row) return;
+    // 1px of slack: fractional layout widths make an unscrollable row report a
+    // scrollWidth a hair over its clientWidth, which would fade it forever.
+    const max = row.scrollWidth - row.clientWidth;
+    setOverflow((prev) => {
+      const next = { start: row.scrollLeft > 1, end: max > 1 && row.scrollLeft < max - 1 };
+      return prev.start === next.start && prev.end === next.end ? prev : next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const row = listRef.current;
+    if (!row) return;
+    measureOverflow();
+    row.addEventListener('scroll', measureOverflow, { passive: true });
+    window.addEventListener('resize', measureOverflow);
+    return () => {
+      row.removeEventListener('scroll', measureOverflow);
+      window.removeEventListener('resize', measureOverflow);
+    };
+  }, [measureOverflow]);
+
   const hasSettled = useRef(false);
   useEffect(() => {
     if (!hasSettled.current) {
@@ -165,7 +211,10 @@ export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSe
       { scrollLeft: row.scrollLeft, clientWidth: row.clientWidth, scrollWidth: row.scrollWidth },
       { offsetLeft: current.offsetLeft, offsetWidth: current.offsetWidth },
     );
-    if (next === null) return;
+    if (next === null) {
+      measureOverflow();
+      return;
+    }
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (typeof row.scrollTo === 'function') {
@@ -173,23 +222,43 @@ export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSe
     } else {
       row.scrollLeft = next;
     }
-  }, [active]);
+    measureOverflow();
+  }, [active, measureOverflow]);
 
   return (
-    <nav ref={listRef} className="cd-section-nav" aria-label="Card detail sections">
-      {visibleCardDetailSections(isOwner).map((id) => (
-        <button
-          key={id}
-          type="button"
-          // Plain buttons, so they are in the tab order and respond to Enter
-          // and Space without a roving-tabindex implementation to get wrong.
-          aria-current={active === id ? 'page' : undefined}
-          onClick={() => onSelect(id)}
-        >
-          {SECTION_LABELS[id]}
-        </button>
-      ))}
-    </nav>
+    /*
+     * The wrapper — not the nav — carries the sticky position, the background
+     * and the edge-to-edge bleed on mobile. It has to: the fade is an absolute
+     * pseudo-element pinned to the edges, and a pseudo-element on the nav
+     * itself would scroll away with the tabs. The nav stays the scroll
+     * container, so `navScroll.ts` and the effect above are unchanged.
+     */
+    <div
+      className="cd-section-nav-wrap"
+      data-overflow-start={overflow.start || undefined}
+      data-overflow-end={overflow.end || undefined}
+    >
+      <nav ref={listRef} className="cd-section-nav" aria-label="Card detail sections">
+        {visibleCardDetailSections(isOwner).map((id) => (
+          <button
+            key={id}
+            type="button"
+            // Plain buttons, so they are in the tab order and respond to Enter
+            // and Space without a roving-tabindex implementation to get wrong.
+            aria-current={active === id ? 'page' : undefined}
+            aria-label={SECTION_LABELS[id]}
+            onClick={() => onSelect(id)}
+          >
+            <span className="cd-nav-label-full">{SECTION_LABELS[id]}</span>
+            {SECTION_LABELS_SHORT[id] && (
+              <span className="cd-nav-label-short" aria-hidden="true">
+                {SECTION_LABELS_SHORT[id]}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
 

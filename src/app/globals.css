@@ -174,3 +174,15 @@ body.has-floating-cta [class*="fixed"][class*="bottom-6"][class*="right-6"] {
    so in-content landmarks survive. Inert in normal browsers: nothing sets the
    attribute there. */
 html[data-embedded="1"] [data-site-chrome] { display: none !important; }
+
+/* Floating site chrome (the help bubble and its panel) sits 1.5rem from the
+   bottom on every page. A page that also renders a fixed bottom action bar
+   publishes that bar's height as --dcm-fixed-bar-height on <html>, and the
+   chrome lifts above it instead of being covered — on a phone the card
+   detail page's Download/InstaList bar was sitting on top of the chat button
+   and swallowing the tap. The variable is absent everywhere else, so the
+   fallback keeps the historical position. `html` prefix only to out-specify
+   Tailwind's own `bottom-6` utility. */
+html [data-site-chrome='floating'] {
+  bottom: calc(1.5rem + var(--dcm-fixed-bar-height, 0px));
+}

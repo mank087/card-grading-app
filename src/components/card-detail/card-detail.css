@@ -13,6 +13,15 @@
 
 .dcm-card-detail {
   --cd-gap: 24px;
+  /*
+   * The page gutter — the space between `.cd-container` and the viewport edge,
+   * on ONE side. Anything that wants to bleed edge-to-edge must negate THIS,
+   * not a hard-coded 16px: the gutter is 24px by default, 16px below 760 and
+   * 12px below 360, and the sticky section nav used to assume 16px everywhere.
+   * At 320 that made the nav 328px wide inside a 320px viewport and the whole
+   * document rubber-banded sideways (mobile-web audit, item A2).
+   */
+  --cd-gutter: 24px;
   --cd-radius: 14px;
   --cd-panel-bg: #fff;
   --cd-panel-border: var(--dcm-border, #dfe3eb);
@@ -29,6 +38,13 @@
   --cd-nav-h: 0px;
   --cd-scroll-offset: calc(var(--cd-header-h) + var(--cd-nav-h) + 12px);
   padding-bottom: var(--cd-mobile-bar-height);
+  /*
+   * A guard, not the fix — the gutter arithmetic above is. `clip`, never
+   * `hidden`: `overflow: hidden` on an ancestor makes that ancestor a scroll
+   * container, which re-parents every `position: sticky` descendant to it and
+   * would stop the section nav pinning under the site header. `clip` does not.
+   */
+  overflow-x: clip;
 }
 
 /*
@@ -57,7 +73,7 @@
 }
 
 .dcm-card-detail .cd-container {
-  width: min(1240px, calc(100% - 48px));
+  width: min(1240px, calc(100% - var(--cd-gutter) * 2));
   margin-inline: auto;
 }
 
@@ -564,15 +580,22 @@
 
 /* ---------- section nav ---------- */
 
+.dcm-card-detail .cd-section-nav-wrap {
+  position: relative;
+  margin-top: 28px;
+}
+
 .dcm-card-detail .cd-section-nav {
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  margin-top: 28px;
   padding-bottom: 2px;
   border-bottom: 1px solid var(--cd-panel-border);
   scrollbar-width: thin;
 }
+
+/* Desktop shows the full wording; the short span is phone-only. */
+.dcm-card-detail .cd-nav-label-short { display: none; }
 
 .dcm-card-detail .cd-section-nav button {
   flex-shrink: 0;
@@ -982,8 +1005,8 @@
     --cd-mobile-bar-height: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
-  .dcm-card-detail .cd-container {
-    width: calc(100% - 32px);
+  .dcm-card-detail {
+    --cd-gutter: 16px;
   }
 
   .dcm-card-detail .cd-hero,
@@ -1038,21 +1061,89 @@
     --cd-nav-h: 51px;
   }
 
-  .dcm-card-detail .cd-section-nav {
+  .dcm-card-detail .cd-section-nav-wrap {
     position: sticky;
     top: var(--cd-header-h);
     z-index: 30;
     margin-top: 20px;
     background: var(--dcm-page-bg, #f9fafb);
-    /* Bleed to the viewport edges so the row reads as a bar, not a card. */
-    margin-inline: -16px;
-    padding-inline: 16px;
+    /*
+     * Bleed to the viewport edges so the row reads as a bar, not a card — by
+     * negating the REAL gutter. The old `-16px` was a guess that held at 390
+     * and overhung by 4px a side at 320, which is what made the whole document
+     * scroll horizontally (mobile-web audit, item A2).
+     */
+    margin-inline: calc(var(--cd-gutter) * -1);
+    padding-inline: var(--cd-gutter);
+  }
+
+  .dcm-card-detail .cd-section-nav {
     scroll-behavior: smooth;
+    /* A nudge, not a lock: `proximity` leaves a deliberate part-scroll alone
+       and only settles a release that is already close to a tab's edge. */
+    scroll-snap-type: x proximity;
+    /* The row is its own scroll container; a flick must not become a page
+       scroll (or, in an app WebView, a pull-to-refresh) at either end. */
+    overscroll-behavior-x: contain;
+  }
+
+  .dcm-card-detail .cd-section-nav button {
+    scroll-snap-align: start;
+  }
+
+  /* Only the two long labels render a short span; a button that has one hides
+     its full wording, and every other button is untouched (`:only-child`). */
+  .dcm-card-detail .cd-section-nav .cd-nav-label-full:not(:only-child) { display: none; }
+  .dcm-card-detail .cd-section-nav .cd-nav-label-short { display: inline; }
+
+  /*
+   * The edge fades. They live on the WRAPPER, pinned to its padding box, so
+   * they stay put while the tabs scroll under them, and each is shown only
+   * when `CardDetailSectionNav` has measured something still to scroll to in
+   * that direction — no permanent decoration on a row that already fits.
+   *
+   * `pointer-events: none` so neither fade can swallow a tap on the tab
+   * underneath it.
+   */
+  .dcm-card-detail .cd-section-nav-wrap::before,
+  .dcm-card-detail .cd-section-nav-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 1px;
+    width: 32px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms linear;
+    z-index: 1;
+  }
+
+  .dcm-card-detail .cd-section-nav-wrap::before {
+    left: 0;
+    background: linear-gradient(
+      to right,
+      var(--dcm-page-bg, #f9fafb),
+      rgb(249 250 251 / 0%)
+    );
+  }
+
+  .dcm-card-detail .cd-section-nav-wrap::after {
+    right: 0;
+    background: linear-gradient(
+      to left,
+      var(--dcm-page-bg, #f9fafb),
+      rgb(249 250 251 / 0%)
+    );
+  }
+
+  .dcm-card-detail .cd-section-nav-wrap[data-overflow-start]::before,
+  .dcm-card-detail .cd-section-nav-wrap[data-overflow-end]::after {
+    opacity: 1;
   }
 
   /* The tour measures elements against its own fixed caption; a second sticky
      layer underneath it competes for the same strip of screen. */
-  .dcm-card-detail[data-tour-active='true'] .cd-section-nav {
+  .dcm-card-detail[data-tour-active='true'] .cd-section-nav-wrap {
     position: static;
   }
 
@@ -1076,8 +1167,8 @@
 }
 
 @media (width <= 360px) {
-  .dcm-card-detail .cd-container {
-    width: calc(100% - 24px);
+  .dcm-card-detail {
+    --cd-gutter: 12px;
   }
 }
 
@@ -1662,8 +1753,11 @@
     inset-block: auto 0;
     top: auto;
     width: auto;
+    /* See `.cd-enlarge-dialog` — `vh` first as the fallback, `dvh` second. */
     max-height: 70vh;
+    max-height: 70dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     margin: 0;
     border-radius: 16px 16px 0 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1757,8 +1851,20 @@
 
 .dcm-card-detail .cd-enlarge-dialog {
   width: min(560px, 100%);
+  /*
+   * `vh` on iOS Safari is the LARGEST viewport — the one with the URL bar
+   * retracted. With the bar showing, 90vh is taller than the screen and this
+   * dialog's Close button sits under the browser chrome. `dvh` tracks the
+   * viewport that is actually visible. The `vh` line above is the fallback a
+   * browser that does not know `dvh` takes; a modern one takes the second
+   * declaration and ignores the first (mobile-web audit, item C1).
+   */
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
+  /* The dialog is the scroll container; a flick past its end must not become a
+     scroll of the page behind it (item A3). */
+  overscroll-behavior: contain;
   display: grid;
   gap: 12px;
   padding: 20px;
@@ -1995,37 +2101,10 @@
    SEPTEMBER 22 REVIEW — the pieces the fixes added
    ========================================================================== */
 
-/* ---------- the card's name above the photo, on phones only ----------
-   The hero stacks on a narrow screen and the identity block lands below the
-   image, the style controls and the holder links. `CardDetailMobileHeading`
-   puts the name under the breadcrumb; it is aria-hidden, so this is purely a
-   sighted-reader affordance and the real <h1> is untouched. 760px is the same
-   breakpoint the mobile action bar uses. */
-
-.dcm-card-detail .cd-mobile-heading { display: none; }
-
-@media (max-width: 760px) {
-  .dcm-card-detail .cd-mobile-heading {
-    display: block;
-    margin: 4px 0 14px;
-  }
-
-  .dcm-card-detail .cd-mobile-heading-name {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 750;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-  }
-
-  .dcm-card-detail .cd-mobile-heading-sub {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: var(--dcm-muted, #566174);
-    overflow-wrap: anywhere;
-  }
-}
+/* The phone-only duplicate heading that used to live here was removed on
+   2026-09-22: the hero's identity block already carries the <h1> and is
+   `order: 1` inside the ≤760px hero, so the name was printed twice, 167px
+   apart, above the photograph. See the mobile-web audit, item A1. */
 
 /* ---------- InstaList: connect before editing ---------- */
 
@@ -2102,9 +2181,203 @@
 
 .dcm-card-detail .cd-listing-image-full {
   max-width: 100%;
+  /* See `.cd-enlarge-dialog` — `vh` first as the fallback, `dvh` second. */
   max-height: 70vh;
+  max-height: 70dvh;
   object-fit: contain;
   border-radius: 10px;
 }
 
 .dcm-card-detail .cd-identity-review:not(:empty) { margin-top: 20px; }
+
+/* ==========================================================================
+   MOBILE ERGONOMICS — mobile-web audit 2026-09-22, items B1, B2 and C2.
+
+   Everything below is phone-only and TYPE AND HIT AREA ONLY: no rule here
+   changes a layout, a grid, a gap or the page's spacing rhythm. It is last in
+   the file on purpose, so a floor wins its tie with the rule it is raising
+   without needing `!important` or a specificity trick.
+   ========================================================================== */
+
+@media (width <= 760px) {
+  /* ---------- B1. Nothing interactive under 44px ---------- */
+  /*
+   * Measured at 390: the Front/Back toggle was 65x40 and 63x40, the label
+   * design trigger 205x38, and the three Enlarge links 44x24 — the smallest
+   * interactive thing on the page. Apple publishes 44pt and Google 48dp.
+   */
+
+  .dcm-card-detail .cd-side-switch button,
+  /* The Grade details evidence tabs measured 40px on the same sweep. */
+  .dcm-card-detail .cd-evidence-tabs button {
+    min-height: 44px;
+  }
+
+  /*
+   * The Market tab's controls come from shared price components with their own
+   * Tailwind sizing (`py-1.5`, `text-xs`) — measured Refresh 64x28, Hide 26x16
+   * and "View on PriceCharting" 125x32. They are raised from HERE, scoped to
+   * `#market`, rather than by editing those components, which several other
+   * pages render at their own sizes.
+   *
+   * The same invisible-overlay trick as the inline link below: the box grows
+   * to 44px in both directions around the control without moving a pixel of
+   * the row it sits in, which matters because several are inline text inside a
+   * flex row that a `min-height` would stretch by 28px. `summary` is included:
+   * the two disclosure toggles in the pricing panel ("See other card
+   * variants", "How match confidence works") are 32px and 16px tall.
+   */
+  .dcm-card-detail #market button,
+  .dcm-card-detail #market a[href],
+  .dcm-card-detail #market summary {
+    position: relative;
+  }
+
+  .dcm-card-detail #market button::after,
+  .dcm-card-detail #market a[href]::after,
+  .dcm-card-detail #market summary::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+
+  /* The style trigger is `LabelStyleDropdown`'s own button, a shared
+     component: raised from here rather than by editing it, so no other page
+     that uses the dropdown is affected. */
+  .dcm-card-detail .cd-label-preview button {
+    min-height: 44px;
+  }
+
+  /*
+   * Enlarge keeps its small type — it is a second look, not an action that
+   * competes with Download and Shop — and becomes a full-width row inside the
+   * holder card instead, which is where the 44px comes from. The negative
+   * top margin goes: it existed to pull a 24px link up under the mockup.
+   */
+  .dcm-card-detail .cd-enlarge-link {
+    min-height: 44px;
+    width: 100%;
+    justify-content: center;
+    margin: 0;
+    padding-block: 10px;
+  }
+
+  /*
+   * The one control that cannot simply be made taller: a link INSIDE a
+   * sentence ("Previewing only. Log in to save a default design."), measured
+   * 38x16. Making it a 44px block would break the line it sits in, so the hit
+   * area is grown by an invisible pseudo-element centred on the link instead.
+   * The text does not move; the tappable box around it is 44x44.
+   */
+  .dcm-card-detail .cd-caption a,
+  .dcm-card-detail p a {
+    position: relative;
+  }
+
+  .dcm-card-detail .cd-caption a::after,
+  .dcm-card-detail p a::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: 44px;
+  }
+
+  /* ---------- B2. A floor under the type ---------- */
+  /*
+   * 57 nodes under 13px, the smallest 10px. The floor is: micro-labels (the
+   * uppercase eyebrows, chip labels and legend terms) 12px, secondary labels
+   * and captions 13px, body 15px. Weight, colour, letter-spacing and
+   * transform are all left exactly as they were — this raises sizes, it does
+   * not restyle anything.
+   */
+
+  /* 12px: the uppercase micro-labels. They are short, spaced and bold, and
+     12px is the floor most accessibility reviews apply. Every definition TERM
+     on the page is one of these — the legend, the dimensions, the value
+     footer — so `dt` is raised wholesale rather than rule by rule; the 11px
+     ones measured at 320 were all `dt`, `.cd-tag`, `.cd-subgrade-label` and
+     `.cd-confidence-label`. */
+  .dcm-card-detail .cd-eyebrow,
+  .dcm-card-detail .cd-grade-chip-label,
+  .dcm-card-detail .cd-grade-chip--compact .cd-grade-chip-label,
+  .dcm-card-detail .cd-tag,
+  .dcm-card-detail .cd-confidence-label,
+  .dcm-card-detail dt,
+  /* Spelled out at the same specificity as the rules they are raising —
+     `.cd-subgrade dt` and `.cd-facts dt` are (0,2,1) and would otherwise beat
+     a bare `.dcm-card-detail dt` at (0,1,1). */
+  .dcm-card-detail .cd-subgrade .cd-subgrade-label,
+  .dcm-card-detail .cd-subgrade dt,
+  .dcm-card-detail .cd-facts dt,
+  .dcm-card-detail .cd-ratios dt,
+  .dcm-card-detail .cd-findings dt,
+  .dcm-card-detail .cd-range-legend dt,
+  /* Found on the Grade details and Reports tabs by the same sweep. */
+  .dcm-card-detail .cd-meter-fill,
+  .dcm-card-detail .cd-holder-tag,
+  .dcm-card-detail .cd-holder-tag span {
+    font-size: 12px;
+  }
+
+  /* 13px: captions, notes, dimension lines and every other secondary label —
+     the band the bulk of the 57 nodes sat in. */
+  .dcm-card-detail .cd-caption,
+  .dcm-card-detail .cd-support-note,
+  .dcm-card-detail .cd-range-legend dd,
+  .dcm-card-detail .cd-enlarge-link,
+  .dcm-card-detail .cd-highlight-split,
+  .dcm-card-detail .cd-confidence-uncertainty,
+  .dcm-card-detail .cd-breadcrumb,
+  .dcm-card-detail .cd-instalist-label,
+  .dcm-card-detail .cd-holder-card .cd-caption,
+  .dcm-card-detail .cd-label-preview .cd-caption {
+    font-size: 13px;
+  }
+
+  /*
+   * 14px for button labels. Deliberately NOT the 15-16px body figure: these
+   * are pills in rows that already wrap at 320, and the section nav is the
+   * subject of B3 — widening its type would push more tabs off-screen, which
+   * is the problem being fixed two items up. 14 clears the floor; the 44px
+   * hit area above is what actually makes them tappable.
+   */
+  .dcm-card-detail .cd-quiet,
+  .dcm-card-detail .cd-side-switch button {
+    font-size: 14px;
+  }
+
+  /* ---------- C2. iOS Safari must not zoom on focus ---------- */
+  /*
+   * Any form control under 16px makes iOS Safari zoom the page when it takes
+   * focus — and it does not zoom back out, which strands the reader mid-form
+   * at 1.3x with the page now scrolling sideways. The InstaList tab is full of
+   * them and is owner-only, so this is written from the CSS side and covers
+   * every control on the page, present and future, rather than the four
+   * fields the audit could name.
+   *
+   * The class selectors are spelled out beside the element ones because
+   * `.dcm-card-detail .cd-instalist-input` (0,2,0) would otherwise outrank
+   * `.dcm-card-detail input` (0,1,1) and keep its 14px.
+   */
+  .dcm-card-detail input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  .dcm-card-detail textarea,
+  .dcm-card-detail select,
+  .dcm-card-detail .cd-instalist-input,
+  .dcm-card-detail .cd-instalist-input--price,
+  .dcm-card-detail .cd-instalist-textarea {
+    font-size: 16px;
+  }
+
+  /* A 16px control needs the room to be one, too. */
+  .dcm-card-detail input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  .dcm-card-detail select {
+    min-height: 44px;
+  }
+}
