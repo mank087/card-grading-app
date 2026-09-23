@@ -69,6 +69,8 @@ interface CardItem {
   conversational_whole_grade: number | null
   conversational_condition_label: string | null
   conversational_card_info: any
+  /** 'failed' when the last grading attempt stopped; the card is not still grading. */
+  grade_status?: string | null
   front_path: string
   front_url?: string
   created_at: string
@@ -262,7 +264,7 @@ export default function CollectionScreen() {
     id, serial, card_name, featured, category, sub_category, card_set,
     card_number, release_date, manufacturer_name, visibility,
     rookie_card, autographed, serial_numbering,
-    conversational_whole_grade, conversational_condition_label,
+    conversational_whole_grade, conversational_condition_label, grade_status,
     conversational_card_info, front_path, card_colors,
     ebay_price_median, dcm_price_estimate,
     dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
@@ -987,6 +989,8 @@ export default function CollectionScreen() {
         </View>
         {item.conversational_whole_grade != null ? (
           <GradeBadge grade={item.conversational_whole_grade} size="sm" />
+        ) : item.grade_status === 'failed' ? (
+          <View style={st.failedBadge}><Text style={st.failedText}>Not graded</Text></View>
         ) : (
           <View style={st.pendingBadge}><Text style={st.pendingText}>Grading...</Text></View>
         )}
@@ -1037,9 +1041,11 @@ export default function CollectionScreen() {
           colorOverrides={colorOverrides}
           heritageBandColors={resolveHeritageBandColors((item as any).card_colors)}
         />
-        {item.conversational_whole_grade == null && (
+        {item.conversational_whole_grade == null && (item.grade_status === 'failed' ? (
+          <View style={[st.gridPendingBadge, st.failedBadge]}><Text style={[st.gridPendingText, st.failedText]}>Not graded</Text></View>
+        ) : (
           <View style={st.gridPendingBadge}><Text style={st.gridPendingText}>Grading...</Text></View>
-        )}
+        ))}
         <View style={st.gridBadgeRow}>
           <View style={[st.gridVisBadge, isPublic ? st.gridVisPublic : st.gridVisPrivate]}>
             <Ionicons
@@ -2049,6 +2055,8 @@ const st = StyleSheet.create({
   listCondition: { fontSize: 10, color: Colors.gray[500], fontWeight: '500' },
   pendingBadge: { backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[500], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   pendingText: { fontSize: 10, fontWeight: '600', color: Colors.amber[600] },
+  failedBadge: { backgroundColor: Colors.gray[100], borderWidth: 1, borderColor: Colors.gray[400], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  failedText: { fontSize: 10, fontWeight: '600', color: Colors.gray[600] },
   listPrice: { fontSize: 11, color: Colors.green[600], fontWeight: '600' },
 
   // Style picker bar

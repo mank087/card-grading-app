@@ -36,6 +36,8 @@ import { useCredits } from '@/contexts/CreditsContext'
 import { formatDate } from '@/lib/locale'
 import { Card } from '@/lib/types'
 import GradeBadge from '@/components/grading/GradeBadge'
+import Button from '@/components/ui/Button'
+import { incompleteInspectionFromErrorMessage } from '@/lib/inspectionMessage'
 import SubgradeBar from '@/components/grading/SubgradeBar'
 import CollapsibleSection from '@/components/ui/CollapsibleSection'
 import SlabCard from '@/components/grading/SlabCard'
@@ -641,6 +643,22 @@ export default function CardDetailScreen() {
 
   if (isLoading) return <View style={s.loading}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
   if (!card) return <View style={s.loading}><Text style={{ color: Colors.gray[500] }}>Card not found</Text></View>
+
+  // The last grading attempt stopped. Without this the screen renders an empty
+  // report and the owner assumes the card is still being graded.
+  if (card.conversational_whole_grade == null && (card as any).grade_status === 'failed') {
+    const failureMessage = incompleteInspectionFromErrorMessage((card as any).error_message)
+      ?? 'We could not finish grading this card. Please try again with new photos. If it keeps happening, contact support.'
+    return (
+      <View style={[s.loading, { paddingHorizontal: 24 }]}>
+        <Ionicons name="alert-circle" size={36} color={Colors.amber[500]} />
+        <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.gray[900], marginTop: 12, textAlign: 'center' }}>This card was not graded</Text>
+        <Text style={{ fontSize: 14, color: Colors.gray[600], marginTop: 8, textAlign: 'center', lineHeight: 20 }}>{failureMessage}</Text>
+        <Button title="Retake Photos" onPress={() => router.replace('/(tabs)/grade')} style={{ marginTop: 16, alignSelf: 'stretch' }} />
+        <Button title="Contact Support" variant="secondary" onPress={() => router.push('/pages/contact')} style={{ marginTop: 8, alignSelf: 'stretch' }} />
+      </View>
+    )
+  }
 
   const subRaw = card.conversational_weighted_sub_scores || card.conversational_sub_scores
   const ci = card.conversational_card_info
