@@ -5,8 +5,12 @@
  *
  * WHAT IT IS. Everything the eBay listing will carry, shown before the listing
  * flow is opened and editable here: the five photos, the title, the description
- * as it renders on eBay, the item specifics and the asking price. Then one
+ * as it renders on eBay, the item specifics and the asking price, and one
  * button that opens the EXISTING flow with those edits.
+ *
+ * ORDER (Phase 2, O1): status, photos, title, price, the Continue button — and
+ * only then Description and Item specifics, each collapsed. The price and the
+ * next step used to sit below every item specific.
  *
  * WHAT IT IS NOT. It publishes nothing. It uploads nothing. The only requests
  * this tab is responsible for are the shared listing check (one per page view,
@@ -26,7 +30,7 @@
 
 import type { ReactNode } from 'react';
 import InstaListImages from './InstaListImages';
-import InstaListFields from './InstaListFields';
+import InstaListFields, { InstaListMoreFields } from './InstaListFields';
 import { CONNECT_TO_EDIT_NOTE, listingEditGate } from '@/lib/ebay/listingDraftState';
 import type { InstaListStatus } from '../useInstaListStatus';
 import type { CardDetailInstaList } from '../useCardDetailInstaList';
@@ -90,7 +94,7 @@ export function InstaListSection({
   const listingUrl = status.listing?.listing_url ?? null;
 
   const beginLabel =
-    ebayConnected === false ? 'Connect eBay to continue' : 'Begin listing on eBay';
+    ebayConnected === false ? 'Connect eBay to continue' : 'Continue to eBay';
 
   /** The connect step, shown FIRST when there is no connection yet. */
   const connectStep = lock.needsConnect ? (
@@ -208,6 +212,10 @@ export function InstaListSection({
           <span className="cd-caption">Your edits will be carried in.</span>
         )}
       </div>
+
+      {/* The long part of the listing, collapsed and AFTER the next step (O1).
+          Display only: the values are the shell's draft either way. */}
+      <InstaListMoreFields draft={draft} locked={lock.locked} />
     </div>
   );
 }

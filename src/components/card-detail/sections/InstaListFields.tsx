@@ -1,12 +1,24 @@
 'use client';
 
 /**
- * The editable half of the InstaList tab: title, description, item specifics,
- * price.
+ * The editable half of the InstaList tab, in two parts (Phase 2, O1):
+ *
+ *   InstaListFields       — title and price, open, above the Continue button;
+ *   InstaListMoreFields   — description and item specifics, each inside a
+ *                           collapsed <details> BELOW the button.
+ *
+ * COLLAPSING IS DISPLAY ONLY. Every value lives in the page's draft
+ * (../useListingDraft), not in these components, and a closed <details> keeps
+ * its content mounted — so an edit made and then collapsed still carries into
+ * the modal through `initialDraft`, and the title → description-headline sync
+ * (done inside the draft's `setField('title')`) runs whether or not the
+ * Description section is open. A collapsed section the owner has edited says
+ * so in its summary ("Edited", from the draft's own `dirty` flags), so an edit
+ * is never out of sight AND out of mind.
  *
  * EVERY EDIT IS SESSION-ONLY. Nothing here writes to the database; the state
  * lives in the page (see ../useListingDraft) and is gone on reload. What it is
- * FOR is the hand-off: when the owner presses "Begin listing", the fields they
+ * FOR is the hand-off: when the owner presses "Continue to eBay", the fields they
  * actually changed are carried into `EbayListingModal` and everything else is
  * seeded by the modal as usual.
  *
@@ -65,22 +77,20 @@ function ResetLink({
   );
 }
 
+/**
+ * Shown in a section's summary when the owner has changed something inside it,
+ * so a collapsed section never hides an edit.
+ */
+function EditedPill() {
+  return <span className="cd-instalist-edited">Edited</span>;
+}
+
 export function InstaListFields({ draft, locked, readOnlyNote = null }: InstaListFieldsProps) {
-  const [showSource, setShowSource] = useState(false);
   const ids = useId();
   const titleId = `cd-il-title-${ids}`;
-  const descId = `cd-il-desc-${ids}`;
   const priceId = `cd-il-price-${ids}`;
 
   const { values, setField } = draft;
-  const specifics = values.itemSpecifics;
-
-  const updateSpecific = (index: number, patch: Partial<ItemSpecific>) => {
-    setField(
-      'itemSpecifics',
-      specifics.map((spec, i) => (i === index ? { ...spec, ...patch } : spec)),
-    );
-  };
 
   return (
     <div className="cd-instalist-fields" aria-disabled={locked || undefined}>
@@ -125,98 +135,6 @@ export function InstaListFields({ draft, locked, readOnlyNote = null }: InstaLis
         <ResetLink field="title" draft={draft} locked={locked} label="title" />
       </section>
 
-      {/* ── description ───────────────────────────────────────────────── */}
-      <section className="cd-panel" aria-labelledby={`${descId}-h`}>
-        <div className="cd-instalist-row">
-          <div>
-            <p className="cd-eyebrow">The listing page</p>
-            <h3 id={`${descId}-h`} className="cd-instalist-h3">
-              Description
-            </h3>
-          </div>
-          <button
-            type="button"
-            className="cd-quiet"
-            aria-pressed={showSource}
-            onClick={() => setShowSource((v) => !v)}
-          >
-            {showSource ? 'Preview' : 'Source'}
-          </button>
-        </div>
-
-        {showSource ? (
-          <>
-            <label className="cd-instalist-label" htmlFor={descId}>
-              Description HTML
-            </label>
-            <textarea
-              id={descId}
-              className="cd-instalist-textarea"
-              rows={12}
-              spellCheck={false}
-              value={values.descriptionHtml}
-              disabled={locked}
-              onChange={(e) => setField('descriptionHtml', e.target.value)}
-            />
-            <p className="cd-caption">
-              Raw HTML, exactly what eBay receives. Switch to Preview to see it rendered.
-            </p>
-          </>
-        ) : (
-          <>
-            <div
-              className="cd-instalist-preview"
-              // Sanitized at render only, the same call the modal's review
-              // preview makes. The HTML submitted to eBay is untouched; a saved
-              // store template must not be able to run script in this page.
-              dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(values.descriptionHtml) }}
-            />
-            <p className="cd-caption">This is how the description appears on eBay.</p>
-          </>
-        )}
-        <ResetLink field="descriptionHtml" draft={draft} locked={locked} label="description" />
-      </section>
-
-      {/* ── item specifics ────────────────────────────────────────────── */}
-      <section className="cd-panel" aria-labelledby="cd-il-specifics-h">
-        <p className="cd-eyebrow">What eBay files it under</p>
-        <h3 id="cd-il-specifics-h" className="cd-instalist-h3">
-          Item specifics
-        </h3>
-        <p className="cd-caption">
-          These are the specifics prefilled from your card. eBay&rsquo;s own extra
-          category fields are fetched and merged on the listing flow&rsquo;s specifics step, so a
-          few more may appear there.
-        </p>
-
-        <ul className="cd-instalist-specifics">
-          {specifics.map((spec, index) => (
-            <li key={`${spec.name}-${index}`} className="cd-instalist-specific">
-              <label className="cd-instalist-label" htmlFor={`cd-il-spec-${index}`}>
-                {spec.name || 'Field'}
-                {/* Spelled out rather than a bare asterisk: a screen reader
-                    announcing "Brand star" does not say what the star means. */}
-                {spec.required && (
-                  <span className="cd-instalist-required"> (required by eBay)</span>
-                )}
-              </label>
-              <input
-                id={`cd-il-spec-${index}`}
-                type="text"
-                className="cd-instalist-input"
-                value={specificValueText(spec.value)}
-                disabled={locked || spec.editable === false}
-                onChange={(e) => updateSpecific(index, { value: e.target.value })}
-              />
-            </li>
-          ))}
-        </ul>
-        {specifics.length === 0 && (
-          <p className="cd-caption">No specifics were prefilled for this card.</p>
-        )}
-        <ResetLink field="itemSpecifics" draft={draft} locked={locked} label="specifics" />
-      </section>
-
       {/* ── price ─────────────────────────────────────────────────────── */}
       <section className="cd-panel" aria-labelledby={`${priceId}-h`}>
         <p className="cd-eyebrow">What you are asking</p>
@@ -240,6 +158,145 @@ export function InstaListFields({ draft, locked, readOnlyNote = null }: InstaLis
         {!draft.dirty.price && draft.priceLabel && <p className="cd-caption">{draft.priceLabel}</p>}
         <ResetLink field="price" draft={draft} locked={locked} label="price" />
       </section>
+    </div>
+  );
+}
+
+/**
+ * Description and item specifics, each collapsed by default (O1). Rendered
+ * BELOW the Continue button: they are the long part of the listing, and the
+ * price and the next step used to sit after all of the item specifics.
+ *
+ * Uncontrolled <details>: the open state is the reader's, per visit to the
+ * tab. The values are not held here — see the file header.
+ */
+export function InstaListMoreFields({
+  draft,
+  locked,
+}: Omit<InstaListFieldsProps, 'readOnlyNote'>) {
+  const [showSource, setShowSource] = useState(false);
+  const ids = useId();
+  const descId = `cd-il-desc-${ids}`;
+
+  const { values, setField } = draft;
+  const specifics = values.itemSpecifics;
+
+  const updateSpecific = (index: number, patch: Partial<ItemSpecific>) => {
+    setField(
+      'itemSpecifics',
+      specifics.map((spec, i) => (i === index ? { ...spec, ...patch } : spec)),
+    );
+  };
+
+  return (
+    <div className="cd-instalist-fields" aria-disabled={locked || undefined}>
+      {/* ── description ───────────────────────────────────────────────── */}
+      <details className="cd-panel cd-instalist-more">
+        <summary className="cd-instalist-summary">
+          <span className="cd-instalist-summary-text">
+            <span className="cd-eyebrow">The listing page</span>
+            <span id={`${descId}-h`} className="cd-instalist-h3">
+              Description
+            </span>
+          </span>
+          {/* Hand edits only: a title change rewrites the headline but is not
+              the owner editing the description. */}
+          {draft.bodyEdited && <EditedPill />}
+        </summary>
+        <div className="cd-instalist-more-body" role="group" aria-labelledby={`${descId}-h`}>
+          <div className="cd-instalist-row">
+            <p className="cd-caption" style={{ margin: 0 }}>
+              {showSource
+                ? 'Raw HTML, exactly what eBay receives.'
+                : 'This is how the description appears on eBay.'}
+            </p>
+            <button
+              type="button"
+              className="cd-quiet"
+              aria-pressed={showSource}
+              onClick={() => setShowSource((v) => !v)}
+            >
+              {showSource ? 'Preview' : 'Source'}
+            </button>
+          </div>
+
+          {showSource ? (
+            <>
+              <label className="cd-instalist-label" htmlFor={descId}>
+                Description HTML
+              </label>
+              <textarea
+                id={descId}
+                className="cd-instalist-textarea"
+                rows={12}
+                spellCheck={false}
+                value={values.descriptionHtml}
+                disabled={locked}
+                onChange={(e) => setField('descriptionHtml', e.target.value)}
+              />
+            </>
+          ) : (
+            <div
+              className="cd-instalist-preview"
+              // Sanitized at render only, the same call the modal's review
+              // preview makes. The HTML submitted to eBay is untouched; a saved
+              // store template must not be able to run script in this page.
+              dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(values.descriptionHtml) }}
+            />
+          )}
+          <ResetLink field="descriptionHtml" draft={draft} locked={locked} label="description" />
+        </div>
+      </details>
+
+      {/* ── item specifics ────────────────────────────────────────────── */}
+      <details className="cd-panel cd-instalist-more">
+        <summary className="cd-instalist-summary">
+          <span className="cd-instalist-summary-text">
+            <span className="cd-eyebrow">What eBay files it under</span>
+            <span id="cd-il-specifics-h" className="cd-instalist-h3">
+              Item specifics
+              {specifics.length > 0 && (
+                <span className="cd-instalist-summary-count"> · {specifics.length}</span>
+              )}
+            </span>
+          </span>
+          {draft.dirty.itemSpecifics && <EditedPill />}
+        </summary>
+        <div className="cd-instalist-more-body" role="group" aria-labelledby="cd-il-specifics-h">
+          <p className="cd-caption" style={{ margin: 0 }}>
+            These are the specifics prefilled from your card. eBay&rsquo;s own extra
+            category fields are fetched and merged on the listing flow&rsquo;s specifics step, so a
+            few more may appear there.
+          </p>
+
+          <ul className="cd-instalist-specifics">
+            {specifics.map((spec, index) => (
+              <li key={`${spec.name}-${index}`} className="cd-instalist-specific">
+                <label className="cd-instalist-label" htmlFor={`cd-il-spec-${index}`}>
+                  {spec.name || 'Field'}
+                  {/* Spelled out rather than a bare asterisk: a screen reader
+                      announcing "Brand star" does not say what the star means. */}
+                  {spec.required && (
+                    <span className="cd-instalist-required"> (required by eBay)</span>
+                  )}
+                </label>
+                <input
+                  id={`cd-il-spec-${index}`}
+                  type="text"
+                  className="cd-instalist-input"
+                  value={specificValueText(spec.value)}
+                  disabled={locked || spec.editable === false}
+                  onChange={(e) => updateSpecific(index, { value: e.target.value })}
+                />
+              </li>
+            ))}
+          </ul>
+          {specifics.length === 0 && (
+            <p className="cd-caption">No specifics were prefilled for this card.</p>
+          )}
+          <ResetLink field="itemSpecifics" draft={draft} locked={locked} label="specifics" />
+        </div>
+      </details>
     </div>
   );
 }

@@ -40,7 +40,8 @@ function instaListLabel(state: InstaListState): { text: string; disabled: boolea
     case 'listed':
       return { text: 'View eBay listing', disabled: false };
     case 'unlisted':
-      return { text: 'List on eBay', disabled: false };
+      // O2 (Sept 23 review): it opens the review flow and lists nothing yet.
+      return { text: 'Prepare eBay listing', disabled: false };
     case 'unverified':
       return { text: 'Check eBay listing', disabled: false };
     default:

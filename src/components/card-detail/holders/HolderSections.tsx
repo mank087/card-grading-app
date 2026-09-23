@@ -18,6 +18,7 @@ import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
 import HolderCards from './HolderCards';
+import { HOLDER_BAND_ID } from './useGoToHolder';
 
 /** Everything both sections need, assembled once by the shell. */
 export interface HolderSectionCommonProps {
@@ -59,11 +60,22 @@ export function OverviewHoldersBand(
   props: HolderSectionCommonProps & { onSeeAll: () => void },
 ) {
   return (
-    <section className="cd-panel" style={{ marginTop: 20 }}>
+    // The anchor the hero's phone-width "Preview holders" link scrolls to and
+    // focuses (S4, useGoToHolder). tabIndex -1 makes it focusable by script
+    // only; it never joins the Tab order.
+    <section
+      id={HOLDER_BAND_ID}
+      className="cd-panel cd-holders-band"
+      style={{ marginTop: 20 }}
+      tabIndex={-1}
+      aria-labelledby={`${HOLDER_BAND_ID}-h`}
+    >
       <div className="cd-showcase-row">
         <div>
           <p className="cd-eyebrow">Labels &amp; holders</p>
-          <h3 style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>See it in a holder.</h3>
+          <h3 id={`${HOLDER_BAND_ID}-h`} style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>
+            See it in a holder.
+          </h3>
         </div>
         <button type="button" className="cd-quiet" onClick={props.onSeeAll}>
           All label options

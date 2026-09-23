@@ -23,6 +23,19 @@
  *   - a shop link.
  *
  * It renders no holder chrome and holds no holder state.
+ *
+ * PHONES (≤760px, Sept 23 review S4). Beside the card a phone keeps ONLY
+ * Front/Back, "Zoom & inspect", the design selector and one "Preview holders"
+ * link. The zoom caption, "Edit card label", "Customize", the shop row and the
+ * visitor sign-in line are hidden there by CSS (`cd-s4-hide`, card-detail.css)
+ * — the Labels & holders tab carries Edit and Customize together beside its
+ * own design control. Desktop is unchanged.
+ *
+ * THE DOWNLOAD MENU STAYS MOUNTED ON PHONES. The mobile bar's "Download label"
+ * opens THIS instance (`openLabelsSignal`), and its bottom sheet is
+ * `position: fixed` INSIDE `#tour-holder-download`. Hiding that wrapper would
+ * take the sheet with it, so only the menu's visible TRIGGERS are hidden
+ * (`.cd-hero-download`, card-detail.css); the sheet still renders.
  */
 
 import type { ReactNode } from 'react';
@@ -89,7 +102,7 @@ export function CardLabelShowcase({
       <div className="cd-stage cd-stage--piece">{renderCardPiece({ side })}</div>
 
       {/* Legacy's caption under each slab (3038, 3231). */}
-      <p className="cd-caption" style={{ textAlign: 'center', margin: 0 }}>
+      <p className="cd-caption cd-s4-hide" style={{ textAlign: 'center', margin: 0 }}>
         Click the photo to zoom.
       </p>
 
@@ -125,7 +138,7 @@ export function CardLabelShowcase({
 
       <div className="cd-showcase-row">
         <div>{styleControl}</div>
-        <div className="dcm-actions" style={{ gap: 8 }}>
+        <div className="dcm-actions cd-s4-hide" style={{ gap: 8 }}>
           {isOwner && onEditLabel && (
             <button type="button" className="cd-quiet" onClick={onEditLabel}>
               Edit card label
@@ -140,9 +153,13 @@ export function CardLabelShowcase({
         </div>
       </div>
 
-      {isOwner && <div id="tour-holder-download">{downloadAction}</div>}
+      {isOwner && (
+        <div id="tour-holder-download" className="cd-hero-download">
+          {downloadAction}
+        </div>
+      )}
 
-      <div className="cd-showcase-row">
+      <div className="cd-showcase-row cd-s4-hide">
         {/* Only the owner has a download menu on this page, so only the owner
             is told where it is. A visitor was being pointed at a control that
             was not rendered for them at all. */}

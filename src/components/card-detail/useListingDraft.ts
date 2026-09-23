@@ -64,6 +64,13 @@ import type { ListingBranding, ListingDescriptionFields } from '@/lib/ebay/listi
 export interface UseListingDraftResult {
   values: ListingDraftValues;
   dirty: Record<ListingDraftField, boolean>;
+  /**
+   * True only when the owner edited the description BODY themselves. A title
+   * edit rewrites the headline too, which sets `dirty.descriptionHtml`, but
+   * that is not the owner editing the description — the "Edited" marker on
+   * the collapsed Description section reads this instead.
+   */
+  bodyEdited: boolean;
   anyDirty: boolean;
   /** Where the seeded price came from, worded as the modal words it. */
   priceLabel: string | null;
@@ -288,6 +295,7 @@ export function useListingDraft(
   return {
     values: state.values,
     dirty: state.dirty,
+    bodyEdited: state.bodyEdited,
     anyDirty: isListingDraftDirty(state),
     priceLabel: basePrice.label,
     loadingDefaults,

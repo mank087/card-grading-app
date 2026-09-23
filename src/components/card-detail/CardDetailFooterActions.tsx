@@ -11,12 +11,25 @@
  * "Grade another card" is not decoration: the happy path used to end here with
  * no next step, and most first-time graders stopped after one card. The
  * onboarding-funnel work added this CTA and V2 may not quietly drop it.
+ *
+ * COMPACT MANAGEMENT ROWS (Sept 23 review, O4). The full binder list and the
+ * "Sold this card?" block used to sit under every tab. They are now two rows —
+ * "Binders · Manage" and "Mark as sold" — each opening the SAME shared
+ * component in a sheet (`CardDetailSheet`), which is where the consequences
+ * are explained. Owner-only, as before. The binder picker stays mounted inside
+ * its closed sheet, so it still loads exactly once per page view and labels
+ * its row through its additive `onMembershipChange`.
  */
 
+import { useEffect, useState } from 'react';
 import { ActionLink } from '@/components/design/Primitives';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
-import { CardBinderPicker } from '@/components/binders/CardBinderPicker';
+import {
+  CardBinderPicker,
+  type CardBinderMembership,
+} from '@/components/binders/CardBinderPicker';
 import { PostResultOffer } from '@/components/conversion/PostResultOffer';
+import CardDetailSheet from './CardDetailSheet';
 
 export interface CardDetailFooterActionsProps {
   card: any;
@@ -28,7 +41,11 @@ export interface CardDetailFooterActionsProps {
   /** Where "grade another" goes when the card has a retake route. */
   retakeHref?: string | null;
   uploadHref: string;
+  /** Reports the management sheet, so the shell locks the page and hides the bar. */
+  onSheetOpenChange?: (open: boolean) => void;
 }
+
+type ManageSheet = 'binders' | 'sold' | null;
 
 export function CardDetailFooterActions({
   card,
@@ -39,8 +56,21 @@ export function CardDetailFooterActions({
   creditsLoading,
   retakeHref,
   uploadHref,
+  onSheetOpenChange,
 }: CardDetailFooterActionsProps) {
   const outOfCredits = !creditsLoading && balance === 0;
+  const [sheet, setSheet] = useState<ManageSheet>(null);
+  // Null until the picker's own load answers.
+  const [binders, setBinders] = useState<CardBinderMembership | null>(null);
+  const isSold = card.ownership_status === 'sold';
+
+  useEffect(() => {
+    onSheetOpenChange?.(sheet !== null);
+  }, [sheet, onSheetOpenChange]);
+  // Never leave the shell thinking a sheet is open after this unmounts.
+  useEffect(() => () => onSheetOpenChange?.(false), [onSheetOpenChange]);
+
+  const closeSheet = () => setSheet(null);
 
   return (
     <div style={{ paddingBottom: 40 }}>
@@ -63,14 +93,62 @@ export function CardDetailFooterActions({
         gradeComplete={!loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0}
         orgId={(card as { org_id?: string | null } | null)?.org_id ?? null}
       />
-      <MarkAsSoldButton
-        cardId={card.id}
-        cardName={cardName}
-        serial={card.serial}
-        ownershipStatus={card.ownership_status}
-        isOwner={isOwner}
-      />
-      <CardBinderPicker cardId={card.id} isOwner={isOwner} />
+      {isOwner && (
+        <div className="cd-manage-rows" role="group" aria-label="Manage this card">
+          {/* Hidden only when the binders feature is unavailable — the picker
+              would render nothing inside the sheet. */}
+          {binders?.available !== false && (
+            <button
+              type="button"
+              className="cd-manage-row"
+              aria-haspopup="dialog"
+              onClick={() => setSheet('binders')}
+            >
+              <span className="cd-manage-row-label">Binders</span>
+              <span className="cd-manage-row-value">
+                {binders ? (binders.names.length ? binders.names.join(', ') : 'Not in a binder') : ''}
+              </span>
+              <span className="cd-manage-row-action">Manage</span>
+            </button>
+          )}
+          {isSold ? (
+            // The SoldBanner at the top carries the detail and the reversal.
+            <p className="cd-manage-row cd-manage-row--static">
+              <span className="cd-manage-row-label">Sold</span>
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="cd-manage-row"
+              aria-haspopup="dialog"
+              onClick={() => setSheet('sold')}
+            >
+              <span className="cd-manage-row-label">Mark as sold</span>
+              <span className="cd-manage-row-value" />
+              <span className="cd-manage-row-action" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {isOwner && (
+        <CardDetailSheet open={sheet === 'binders'} title="Binders" onClose={closeSheet} keepMounted>
+          <CardBinderPicker cardId={card.id} isOwner={isOwner} onMembershipChange={setBinders} />
+        </CardDetailSheet>
+      )}
+      {isOwner && !isSold && (
+        <CardDetailSheet open={sheet === 'sold'} title="Mark as sold" onClose={closeSheet}>
+          <MarkAsSoldButton
+            cardId={card.id}
+            cardName={cardName}
+            serial={card.serial}
+            ownershipStatus={card.ownership_status}
+            isOwner={isOwner}
+          />
+        </CardDetailSheet>
+      )}
     </div>
   );
 }

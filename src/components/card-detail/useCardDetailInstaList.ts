@@ -33,7 +33,7 @@ export interface CardDetailInstaList {
   setEbayConnected: (connected: boolean) => void;
   /** The mobile bar's single tap: view, re-check, or open the flow. */
   onAct: () => void;
-  /** The InstaList tab's "Begin listing". */
+  /** The InstaList tab's "Continue to eBay". */
   beginListing: () => void;
 }
 

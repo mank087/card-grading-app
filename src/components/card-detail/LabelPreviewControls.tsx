@@ -91,8 +91,9 @@ export function LabelPreviewControls({
             <p className="cd-caption">{idleNote}</p>
           )}
 
+          {/* `cd-signin-note`: hidden beside the hero's card on a phone (S4). */}
           {!viewerSignedIn && (
-            <p className="cd-caption">
+            <p className="cd-caption cd-signin-note">
               Previewing only. <a href="/login">Log in</a> to save a default design or create your
               own in Label Studio.
             </p>

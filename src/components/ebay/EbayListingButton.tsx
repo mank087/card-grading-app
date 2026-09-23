@@ -63,6 +63,18 @@ interface EbayListingButtonProps {
    * here: the caller bumps `openSignal` and `handleClick` decides.
    */
   onConnectionChange?: (connected: boolean) => void;
+  /**
+   * ADDITIVE (card detail V2, Sept 23 review O2). The trigger's text when the
+   * account IS connected. The card detail page says "Prepare eBay listing",
+   * because this button opens a review flow and publishes nothing by itself.
+   * Omitted: 'List on eBay', exactly as before, on every variant.
+   */
+  label?: string;
+  /**
+   * ADDITIVE, the same seam for the NOT-connected text. Omitted: each
+   * variant's own existing wording, unchanged.
+   */
+  connectLabel?: string;
 }
 
 export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
@@ -79,6 +91,8 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
   onModalOpenChange,
   initialDraft = null,
   onConnectionChange,
+  label,
+  connectLabel,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ebayStatus, setEbayStatus] = useState<{
@@ -209,7 +223,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
         <button
           onClick={handleClick}
           className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${className}`}
-          title={ebayStatus.connected ? 'List on eBay' : 'Connect eBay to list'}
+          title={ebayStatus.connected ? (label ?? 'List on eBay') : (connectLabel ?? 'Connect eBay to list')}
         >
           <svg className="w-5 h-5 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
             <path d="M5.5 9.5h3v5h-3v-5zm5 0h3v5h-3v-5zm5 0h3v5h-3v-5zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
@@ -232,7 +246,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
           </svg>
-          {ebayStatus.connected ? 'List on eBay' : 'Connect eBay'}
+          {ebayStatus.connected ? (label ?? 'List on eBay') : (connectLabel ?? 'Connect eBay')}
         </button>
 
         {modal}
@@ -256,7 +270,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
             <tspan fill="#86b817">y</tspan>
           </text>
         </svg>
-        <span>{ebayStatus.connected ? 'List on eBay' : 'Connect eBay to List'}</span>
+        <span>{ebayStatus.connected ? (label ?? 'List on eBay') : (connectLabel ?? 'Connect eBay to List')}</span>
       </button>
 
         {modal}

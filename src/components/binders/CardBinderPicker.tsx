@@ -24,7 +24,29 @@ interface Binder {
   system_key: string | null;
 }
 
-export function CardBinderPicker({ cardId, isOwner }: { cardId: string; isOwner: boolean }) {
+/** What `onMembershipChange` reports once the picker has loaded. */
+export interface CardBinderMembership {
+  /** False when the binders feature is unavailable; the picker renders nothing. */
+  available: boolean;
+  /** The names of the binders this card is in, in the picker's own order. */
+  names: string[];
+}
+
+export function CardBinderPicker({
+  cardId,
+  isOwner,
+  onMembershipChange,
+}: {
+  cardId: string;
+  isOwner: boolean;
+  /**
+   * ADDITIVE (card detail V2, Sept 23 review O4). Called after the picker's
+   * OWN load and after every toggle, so a caller can label a compact
+   * "Binders" row without fetching the binders a second time. Omitted, the
+   * effect below returns at once and nothing changes.
+   */
+  onMembershipChange?: (membership: CardBinderMembership) => void;
+}) {
   const [binders, setBinders] = useState<Binder[]>([]);
   const [memberOf, setMemberOf] = useState<Set<string>>(new Set());
   const [available, setAvailable] = useState(true);
@@ -59,6 +81,15 @@ export function CardBinderPicker({ cardId, isOwner }: { cardId: string; isOwner:
   }, [cardId]);
 
   useEffect(() => { if (isOwner) load(); else setLoaded(true); }, [isOwner, load]);
+
+  // ADDITIVE: see `onMembershipChange`. Above the early return on purpose.
+  useEffect(() => {
+    if (!onMembershipChange || !isOwner || !loaded) return;
+    onMembershipChange({
+      available,
+      names: binders.filter(b => !b.smart_filter && memberOf.has(b.id)).map(b => b.name),
+    });
+  }, [onMembershipChange, isOwner, loaded, available, binders, memberOf]);
 
   if (!isOwner || !available || !loaded) return null;
 

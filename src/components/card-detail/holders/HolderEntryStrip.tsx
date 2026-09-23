@@ -12,18 +12,29 @@
  *
  * It is not a selector and holds no state — the hero still depends on no
  * holder.
+ *
+ * PHONES (≤760px, Sept 23 review S4): the three buttons collapse into ONE
+ * "Preview holders" link that opens Overview at the holder band. Both forms
+ * are rendered and CSS shows one; desktop keeps the three.
  */
 
 import { CARD_HOLDERS, HOLDER_NAMES, type CardHolderId } from '@/lib/cardDetail/holderSupport';
 
 export interface HolderEntryStripProps {
   onGoToHolder: (holder: CardHolderId) => void;
+  /** The phone form's single link: Overview, scrolled to the holder band. */
+  onGoToBand?: () => void;
 }
 
-export function HolderEntryStrip({ onGoToHolder }: HolderEntryStripProps) {
+export function HolderEntryStrip({ onGoToHolder, onGoToBand }: HolderEntryStripProps) {
   return (
-    <div className="cd-holder-entry">
-      <p className="cd-eyebrow" id="cd-holder-entry-label">
+    <div className="cd-holder-entry" data-has-band-link={onGoToBand ? 'true' : undefined}>
+      {onGoToBand && (
+        <button type="button" className="cd-quiet cd-holder-entry-all" onClick={onGoToBand}>
+          Preview holders
+        </button>
+      )}
+      <p className="cd-eyebrow cd-holder-entry-eyebrow" id="cd-holder-entry-label">
         See it in a holder
       </p>
       <div className="cd-holder-entry-row" role="group" aria-labelledby="cd-holder-entry-label">

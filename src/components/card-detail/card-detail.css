@@ -2381,3 +2381,272 @@
     min-height: 44px;
   }
 }
+
+/* ==========================================================================
+   PHASE 2 — OWNER FLOWS (Sept 23 mobile review: O1, O4, S4)
+
+   O1 and O4 apply at every width. S4 is phones only (≤760px) and is the
+   media block at the end. Last in the file, like the block above it, so each
+   rule wins its tie without a specificity trick.
+   ========================================================================== */
+
+/* ---------- O1. InstaList: Description and Item specifics collapsed ---------- */
+
+.dcm-card-detail .cd-instalist-more {
+  padding: 0;
+}
+
+.dcm-card-detail .cd-instalist-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--cd-radius);
+}
+
+.dcm-card-detail .cd-instalist-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The disclosure chevron: points down closed, up open. */
+.dcm-card-detail .cd-instalist-summary::after {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-left: 4px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  opacity: 0.6;
+}
+
+.dcm-card-detail .cd-instalist-more[open] > .cd-instalist-summary::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+.dcm-card-detail .cd-instalist-summary:focus-visible {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 2px;
+}
+
+.dcm-card-detail .cd-instalist-summary-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.dcm-card-detail .cd-instalist-summary .cd-instalist-h3 {
+  margin: 0;
+}
+
+.dcm-card-detail .cd-instalist-summary-count {
+  color: var(--dcm-muted, #566174);
+  font-weight: 600;
+}
+
+/* An edit inside a collapsed section is never out of sight. */
+.dcm-card-detail .cd-instalist-edited {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dcm-purple, #9810fa) 12%, transparent);
+  color: var(--dcm-purple, #9810fa);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dcm-card-detail .cd-instalist-more-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+/* ---------- O4. Owner management rows + their sheet ---------- */
+
+.dcm-card-detail .cd-manage-rows {
+  display: grid;
+  gap: 10px;
+  max-width: 560px;
+  margin: 24px auto 0;
+}
+
+.dcm-card-detail .cd-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--cd-panel-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--dcm-ink, #0b1220);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dcm-card-detail button.cd-manage-row:hover {
+  border-color: color-mix(in srgb, var(--dcm-purple, #9810fa) 40%, var(--cd-panel-border));
+}
+
+.dcm-card-detail .cd-manage-row:focus-visible {
+  outline: 2px solid var(--dcm-purple, #9810fa);
+  outline-offset: 2px;
+}
+
+.dcm-card-detail .cd-manage-row--static {
+  cursor: default;
+  background: var(--dcm-surface, #f6f7fa);
+}
+
+.dcm-card-detail .cd-manage-row-label {
+  flex: none;
+  font-weight: 700;
+}
+
+.dcm-card-detail .cd-manage-row-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dcm-muted, #566174);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcm-card-detail .cd-manage-row-action {
+  flex: none;
+  color: var(--dcm-purple, #9810fa);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* A sheet kept mounted while closed (the binder picker) must stay closed:
+   the backdrop's own `display: flex` would otherwise beat `[hidden]`. */
+.dcm-card-detail .cd-sheet-backdrop[hidden] {
+  display: none;
+}
+
+.dcm-card-detail .cd-sheet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* The shared components bring their own card frame for the foot of a page;
+   inside a sheet that frame is a box in a box. */
+.dcm-card-detail .cd-sheet-body > .mt-8 {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+/* ---------- S4. The phone-only "Preview holders" link ---------- */
+
+/* The band is focused by script on arrival (tabIndex -1, not a control), so
+   it gets no focus ring of its own. */
+.dcm-card-detail .cd-holders-band:focus {
+  outline: none;
+}
+
+.dcm-card-detail .cd-holder-entry-all {
+  display: none;
+}
+
+@media (width <= 760px) {
+  /* ---------- S4. One set of controls beside the card ---------- */
+
+  .dcm-card-detail .cd-hero-showcase .cd-s4-hide,
+  .dcm-card-detail .cd-hero-showcase .cd-signin-note {
+    display: none;
+  }
+
+  /*
+   * THE DOWNLOAD GOTCHA. The mobile bar's "Download label" opens THIS menu
+   * instance, whose bottom sheet (`.dcm-download-sheet`, above) is
+   * `position: fixed` INSIDE the wrapper. So the wrapper is never
+   * `display: none`: it is taken out of the grid flow (no empty row, no gap)
+   * and only the menu's two visible TRIGGERS — and the lazy-load placeholder —
+   * are hidden. The panels are siblings of the triggers and still render.
+   */
+  .dcm-card-detail .cd-hero-download {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: visible;
+  }
+
+  .dcm-card-detail .cd-hero-download .relative > button,
+  .dcm-card-detail .cd-hero-download .cd-download-placeholder {
+    display: none;
+  }
+
+  /* Three holder buttons become one link to the band. */
+  .dcm-card-detail .cd-holder-entry[data-has-band-link] .cd-holder-entry-eyebrow,
+  .dcm-card-detail .cd-holder-entry[data-has-band-link] .cd-holder-entry-row {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-holder-entry-all {
+    display: inline-flex;
+    justify-self: start;
+  }
+
+  /* ---------- O4. The management sheet is a bottom sheet ---------- */
+
+  .dcm-card-detail .cd-sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .dcm-card-detail .cd-sheet {
+    width: 100%;
+    max-height: 85vh;
+    max-height: 85dvh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dcm-card-detail .cd-manage-rows {
+    max-width: none;
+  }
+
+  /* ---------- O1. The five photos as a thumbnail strip ---------- */
+  /*
+   * Five 3:4 photos stacked two-up were most of a screen before the title.
+   * A strip keeps them one row tall; each still opens the same dialog. The
+   * strip scrolls inside itself — the page never scrolls sideways.
+   */
+  .dcm-card-detail .cd-instalist-image-grid {
+    display: flex;
+    gap: 10px;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-bottom: 6px;
+  }
+
+  .dcm-card-detail .cd-instalist-image {
+    flex: 0 0 88px;
+    scroll-snap-align: start;
+  }
+
+  .dcm-card-detail .cd-instalist-image .cd-caption {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  /* A tap on a thumbnail is obviously "look closer"; the pill is clutter. */
+  .dcm-card-detail .cd-instalist-image-grid .cd-instalist-image-zoom {
+    display: none;
+  }
+}

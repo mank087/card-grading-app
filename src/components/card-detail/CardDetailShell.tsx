@@ -61,7 +61,7 @@ import {
 } from './holders/HolderSections';
 import HolderEntryStrip from './holders/HolderEntryStrip';
 import HolderEnlargeModal from './holders/HolderEnlargeModal';
-import { holderCardAnchorId } from './holders/HolderCards';
+import { useGoToHolder } from './holders/useGoToHolder';
 import {
   HOLDER_LABEL_STOCK,
   holderStyleSupport,
@@ -304,6 +304,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [identityReviewShowing, setIdentityReviewShowing] = useState(false);
   const [enlargedHolder, setEnlargedHolder] = useState<CardHolderId | null>(null);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  // The footer's Binders / Mark as sold sheet (O4).
+  const [manageSheetOpen, setManageSheetOpen] = useState(false);
   // Counter the mobile bar bumps to open the download menu in place. See
   // DownloadReportButton.openLabelsSignal. The listing flow's own counter is
   // held by `insta` below, beside the rest of the listing state.
@@ -373,6 +375,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     showEditLabelModal ||
     showFirstGradeModal ||
     enlargedHolder !== null ||
+    manageSheetOpen ||
     insta.modalOpen;
 
   /* Above the loading and error returns on purpose: a hook below an early
@@ -400,32 +403,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
     [routing],
   );
 
-  /**
-   * The hero's holder strip: open the Overview section, scroll to that
-   * holder's card and mark it briefly so the reader's eye lands on it. The
-   * highlight is a CSS animation and is suppressed under reduced motion.
-   */
-  const goToHolder = useCallback(
-    (holder: CardHolderId) => {
-      jumpTo('overview');
-      const anchorId = holderCardAnchorId(holder);
-      const reduce =
-        typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      // A timer, not requestAnimationFrame: rAF is throttled to a standstill in
-      // a background tab, and this must still land when the reader comes back
-      // to one. 60ms is enough for React to have mounted the band.
-      window.setTimeout(() => {
-        const el = document.getElementById(anchorId);
-        if (!el) return;
-        el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
-        el.focus({ preventScroll: true });
-        el.setAttribute('data-arrived', 'true');
-        window.setTimeout(() => el.removeAttribute('data-arrived'), 1600);
-      }, 60);
-    },
-    [jumpTo],
-  );
+  const openOverview = useCallback(() => jumpTo('overview'), [jumpTo]);
+  const { goToHolder, goToHolderBand } = useGoToHolder(openOverview);
 
   // ── States, in the legacy order ────────────────────────────────────────
 
@@ -703,7 +682,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
             onSideChange={setSide}
             onZoom={openZoom}
             styleControl={styleControls(false)}
-            holderEntry={<HolderEntryStrip onGoToHolder={goToHolder} />}
+            holderEntry={<HolderEntryStrip onGoToHolder={goToHolder} onGoToBand={goToHolderBand} />}
             downloadAction={renderDownloadButton({
               ...downloadContext,
               openLabelsSignal: openDownloadsSignal,
@@ -942,6 +921,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
           creditsLoading={creditsLoading}
           retakeHref={retakeHref}
           uploadHref={uploadHref}
+          onSheetOpenChange={setManageSheetOpen}
         />
       </div>
 

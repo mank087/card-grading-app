@@ -82,6 +82,8 @@ export function InstaListPanel({
       onModalOpenChange={onModalOpenChange}
       initialDraft={initialDraft}
       onConnectionChange={onConnectionChange}
+      // O2: it opens a review flow; publishing is a separate step inside it.
+      label="Prepare eBay listing"
     />
   );
 
