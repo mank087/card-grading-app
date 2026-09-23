@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import HelpBotPanel from './HelpBotPanel'
 import { type HelpBotMessageData } from './HelpBotMessage'
 import {
@@ -12,6 +12,7 @@ import {
   type Category,
 } from './helpBotKnowledge'
 import { searchKnowledge } from '@/lib/helpBotSearch'
+import { nextScrollAwayHidden, scrollAwayMovementCounts } from '@/lib/helpBotScrollAway'
 
 type ContextState =
   | { type: 'home' }
@@ -44,12 +45,67 @@ function buildEscalationMessage(): HelpBotMessageData {
   }
 }
 
+
+/** Phones: where the bubble steps aside while scrolling. Matches the card page's phone layout. */
+const PHONE_QUERY = '(max-width: 760px)'
+/** How long after the reader stops scrolling before the bubble comes back. */
+const REST_DELAY_MS = 700
+
+/**
+ * On a phone the bubble sat on top of whatever the reader was looking at
+ * (mobile review, Sept 23). It now steps aside while they scroll down, comes
+ * back when they scroll up or stop, and is always shown near the top of the
+ * page. Desktop never hides it. The rule itself is `nextScrollAwayHidden`.
+ */
+function useScrollAwayOnPhones(): boolean {
+  const [hidden, setHidden] = useState(false)
+  const hiddenRef = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia(PHONE_QUERY)
+    let lastY = window.scrollY
+    let rest: ReturnType<typeof setTimeout> | undefined
+
+    // Decided synchronously against a ref, not inside a state updater, so the
+    // comparison uses the position of THIS scroll event.
+    const apply = (next: boolean) => {
+      if (hiddenRef.current === next) return
+      hiddenRef.current = next
+      setHidden(next)
+    }
+
+    const onScroll = () => {
+      if (!mq.matches) return
+      const y = window.scrollY
+      apply(nextScrollAwayHidden(hiddenRef.current, lastY, y))
+      if (scrollAwayMovementCounts(lastY, y)) lastY = y
+      if (rest) clearTimeout(rest)
+      rest = setTimeout(() => apply(false), REST_DELAY_MS)
+    }
+    const onViewportChange = () => {
+      if (!mq.matches) apply(false)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    mq.addEventListener?.('change', onViewportChange)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      mq.removeEventListener?.('change', onViewportChange)
+      if (rest) clearTimeout(rest)
+    }
+  }, [])
+
+  return hidden
+}
+
 export default function HelpBot() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [messages, setMessages] = useState<HelpBotMessageData[]>([])
   const [currentContext, setCurrentContext] = useState<ContextState>({ type: 'home' })
   const [categoryQuestions, setCategoryQuestions] = useState<{ id: string; label: string }[]>([])
   const [showPulse, setShowPulse] = useState(false)
+  const bubbleAway = useScrollAwayOnPhones()
 
   // Load state on mount
   useEffect(() => {
@@ -251,13 +307,20 @@ export default function HelpBot() {
       {!isExpanded && (
         <button
           data-site-chrome="floating"
+          data-helpbot="bubble"
           onClick={toggleExpanded}
-          className={`fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all z-40 flex items-center justify-center ${
-            showPulse ? 'animate-pulse' : ''
-          }`}
+          // Phones: 44px instead of 56px and 16px from the edge. While the
+          // reader scrolls down it slides away and stops taking taps; keyboard
+          // focus always brings it back. The pulse is suppressed while away,
+          // because its opacity keyframes would otherwise flash it back in.
+          className={`fixed bottom-6 right-6 w-14 h-14 max-[760px]:right-4 max-[760px]:w-11 max-[760px]:h-11 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 motion-reduce:transition-none z-40 flex items-center justify-center ${
+            bubbleAway
+              ? 'opacity-0 translate-y-3 pointer-events-none motion-reduce:translate-y-0 focus-visible:opacity-100 focus-visible:translate-y-0 focus-visible:pointer-events-auto'
+              : ''
+          } ${showPulse && !bubbleAway ? 'animate-pulse' : ''}`}
           aria-label="Open help chat"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-6 h-6 max-[760px]:w-5 max-[760px]:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
         </button>

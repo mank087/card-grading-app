@@ -186,3 +186,14 @@ html[data-embedded="1"] [data-site-chrome] { display: none !important; }
 html [data-site-chrome='floating'] {
   bottom: calc(1.5rem + var(--dcm-fixed-bar-height, 0px));
 }
+
+/* The help chat's phone layout is a full-width sheet on the bottom edge
+   (HelpBotPanel's max-[640px]:bottom-0). The floating-chrome lift above
+   out-ranked it, so since Sept 22 the sheet floated 1.5rem off the bottom of
+   every phone screen. On phones it sits flush on the bottom edge, or flush on
+   top of a page's fixed action bar when there is one. */
+@media (max-width: 640px) {
+  html [data-helpbot='panel'] {
+    bottom: var(--dcm-fixed-bar-height, 0px);
+  }
+}
