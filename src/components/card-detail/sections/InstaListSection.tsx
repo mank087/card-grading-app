@@ -24,6 +24,7 @@
  * there is exactly one `/api/ebay/listing/check` per page view.
  */
 
+import type { ReactNode } from 'react';
 import InstaListImages from './InstaListImages';
 import InstaListFields from './InstaListFields';
 import { CONNECT_TO_EDIT_NOTE, listingEditGate } from '@/lib/ebay/listingDraftState';
@@ -51,6 +52,8 @@ export interface InstaListSectionProps {
    * is React state — anything typed before it would be silently discarded.
    */
   insta: CardDetailInstaList;
+  /** Identity notice, when the card's details need checking before listing. */
+  notice?: ReactNode;
 }
 
 function statusLine(state: InstaListStatus['state']): string {
@@ -77,6 +80,7 @@ export function InstaListSection({
   customLabelConfig,
   showFounderEmblem,
   insta,
+  notice,
 }: InstaListSectionProps) {
   const { status, draft, ebayConnected, beginListing: onBeginListing } = insta;
   // Locked/sold FIRST, then the connection. A disconnected owner gets the
@@ -124,6 +128,8 @@ export function InstaListSection({
             : ' Edit anything here and it carries into the listing flow. Edits last for this visit only.'}
         </p>
       </div>
+
+      {notice}
 
       {/* ── status ────────────────────────────────────────────────────── */}
       <section className="cd-panel cd-instalist-status" aria-labelledby="cd-il-status-h">

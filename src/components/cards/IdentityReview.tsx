@@ -71,6 +71,12 @@ interface Props {
   backUrl?: string | null;
   /** Called after a save, with the updated card. Use the page's existing edit handler. */
   onSaved: (card: unknown) => void;
+  /**
+   * ADDITIVE (card detail V2). Told whether this review currently needs the
+   * owner, so a page can avoid showing a second "check your card details"
+   * notice beside this one. Pages that omit it are unaffected.
+   */
+  onNeedsReviewChange?: (needsReview: boolean) => void;
 }
 
 /**
@@ -90,7 +96,7 @@ export function ConfirmCardDetailsCalloutButton({ className = '' }: { className?
   );
 }
 
-export default function IdentityReview({ card, currentUserId, frontUrl, backUrl, onSaved }: Props) {
+export default function IdentityReview({ card, currentUserId, frontUrl, backUrl, onSaved, onNeedsReviewChange }: Props) {
   const [state, setState] = useState<IdentityReviewState | null>(null);
   const [open, setOpen] = useState(false);
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
@@ -173,6 +179,12 @@ export default function IdentityReview({ card, currentUserId, frontUrl, backUrl,
     window.addEventListener(IDENTITY_REVIEW_OPEN_EVENT, openNow);
     return () => window.removeEventListener(IDENTITY_REVIEW_OPEN_EVENT, openNow);
   }, [eligible, load, state]);
+
+  // Hooks before the early return. Reports the same condition the banner uses.
+  const needsReviewNow = eligible && !!state && state.mode !== 'none';
+  useEffect(() => {
+    onNeedsReviewChange?.(needsReviewNow);
+  }, [needsReviewNow, onNeedsReviewChange]);
 
   if (!eligible) return null;
   const needsReview = !!state && state.mode !== 'none';

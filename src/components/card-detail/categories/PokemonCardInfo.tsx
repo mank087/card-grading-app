@@ -6,8 +6,8 @@
  * PORTED FROM `src/app/pokemon/[id]/CardDetailClient.tsx`; the sports client
  * has none of it:
  *
- *   3841-3891   the low/medium identification-confidence banner, driven by
- *               `pokemon_api_confidence`, with the owner-only edit button
+ *   3841-3891   the identification-confidence banner — MOVED to
+ *               CardIdentityNotice under the card name (review Sept 23)
  *   3893-3928   Card Name, rendered bilingually
  *   3930-3968   the "(Era)" marker when the set name is really a set era
  *   4002-4062   Type, Stage and HP
@@ -22,7 +22,6 @@
  * `CardFacts`'s `categorySlot`. Nothing shared imports it.
  */
 
-import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { splitBilingual, splitBilingualLines } from '@/lib/cardDetail/bilingual';
 import type { LegacyCardInfo } from '@/lib/cardDetail/cardInfo';
 
@@ -100,8 +99,6 @@ export function PokemonCardInfo({
   isOwner,
   onEdited,
 }: PokemonCardInfoProps) {
-  const confidence = card?.pokemon_api_confidence;
-  const lowConfidence = confidence === 'low' || confidence === 'medium';
 
   const cardName =
     cardInfo.card_name ||
@@ -127,30 +124,8 @@ export function PokemonCardInfo({
 
   return (
     <>
-      {lowConfidence && (
-        <div className="cd-callout">
-          <p>
-            <strong>
-              {confidence === 'low'
-                ? 'Card identification may be incorrect'
-                : 'Card identification uncertain'}
-            </strong>
-          </p>
-          <p className="cd-caption">
-            {confidence === 'low'
-              ? 'Our system had difficulty matching this card to our database. The set, year, or card number shown may not be accurate. Please verify the information and edit if needed.'
-              : 'The card identification has moderate confidence. Some details may need verification.'}
-          </p>
-          {isOwner && (
-            <EditCardDetailsButton
-              card={card}
-              currentUserId={currentUserId ?? undefined}
-              onEditComplete={onEdited}
-              variant="default"
-            />
-          )}
-        </div>
-      )}
+      {/* The identification-confidence notice moved under the card name
+          (CardIdentityNotice) so it stays visible when card facts collapse. */}
 
       <dl className="cd-facts">
         <div>

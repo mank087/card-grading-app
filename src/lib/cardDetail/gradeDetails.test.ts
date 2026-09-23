@@ -4,7 +4,6 @@ import {
   hasCenteringData,
   imageQualityInfoFor,
   isSlabbed,
-  parseLegacyRatio,
   readCaseDetection,
   readConditionDetails,
   readFaceCentering,
@@ -12,23 +11,6 @@ import {
   readSlabDetection,
   readStructuralUnconfirmedNote,
 } from './gradeDetails';
-
-describe('parseLegacyRatio', () => {
-  it('parses a normal ratio', () => {
-    expect(parseLegacyRatio('55/45')).toEqual({ left: 55, right: 45 });
-  });
-
-  it('keeps the legacy NaN round trip for an unmeasurable face', () => {
-    const parsed = parseLegacyRatio('XX/XX');
-    expect(Number.isNaN(parsed.left)).toBe(true);
-    // The re-joined string is what the display helpers reject as "not measurable".
-    expect(`${parsed.left}/${parsed.right}`).toBe('NaN/NaN');
-  });
-
-  it('falls back to dead centre when the string has no slash', () => {
-    expect(parseLegacyRatio('N/A'.replace('/', ''))).toEqual({ left: 50, right: 50 });
-  });
-});
 
 describe('readFaceCentering', () => {
   const card = {
@@ -49,6 +31,7 @@ describe('readFaceCentering', () => {
     expect(readFaceCentering(card, 'front')).toEqual({
       lrText: '52/48',
       tbText: '50/50',
+      measurable: true,
       qualityTier: 'Excellent',
       score: 9,
       analysis: 'Front sits slightly left.',
@@ -63,10 +46,36 @@ describe('readFaceCentering', () => {
     expect(back.analysis).toBeNull();
   });
 
-  it('defaults a face with no ratio at all to 50/50', () => {
+  it('reports a face with no stored ratio as unmeasured, never a made-up 50/50', () => {
     const bare = readFaceCentering({}, 'front');
-    expect(bare.lrText).toBe('50/50');
+    expect(bare.lrText).toBeNull();
+    expect(bare.tbText).toBeNull();
+    expect(bare.measurable).toBe(false);
     expect(bare.score).toBeNull();
+  });
+
+  // The grader stores these when a face has nothing to measure (full-art,
+  // borderless, die-cut). Each used to reach the page as "NaN/NaN" or "50/50".
+  it.each(['XX/XX', 'n/a', 'N/A', 'borderless'])(
+    'passes the stored %s through untouched and marks the face unmeasured',
+    (raw) => {
+      const face = readFaceCentering(
+        { conversational_centering_ratios: { front_lr: raw, front_tb: raw } },
+        'front',
+      );
+      expect(face.lrText).toBe(raw);
+      expect(face.lrText).not.toContain('NaN');
+      expect(face.lrText).not.toBe('50/50');
+      expect(face.measurable).toBe(false);
+    },
+  );
+
+  it('is measurable when only one axis was measured', () => {
+    const face = readFaceCentering(
+      { conversational_centering_ratios: { front_lr: '55/45', front_tb: 'XX/XX' } },
+      'front',
+    );
+    expect(face.measurable).toBe(true);
   });
 });
 

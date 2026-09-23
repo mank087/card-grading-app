@@ -34,10 +34,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
-import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { GradeReviewButton } from '@/components/grade-review/GradeReviewButton';
-import type { GradingPasses } from '@/types/card';
 import type { UserConditionReportInput } from '@/types/conditionReport';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
@@ -106,17 +104,6 @@ export interface GradeDetailsSectionProps {
   onConfidenceOpenChange: (open: boolean) => void;
   userReportOpen: boolean;
   onUserReportOpenChange: (open: boolean) => void;
-}
-
-/** `conversational_grading` is JSON in v4.0+ and markdown before it. */
-function readGradingPasses(card: any): GradingPasses | undefined {
-  const report = card?.conversational_grading;
-  if (typeof report !== 'string' || !report) return undefined;
-  try {
-    return (JSON.parse(report)?.grading_passes as GradingPasses | undefined) ?? undefined;
-  } catch {
-    return undefined; // Markdown report — no structured passes to show.
-  }
 }
 
 export function GradeDetailsSection({
@@ -201,7 +188,6 @@ export function GradeDetailsSection({
     if (focusAnchor === 'tour-optic-score') setConfidenceOpen(true);
   }, [focusAnchor, setEvidence, setConfidenceOpen]);
 
-  const gradingPasses = readGradingPasses(card);
   const structuralNote = readStructuralUnconfirmedNote(card);
   const hasUserReport = !!card?.has_user_condition_report && !!card?.user_condition_report;
   const frontUrl = vm.images.front.url;
@@ -360,11 +346,10 @@ export function GradeDetailsSection({
         </details>
       </section>
 
-      {gradingPasses && (
-        <section className="cd-panel">
-          <ThreePassSummary gradingPasses={gradingPasses} />
-        </section>
-      )}
+      {/* The three-pass summary is NOT rendered here. It shows inside "Full DCM
+          Optic analysis" (FullAnalysisJson), which reads the same
+          grading_passes from the same JSON report, so it was on the page
+          twice. Legacy only ever showed it inside the full analysis. */}
 
       <section className="cd-panel">
         <ReportProvenance card={card} />

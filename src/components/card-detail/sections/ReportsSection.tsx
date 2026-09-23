@@ -55,6 +55,20 @@ export function ReportsSection({
         DCM serial <strong className="cd-serial">{serial}</strong>
       </p>
 
+      {/* Once, above the list. It used to repeat on every one of the four
+          report cards, which a visitor read four times in a row. */}
+      {!(isOwner && renderReportDownload) && (
+        <p className="cd-caption cd-report-locked">
+          {viewerSignedIn ? (
+            'Only the card’s owner can download these reports.'
+          ) : (
+            <>
+              <a href="/login">Log in</a> as the card&rsquo;s owner to download these reports.
+            </>
+          )}
+        </p>
+      )}
+
       <div id="tour-download-buttons" className="cd-holder-cards cd-report-cards">
         {CARD_REPORT_EXPORTS.map((report) => (
           <section key={report.kind} className="cd-holder-card" aria-label={report.name}>
@@ -66,21 +80,11 @@ export function ReportsSection({
               <p className="cd-caption">{report.summary}</p>
             </div>
 
-            <div className="dcm-actions cd-holder-card-actions">
-              {isOwner && renderReportDownload ? (
-                renderReportDownload(report.kind, report.action)
-              ) : (
-                <p className="cd-caption cd-report-locked">
-                  {viewerSignedIn ? (
-                    'Only the card’s owner can download this.'
-                  ) : (
-                    <>
-                      <a href="/login">Log in</a> as the card&rsquo;s owner to download this.
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
+            {isOwner && renderReportDownload && (
+              <div className="dcm-actions cd-holder-card-actions">
+                {renderReportDownload(report.kind, report.action)}
+              </div>
+            )}
           </section>
         ))}
       </div>

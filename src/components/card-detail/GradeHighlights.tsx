@@ -20,6 +20,7 @@ import {
   readImageGrade,
   hasCenteringData,
 } from '@/lib/cardDetail/gradeDetails';
+import { centeringFaceLine } from '@/lib/cardDetail/centeringLine';
 import GradeChip from './GradeChip';
 import { getUncertaintyFromConfidence } from '@/lib/cardDetail/parsers';
 
@@ -115,9 +116,9 @@ export function GradeHighlights({ vm, card, conditionSummary, onJumpToGrade }: G
           </span>
           {showCenteringRatios && (
             <span className="cd-highlight-split">
-              Front {frontCentering.lrText} · {frontCentering.tbText}
+              {centeringFaceLine('Front', frontCentering)}
               <br />
-              Back {backCentering.lrText} · {backCentering.tbText}
+              {centeringFaceLine('Back', backCentering)}
             </span>
           )}
           {findingText(frontCentering.analysis) && (

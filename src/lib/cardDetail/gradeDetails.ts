@@ -7,7 +7,6 @@
  *   readDvgGrading                2488-2527 (reduced — see the note there)
  *   readCentering                 2657
  *   readCenteringMeasurements     2707-2765
- *   parseLegacyRatio              4406-4417
  *   readFaceCentering             4524-4527, 4541-4571, 4610-4640
  *   readConditionDetails          4814-4880
  *   readStructuralNote            2708-2722
@@ -23,6 +22,7 @@
  * dropped — they are developer noise, not behaviour a visitor can see.
  */
 
+import { isCenteringMeasurable } from '@/lib/centeringDisplay';
 import { extractCenteringAnalysis } from './parsers';
 
 export type CardSideKey = 'front' | 'back';
@@ -99,30 +99,33 @@ export function readCenteringMeasurements(card: any): any {
   };
 }
 
-/**
- * Legacy 4406-4417. Deliberately naive: "XX/XX" parses to NaN/NaN and is
- * re-joined as the string "NaN/NaN", which `displayCenteringRatio` and
- * `centeringQuality` both read as "not measurable". That round trip is the
- * behaviour the v9.21 fix depends on, so it is kept.
- */
-export function parseLegacyRatio(ratioStr: string): { left: number; right: number } {
-  const parts = String(ratioStr)
-    .split('/')
-    .map((p) => parseInt(p.trim()));
-  if (parts.length !== 2) return { left: 50, right: 50 };
-  return { left: parts[0], right: parts[1] };
-}
-
 export interface FaceCentering {
-  /** "53/47" as legacy re-joins it from the parsed numbers. */
-  lrText: string;
-  tbText: string;
+  /**
+   * The ratio exactly as the grader stored it ("53/47", or "XX/XX" / "n/a" /
+   * "borderless" when it could not measure), or null when nothing was stored.
+   * NEVER parsed or defaulted here: `@/lib/centeringDisplay` is the one place
+   * that decides what a ratio string means, and every consumer must go through
+   * `displayCenteringRatio` / `isCenteringMeasurable` / `centeringQuality`.
+   */
+  lrText: string | null;
+  tbText: string | null;
+  /** True when at least one axis carries a real measurement. */
+  measurable: boolean;
   /** The grader's own tier for this face, when it gave one. */
   qualityTier: string | null;
   /** The face's own centering score, raw off the sub-scores. */
   score: number | string | null;
   /** The prose. Null when no source had any. */
   analysis: string | null;
+}
+
+
+/** The first non-empty stored ratio string, trimmed; null when there is none. */
+function firstRatioText(...candidates: unknown[]): string | null {
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return null;
 }
 
 /** Legacy 4524-4527 + 4541-4571 (front) / 4610-4640 (back). */
@@ -135,12 +138,13 @@ export function readFaceCentering(card: any, side: CardSideKey): FaceCentering {
     conversational_back_summary: card?.conversational_back_summary,
   });
 
-  const lr = parseLegacyRatio(
-    ratios?.[`${side}_lr`] || centering[`${side}_left_right_ratio_text`] || '50/50'
-  );
-  const tb = parseLegacyRatio(
-    ratios?.[`${side}_tb`] || centering[`${side}_top_bottom_ratio_text`] || '50/50'
-  );
+  // Raw stored text, first source that has one. This used to go through a
+  // parseInt-and-rejoin copied from the legacy page, which turned "XX/XX" and
+  // "n/a" into the string "NaN/NaN" (printed as-is in the Overview tiles), and
+  // defaulted a missing or slash-less value ("borderless") to "50/50" — a
+  // perfect-centering measurement that was never taken.
+  const lrText = firstRatioText(ratios?.[`${side}_lr`], centering[`${side}_left_right_ratio_text`]);
+  const tbText = firstRatioText(ratios?.[`${side}_tb`], centering[`${side}_top_bottom_ratio_text`]);
 
   const analysis =
     card?.conversational_corners_edges_surface?.[`${side}_centering`]?.summary ||
@@ -151,8 +155,9 @@ export function readFaceCentering(card: any, side: CardSideKey): FaceCentering {
   const scoreRaw = card?.conversational_sub_scores?.centering?.[side];
 
   return {
-    lrText: `${lr.left}/${lr.right}`,
-    tbText: `${tb.left}/${tb.right}`,
+    lrText,
+    tbText,
+    measurable: isCenteringMeasurable(lrText, tbText),
     qualityTier: measurements[`${side}_quality_tier`] || ratios?.[`${side}_quality_tier`] || null,
     score: scoreRaw === undefined ? null : scoreRaw,
     analysis,

@@ -104,6 +104,8 @@ import InstaListPanel from './InstaListPanel';
 import GradeHighlights from './GradeHighlights';
 import CardFacts from './CardFacts';
 import IdentityReview from '@/components/cards/IdentityReview';
+import CardIdentityNotice from './CardIdentityNotice';
+import { readIdentityConcern } from '@/lib/cardDetail/identityConcern';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
 import MarketSection from './sections/MarketSection';
 import ReportsSection from './sections/ReportsSection';
@@ -298,6 +300,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  // True while IdentityReview's own banner is on screen.
+  const [identityReviewShowing, setIdentityReviewShowing] = useState(false);
   const [enlargedHolder, setEnlargedHolder] = useState<CardHolderId | null>(null);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   // Counter the mobile bar bumps to open the download menu in place. See
@@ -530,6 +534,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
     : null;
 
   /** Number · rarity · language. One line, under the hero's <h1>. */
+  // Weak database match, if any. Shown under the name by CardIdentityNotice.
+  const identityConcern = readIdentityConcern(card);
   const identitySubtitle =
     [vm.identity.cardNumberFormatted, vm.identity.rarityOrVariant, vm.identity.language]
       .filter(Boolean)
@@ -740,6 +746,30 @@ export function CardDetailShell(props: CardDetailShellProps) {
               </div>
               <h1>{vm.identity.displayName}</h1>
               {identitySubtitle && <p className="cd-subtitle">{identitySubtitle}</p>}
+
+              {/* One identity notice, under the name. IdentityReview (the
+                  confirm-details popup + banner) is mounted here, outside the
+                  tabbed sections, so it exists on every tab and pops at most
+                  once per page load; the database-match notice steps aside
+                  while its banner is showing. */}
+              <CardIdentityNotice
+                concern={identityConcern}
+                suppressed={isOwner && identityReviewShowing}
+                isOwner={isOwner}
+                card={card}
+                currentUserId={getStoredSession()?.user?.id}
+                onEdited={refreshAfterEdit}
+              />
+              <div className="cd-identity-review">
+                <IdentityReview
+                  card={card}
+                  currentUserId={getStoredSession()?.user?.id}
+                  frontUrl={vm.images.front.url}
+                  backUrl={vm.images.back.url}
+                  onSaved={refreshAfterEdit}
+                  onNeedsReviewChange={setIdentityReviewShowing}
+                />
+              </div>
             </div>
 
             <GradeSummary
@@ -770,22 +800,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
               onConnectionChange={insta.setEbayConnected}
             />
           </div>
-        </div>
-
-        {/* The "confirm your card details" popup and banner. Mounted HERE, outside
-            the tabbed sections, so it is present on every tab: it decides for
-            itself whether to open (owner, flag, server "popup" mode, no other
-            overlay), and it must pop at most once per page load. Inside the
-            Overview tab it would be unmounted whenever another tab was active
-            — never showing for a deep link, and popping again on every return. */}
-        <div className="cd-identity-review">
-          <IdentityReview
-            card={card}
-            currentUserId={getStoredSession()?.user?.id}
-            frontUrl={vm.images.front.url}
-            backUrl={vm.images.back.url}
-            onSaved={refreshAfterEdit}
-          />
         </div>
 
         {/* ── sections ───────────────────────────────────────────────── */}
@@ -903,6 +917,18 @@ export function CardDetailShell(props: CardDetailShellProps) {
               customLabelConfig={preview.activeConfig}
               showFounderEmblem={detail.emblems.showFounderEmblem}
               insta={insta}
+              notice={
+                <CardIdentityNotice
+                  concern={identityConcern}
+                  reviewPending={identityReviewShowing}
+                  suppressed={false}
+                  isOwner={isOwner}
+                  card={card}
+                  currentUserId={getStoredSession()?.user?.id}
+                  onEdited={refreshAfterEdit}
+                  context="The listing title and item specifics are built from them."
+                />
+              }
             />
           }
         />
