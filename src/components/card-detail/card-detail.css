@@ -1019,11 +1019,10 @@
   /*
    * Mobile order (Sept 23 review, S1): identity, then the SECTION NAV, then —
    * on Overview only — the card, grade, value and InstaList panels, then the
-   * active section. The nav lives after the hero in the DOM, and it must stay
-   * a child of `.cd-container` (the box its `position: sticky` pins within),
-   * so the container becomes the flex column and the two hero wrappers step
-   * aside with `display: contents`. The breadcrumb and sold banner keep
-   * order 0 and stay first.
+   * active section. The phone nav must pin against `.cd-container` (the box
+   * its `position: sticky` pins within) although it sits inside the hero, so
+   * the container becomes the flex column and the two hero wrappers step
+   * aside with `display: contents`. The breadcrumb and sold banner stay first.
    */
   .dcm-card-detail .cd-container {
     display: flex;
@@ -1042,40 +1041,30 @@
     gap: 16px;
   }
 
-  .dcm-card-detail .cd-hero-summary > .cd-identity {
-    order: 1;
-  }
-
-  .dcm-card-detail .cd-container > .cd-section-nav-wrap {
-    order: 2;
+  /*
+   * Since Phase 4 (A) that order is the DOM order too — identity and the
+   * phone copy of the nav come first inside the hero — so no `order` is
+   * needed and the Tab / screen-reader order matches what is on screen. The
+   * desktop copy of the nav (`--wide`, after the hero) is `display: none`.
+   */
+  .dcm-card-detail .cd-section-nav-wrap--wide {
+    display: none;
   }
 
   .dcm-card-detail .cd-hero-showcase {
-    order: 3;
     margin-top: 20px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-grade-panel {
-    order: 4;
     margin-top: 32px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-value-panel {
-    order: 5;
     margin-top: 32px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-instalist {
-    order: 6;
     margin-top: 32px;
-  }
-
-  .dcm-card-detail .cd-container > .cd-section-host {
-    order: 7;
-  }
-
-  .dcm-card-detail .cd-container > .cd-footer-actions {
-    order: 8;
   }
 
   /*
@@ -2833,17 +2822,17 @@
     background: transparent;
   }
 
-  /* Labels & holders tab: the two introductory blocks go, so the holder sits
-     directly under the design controls. The headings stay for screen readers;
-     the visitor's "only the owner can download" line stays visible. */
-  .dcm-card-detail .cd-labels-intro > .cd-eyebrow,
-  .dcm-card-detail .cd-labels-intro > p:not(.cd-caption),
+  /* Labels & holders tab: the intro is one short heading (Phase 4 H — the
+     generic `.cd-section-title` rules below), and the holder panel's own
+     title block goes, so the holder sits under the design controls with the
+     Slab / Top loader / One-Touch selector as its heading. That panel's
+     heading stays for screen readers; the visitor's "only the owner can
+     download" line stays visible. */
   .dcm-card-detail .cd-labels-holders > .cd-eyebrow,
   .dcm-card-detail .cd-labels-holders > .cd-labels-holders-lead {
     display: none;
   }
 
-  .dcm-card-detail .cd-labels-intro > h2,
   .dcm-card-detail .cd-labels-holders > h3 {
     position: absolute;
     width: 1px;
@@ -2856,14 +2845,304 @@
     border: 0;
   }
 
-  /* No box of its own, so an owner's (empty-looking) intro adds no grid gap
-     above the design panel; the sr-only heading and a visitor's caption
-     still render. */
-  .dcm-card-detail .cd-labels-intro {
-    display: contents;
-  }
-
   .dcm-card-detail .cd-labels-holders > .cd-holder-picker {
     margin-top: 0;
+  }
+}
+
+/* ==========================================================================
+   PHASE 4 — CONTENT (Sept 23 mobile review, sections 5 O3 and 6)
+   Everything below is phone-only (≤760px) except the desktop rules that keep
+   a desktop EXACTLY as it was around the new, static markup: the hero's grid
+   areas (A), the hidden phone nav, and the always-open disclosures.
+   ========================================================================== */
+
+/* O3, every width: the holder sheet's title is a sheet title, not a page
+   heading (the page's own h2 sizing would otherwise apply to it). */
+.dcm-card-detail .dcm-holder-menu h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+/* Phone-only markup exists at every width; a desktop never shows it. */
+.dcm-card-detail .cd-title-phone,
+.dcm-card-detail .cd-title-phone-note,
+.dcm-card-detail .cd-phone-only {
+  display: none;
+}
+
+@media (width > 760px) {
+  /*
+   * A. Identity is the hero's FIRST child now (so a phone's DOM order is its
+   * visual order), but a desktop keeps it top-right above the grade, value
+   * and InstaList panels, exactly where it sat inside `.cd-hero-summary`.
+   * The second row is `1fr` so that when the card column is the taller one,
+   * the extra height goes under the panels — the identity row stays its own
+   * height and the gap under it stays the summary's own `--cd-gap`.
+   */
+  .dcm-card-detail .cd-hero--split {
+    grid-template-areas:
+      'showcase identity'
+      'showcase summary';
+    grid-template-rows: auto 1fr;
+    row-gap: var(--cd-gap);
+  }
+
+  .dcm-card-detail .cd-hero--split > .cd-identity {
+    grid-area: identity;
+    min-width: 0;
+  }
+
+  .dcm-card-detail .cd-hero--split > .cd-hero-showcase {
+    grid-area: showcase;
+  }
+
+  .dcm-card-detail .cd-hero--split > .cd-hero-summary {
+    grid-area: summary;
+  }
+
+  /* One nav at a time: the desktop's is the one after the hero. */
+  .dcm-card-detail .cd-section-nav-wrap--phone {
+    display: none;
+  }
+
+  /* PhoneDisclosure: open, with no summary and no box of its own. */
+  .dcm-card-detail .cd-disclosure > .cd-disclosure-summary {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-disclosure {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Belt and braces: PhoneDisclosure re-opens itself when the viewport
+     crosses 760px, but a desktop must never lose this content to a missed
+     media-query event. Where `::details-content` is supported, a closed
+     disclosure still shows its content here (its own rule, so a browser that
+     does not know the pseudo-element drops only this). */
+  .dcm-card-detail .cd-disclosure::details-content {
+    content-visibility: visible;
+  }
+
+  /* Market (M): the estimates panel follows the links in the DOM, which is
+     the phone's order; a desktop keeps links, then estimates, then portfolio. */
+  .dcm-card-detail .cd-market-links {
+    order: 1;
+  }
+
+  .dcm-card-detail .cd-market-pro {
+    order: 2;
+  }
+
+  .dcm-card-detail .cd-market-portfolio {
+    order: 3;
+  }
+}
+
+@media (width <= 760px) {
+  /* ---------- H. One heading per section ---------- */
+
+  .dcm-card-detail .cd-section-title > .cd-eyebrow,
+  .dcm-card-detail .cd-section-title > .cd-title-wide,
+  .dcm-card-detail .cd-section-title > .cd-title-lead {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-section-title > .cd-title-phone,
+  .dcm-card-detail .cd-title-phone-note,
+  .dcm-card-detail .cd-phone-only {
+    display: block;
+  }
+
+  .dcm-card-detail .cd-section-title > .cd-title-phone-note {
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  /* Overview: the holder band and "Your grade, explained." keep their h3 and
+     lose the grey lead-in above it and the paragraph under it. */
+  .dcm-card-detail .cd-holders-band .cd-showcase-row .cd-eyebrow,
+  .dcm-card-detail .cd-holders-band > .cd-caption,
+  .dcm-card-detail .cd-overview-more > .cd-eyebrow,
+  .dcm-card-detail .cd-overview-more-lead {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-overview-more .dcm-actions {
+    margin-top: 12px !important;
+  }
+
+  /* ---------- the closed-by-default disclosures (M, F) ---------- */
+
+  .dcm-card-detail .cd-disclosure-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 12px 16px;
+    border: 1px solid var(--cd-panel-border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--dcm-ink, #0b1220);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .dcm-card-detail .cd-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-disclosure-chevron {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-right: 2px solid var(--dcm-purple-text, #7624b5);
+    border-bottom: 2px solid var(--dcm-purple-text, #7624b5);
+    transform: translateY(-2px) rotate(45deg);
+  }
+
+  .dcm-card-detail .cd-disclosure[open] > .cd-disclosure-summary > .cd-disclosure-chevron {
+    transform: translateY(2px) rotate(-135deg);
+  }
+
+  .dcm-card-detail .cd-disclosure[open] > .cd-disclosure-summary {
+    margin-bottom: 14px;
+  }
+
+  .dcm-card-detail .cd-disclosure-summary:focus-visible {
+    outline: 2px solid var(--dcm-purple, #9810fa);
+    outline-offset: 2px;
+  }
+
+  /* Inside a panel the summary IS the panel's heading row, not a second box. */
+  .dcm-card-detail .cd-panel .cd-disclosure-summary {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 17px;
+  }
+
+  /* ---------- M. Market: the value first ---------- */
+
+  /* The disclosure's summary says it; the h3 would say it twice. */
+  .dcm-card-detail .cd-market-pro-h {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-market-match {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--dcm-muted, #566174);
+    overflow-wrap: anywhere;
+  }
+
+  .dcm-card-detail .cd-market-match strong {
+    color: var(--dcm-ink, #0b1220);
+    font-weight: 650;
+  }
+
+  /* ---------- F. Card facts: the grid, then "More card details" ---------- */
+
+  .dcm-card-detail .cd-more-details {
+    margin-top: 16px;
+    padding-top: 4px;
+    border-top: 1px solid var(--cd-panel-border);
+  }
+
+  /* The description's own panel is the desktop's copy; a phone reads the one
+     inside "More card details". */
+  .dcm-card-detail .cd-desc-panel {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-desc-bare {
+    margin-top: 18px;
+  }
+
+  /* ---------- R. Reports as a compact list ---------- */
+
+  .dcm-card-detail .cd-report-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border: 1px solid var(--cd-panel-border);
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .dcm-card-detail .cd-report-cards > .cd-holder-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    height: auto;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dcm-card-detail .cd-report-cards > .cd-holder-card + .cd-holder-card {
+    border-top: 1px solid var(--cd-panel-border);
+  }
+
+  /* Name, then the format pill (which drops under the name when the two do
+     not fit on one line), then the one-line purpose. `order` only moves the
+     pill after the name visually; none of these is focusable. */
+  .dcm-card-detail .cd-report-cards > .cd-holder-card > .cd-holder-card-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 2px 8px;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .dcm-card-detail .cd-report-cards .cd-holder-card-name {
+    order: 1;
+  }
+
+  .dcm-card-detail .cd-report-cards .cd-holder-tag {
+    order: 2;
+  }
+
+  .dcm-card-detail .cd-report-cards .cd-holder-tag > span {
+    padding: 1px 8px;
+    white-space: nowrap;
+  }
+
+  /* One line; the whole sentence stays in the DOM for a screen reader. */
+  .dcm-card-detail .cd-report-cards .cd-report-purpose {
+    order: 3;
+    flex: 1 0 100%;
+    min-width: 0;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dcm-card-detail .cd-report-cards > .cd-holder-card > .cd-holder-card-actions {
+    flex: none;
+    width: auto;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  /* ---------- O3. The holder sheet, full width as a bottom sheet ---------- */
+
+  .dcm-card-detail .dcm-download-sheet.dcm-holder-menu {
+    max-width: none;
   }
 }

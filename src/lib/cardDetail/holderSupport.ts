@@ -175,6 +175,17 @@ export const HOLDER_DOWNLOAD_LABELS: Record<CardHolderId, string> = {
   onetouch: 'Download One-Touch label',
 };
 
+/**
+ * The empty-holder product photo each holder's mockup is drawn on — the SAME
+ * files `LabelMockup` uses (slab 465, top loader 536, One-Touch 689). The
+ * download sheet (O3) shows them small beside each holder's row.
+ */
+export const HOLDER_PHOTOS: Record<CardHolderId, string> = {
+  slab: '/labels/graded-card-slab.png',
+  toploader: '/labels/top-loader-dcm.png',
+  onetouch: '/labels/mag-one-touch-DCM.png',
+};
+
 export const HOLDER_NAMES: Record<CardHolderId, string> = {
   slab: 'Graded slab',
   toploader: 'Top loader',

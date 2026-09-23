@@ -40,7 +40,8 @@ import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 import { buildCardInfo } from '@/lib/cardDetail/cardInfo';
 import { readDvgGrading } from '@/lib/cardDetail/gradeDetails';
 import DetectedSlabPanel from './DetectedSlabPanel';
-import SpecialFeatures from './SpecialFeatures';
+import SpecialFeatures, { CardDescription } from './SpecialFeatures';
+import PhoneDisclosure from './PhoneDisclosure';
 
 export interface CardFactsProps {
   vm: CardDetailViewModel;
@@ -79,6 +80,7 @@ export function CardFacts({
   const { identity } = vm;
   const cardInfo = buildCardInfo(card, category);
   const dvgGrading = readDvgGrading(card);
+  const hasDescription = !!dvgGrading?.card_text_blocks?.main_text_box;
 
   const facts: Array<[string, string | null]> = [
     ['Set', identity.setName],
@@ -129,7 +131,20 @@ export function CardFacts({
           </p>
         )}
 
-        {categorySlot}
+        {/* PHONES (Sept 23 review, Phase 4 F): the category's own fields and
+            long text (card text, abilities, Pokédex entry, flavour text, the
+            card-back description) and the card description fold into one
+            closed "More card details". The shared grid above stays visible,
+            and so do the Special features badges below. On a desktop the
+            disclosure is open with no summary and lays out as it always did;
+            the description keeps its own panel there (`cd-desc-panel`), so
+            the copy in here is phone-only. */}
+        {(categorySlot || hasDescription) && (
+          <PhoneDisclosure summary="More card details" className="cd-more-details">
+            {categorySlot}
+            <CardDescription dvgGrading={dvgGrading} bare className="cd-phone-only cd-desc-bare" />
+          </PhoneDisclosure>
+        )}
       </section>
 
       <SpecialFeatures

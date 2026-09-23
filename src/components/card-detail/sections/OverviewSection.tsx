@@ -77,10 +77,11 @@ export function OverviewSection({
           categoryVariantBadge={categoryVariantBadge}
           categoryFeaturesVisible={categoryFeaturesVisible}
         />
-        <section className="cd-panel">
+        {/* On a phone the eyebrow and the lead line go (one heading each). */}
+        <section className="cd-panel cd-overview-more">
           <p className="cd-eyebrow">The whole picture</p>
           <h3 style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>Your grade, explained.</h3>
-          <p className="cd-caption" style={{ marginTop: 8 }}>
+          <p className="cd-caption cd-overview-more-lead" style={{ marginTop: 8 }}>
             Read the front-to-back findings, or take a report away with you.
           </p>
           <div className="dcm-actions" style={{ marginTop: 16 }}>

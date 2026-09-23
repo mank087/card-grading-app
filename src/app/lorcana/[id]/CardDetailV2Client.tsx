@@ -301,6 +301,12 @@ export function LorcanaCardDetailsV2() {
       onSwitchStyle={switchStyle}
       live={live}
       marketRange={marketRange}
+      // Phone Market tab: "Matched: <product> · <confidence>" (Phase 4 M).
+      priceMatch={
+        dcmPriceData?.productName
+          ? { productName: dcmPriceData.productName, matchConfidence: dcmPriceData.matchConfidence }
+          : null
+      }
       conditionSummary={conditionSummary}
       shareData={shareData}
       renderDownloadButton={(ctx) =>
@@ -317,6 +323,8 @@ export function LorcanaCardDetailsV2() {
             openLabelsSignal={ctx.openLabelsSignal}
             onMenuOpenChange={ctx.onMenuOpenChange}
             sheetOnMobile={ctx.sheetOnMobile}
+            menuLayout={ctx.menuLayout}
+            holderMenu={ctx.holderMenu}
           />
         ) : null
       }

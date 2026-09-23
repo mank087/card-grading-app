@@ -30,6 +30,7 @@
 
 import type { ReactNode } from 'react';
 import InstaListImages from './InstaListImages';
+import SectionTitle from '../SectionTitle';
 import InstaListFields, { InstaListMoreFields } from './InstaListFields';
 import { CONNECT_TO_EDIT_NOTE, listingEditGate } from '@/lib/ebay/listingDraftState';
 import type { InstaListStatus } from '../useInstaListStatus';
@@ -122,16 +123,26 @@ export function InstaListSection({
 
   return (
     <div className="cd-section cd-instalist-section" id="instalist-panel">
-      <div className="cd-section-title">
-        <p className="cd-eyebrow">Ready for its next collector?</p>
-        <h2>Your listing, before you list it.</h2>
-        <p>
-          The photos, the title, the description and the specifics that will go to eBay.
-          {lock.needsConnect
-            ? ' Connect eBay to edit any of it — editing is unlocked once connected.'
-            : ' Edit anything here and it carries into the listing flow. Edits last for this visit only.'}
-        </p>
-      </div>
+      {/* On a phone the lead goes (one heading per section), but its last
+          sentence is the one-line edit note O1 keeps, so that stays. */}
+      <SectionTitle
+        eyebrow="Ready for its next collector?"
+        title="Your listing, before you list it."
+        phoneTitle="InstaList"
+        lead={
+          <>
+            The photos, the title, the description and the specifics that will go to eBay.
+            {lock.needsConnect
+              ? ' Connect eBay to edit any of it — editing is unlocked once connected.'
+              : ' Edit anything here and it carries into the listing flow. Edits last for this visit only.'}
+          </>
+        }
+        phoneNote={
+          lock.needsConnect
+            ? 'Connect eBay to edit any of it — editing is unlocked once connected.'
+            : 'Edits last for this visit only.'
+        }
+      />
 
       {notice}
 

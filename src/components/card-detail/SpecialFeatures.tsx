@@ -54,6 +54,54 @@ export interface SpecialFeaturesProps {
   extraVisible?: boolean;
 }
 
+/**
+ * The card description (`dvg_grading.card_text_blocks`), or nothing.
+ *
+ * Rendered in TWO places since Phase 4 (F) of the Sept 23 mobile review, and
+ * only ever visible in one: its own panel after Special features on a desktop
+ * (`cd-desc-panel`, hidden on a phone), and — `bare` — inside the facts
+ * panel's "More card details" disclosure on a phone (hidden on a desktop).
+ * It is plain text with no state, no effects and no ids, so the second copy
+ * costs nothing but the markup.
+ */
+export function CardDescription({
+  dvgGrading,
+  bare = false,
+  className,
+}: {
+  dvgGrading: any;
+  bare?: boolean;
+  className?: string;
+}) {
+  const textBlocks = dvgGrading?.card_text_blocks;
+  if (!textBlocks?.main_text_box) return null;
+  const body = (
+    <>
+      <div className="cd-panel-heading">
+        <h3>Card description</h3>
+        {textBlocks.text_confidence && (
+          <span className="cd-tag">Text quality: {textBlocks.text_confidence}</span>
+        )}
+      </div>
+      <p className="cd-finding-prose" style={{ whiteSpace: 'pre-wrap' }}>
+        {textBlocks.main_text_box}
+      </p>
+      {textBlocks.stat_table_text && textBlocks.stat_table_text !== 'None' && (
+        <>
+          <p className="cd-eyebrow">Statistics</p>
+          <pre className="cd-pre">{textBlocks.stat_table_text}</pre>
+        </>
+      )}
+      {textBlocks.copyright_text && <p className="cd-caption">{textBlocks.copyright_text}</p>}
+    </>
+  );
+  return bare ? (
+    <div className={className}>{body}</div>
+  ) : (
+    <section className={className ? `cd-panel ${className}` : 'cd-panel'}>{body}</section>
+  );
+}
+
 function Badge({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="cd-badge">
@@ -94,7 +142,6 @@ export function SpecialFeatures({
     !card.conversational_validation_checklist.autograph_verified;
   const printFinish = dvgGrading?.rarity_features?.print_finish;
   const featureTags: string[] = dvgGrading?.rarity_features?.feature_tags || [];
-  const textBlocks = dvgGrading?.card_text_blocks;
 
   return (
     <>
@@ -151,28 +198,7 @@ export function SpecialFeatures({
         </section>
       )}
 
-      {textBlocks?.main_text_box && (
-        <section className="cd-panel">
-          <div className="cd-panel-heading">
-            <h3>Card description</h3>
-            {textBlocks.text_confidence && (
-              <span className="cd-tag">Text quality: {textBlocks.text_confidence}</span>
-            )}
-          </div>
-          <p className="cd-finding-prose" style={{ whiteSpace: 'pre-wrap' }}>
-            {textBlocks.main_text_box}
-          </p>
-          {textBlocks.stat_table_text && textBlocks.stat_table_text !== 'None' && (
-            <>
-              <p className="cd-eyebrow">Statistics</p>
-              <pre className="cd-pre">{textBlocks.stat_table_text}</pre>
-            </>
-          )}
-          {textBlocks.copyright_text && (
-            <p className="cd-caption">{textBlocks.copyright_text}</p>
-          )}
-        </section>
-      )}
+      <CardDescription dvgGrading={dvgGrading} className="cd-desc-panel" />
     </>
   );
 }

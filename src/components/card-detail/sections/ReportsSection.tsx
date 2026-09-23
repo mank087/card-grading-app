@@ -16,11 +16,17 @@
  *
  * `#tour-download-buttons` is on the grid, because that is what the onboarding
  * tour is pointing at.
+ *
+ * PHONES (≤760px, Sept 23 review, Phase 4 R): the same four cards render as a
+ * compact list — name and format on one line, the purpose trimmed to one line
+ * by CSS (the full sentence stays in the DOM for a screen reader), and the
+ * download at the end of the row. Markup is unchanged; card-detail.css does it.
  */
 
 import type { ReactNode } from 'react';
 import { CARD_REPORT_EXPORTS } from '@/lib/cardDetail/reportExports';
 import type { ReportDownloadKind } from '@/components/reports/DownloadReportButton';
+import SectionTitle from '../SectionTitle';
 
 export interface ReportsSectionProps {
   serial: string;
@@ -42,14 +48,17 @@ export function ReportsSection({
 }: ReportsSectionProps) {
   return (
     <div className="cd-section">
-      <div className="cd-section-title">
-        <p className="cd-eyebrow">Keep it. Share it. Show it.</p>
-        <h2>Your grading report, ready to go.</h2>
-        <p>
-          Four ways to take this grade with you. Printable labels for a slab, a top loader or a
-          One-Touch are in Labels &amp; holders.
-        </p>
-      </div>
+      <SectionTitle
+        eyebrow="Keep it. Share it. Show it."
+        title="Your grading report, ready to go."
+        phoneTitle="Reports"
+        lead={
+          <>
+            Four ways to take this grade with you. Printable labels for a slab, a top loader or a
+            One-Touch are in Labels &amp; holders.
+          </>
+        }
+      />
 
       <p className="cd-caption">
         DCM serial <strong className="cd-serial">{serial}</strong>
@@ -77,7 +86,7 @@ export function ReportsSection({
                 <span>{report.format}</span>
               </p>
               <h4 className="cd-holder-card-name">{report.name}</h4>
-              <p className="cd-caption">{report.summary}</p>
+              <p className="cd-caption cd-report-purpose">{report.summary}</p>
             </div>
 
             {isOwner && renderReportDownload && (

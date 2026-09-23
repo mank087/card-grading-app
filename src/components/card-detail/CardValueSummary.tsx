@@ -25,6 +25,7 @@
  * no purchase-price column anywhere in the schema (plan gaps G7/G8).
  */
 
+import { useId } from 'react';
 import type { CardDetailValue } from '@/lib/cardDetail/viewModel';
 import type { MarketRange } from '@/lib/pricing/marketRange';
 import { buildValuation, type LiveValuationInput } from '@/lib/cardDetail/valuation';
@@ -45,6 +46,15 @@ export interface CardValueSummaryProps {
   isOwner: boolean;
   /** Activate the Market & portfolio section. */
   onJumpToMarket: () => void;
+  /**
+   * 'hero' (default) is the panel exactly as it has always been. 'market' is
+   * the phone Market tab's compact copy (Sept 23 review, Phase 4 M): the same
+   * amount, source, freshness and range strip, but NO ids — the hero's panel
+   * is parked but mounted on that tab and owns `#tour-market-value` — no
+   * "Pricing & portfolio" jump (the reader is already there), and nothing at
+   * all for a withheld value (the hero's correction callout covers it).
+   */
+  variant?: 'hero' | 'market';
 }
 
 function formatMoney(amount: number): string {
@@ -123,7 +133,9 @@ export function CardValueSummary({
   marketRange = null,
   isOwner,
   onJumpToMarket,
+  variant = 'hero',
 }: CardValueSummaryProps) {
+  const marketHeadingId = useId();
   const valuation = buildValuation(
     { status: value.status, amount: value.amount, source: value.source, updatedAt: value.updatedAt },
     live,
@@ -132,7 +144,7 @@ export function CardValueSummary({
   // Withheld and no live estimate to replace it: the owner gets the same
   // correction callout the legacy page shows; the public sees nothing at all.
   if (valuation.isWithheld) {
-    if (!isOwner) return null;
+    if (!isOwner || variant === 'market') return null;
     return (
       <section id="tour-market-value" className="cd-panel cd-value-panel" aria-labelledby="cd-value-heading">
         <p className="cd-eyebrow" id="cd-value-heading">
@@ -144,6 +156,32 @@ export function CardValueSummary({
           printing. Add the set and year with Edit Card Details and the value will appear here.
         </p>
         <ConfirmCardDetailsCalloutButton />
+      </section>
+    );
+  }
+
+  if (variant === 'market') {
+    return (
+      <section className="cd-panel cd-value-panel cd-value-panel--market" aria-labelledby={marketHeadingId}>
+        <div className="cd-panel-heading">
+          <p className="cd-eyebrow" id={marketHeadingId}>
+            Estimated market value
+          </p>
+        </div>
+        {valuation.amount !== null ? (
+          <p className="cd-price">{formatMoney(valuation.amount)}</p>
+        ) : (
+          <p className="cd-price cd-price--unavailable">Unavailable</p>
+        )}
+        {valuation.amount !== null && marketRange && marketRange.high > marketRange.low && (
+          <MarketRangeStrip range={marketRange} estimate={valuation.amount} />
+        )}
+        <div className="cd-value-footer">
+          <span>{valuation.statusLabel}</span>
+        </div>
+        <p className="cd-caption" style={{ marginTop: 8 }}>
+          Estimates are not sale guarantees.
+        </p>
       </section>
     );
   }

@@ -74,13 +74,39 @@ function isNarrowViewport(): boolean {
   return window.matchMedia('(max-width: 760px)').matches;
 }
 
+/**
+ * Open any closed PHONE DISCLOSURE (`PhoneDisclosure`, `details.cd-disclosure`)
+ * that would hide this anchor: the ones around it, and one directly inside it
+ * (`#tour-pro-estimates` is the panel that holds the mail-away disclosure).
+ * Only those: Grade details' own expanders keep their own rules.
+ *
+ * Since Phase 4 a phone folds "Prices by grade", the mail-away estimates and
+ * "More card details" behind closed disclosures; a hash link or a tour step
+ * that points into one must not land on a zero-size target. Setting `open` fires `toggle`, which PhoneDisclosure
+ * follows, so React's state stays in step.
+ */
+function revealDisclosures(el: Element | null) {
+  if (!el) return;
+  for (
+    let d = el.closest('details.cd-disclosure');
+    d;
+    d = d.parentElement?.closest('details.cd-disclosure') ?? null
+  ) {
+    if (d instanceof HTMLDetailsElement && !d.open) d.open = true;
+  }
+  const inner = el.querySelector(':scope > details.cd-disclosure');
+  if (inner instanceof HTMLDetailsElement && !inner.open) inner.open = true;
+}
+
 /** Scroll after React has had two frames to mount the newly active section. */
 function scrollToWhenReady(elementId: string) {
   if (typeof window === 'undefined') return;
   const behavior: ScrollBehavior = prefersReducedMotion() ? 'auto' : 'smooth';
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      document.getElementById(elementId)?.scrollIntoView({ behavior, block: 'start' });
+      const target = document.getElementById(elementId);
+      revealDisclosures(target);
+      target?.scrollIntoView({ behavior, block: 'start' });
     });
   });
 }
@@ -137,6 +163,9 @@ export function useCardDetailSectionRouting(isOwner: boolean): SectionRouting {
     const owner = sectionForAnchorAt(anchorId, isNarrowViewport());
     // Synchronous on purpose: the tour reads the DOM immediately after this.
     if (owner && owner !== 'hero') flushSync(() => setActive(sectionForViewer(owner, isOwner)));
+    // A step pointing into a closed phone disclosure opens it, so the tour
+    // measures a real box (see revealDisclosures).
+    revealDisclosures(document.getElementById(anchorId));
   }, [isOwner]);
 
   return { active, selectSection, revealAnchor };
@@ -147,9 +176,25 @@ export interface CardDetailSectionNavProps {
   onSelect: (id: CardDetailSectionId) => void;
   /** Owner-only sections are absent from a visitor's nav entirely. */
   isOwner: boolean;
+  /**
+   * Which copy this is (Sept 23 review, Phase 4 A). The page renders TWO: a
+   * 'phone' copy directly after the card name, inside the hero, so a phone's
+   * DOM — and with it the Tab and screen-reader order — reads identity, nav,
+   * card, panels, the way the page looks; and the 'wide' copy after the hero,
+   * where a desktop has always had it. card-detail.css makes exactly one of
+   * them `display: none` at every width, so only one is ever on screen, in
+   * the Tab order or in the accessibility tree. Omitted: a single nav, no
+   * width gating (the original behaviour).
+   */
+  placement?: 'phone' | 'wide';
 }
 
-export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSectionNavProps) {
+export function CardDetailSectionNav({
+  active,
+  onSelect,
+  isOwner,
+  placement,
+}: CardDetailSectionNavProps) {
   const listRef = useRef<HTMLElement>(null);
 
   /**
@@ -245,7 +290,9 @@ export function CardDetailSectionNav({ active, onSelect, isOwner }: CardDetailSe
      * container, so `navScroll.ts` and the effect above are unchanged.
      */
     <div
-      className="cd-section-nav-wrap"
+      className={
+        placement ? `cd-section-nav-wrap cd-section-nav-wrap--${placement}` : 'cd-section-nav-wrap'
+      }
       data-overflow-start={overflow.start || undefined}
       data-overflow-end={overflow.end || undefined}
     >

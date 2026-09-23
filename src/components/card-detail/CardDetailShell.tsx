@@ -32,7 +32,6 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 import type { UseCardDetailResult } from './useCardDetail';
@@ -63,7 +62,9 @@ import HolderEntryStrip from './holders/HolderEntryStrip';
 import HolderEnlargeModal from './holders/HolderEnlargeModal';
 import { useGoToHolder } from './holders/useGoToHolder';
 import {
+  CARD_HOLDERS,
   HOLDER_LABEL_STOCK,
+  HOLDER_PHOTOS,
   holderStyleSupport,
   type CardHolderId,
 } from '@/lib/cardDetail/holderSupport';
@@ -105,11 +106,20 @@ import CardDetailIdentity from './CardDetailIdentity';
 import CardIdentityNotice from './CardIdentityNotice';
 import { readIdentityConcern } from '@/lib/cardDetail/identityConcern';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
-import MarketSection from './sections/MarketSection';
+import MarketSection, { type MarketPriceMatch } from './sections/MarketSection';
+import {
+  CardNotFoundPage,
+  CardUnavailablePage,
+  LoadingSkeleton,
+  PrivateCardPage,
+} from './CardDetailStates';
 import OverviewSection from './sections/OverviewSection';
 import ReportsSection from './sections/ReportsSection';
 import InstaListSection from './sections/InstaListSection';
-import type { ReportDownloadKind } from '@/components/reports/DownloadReportButton';
+import type {
+  HolderMenuDetails,
+  ReportDownloadKind,
+} from '@/components/reports/DownloadReportButton';
 import {
   CardDetailSectionNav,
   CardDetailSections,
@@ -138,6 +148,9 @@ export interface DownloadSlotContext {
   openLabelsSignal?: number;
   onMenuOpenChange?: (open: boolean) => void;
   sheetOnMobile?: boolean;
+  /** The O3 holder sheet (`DownloadReportButton.menuLayout`), hero only. */
+  menuLayout?: 'holders';
+  holderMenu?: HolderMenuDetails;
 }
 
 export interface CardDetailShellProps {
@@ -227,32 +240,15 @@ export interface CardDetailShellProps {
   live: LiveValuationInput | null;
   /** Low / median / high from the live price match; null until it reports. */
   marketRange?: MarketRange | null;
+  /**
+   * The product the live lookup matched, as it reported it through
+   * `onPriceLoad`. A phone's Market tab prints it as one row above the lookup.
+   * Omitted or null: no row.
+   */
+  priceMatch?: MarketPriceMatch | null;
   /** `extractConditionSummary(card.conversational_grading)`, or null. */
   conditionSummary: string | null;
   shareData: CardSharingData;
-}
-
-function PageShell({ children }: { children: ReactNode }) {
-  return <div className="dcm-brand dcm-card-detail">{children}</div>;
-}
-
-function LoadingSkeleton() {
-  return (
-    <PageShell>
-      <div className="cd-container" style={{ paddingBlock: 48 }}>
-        <p role="status" aria-live="polite" className="cd-caption">
-          Loading this card…
-        </p>
-        <div aria-hidden="true" className="cd-hero" style={{ marginTop: 24 }}>
-          <div className="cd-showcase" style={{ minHeight: 420 }} />
-          <div className="cd-hero-summary">
-            <div className="cd-panel" style={{ minHeight: 120 }} />
-            <div className="cd-panel" style={{ minHeight: 180 }} />
-          </div>
-        </div>
-      </div>
-    </PageShell>
-  );
 }
 
 export function CardDetailShell(props: CardDetailShellProps) {
@@ -283,6 +279,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     retakeHref,
     live,
     marketRange,
+    priceMatch,
     conditionSummary,
     shareData,
   } = props;
@@ -424,73 +421,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
   if (loading || isProcessing) return <LoadingSkeleton />;
 
   if (error) {
-    if (error === 'PRIVATE_CARD') {
-      return (
-        <PageShell>
-          <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
-            <h1 style={{ fontSize: 34, fontWeight: 750, letterSpacing: '-.03em' }}>
-              This card is private
-            </h1>
-            <p className="dcm-lead">Only the owner can view this card.</p>
-            <ul className="cd-caption" style={{ marginTop: 16, paddingLeft: 20 }}>
-              <li>This card has been set to private by its owner.</li>
-              <li>Private cards are not visible to other collectors.</li>
-              <li>Private cards cannot be searched, and shared links stop working.</li>
-            </ul>
-            <div className="dcm-actions" style={{ marginTop: 28 }}>
-              <Link className="dcm-button dcm-button--primary" href="/login">
-                Log in
-              </Link>
-              <Link className="dcm-button dcm-button--secondary" href="/collection">
-                View your collection
-              </Link>
-            </div>
-          </div>
-        </PageShell>
-      );
-    }
-
-    return (
-      <PageShell>
-        <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
-          <h1 style={{ fontSize: 30, fontWeight: 750, letterSpacing: '-.03em' }}>
-            Card not available
-          </h1>
-          <p className="dcm-lead">
-            This card no longer exists or is not viewable at this moment.
-          </p>
-          <div className="dcm-actions" style={{ marginTop: 28 }}>
-            {viewerSignedIn ? (
-              <Link className="dcm-button dcm-button--primary" href="/collection">
-                My collection
-              </Link>
-            ) : (
-              <Link className="dcm-button dcm-button--primary" href="/">
-                Back to DCM Grading
-              </Link>
-            )}
-            <Link className="dcm-button dcm-button--secondary" href={uploadHref}>
-              Grade a card
-            </Link>
-          </div>
-        </div>
-      </PageShell>
-    );
+    if (error === 'PRIVATE_CARD') return <PrivateCardPage />;
+    return <CardUnavailablePage viewerSignedIn={viewerSignedIn} uploadHref={uploadHref} />;
   }
 
   if (!card || !vm) {
-    return (
-      <PageShell>
-        <div className="cd-container" style={{ paddingBlock: 64, maxWidth: 680 }}>
-          <h1 style={{ fontSize: 30, fontWeight: 750 }}>{categoryLabel} card not found</h1>
-          <div className="dcm-actions" style={{ marginTop: 24 }}>
-            <Link className="dcm-button dcm-button--secondary" href={uploadHref}>
-              Back to {categoryLabel} upload
-            </Link>
-          </div>
-        </div>
-      </PageShell>
-    );
+    return <CardNotFoundPage categoryLabel={categoryLabel} uploadHref={uploadHref} />;
   }
 
   // ── The page ───────────────────────────────────────────────────────────
@@ -531,6 +467,26 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const downloadContext: DownloadSlotContext = {
     labelStyle: preview.style,
     customLabelConfig: preview.activeConfig,
+  };
+
+  /**
+   * The hero download sheet's rows (O3): each holder's product photo and the
+   * same "<stock> · <size>" line its holder card prints, for the PREVIEWED
+   * design, and the Label Studio link the rest of the page uses.
+   */
+  const holderMenu: HolderMenuDetails = {
+    holders: Object.fromEntries(
+      CARD_HOLDERS.map((h) => [
+        h,
+        {
+          imageSrc: HOLDER_PHOTOS[h],
+          detail: `${HOLDER_LABEL_STOCK[h]} · ${
+            resolveEffectiveLabelSize(h, preview.style, preview.activeConfig).formatted
+          }`,
+        },
+      ]),
+    ) as HolderMenuDetails['holders'],
+    labelStudioHref: labelStudioHref(),
   };
 
   /** Shared by the hero piece and the three holder compositions. */
@@ -680,8 +636,35 @@ export function CardDetailShell(props: CardDetailShellProps) {
           />
         )}
 
-        {/* ── hero ───────────────────────────────────────────────────── */}
-        <div className="cd-hero">
+        {/* ── hero ───────────────────────────────────────────────────────
+            A (Phase 4): the DOM runs identity → (phone) nav → card → panels,
+            which is the order a phone SHOWS, so focus and a screen reader
+            follow the page. The structure is the same at every width — only
+            CSS differs — so IdentityReview is never re-parented or remounted
+            by a resize (its once-per-load guard lives in a ref). A desktop
+            puts the identity back top-right with grid areas. */}
+        <div className="cd-hero cd-hero--split">
+          <CardDetailIdentity
+            vm={vm}
+            card={card}
+            categoryLabel={categoryLabel}
+            isOwner={isOwner}
+            currentUserId={currentUserId}
+            concern={identityConcern}
+            reviewShowing={identityReviewShowing}
+            onReviewShowingChange={setIdentityReviewShowing}
+            onEdited={refreshAfterEdit}
+          />
+
+          {/* The phone's nav. Inside the hero, which is `display: contents`
+              on a phone, so it is still a sticky child of .cd-container. */}
+          <CardDetailSectionNav
+            placement="phone"
+            active={routing.active}
+            onSelect={(id) => jumpTo(id)}
+            isOwner={isOwner}
+          />
+
           <CardLabelShowcase
             vm={vm}
             side={side}
@@ -694,6 +677,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
               openLabelsSignal: openDownloadsSignal,
               onMenuOpenChange: setDownloadMenuOpen,
               sheetOnMobile: true,
+              menuLayout: 'holders',
+              holderMenu,
             })}
             onEditLabel={() => setShowEditLabelModal(true)}
             isOwner={isOwner}
@@ -723,18 +708,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
           />
 
           <div className="cd-hero-summary">
-            <CardDetailIdentity
-              vm={vm}
-              card={card}
-              categoryLabel={categoryLabel}
-              isOwner={isOwner}
-              currentUserId={currentUserId}
-              concern={identityConcern}
-              reviewShowing={identityReviewShowing}
-              onReviewShowingChange={setIdentityReviewShowing}
-              onEdited={refreshAfterEdit}
-            />
-
             <GradeSummary
               vm={vm}
               conditionSummary={conditionSummary}
@@ -770,6 +743,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
         {/* ── sections ───────────────────────────────────────────────── */}
         <CardDetailSectionNav
+          placement="wide"
           active={routing.active}
           onSelect={(id) => jumpTo(id)}
           isOwner={isOwner}
@@ -813,6 +787,18 @@ export function CardDetailShell(props: CardDetailShellProps) {
               marketplaceLinks={renderMarketplaceLinks()}
               proEstimates={hasProEstimates ? renderProEstimates!() : null}
               isOwner={isOwner}
+              // Phone-only (M): the value first. No ids — see CardValueSummary.
+              valueSummary={
+                <CardValueSummary
+                  variant="market"
+                  value={vm.value}
+                  live={live}
+                  marketRange={marketRange ?? null}
+                  isOwner={isOwner}
+                  onJumpToMarket={() => jumpTo('market')}
+                />
+              }
+              priceMatch={priceMatch}
             />
           }
           grade={

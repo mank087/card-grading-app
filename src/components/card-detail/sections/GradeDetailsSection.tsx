@@ -48,6 +48,7 @@ import EvidenceCentering from './grade/EvidenceCentering';
 import { EvidenceCorners, EvidenceEdges, EvidenceSurface } from './grade/EvidenceCondition';
 import ConfidencePanel from './grade/ConfidencePanel';
 import ReportProvenance from './grade/ReportProvenance';
+import SectionTitle from '../SectionTitle';
 
 /** Image-heavy and below the fold. */
 const DefectInspection = dynamic(() => import('./grade/DefectInspection'), {
@@ -197,13 +198,16 @@ export function GradeDetailsSection({
 
   return (
     <div className="cd-section" data-category={category}>
-      <div className="cd-section-title">
-        <p className="cd-eyebrow">The details make the grade</p>
-        <h2>
-          Why {vm.grade.gradeFormatted === 'N/A' ? 'this assessment' : `a ${vm.grade.gradeFormatted}`}?
-        </h2>
-        <p>The findings behind the grade, front and back.</p>
-      </div>
+      <SectionTitle
+        eyebrow="The details make the grade"
+        title={
+          <>
+            Why {vm.grade.gradeFormatted === 'N/A' ? 'this assessment' : `a ${vm.grade.gradeFormatted}`}?
+          </>
+        }
+        phoneTitle="Grade details"
+        lead="The findings behind the grade, front and back."
+      />
 
       {/* Overall condition summary — owns #tour-condition-summary. */}
       <section id="tour-condition-summary" className="cd-panel">

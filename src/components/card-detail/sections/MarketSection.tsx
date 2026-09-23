@@ -17,9 +17,34 @@
  * it stays — as one calm line. The heading is rendered only when there IS
  * something under it, because a heading over an empty panel reads as a section
  * that failed to load.
+ *
+ * PHONES (≤760px, Sept 23 review, Phase 4 M) — the value first:
+ *   1. `valueSummary`: estimate, source, freshness and the low/median/high
+ *      strip (CardValueSummary's `market` variant, which carries no ids — the
+ *      hero's copy owns `#tour-market-value`);
+ *   2. "Matched: <product> · <confidence>" when the lookup reported one;
+ *   3. the category price lookup inside "Prices by grade", CLOSED;
+ *   4. the mail-away estimates inside their own disclosure, CLOSED;
+ *   5. the marketplace links and the portfolio link, as before.
+ * The price lookup is never unmounted by any of this: a closed `<details>`
+ * keeps its children mounted, so the lookup still fetches and saves.
+ *
+ * DESKTOP: unchanged. 1 and 2 are phone-only, both disclosures are open with
+ * their summaries hidden (PhoneDisclosure), and the estimates panel — which is
+ * after the links in the DOM so a phone reads it in the order above — is put
+ * back after the links with `order`. It holds nothing focusable on a desktop
+ * (its summary is hidden), so the Tab order there is unchanged too.
  */
 
 import type { ReactNode } from 'react';
+import SectionTitle from '../SectionTitle';
+import PhoneDisclosure from '../PhoneDisclosure';
+
+/** What the category lookup matched, as it reported it through `onPriceLoad`. */
+export interface MarketPriceMatch {
+  productName: string;
+  matchConfidence?: 'high' | 'medium' | 'low' | 'none' | null;
+}
 
 export interface MarketSectionProps {
   /** The category's price lookup, mounted exactly as legacy mounts it. */
@@ -29,25 +54,69 @@ export interface MarketSectionProps {
   /** The PSA/BGS/SGC/CGC panel, or null when there is nothing to draw. */
   proEstimates: ReactNode | null;
   isOwner: boolean;
+  /** Phone-only value summary. Omitted: nothing is drawn. */
+  valueSummary?: ReactNode;
+  /** Phone-only matched-product row. Omitted or null: no row. */
+  priceMatch?: MarketPriceMatch | null;
 }
+
+const CONFIDENCE_WORDS: Record<string, string> = {
+  high: 'High-confidence match',
+  medium: 'Medium-confidence match',
+  low: 'Low-confidence match',
+};
 
 export function MarketSection({
   pricing,
   marketplaceLinks,
   proEstimates,
   isOwner,
+  valueSummary,
+  priceMatch,
 }: MarketSectionProps) {
+  const confidence = priceMatch?.matchConfidence
+    ? CONFIDENCE_WORDS[priceMatch.matchConfidence]
+    : undefined;
+
   return (
-    <div className="cd-section">
-      <div className="cd-section-title">
-        <p className="cd-eyebrow">Know what you hold</p>
-        <h2>Your card in the market.</h2>
-        <p>Estimates, not sale guarantees.</p>
-      </div>
+    <div className="cd-section cd-market-section">
+      <SectionTitle
+        eyebrow="Know what you hold"
+        title="Your card in the market."
+        phoneTitle="Market value"
+        lead="Estimates, not sale guarantees."
+      />
 
-      <div id="tour-live-market-pricing">{pricing}</div>
+      {valueSummary && <div className="cd-phone-only cd-market-value">{valueSummary}</div>}
 
-      <section id="tour-market-pricing" className="cd-panel">
+      {priceMatch?.productName && (
+        <p className="cd-phone-only cd-market-match">
+          <span className="cd-market-match-label">Matched:</span>{' '}
+          <strong>{priceMatch.productName}</strong>
+          {confidence && <> · {confidence}</>}
+        </p>
+      )}
+
+      <PhoneDisclosure summary="Prices by grade" className="cd-market-prices">
+        <div id="tour-live-market-pricing">{pricing}</div>
+      </PhoneDisclosure>
+
+      <section id="tour-pro-estimates" className="cd-panel cd-market-pro">
+        {proEstimates ? (
+          <PhoneDisclosure summary="Estimated mail-away grades">
+            <h3 className="cd-market-pro-h" style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
+              Estimated mail-away grades
+            </h3>
+            {proEstimates}
+          </PhoneDisclosure>
+        ) : (
+          <p className="cd-caption" style={{ margin: 0 }}>
+            No mail-away grade estimates for this card.
+          </p>
+        )}
+      </section>
+
+      <section id="tour-market-pricing" className="cd-panel cd-market-links">
         <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px' }}>
           Find and price this card or similar
         </h3>
@@ -57,23 +126,8 @@ export function MarketSection({
         <div className="cd-link-grid">{marketplaceLinks}</div>
       </section>
 
-      <section id="tour-pro-estimates" className="cd-panel">
-        {proEstimates ? (
-          <>
-            <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              Estimated mail-away grades
-            </h3>
-            {proEstimates}
-          </>
-        ) : (
-          <p className="cd-caption" style={{ margin: 0 }}>
-            No mail-away grade estimates for this card.
-          </p>
-        )}
-      </section>
-
       {isOwner && (
-        <div className="dcm-actions">
+        <div className="dcm-actions cd-market-portfolio">
           <a className="cd-quiet" href="/market-pricing" target="_blank" rel="noopener">
             View full portfolio
           </a>

@@ -133,6 +133,29 @@ interface DownloadReportButtonProps {
    * phone it lands off-screen. Default false — anchored, as today.
    */
   sheetOnMobile?: boolean;
+  /**
+   * ADDITIVE (card detail V2, Sept 23 mobile review O3). 'holders' replaces
+   * the default variant's two dropdowns with ONE trigger, "Download label",
+   * whose panel is a sheet you can scan: a title and a Close control, then
+   * Slab, Top loader (with Fold-over under it) and One-Touch as large rows —
+   * each with its holder photo and dimensions from `holderMenu` — then the
+   * card images, then Label Studio LAST. Reports are not in it (the V2 page
+   * has a Reports tab). Every row opens the SAME handler the default menu's
+   * item opens; nothing is generated differently.
+   *
+   * Absent (or without `holderMenu`) and the component renders and behaves
+   * exactly as before — every existing caller.
+   */
+  menuLayout?: 'holders';
+  /** The photos, dimension lines and Label Studio link for `menuLayout`. */
+  holderMenu?: HolderMenuDetails;
+}
+
+/** What `menuLayout="holders"` draws beside each holder. See that prop. */
+export interface HolderMenuDetails {
+  holders: Record<'slab' | 'toploader' | 'onetouch', { imageSrc: string; detail: string }>;
+  /** Defaults to this component's own `/labels?card=<serial>`. */
+  labelStudioHref?: string;
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
@@ -154,6 +177,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   openLabelsSignal,
   onMenuOpenChange,
   sheetOnMobile = false,
+  menuLayout,
+  holderMenu,
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
@@ -217,6 +242,17 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [anyDropdownOpen]);
+
+  // ADDITIVE (menuLayout="holders"): the sheet takes focus when it opens, so a
+  // keyboard or screen-reader user lands in it — the mobile bar that opened
+  // it steps aside while it is up. A no-op for every other caller.
+  const holderMenuActive = menuLayout === 'holders' && !!holderMenu;
+  const holderMenuTitleId = React.useId();
+  const holderMenuTitleRef = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => {
+    if (!holderMenuActive || !isLabelsDropdownOpen) return;
+    holderMenuTitleRef.current?.focus({ preventScroll: true });
+  }, [holderMenuActive, isLabelsDropdownOpen]);
 
   /** Anchored panel classes, or the mobile bottom-sheet variant. */
   const dropdownPanelClass = (anchored: string) =>
@@ -1704,6 +1740,187 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           </div>
         )}
       </>
+    );
+  }
+
+  // ── The scannable holder sheet (additive; see `menuLayout`) ──
+  // Same trigger styling, same panel classes (so `sheetOnMobile` still makes
+  // it the bottom sheet), same handlers and the same modal instances as the
+  // default variant below. Only the order and the presentation differ.
+  if (holderMenuActive && holderMenu && variant === 'default') {
+    const labelsBusy =
+      isGenerating &&
+      (generatingType === 'card-images' ||
+        generatingType === 'avery' ||
+        generatingType === 'avery8167' ||
+        generatingType === 'foldover' ||
+        generatingType === 'label');
+    const closeMenu = () => setIsLabelsDropdownOpen(false);
+    const holderRows: Array<{
+      id: 'slab' | 'toploader' | 'onetouch';
+      name: string;
+      onClick: () => void;
+    }> = publicMenu
+      ? []
+      : [
+          { id: 'slab', name: 'Slab', onClick: handleDownloadSlabLabel },
+          { id: 'toploader', name: 'Top loader', onClick: handleOpenAvery8167Modal },
+          { id: 'onetouch', name: 'One-Touch', onClick: handleOpenAveryModal },
+        ];
+
+    return (
+      <div className="flex gap-3">
+        <div className="relative" ref={labelsDropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsLabelsDropdownOpen(!isLabelsDropdownOpen)}
+            disabled={labelsBusy}
+            aria-expanded={isLabelsDropdownOpen}
+            className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
+          >
+            {labelsBusy ? (
+              <span>Generating…</span>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>{publicMenu ? 'Card Images' : 'Download label'}</span>
+                <svg className={`w-5 h-5 transition-transform ${isLabelsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {isLabelsDropdownOpen && !isGenerating && (
+            <div
+              role="dialog"
+              aria-labelledby={holderMenuTitleId}
+              className={dropdownPanelClass('dcm-holder-menu absolute top-full left-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden')}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 pl-4 pr-2 py-2 bg-white border-b border-gray-100">
+                <h2
+                  id={holderMenuTitleId}
+                  ref={holderMenuTitleRef}
+                  tabIndex={-1}
+                  className="text-base font-bold text-gray-900 outline-none"
+                >
+                  Download a label
+                </h2>
+                <button
+                  type="button"
+                  onClick={closeMenu}
+                  className="min-h-[44px] px-3 rounded-lg text-sm font-semibold text-purple-700 hover:bg-purple-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              {holderRows.map((row) => (
+                <div key={row.id} className="border-b border-gray-100">
+                  <button
+                    type="button"
+                    onClick={row.onClick}
+                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-purple-50 transition-colors text-left"
+                  >
+                    <img
+                      src={holderMenu.holders[row.id].imageSrc}
+                      alt=""
+                      className="w-11 h-16 object-contain flex-shrink-0"
+                    />
+                    <span>
+                      <span className="block font-semibold text-gray-900">{row.name}</span>
+                      <span className="block text-sm text-gray-500">{holderMenu.holders[row.id].detail}</span>
+                    </span>
+                  </button>
+                  {row.id === 'toploader' && (
+                    <button
+                      type="button"
+                      onClick={handleOpenFoldOverModal}
+                      className="w-full flex items-center min-h-[44px] pl-[76px] pr-4 pb-3 pt-1 hover:bg-purple-50 transition-colors text-left"
+                    >
+                      <span>
+                        <span className="block text-sm font-semibold text-gray-800">Fold-over label</span>
+                        <span className="block text-xs text-gray-500">Avery 8167 — grade on front, QR on back</span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={handleDownloadCardImages}
+                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100"
+              >
+                <span>
+                  <span className="block font-semibold text-gray-900">Card images with graded label</span>
+                  <span className="block text-sm text-gray-500">Front &amp; back, for marketplaces and social media</span>
+                </span>
+              </button>
+
+              {showLabelStudioLink && (
+                <a
+                  href={holderMenu.labelStudioHref ?? labelStudioUrl}
+                  className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left"
+                >
+                  <span>
+                    <span className="block font-semibold text-purple-700">Design in Label Studio</span>
+                    <span className="block text-sm text-purple-500">Design custom labels for any case type</span>
+                  </span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        <AveryLabelModal
+          isOpen={isAveryModalOpen}
+          onClose={() => setIsAveryModalOpen(false)}
+          onConfirm={handleDownloadAveryLabel}
+          isGenerating={isGenerating && generatingType === 'avery'}
+        />
+        <Avery8167LabelModal
+          isOpen={isAvery8167ModalOpen}
+          onClose={() => setIsAvery8167ModalOpen(false)}
+          onConfirm={handleDownloadAvery8167Label}
+          isGenerating={isGenerating && generatingType === 'avery8167'}
+        />
+        <FoldOverLabelModal
+          isOpen={isFoldOverModalOpen}
+          onClose={() => setIsFoldOverModalOpen(false)}
+          onConfirm={handleDownloadFoldOverLabel}
+          isGenerating={isGenerating && generatingType === 'foldover'}
+        />
+        {showPrintFormatChoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowPrintFormatChoice(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Print Format</h3>
+              <p className="text-sm text-gray-500 mb-4">Choose how you&apos;d like to print your slab label</p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleSlabDownload('duplex')}
+                  className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all"
+                >
+                  <p className="font-semibold text-gray-900 text-sm">Front + Back (Duplex)</p>
+                  <p className="text-xs text-gray-500">2-page PDF &mdash; requires double-sided printing</p>
+                </button>
+                <button
+                  onClick={() => handleSlabDownload('foldover')}
+                  className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all"
+                >
+                  <p className="font-semibold text-gray-900 text-sm">Fold-Over (Single-Sided)</p>
+                  <p className="text-xs text-gray-500">1-page PDF &mdash; cut and fold, no duplex needed</p>
+                </button>
+              </div>
+              <button onClick={() => setShowPrintFormatChoice(false)} className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700 py-2">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 

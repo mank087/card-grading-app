@@ -19,6 +19,7 @@ import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import type { CardHolderId } from '@/lib/cardDetail/holderSupport';
 import HolderCards from './HolderCards';
+import SectionTitle from '../SectionTitle';
 import { HOLDER_BAND_ID } from './useGoToHolder';
 
 /** Everything both sections need, assembled once by the shell. */
@@ -110,21 +111,26 @@ export function LabelsHoldersSection(
 ) {
   return (
     <div className="cd-section cd-labels-section">
-      {/* On a phone the eyebrow and lead line are hidden and the heading is
-          kept for screen readers only (S3), so the holder sits directly under
-          the design controls. The visitor line stays. */}
-      <div className="cd-section-title cd-labels-intro">
-        <p className="cd-eyebrow">Designed to go with your card</p>
-        {/* A visitor is not being offered a print: there is no download control
-            for them anywhere on this tab, and a heading that says "print your
-            label" with nothing to press is a dead end. One line says whose
-            label it is instead (review 2026-09-22). */}
-        <h2>{props.isOwner ? 'Pick a design. Print your label.' : 'Pick a design.'}</h2>
-        <p>Each design below is shown in every holder we print for, at the size it prints.</p>
+      {/* On a phone the eyebrow and lead line are hidden and the one short
+          heading "Labels & holders" shows instead (Phase 4, H), so the holder
+          sits almost directly under the design controls. The visitor line
+          stays.
+
+          A visitor is not being offered a print: there is no download control
+          for them anywhere on this tab, and a heading that says "print your
+          label" with nothing to press is a dead end. One line says whose label
+          it is instead (review 2026-09-22). */}
+      <SectionTitle
+        className="cd-labels-intro"
+        eyebrow="Designed to go with your card"
+        title={props.isOwner ? 'Pick a design. Print your label.' : 'Pick a design.'}
+        phoneTitle="Labels & holders"
+        lead="Each design below is shown in every holder we print for, at the size it prints."
+      >
         {!props.isOwner && (
           <p className="cd-caption">Only the card&rsquo;s owner can download this label.</p>
         )}
-      </div>
+      </SectionTitle>
 
       {/* One panel: the design chooser and what it applies to. The selector
           previews; saving a default is its own explicit action inside it. */}
