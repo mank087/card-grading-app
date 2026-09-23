@@ -18,10 +18,13 @@ describe('incomplete-inspection wording shared with the mobile app', () => {
     const body = (over: Record<string, unknown>) => ({ code: 'INSPECTION_INCOMPLETE', inspection_incomplete: true, ...over });
     expect(incompleteInspectionMessage(body({ credit_refunded: true }))).toContain('Your grading credit was refunded.');
     expect(incompleteInspectionMessage(body({ credit_refund_status: 'not_charged' }))).toContain('No grading credit was charged');
-    expect(incompleteInspectionMessage(body({ credit_refunded: false }))).toContain('We could not confirm a credit refund.');
+    expect(incompleteInspectionMessage(body({ credit_refunded: true }))).toContain('Retake both photos');
+    expect(incompleteInspectionMessage(body({ credit_refunded: false }))).toContain('We could not confirm a credit refund');
+    // An unconfirmed refund must not invite a resubmission before support has looked.
+    expect(incompleteInspectionMessage(body({ credit_refunded: false }))).not.toContain('Retake');
     expect(incompleteInspectionMessage({ code: 'SOMETHING_ELSE' })).toBeNull();
     const fromRow = incompleteInspectionFromErrorMessage('Inspection incomplete (zoom). A reliable grade could not be completed.');
-    expect(fromRow).toContain('Inspection incomplete');
+    expect(fromRow).toContain('Retake both photos');
     expect(fromRow).not.toMatch(/refunded/i);
     expect(incompleteInspectionFromErrorMessage('Grading timed out')).toBeNull();
   });

@@ -101,8 +101,8 @@ describe('incomplete outcome boundary', () => {
     expect(() => requireCompleteZoom(null)).toThrow(IncompleteInspectionError);
     expect(() => requireCompleteZoom({ ok: true })).not.toThrow();
     const response = inspectionFailureResponse(new IncompleteInspectionError('geometry', 'private diagnostic'));
-    expect(response).toMatchObject({ inspection_incomplete: true, next_action: 'contact_support' });
-    expect(response.error).not.toMatch(/retry|retake/i);
+    expect(response).toMatchObject({ inspection_incomplete: true, next_action: 'retake_photos' });
+    expect(response.error).toMatch(/^Inspection incomplete \(geometry\)\. .*retake them/);
     expect(JSON.stringify(response)).not.toContain('private diagnostic');
     expect(inspectionFailureResponse(new Error('other'))).toEqual({});
   });

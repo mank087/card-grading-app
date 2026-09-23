@@ -306,9 +306,10 @@ export default function ProcessingScreen() {
       {inspectionFailure && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={32} color={Colors.amber[500]} />
-          <Text style={styles.errorTitle}>Inspection incomplete</Text>
+          <Text style={styles.errorTitle}>Please retake your photos</Text>
           <Text style={styles.errorText}>{inspectionFailure}</Text>
-          <Button title="Contact Support" onPress={() => router.push('/pages/contact')} style={{ marginTop: 12 }} />
+          <Button title="Retake Photos" onPress={handleGradeAnother} style={{ marginTop: 12 }} />
+          <Button title="Contact Support" variant="secondary" onPress={() => router.push('/pages/contact')} style={{ marginTop: 8 }} />
           <Button title="Go to Collection" variant="secondary" onPress={() => router.replace('/(tabs)/collection')} style={{ marginTop: 8 }} />
         </View>
       )}

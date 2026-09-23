@@ -5,8 +5,8 @@ describe('customer inspection outcome', () => {
     const response = Response.json({ code: 'INSPECTION_INCOMPLETE', inspection_incomplete: true, credit_refunded: true }, { status: 500 });
     const message = await readIncompleteInspectionMessage(response);
     expect(message).toContain('Your grading credit was refunded.');
-    expect(message).toContain('Contact support');
-    expect(message).not.toMatch(/retry|retake/i);
+    expect(message).toContain('Retake both photos');
+    expect(message).toContain('contact support');
     expect((await response.json()).code).toBe('INSPECTION_INCOMPLETE');
   });
   it('does not promise a refund when it failed or is unknown', async () => {
