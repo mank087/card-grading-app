@@ -15,7 +15,9 @@ import {
   LEGACY_ANCHOR_IDS,
   LEGACY_ANCHOR_SECTIONS,
   OWNER_ONLY_SECTIONS,
+  PHONE_OVERVIEW_HERO_ANCHORS,
   resolveHashTarget,
+  sectionForAnchorAt,
   sectionForAnchor,
   sectionForViewer,
   V2_ANCHOR_IDS,
@@ -173,5 +175,46 @@ describe('owner-only sections', () => {
     // The onboarding step points at the hero panel. Moving it would make the
     // step open a tab the reader did not ask for.
     expect(sectionForAnchor('tour-insta-list')).toBe('hero');
+  });
+});
+
+describe('hero anchors on a phone (S1: the hero belongs to Overview)', () => {
+  it('lists only hero anchors, and never the breadcrumb visibility toggle', () => {
+    for (const id of PHONE_OVERVIEW_HERO_ANCHORS) expect(sectionForAnchor(id)).toBe('hero');
+    expect(PHONE_OVERVIEW_HERO_ANCHORS).not.toContain('tour-visibility-toggle');
+  });
+
+  it('covers every hero anchor except the visibility toggle', () => {
+    const hero = LEGACY_ANCHOR_IDS.filter((id) => LEGACY_ANCHOR_SECTIONS[id] === 'hero');
+    expect([...PHONE_OVERVIEW_HERO_ANCHORS].sort()).toEqual(
+      hero.filter((id) => id !== 'tour-visibility-toggle').sort(),
+    );
+  });
+
+  it('sends a hero anchor to Overview on a phone and leaves it on the hero on a desktop', () => {
+    expect(sectionForAnchorAt('tour-market-value', true)).toBe('overview');
+    expect(sectionForAnchorAt('tour-market-value', false)).toBe('hero');
+    expect(sectionForAnchorAt('tour-visibility-toggle', true)).toBe('hero');
+  });
+
+  it('does not move section anchors or unknown ids at either width', () => {
+    expect(sectionForAnchorAt('tour-centering', true)).toBe('grade');
+    expect(sectionForAnchorAt('tour-centering', false)).toBe('grade');
+    expect(sectionForAnchorAt('nope', true)).toBeNull();
+  });
+
+  it('resolves a hero hash to Overview on a phone only', () => {
+    expect(resolveHashTarget('#tour-market-value', true)).toEqual({
+      section: 'overview',
+      anchorId: 'tour-market-value',
+    });
+    expect(resolveHashTarget('#tour-market-value')).toEqual({
+      section: null,
+      anchorId: 'tour-market-value',
+    });
+    expect(resolveHashTarget('#tour-visibility-toggle', true)).toEqual({
+      section: null,
+      anchorId: 'tour-visibility-toggle',
+    });
   });
 });

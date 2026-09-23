@@ -1016,35 +1016,111 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Mobile order: identity first, then the card, then grade / value / list. */
-  .dcm-card-detail .cd-hero {
+  /*
+   * Mobile order (Sept 23 review, S1): identity, then the SECTION NAV, then —
+   * on Overview only — the card, grade, value and InstaList panels, then the
+   * active section. The nav lives after the hero in the DOM, and it must stay
+   * a child of `.cd-container` (the box its `position: sticky` pins within),
+   * so the container becomes the flex column and the two hero wrappers step
+   * aside with `display: contents`. The breadcrumb and sold banner keep
+   * order 0 and stay first.
+   */
+  .dcm-card-detail .cd-container {
     display: flex;
     flex-direction: column;
   }
 
-  .dcm-card-detail .cd-hero-showcase {
-    order: 2;
+  .dcm-card-detail .cd-hero,
+  .dcm-card-detail .cd-hero-summary {
+    display: contents;
   }
 
-  .dcm-card-detail .cd-hero-summary {
-    order: 1;
-    display: contents;
+  /* The loading skeleton's placeholder hero keeps its own stacked grid. */
+  .dcm-card-detail .cd-hero[aria-hidden='true'],
+  .dcm-card-detail .cd-hero[aria-hidden='true'] > .cd-hero-summary {
+    display: grid;
+    gap: 16px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-identity {
     order: 1;
   }
 
-  .dcm-card-detail .cd-hero-summary > .cd-grade-panel {
+  .dcm-card-detail .cd-container > .cd-section-nav-wrap {
+    order: 2;
+  }
+
+  .dcm-card-detail .cd-hero-showcase {
     order: 3;
+    margin-top: 20px;
+  }
+
+  .dcm-card-detail .cd-hero-summary > .cd-grade-panel {
+    order: 4;
+    margin-top: 32px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-value-panel {
-    order: 4;
+    order: 5;
+    margin-top: 32px;
   }
 
   .dcm-card-detail .cd-hero-summary > .cd-instalist {
-    order: 5;
+    order: 6;
+    margin-top: 32px;
+  }
+
+  .dcm-card-detail .cd-container > .cd-section-host {
+    order: 7;
+  }
+
+  .dcm-card-detail .cd-container > .cd-footer-actions {
+    order: 8;
+  }
+
+  /*
+   * S1 — THE HERO BELONGS TO OVERVIEW ON A PHONE. On every other tab its four
+   * panels are PARKED, not removed:
+   *
+   *   - never `display: none` and never unmounted, because three owner actions
+   *     render their overlay INSIDE them: the mobile bar's "Download label"
+   *     sheet (`.dcm-download-sheet`, in `#tour-holder-download`), the eBay
+   *     listing modal that the bar and the InstaList tab's "Continue to eBay"
+   *     open (inside the hero `InstaListPanel`), and the Avery / fold-over /
+   *     print-format modals the download menu opens;
+   *   - `visibility: hidden` takes the parked panels out of the accessibility
+   *     tree and the Tab order, and `pointer-events: none` out of hit-testing.
+   *     NOT `inert` and NOT `clip-path`: both would reach the overlays too;
+   *   - the overlays are `position: fixed`, so the 1px box's `overflow:
+   *     hidden` does not clip them (their containing block is the viewport),
+   *     and the rule below turns them back on. That holds only while NO
+   *     ancestor of an overlay has a transform, filter, perspective,
+   *     backdrop-filter, contain or will-change — none does; checked on the
+   *     live page, see the Phase 3 report. Do not add one.
+   */
+  .dcm-card-detail[data-section]:not([data-section='overview']) :is(
+      .cd-hero-showcase,
+      .cd-hero-summary > .cd-grade-panel,
+      .cd-hero-summary > .cd-value-panel,
+      .cd-hero-summary > .cd-instalist
+    ) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .dcm-card-detail[data-section]:not([data-section='overview']) :is(
+      .cd-hero-showcase,
+      .cd-hero-summary > .cd-instalist
+    ) :is(.dcm-download-sheet, .fixed) {
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .dcm-card-detail .cd-subgrades {
@@ -2648,5 +2724,146 @@
   /* A tap on a thumbnail is obviously "look closer"; the pill is clutter. */
   .dcm-card-detail .cd-instalist-image-grid .cd-instalist-image-zoom {
     display: none;
+  }
+}
+
+/* ---------- S3. The phone's one-holder selector ---------- */
+
+/* Phone-only. A desktop shows all three holders side by side. */
+.dcm-card-detail .cd-holder-picker {
+  display: none;
+}
+
+@media (width <= 760px) {
+  /* ---------- S2. "Why this grade" folded into the hero tiles ---------- */
+
+  /* The block and its section title repeat the grade chip and the four
+     scores the hero already shows; on a phone the tiles carry its content. */
+  .dcm-card-detail .cd-overview-why,
+  .dcm-card-detail .cd-highlights {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-grade-confidence {
+    margin-top: 14px;
+  }
+
+  .dcm-card-detail .cd-subgrade--detail {
+    align-content: start;
+    gap: 4px;
+  }
+
+  .dcm-card-detail .cd-subgrade--detail.is-limiting {
+    border-color: #c9a2e8;
+    background: #faf5fe;
+  }
+
+  .dcm-card-detail .cd-subgrade-result {
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--dcm-ink, #0b1220);
+    overflow-wrap: anywhere;
+  }
+
+  .dcm-card-detail .cd-subgrade-flag {
+    justify-self: start;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #ead9f8;
+    color: var(--dcm-purple-text, #7624b5);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .dcm-card-detail .cd-subgrade-more {
+    padding-top: 2px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--dcm-purple-text, #7624b5);
+  }
+
+  /* ---------- S3. One holder at a time ---------- */
+
+  .dcm-card-detail .cd-holder-picker {
+    display: flex;
+    gap: 4px;
+    margin-top: 14px;
+    padding: 4px;
+    border: 1px solid var(--cd-panel-border);
+    border-radius: 999px;
+    background: #fff;
+  }
+
+  .dcm-card-detail .cd-holder-picker button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 6px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--dcm-muted, #566174);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .dcm-card-detail .cd-holder-picker button[aria-checked='true'] {
+    background: var(--dcm-purple, #9810fa);
+    color: #fff;
+  }
+
+  .dcm-card-detail .cd-holder-picker button:focus-visible {
+    outline: 2px solid var(--dcm-purple, #9810fa);
+    outline-offset: 2px;
+  }
+
+  /* Only the selected holder shows, and it takes the row's full width: the
+     card's own frame is dropped so the preview can use it (HolderCards
+     measures the row for the preview width). */
+  .dcm-card-detail .cd-holder-cards[data-single] > .cd-holder-card:not([data-selected]) {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-holder-cards[data-single] > .cd-holder-card {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  /* Labels & holders tab: the two introductory blocks go, so the holder sits
+     directly under the design controls. The headings stay for screen readers;
+     the visitor's "only the owner can download" line stays visible. */
+  .dcm-card-detail .cd-labels-intro > .cd-eyebrow,
+  .dcm-card-detail .cd-labels-intro > p:not(.cd-caption),
+  .dcm-card-detail .cd-labels-holders > .cd-eyebrow,
+  .dcm-card-detail .cd-labels-holders > .cd-labels-holders-lead {
+    display: none;
+  }
+
+  .dcm-card-detail .cd-labels-intro > h2,
+  .dcm-card-detail .cd-labels-holders > h3 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* No box of its own, so an owner's (empty-looking) intro adds no grid gap
+     above the design panel; the sr-only heading and a visitor's caption
+     still render. */
+  .dcm-card-detail .cd-labels-intro {
+    display: contents;
+  }
+
+  .dcm-card-detail .cd-labels-holders > .cd-holder-picker {
+    margin-top: 0;
   }
 }

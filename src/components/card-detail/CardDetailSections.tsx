@@ -31,7 +31,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom';
 import {
   resolveHashTarget,
-  sectionForAnchor,
+  sectionForAnchorAt,
   sectionForViewer,
   visibleCardDetailSections,
   type CardDetailSectionId,
@@ -62,6 +62,16 @@ const SECTION_LABELS_SHORT: Partial<Record<CardDetailSectionId, string>> = {
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Below the page's 760px breakpoint, read at the moment of use. On a phone the
+ * hero's card, grade, value and InstaList panels belong to Overview (S1), so a
+ * hero anchor must activate Overview first; on a desktop nothing changes.
+ */
+function isNarrowViewport(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(max-width: 760px)').matches;
 }
 
 /** Scroll after React has had two frames to mount the newly active section. */
@@ -95,7 +105,7 @@ export function useCardDetailSectionRouting(isOwner: boolean): SectionRouting {
   const [active, setActive] = useState<CardDetailSectionId>('overview');
 
   const applyHash = useCallback(() => {
-    const target = resolveHashTarget(window.location.hash);
+    const target = resolveHashTarget(window.location.hash, isNarrowViewport());
     if (!target) return;
     // A visitor on `#instalist` gets Overview, and is not scrolled to a tab
     // that is not there.
@@ -123,7 +133,8 @@ export function useCardDetailSectionRouting(isOwner: boolean): SectionRouting {
   }, [isOwner]);
 
   const revealAnchor = useCallback((anchorId: string) => {
-    const owner = sectionForAnchor(anchorId);
+    // On a phone a hero anchor answers 'overview' (S1); on a desktop 'hero'.
+    const owner = sectionForAnchorAt(anchorId, isNarrowViewport());
     // Synchronous on purpose: the tour reads the DOM immediately after this.
     if (owner && owner !== 'hero') flushSync(() => setActive(sectionForViewer(owner, isOwner)));
   }, [isOwner]);
@@ -297,12 +308,17 @@ export function CardDetailSections({
   return (
     <>
       {active !== 'market' && (
-        <div id={active} aria-label={SECTION_LABELS[active]}>
+        <div id={active} className="cd-section-host" aria-label={SECTION_LABELS[active]}>
           {unmountedWhenInactive[active]}
         </div>
       )}
       {/* Always mounted so the price lookup runs on every view; see the header. */}
-      <div id="market" aria-label={SECTION_LABELS.market} hidden={active !== 'market'}>
+      <div
+        id="market"
+        className="cd-section-host"
+        aria-label={SECTION_LABELS.market}
+        hidden={active !== 'market'}
+      >
         {market}
       </div>
     </>

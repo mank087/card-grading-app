@@ -8,7 +8,9 @@
  * mounted the band:
  *   - `goToHolder`     — to one holder's card, marked briefly on arrival so the
  *                        reader's eye lands on it (desktop's three buttons);
- *   - `goToHolderBand` — to the band itself (the single phone link, S4).
+ *   - `goToHolderBand` — to the band itself (the single phone link, S4),
+ *                        which on a phone shows the holder currently selected
+ *                        (S3) — the one the reader last chose anywhere.
  *
  * A timer, not requestAnimationFrame: rAF is throttled to a standstill in a
  * background tab, and this must still land when the reader comes back to one.
@@ -30,9 +32,14 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-export function useGoToHolder(openOverview: () => void) {
+export function useGoToHolder(
+  openOverview: () => void,
+  /** The shell's one selected-holder setter (S3): choosing a holder here selects it everywhere. */
+  selectHolder?: (holder: CardHolderId) => void,
+) {
   const goToHolder = useCallback(
     (holder: CardHolderId) => {
+      selectHolder?.(holder);
       openOverview();
       const anchorId = holderCardAnchorId(holder);
       const reduce = prefersReducedMotion();
@@ -45,7 +52,7 @@ export function useGoToHolder(openOverview: () => void) {
         window.setTimeout(() => el.removeAttribute('data-arrived'), 1600);
       }, 60);
     },
-    [openOverview],
+    [openOverview, selectHolder],
   );
 
   const goToHolderBand = useCallback(() => {

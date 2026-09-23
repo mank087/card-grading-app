@@ -101,13 +101,12 @@ const HolderComposition = dynamic(() => import('./holders/HolderComposition'), {
 import GradeSummary from './GradeSummary';
 import CardValueSummary from './CardValueSummary';
 import InstaListPanel from './InstaListPanel';
-import GradeHighlights from './GradeHighlights';
-import CardFacts from './CardFacts';
-import IdentityReview from '@/components/cards/IdentityReview';
+import CardDetailIdentity from './CardDetailIdentity';
 import CardIdentityNotice from './CardIdentityNotice';
 import { readIdentityConcern } from '@/lib/cardDetail/identityConcern';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
 import MarketSection from './sections/MarketSection';
+import OverviewSection from './sections/OverviewSection';
 import ReportsSection from './sections/ReportsSection';
 import InstaListSection from './sections/InstaListSection';
 import type { ReportDownloadKind } from '@/components/reports/DownloadReportButton';
@@ -303,6 +302,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
   // True while IdentityReview's own banner is on screen.
   const [identityReviewShowing, setIdentityReviewShowing] = useState(false);
   const [enlargedHolder, setEnlargedHolder] = useState<CardHolderId | null>(null);
+  // The ONE selected holder (S3). A phone shows only this holder in the
+  // Overview band and the Labels tab; every entry point selects it; a desktop
+  // shows all three and ignores it for layout.
+  const [selectedHolder, setSelectedHolder] = useState<CardHolderId>('slab');
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   // The footer's Binders / Mark as sold sheet (O4).
   const [manageSheetOpen, setManageSheetOpen] = useState(false);
@@ -404,7 +407,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   );
 
   const openOverview = useCallback(() => jumpTo('overview'), [jumpTo]);
-  const { goToHolder, goToHolderBand } = useGoToHolder(openOverview);
+  const { goToHolder, goToHolderBand } = useGoToHolder(openOverview, setSelectedHolder);
 
   // ── States, in the legacy order ────────────────────────────────────────
 
@@ -512,13 +515,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
       }
     : null;
 
-  /** Number · rarity · language. One line, under the hero's <h1>. */
   // Weak database match, if any. Shown under the name by CardIdentityNotice.
   const identityConcern = readIdentityConcern(card);
-  const identitySubtitle =
-    [vm.identity.cardNumberFormatted, vm.identity.rarityOrVariant, vm.identity.language]
-      .filter(Boolean)
-      .join(' · ') || null;
+  const currentUserId = getStoredSession()?.user?.id;
 
   const returnPath = `/${category}/${cardId}`;
   const labelStudioHref = (forHolder?: CardHolderId) =>
@@ -556,9 +555,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
   );
 
   /**
-   * Everything the two holder sections need, assembled once. There is no
-   * holder SELECTION state: nothing in the hero depends on a holder, so each
-   * card is self-contained and the mockup owns its own front/back.
+   * Everything the two holder sections need, assembled once. The selected
+   * holder decides which ONE card a phone shows (S3); nothing in the hero
+   * depends on it, and each mockup still owns its own front/back.
    */
   const holderSectionProps = {
     labelStyle: preview.style,
@@ -570,6 +569,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
       : undefined,
     renderComposition,
     onEnlarge: setEnlargedHolder,
+    selectedHolder,
+    onSelectHolder: setSelectedHolder,
   };
 
   const enlargedSize = enlargedHolder
@@ -636,6 +637,11 @@ export function CardDetailShell(props: CardDetailShellProps) {
       // The tour positions its targets with its own maths; the page's scroll
       // offsets are stood down while it runs so the two cannot compound.
       data-tour-active={showOnboardingTour}
+      // S1: below 760px the hero's card, grade, value and InstaList panels
+      // belong to Overview. card-detail.css parks them out of view on every
+      // other tab — never `display: none`, because the mobile bar's download
+      // sheet and listing modal render INSIDE them. See "S1" in the CSS.
+      data-section={routing.active}
     >
       {/* The tour's caption card is fixed to the top of the screen and the tour
           scrolls each target to just below it. The first targets (visibility
@@ -717,44 +723,25 @@ export function CardDetailShell(props: CardDetailShellProps) {
           />
 
           <div className="cd-hero-summary">
-            <div className="cd-identity">
-              <div className="cd-identity-tags">
-                <span className="cd-tag">{categoryLabel}</span>
-                {vm.identity.contextLine && <span>{vm.identity.contextLine}</span>}
-                <span className="cd-serial">#{vm.identity.serial}</span>
-              </div>
-              <h1>{vm.identity.displayName}</h1>
-              {identitySubtitle && <p className="cd-subtitle">{identitySubtitle}</p>}
-
-              {/* One identity notice, under the name. IdentityReview (the
-                  confirm-details popup + banner) is mounted here, outside the
-                  tabbed sections, so it exists on every tab and pops at most
-                  once per page load; the database-match notice steps aside
-                  while its banner is showing. */}
-              <CardIdentityNotice
-                concern={identityConcern}
-                suppressed={isOwner && identityReviewShowing}
-                isOwner={isOwner}
-                card={card}
-                currentUserId={getStoredSession()?.user?.id}
-                onEdited={refreshAfterEdit}
-              />
-              <div className="cd-identity-review">
-                <IdentityReview
-                  card={card}
-                  currentUserId={getStoredSession()?.user?.id}
-                  frontUrl={vm.images.front.url}
-                  backUrl={vm.images.back.url}
-                  onSaved={refreshAfterEdit}
-                  onNeedsReviewChange={setIdentityReviewShowing}
-                />
-              </div>
-            </div>
+            <CardDetailIdentity
+              vm={vm}
+              card={card}
+              categoryLabel={categoryLabel}
+              isOwner={isOwner}
+              currentUserId={currentUserId}
+              concern={identityConcern}
+              reviewShowing={identityReviewShowing}
+              onReviewShowingChange={setIdentityReviewShowing}
+              onEdited={refreshAfterEdit}
+            />
 
             <GradeSummary
               vm={vm}
               conditionSummary={conditionSummary}
               onJumpToGrade={(anchorId) => jumpTo('grade', anchorId)}
+              // S2: "Why this grade" folds into these tiles on a phone only.
+              phoneDetail={narrowViewport}
+              card={card}
             />
 
             <CardValueSummary
@@ -791,55 +778,26 @@ export function CardDetailShell(props: CardDetailShellProps) {
         <CardDetailSections
           active={routing.active}
           overview={
-            <div className="cd-section">
-              <div className="cd-section-title">
-                <p className="cd-eyebrow">The grade, at a glance</p>
-                <h2>What we found on your card.</h2>
-                <p>The findings behind each subgrade, then the record behind the label.</p>
-              </div>
-              <GradeHighlights
-                vm={vm}
-                card={card}
-                conditionSummary={conditionSummary}
-                onJumpToGrade={(anchorId) => jumpTo('grade', anchorId)}
-              />
-              <OverviewHoldersBand {...holderSectionProps} onSeeAll={() => jumpTo('labels')} />
-
-              <div className="cd-two-col" style={{ marginTop: 20 }}>
-                <CardFacts
-                  vm={vm}
-                  card={card}
-                  currentUserId={getStoredSession()?.user?.id}
-                  isOwner={isOwner}
-                  onEdited={refreshAfterEdit}
-                  categorySlot={renderCategoryCardInfo?.({
-                    card,
-                    currentUserId: getStoredSession()?.user?.id,
-                    isOwner,
-                    onEdited: refreshAfterEdit,
-                  })}
-                  category={category}
-                  categoryBadges={renderCategoryBadges?.()}
-                  categoryVariantBadge={renderCategoryVariantBadge?.()}
-                  categoryFeaturesVisible={hasCategoryFeatures}
-                />
-                <section className="cd-panel">
-                  <p className="cd-eyebrow">The whole picture</p>
-                  <h3 style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>Your grade, explained.</h3>
-                  <p className="cd-caption" style={{ marginTop: 8 }}>
-                    Read the front-to-back findings, or take a report away with you.
-                  </p>
-                  <div className="dcm-actions" style={{ marginTop: 16 }}>
-                    <button type="button" className="cd-quiet" onClick={() => jumpTo('grade')}>
-                      Grade details
-                    </button>
-                    <button type="button" className="cd-quiet" onClick={() => jumpTo('reports')}>
-                      Reports &amp; downloads
-                    </button>
-                  </div>
-                </section>
-              </div>
-            </div>
+            <OverviewSection
+              vm={vm}
+              card={card}
+              category={category}
+              conditionSummary={conditionSummary}
+              isOwner={isOwner}
+              currentUserId={currentUserId}
+              onEdited={refreshAfterEdit}
+              jumpTo={jumpTo}
+              holderSectionProps={holderSectionProps}
+              categorySlot={renderCategoryCardInfo?.({
+                card,
+                currentUserId,
+                isOwner,
+                onEdited: refreshAfterEdit,
+              })}
+              categoryBadges={renderCategoryBadges?.()}
+              categoryVariantBadge={renderCategoryVariantBadge?.()}
+              categoryFeaturesVisible={hasCategoryFeatures}
+            />
           }
           labels={
             <LabelsHoldersSection
@@ -903,7 +861,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
                   suppressed={false}
                   isOwner={isOwner}
                   card={card}
-                  currentUserId={getStoredSession()?.user?.id}
+                  currentUserId={currentUserId}
                   onEdited={refreshAfterEdit}
                   context="The listing title and item specifics are built from them."
                 />

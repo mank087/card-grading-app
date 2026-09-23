@@ -127,6 +127,37 @@ export function sectionForAnchor(anchorId: string): AnchorOwner | null {
   return LEGACY_ANCHOR_SECTIONS[anchorId] ?? V2_ANCHOR_SECTIONS[anchorId] ?? null;
 }
 
+/**
+ * PHONES ONLY (Sept 23 mobile review, S1). Below 760px the hero's card
+ * showcase, grade, value and InstaList panels belong to Overview: on any other
+ * tab they are parked out of view. These hero anchors live inside those
+ * panels, so on a phone they are reached by activating Overview first.
+ *
+ * `tour-visibility-toggle` is deliberately absent: it lives in the breadcrumb,
+ * which stays on screen on every tab.
+ */
+export const PHONE_OVERVIEW_HERO_ANCHORS: readonly string[] = [
+  'tour-card-images',
+  'tour-grade-score',
+  'tour-subgrades',
+  'tour-market-value',
+  'tour-insta-list',
+];
+
+/**
+ * `sectionForAnchor`, for the viewport the page is actually at. On a phone a
+ * hero anchor inside the Overview-only part of the hero answers 'overview';
+ * everything else (and every anchor on a desktop) answers exactly what
+ * `sectionForAnchor` does.
+ */
+export function sectionForAnchorAt(anchorId: string, narrow: boolean): AnchorOwner | null {
+  const owner = sectionForAnchor(anchorId);
+  if (narrow && owner === 'hero' && PHONE_OVERVIEW_HERO_ANCHORS.includes(anchorId)) {
+    return 'overview';
+  }
+  return owner;
+}
+
 export interface ResolvedHashTarget {
   /** The section to activate before scrolling, or null to leave the tab alone. */
   section: CardDetailSectionId | null;
@@ -142,7 +173,11 @@ export interface ResolvedHashTarget {
  *   `#tour-centering`    a legacy anchor — activate its owner, then scroll to it.
  *   anything else        not ours; leave the page alone.
  */
-export function resolveHashTarget(hash: string | null | undefined): ResolvedHashTarget | null {
+export function resolveHashTarget(
+  hash: string | null | undefined,
+  /** True below 760px, where most hero anchors belong to Overview (S1). */
+  narrow = false,
+): ResolvedHashTarget | null {
   if (!hash) return null;
   const id = hash.replace(/^#/, '').trim();
   if (!id) return null;
@@ -151,7 +186,7 @@ export function resolveHashTarget(hash: string | null | undefined): ResolvedHash
     return { section: id, anchorId: null };
   }
 
-  const owner = sectionForAnchor(id);
+  const owner = sectionForAnchorAt(id, narrow);
   if (!owner) return null;
 
   return { section: owner === 'hero' ? null : owner, anchorId: id };

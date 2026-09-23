@@ -10,7 +10,8 @@
  *    note, download, Label Studio, named supplies).
  *
  * They live here rather than inline in `CardDetailShell` so the shell keeps to
- * composition. Nothing here owns state.
+ * composition. Nothing here owns state: the selected holder (S3, phones) is
+ * the shell's, passed through to `HolderCards`.
  */
 
 import type { ReactNode } from 'react';
@@ -31,6 +32,13 @@ export interface HolderSectionCommonProps {
   renderComposition: (holder: CardHolderId, maxWidth: number) => ReactNode;
   /** Opens the shell's enlarge modal on one holder. */
   onEnlarge: (holder: CardHolderId) => void;
+  /**
+   * The ONE selected holder (S3), owned by the shell and shared by the
+   * Overview band, the Labels tab and the hero's entry points. A phone shows
+   * only that holder; a desktop shows all three and ignores it for layout.
+   */
+  selectedHolder?: CardHolderId;
+  onSelectHolder?: (holder: CardHolderId) => void;
 }
 
 function cardsFor(
@@ -52,6 +60,8 @@ function cardsFor(
       variant={variant}
       cardWidth={cardWidth}
       onEnlarge={props.onEnlarge}
+      selectedHolder={props.selectedHolder}
+      onSelectHolder={props.onSelectHolder}
     />
   );
 }
@@ -99,8 +109,11 @@ export function LabelsHoldersSection(
   },
 ) {
   return (
-    <div className="cd-section">
-      <div className="cd-section-title">
+    <div className="cd-section cd-labels-section">
+      {/* On a phone the eyebrow and lead line are hidden and the heading is
+          kept for screen readers only (S3), so the holder sits directly under
+          the design controls. The visitor line stays. */}
+      <div className="cd-section-title cd-labels-intro">
         <p className="cd-eyebrow">Designed to go with your card</p>
         {/* A visitor is not being offered a print: there is no download control
             for them anywhere on this tab, and a heading that says "print your
@@ -133,12 +146,12 @@ export function LabelsHoldersSection(
         </div>
       </section>
 
-      <section className="cd-panel" style={{ marginTop: 16 }}>
+      <section className="cd-panel cd-labels-holders" style={{ marginTop: 16 }}>
         <p className="cd-eyebrow">Every holder we print for</p>
         <h3 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 4px' }}>
           Your card in each holder.
         </h3>
-        <p className="cd-caption" style={{ marginBottom: 14 }}>
+        <p className="cd-caption cd-labels-holders-lead" style={{ marginBottom: 14 }}>
           Each one names the stock and the size it prints at, and says so when a holder cannot
           show the design exactly.
         </p>

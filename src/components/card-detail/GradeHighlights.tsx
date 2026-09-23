@@ -14,15 +14,13 @@
 
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 import {
-  confidenceLevelFor,
   readConditionDetails,
   readFaceCentering,
-  readImageGrade,
   hasCenteringData,
 } from '@/lib/cardDetail/gradeDetails';
 import { centeringFaceLine } from '@/lib/cardDetail/centeringLine';
 import GradeChip from './GradeChip';
-import { getUncertaintyFromConfidence } from '@/lib/cardDetail/parsers';
+import ConfidenceChip from './ConfidenceChip';
 
 export interface GradeHighlightsProps {
   vm: CardDetailViewModel;
@@ -67,9 +65,6 @@ export function GradeHighlights({ vm, card, conditionSummary, onJumpToGrade }: G
   const frontCentering = readFaceCentering(card, 'front');
   const backCentering = readFaceCentering(card, 'back');
   const showCenteringRatios = hasCenteringData(card);
-  const confidenceScore = readImageGrade(card);
-  const confidence = confidenceLevelFor(confidenceScore);
-  const uncertainty = getUncertaintyFromConfidence(confidenceScore, card?.conversational_whole_grade);
   // Free text from the report ("Corners", "front edges"), so match by inclusion.
   const limiting = vm.grade.limitingFactor?.toLowerCase() ?? '';
 
@@ -89,17 +84,9 @@ export function GradeHighlights({ vm, card, conditionSummary, onJumpToGrade }: G
           </div>
         </div>
         {/* The score itself (the A-D letter legacy prints beside the grade) and
-            the grade uncertainty that follows from it. Opens the explanation. */}
-        <button
-          type="button"
-          className={`cd-confidence-chip cd-tone-${confidence.tone}`}
-          onClick={() => onJumpToGrade('tour-optic-score')}
-          aria-label={`DCM Optic confidence score ${confidenceScore}, grade uncertainty ${uncertainty}. Open the explanation.`}
-        >
-          <span className="cd-confidence-label">Confidence score</span>
-          <strong>{confidenceScore}</strong>
-          <span className="cd-confidence-uncertainty">{uncertainty}</span>
-        </button>
+            the grade uncertainty that follows from it. Opens the explanation.
+            Shared with the hero grade panel, which shows it on a phone (S2). */}
+        <ConfidenceChip card={card} onOpen={() => onJumpToGrade('tour-optic-score')} />
       </div>
 
       {conditionSummary && <p className="cd-highlights-summary">{conditionSummary}</p>}

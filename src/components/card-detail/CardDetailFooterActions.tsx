@@ -73,7 +73,7 @@ export function CardDetailFooterActions({
   const closeSheet = () => setSheet(null);
 
   return (
-    <div style={{ paddingBottom: 40 }}>
+    <div className="cd-footer-actions" style={{ paddingBottom: 40 }}>
       {isOwner && (
         <div style={{ textAlign: 'center', paddingBlock: 24 }}>
           <ActionLink href={outOfCredits ? '/credits' : (retakeHref ?? uploadHref)} variant="primary">

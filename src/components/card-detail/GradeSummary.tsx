@@ -20,7 +20,9 @@
  */
 
 import GradeChip from './GradeChip';
+import ConfidenceChip from './ConfidenceChip';
 import type { CardDetailViewModel, GradeStatus } from '@/lib/cardDetail/viewModel';
+import { subgradeResultLine } from '@/lib/cardDetail/subgradeResultLine';
 
 export interface GradeSummaryProps {
   vm: CardDetailViewModel;
@@ -32,6 +34,17 @@ export interface GradeSummaryProps {
   conditionSummary: string | null;
   /** Activate the Grade details section, optionally scrolling to an anchor. */
   onJumpToGrade: (anchorId?: string) => void;
+  /**
+   * PHONES ONLY (Sept 23 mobile review, S2). The Overview's "Why this grade"
+   * block is hidden below 760px, so its content folds in here: each tile gains
+   * one stored-data result line (`subgradeResultLine`) and a "View evidence"
+   * affordance, the limiting subgrade is highlighted, and the confidence score
+   * chip moves up into this panel. Absent or false — every desktop render —
+   * the panel is exactly what it was.
+   */
+  phoneDetail?: boolean;
+  /** The raw row, read by the result lines and the chip. Needed with `phoneDetail`. */
+  card?: any;
 }
 
 /**
@@ -65,9 +78,20 @@ function statusHeadline(status: GradeStatus, condition: string | null): string {
   }
 }
 
-export function GradeSummary({ vm, conditionSummary, onJumpToGrade }: GradeSummaryProps) {
+export function GradeSummary({
+  vm,
+  conditionSummary,
+  onJumpToGrade,
+  phoneDetail = false,
+  card,
+}: GradeSummaryProps) {
   const { grade, detectedSlabGrade } = vm;
   const showsSubgrades = grade.status === 'graded' || grade.status === 'altered-authentic';
+  // The folded-in "Why this grade" detail, for a graded card on a phone only.
+  const detail = phoneDetail && showsSubgrades && card != null;
+  // Free text from the report ("Corners", "front edges"), matched by inclusion
+  // exactly as GradeHighlights does.
+  const limiting = detail ? grade.limitingFactor?.toLowerCase() ?? '' : '';
 
   return (
     <section className="cd-panel cd-grade-panel" aria-labelledby="cd-grade-heading">
@@ -112,21 +136,56 @@ export function GradeSummary({ vm, conditionSummary, onJumpToGrade }: GradeSumma
         </div>
       </div>
 
+      {detail && (
+        <div className="cd-grade-confidence">
+          <ConfidenceChip card={card} onOpen={() => onJumpToGrade('tour-optic-score')} />
+        </div>
+      )}
+
       {/* The tour highlights this block whether or not it has numbers in it. */}
       <div id="tour-subgrades" className="cd-subgrades">
         {SUBGRADE_ORDER.map(({ key, label, anchor }) => {
           const value = vm.grade.subgrades[key];
+          const scoreText = value === null ? 'not scored' : value;
+          if (!detail) {
+            return (
+              <button
+                key={key}
+                type="button"
+                className="cd-subgrade"
+                onClick={() => onJumpToGrade(anchor)}
+                aria-label={`${label}: ${scoreText}. Open the grade details.`}
+              >
+                <span className="cd-subgrade-label">{label}</span>
+                {/* null is "never scored", not zero. */}
+                <b>{value === null ? '—' : value}</b>
+              </button>
+            );
+          }
+          // Phone form: one stored-data line, the limiting flag, and the
+          // affordance. The tile was already the jump to its evidence.
+          const line = subgradeResultLine(card, key);
+          const isLimiting = limiting.includes(key);
           return (
             <button
               key={key}
               type="button"
-              className="cd-subgrade"
+              className={`cd-subgrade cd-subgrade--detail${isLimiting ? ' is-limiting' : ''}`}
               onClick={() => onJumpToGrade(anchor)}
-              aria-label={`${label}: ${value === null ? 'not scored' : value}. Open the grade details.`}
+              aria-label={
+                `${label}: ${scoreText}.` +
+                (isLimiting ? ' Limiting factor.' : '') +
+                (line ? ` ${line}.` : '') +
+                ' View evidence.'
+              }
             >
               <span className="cd-subgrade-label">{label}</span>
-              {/* null is "never scored", not zero. */}
               <b>{value === null ? '—' : value}</b>
+              {line && <span className="cd-subgrade-result">{line}</span>}
+              {isLimiting && <span className="cd-subgrade-flag">Limiting factor</span>}
+              <span className="cd-subgrade-more" aria-hidden="true">
+                View evidence &rarr;
+              </span>
             </button>
           );
         })}
