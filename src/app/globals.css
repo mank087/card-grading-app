@@ -206,3 +206,20 @@ html [data-site-chrome='floating'] {
     font-size: 16px;
   }
 }
+
+/* Belt and braces for the same modals' text (owner report Sept 23: the eBay
+   listing title looked blank on mobile web). A light colour scheme keeps the
+   browser's own form-control styling light whatever the phone's setting, and
+   form fields get an explicit dark text colour instead of inheriting one.
+   In the base layer on purpose, so any colour utility on a field still wins;
+   -webkit-text-fill-color follows `color` so WebKit cannot paint it lighter. */
+@layer base {
+  [data-dcm-portal] {
+    color-scheme: light;
+    color: #171717;
+  }
+  [data-dcm-portal] :is(input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea) {
+    color: #111827;
+    -webkit-text-fill-color: currentColor;
+  }
+}
