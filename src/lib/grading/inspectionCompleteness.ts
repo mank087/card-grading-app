@@ -3,7 +3,8 @@ import { normalizeCropRegionIds } from '../normalizeCropRegionIds';
 export class IncompleteInspectionError extends Error {
   readonly code = 'INSPECTION_INCOMPLETE';
   constructor(readonly stage: 'geometry' | 'zoom' | 'structural' | 'ensemble', readonly reason: string) {
-    super(`Inspection incomplete (${stage}). A reliable grade could not be completed. Please contact support for help with this submission.`);
+    // The stage prefix stays for support and failure-rate queries; the rest is what an owner sees if a surface shows this raw.
+    super(`Inspection incomplete (${stage}). We could not finish a reliable grade from these photos. Please retake them and try again.`);
     this.name = 'IncompleteInspectionError';
   }
 }
@@ -11,7 +12,7 @@ export class IncompleteInspectionError extends Error {
 export function inspectionFailureResponse(error: unknown) {
   if (!(error instanceof IncompleteInspectionError)) return {};
   return { error: error.message, inspection_incomplete: true, code: error.code,
-    inspection_stage: error.stage, next_action: 'contact_support' };
+    inspection_stage: error.stage, next_action: 'retake_photos' };
 }
 
 export function completedChoice(choice: any): boolean {

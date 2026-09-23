@@ -72,7 +72,7 @@ function statusHeadline(status: GradeStatus, condition: string | null): string {
     case 'in-progress':
       return 'Grading in progress';
     case 'incomplete-inspection':
-      return 'Inspection incomplete';
+      return 'Please retake your photos';
     case 'ungraded':
       return 'Not yet graded';
   }
