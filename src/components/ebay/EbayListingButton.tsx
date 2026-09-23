@@ -69,6 +69,8 @@ interface EbayListingButtonProps {
    * because this button opens a review flow and publishes nothing by itself.
    * Omitted: 'List on eBay', exactly as before, on every variant.
    */
+  /** ADDITIVE: forwarded to EbayListingModal (reuse images the page already rendered). */
+  getPreparedImages?: () => { blobs: Record<string, Blob> } | null;
   label?: string;
   /**
    * ADDITIVE, the same seam for the NOT-connected text. Omitted: each
@@ -91,6 +93,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
   onModalOpenChange,
   initialDraft = null,
   onConnectionChange,
+  getPreparedImages,
   label,
   connectLabel,
 }) => {
@@ -203,6 +206,7 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
       customLabelConfig={customLabelConfig}
       onListed={onListed}
       initialDraft={openedDraft}
+      getPreparedImages={getPreparedImages}
     />
   );
 

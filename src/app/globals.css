@@ -197,3 +197,12 @@ html [data-site-chrome='floating'] {
     bottom: var(--dcm-fixed-bar-height, 0px);
   }
 }
+
+/* Modals the card detail page renders on <body> (ModalPortal). They used to
+   sit inside the page and got its 16px form-control rule from there; iOS
+   zooms into any field smaller than 16px and does not zoom back out. */
+@media (max-width: 760px) {
+  [data-dcm-portal] :is(input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea) {
+    font-size: 16px;
+  }
+}

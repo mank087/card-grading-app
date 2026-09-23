@@ -61,6 +61,11 @@ const PLACEHOLDER_KEYS = ['front', 'back', 'rawFront', 'rawBack', 'miniReport'] 
 const CACHE_LIMIT = 4;
 const renderedCache = new Map<string, PreparedListingImages>();
 
+/** Also read by the InstaList panel, so the listing modal reuses these images. */
+export function readCachedListingImages(key: string): PreparedListingImages | null {
+  return readCache(key);
+}
+
 function readCache(key: string): PreparedListingImages | null {
   return renderedCache.get(key) ?? null;
 }

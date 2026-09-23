@@ -31,6 +31,7 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ModalPortalProvider } from '@/components/ui/ModalPortal';
 import dynamic from 'next/dynamic';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
@@ -587,6 +588,9 @@ export function CardDetailShell(props: CardDetailShellProps) {
   );
 
   return (
+    // Shared components' modals (eBay listing, label print dialogs) render on
+    // <body> inside this page, out of reach of its panel styles. See ModalPortal.
+    <ModalPortalProvider>
     <div
       className="dcm-brand dcm-card-detail"
       data-mobile-bar={showMobileBar}
@@ -963,6 +967,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
         />
       )}
     </div>
+    </ModalPortalProvider>
   );
 }
 

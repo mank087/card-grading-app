@@ -27,6 +27,8 @@ import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { InstaListStatus } from './useInstaListStatus';
 import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
+import { listingImageKey } from '@/lib/cardDetail/listingImageKey';
+import { readCachedListingImages } from './sections/InstaListImages';
 
 type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
 
@@ -82,6 +84,13 @@ export function InstaListPanel({
       onModalOpenChange={onModalOpenChange}
       initialDraft={initialDraft}
       onConnectionChange={onConnectionChange}
+      // The InstaList tab renders the same five images with the same inputs;
+      // reuse them so the modal's photos appear at once instead of re-rendering.
+      getPreparedImages={() =>
+        readCachedListingImages(
+          listingImageKey({ cardId: card?.id, cardType, labelStyle, customLabelConfig, showFounderEmblem }),
+        )
+      }
       // O2: it opens a review flow; publishing is a separate step inside it.
       label="Prepare eBay listing"
     />

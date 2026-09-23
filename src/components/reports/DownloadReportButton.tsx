@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { MaybePortal } from '@/components/ui/ModalPortal';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, ReportCardData } from './CardGradingReport';
 import { getAuthenticatedClient } from '../../lib/directAuth';
@@ -1694,6 +1695,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           {trigger.busy ? 'Generating…' : (holderDownloadLabel ?? trigger.label)}
         </button>
 
+        <MaybePortal>
         <AveryLabelModal
           isOpen={isAveryModalOpen}
           onClose={() => setIsAveryModalOpen(false)}
@@ -1739,6 +1741,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
             </div>
           </div>
         )}
+        </MaybePortal>
       </>
     );
   }
@@ -1875,6 +1878,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           )}
         </div>
 
+        <MaybePortal>
         <AveryLabelModal
           isOpen={isAveryModalOpen}
           onClose={() => setIsAveryModalOpen(false)}
@@ -1920,6 +1924,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
             </div>
           </div>
         )}
+        </MaybePortal>
       </div>
     );
   }
@@ -2023,6 +2028,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           )}
         </div>
 
+        <MaybePortal>
         {/* Avery Label Position Modal */}
         <AveryLabelModal
           isOpen={isAveryModalOpen}
@@ -2046,6 +2052,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           onConfirm={handleDownloadFoldOverLabel}
           isGenerating={isGenerating && generatingType === 'foldover'}
         />
+        </MaybePortal>
       </div>
     );
   }
@@ -2148,6 +2155,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         )}
       </div>
 
+      <MaybePortal>
       {/* Avery Label Position Modal */}
       <AveryLabelModal
         isOpen={isAveryModalOpen}
@@ -2213,6 +2221,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           </div>
         </div>
       )}
+      </MaybePortal>
     </div>
   );
 };

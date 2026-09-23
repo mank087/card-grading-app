@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MaybePortal } from '@/components/ui/ModalPortal';
 import { pdf } from '@react-pdf/renderer';
 import { generateQRCodeWithLogo } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard } from '@/lib/orgBranding';
@@ -87,6 +88,15 @@ interface EbayListingModalProps {
    */
   onListed?: (result: { listingId?: string; listingUrl?: string; sku?: string }) => void;
   /**
+   * ADDITIVE (card detail V2, Sept 23). Images this card's page has ALREADY
+   * rendered through prepareListingImages with the same inputs (card, type,
+   * label style, config, founder emblem). When it returns a set, the modal uses
+   * it instead of rendering all five again, so the photos appear at once. The
+   * modal makes its own object URLs from the blobs, so the caller can revoke
+   * its copies freely. Omitted or null: renders exactly as before.
+   */
+  getPreparedImages?: () => { blobs: Record<string, Blob> } | null;
+  /**
    * ADDITIVE (card detail V2, InstaList tab). Fields the caller has ALREADY
    * edited, which override this modal's own seed for those fields only.
    *
@@ -117,6 +127,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   labelStyle = 'modern',
   customLabelConfig = null,
   onListed,
+  getPreparedImages,
   initialDraft = null,
 }) => {
   const [step, setStep] = useState<ListingStep>('images');
@@ -589,15 +600,20 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     // Re-render unconditionally rather than only when the FIELDS changed: the
     // template and the branding arrive without touching any field, and an
     // early return on field equality would drop them on the floor.
-    setDescription(prev => {
-      if (prev !== autoDescriptionRef.current) return prev;
-      const next = activeTemplate
-        ? renderDescriptionTemplate(activeTemplate, nextFields, listingBranding)
-        : generateHtmlDescription(nextFields, listingBranding);
-      if (next === prev) return prev;
+    //
+    // The ref is read and written HERE, never inside the state updater: React
+    // may run an updater twice (always in dev, on a restarted render in
+    // production), and an updater that advanced the ref made its second run
+    // see "hand-edited" and keep the old text — so the headline stopped
+    // following the title (found Sept 23).
+    const lastAuto = autoDescriptionRef.current;
+    const next = activeTemplate
+      ? renderDescriptionTemplate(activeTemplate, nextFields, listingBranding)
+      : generateHtmlDescription(nextFields, listingBranding);
+    if (next !== lastAuto) {
       autoDescriptionRef.current = next;
-      return next;
-    });
+      setDescription(prev => (prev === lastAuto ? next : prev));
+    }
     // descriptionFields IS a dependency (it can arrive after this effect first
     // runs); the equality guard above is what stops the write from looping.
   }, [isOpen, title, shippingForm, usePolicies, policyForm, activeTemplate, listingBranding, descriptionFields]);
@@ -970,12 +986,21 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // The whole render pipeline (badges + org branding, label front/back,
       // raw crops, QR, mini report) lives in prepareListingImages so the bulk
       // review can run it per row. Behaviour here is unchanged.
-      const prepared = await prepareListingImages(card, {
-        cardType,
-        labelStyle,
-        customLabelConfig,
-        showFounderEmblem,
-      });
+      const reused = getPreparedImages?.() ?? null;
+      const prepared = reused
+        ? {
+            blobs: reused.blobs as typeof imageBlobs & Record<string, Blob>,
+            // Our own URLs: the page's cache may revoke its copies at any time.
+            objectUrls: Object.fromEntries(
+              Object.entries(reused.blobs).map(([key, blob]) => [key, URL.createObjectURL(blob)])
+            ) as typeof imageUrls & Record<string, string>,
+          }
+        : await prepareListingImages(card, {
+            cardType,
+            labelStyle,
+            customLabelConfig,
+            showFounderEmblem,
+          });
 
       // Create preview URLs
       setImageBlobs(prepared.blobs);
@@ -1503,6 +1528,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   );
 
   return (
+    <MaybePortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div
         ref={dialogRef}
@@ -3577,5 +3603,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         </div>
       </div>
     </div>
+    </MaybePortal>
   );
 };
