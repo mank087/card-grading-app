@@ -37,6 +37,29 @@ export async function getItemDetail(
   config: TradingApiConfig,
   itemId: string
 ): Promise<EbayItemDetail | null> {
+  const outcome = await getItemDetailOutcome(config, itemId);
+  return outcome.kind === 'found' ? outcome.detail : null;
+}
+
+/**
+ * GetItem, telling "eBay says this item does not exist" apart from "we could
+ * not get an answer". Only the first may end a listing: before Sept 23 the
+ * sync treated every failed call (timeout, rate limit, token hiccup) as "gone"
+ * and marked live listings ended — an owner's card that was live on eBay then
+ * offered to be listed a second time.
+ */
+export type ItemDetailOutcome =
+  | { kind: 'found'; detail: EbayItemDetail }
+  | { kind: 'not_found' }
+  | { kind: 'error'; reason: string };
+
+/** eBay's "item not found / cannot be accessed" error codes. */
+const ITEM_NOT_FOUND_CODES = new Set(['17']);
+
+export async function getItemDetailOutcome(
+  config: TradingApiConfig,
+  itemId: string
+): Promise<ItemDetailOutcome> {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials><eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken></RequesterCredentials>
@@ -51,18 +74,19 @@ export async function getItemDetail(
     response = await callTradingApi(config, 'GetItem', xml);
   } catch (err) {
     console.error('[getItemDetail]', itemId, 'API call failed:', err);
-    return null;
+    return { kind: 'error', reason: err instanceof Error ? err.message : 'call failed' };
   }
 
   // eBay returns a top-level <Ack> indicating success/failure.
   const ack = response.match(/<Ack>([^<]*)<\/Ack>/i)?.[1] ?? '';
   if (ack !== 'Success' && ack !== 'Warning') {
-    // Common case: <Errors><ErrorCode>17</ErrorCode> = item not found
-    return null;
+    const codes = [...response.matchAll(/<ErrorCode>(\d+)<\/ErrorCode>/gi)].map(m => m[1]);
+    if (codes.some(c => ITEM_NOT_FOUND_CODES.has(c))) return { kind: 'not_found' };
+    return { kind: 'error', reason: `GetItem ${ack || 'no Ack'} ${codes.join(',')}`.trim() };
   }
 
   const itemBlockMatch = response.match(/<Item>([\s\S]*?)<\/Item>/i);
-  if (!itemBlockMatch) return null;
+  if (!itemBlockMatch) return { kind: 'error', reason: 'GetItem response had no Item' };
   const itemXml = itemBlockMatch[1];
 
   // ListingStatus lives inside SellingStatus
@@ -81,7 +105,7 @@ export async function getItemDetail(
   // EndTime is in ListingDetails (sometimes at item top level too)
   const listingDetailsXml = itemXml.match(/<ListingDetails>([\s\S]*?)<\/ListingDetails>/i)?.[1] ?? '';
 
-  return {
+  return { kind: 'found', detail: {
     itemId,
     listingStatus,
     quantitySold: tagNum(sellingStatusXml, 'QuantitySold') ?? 0,
@@ -90,7 +114,7 @@ export async function getItemDetail(
     watchCount: tagNum(itemXml, 'WatchCount') ?? null,
     currentPrice: priceMatch ? parseFloat(priceMatch[2]) : 0,
     currency: priceMatch ? priceMatch[1] : 'USD',
-  };
+  } };
 }
 
 export interface EbaySellingItem {
@@ -134,6 +158,12 @@ export async function getMyEbaySelling(
     soldEntries?: number;
     unsoldEntries?: number;
     includeFlags?: { active?: boolean; sold?: boolean; unsold?: boolean };
+    /**
+     * Fetch EVERY page of the active list, not just the first. The sync needs
+     * this: a live listing past the first page looked "missing" and fell to
+     * the GetItem fallback, which could end it (Sept 23).
+     */
+    allActivePages?: boolean;
   } = {}
 ): Promise<MyEbaySellingResult> {
   const activeEntries = options.activeEntries ?? 200;
@@ -149,8 +179,24 @@ export async function getMyEbaySelling(
 
   const responseXml = await callTradingApi(config, 'GetMyeBaySelling', xml);
 
+  const active = flags.active ? parseItemArray(extractContainer(responseXml, 'ActiveList')) : [];
+  if (flags.active && options.allActivePages) {
+    const totalPages = Math.min(
+      totalPagesOf(extractContainer(responseXml, 'ActiveList')),
+      MAX_ACTIVE_PAGES
+    );
+    for (let page = 2; page <= totalPages; page++) {
+      const pageXml = await callTradingApi(
+        config,
+        'GetMyeBaySelling',
+        buildGetMyEbaySellingXml({ activeEntries, soldEntries: 0, unsoldEntries: 0, activePage: page })
+      );
+      active.push(...parseItemArray(extractContainer(pageXml, 'ActiveList')));
+    }
+  }
+
   return {
-    active: flags.active ? parseItemArray(extractContainer(responseXml, 'ActiveList')) : [],
+    active,
     // SoldList wraps Items inside OrderTransactionArray > OrderTransaction >
     // Transaction > Item — completely different shape from the other two lists.
     // We parse those Transaction nodes individually so we can lift the Item.
@@ -165,10 +211,21 @@ export async function getMyEbaySelling(
  * Setting `entriesPerPage: 0` in any container omits that container from
  * the response — useful for sync crons that only need active listings.
  */
+/** 200 per page x 25 pages = 5,000 live listings, far past any seller today. */
+const MAX_ACTIVE_PAGES = 25;
+
+/** `<PaginationResult><TotalNumberOfPages>` of one list container; 1 when absent. */
+function totalPagesOf(containerXml: string): number {
+  const n = Number(containerXml.match(/<TotalNumberOfPages>(\d+)<\/TotalNumberOfPages>/i)?.[1]);
+  return Number.isFinite(n) && n > 1 ? n : 1;
+}
+
 function buildGetMyEbaySellingXml(args: {
   activeEntries: number;
   soldEntries: number;
   unsoldEntries: number;
+  /** Page of the ACTIVE list to fetch (default 1). Sold/unsold always page 1. */
+  activePage?: number;
 }): string {
   const container = (name: string, entries: number, sort: string) => {
     if (entries <= 0) return '';
@@ -183,7 +240,7 @@ function buildGetMyEbaySellingXml(args: {
       <Sort>${sort}</Sort>
       <Pagination>
         <EntriesPerPage>${entries}</EntriesPerPage>
-        <PageNumber>1</PageNumber>
+        <PageNumber>${name === 'ActiveList' ? args.activePage ?? 1 : 1}</PageNumber>
       </Pagination>
       ${durationField}
       <Include>true</Include>

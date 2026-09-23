@@ -26,7 +26,7 @@
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getEbayConnection, getValidAccessToken } from '@/lib/ebay/auth';
-import { getMyEbaySelling, getItemDetail, type EbaySellingItem } from '@/lib/ebay/sellApi';
+import { getMyEbaySelling, getItemDetailOutcome, type EbaySellingItem } from '@/lib/ebay/sellApi';
 
 /**
  * Final sale price for a sold listing, or null when eBay didn't expose one.
@@ -92,7 +92,9 @@ export async function syncUser(
   const apiConfig = { accessToken, sandbox: useSandbox };
   const ebayState = await getMyEbaySelling(
     apiConfig,
-    { activeEntries: 200, soldEntries: 200, unsoldEntries: 200 }
+    // Every active page: a live listing past the first 200 used to look
+    // missing, fall to the GetItem fallback below and get ended (Sept 23).
+    { activeEntries: 200, soldEntries: 200, unsoldEntries: 200, allActivePages: true }
   );
 
   const { data: dbRows } = await supabaseAdmin
@@ -289,11 +291,31 @@ export async function syncUser(
 
   for (const orphan of orphans) {
     if (getItemCalls >= getItemBudget) break;
-    const detail = await getItemDetail(apiConfig, orphan.listing_id);
+    const outcome = await getItemDetailOutcome(apiConfig, orphan.listing_id);
     getItemCalls++;
 
-    if (!detail) {
-      // eBay can't find the listing — archived, deleted, or stale ID.
+    // No answer from eBay (timeout, rate limit, token trouble), or an answer
+    // we cannot read: leave the status alone and try again next run. Ending
+    // on "no answer" is how live listings were marked ended and then offered
+    // for listing a second time (Sept 23). Stamping last_synced_at rotates
+    // the row to the back of the stalest-first queue.
+    const unreadable =
+      outcome.kind === 'error' ||
+      (outcome.kind === 'found' && outcome.detail.listingStatus === 'Unknown');
+    if (unreadable) {
+      console.warn(
+        `[ebay-sync] listing ${orphan.listing_id}: no usable GetItem answer, status left as is`,
+        outcome.kind === 'error' ? outcome.reason : 'ListingStatus Unknown'
+      );
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update({ last_synced_at: now })
+        .eq('id', orphan.id);
+      continue;
+    }
+
+    if (outcome.kind === 'not_found') {
+      // eBay says the item does not exist — archived, deleted, or stale ID.
       // Never the "still live for sale" case, so promote to ended.
       await supabaseAdmin
         .from('ebay_listings')
@@ -307,6 +329,7 @@ export async function syncUser(
       continue;
     }
 
+    const detail = outcome.detail;
     if (detail.listingStatus === 'Active') {
       await supabaseAdmin
         .from('ebay_listings')

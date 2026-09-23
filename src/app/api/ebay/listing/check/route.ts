@@ -143,6 +143,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // An answer we cannot read is not "ended". Writing 'ended' on it hid a
+    // live listing and let the owner list the card again (Sept 23).
+    if (ebayListingStatus !== 'Completed' && ebayListingStatus !== 'Ended') {
+      console.log('[eBay Listing Check] Unrecognised eBay status, not ending:', ebayListingStatus);
+      return NextResponse.json({
+        hasListing: false,
+        listing: null,
+        previousListing: existingListing,
+        verified: false,
+        message: `Couldn't confirm the existing listing's status with eBay. If you've already ended it on eBay, you're safe to proceed.`,
+      });
+    }
+
     // Listing is no longer active on eBay (Ended, Completed, or not found)
     console.log('[eBay Listing Check] Listing is no longer active on eBay:', ebayListingStatus);
 
