@@ -1,3 +1,4 @@
+import { prechargeBlockedResponse } from '@/lib/grading/prechargeGate';
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { linkFromFirstLook } from "@/lib/identity/catalogRelink";
 import { keepAliveAfterResponse } from "@/lib/identification/firstLookRunner";
@@ -586,6 +587,11 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     } else if (forceRegrade) {
       console.log(`[GET /api/lorcana/${cardId}] 🔄 Force re-grade requested, bypassing cache`);
     }
+
+    // Stopped by the pre-charge photo check (never charged): an older app that
+    // ignored the deduct refusal lands here and gets the same reason.
+    const prechargeBlock = prechargeBlockedResponse(card, forceRegrade);
+    if (prechargeBlock) return prechargeBlock;
 
     // 🔐 Cross-instance grading lock (the in-memory set above only guards one
     // serverless instance; this CAS on cards.grade_status guards all of them)

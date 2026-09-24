@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
 import { reportUploadEvent, beginCaptureAttempt, getCaptureAttemptId } from '@/lib/uploadTelemetry'
+import { incompleteInspectionMessage } from '@/lib/grading/inspectionMessageText'
 import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage, getImageDimensions } from '@/lib/imageCompression'
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality'
 import { ImageQualityValidation } from '@/types/camera'
@@ -58,7 +59,7 @@ let submissionInFlight = false;
 function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { addToQueue, updateCardStatus } = useGradingQueue();
+  const { addToQueue, updateCardStatus, removeFromQueue } = useGradingQueue();
   const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits } = useCredits();
   const { refreshOrg, isOrgScope, membership: orgMembership } = useOrgContext();
   const toast = useToast();
@@ -123,6 +124,9 @@ function UniversalUploadPageContent() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedCardId, setUploadedCardId] = useState<string | null>(null)
   const [uploadedCardCategory, setUploadedCardCategory] = useState<string | null>(null)
+  // Set when the server's pre-charge photo check refused the photos (nothing
+  // was charged). Shown above the wizard buttons until the owner retakes.
+  const [photoCheckIssue, setPhotoCheckIssue] = useState<string | null>(null)
 
   // Camera/upload mode state
   const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery' | 'review'>('select')
@@ -243,6 +247,8 @@ function UniversalUploadPageContent() {
     source: 'camera' | 'gallery' | 'crop' = 'gallery',
     captureMethod?: WebCaptureMethod
   ) => {
+    // A new photo answers a pre-charge photo-check refusal.
+    setPhotoCheckIssue(null)
     // P0: record how this side arrived, before any early return below can skip
     // it. Recorded even for images that go on to fail the resolution gate —
     // a rejected submission is still evidence about which path produces bad
@@ -619,6 +625,7 @@ function UniversalUploadPageContent() {
 
     try {
       submissionInFlight = true
+      setPhotoCheckIssue(null)
       setIsUploading(true)
       setStatus(`⏳ Uploading ${config.label}...`)
 
@@ -771,8 +778,10 @@ function UniversalUploadPageContent() {
         throw dbError
       }
 
-      // Deduct credit after successful upload
+      // Deduct credit after successful upload. The server first runs the
+      // pre-charge photo check; a refusal comes back as 422 and charges nothing.
       console.log('[Upload] Deducting credit...')
+      setStatus('🔍 Checking your photos...')
       try {
         const creditResponse = await fetch('/api/stripe/deduct', {
           method: 'POST',
@@ -782,6 +791,33 @@ function UniversalUploadPageContent() {
           },
           body: JSON.stringify({ cardId, isRegrade: false }),
         })
+
+        if (creditResponse.status === 422) {
+          const body = await creditResponse.json().catch(() => null)
+          if (body?.photo_check_blocked) {
+            // Photos cannot be graded (no card, two different cards, cut-off
+            // edges, heavy blur, a screenshot...). No credit was taken and no
+            // grade is started: send the owner back to the photos to retake.
+            const message = incompleteInspectionMessage(body) || body.error || 'These photos cannot be graded. Please retake them.'
+            console.warn('[Upload] Photo check refused the photos:', body.inspection_reason, body.photo_side)
+            reportUploadEvent({
+              event: 'preflight_rejected',
+              submission_id: cardId,
+              rule_code: body.inspection_reason,
+              side: body.photo_side === 'front' || body.photo_side === 'back' ? body.photo_side : undefined,
+              gate_version: 'precharge',
+            }, session?.access_token)
+            removeFromQueue(queueId)
+            setUploadedCardId(null)
+            setUploadedCardCategory(null)
+            setPhotoCheckIssue(message)
+            setStatus(`❌ ${message}`)
+            toast.error(message)
+            setWizardStep(2)
+            setIsUploading(false)
+            return
+          }
+        }
 
         if (creditResponse.ok) {
           console.log('[Upload] Credit deducted successfully')
@@ -1002,6 +1038,7 @@ function UniversalUploadPageContent() {
   }
 
   const handleRetakePhoto = (side: 'front' | 'back') => {
+    setPhotoCheckIssue(null)
     // On desktop (no camera option), directly open file picker
     // The new file will overwrite the old one when selected - no need to clear first
     // On mobile/tablet, clear the file and return to the original upload method
@@ -1950,6 +1987,13 @@ function UniversalUploadPageContent() {
 
           {/* Action Buttons - Fixed at bottom */}
           <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
+            {/* Pre-charge photo check refusal: what to fix, and that nothing was charged */}
+            {photoCheckIssue && (
+              <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <p className="font-semibold">Please retake your photos</p>
+                <p className="mt-1">{photoCheckIssue}</p>
+              </div>
+            )}
             {/* Processing indicator (only on step 3) */}
             {wizardStep === 3 && isCompressing && (
               <div className="flex items-center justify-center gap-2 text-indigo-600 py-1">

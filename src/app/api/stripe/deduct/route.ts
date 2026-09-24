@@ -9,6 +9,10 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { scheduleFirstGradeEmails } from '@/lib/emailScheduler';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isUuid } from '@/lib/uuid';
+import { prechargePhotoGate } from '@/lib/grading/prechargeGate';
+
+// The pre-charge photo check adds up to ~12s (it fails open past that).
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
     const { data: card } = await supabaseAdmin
       .from('cards')
-      .select('id, user_id')
+      .select('id, user_id, front_path, back_path, grade_status, error_message')
       .eq('id', cardId)
       .maybeSingle();
     if (!card) {
@@ -44,6 +48,18 @@ export async function POST(request: NextRequest) {
     }
     if (card.user_id !== userId) {
       return NextResponse.json({ error: 'Card does not belong to this user' }, { status: 403 });
+    }
+
+    // Pre-charge photo check (PRECHARGE_PHOTO_CHECK, default on): photos that
+    // cannot be graded — no card, two different cards, several cards, a comic,
+    // edges cut off, heavy blur, a screenshot — are stopped here, before any
+    // credit moves. 422 with the INSPECTION_INCOMPLETE body both clients
+    // already render. Anything uncertain, and any error, passes.
+    if (!isRegrade) {
+      const gate = await prechargePhotoGate(card);
+      if (gate.blocked) {
+        return NextResponse.json(gate.body, { status: 422 });
+      }
     }
 
     // Active workspace context: web clients send the dcm-org-scope cookie

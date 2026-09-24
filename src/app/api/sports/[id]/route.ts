@@ -1,3 +1,4 @@
+import { prechargeBlockedResponse } from '@/lib/grading/prechargeGate';
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
@@ -566,6 +567,11 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     } else if (forceRegrade) {
       console.log(`[GET /api/sports/${cardId}] 🔄 Force re-grade requested, bypassing cache`);
     }
+
+    // Stopped by the pre-charge photo check (never charged): an older app that
+    // ignored the deduct refusal lands here and gets the same reason.
+    const prechargeBlock = prechargeBlockedResponse(card, forceRegrade);
+    if (prechargeBlock) return prechargeBlock;
 
     // 🔐 Cross-instance grading lock (the in-memory set above only guards one
     // serverless instance; this CAS on cards.grade_status guards all of them)
