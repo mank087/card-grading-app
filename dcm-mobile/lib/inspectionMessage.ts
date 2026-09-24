@@ -42,6 +42,15 @@ const REASONS: Record<string, { title: string; advice: string }> = {
     title: "Part of the card's edge was cut off or too small to inspect up close.",
     advice: 'Retake the photos with all four edges fully in the frame, a little space around the card, and the card filling most of the photo.',
   },
+  // Sept 2026: the pre-charge photo check (src/lib/grading/photoPrecheck.ts).
+  blurry: {
+    title: 'A photo is too blurry to read the card.',
+    advice: 'Hold the phone steady, tap the card to focus, use good light, and retake the photo, then try again.',
+  },
+  screenshot: {
+    title: 'This looks like a screenshot or a photo of a screen, not a photo of the card itself.',
+    advice: 'Photograph the physical card with your camera, front and back, with all four edges in the frame, then try again.',
+  },
   altered_marking: {
     title: 'We found writing or marks added to this card after it was printed.',
     advice: 'Cards with added markings cannot receive a numeric grade. If you believe this is part of the printed card, contact support.',
@@ -54,6 +63,13 @@ export interface InspectionFailureBody {
   inspection_reason?: string | null;
   credit_refunded?: boolean;
   credit_refund_status?: string;
+  /** Which photo the problem is in, when the server knows (pre-charge photo check). */
+  photo_side?: string | null;
+}
+
+/** "The problem is in the back photo." — only for a single named side. */
+function sideNote(side: string | null | undefined): string {
+  return side === 'front' || side === 'back' ? ` The problem is in the ${side} photo.` : '';
 }
 
 function parts(reason: string | null | undefined): { title: string; advice: string } {
@@ -66,7 +82,7 @@ export function incompleteInspectionMessage(body: InspectionFailureBody | null |
   if (!body || body.code !== 'INSPECTION_INCOMPLETE' || body.inspection_incomplete !== true) return null;
   const { title, advice } = parts(body.inspection_reason);
   if (body.credit_refund_status === 'not_charged') {
-    return `${title} No grading credit was charged for this attempt. ${advice}`;
+    return `${title}${sideNote(body.photo_side)} No grading credit was charged for this attempt. ${advice}`;
   }
   return body.credit_refunded === true
     ? `${title} Your grading credit was refunded. ${advice}`
@@ -77,10 +93,11 @@ export function incompleteInspectionMessage(body: InspectionFailureBody | null |
  * The same outcome read back from the card row, for when the app was not
  * holding the grading request open (backgrounded, or the owner came back
  * later). The row does not say whether a refund landed, so this does not claim one.
- * The server writes the reason into the stored message as "[reason]".
+ * The server writes the reason into the stored message as "[reason]", and the
+ * pre-charge photo check adds the photo as "(front photo)" / "(back photo)".
  */
 export function incompleteInspectionFromErrorMessage(errorMessage: string | null | undefined): string | null {
   if (!errorMessage || !/inspection incomplete/i.test(errorMessage)) return null;
   const { title, advice } = parts(/\[([a-z_]+)\]/.exec(errorMessage)?.[1]);
-  return `${title} ${advice}`;
+  return `${title}${sideNote(/\((front|back) photo\)/.exec(errorMessage)?.[1])} ${advice}`;
 }

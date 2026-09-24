@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Crypto from 'expo-crypto'
 import { Colors, CardCategories } from '@/lib/constants'
 import { reportUploadEvent } from '@/lib/uploadTelemetry'
+import { incompleteInspectionMessage } from '@/lib/inspectionMessage'
 import CategoryPicker from '@/components/CategoryPicker'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -219,11 +220,15 @@ export default function ReviewScreen() {
 
       if (__DEV__) console.log('[Upload] Card record created')
 
-      // Deduct credit via API (same as web — handles tracking)
+      // Deduct credit via API (same as web — handles tracking). The server
+      // first runs the pre-charge photo check; photos it cannot grade come back
+      // as 422 { photo_check_blocked } and nothing is charged.
+      let photoCheckRefusal: string | null = null
+      let photoCheckBody: any = null
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
-        await fetch(`${API_BASE}/api/stripe/deduct`, {
+        const deductRes = await fetch(`${API_BASE}/api/stripe/deduct`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${currentSession?.access_token}`,
@@ -231,7 +236,13 @@ export default function ReviewScreen() {
           },
           body: JSON.stringify({ cardId }),
         })
-        if (__DEV__) console.log('[Upload] Credit deducted via API')
+        if (deductRes.status === 422) {
+          photoCheckBody = await deductRes.json().catch(() => null)
+          if (photoCheckBody?.photo_check_blocked) {
+            photoCheckRefusal = incompleteInspectionMessage(photoCheckBody) || photoCheckBody.error || 'These photos cannot be graded. Please retake them.'
+          }
+        }
+        if (__DEV__) console.log('[Upload] Credit deduct response:', deductRes.status)
       } catch (creditErr) {
         // Do NOT fall back to decrementing user_credits directly: a network
         // timeout can fire AFTER the server already deducted, so a client-side
@@ -242,6 +253,21 @@ export default function ReviewScreen() {
         console.warn('[Upload] API credit deduction failed (server will reconcile):', creditErr)
       }
       refreshCredits()
+
+      if (photoCheckRefusal) {
+        reportUploadEvent({
+          event: 'preflight_rejected',
+          submission_id: cardId,
+          rule_code: photoCheckBody?.inspection_reason,
+          side: photoCheckBody?.photo_side === 'front' || photoCheckBody?.photo_side === 'back' ? photoCheckBody.photo_side : undefined,
+          gate_version: 'precharge',
+        })
+        Alert.alert('Please retake your photos', photoCheckRefusal, [
+          { text: 'Retake Photos', onPress: () => router.back() },
+          { text: 'OK', style: 'cancel' },
+        ])
+        return
+      }
 
       // Add to the global grading queue (the persistent status bar at
       // the top of the app reads from this) AND route to the dedicated
