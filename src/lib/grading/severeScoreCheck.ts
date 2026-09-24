@@ -10,16 +10,19 @@
  * at 1 beside corners, edges and centering of 10.
  *
  * A severe SURFACE score (<= SEVERE_MAX) is now verified before it can decide
- * the grade, but only when the evaluations themselves split by 4+ points and
- * every flaw they recorded is a type printing or cardstock can imitate (print
- * lines, ink/marks, stains). One dedicated call asks whether the flaw is
- * physical (damage or an added mark) or printed design / a photo artifact.
- * Corners, edges and deformation types (dents, creases, scratches) are never
- * sent here — see CONFUSABLE below for the measurement behind that.
+ * the grade when every flaw the low-scoring evaluations recorded is a type
+ * printing or cardstock can imitate (print lines, ink/marks, stains). One
+ * dedicated call asks whether the flaw is physical (damage or an added mark),
+ * a hand-signed autograph, or printed design / a photo artifact. Corners, edges
+ * and deformation types (dents, creases, scratches) are never sent here — see
+ * CONFUSABLE below for the measurement behind that.
  *
  *   confirmed -> the score stands
  *   refuted   -> the category takes the evaluations' clean reading (the highest
- *                pass score), still bounded by any magnified-inspection cap
+ *                pass score, or 9 when all scored it low and zoom was clean),
+ *                still bounded by any magnified-inspection cap
+ *   signature -> treated as refuted (autograph policy v9.23: never a surface
+ *                defect) when an evaluation also reported the autograph
  *   unknown   -> the score stands, and the record says it was not verified
  *
  * Structural damage is excluded: it has its own verifier (Step 3.9).
@@ -97,7 +100,18 @@ export function severeScoreTriggers(input: SevereTriggerInput): SevereTrigger[] 
   return [{ cat, score, passScores, spread, zoomClean, reasons }];
 }
 
-export type SevereVerdict = { ok: boolean; confirmed: boolean | null; reason: string; votes?: string[] };
+export type SevereVerdict = {
+  ok: boolean;
+  confirmed: boolean | null;
+  reason: string;
+  votes?: string[];
+  /**
+   * A majority read the mark as a hand-signed autograph. Autograph policy v9.23:
+   * never a surface defect. `confirmed` is false in that case; the caller applies
+   * it only when an evaluation also reported the autograph.
+   */
+  signature?: boolean;
+};
 
 /**
  * The score a category takes after verification. Pure.
@@ -117,7 +131,7 @@ export function resolveSevereScore(trigger: SevereTrigger, verdict: SevereVerdic
 const VERIFY_EDGE = 1600;
 /** Quadrant crops are enlarged to this edge so fine detail survives the model's image tiling. */
 const QUADRANT_EDGE = 1024;
-const CLASSES = new Set(['physical', 'printed_design', 'photo_artifact', 'cannot_tell']);
+const CLASSES = new Set(['physical', 'printed_design', 'photo_artifact', 'signature', 'cannot_tell']);
 
 /**
  * A claim reduced to neutral facts. The evaluations' descriptions carry their
@@ -180,7 +194,8 @@ CLAIMED FLAW(S):
 ${claimList}
 
 Classify the claimed flaw as ONE of:
-- "physical": real damage or an alteration of the physical card — a scratch, dent, stain, crease, whitening, chipping, missing material, or ink/marker/pen ADDED after printing.
+- "physical": real damage or an alteration of the physical card — a scratch, dent, stain, crease, whitening, chipping, missing material, or ink/marker/pen ADDED after printing that is NOT a signature (writing, numbers, doodles, circles, price marks, names written on the back).
+- "signature": a hand-signed autograph — a person's signature in pen or marker, with or without a short inscription (a year, a number, "HOF"), signed across the front or back. Classify it here, not as "physical".
 - "printed_design": part of the card as manufactured — artwork outlines and strokes, full-art or illustration line work, textures, holofoil/foil/rainbow/etched patterns, borders, design elements.
 - "photo_artifact": produced by the photo, not the card — glare or reflections (including off a sleeve, top loader or case), screen moire, compression blocks, blur, shadows.
 - "cannot_tell": the photo does not show enough to decide.
@@ -195,7 +210,7 @@ Look at the enlarged quarters before deciding, and report what you OBSERVE first
 - "overlap": where the flagged line or mark meets printed text or symbols, which is on top? "printed_text_on_top" (the text is crisp and uninterrupted over the line), "mark_on_top_of_text" (the mark covers or crosses over letters), "no_overlap" (they never meet), or "cannot_tell".
 - "follows_artwork": true if the line traces the shapes of the artwork (a character's outline, the design's geometry), false if it ignores them.
 
-Reply ONLY JSON: {"overlap":"printed_text_on_top|mark_on_top_of_text|no_overlap|cannot_tell","follows_artwork":true|false,"classification":"physical|printed_design|photo_artifact|cannot_tell","reason":"<one sentence naming what you saw>"}`;
+Reply ONLY JSON: {"overlap":"printed_text_on_top|mark_on_top_of_text|no_overlap|cannot_tell","follows_artwork":true|false,"classification":"physical|printed_design|photo_artifact|signature|cannot_tell","reason":"<one sentence naming what you saw>"}`;
 
     const img = (b: Buffer) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b.toString('base64')}`, detail: 'high' } });
     const content: any[] = [
@@ -252,8 +267,13 @@ export function tallySevereVotes(choices: any[]): SevereVerdict {
   if (votes.length !== 3) return { ok: false, confirmed: null, reason: 'verification incomplete — three complete answers required', votes };
   const physical = votes.filter(v => v === 'physical').length;
   const notDamage = votes.filter(v => v === 'printed_design' || v === 'photo_artifact').length;
-  const reason = reasons[0];
-  if (physical >= 2) return { ok: true, confirmed: true, reason, votes };
-  if (notDamage >= 2) return { ok: true, confirmed: false, reason, votes };
+  const signatures = votes.filter(v => v === 'signature').length;
+  // The recorded reason comes from a sample on the winning side: quoting a
+  // dissenter ("hand-drawn line") under a printed-design verdict misleads the
+  // report and anyone auditing it.
+  const reasonFor = (...won: string[]) => reasons[votes.findIndex(v => won.includes(v))];
+  if (physical >= 2) return { ok: true, confirmed: true, reason: reasonFor('physical'), votes };
+  if (notDamage >= 2) return { ok: true, confirmed: false, reason: reasonFor('printed_design', 'photo_artifact'), votes };
+  if (signatures >= 2) return { ok: true, confirmed: false, reason: reasonFor('signature'), votes, signature: true };
   return { ok: true, confirmed: null, reason: `no majority (${votes.join(', ')})`, votes };
 }

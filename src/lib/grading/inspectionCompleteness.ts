@@ -1,18 +1,33 @@
 import { normalizeCropRegionIds } from '../normalizeCropRegionIds';
+import { incompleteInspectionFromErrorMessage } from './inspectionMessageText';
+import type { EnsembleFailureReason } from './declinedEnsemble';
 
 export class IncompleteInspectionError extends Error {
   readonly code = 'INSPECTION_INCOMPLETE';
-  constructor(readonly stage: 'geometry' | 'zoom' | 'structural' | 'ensemble', readonly reason: string) {
-    // The stage prefix stays for support and failure-rate queries; the rest is what an owner sees if a surface shows this raw.
-    super(`Inspection incomplete (${stage}). We could not finish a reliable grade from these photos. Please retake them and try again.`);
+  constructor(
+    readonly stage: 'geometry' | 'zoom' | 'structural' | 'ensemble',
+    readonly reason: string,
+    /** Why the evaluations declined, when they said (grading/declinedEnsemble.ts). */
+    readonly detail?: EnsembleFailureReason,
+  ) {
+    // The stage prefix stays for support and failure-rate queries, and "[detail]"
+    // lets a client reading the stored row show the specific message. The rest is
+    // what an owner sees if a surface shows this raw.
+    const tag = detail && detail !== 'unknown' ? ` [${detail}]` : '';
+    super(`Inspection incomplete (${stage}).${tag} ${incompleteInspectionFromErrorMessage(`inspection incomplete${tag}`)}`);
     this.name = 'IncompleteInspectionError';
   }
 }
 
+/** Reasons the owner fixes by photographing again, versus ones that need support. */
+const SUPPORT_REASONS = new Set<string>(['not_a_card', 'altered_marking']);
+
 export function inspectionFailureResponse(error: unknown) {
   if (!(error instanceof IncompleteInspectionError)) return {};
+  const reason = error.detail && error.detail !== 'unknown' ? error.detail : null;
   return { error: error.message, inspection_incomplete: true, code: error.code,
-    inspection_stage: error.stage, next_action: 'retake_photos' };
+    inspection_stage: error.stage, inspection_reason: reason,
+    next_action: reason && SUPPORT_REASONS.has(reason) ? 'contact_support' : 'retake_photos' };
 }
 
 export function completedChoice(choice: any): boolean {

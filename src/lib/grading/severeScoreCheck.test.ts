@@ -77,6 +77,18 @@ describe('neutral claims', () => {
 });
 
 describe('verifier vote tally', () => {
+  it('records the reason from the winning side, not a dissenter', () => {
+    const v = tallySevereVotes([answer('physical', 'hand-drawn line'), answer('printed_design', 'traces the outline'), answer('printed_design', 'under the text')]);
+    expect(v.reason).toBe('traces the outline');
+  });
+
+  it('a signature majority is not damage and is flagged as a signature (autograph policy v9.23)', () => {
+    const v = tallySevereVotes([answer('signature'), answer('signature'), answer('physical')]);
+    expect(v).toMatchObject({ confirmed: false, signature: true });
+    expect(tallySevereVotes([answer('physical'), answer('physical'), answer('signature')]).confirmed).toBe(true);
+    expect(tallySevereVotes([answer('printed_design'), answer('printed_design'), answer('signature')]).signature).toBeUndefined();
+  });
+
   it('counts an observation of printed text on top of the line as printed design', () => {
     const observed = (classification: string) => ({ finish_reason: 'stop',
       message: { content: JSON.stringify({ overlap: 'printed_text_on_top', follows_artwork: true, classification, reason: 'text over line' }) } });

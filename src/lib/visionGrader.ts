@@ -43,6 +43,7 @@ import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
+import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
@@ -1963,6 +1964,10 @@ export async function gradeCardConversational(
   const MAX_RETRIES = 3;
   const INITIAL_RETRY_DELAY = 2000; // 2 seconds
 
+  // Sept 2026: set when evaluations declined over a claimed added marking and the
+  // verifier found printed design instead. The one re-grade states that finding.
+  let markingRecheckNote: string | null = null;
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       console.log(`[CONVERSATIONAL] Calling Chat Completions API... (attempt ${attempt}/${MAX_RETRIES})`);
@@ -2023,7 +2028,9 @@ export async function gradeCardConversational(
 - Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
 ${categoryHintSection}${cvAdvisorySection}${conditionReportSection?.has_user_hints ? `
-${conditionReportSection.full_prompt_text}` : ''}
+${conditionReportSection.full_prompt_text}` : ''}${markingRecheckNote?.startsWith('PRINTED') ? `
+- VERIFIED BEFORE THIS EVALUATION: lines or marks on this card that an earlier evaluation took for added writing were re-inspected up close and are PRINTED DESIGN, not an alteration (${markingRecheckNote.slice(9)}). Do not report them as a marking or as surface damage; grade the card normally on its actual condition.` : ''}${markingRecheckNote?.startsWith('SIGNATURE') ? `
+- VERIFIED BEFORE THIS EVALUATION: the ink an earlier evaluation took for added writing is a hand-signed AUTOGRAPH (${markingRecheckNote.slice(11)}). Apply [STEP 0A]: report it in alteration_detection.autograph, never as a marking, never as N/A; score all four categories normally with surface judged as if the ink were absent.` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
 
@@ -2171,6 +2178,32 @@ Provide detailed analysis as markdown with all required sections.`
             surface: catScore(j, 'surface'),
           },
         }));
+      // Sept 2026: an evaluation that returns no scores has usually declined on
+      // purpose (no card in a photo, not a trading card, a claimed added marking).
+      // Act on the stated reason instead of reporting every case as bad photos.
+      const unusable = scored.map(x => [x.final, ...Object.values(x.cats)]
+        .some(v => typeof v !== 'number' || !Number.isFinite(v) || v < 1 || v > 10));
+      const declinedInfo = unusable.some(Boolean) ? describeDeclinedEnsemble(scored.map(x => x.j), unusable) : null;
+      if (declinedInfo) {
+        console.warn(`[INSPECTION] ${declinedInfo.declined}/${scored.length} evaluations declined: ${declinedInfo.reason} (${declinedInfo.note})`);
+        if (declinedInfo.reason === 'suspected_alteration' && !markingRecheckNote) {
+          const verdict = await verifySevereClaim(frontImageUrl, backImageUrl, 'surface', declinedInfo.markingClaims, {
+            model, images: await loadOriginals().catch(() => undefined),
+            reasoningEffort: process.env.SEVERE_VERIFY_REASONING_EFFORT || 'medium',
+          });
+          console.log(`[INSPECTION] claimed marking → ${verdict.confirmed === true ? 'confirmed added' : verdict.confirmed === false ? 'printed design / photo' : 'undecided'} (${verdict.reason})`);
+          if (verdict.confirmed === false) {
+            markingRecheckNote = `${verdict.signature ? 'SIGNATURE' : 'PRINTED'}: ${verdict.reason.slice(0, 300)}`;
+            continue; // one re-grade, told what the verification found
+          }
+          if (verdict.confirmed === true) {
+            throw new IncompleteInspectionError('ensemble', `added marking confirmed: ${verdict.reason}`, 'altered_marking');
+          }
+        }
+        if (declinedInfo.reason !== 'unknown' && declinedInfo.reason !== 'suspected_alteration') {
+          throw new IncompleteInspectionError('ensemble', declinedInfo.note, declinedInfo.reason);
+        }
+      }
       requireCompleteEnsemble(scored);
 
       // MEDIAN-PICK: the completion whose final grade is the median becomes the displayed
@@ -3187,10 +3220,24 @@ Provide detailed analysis as markdown with all required sections.`
             const severeEffort = process.env.SEVERE_VERIFY_REASONING_EFFORT || 'medium';
             let verdict = await verifySevereClaim(frontImageUrl, backImageUrl, trigger.cat, claims, { model, images: verifierImages, reasoningEffort: severeEffort });
             if (!verdict.ok) verdict = await verifySevereClaim(frontImageUrl, backImageUrl, trigger.cat, claims, { model, images: verifierImages, reasoningEffort: severeEffort });
+            // Autograph policy v9.23: a signature is never a surface defect. Applied
+            // only when an evaluation also reported the autograph, so the designation
+            // logic (resolveAutographVerdict) has a real verdict to read.
+            if (verdict.signature) {
+              const reporting = scored.find(x => resolveAutographVerdict(x.j).present);
+              if (!reporting) {
+                verdict = { ...verdict, confirmed: null, reason: `read as a signature, but no evaluation reported an autograph (${verdict.reason})` };
+              } else if (!resolveAutographVerdict(jsonData).present) {
+                const auto = reporting.j?.alteration_detection?.autograph || reporting.j?.autograph;
+                if (auto && typeof auto === 'object') {
+                  jsonData.alteration_detection = { ...(jsonData.alteration_detection || {}), autograph: auto };
+                }
+              }
+            }
             const faceCaps = ['front', 'back'].map(f => appliedFaceCaps[`${trigger.cat}_${f}`]).filter((n): n is number => typeof n === 'number');
             const zoomCap = faceCaps.length ? Math.min(...faceCaps) : null;
             const newScore = resolveSevereScore(trigger, verdict, zoomCap);
-            const outcome = verdict.confirmed === true ? 'confirmed' : verdict.confirmed === false ? 'refuted' : 'unverified';
+            const outcome = verdict.confirmed === true ? 'confirmed' : verdict.confirmed === false ? (verdict.signature ? 'signature' : 'refuted') : 'unverified';
             console.log(`[GRADE RECALC] 🔍 low-score check: ${trigger.cat} ${trigger.score} (${trigger.reasons.join('; ')}) → ${outcome}${newScore !== trigger.score ? `, ${trigger.score} → ${newScore}` : ''} — ${verdict.reason}`);
             severeRecords.push({ category: trigger.cat, score_before: trigger.score, score_after: newScore, outcome,
               triggers: trigger.reasons, pass_scores: trigger.passScores, votes: verdict.votes ?? null, reason: verdict.reason });
@@ -3235,11 +3282,17 @@ Provide detailed analysis as markdown with all required sections.`
               if (jsonData.final_grade && jsonData.final_grade.dominant_defect === trigger.cat) {
                 jsonData.final_grade.model_summary = `The ${trigger.cat} flaw that drove the evaluations' low score was re-inspected and found to be printed design or a photo artifact, not damage.`;
               }
-              // The pass finals carried the same refuted flaw; take the clean evaluation's final.
-              serverRounded.final = Math.max(serverRounded.final, Math.max(f1, f2, f3));
+              // The pass finals carried the same refuted flaw. Take the clean evaluation's
+              // final, and when every evaluation carried it (a unanimous misread, so no
+              // final is clean) the lowest remaining subgrade. Weakest-link still applies
+              // at Step 4, and the gates for a 10 still run after it.
+              serverRounded.final = Math.max(serverRounded.final, Math.max(f1, f2, f3),
+                Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface));
               if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
                 jsonData.grading_passes.consensus_notes.push(
-                  `Low-score check: ${trigger.cat} was scored ${trigger.score} (${trigger.reasons.join('; ')}). A dedicated re-inspection found the flagged mark is not damage (${verdict.reason}), so ${trigger.cat} uses the clean reading of ${newScore}.`
+                  verdict.signature
+                    ? `Low-score check: ${trigger.cat} was scored ${trigger.score} for ink that a dedicated re-inspection identified as a hand-signed autograph (${verdict.reason}). Under DCM's autograph policy a signature is never a surface defect, so ${trigger.cat} is judged as if the ink were absent: ${newScore}.`
+                    : `Low-score check: ${trigger.cat} was scored ${trigger.score} (${trigger.reasons.join('; ')}). A dedicated re-inspection found the flagged mark is not damage (${verdict.reason}), so ${trigger.cat} uses the clean reading of ${newScore}.`
                 );
               }
             } else if (outcome === 'unverified' && Array.isArray(jsonData.grading_passes?.consensus_notes)) {

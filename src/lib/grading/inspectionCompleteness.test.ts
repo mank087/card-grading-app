@@ -102,7 +102,12 @@ describe('incomplete outcome boundary', () => {
     expect(() => requireCompleteZoom({ ok: true })).not.toThrow();
     const response = inspectionFailureResponse(new IncompleteInspectionError('geometry', 'private diagnostic'));
     expect(response).toMatchObject({ inspection_incomplete: true, next_action: 'retake_photos' });
-    expect(response.error).toMatch(/^Inspection incomplete \(geometry\)\. .*retake them/);
+    expect(response.error).toMatch(/^Inspection incomplete \(geometry\)\. .*Retake both photos/);
+    expect(response).toMatchObject({ inspection_reason: null });
+    const declined = inspectionFailureResponse(new IncompleteInspectionError('ensemble', 'x', 'different_cards'));
+    expect(declined).toMatchObject({ inspection_reason: 'different_cards', next_action: 'retake_photos' });
+    expect(declined.error).toMatch(/^Inspection incomplete \(ensemble\)\. \[different_cards\] The front and back photos appear to show two different cards\./);
+    expect(inspectionFailureResponse(new IncompleteInspectionError('ensemble', 'x', 'altered_marking'))).toMatchObject({ next_action: 'contact_support' });
     expect(JSON.stringify(response)).not.toContain('private diagnostic');
     expect(inspectionFailureResponse(new Error('other'))).toEqual({});
   });
