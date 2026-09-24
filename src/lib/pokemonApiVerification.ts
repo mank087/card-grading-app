@@ -734,6 +734,28 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   // searched every set by name and ranked by numeric distance, and accepted
   // Espeon-GX sm1-152 (a different Rainbow Rare) for a card printed 140/149.
 
+  // Strategy 6 (Sept 2026): the ONE catalog card with this exact printed number
+  // and set total whose name agrees by namesAgree. The strategies above match
+  // names with a substring ilike, so a read of "Espeon GX" never finds the
+  // catalog's "Espeon-GX" (same for EX / V / VMAX spellings); the fresh
+  // re-identification of a9eca6ef read 140/149 correctly and still found nothing.
+  if (!dbCard && cardName && cardNumberRaw && /\//.test(String(cardNumberRaw))) {
+    try {
+      const unique = await findUniqueCatalogMatch(cardName, String(cardNumberRaw));
+      if (unique.card) {
+        console.log(`[Pokemon Local Verification] Strategy 6: unique printed-number match ${unique.card.id} (${unique.card.name})`);
+        dbCard = unique.card;
+        result.verification_method = 'set_id_number';
+        result.confidence = 'high';
+        result.name_agreement = namesAgree(cardName, unique.card.name);
+      } else if (unique.agreeing.length > 1 && !result.candidates?.length) {
+        result.candidates = unique.agreeing.map(toCatalogCandidate);
+      }
+    } catch (error) {
+      console.error('[Pokemon Local Verification] Strategy 6 failed:', error);
+    }
+  }
+
   // Process results
   if (dbCard) {
     return settleMatch(result, dbCard, { cardName, setName, year: cardInfo.year, setTotal, anniversary: !!anniversarySets });
