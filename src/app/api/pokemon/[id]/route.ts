@@ -745,10 +745,12 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           pokemon_api_verified_at: null,
           pokemon_api_confidence: null,
           pokemon_api_method: null,
-          // Also clear the card info fields that get overwritten by verification
-          card_number: null,
-          card_set: null,
-          release_date: null,
+          // Sept 2026: card_number / card_set / release_date are NOT cleared any more.
+          // They were blanked here on the assumption that verification refills them,
+          // which it did only through the loose cross-set number match (removed Sept
+          // 24). A regrade refreshes condition, not identity: the Espeon-GX a9eca6ef
+          // regrade came back with set, number and year blank. preserveIdentityOnRegrade
+          // also needs these to still be on the row to protect the owner's identity.
           // Clear label data so it gets regenerated
           label_data: null
         })
