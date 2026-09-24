@@ -227,7 +227,7 @@ export default function PokemonDatabasePage() {
 
   const getGradeCtaText = () => {
     if (!user) return 'Sign Up to Grade'
-    if (credits <= 0) return 'Buy Credits to Grade'
+    if (credits <= 0) return 'See Credit Options to Grade'
     return 'Grade This Card'
   }
 

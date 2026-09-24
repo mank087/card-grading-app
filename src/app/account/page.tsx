@@ -9,6 +9,7 @@ import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 import ReferralPartnerCard from '@/components/account/ReferralPartnerCard'
+import { GradingOptionsList } from '@/components/conversion/GradingOptions'
 
 type AccountStats = {
   totalCards: number
@@ -903,7 +904,7 @@ export default function AccountPage() {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    First purchase bonus: +1 FREE credit
+                    First-pack bonus: up to +5 free credits
                   </div>
                 )}
               </div>
@@ -911,28 +912,16 @@ export default function AccountPage() {
                 href="/credits"
                 className="inline-block text-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                Buy Credits
+                See all options
               </Link>
             </div>
           </div>
 
           {/* Pricing Info */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 font-medium mb-2">Credit Packages:</p>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="font-bold text-blue-900">Basic</p>
-                <p className="text-sm text-blue-700">1 credit - $2.99</p>
-              </div>
-              <div>
-                <p className="font-bold text-blue-900">Pro</p>
-                <p className="text-sm text-blue-700">5 credits - $9.99</p>
-              </div>
-              <div>
-                <p className="font-bold text-blue-900">Elite</p>
-                <p className="text-sm text-blue-700">20 credits - $19.99</p>
-              </div>
-            </div>
+          {/* Every way to buy, from the same list the out-of-credits screens use. */}
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-gray-900 mb-2">Ways to buy credits</p>
+            <GradingOptionsList showFirstPurchaseBonus={isFirstPurchase} />
           </div>
         </div>
 

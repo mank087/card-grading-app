@@ -25,6 +25,7 @@ import MobileCamera, { type WebCaptureMethod } from '@/components/camera/MobileC
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { useOrgContext } from '@/contexts/OrgContext'
 import { useCredits } from '@/contexts/CreditsContext'
+import { GradingOptionsList, creditsHref } from '@/components/conversion/GradingOptions'
 import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPopup'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
@@ -60,7 +61,10 @@ function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addToQueue, updateCardStatus, removeFromQueue } = useGradingQueue();
-  const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits } = useCredits();
+  const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits, isFirstPurchase, totalPurchased } = useCredits();
+  // Out-of-credits screens show every way to buy (owner request, Sept 24 2026).
+  const neverPurchased = totalPurchased === 0;
+  const outOfCreditsTitle = neverPurchased ? 'You’ve used your free grades' : 'You’re out of credits';
   const { refreshOrg, isOrgScope, membership: orgMembership } = useOrgContext();
   const toast = useToast();
 
@@ -1264,26 +1268,26 @@ function UniversalUploadPageContent() {
 
           {/* Title */}
           <h1 className="text-2xl font-bold text-gray-900 mb-3">
-            Credits Required
+            {outOfCreditsTitle}
           </h1>
 
           {/* Description */}
           <p className="text-gray-600 mb-6">
-            You need at least 1 credit to grade a card. Purchase credits to start grading your collection.
+            Each grade uses 1 credit. There&rsquo;s more than one way to keep grading, so pick what
+            fits how many cards you have.
           </p>
 
-          {/* Current Balance */}
-          <div className="bg-gray-100 rounded-xl p-4 mb-6">
-            <p className="text-sm text-gray-500 mb-1">Current Balance</p>
-            <p className="text-3xl font-bold text-gray-900">0 credits</p>
+          {/* Every option, each linking to its plan on /credits */}
+          <div className="text-left mb-6">
+            <GradingOptionsList showFirstPurchaseBonus={isFirstPurchase} withPromo={neverPurchased} />
           </div>
 
           {/* CTA Buttons */}
           <Link
-            href="/credits"
+            href={creditsHref(undefined, neverPurchased)}
             className="block w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg mb-3"
           >
-            Purchase Credits
+            Compare all options
           </Link>
 
           <Link
@@ -1295,7 +1299,8 @@ function UniversalUploadPageContent() {
 
           {/* Info text */}
           <p className="text-xs text-gray-500 mt-6">
-            Each card grading costs 1 credit. Credits never expire.
+            Credits never expire and work on every card type.
+            {neverPurchased && <> Code <span className="font-mono font-semibold">Grade10</span> takes 10% off a credit pack.</>}
           </p>
         </div>
       </main>
@@ -2101,7 +2106,7 @@ function UniversalUploadPageContent() {
       {/* Insufficient Credits Modal */}
       {showInsufficientCredits && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 max-h-[90vh] overflow-y-auto">
             <div className="text-center">
               {/* Icon */}
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2110,24 +2115,23 @@ function UniversalUploadPageContent() {
                 </svg>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Insufficient Credits</h2>
-              <p className="text-gray-600 mb-6">
-                You need at least 1 credit to grade a card. Purchase credits to continue grading.
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{outOfCreditsTitle}</h2>
+              <p className="text-gray-600 mb-5">
+                Each grade uses 1 credit. Pick the option that fits how many cards you have.
               </p>
 
-              {/* Current Balance */}
-              <div className="bg-gray-100 rounded-lg p-4 mb-6">
-                <p className="text-sm text-gray-600">Current Balance</p>
-                <p className="text-3xl font-bold text-gray-900">{balance} credits</p>
+              {/* Every option, each linking to its plan on /credits */}
+              <div className="text-left mb-5">
+                <GradingOptionsList showFirstPurchaseBonus={isFirstPurchase} withPromo={neverPurchased} />
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3">
                 <Link
-                  href="/credits"
+                  href={creditsHref(undefined, neverPurchased)}
                   className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200"
                 >
-                  Purchase Credits
+                  Compare all options
                 </Link>
                 <button
                   onClick={() => setShowInsufficientCredits(false)}
@@ -2154,7 +2158,7 @@ function UniversalUploadPageContent() {
             </svg>
             <span>{balance} credit{balance !== 1 ? 's' : ''} available</span>
             {balance === 0 && (
-              <Link href="/credits" className="underline hover:text-purple-900">Get credits</Link>
+              <Link href="/credits" className="underline hover:text-purple-900">See all options</Link>
             )}
           </div>
         )}

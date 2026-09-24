@@ -1519,7 +1519,7 @@ function SubmissionsNewInner() {
                         onClick={persistDraftAndGoToCredits}
                         className="px-3 py-1.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700"
                       >
-                        Buy credits
+                        See credit options
                       </button>
                     </div>
                   </div>

@@ -110,18 +110,17 @@ export function CardDetailModals({
       {showInsufficientCredits && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Insufficient credits</h2>
-            <p className="text-gray-600 mb-4">You need 1 credit to re-grade this card.</p>
-            <div className="bg-gray-100 rounded-lg p-3 mb-4">
-              <p className="text-sm text-gray-600">Current balance</p>
-              <p className="text-2xl font-bold text-gray-900">{balance} credits</p>
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">You&rsquo;re out of credits</h2>
+            <p className="text-gray-600 mb-5">
+              A re-grade uses 1 credit. Packs start at one credit, and bigger packs, VIP and Card
+              Lovers cost less per grade.
+            </p>
             <div className="space-y-2">
               <Link
                 href="/credits"
                 className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-6 rounded-xl"
               >
-                Purchase credits
+                See all options
               </Link>
               <button
                 onClick={onCloseInsufficientCredits}

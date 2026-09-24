@@ -25,6 +25,7 @@ import { useEffect, useState } from 'react';
 import { ActionLink } from '@/components/design/Primitives';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
 import { isCardGradeComplete } from './useCardDetail';
+import { useCredits } from '@/contexts/CreditsContext';
 import {
   CardBinderPicker,
   type CardBinderMembership,
@@ -60,6 +61,8 @@ export function CardDetailFooterActions({
   onSheetOpenChange,
 }: CardDetailFooterActionsProps) {
   const outOfCredits = !creditsLoading && balance === 0;
+  // "Free grades" is only true for someone who has never bought credits.
+  const { totalPurchased } = useCredits();
   const [sheet, setSheet] = useState<ManageSheet>(null);
   // Null until the picker's own load answers.
   const [binders, setBinders] = useState<CardBinderMembership | null>(null);
@@ -78,12 +81,12 @@ export function CardDetailFooterActions({
       {isOwner && (
         <div style={{ textAlign: 'center', paddingBlock: 24 }}>
           <ActionLink href={outOfCredits ? '/credits' : (retakeHref ?? uploadHref)} variant="primary">
-            {outOfCredits ? 'Get credits to grade more' : 'Grade another card'}
+            {outOfCredits ? 'See all options to keep grading' : 'Grade another card'}
           </ActionLink>
           {!creditsLoading && (
             <p className="cd-caption" style={{ marginTop: 8 }}>
               {balance === 0
-                ? 'Your free grades are used up.'
+                ? (totalPurchased === 0 ? 'You’ve used your free grades.' : 'You’re out of credits.')
                 : `You have ${balance} credit${balance === 1 ? '' : 's'} left.`}
             </p>
           )}

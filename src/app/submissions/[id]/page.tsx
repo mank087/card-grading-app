@@ -417,7 +417,7 @@ export default function SubmissionStatusPage() {
               {(submission?.status === 'blocked_insufficient_credits') && (
                 <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800">
                   Paused — not enough credits to keep grading.{' '}
-                  <Link href="/credits" className="underline font-semibold">Buy credits</Link>, then use Retry above.
+                  <Link href="/credits" className="underline font-semibold">See credit options</Link>, then use Retry above.
                 </div>
               )}
               {(submission?.status === 'paused') && (

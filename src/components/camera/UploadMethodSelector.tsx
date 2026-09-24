@@ -51,14 +51,14 @@ export default function UploadMethodSelector({
               </svg>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-red-800">No credits available</p>
-              <p className="text-xs text-red-600">Purchase credits to start grading</p>
+              <p className="text-sm font-semibold text-red-800">You&rsquo;re out of credits</p>
+              <p className="text-xs text-red-600">Packs, VIP and Card Lovers all work. Pick what fits.</p>
             </div>
             <Link
               href="/credits"
               className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
             >
-              Get Credits
+              See all options
             </Link>
           </div>
         </div>
