@@ -99,6 +99,13 @@ describe('incomplete outcome boundary', () => {
     expect(validFill(100)).toBe(100);
     expect(() => requireCompleteZoom({ ok: false })).toThrow(IncompleteInspectionError);
     expect(() => requireCompleteZoom(null)).toThrow(IncompleteInspectionError);
+    // Named missing edge/corner regions are a framing problem the owner can fix.
+    try { requireCompleteZoom({ ok: false, error: 'x', missingRegions: ['B-COR-TL', 'B-COR-TR', 'B-COR-BL', 'B-COR-BR'] }); } catch (e: any) {
+      expect(e.detail).toBe('framing');
+      expect(e.message).toMatch(/\[framing\] Part of the card's edge was cut off/);
+    }
+    try { requireCompleteZoom({ ok: false, error: 'x' }); } catch (e: any) { expect(e.detail).toBeUndefined(); }
+    expect(() => requireCompleteZoom({ ok: true })).not.toThrow();
     expect(() => requireCompleteZoom({ ok: true })).not.toThrow();
     const response = inspectionFailureResponse(new IncompleteInspectionError('geometry', 'private diagnostic'));
     expect(response).toMatchObject({ inspection_incomplete: true, next_action: 'retake_photos' });

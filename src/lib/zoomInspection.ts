@@ -78,6 +78,10 @@ export interface ZoomResult {
   defects: ZoomDefect[];
   /** Max allowed score per `${category}_${face}` (only present when a cap applies) */
   faceCaps: Record<string, number>;
+  /** Edge/corner regions no quorum of samples could observe; the grade proceeds but a 10 is held. */
+  uninspectedRegions?: string[];
+  /** On failure: the regions that could not be inspected. */
+  missingRegions?: string[];
   /** Distinct structural findings (creases/bends/warps) — feeds structural_damage.findings */
   structuralFindings: Array<{ type: string; location: string; description: string }>;
   /** v9.5 measured centering per face; null/undefined = low confidence, model estimate stands */
@@ -364,7 +368,9 @@ Return exactly one verdict for each CLAIM. Its "claim" value is ONLY the short i
 // of the same wear level, not extra damage).
 const SEVERITY_CAP: Record<string, number> = { minor: 9, moderate: 8, heavy: 6 };
 const STRUCTURAL_TYPES = new Set(['crease', 'bend', 'fold', 'warp', 'tear']);
-const MAX_REGION_EDGE = 1024; // downscale cap per crop (no enlargement — upscaling adds no information)
+const MAX_REGION_EDGE = 1024;
+/** Uninspected edge/corner regions a grade may proceed with (a 10 is then held). */
+export const MAX_UNINSPECTED_REGIONS = 3; // downscale cap per crop (no enlargement — upscaling adds no information)
 
 type Pt = { x: number; y: number };
 type Quad = [Pt, Pt, Pt, Pt]; // [TL, TR, BR, BL] in pixel space
@@ -1045,8 +1051,19 @@ export async function runZoomInspection(
       inspected: batchResults.reduce((sum, batch) => sum + batch.covered, 0),
       incompleteBatches: batchResults.filter(batch => !batch.complete).length,
       validSamplesPerBatch: batchResults.map(batch => batch.batchSamples.length) };
-    if (coverage.incompleteBatches) return { ...empty, capture, coverage,
-      regionsInspected: coverage.inspected, error: 'magnified inspection has missing, invalid or unobservable regions after retry' };
+    // Sept 2026: of the 24 zoom failures Sept 17-24, 22 missed only 1-3 regions (13
+    // missed exactly one), always edge strips or corners where the crop held only part
+    // of the card, and half passed outright on a re-run. A handful of uninspected edge
+    // regions no longer fails the card: they are reported, and the grader holds a 10
+    // (it cannot confirm what it could not see). More than that, or a region the photo
+    // does not contain at all, still fails, now with the regions named.
+    const covered = new Set(batchResults.flatMap(batch => batch.coveredIds));
+    const missing = regions.map(r => r.id).filter(id => !covered.has(id));
+    const tolerable = missing.length > 0 && missing.length <= MAX_UNINSPECTED_REGIONS
+      && missing.length / regions.length <= 0.1 && missing.every(id => /-(COR|EDG)-/.test(id));
+    if (coverage.incompleteBatches && !tolerable) return { ...empty, capture, coverage, missingRegions: missing,
+      regionsInspected: coverage.inspected, error: `magnified inspection has missing, invalid or unobservable regions after retry (${missing.join(', ')})` };
+    if (tolerable) console.warn(`[ZOOM] grading on with ${missing.length} uninspected region(s): ${missing.join(', ')}`);
     const usageTotals = batchResults.reduce((a, b) => ({ p: a.p + b.promptTokens, c: a.c + b.completionTokens }), { p: 0, c: 0 });
     const samplesPerBatch = Math.round(samples.length / Math.max(1, batches.length));
     if (samples.length === 0) throw new Error('no parseable zoom samples');
@@ -1232,7 +1249,8 @@ export async function runZoomInspection(
 
     console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
-    return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture };
+    return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture,
+      ...(tolerable ? { uninspectedRegions: missing } : {}) };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };

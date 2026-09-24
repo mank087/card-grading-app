@@ -2540,8 +2540,17 @@ Provide detailed analysis as markdown with all required sections.`
 
         const zoomAdjustments: string[] = [];
         requireCompleteZoom(zoom);
-        jsonData.inspection_status = { status: 'complete', version: 'inspection-v1',
-          ensemble_passes: scored.length, zoom_coverage: zoom?.coverage };
+        // A few edge/corner regions the crops could not observe (zoomInspection.ts,
+        // MAX_UNINSPECTED_REGIONS): the grade stands on the rest, and a 10 is held below.
+        const uninspectedRegions: string[] = zoom?.uninspectedRegions ?? [];
+        jsonData.inspection_status = { status: uninspectedRegions.length ? 'partial' : 'complete', version: 'inspection-v1',
+          ensemble_passes: scored.length, zoom_coverage: zoom?.coverage,
+          ...(uninspectedRegions.length ? { uninspected_regions: uninspectedRegions } : {}) };
+        if (uninspectedRegions.length && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+          jsonData.grading_passes.consensus_notes.push(
+            `Magnified inspection could not see ${uninspectedRegions.length} edge or corner area(s) clearly enough (${uninspectedRegions.map(humanizeZoomRegion).join(', ')}); those areas were judged from the whole-card evaluations only.`
+          );
+        }
         // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
         // displayed pass rows below the consensus when a cap was corroboration-limited.
@@ -3596,10 +3605,20 @@ Provide detailed analysis as markdown with all required sections.`
             }
           }
         }
-        if (finalGrade === 10 && (uncertaintyValue >= 2 || rigidCase || (!unanimous10 && !majorityTenAwarded))) {
+        if (finalGrade === 10 && (uninspectedRegions.length > 0 || uncertaintyValue >= 2 || rigidCase || (!unanimous10 && !majorityTenAwarded))) {
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
-          if (uncertaintyValue >= 2) {
+          if (uninspectedRegions.length > 0) {
+            // A 10 asserts every edge and corner is clean; these could not be seen up close.
+            const where = uninspectedRegions.map(humanizeZoomRegion).join(', ');
+            gradeCapReason = `some edge or corner areas could not be inspected up close (${where})`;
+            const advice = 'Retake the photos with all four edges fully in the frame and a little space around the card.';
+            gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9. ${advice}`;
+            jsonData.grade_hold = { held: true, from: 10, to: 9, cause: 'regions_uninspected', reason: gradeCapReason, advice,
+              evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
+            (threePassData as any).grade_hold = jsonData.grade_hold;
+            console.log(`[GRADE RECALC] ⚖️ inspection gate: 10 → 9 (${uninspectedRegions.length} uninspected region(s))`);
+          } else if (uncertaintyValue >= 2) {
             // v9.26: say the TRUE reason. This used to read "the photos are not clear enough"
             // even when the cause was a clipped corner, a holder or disagreeing evaluations.
             const hold = explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread, imageNotes: jsonData.image_quality?.notes });

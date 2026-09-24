@@ -38,6 +38,10 @@ const REASONS: Record<string, { title: string; advice: string }> = {
     title: 'This item does not appear to be a trading card we can grade.',
     advice: 'Comics, custom or unofficial cards and other collectibles cannot receive a card grade. If you believe this is a genuine trading card, contact support.',
   },
+  framing: {
+    title: "Part of the card's edge was cut off or too small to inspect up close.",
+    advice: 'Retake the photos with all four edges fully in the frame, a little space around the card, and the card filling most of the photo.',
+  },
   altered_marking: {
     title: 'We found writing or marks added to this card after it was printed.',
     advice: 'Cards with added markings cannot receive a numeric grade. If you believe this is part of the printed card, contact support.',

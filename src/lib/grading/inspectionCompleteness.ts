@@ -111,11 +111,11 @@ export async function inspectZoomBatch(expectedIds: string[], request: () => Pro
         .map((choice: any) => parseZoomSample(choice, expectedIds)).filter(Boolean) as { regions: any[] }[];
       const covered = coveredRegionIds(samples, expectedIds);
       if (covered.length > bestCovered.length || (covered.length === bestCovered.length && samples.length > best.length)) { best = samples; bestCovered = covered; }
-      if (bestCovered.length === expectedIds.length) return { batchSamples: best, complete: true, covered: bestCovered.length, attempts: attempt + 1, promptTokens, completionTokens };
+      if (bestCovered.length === expectedIds.length) return { batchSamples: best, complete: true, covered: bestCovered.length, coveredIds: bestCovered, attempts: attempt + 1, promptTokens, completionTokens };
       console.warn(`[ZOOM] batch attempt ${attempt + 1}: no quorum for ${expectedIds.filter(id => !covered.includes(id)).join(', ')}`);
     } catch { /* the next attempt is limited to this batch */ }
   }
-  return { batchSamples: best, complete: false, covered: bestCovered.length, attempts: 2, promptTokens, completionTokens };
+  return { batchSamples: best, complete: false, covered: bestCovered.length, coveredIds: bestCovered, attempts: 2, promptTokens, completionTokens };
 }
 
 export function validFill(value: unknown): number | null {
@@ -138,6 +138,11 @@ export function requireCompleteEnsemble(evaluations: Array<{ final: number | nul
   }
 }
 
-export function requireCompleteZoom(zoom: { ok: boolean; error?: string; capture?: { outcome: string } } | null): void {
-  if (!zoom?.ok) throw new IncompleteInspectionError(zoom?.capture?.outcome === 'abandoned' ? 'geometry' : 'zoom', zoom?.error || 'inspection unavailable');
+export function requireCompleteZoom(zoom: { ok: boolean; error?: string; capture?: { outcome: string }; missingRegions?: string[] } | null): void {
+  if (zoom?.ok) return;
+  const stage = zoom?.capture?.outcome === 'abandoned' ? 'geometry' : 'zoom';
+  // Missing regions are edges and corners the crops could not see: a framing problem
+  // the owner can fix, so say so instead of the generic advice.
+  const framing = stage === 'zoom' && Array.isArray(zoom?.missingRegions) && zoom!.missingRegions.length > 0;
+  throw new IncompleteInspectionError(stage, zoom?.error || 'inspection unavailable', framing ? 'framing' : undefined);
 }

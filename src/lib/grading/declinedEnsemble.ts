@@ -24,7 +24,7 @@ export type DeclineReason =
   | 'unknown';
 
 /** The reason an incomplete ensemble reports; 'altered_marking' once a marking is verified. */
-export type EnsembleFailureReason = DeclineReason | 'altered_marking';
+export type EnsembleFailureReason = DeclineReason | 'altered_marking' | 'framing';
 
 export interface DeclinedEnsemble {
   reason: DeclineReason;

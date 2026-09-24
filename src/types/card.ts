@@ -162,7 +162,7 @@ export interface GradeHold {
   held: true;
   from: number;
   to: number;
-  cause: 'clipped_corner' | 'holder' | 'rigid_holder' | 'possible_damage_unconfirmed' | 'evaluations_disagree' | 'evaluation_dissent' | 'image_quality';
+  cause: 'clipped_corner' | 'regions_uninspected' | 'holder' | 'rigid_holder' | 'possible_damage_unconfirmed' | 'evaluations_disagree' | 'evaluation_dissent' | 'image_quality';
   reason: string;
   advice: string | null;
   evaluations: { pass_1: number; pass_2: number; pass_3: number };
