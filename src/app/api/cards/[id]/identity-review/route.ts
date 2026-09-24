@@ -34,6 +34,7 @@ import {
 import { loadReviewCandidates, serialDenominatorOf } from '@/lib/identity/reviewCandidates';
 import { resolveSetCodesInFields } from '@/lib/identity/setOptions';
 import { settlePokemonNumber } from '@/lib/identity/pokemonNumberCheck';
+import { catalogCandidatesOf } from '@/lib/identity/catalogCandidates';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,6 +129,8 @@ export async function GET(
         ? { product_name: String(card.dcm_selected_product_name || card.dcm_price_product_name), picked_by_owner: !!card.dcm_selected_product_id }
         : null,
       current_product_id: card.dcm_selected_product_id ? String(card.dcm_selected_product_id) : null,
+      // Pokémon cards the catalog could not choose between: the owner picks.
+      catalog_candidates: card.category === 'Pokemon' ? catalogCandidatesOf(card.conversational_card_info) : [],
       suggested_candidate_id: suggestCandidate(candidates.candidates, card, prefill),
     });
   } catch (err: any) {

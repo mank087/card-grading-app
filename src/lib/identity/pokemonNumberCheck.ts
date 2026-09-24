@@ -16,6 +16,7 @@
  */
 import { supabaseServer } from '@/lib/supabaseServer';
 import type { ReviewField } from './reviewPrefill';
+import { namesAgree, speciesKey } from './nameAgreement';
 
 export interface ParsedPokemonNumber { number: string; total: number | null }
 
@@ -32,17 +33,29 @@ export function parsePokemonNumber(text: string | null | undefined): ParsedPokem
 
 type Lookup = (name: string, number: string, total: number | null) => Promise<{ setName: string } | null>;
 
+/**
+ * The ONE catalog card with this number and set total whose name agrees with the
+ * read. Sept 24 2026: the name used to be matched with an exact `ilike`, so
+ * "Espeon GX" never found the catalog's "Espeon-GX" (same for EX, V, VMAX, ex).
+ * The name is now compared with namesAgree in code, and two agreeing cards are
+ * no match: the catalog settles a disagreement only when it is unambiguous.
+ */
 async function catalogLookup(name: string, number: string, total: number | null): Promise<{ setName: string } | null> {
   let query = supabaseServer()
     .from('pokemon_cards')
-    .select('set_name, set_printed_total')
-    .ilike('name', name)
+    .select('name, set_name, set_printed_total')
     .eq('number', number)
-    .limit(5);
+    .limit(25);
   if (total !== null) query = query.eq('set_printed_total', total);
+  // A coarse, hyphen-proof narrowing on the longest species token ("espeon"), so a
+  // number shared by many sets cannot push the right card past the limit.
+  const token = speciesKey(name).split(' ').sort((a, b) => b.length - a.length)[0];
+  if (token && token.length >= 3) query = query.ilike('name', `%${token}%`);
   const { data, error } = await query;
   if (error || !data || data.length === 0) return null;
-  return { setName: String(data[0].set_name || '') };
+  const agreeing = (data as any[]).filter(row => namesAgree(name, String(row.name || '')).agrees);
+  if (agreeing.length !== 1) return null;
+  return { setName: String(agreeing[0].set_name || '') };
 }
 
 /**

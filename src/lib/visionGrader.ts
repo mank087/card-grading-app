@@ -31,7 +31,7 @@ import { clippedCorners, confidenceWithClipping } from './grading/frameClipping'
 import { verifyClippedCorners } from './grading/frameEdgeCheck';
 import { caseConsensus } from './grading/caseConsensus';
 import { explainUncertaintyHold, letterUncertainty as letterUncertaintyFromEvidence } from './grading/evidenceHold';
-import { firstLookEnabled, runFirstLook, recordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
+import { firstLookEnabled, runAndRecordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
@@ -1877,8 +1877,10 @@ export async function gradeCardConversational(
   const completedFirstLook = (): FirstLookRecord | null => firstLookRecord;
   const startFirstLook = (images: CardOriginals) => {
     if (firstLookRun || !firstLookEnabled() || !options?.routingKey) return;
-    firstLookRun = runFirstLook({ front: images.front, back: images.back })
-      .then(record => { firstLookRecord = record; return recordFirstLook(options?.routingKey, record); })
+    // Settles once PASS 1 is read and saved; the optional search pass carries on
+    // in the background (kept alive past the response) and updates the record.
+    firstLookRun = runAndRecordFirstLook(options?.routingKey, { front: images.front, back: images.back }).contract
+      .then(record => { firstLookRecord = record; })
       .catch(() => undefined);
   };
   const pendingFirstLook = (): Promise<unknown> | null => firstLookRun;
@@ -3311,9 +3313,9 @@ Provide detailed analysis as markdown with all required sections.`
         // v8.8: honest uncertainty — derived from measured signals, not the AI's self-report.
         // Components: image-confidence letter (A=0,B=1,C=2,D=3), spread between the three pass
         // finals, and whether the server had to lower the model's own average (cap/clamp fired).
-        // Give first look a short grace period to finish its write: a
-        // serverless function may be frozen the moment the grade returns. Capped,
-        // so a slow search pass is dropped rather than delaying the customer.
+        // Give first look a short grace period for its PASS-1 read and write (the
+        // search pass is not waited for: it runs on under after()). Capped, so a
+        // slow read never delays the customer.
         const firstLookPending = pendingFirstLook();
         if (firstLookPending) await Promise.race([firstLookPending, new Promise(resolve => setTimeout(resolve, 6000))]);
         // A grading call that returned no card number takes the one first look READ off

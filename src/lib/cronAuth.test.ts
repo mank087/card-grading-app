@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { requireCron } from './cronAuth'
+import { requireCron, internalServiceHeaders } from './cronAuth'
 import type { NextRequest } from 'next/server'
 
 /** requireCron only reads request.headers.get('authorization'). */
@@ -63,5 +63,20 @@ describe('requireCron', () => {
   test('still enforces a set secret outside production', () => {
     setEnv('development', 'topsecret')
     expect(requireCron(req('Bearer wrong'), 't').ok).toBe(false)
+  })
+})
+
+describe('internalServiceHeaders', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  test('carries the secret a requireCron endpoint accepts', () => {
+    vi.stubEnv('CRON_SECRET', 'topsecret')
+    vi.stubEnv('NODE_ENV', 'production')
+    const headers = internalServiceHeaders()
+    expect(headers['Content-Type']).toBe('application/json')
+    expect(requireCron(req(headers.Authorization), 't').ok).toBe(true)
+  })
+  test('sends no Authorization header when no secret is set', () => {
+    vi.stubEnv('CRON_SECRET', '')
+    expect(internalServiceHeaders().Authorization).toBeUndefined()
   })
 })

@@ -21,6 +21,7 @@
  */
 
 import OpenAI from 'openai';
+import { after } from 'next/server';
 import sharp from 'sharp';
 import { FIRST_LOOK_PROMPT, FIRST_LOOK_SCHEMA, FIRST_LOOK_VERSION, normalizeFirstLook, type FirstLook } from './firstLook';
 import { logOpenAIUsage } from '../apiUsageLogger';
@@ -77,9 +78,20 @@ async function toDataUrl(buffer: Buffer): Promise<string> {
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
 }
 
+export interface RunFirstLookOptions {
+  model?: string;
+  allowSearch?: boolean;
+  /**
+   * Called with pass 1's record as soon as it is known, BEFORE the optional
+   * search pass starts. Only called when a search pass follows (otherwise the
+   * returned record is pass 1). Not awaited; errors are swallowed.
+   */
+  onContractPass?: (record: FirstLookRecord) => unknown;
+}
+
 export async function runFirstLook(
   images: { front: Buffer; back?: Buffer | null },
-  opts: { model?: string; allowSearch?: boolean } = {}
+  opts: RunFirstLookOptions = {}
 ): Promise<FirstLookRecord | null> {
   const started = Date.now();
   try {
@@ -109,6 +121,14 @@ export async function runFirstLook(
       return { ...base, pass: 'contract', search_ran: false, searches: 0, ms: Date.now() - started, repairs: first.repairs, result: first.value };
     }
 
+    // Pass 1 is already worth saving: it READ the card (Espeon-GX 140/149 was read
+    // correctly in pass 1 and only reached the row ~160s later, after the owner
+    // had confirmed the wrong number). Hand it out now; the search pass follows.
+    if (opts.onContractPass) {
+      const contractRecord: FirstLookRecord = { ...base, pass: 'contract', search_ran: false, searches: 0, ms: Date.now() - started, repairs: first.repairs, result: first.value };
+      try { Promise.resolve(opts.onContractPass(contractRecord)).catch(() => undefined); } catch { /* never block pass 2 */ }
+    }
+
     // Pass 2 — same contract, with web search. Any failure keeps pass 1.
     try {
       const t2 = Date.now();
@@ -135,8 +155,39 @@ export async function runFirstLook(
   }
 }
 
-/** Best-effort write to cards.first_look. 42703 = the column is not there yet. */
-export async function recordFirstLook(cardId: string | null | undefined, record: FirstLookRecord | null): Promise<boolean> {
+const PASS_RANK: Record<string, number> = { contract: 1, contract_with_search: 2 };
+
+/**
+ * May `incoming` replace the stored first-look record? The grading-time run and
+ * the dialog's on-demand run can race for the same card; the later writer must
+ * not overwrite an answer that is as good or better.
+ *   - nothing stored (or unreadable)             → write
+ *   - same run (same measured_at): its final record over its pass 1 → write
+ *     (never pass 1 over the final, when the two writes cross)
+ *   - a strictly richer pass (search > contract) → write
+ *   - otherwise (same or poorer pass from another run) → keep what is stored
+ */
+export function shouldReplaceFirstLook(existing: unknown, incoming: FirstLookRecord): boolean {
+  if (!existing || typeof existing !== 'object') return true;
+  const stored = existing as Partial<FirstLookRecord>;
+  if (!stored.result || !stored.pass) return true;
+  const incomingRank = PASS_RANK[incoming.pass] || 0;
+  const storedRank = PASS_RANK[stored.pass] || 0;
+  // Same run: an upgrade (or its own final record) may land; a late pass-1 write may not.
+  if (stored.measured_at && stored.measured_at === incoming.measured_at) return incomingRank >= storedRank;
+  return incomingRank > storedRank;
+}
+
+/**
+ * Best-effort write to cards.first_look, under shouldReplaceFirstLook. 42703 = the
+ * column is not there yet. After a write, a Pokémon card whose stored number
+ * found no catalog card is re-verified with this read (identity/pokemonCatalogLink).
+ */
+export async function recordFirstLook(
+  cardId: string | null | undefined,
+  record: FirstLookRecord | null,
+  opts: { reconcile?: boolean } = {},
+): Promise<boolean> {
   if (!cardId || !record || !/^[0-9a-f-]{36}$/i.test(cardId)) return false;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -144,16 +195,107 @@ export async function recordFirstLook(cardId: string | null | undefined, record:
     if (!url || !key) return false;
     const { createClient } = await import('@supabase/supabase-js');
     const client = createClient(url, key);
+
+    const { data: current, error: readError } = await client.from('cards').select('first_look').eq('id', cardId).maybeSingle();
+    if (readError && (readError as any).code === '42703') return false; // no first_look column yet
+    const stored = (current as any)?.first_look ?? null;
+    if (!readError && !shouldReplaceFirstLook(stored, record)) {
+      console.log(`[first-look] kept the stored ${stored?.pass} record (${stored?.measured_at}); not replacing it with a ${record.pass} record`);
+      return false;
+    }
+
     // item_type is a scalar copy so list pages and the value guard can read it
     // without selecting the whole first-look JSON. null = treat as a standard card.
     const itemType = actionableItemType(record);
     const withItemType = { first_look: record, item_type: itemType, item_type_evidence: itemType ? String(record.result.photos.item_type_evidence || '').slice(0, 300) : null };
-    let { error } = await client.from('cards').update(withItemType).eq('id', cardId);
+    // Compare-and-set on what was read, so a concurrent writer that got in first
+    // is re-judged instead of overwritten.
+    const casWrite = (payload: Record<string, unknown>, seen: any) => {
+      const q = client.from('cards').update(payload).eq('id', cardId);
+      // No record → the slot must still be empty; a record without a timestamp
+      // (pre-dates this rule) cannot be compared, so it is written over as before.
+      const guarded = seen == null ? q.is('first_look', null)
+        : seen.measured_at ? q.eq('first_look->>measured_at', seen.measured_at) : q;
+      return guarded.select('id');
+    };
+    let { data: written, error } = await casWrite(withItemType, stored);
     // 42703 = a column is not there yet (migration 20260918_item_type not applied): keep the JSON.
-    if (error && (error as any).code === '42703') ({ error } = await client.from('cards').update({ first_look: record }).eq('id', cardId));
-    if (error && (error as any).code !== '42703') console.warn('[first-look] could not record:', error.message);
-    return !error;
+    if (error && (error as any).code === '42703') ({ data: written, error } = await casWrite({ first_look: record }, stored));
+    if (error) {
+      if ((error as any).code !== '42703') console.warn('[first-look] could not record:', error.message);
+      return false;
+    }
+    if (!written || written.length === 0) {
+      // Another writer got in between the read and the write: judge its record once.
+      const again = await client.from('cards').select('first_look').eq('id', cardId).maybeSingle();
+      const now = (again.data as any)?.first_look ?? null;
+      if (again.error || !shouldReplaceFirstLook(now, record)) return false;
+      const retry = await casWrite(withItemType, now);
+      if (retry.error || !retry.data?.length) return false;
+    }
+
+    if (opts.reconcile !== false) {
+      try {
+        const { reconcileFirstLookNumber } = await import('../identity/pokemonCatalogLink');
+        await reconcileFirstLookNumber(client as any, cardId);
+      } catch (e: any) {
+        console.warn('[first-look] catalog reconcile skipped:', e?.message || e);
+      }
+    }
+    return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Keep work running after the response is sent. Next 15's `after()` (Vercel
+ * waitUntil underneath) extends the function's life until the promise settles.
+ * Outside a request scope (scripts, tests) it throws, and the work simply runs
+ * fire-and-forget as it did before.
+ */
+export function keepAliveAfterResponse(work: Promise<unknown>): void {
+  try {
+    after(work.then(() => undefined, () => undefined));
+  } catch {
+    /* not inside a request scope */
+  }
+}
+
+/**
+ * Run first look for a card and record it in two steps: pass 1 is saved as soon
+ * as it is read (so the grade's short wait, the owner dialog and catalog
+ * verification can use it), and the search pass, when it runs, updates the
+ * record afterwards. `contract` settles once pass 1 is saved (or with the final
+ * record when there is no search pass); `final` when everything is done.
+ * Neither ever rejects. The whole run is kept alive past the response.
+ */
+export function runAndRecordFirstLook(
+  cardId: string | null | undefined,
+  images: { front: Buffer; back?: Buffer | null },
+  opts: Omit<RunFirstLookOptions, 'onContractPass'> = {},
+): { contract: Promise<FirstLookRecord | null>; final: Promise<FirstLookRecord | null> } {
+  let settleContract!: (record: FirstLookRecord | null) => void;
+  let contractSettled = false;
+  const contract = new Promise<FirstLookRecord | null>(resolve => {
+    settleContract = record => { if (!contractSettled) { contractSettled = true; resolve(record); } };
+  });
+  let contractWrite: Promise<unknown> = Promise.resolve();
+  const final = runFirstLook(images, {
+    ...opts,
+    onContractPass: record => {
+      contractWrite = recordFirstLook(cardId, record).catch(() => false).finally(() => settleContract(record));
+      return contractWrite;
+    },
+  })
+    .then(async record => {
+      // Let pass 1's write finish first so the final record lands on top of it.
+      await contractWrite;
+      if (record) await recordFirstLook(cardId, record);
+      settleContract(record);
+      return record;
+    })
+    .catch(() => { settleContract(null); return null; });
+  keepAliveAfterResponse(final);
+  return { contract, final };
 }

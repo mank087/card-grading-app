@@ -87,10 +87,19 @@ export async function POST(
       if (!front || !back) return json({ first_look: null, fields: null });
 
       const originals = await fetchCardOriginals(front, back);
+      // Pass 1 is saved the moment it is read, so a grading-time wait or a
+      // reload of the dialog can use it while the search pass is still running.
+      // recordFirstLook never replaces a record that is as good or better, so
+      // this run and the grading-time run cannot clobber each other.
+      let contractWrite: Promise<unknown> = Promise.resolve();
       const record = await runFirstLook(
         { front: originals.front, back: originals.back },
-        { allowSearch: process.env.FIRST_LOOK_SEARCH === '1' },
+        {
+          allowSearch: process.env.FIRST_LOOK_SEARCH === '1',
+          onContractPass: contractRecord => (contractWrite = Promise.resolve(recordFirstLook(cardId, contractRecord)).catch(() => false)),
+        },
       );
+      await contractWrite;
       if (!record) return json({ first_look: null, fields: null });
 
       await recordFirstLook(cardId, record);

@@ -29,13 +29,24 @@ import {
   REVIEW_MAX_LENGTH as MAX_LENGTH,
   reviewOwnerEdited,
   versionPickNeedsSaving,
-  type IdentityReviewState,
+  type IdentityReviewState as SharedIdentityReviewState,
   type ReviewAlternative,
   type ReviewCandidate,
   type ReviewField,
 } from '@/lib/identity/reviewClient';
+import {
+  catalogCandidateNumber,
+  catalogCandidatesOf,
+  catalogCandidateValues,
+  type CatalogCandidate,
+} from '@/lib/identity/catalogCandidates';
 
-export type { IdentityReviewState };
+/**
+ * The review state as the web receives it. `catalog_candidates` (Pokémon cards
+ * the catalog could not choose between) is web-only for now, so it is added here
+ * rather than to reviewClient.ts, which is shared byte for byte with the app.
+ */
+export type IdentityReviewState = SharedIdentityReviewState & { catalog_candidates?: CatalogCandidate[] };
 
 interface Props {
   cardId: string;
@@ -229,6 +240,20 @@ export default function ConfirmCardDetailsDialog({
     setTouched(previous => ({ ...previous, [key]: true }));
   };
 
+  /* Pokémon "Which card is it?" — catalog cards verification could not choose between. */
+  const catalogCandidates = useMemo(
+    () => (review.category === 'Pokemon' ? catalogCandidatesOf({ catalog_candidates: review.catalog_candidates }) : []),
+    [review.category, review.catalog_candidates],
+  );
+  const [catalogPick, setCatalogPick] = useState<string | null>(null);
+  const chooseCatalogCandidate = (candidate: CatalogCandidate) => {
+    setCatalogPick(candidate.id);
+    for (const [key, value] of Object.entries(catalogCandidateValues(candidate))) {
+      if (fields.some(f => f.key === key)) setValue(key, value);
+    }
+    setCustomSet(false);
+  };
+
   const applyAlternative = (alternative: ReviewAlternative) => {
     const key = ALTERNATIVE_FIELD[alternative.differs_in];
     if (!key || !fields.some(f => f.key === key)) return;
@@ -398,6 +423,43 @@ export default function ConfirmCardDetailsDialog({
 
             {checking && (
               <p className="text-xs text-slate-500" role="status">Checking the card...</p>
+            )}
+
+            {catalogCandidates.length > 0 && (
+              <fieldset className="rounded-lg border border-slate-200 p-3">
+                <legend className="text-xs font-semibold text-slate-700 px-1">Which card is it?</legend>
+                <p className="text-xs text-slate-600 mb-2">
+                  We could not tell these cards apart from the number we read. Pick the one that matches your card, or leave the details as they are.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {catalogCandidates.map(candidate => (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => chooseCatalogCandidate(candidate)}
+                      aria-pressed={catalogPick === candidate.id}
+                      className={`text-left rounded-lg border p-2 bg-white ${catalogPick === candidate.id ? 'border-slate-800 ring-2 ring-slate-400' : 'border-slate-200 hover:border-slate-400'}`}
+                    >
+                      {candidate.image_small ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={candidate.image_small}
+                          alt={`${candidate.name} ${catalogCandidateNumber(candidate)}`}
+                          loading="lazy"
+                          className="w-full h-auto rounded object-contain max-h-40"
+                        />
+                      ) : (
+                        <div className="h-24 rounded bg-slate-50 border border-dashed border-slate-200" />
+                      )}
+                      <span className="mt-1 block text-xs font-medium text-slate-800">{candidate.name}</span>
+                      <span className="block text-[11px] text-slate-600">
+                        #{catalogCandidateNumber(candidate)}{candidate.set_name ? ` · ${candidate.set_name}` : ''}
+                      </span>
+                      {candidate.rarity && <span className="block text-[11px] text-slate-500">{candidate.rarity}</span>}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
             )}
 
             <div className="space-y-3">
