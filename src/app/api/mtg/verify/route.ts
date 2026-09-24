@@ -6,6 +6,7 @@ import {
   extractMTGDisplayMetadata,
   type MTGCardInfoForVerification
 } from "@/lib/mtgApiVerification";
+import { requireCron } from "@/lib/cronAuth";
 import { guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT } from "@/lib/pricing/guardedPriceWrite";
 
 /**
@@ -13,6 +14,9 @@ import { guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT } from "@
  *
  * Verify an MTG card against the Scryfall API
  * Called automatically after grading an MTG card
+ *
+ * SERVER-TO-SERVER ONLY (Sept 24 2026): it writes catalog/identity fields for
+ * any card_id, so it requires `Authorization: Bearer ${CRON_SECRET}`.
  *
  * Request body:
  * {
@@ -31,6 +35,8 @@ import { guardedPriceUpdate, readPriceRevisions, PRICE_REVISION_SELECT } from "@
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const auth = requireCron(request, "mtg/verify");
+  if (!auth.ok) return auth.response;
 
   try {
     const body = await request.json();

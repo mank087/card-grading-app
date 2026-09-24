@@ -41,6 +41,7 @@ import { searchMTGCardPrices, estimateMTGDcmValue, isMTGPricingEnabled } from "@
 import { searchLorcanaCardPrices, estimateLorcanaDcmValue, isLorcanaPricingEnabled } from "@/lib/lorcanaPricing";
 import { searchOnePieceCardPrices, estimateOnePieceDcmValue, isOnePiecePricingEnabled } from "@/lib/onepiecePricing";
 import { searchOtherCardPrices, estimateOtherDcmValue, isOtherPricingEnabled } from "@/lib/otherPricing";
+import { internalServiceHeaders } from "@/lib/cronAuth";
 
 // Track cards currently being processed
 const processingCards = new Map<string, number>();
@@ -1990,7 +1991,7 @@ EXTRACTION RULES:
         // Call the Pokemon verify API endpoint
         const verifyResponse = await fetch(`${request.nextUrl.origin}/api/pokemon/verify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: internalServiceHeaders(),
           body: JSON.stringify({
             card_id: cardId,
             card_info: conversationalGradingData?.card_info || null
@@ -2029,7 +2030,7 @@ EXTRACTION RULES:
         // Call the MTG verify API endpoint
         const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: internalServiceHeaders(),
           body: JSON.stringify({
             card_id: cardId,
             card_info: conversationalGradingData?.card_info || null

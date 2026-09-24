@@ -109,3 +109,29 @@ describe('set dropdown for a TCG card', () => {
     expect(html).toContain('id="identity-review-card_number"');
   });
 });
+
+describe('"Which card is it?" for an ambiguous Pokémon number', () => {
+  const candidates = [
+    { id: 'sm1-140', name: 'Espeon-GX', number: '140', set_name: 'Sun & Moon', set_id: 'sm1', rarity: 'Rare Holo GX', printed_total: 149, image_small: 'https://images.pokemontcg.io/sm1/140.png' },
+    { id: 'sm1-152', name: 'Espeon-GX', number: '152', set_name: 'Sun & Moon', set_id: 'sm1', rarity: 'Rare Rainbow', printed_total: 149, image_small: null },
+  ];
+  const render = (state: IdentityReviewState) => renderToStaticMarkup(createElement(ConfirmCardDetailsDialog as any, {
+    cardId: card.id, review: state, frontUrl: null, backUrl: null,
+    onClose: () => {}, onDismissed: () => {}, onSaved: () => {}, onOpenMoreDetails: () => {}, onReload: async () => null, fetchFirstLook: false,
+  }));
+
+  it('shows each catalog card with its picture, number/total and set', () => {
+    const html = render({ ...reviewState(), category: 'Pokemon', catalog_candidates: candidates });
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(text).toContain('Which card is it?');
+    expect(text).toContain('#140/149 · Sun &amp; Moon');
+    expect(text).toContain('#152/149');
+    expect(html).toContain('src="https://images.pokemontcg.io/sm1/140.png"');
+    expect(html).toContain('aria-pressed="false"');
+  });
+
+  it('is absent without candidates, and for other games', () => {
+    expect(render({ ...reviewState(), category: 'Pokemon' })).not.toContain('Which card is it?');
+    expect(render({ ...reviewState(), category: 'MTG', catalog_candidates: candidates })).not.toContain('Which card is it?');
+  });
+});

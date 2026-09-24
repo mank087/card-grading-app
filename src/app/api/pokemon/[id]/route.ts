@@ -27,6 +27,7 @@ import { getUserCredits } from "@/lib/credits";
 // Color extraction for color-matched labels
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+import { internalServiceHeaders } from "@/lib/cronAuth";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -1747,7 +1748,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       // We don't await this - the response returns immediately while verification runs
       fetch(`${request.nextUrl.origin}/api/pokemon/verify?force=true`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalServiceHeaders(),
         body: JSON.stringify({
           card_id: cardId,
           card_info: conversationalGradingData?.card_info || null,

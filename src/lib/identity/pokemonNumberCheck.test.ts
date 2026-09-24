@@ -1,4 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// The default catalog lookup (no injected `lookup`) reads pokemon_cards.
+const rows = vi.hoisted(() => ({ data: [] as Array<{ name: string; number: string; set_name: string; set_printed_total: number }>, filters: [] as string[] }));
+vi.mock('@/lib/supabaseServer', () => ({
+  supabaseServer: () => {
+    const f: Record<string, any> = {};
+    const chain: any = {
+      select: () => chain,
+      limit: () => chain,
+      eq: (col: string, value: any) => { f[col] = value; return chain; },
+      ilike: (col: string, value: string) => { rows.filters.push(`${col} ilike ${value}`); f.ilike = value.replace(/%/g, '').toLowerCase(); return chain; },
+      then: (resolve: any) => resolve({ error: null, data: rows.data.filter(r => r.number === f.number
+        && (f.set_printed_total === undefined || r.set_printed_total === f.set_printed_total)
+        && (!f.ilike || r.name.toLowerCase().includes(f.ilike))) }),
+    };
+    return { from: () => chain };
+  },
+}));
 import { parsePokemonNumber, settlePokemonNumber } from './pokemonNumberCheck';
 import type { ReviewField } from './reviewPrefill';
 
@@ -37,5 +55,32 @@ describe('settlePokemonNumber', () => {
     const mtg = [name, base({ value: '086', suggestion: { value: '066/196', origin: 'suggested', source: 'printed' } })];
     expect(await settlePokemonNumber(mtg, 'MTG', catalog)).toEqual(mtg);
     expect(await settlePokemonNumber(mtg, 'Pokemon', async () => { throw new Error('down'); })).toEqual(mtg);
+  });
+});
+
+describe('settlePokemonNumber against the catalog table', () => {
+  const espeon: ReviewField = { ...name, key: 'card_name', value: 'Espeon GX', storedValue: 'Espeon GX' };
+  const fields = () => [espeon, base({ value: '150/149', storedValue: '150/149', origin: 'from_grading', suggestion: { value: '140/149', origin: 'suggested', source: 'printed' } })];
+
+  it('matches "Espeon GX" to the catalog entry "Espeon-GX" and pre-fills the re-read number', async () => {
+    rows.data = [
+      { name: 'Espeon-GX', number: '140', set_name: 'Sun & Moon', set_printed_total: 149 },
+      { name: 'Espeon-GX', number: '152', set_name: 'Sun & Moon', set_printed_total: 149 },
+    ];
+    rows.filters = [];
+    const card = (await settlePokemonNumber(fields(), 'Pokemon')).find(f => f.key === 'card_number')!;
+    expect(card).toMatchObject({ value: '140/149', origin: 'read_from_card', catalogNote: 'Matches the Pokémon catalog (Sun & Moon)' });
+    expect(card.suggestion?.value).toBe('150/149');
+    expect(rows.filters).toContain('name ilike %espeon%');
+  });
+
+  it('does not settle on a number two catalog cards share', async () => {
+    rows.data = [
+      { name: 'Espeon-GX', number: '140', set_name: 'Sun & Moon', set_printed_total: 149 },
+      { name: 'Espeon GX', number: '140', set_name: 'Some Reprint', set_printed_total: 149 },
+    ];
+    const card = (await settlePokemonNumber(fields(), 'Pokemon')).find(f => f.key === 'card_number')!;
+    expect(card.value).toBe('150/149');
+    expect(card.catalogNote).toBeUndefined();
   });
 });

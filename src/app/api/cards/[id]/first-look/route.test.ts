@@ -127,7 +127,7 @@ describe('POST /api/cards/[id]/first-look', () => {
     expect(response.status).toBe(200);
     expect(mocks.run).toHaveBeenCalledWith(
       { front: expect.any(Buffer), back: expect.any(Buffer) },
-      { allowSearch: false },
+      expect.objectContaining({ allowSearch: false }),
     );
     expect(mocks.record).toHaveBeenCalledWith(cardId, expect.objectContaining({ version: 'first-look-v1' }));
     expect(body.reused).toBe(false);
@@ -138,7 +138,21 @@ describe('POST /api/cards/[id]/first-look', () => {
     vi.stubEnv('FIRST_LOOK_SEARCH', '1');
     card();
     await POST(request(), context);
-    expect(mocks.run).toHaveBeenCalledWith(expect.anything(), { allowSearch: true });
+    expect(mocks.run).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ allowSearch: true }));
+  });
+
+  it('saves pass 1 as soon as it is read, then the search-pass record', async () => {
+    vi.stubEnv('FIRST_LOOK_SEARCH', '1');
+    card();
+    const contract = { version: 'first-look-v1', measured_at: 't1', pass: 'contract', search_ran: false, searches: 0, result };
+    const searched = { ...contract, pass: 'contract_with_search', search_ran: true, searches: 2 };
+    mocks.run.mockImplementation(async (_images: unknown, opts: any) => {
+      opts.onContractPass(contract);
+      expect(mocks.record).toHaveBeenCalledWith(cardId, contract);
+      return searched;
+    });
+    await POST(request(), context);
+    expect(mocks.record.mock.calls.map(c => c[1].pass)).toEqual(['contract', 'contract_with_search']);
   });
 
   it('answers with no first look when the run could not produce one', async () => {

@@ -9,13 +9,13 @@ import {
   normalizeCardNumber as normalizeCardNumberFromApi,
   detectCardNumberFormat,
   getPromoSetId,
-  searchLocalFuzzyNumber,
   searchLocalDatabase,
   searchLocalByNameNumberSetId,
   searchLocalByNameNumberTotal
 } from './pokemonTcgApi';
 import { namesAgree, speciesKey, type NameAgreement } from './identity/nameAgreement';
-import { findUniqueDigitVariant } from './cardNumberUtils';
+import { findUniqueDigitVariant, positionsOff } from './cardNumberUtils';
+import type { CatalogCandidate } from './identity/catalogCandidates';
 import { anniversaryNumber, anniversarySetIds, pokemonPrintedNumber, printedDenominatorMatches } from './pokemonAnniversary';
 
 export interface PokemonApiVerificationResult {
@@ -35,6 +35,38 @@ export interface PokemonApiVerificationResult {
   name_agreement?: NameAgreement;
   /** A set+number hit that was REJECTED because its name contradicted the model's read */
   rejected_candidate?: { id: string; name: string; set_name: string; number: string; reason: string };
+  /**
+   * Sept 24 2026: the catalog cards this read could be when the lookup was
+   * AMBIGUOUS (the in-set digit rescue found more than one, or the name+number
+   * search across sets left more than one). Never auto-picked: the owner chooses.
+   */
+  candidates?: PokemonCatalogCandidate[];
+}
+
+/** One catalog card offered to the owner when verification could not decide. */
+export type PokemonCatalogCandidate = CatalogCandidate;
+
+export function toCatalogCandidate(card: PokemonCard): PokemonCatalogCandidate {
+  return {
+    id: card.id,
+    name: card.name,
+    number: String(card.number),
+    set_name: card.set?.name || '',
+    set_id: card.set?.id || '',
+    rarity: card.rarity || null,
+    printed_total: card.set?.printedTotal || null,
+    image_small: card.images?.small || null,
+  };
+}
+
+/** Candidates merged by catalog id, in first-seen order, capped. */
+function addCandidates(result: PokemonApiVerificationResult, cards: PokemonCard[]): void {
+  const list = result.candidates ? [...result.candidates] : [];
+  for (const card of cards) {
+    if (!card?.id || list.some(c => c.id === card.id)) continue;
+    list.push(toCatalogCandidate(card));
+  }
+  if (list.length) result.candidates = list.slice(0, 6);
 }
 
 export interface CardInfoForVerification {
@@ -373,6 +405,15 @@ async function queryBySetIdAndNumberChecked(
       result.name_agreement = namesAgree(aiName, variant.name);
       return { card: variant, corrected: true };
     }
+    // Two or more cards of this species sit one digit away (Espeon-GX 150/149 →
+    // #140 and #152 in Sun & Moon). Guessing picks a different real card; the
+    // owner picks instead.
+    const target = normalizeCardNumber(cardNumber);
+    const nearby = agreeing.filter(c => positionsOff(target, String(c.number)) === 1);
+    if (nearby.length > 1) {
+      console.log(`[Pokemon Local Verification] number "${cardNumber}" is ambiguous within set ${setId}: ${nearby.map(c => c.number).join(', ')}`);
+      addCandidates(result, nearby);
+    }
   } catch (e: any) {
     console.warn('[Pokemon Local Verification] rescue lookup failed:', e?.message);
   }
@@ -391,11 +432,14 @@ async function searchLocalNameInSet(nameToken: string, setId: string): Promise<P
       .limit(25);
     if (!data?.length) return [];
     // Reuse the local→API shape converter via a number-less search helper is not exposed;
-    // map the minimal fields the rescue needs (id, name, number, set).
+    // map the minimal fields the rescue needs (id, name, number, set), plus what an
+    // owner-facing candidate shows (rarity, thumbnail).
     return (data as any[]).map(r => ({
       id: r.id,
       name: r.name,
       number: String(r.number),
+      rarity: r.rarity || '',
+      images: { small: r.image_small || '', large: r.image_large || '' },
       set: { id: r.set_id, name: r.set_name, printedTotal: r.set_printed_total, releaseDate: r.set_release_date },
     })) as unknown as PokemonCard[];
   } catch {
@@ -654,72 +698,65 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     }
   }
 
-  // Strategy 4: Just name + number (broader search)
+  // Strategy 4: Just name + number (broader search, across every set).
+  // Sept 24 2026: accepted ONLY when exactly one card survives the denominator
+  // (and year) filter. It used to take results[0] and, with no denominator match,
+  // fall back to the unfiltered list — a real card from some other set.
   if (!dbCard && cardName && cardNumber) {
     const normalizedNumber = normalizeCardNumber(cardNumber);
     console.log(`[Pokemon Local Verification] Strategy 4: Name + Number only`);
 
     try {
-      let results = await searchLocalByNameNumberTotal(cardName, normalizedNumber);
+      const results = await searchLocalByNameNumberTotal(cardName, normalizedNumber);
       if (results.length > 0) {
-        // CRITICAL: Filter by denominator first to avoid misidentification
-        const denominatorFiltered = filterByDenominator(results, setTotal);
-        if (denominatorFiltered.length > 0) {
-          results = denominatorFiltered;
-          console.log(`[Pokemon Local Verification] Filtered ${results.length} results by denominator ${setTotal}`);
-        } else if (setTotal) {
-          console.log(`[Pokemon Local Verification] WARNING: No results matched denominator ${setTotal}, using unfiltered results`);
+        let pool = filterByDenominator(results, setTotal);
+        if (cardInfo.year && pool.length > 1) {
+          const sameYear = pool.filter((c: PokemonCard) => c.set.releaseDate?.startsWith(cardInfo.year!));
+          if (sameYear.length > 0) pool = sameYear;
         }
-
-        // If we have year, filter by it
-        if (cardInfo.year) {
-          const yearMatch = results.find((c: PokemonCard) =>
-            c.set.releaseDate?.startsWith(cardInfo.year!)
-          );
-          dbCard = yearMatch || results[0];
+        if (pool.length === 1) {
+          dbCard = pool[0];
+          result.verification_method = 'local_db';
+          result.confidence = 'low';
+        } else if (pool.length > 1) {
+          console.log(`[Pokemon Local Verification] Strategy 4 ambiguous: ${pool.length} cards across sets — no match`);
+          addCandidates(result, pool.filter(c => namesAgree(cardName, c.name).agrees));
         } else {
-          dbCard = results[0];
+          console.log(`[Pokemon Local Verification] Strategy 4: no card matches denominator ${setTotal} — no match`);
         }
-        result.verification_method = 'local_db';
-        result.confidence = 'low';
       }
     } catch (error) {
       console.error('[Pokemon Local Verification] Strategy 4 failed:', error);
     }
   }
 
-  // Strategy 5: Fuzzy number matching - try nearby numbers when exact fails
-  // NOTE: Skip fuzzy matching for vintage cards (WOTC era) to avoid misidentification
-  const isVintageCard = setTotal && parseInt(setTotal.replace(/[^0-9]/g, '')) <= 132; // WOTC sets had <=132 cards
-  if (!dbCard && cardName && cardNumber && !isVintageCard) {
-    const normalizedNumber = normalizeCardNumber(cardNumber);
-    console.log(`[Pokemon Local Verification] Strategy 5: Fuzzy number matching (±3 range)`);
-
-    // Detect if this is a promo card
-    const promoSetId = getPromoSetId(cardNumberFormat);
-
-    const fuzzyResult = await searchLocalFuzzyNumber(cardName, normalizedNumber, promoSetId || undefined);
-    if (fuzzyResult.card && validateDenominator(fuzzyResult.card, setTotal)) {
-      dbCard = fuzzyResult.card;
-      result.verification_method = 'fuzzy_match';
-      result.confidence = 'medium'; // Medium because name matched but number was corrected
-
-      // Add correction for the number
-      if (fuzzyResult.matchedNumber && fuzzyResult.matchedNumber !== normalizedNumber) {
-        result.corrections.push({
-          field: 'card_number',
-          original: cardNumber,
-          corrected: `${fuzzyResult.matchedNumber}/${dbCard.set.printedTotal}`
-        });
-        console.log(`[Pokemon Local Verification] Fuzzy match corrected number: ${normalizedNumber} → ${fuzzyResult.matchedNumber}`);
-      }
-    }
-  } else if (isVintageCard && !dbCard) {
-    console.log(`[Pokemon Local Verification] Skipping fuzzy matching for vintage card (denominator ${setTotal})`);
-  }
+  // Strategy 5 (cross-set ±3 fuzzy number match) was REMOVED Sept 24 2026: it
+  // searched every set by name and ranked by numeric distance, and accepted
+  // Espeon-GX sm1-152 (a different Rainbow Rare) for a card printed 140/149.
 
   // Process results
   if (dbCard) {
+    return settleMatch(result, dbCard, { cardName, setName, year: cardInfo.year, setTotal, anniversary: !!anniversarySets });
+  }
+  result.error = 'No matching card found in local database';
+  console.log(`[Pokemon Local Verification] FAILED: No match found for ${cardName} #${cardNumber}${result.candidates?.length ? ` (${result.candidates.length} candidates for the owner)` : ''}`);
+  return result;
+}
+
+/**
+ * Validate a found card against what was read (year, denominator, name) and
+ * record the corrections. Shared by the strategy chain and the first-look
+ * printed-number path so both apply the same rejections.
+ */
+function settleMatch(
+  result: PokemonApiVerificationResult,
+  dbCard: PokemonCard,
+  read: { cardName: string; setName: string; year?: string; setTotal: string; anniversary: boolean },
+): PokemonApiVerificationResult {
+  const { cardName, setName, setTotal } = read;
+  const cardInfo = { year: read.year };
+  const anniversarySets = read.anniversary;
+  {
     // Check for corrections
     const dbSetName = dbCard.set.name;
     const dbCardName = dbCard.name;
@@ -792,6 +829,7 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
 
     result.success = true;
     result.verified = true;
+    delete result.candidates;
     result.pokemon_api_id = dbCard.id;
     result.pokemon_api_data = dbCard;
 
@@ -824,12 +862,80 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     if (result.corrections.length > 0) {
       console.log(`[Pokemon Local Verification] Corrections needed:`, result.corrections);
     }
-  } else {
-    result.error = 'No matching card found in local database';
-    console.log(`[Pokemon Local Verification] FAILED: No match found for ${cardName} #${cardNumber}`);
   }
-
   return result;
+}
+
+/** "140/149" → { number: "140", total: 149 }; "TG05/TG30" → { number: "TG05", total: 30 }. */
+export function splitPrintedPokemonNumber(printed: string | null | undefined): { number: string; total: number } | null {
+  const raw = String(printed || '').trim().replace(/^#\s*/, '');
+  const m = /^([A-Za-z]{0,6}\d+[A-Za-z]?)\s*\/\s*([A-Za-z]{0,6})(\d+)$/.exec(raw);
+  if (!m) return null;
+  const number = normalizeCardNumber(`${m[1]}/${m[2]}${m[3]}`);
+  const total = parseInt(m[3], 10);
+  if (!number || !Number.isFinite(total) || total <= 0) return null;
+  return { number, total };
+}
+
+/**
+ * The ONE catalog card with this exact printed number and set total whose name
+ * agrees with `name` (namesAgree: "Espeon GX" agrees with "Espeon-GX"). The name
+ * is compared in code, not with ilike, so hyphen/space variants of GX, EX, V,
+ * VMAX and ex all match. Zero or 2+ agreeing cards → no match.
+ */
+export async function findUniqueCatalogMatch(
+  name: string,
+  printed: string,
+): Promise<{ card: PokemonCard | null; agreeing: PokemonCard[] }> {
+  const parsed = splitPrintedPokemonNumber(printed);
+  if (!parsed || !String(name || '').trim()) return { card: null, agreeing: [] };
+  const rows = await searchLocalByNameNumberTotal('', parsed.number, parsed.total);
+  const agreeing = rows.filter(c => namesAgree(name, c.name).agrees);
+  return { card: agreeing.length === 1 ? agreeing[0] : null, agreeing };
+}
+
+/**
+ * Sept 24 2026 — the second read. When the grading call's number found no exact
+ * catalog card (or several), first look's printed number is tried: it wins only
+ * when it names exactly one catalog card whose name agrees with the read and
+ * whose set total agrees with the grading call's denominator (when there is
+ * one). The number change is recorded as a correction so the row, label and
+ * report follow it.
+ */
+export async function verifyPokemonCardByPrintedNumber(
+  cardInfo: CardInfoForVerification,
+  printedNumber: string,
+): Promise<PokemonApiVerificationResult> {
+  const result: PokemonApiVerificationResult = {
+    success: false, verified: false, pokemon_api_id: null, pokemon_api_data: null,
+    verification_method: 'none', confidence: 'low', corrections: [],
+  };
+  const cardName = cardInfo.player_or_character || cardInfo.card_name || '';
+  const gradingRaw = cardInfo.card_number_raw || cardInfo.card_number || '';
+  const parsed = splitPrintedPokemonNumber(printedNumber);
+  if (!cardName || !parsed) {
+    result.error = 'No name or printed number to check';
+    return result;
+  }
+  const gradingTotalText = cardInfo.set_total || gradingRaw.split('/')[1] || '';
+  const gradingTotal = parseInt(String(gradingTotalText).replace(/[^0-9]/g, ''), 10);
+  if (Number.isFinite(gradingTotal) && gradingTotal !== parsed.total) {
+    result.error = `Printed denominator /${parsed.total} disagrees with the grading read /${gradingTotal}`;
+    return result;
+  }
+  const { card, agreeing } = await findUniqueCatalogMatch(cardName, printedNumber);
+  if (!card) {
+    result.error = agreeing.length > 1 ? 'Printed number matches more than one catalog card' : 'Printed number has no catalog card with this name';
+    if (agreeing.length > 1) addCandidates(result, agreeing);
+    return result;
+  }
+  result.verification_method = 'set_id_number';
+  result.confidence = 'high';
+  const corrected = card.printedNumber || pokemonPrintedNumber(card.id, card.number, card.set.printedTotal);
+  result.corrections.push({ field: 'card_number', original: gradingRaw || null, corrected });
+  return settleMatch(result, card, {
+    cardName, setName: cardInfo.set_name || '', year: cardInfo.year, setTotal: String(parsed.total), anniversary: false,
+  });
 }
 
 /**

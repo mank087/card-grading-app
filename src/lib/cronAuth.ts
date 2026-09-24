@@ -55,3 +55,14 @@ export function requireCron(request: NextRequest, label: string): CronAuthResult
 
   return { ok: true };
 }
+
+/**
+ * Headers for a server-to-server call to an endpoint guarded by requireCron
+ * (e.g. POST /api/pokemon/verify from a grading route). The secret never leaves
+ * the server: these calls are made from route handlers, not from the browser.
+ */
+export function internalServiceHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+  if (process.env.CRON_SECRET) headers.Authorization = `Bearer ${process.env.CRON_SECRET}`;
+  return headers;
+}

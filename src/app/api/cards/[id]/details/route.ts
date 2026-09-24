@@ -5,6 +5,7 @@ import { generateLabelData } from "@/lib/labelDataGenerator";
 import { isUuid } from "@/lib/uuid";
 import { isRecordLocked, LOCKED_RECORD_ERROR } from "@/lib/cards/ownership";
 import { saveCardIdentity, IDENTITY_CONTROL_KEYS } from "@/lib/identity/saveCardIdentity";
+import { catalogRelinkNeeded, verifyAndSavePokemonCard } from "@/lib/identity/pokemonCatalogLink";
 
 // Fields that are protected and cannot be edited
 const PROTECTED_FIELDS = [
@@ -261,6 +262,21 @@ export async function PATCH(
             error: saved.error || "Failed to update card",
             ...(saved.field ? { field: saved.field } : {}),
           }, { status: 400 });
+      }
+    }
+
+    // 8b. Pokémon catalog link. pokemon_api_* describes the card the grading read
+    // named; after the owner changes the name, number or set it may describe a
+    // different card (Espeon-GX stayed linked to sm1-152 after the owner's fix).
+    // Re-verify from the owner's identity: link-only, it never rewrites what the
+    // owner saved, and it clears the link when the new identity has no single
+    // catalog card. Other categories' catalog links are left alone for now.
+    if (catalogRelinkNeeded(card.category, saved.changedFields)) {
+      try {
+        const relink = await verifyAndSavePokemonCard(supabase, cardId, { force: true, linkOnly: true, trigger: 'owner-edit' });
+        console.log(`[Edit Card Details] Pokemon catalog relink: ${relink.body?.success ? relink.body.pokemon_api_id : 'no single match — link cleared'}`);
+      } catch (relinkError: any) {
+        console.error('[Edit Card Details] Pokemon catalog relink failed (identity saved):', relinkError?.message);
       }
     }
 
