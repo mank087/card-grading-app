@@ -32,6 +32,7 @@ import { verifyClippedCorners } from './grading/frameEdgeCheck';
 import { caseConsensus } from './grading/caseConsensus';
 import { explainUncertaintyHold, letterUncertainty as letterUncertaintyFromEvidence } from './grading/evidenceHold';
 import { firstLookEnabled, runAndRecordFirstLook, type FirstLookRecord } from './identification/firstLookRunner';
+import { firstLookCatalogCheck } from './identification/firstLookCatalogCheck';
 import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requireCompleteEnsemble } from './grading/inspectionCompleteness';
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
@@ -1880,7 +1881,7 @@ export async function gradeCardConversational(
     if (firstLookRun || !firstLookEnabled() || !options?.routingKey) return;
     // Settles once PASS 1 is read and saved; the optional search pass carries on
     // in the background (kept alive past the response) and updates the record.
-    firstLookRun = runAndRecordFirstLook(options?.routingKey, { front: images.front, back: images.back }).contract
+    firstLookRun = runAndRecordFirstLook(options?.routingKey, { front: images.front, back: images.back }, { catalogConfirms: firstLookCatalogCheck(cardType) }).contract
       .then(record => { firstLookRecord = record; })
       .catch(() => undefined);
   };

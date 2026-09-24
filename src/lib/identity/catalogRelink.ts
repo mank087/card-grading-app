@@ -127,6 +127,13 @@ export async function relinkCatalog(supabase: SupabaseClient<any, any, any>, car
   return { status: 'linked', catalogId: hit.id, name: hit.name, confidence: hit.confidence };
 }
 
+/** Does this identity name exactly one catalog card (all the link guards applied)? */
+export async function catalogConfirmsIdentity(category: string, who: { name: string; set: string | null; number: string | null }): Promise<boolean> {
+  if (!LINK_COLUMN[category]) return false;
+  const hit = await matchCatalog(category, who, {});
+  return !('reason' in hit);
+}
+
 /** First look's read of the card, as an identity to look up. */
 export function firstLookIdentity(firstLook: unknown): Identity | null {
   const rec: any = typeof firstLook === 'string' ? (() => { try { return JSON.parse(firstLook); } catch { return null; } })() : firstLook;

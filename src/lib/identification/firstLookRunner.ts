@@ -54,6 +54,8 @@ export interface FirstLookRecord {
   contract_identity?: FirstLook['identity'];
   /** Pass 1's item_type when pass 2 ran: acting on a non-card needs both passes to agree. */
   contract_item_type?: string | null;
+  /** Set when the search pass was not needed: pass 1's read already named one catalog card. */
+  search_skipped?: 'catalog_match';
 }
 
 /**
@@ -87,7 +89,17 @@ export interface RunFirstLookOptions {
    * returned record is pass 1). Not awaited; errors are swallowed.
    */
   onContractPass?: (record: FirstLookRecord) => unknown;
+  /**
+   * Sept 2026: does pass 1's read already name exactly one catalog card? Then the
+   * web search cannot improve the identity and is skipped. Measured on 392 Pokemon
+   * search passes (Sept 18-24): 257 ran although pass 1 had a unique catalog match,
+   * and in none of them did the search land on a different card. Search passes
+   * took p50 35s, p90 163s, p99 522s. Capped at CATALOG_CHECK_MS; errors = search.
+   */
+  catalogConfirms?: (read: FirstLook) => Promise<boolean>;
 }
+
+const CATALOG_CHECK_MS = 5_000;
 
 export async function runFirstLook(
   images: { front: Buffer; back?: Buffer | null },
@@ -120,6 +132,15 @@ export async function runFirstLook(
     if (!allowSearch || !needsSearchPass(first.value)) {
       return { ...base, pass: 'contract', search_ran: false, searches: 0, ms: Date.now() - started, repairs: first.repairs, result: first.value };
     }
+    if (opts.catalogConfirms) {
+      const confirmed = await Promise.race([
+        opts.catalogConfirms(first.value).catch(() => false),
+        new Promise<boolean>(resolve => setTimeout(() => resolve(false), CATALOG_CHECK_MS)),
+      ]);
+      if (confirmed) {
+        return { ...base, pass: 'contract', search_ran: false, searches: 0, ms: Date.now() - started, repairs: first.repairs, result: first.value, search_skipped: 'catalog_match' };
+      }
+    }
 
     // Pass 1 is already worth saving: it READ the card (Espeon-GX 140/149 was read
     // correctly in pass 1 and only reached the row ~160s later, after the owner
@@ -136,7 +157,7 @@ export async function runFirstLook(
         model, tools: [{ type: 'web_search' }],
         text: { format: { type: 'json_schema', name: FIRST_LOOK_SCHEMA.name, schema: FIRST_LOOK_SCHEMA.schema, strict: true } },
         input: [{ role: 'user', content: [{ type: 'input_text', text: FIRST_LOOK_PROMPT + SEARCH_ADDENDUM }, ...urls.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
-      }, { timeout: PASS_TIMEOUT_MS });
+      }, { timeout: PASS_TIMEOUT_MS, maxRetries: 0 }); // one attempt: a retry doubled the slowest searches
       const searches = (r2.output || []).filter((o: any) => o.type === 'web_search_call').length;
       logOpenAIUsage({ operation: 'first_look_search', model, usage: { prompt_tokens: r2.usage?.input_tokens, completion_tokens: r2.usage?.output_tokens, total_tokens: r2.usage?.total_tokens } as any, durationMs: Date.now() - t2, metadata: { searches } });
       const second = normalizeFirstLook(JSON.parse(r2.output_text));

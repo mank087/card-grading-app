@@ -20,6 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { firstLookCatalogCheck } from '@/lib/identification/firstLookCatalogCheck';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyAuth } from '@/lib/serverAuth';
 import { isUuid } from '@/lib/uuid';
@@ -96,6 +97,9 @@ export async function POST(
         { front: originals.front, back: originals.back },
         {
           allowSearch: process.env.FIRST_LOOK_SEARCH === '1',
+          // The owner waits on this response: skip the search when the catalog
+          // already confirms pass 1's read (identification/firstLookCatalogCheck.ts).
+          catalogConfirms: firstLookCatalogCheck(String(card.category || '').toLowerCase().replace(/[^a-z]/g, '')),
           onContractPass: contractRecord => (contractWrite = Promise.resolve(recordFirstLook(cardId, contractRecord)).catch(() => false)),
         },
       );
