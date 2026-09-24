@@ -15,10 +15,23 @@ import { anniversaryNumber, pokemonPrintedNumber } from './pokemonAnniversary';
 export function normalizeCatalogName(name: string): string {
   return String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 }
-function catalogNameFilter(name: string): [string, string] {
-  return process.env.CATALOG_NAME_SEARCH === '1'
-    ? ['name_search', `%${normalizeCatalogName(name)}%`]
-    : ['name', `%${name}%`];
+/**
+ * "and" vs "&": the catalog writes tag teams with "&" (164 names, e.g. "Pikachu &
+ * Zekrom-GX"; name_search drops the "&"), but a handful of names contain the word
+ * "and" ("Wait and See Hammer"), and owners type either. When the input has "&" or
+ * a standalone "and", both forms are searched: with the word "and" and without it.
+ */
+export function catalogNameVariants(name: string): string[] {
+  const withAnd = normalizeCatalogName(String(name || '').replace(/&/g, ' and '));
+  const withoutAnd = normalizeCatalogName(String(name || '').replace(/&/g, ' ').replace(/\band\b/gi, ' '));
+  return withAnd === withoutAnd ? [withAnd] : [withoutAnd, withAnd];
+}
+function withCatalogName<Q extends { ilike: (c: string, p: string) => Q; or: (f: string) => Q }>(query: Q, name: string): Q {
+  if (process.env.CATALOG_NAME_SEARCH !== '1') return query.ilike('name', `%${name}%`);
+  const variants = catalogNameVariants(name).filter(Boolean);
+  if (variants.length <= 1) return query.ilike('name_search', `%${variants[0] ?? ''}%`);
+  // Variants are letters and digits only, so they are safe inside the or() syntax.
+  return query.or(variants.map(v => `name_search.ilike.%${v}%`).join(','));
 }
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
@@ -214,10 +227,9 @@ export async function searchLocalDatabase(
   try {
     console.log('[Pokemon Local DB] Searching:', { name, setName, cardNumber });
 
-    let query = supabase
+    let query = withCatalogName(supabase
       .from('pokemon_cards')
-      .select('*')
-      .ilike(...catalogNameFilter(name));
+      .select('*'), name);
 
     // Add set name filter if provided
     if (setName) {
@@ -314,10 +326,9 @@ export async function searchLocalFuzzyNumber(
     console.log(`[Pokemon Local DB] Fuzzy search: name="${name}", trying numbers:`, numberVariations);
 
     // Build query for all number variations at once
-    let query = supabase
+    let query = withCatalogName(supabase
       .from('pokemon_cards')
-      .select('*')
-      .ilike(...catalogNameFilter(name))
+      .select('*'), name)
       .in('number', numberVariations);
 
     // Add set filter if provided
@@ -387,10 +398,9 @@ export async function searchLocalByNameNumberSetId(
   try {
     console.log('[Pokemon Local DB] Searching promo by name+number+setId:', { name, cardNumber, setId });
 
-    const { data, error } = await supabase
+    const { data, error } = await withCatalogName(supabase
       .from('pokemon_cards')
-      .select('*')
-      .ilike(...catalogNameFilter(name))
+      .select('*'), name)
       .eq('number', cardNumber)
       .eq('set_id', setId)
       .limit(10);
@@ -428,10 +438,9 @@ export async function searchLocalByNameNumberTotal(
   try {
     console.log('[Pokemon Local DB] Searching by name+number+total:', { name, cardNumber, printedTotal });
 
-    let query = supabase
+    let query = withCatalogName(supabase
       .from('pokemon_cards')
-      .select('*')
-      .ilike(...catalogNameFilter(name))
+      .select('*'), name)
       .eq('number', cardNumber);
 
     if (printedTotal) {
