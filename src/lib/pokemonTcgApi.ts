@@ -6,6 +6,21 @@
 import { createClient } from '@supabase/supabase-js';
 import { anniversaryNumber, pokemonPrintedNumber } from './pokemonAnniversary';
 
+/**
+ * Sept 2026: name filter for the local catalog searches. With CATALOG_NAME_SEARCH=1
+ * (after migration 20260925_catalog_name_search.sql) it searches name_search, the
+ * name with punctuation and spacing removed, so "Espeon GX" finds "Espeon-GX".
+ * Without it, the old substring search on the official name.
+ */
+export function normalizeCatalogName(name: string): string {
+  return String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+function catalogNameFilter(name: string): [string, string] {
+  return process.env.CATALOG_NAME_SEARCH === '1'
+    ? ['name_search', `%${normalizeCatalogName(name)}%`]
+    : ['name', `%${name}%`];
+}
+
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
 // Get API key from environment variable - NO HARDCODED FALLBACKS
 const POKEMON_API_KEY = process.env.POKEMON_TCG_API_KEY || '';
@@ -202,7 +217,7 @@ export async function searchLocalDatabase(
     let query = supabase
       .from('pokemon_cards')
       .select('*')
-      .ilike('name', `%${name}%`);
+      .ilike(...catalogNameFilter(name));
 
     // Add set name filter if provided
     if (setName) {
@@ -302,7 +317,7 @@ export async function searchLocalFuzzyNumber(
     let query = supabase
       .from('pokemon_cards')
       .select('*')
-      .ilike('name', `%${name}%`)
+      .ilike(...catalogNameFilter(name))
       .in('number', numberVariations);
 
     // Add set filter if provided
@@ -375,7 +390,7 @@ export async function searchLocalByNameNumberSetId(
     const { data, error } = await supabase
       .from('pokemon_cards')
       .select('*')
-      .ilike('name', `%${name}%`)
+      .ilike(...catalogNameFilter(name))
       .eq('number', cardNumber)
       .eq('set_id', setId)
       .limit(10);
@@ -416,7 +431,7 @@ export async function searchLocalByNameNumberTotal(
     let query = supabase
       .from('pokemon_cards')
       .select('*')
-      .ilike('name', `%${name}%`)
+      .ilike(...catalogNameFilter(name))
       .eq('number', cardNumber);
 
     if (printedTotal) {
