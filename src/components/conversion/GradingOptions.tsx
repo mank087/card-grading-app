@@ -19,6 +19,8 @@ export interface GradingOption {
   perGrade: string
   bonus?: string
   tag?: string
+  /** Drawn with the purple border the featured card has on /credits. */
+  featured?: boolean
   anchor: string
 }
 
@@ -41,6 +43,7 @@ export function getGradingOptions(showFirstPurchaseBonus: boolean): GradingOptio
       ? `+${tier.bonusCredits} bonus on your first pack`
       : undefined,
     tag: tier.popular ? 'Most popular' : undefined,
+    featured: tier.popular,
     anchor: `plan-${tier.id}`,
   }))
 
@@ -93,7 +96,9 @@ export function GradingOptionsList({
             onClick={onNavigate}
             className="group flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-[#f7f2fd]"
             style={{
-              border: '1px solid var(--dcm-border, #dfe3eb)',
+              border: option.featured
+                ? '2px solid var(--dcm-purple, #9810fa)'
+                : '1px solid var(--dcm-border, #dfe3eb)',
               borderRadius: '10px',
               textDecoration: 'none',
             }}

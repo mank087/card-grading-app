@@ -44,7 +44,6 @@ export const pricingTiers: PricingTier[] = [
     credits: 5,
     bonusCredits: 3,
     description: 'Best value for casual collectors',
-    popular: true,
     icon: '🚀',
     color: 'purple',
     bgGradient: 'from-purple-600 to-indigo-600',
@@ -58,6 +57,8 @@ export const pricingTiers: PricingTier[] = [
     credits: 20,
     bonusCredits: 5,
     description: 'For serious collectors and dealers',
+    // Matches the featured "Most popular" card on /credits (PricingExperience).
+    popular: true,
     icon: '👑',
     color: 'amber',
     bgGradient: 'from-amber-500 to-orange-600',
