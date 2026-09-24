@@ -25,7 +25,10 @@ import { lookupLorcanaCard } from '@/lib/lorcanaCardMatcher';
 import { lookupOnePieceCard } from '@/lib/onepieceCardMatcher';
 
 export const RELINK_CATEGORIES = ['MTG', 'Lorcana', 'One Piece'] as const;
-const LINK_COLUMN: Record<string, string> = { MTG: 'mtg_card_id', Lorcana: 'lorcana_card_id', 'One Piece': 'onepiece_card_id' };
+// Lorcana: cards.lorcana_card_id is a uuid column, but Lorcast ids are text
+// ("crd_04d9..."), so the id cannot be stored there (the grading route leaves it
+// out too). The reference image and card_info.lorcana_database_id carry the link.
+const LINK_COLUMN: Record<string, string> = { MTG: 'mtg_card_id', Lorcana: 'lorcana_reference_image', 'One Piece': 'onepiece_card_id' };
 
 export type RelinkOutcome =
   | { status: 'linked'; catalogId: string; name: string; confidence: string }
@@ -89,8 +92,8 @@ async function matchCatalog(category: string, who: Identity, info: Record<string
     if (!namesCompatible(who.name, db.name, db.full_name)) return { reason: `catalog name "${db.name}" does not match "${who.name}"` };
     if (!setsAgree(who.set, db.set_name)) return { reason: `catalog set "${db.set_name}" does not match "${who.set}"` };
     return { id: String(db.id), name: db.full_name || db.name, set: db.set_name ?? null, number: db.collector_number ?? null, confidence: r.confidence.overallConfidence,
-      columns: { lorcana_card_id: db.id, lorcana_reference_image: db.image_normal || db.image_large || null, validated_source: 'lorcana_cards', validation_tier: 'exact', validation_confidence: r.confidence.overallConfidence },
-      info: {} };
+      columns: { lorcana_reference_image: db.image_normal || db.image_large || null, validated_source: 'lorcana_cards', validation_tier: 'exact', validation_confidence: r.confidence.overallConfidence },
+      info: { lorcana_database_id: db.id } };
   }
   // One Piece: the printed card id (e.g. OP05-119) is its collector number.
   const r = await lookupOnePieceCard({ cardId: who.number || info.card_id || undefined, name: who.name, set: who.set || undefined });
@@ -108,7 +111,7 @@ function parseInfo(raw: unknown): Record<string, any> {
   return info && typeof info === 'object' ? info : {};
 }
 
-const CARD_FIELDS = 'id, category, card_name, featured, card_set, card_number, mtg_set_code, conversational_card_info, conversational_whole_grade, grade_status, identity_confirmed_revision, first_look, mtg_card_id, lorcana_card_id, onepiece_card_id';
+const CARD_FIELDS = 'id, category, card_name, featured, card_set, card_number, mtg_set_code, conversational_card_info, conversational_whole_grade, grade_status, identity_confirmed_revision, first_look, mtg_card_id, lorcana_reference_image, onepiece_card_id';
 
 /** After an owner save: link from the owner's saved identity. */
 export async function relinkCatalog(supabase: SupabaseClient<any, any, any>, cardId: string): Promise<RelinkOutcome> {
@@ -123,7 +126,8 @@ export async function relinkCatalog(supabase: SupabaseClient<any, any, any>, car
   const setCode = card.category === 'MTG' ? (card.mtg_set_code || (setUnchanged ? info.expansion_code : null)) : (setUnchanged ? info.set_code : null);
   const hit = await matchCatalog(card.category, { name, set: card.card_set || null, number: card.card_number || null, setCode }, info);
   if ('reason' in hit) return { status: 'no_match', reason: hit.reason };
-  await supabase.from('cards').update({ ...hit.columns, conversational_card_info: { ...info, ...hit.info } }).eq('id', cardId);
+  const { error: writeError } = await supabase.from('cards').update({ ...hit.columns, conversational_card_info: { ...info, ...hit.info } }).eq('id', cardId);
+  if (writeError) return { status: 'skipped', reason: `link write failed: ${writeError.message}` };
   return { status: 'linked', catalogId: hit.id, name: hit.name, confidence: hit.confidence };
 }
 
@@ -178,8 +182,9 @@ export async function linkFromFirstLook(
     const fills: Record<string, any> = {};
     if (!card.card_set && hit.set) fills.card_set = hit.set;
     if (!card.card_number && hit.number) fills.card_number = hit.number;
-    await supabase.from('cards').update({ ...hit.columns, ...fills,
+    const { error: writeError } = await supabase.from('cards').update({ ...hit.columns, ...fills,
       conversational_card_info: { ...info, ...hit.info, catalog_link_source: 'first_look' } }).eq('id', cardId);
+    if (writeError) return { status: 'skipped', reason: `link write failed: ${writeError.message}` };
     return { status: 'linked', catalogId: hit.id, name: hit.name, confidence: hit.confidence };
   } catch (e: any) {
     return { status: 'skipped', reason: `first-look link failed: ${e?.message || e}` };
