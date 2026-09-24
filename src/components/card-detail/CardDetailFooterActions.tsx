@@ -24,6 +24,7 @@
 import { useEffect, useState } from 'react';
 import { ActionLink } from '@/components/design/Primitives';
 import { MarkAsSoldButton } from '@/components/cards/MarkAsSoldButton';
+import { isCardGradeComplete } from './useCardDetail';
 import {
   CardBinderPicker,
   type CardBinderMembership,
@@ -90,7 +91,7 @@ export function CardDetailFooterActions({
       )}
       <PostResultOffer
         ownerId={card?.user_id ?? null}
-        gradeComplete={!loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0}
+        gradeComplete={!loading && isCardGradeComplete(card)}
         orgId={(card as { org_id?: string | null } | null)?.org_id ?? null}
       />
       {isOwner && (

@@ -78,6 +78,20 @@ export interface CardDetailRecord {
   [key: string]: any;
 }
 
+/**
+ * True when the card has a finished numeric grade. The row has no `grade`
+ * column: the whole grade lives in dcm_grade_whole, with
+ * conversational_whole_grade as the fallback. Checking `card.grade` (as the
+ * page used to) was always false, which silently disabled every post-grade
+ * prompt on this page.
+ */
+export function isCardGradeComplete(card: CardDetailRecord | null | undefined): boolean {
+  if (!card) return false;
+  const raw = card.dcm_grade_whole ?? card.conversational_whole_grade;
+  const n = typeof raw === 'string' ? Number(raw) : raw;
+  return typeof n === 'number' && Number.isFinite(n) && n > 0;
+}
+
 export interface OrgLogos {
   color: string | null;
   white: string | null;

@@ -36,6 +36,7 @@ import dynamic from 'next/dynamic';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 import type { UseCardDetailResult } from './useCardDetail';
+import { isCardGradeComplete } from './useCardDetail';
 import type { CardDetailSectionId } from '@/lib/cardDetail/anchorMap';
 import type { SavedCustomStyle, CustomLabelConfig } from '@/lib/labelPresets';
 import type { LabelStyleId } from '@/hooks/useCustomLabelStyle';
@@ -362,7 +363,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   // Same rule as legacy: one ask per page for an empty balance.
   const postResultOfferEligible = usePostResultOfferEligible({
     ownerId: card?.user_id ?? null,
-    gradeComplete: !loading && typeof card?.grade === 'number' && (card.grade ?? 0) > 0,
+    gradeComplete: !loading && isCardGradeComplete(card),
     orgId: (card as { org_id?: string | null } | null)?.org_id ?? null,
   });
 
@@ -408,7 +409,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   useEffect(() => {
     if (!card || loading || creditsLoading) return;
     if (identityReviewShowing) return;
-    if (typeof card.grade !== 'number' || card.grade <= 0) return;
+    if (!isCardGradeComplete(card)) return;
     if ((card as { org_id?: string | null }).org_id) return;
     if (!(balance > 0) || totalPurchased !== 0 || isCardLover || isVip) return;
     const session = getStoredSession();
