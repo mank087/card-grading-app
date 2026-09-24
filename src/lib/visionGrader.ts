@@ -63,7 +63,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a corners/edges/surface score of 4 or below is re-inspected when the evaluations split by 4+ or zoom found nothing there (grading/severeScoreCheck.ts). v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (print line, ink, stain) (grading/severeScoreCheck.ts). v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3156,9 +3156,9 @@ Provide detailed analysis as markdown with all required sections.`
         }
 
         // Step 3.95 (Sept 2026): LOW-SCORE VERIFICATION. Every other gate guards the
-        // way up; this one guards the way down. A corners/edges/surface score of 4 or
-        // below is re-checked when the evaluations split by 4+ points on it or the
-        // magnified inspection found nothing there (grading/severeScoreCheck.ts).
+        // way up; this one guards the way down, narrowly: a surface score of 4 or
+        // below is re-checked only when every recorded flaw is a type printing can
+        // imitate (print lines, ink, stains). Measured scope in grading/severeScoreCheck.ts.
         // Refuted -> the category takes the evaluations' clean reading; unknown ->
         // the score stands and the record says so. Never throws.
         try {
@@ -3167,6 +3167,12 @@ Provide detailed analysis as markdown with all required sections.`
             passScores: { corners: rawPassCats.corners, edges: rawPassCats.edges, surface: rawPassCats.surface },
             zoomDefectCategories: zoom?.ok ? new Set(zoom.defects.map(d => String(d.category))) : null,
             structuralDetected,
+            // Flaw types recorded by the evaluations that scored surface low.
+            surfaceDefectTypes: scored
+              .filter(x => typeof x.cats.surface === 'number' && (x.cats.surface as number) <= 4)
+              .flatMap(x => ['front', 'back'].flatMap(face => Array.isArray(x.j?.surface?.[face]?.defects) ? x.j.surface[face].defects : []))
+              .filter((d: any) => d && typeof d === 'object' && String(d.severity || '').toLowerCase() !== 'none')
+              .map((d: any) => String(d.type || '')),
           });
           const severeRecords: any[] = [];
           for (const trigger of severeTriggers) {

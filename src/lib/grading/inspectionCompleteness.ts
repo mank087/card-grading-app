@@ -111,7 +111,15 @@ export function requireCompleteEnsemble(evaluations: Array<{ final: number | nul
   if (evaluations.length !== 3 || evaluations.some(e =>
     [e.final, ...['centering', 'corners', 'edges', 'surface'].map(key => e.cats[key])]
       .some(v => typeof v !== 'number' || !Number.isFinite(v) || v < 1 || v > 10))) {
-    throw new IncompleteInspectionError('ensemble', 'three complete evaluations with finite scores in range are required');
+    // Name the missing values: an evaluation that returned no numeric grade on
+    // purpose (the rubric's N/A for a suspected alteration) looks identical to a
+    // broken one from outside, and the failure log is the only place to tell.
+    const missing = evaluations.map((e, i) => {
+      const bad = Object.entries({ final: e.final, ...e.cats })
+        .filter(([, v]) => typeof v !== 'number' || !Number.isFinite(v) || v < 1 || v > 10).map(([k, v]) => `${k}=${v}`);
+      return bad.length ? `evaluation ${i + 1}: ${bad.join(', ')}` : null;
+    }).filter(Boolean).join('; ');
+    throw new IncompleteInspectionError('ensemble', `three complete evaluations with finite scores in range are required (${evaluations.length} received${missing ? `; ${missing}` : ''})`);
   }
 }
 

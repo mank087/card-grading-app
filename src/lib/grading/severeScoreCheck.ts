@@ -9,11 +9,13 @@
  * while the magnified inspection found all 28 regions clean. The card published
  * at 1 beside corners, edges and centering of 10.
  *
- * A severe cosmetic score (<= SEVERE_MAX) is now verified before it can decide
- * the grade when the evidence around it disagrees: the evaluations are 4+
- * points apart on that category, or the magnified inspection found nothing in
- * that category. One dedicated call asks whether the flaw is physical (damage or
- * an added mark) or printed design / a photo artifact.
+ * A severe SURFACE score (<= SEVERE_MAX) is now verified before it can decide
+ * the grade, but only when the evaluations themselves split by 4+ points and
+ * every flaw they recorded is a type printing or cardstock can imitate (print
+ * lines, ink/marks, stains). One dedicated call asks whether the flaw is
+ * physical (damage or an added mark) or printed design / a photo artifact.
+ * Corners, edges and deformation types (dents, creases, scratches) are never
+ * sent here — see CONFUSABLE below for the measurement behind that.
  *
  *   confirmed -> the score stands
  *   refuted   -> the category takes the evaluations' clean reading (the highest
@@ -52,24 +54,47 @@ export interface SevereTriggerInput {
   zoomDefectCategories: Set<string> | null;
   /** Surface held by a verified structural finding is not re-checked here. */
   structuralDetected: boolean;
+  /** Defect types the low-scoring evaluations recorded for surface (e.g. "print_line"). */
+  surfaceDefectTypes: string[];
 }
 
-/** Which severe scores need a second look. Pure. */
+/**
+ * Surface defect types that printing or cardstock can imitate. Only these are
+ * re-inspected. Measured Sept 24 on every low score from the previous 30 days
+ * (162 category scores): with corners/edges and deformation types included the
+ * verifier refuted 36%, including worn corners and front+back fold lines it
+ * described as damage in its own words. Physical deformation has no printed
+ * look-alike this check can rule out, and corners/edges are not "lines".
+ */
+const CONFUSABLE = /print|ink|mark|writ|stain|discolor|toning|tone|spot/;
+const DEFORMATION = /indent|crease|fold|bend|dent|wrinkle|warp|tear|scratch|scuff|abrasion|chip|crack|ding|impression|puncture|hole/;
+
+export function surfaceClaimsConfusable(types: string[]): boolean {
+  const t = types.map(x => String(x || '').toLowerCase().replace(/[_-]+/g, ' ').trim()).filter(Boolean);
+  return t.length > 0 && t.every(x => CONFUSABLE.test(x) && !DEFORMATION.test(x));
+}
+
+/**
+ * Which severe scores need a second look. Pure.
+ * Surface only, and only when every recorded flaw is a type printing can
+ * imitate. The evaluations need not disagree: the same Espeon photo came back
+ * 1/10/1 in one run and 1/1/1 in the next (all three misreading the same
+ * outline). Over 30 days of production the type filter alone selected 10 cards
+ * in every category combined; the verifier changed 2 (both confirmed correct
+ * by eye) and confirmed the other 8 (pen marks and autographs).
+ */
 export function severeScoreTriggers(input: SevereTriggerInput): SevereTrigger[] {
-  const out: SevereTrigger[] = [];
-  for (const cat of ['corners', 'edges', 'surface'] as const) {
-    const score = input.scores[cat];
-    if (typeof score !== 'number' || score > SEVERE_MAX) continue;
-    if (cat === 'surface' && input.structuralDetected) continue;
-    const passScores = (input.passScores[cat] || []).filter((n): n is number => typeof n === 'number');
-    const spread = passScores.length ? Math.max(...passScores) - Math.min(...passScores) : 0;
-    const zoomClean = input.zoomDefectCategories !== null && !input.zoomDefectCategories.has(cat);
-    const reasons: string[] = [];
-    if (spread >= SEVERE_SPREAD) reasons.push(`evaluations ${passScores.join('/')} disagree`);
-    if (zoomClean) reasons.push('magnified inspection found no defect in this category');
-    if (reasons.length) out.push({ cat, score, passScores, spread, zoomClean, reasons });
-  }
-  return out;
+  const cat = 'surface' as const;
+  const score = input.scores[cat];
+  if (typeof score !== 'number' || score > SEVERE_MAX || input.structuralDetected) return [];
+  if (!surfaceClaimsConfusable(input.surfaceDefectTypes)) return [];
+  const passScores = (input.passScores[cat] || []).filter((n): n is number => typeof n === 'number');
+  const spread = passScores.length ? Math.max(...passScores) - Math.min(...passScores) : 0;
+  const zoomClean = input.zoomDefectCategories !== null && !input.zoomDefectCategories.has(cat);
+  const reasons = [`surface ${score} rests on print-like flaw(s) only`];
+  if (spread >= SEVERE_SPREAD) reasons.push(`evaluations ${passScores.join('/')} disagree`);
+  if (zoomClean) reasons.push('magnified inspection found no surface defect');
+  return [{ cat, score, passScores, spread, zoomClean, reasons }];
 }
 
 export type SevereVerdict = { ok: boolean; confirmed: boolean | null; reason: string; votes?: string[] };
@@ -80,7 +105,12 @@ export type SevereVerdict = { ok: boolean; confirmed: boolean | null; reason: st
  */
 export function resolveSevereScore(trigger: SevereTrigger, verdict: SevereVerdict, zoomCap: number | null): number {
   if (verdict.confirmed !== false) return trigger.score;
-  const clean = Math.max(trigger.score, ...trigger.passScores);
+  const highestPass = Math.max(trigger.score, ...trigger.passScores);
+  // Every evaluation scored it low on the refuted flaw, so none offers a clean
+  // reading. Same rule as Step 3.8 evidence reconciliation: with the flaw gone
+  // and the magnified inspection clean, the deduction is undocumented -> Mint (9).
+  // Without a clean magnified read there is nothing to stand on; keep the score.
+  const clean = highestPass > SEVERE_MAX ? highestPass : trigger.zoomClean ? 9 : trigger.score;
   return zoomCap == null ? clean : Math.max(trigger.score, Math.min(clean, zoomCap));
 }
 

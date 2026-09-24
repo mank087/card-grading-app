@@ -6,31 +6,47 @@ const base = {
   passScores: { corners: [10, 10, 10], edges: [10, 10, 10], surface: [1, 10, 1] },
   zoomDefectCategories: new Set<string>(),
   structuralDetected: false,
+  surfaceDefectTypes: ['print_line'],
 };
 const answer = (classification: string, reason = 'seen') => ({
   finish_reason: 'stop', message: { content: JSON.stringify({ classification, reason }) },
 });
 
 describe('low-score verification triggers', () => {
-  it('flags the Espeon case: surface 1 with passes 1/10/1 and a clean magnified inspection', () => {
+  it('flags the Espeon case: surface 1, passes 1/10/1, a print line', () => {
     const [t, ...rest] = severeScoreTriggers(base);
     expect(rest).toHaveLength(0);
     expect(t).toMatchObject({ cat: 'surface', score: 1, spread: 9, zoomClean: true });
   });
 
-  it('leaves agreed, corroborated low scores alone', () => {
-    const agreed = severeScoreTriggers({ ...base, passScores: { ...base.passScores, surface: [1, 2, 1] }, zoomDefectCategories: new Set(['surface']) });
-    expect(agreed).toHaveLength(0);
+  it('flags a stain call on toned vintage cardstock (1975 Topps McCovey, passes 1/1/7)', () => {
+    const t = severeScoreTriggers({ ...base, passScores: { ...base.passScores, surface: [1, 1, 7] }, surfaceDefectTypes: ['stain', 'stain'] });
+    expect(t).toHaveLength(1);
   });
 
-  it('does not re-check scores above 4, or surface held by verified structural damage', () => {
+  it('never re-checks deformation: dents, creases, fold lines, scratches', () => {
+    for (const types of [['indentation'], ['crease'], ['print_line', 'indentation'], ['scratch']]) {
+      expect(severeScoreTriggers({ ...base, surfaceDefectTypes: types })).toHaveLength(0);
+    }
+  });
+
+  it('never re-checks corners or edges, however low', () => {
+    const t = severeScoreTriggers({ ...base, scores: { corners: 2, edges: 2, surface: 9 }, passScores: { corners: [2, 9, 2], edges: [2, 9, 2], surface: [9, 9, 9] } });
+    expect(t).toHaveLength(0);
+  });
+
+  it('re-checks a unanimous misread too (the same Espeon photo also came back 1/1/1)', () => {
+    expect(severeScoreTriggers({ ...base, passScores: { ...base.passScores, surface: [1, 1, 1] } })).toHaveLength(1);
+  });
+
+  it('leaves agreed low scores on physical flaws alone', () => {
+    expect(severeScoreTriggers({ ...base, passScores: { ...base.passScores, surface: [4, 4, 4] }, scores: { ...base.scores, surface: 4 }, surfaceDefectTypes: ['scratch', 'indentation'] })).toHaveLength(0);
+  });
+
+  it('needs a recorded flaw, a score of 4 or below, and no verified structural damage', () => {
+    expect(severeScoreTriggers({ ...base, surfaceDefectTypes: [] })).toHaveLength(0);
     expect(severeScoreTriggers({ ...base, scores: { ...base.scores, surface: 5 } })).toHaveLength(0);
     expect(severeScoreTriggers({ ...base, structuralDetected: true })).toHaveLength(0);
-  });
-
-  it('treats a missing magnified inspection as no evidence either way', () => {
-    const t = severeScoreTriggers({ ...base, passScores: { ...base.passScores, surface: [1, 2, 1] }, zoomDefectCategories: null });
-    expect(t).toHaveLength(0);
   });
 });
 
@@ -39,6 +55,11 @@ describe('low-score resolution', () => {
   it('refuted takes the clean reading, bounded by a magnified-inspection cap', () => {
     expect(resolveSevereScore(trigger, { ok: true, confirmed: false, reason: '' }, null)).toBe(10);
     expect(resolveSevereScore(trigger, { ok: true, confirmed: false, reason: '' }, 8)).toBe(8);
+  });
+  it('a refuted unanimous misread reconciles to 9 only when the magnified inspection was clean', () => {
+    const unanimous: SevereTrigger = { ...trigger, passScores: [1, 1, 1], spread: 0 };
+    expect(resolveSevereScore(unanimous, { ok: true, confirmed: false, reason: '' }, null)).toBe(9);
+    expect(resolveSevereScore({ ...unanimous, zoomClean: false }, { ok: true, confirmed: false, reason: '' }, null)).toBe(1);
   });
   it('confirmed or unknown keeps the score', () => {
     expect(resolveSevereScore(trigger, { ok: true, confirmed: true, reason: '' }, null)).toBe(1);
