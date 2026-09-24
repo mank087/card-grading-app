@@ -48,7 +48,7 @@ import ImageZoomModal from '@/app/pokemon/[id]/ImageZoomModal';
 import { SoldBanner } from '@/components/cards/SoldBanner';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
-import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
+import { FirstGradeCongratsModal, isCongratsModalDismissed } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { useCredits } from '@/contexts/CreditsContext';
@@ -286,7 +286,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
   } = props;
 
   const { card, loading, isProcessing, error, regradingImageUrl } = detail;
-  const { balance, isFirstPurchase, isLoading: creditsLoading } = useCredits();
+  const { balance, isFirstPurchase, totalPurchased, isCardLover, isVip, isLoading: creditsLoading } = useCredits();
 
   const routing = useCardDetailSectionRouting(detail.isOwner);
   const [side, setSide] = useState<CardSide>('front');
@@ -296,6 +296,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
+  // Welcome after the FIRST free grade (a free credit is still left). The
+  // balance-0 modal above never fired for these people, so a new user's first
+  // result page had no welcome, no tour and no nudge toward grade #2.
+  const [showFreeGradeWelcome, setShowFreeGradeWelcome] = useState(false);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   // True while IdentityReview's own banner is on screen.
   const [identityReviewShowing, setIdentityReviewShowing] = useState(false);
@@ -375,6 +379,7 @@ export function CardDetailShell(props: CardDetailShellProps) {
     showInsufficientCredits ||
     showEditLabelModal ||
     showFirstGradeModal ||
+    showFreeGradeWelcome ||
     enlargedHolder !== null ||
     manageSheetOpen ||
     insta.modalOpen;
@@ -390,11 +395,27 @@ export function CardDetailShell(props: CardDetailShellProps) {
   useEffect(() => {
     if (card && !loading && balance === 0 && !postResultOfferEligible) {
       const session = getStoredSession();
-      if (session?.user?.id && card.user_id && session.user.id === card.user_id) {
+      if (session?.user?.id && card.user_id && session.user.id === card.user_id && !isCongratsModalDismissed('first-grade')) {
         setShowFirstGradeModal(true);
       }
     }
   }, [card, loading, balance, postResultOfferEligible]);
+
+  // Owner on free credits (never paid, not a subscriber, not an org card) with
+  // a finished grade and at least one free grade left. Held while the identity
+  // check banner is up so the two do not stack; the modal's own dismiss key
+  // keeps it to once per browser.
+  useEffect(() => {
+    if (!card || loading || creditsLoading) return;
+    if (identityReviewShowing) return;
+    if (typeof card.grade !== 'number' || card.grade <= 0) return;
+    if ((card as { org_id?: string | null }).org_id) return;
+    if (!(balance > 0) || totalPurchased !== 0 || isCardLover || isVip) return;
+    const session = getStoredSession();
+    if (session?.user?.id && card.user_id && session.user.id === card.user_id && !isCongratsModalDismissed('free-grade-left')) {
+      setShowFreeGradeWelcome(true);
+    }
+  }, [card, loading, creditsLoading, identityReviewShowing, balance, totalPurchased, isCardLover, isVip]);
 
   const jumpTo = useCallback(
     (id: CardDetailSectionId, anchorId?: string) => {
@@ -945,6 +966,19 @@ export function CardDetailShell(props: CardDetailShellProps) {
           onDismiss={() => setShowFirstGradeModal(false)}
           onStartTour={() => {
             setShowFirstGradeModal(false);
+            setShowOnboardingTour(true);
+          }}
+        />
+      )}
+
+      {showFreeGradeWelcome && (
+        <FirstGradeCongratsModal
+          variant="free-grade-left"
+          freeCreditsLeft={balance}
+          isFirstPurchase={isFirstPurchase}
+          onDismiss={() => setShowFreeGradeWelcome(false)}
+          onStartTour={() => {
+            setShowFreeGradeWelcome(false);
             setShowOnboardingTour(true);
           }}
         />

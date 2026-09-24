@@ -266,6 +266,13 @@ export default function MarketplaceClient() {
     if (pageState !== 'marketplace') return;
     if (activeTab !== null) return;
     if (!stats) return;
+    // ?tab=settings deep link (from the listing modal's "Switch account").
+    let requested: string | null = null;
+    try { requested = new URLSearchParams(window.location.search).get('tab'); } catch { /* no-op */ }
+    if (requested === 'settings') {
+      setActiveTab('settings');
+      return;
+    }
     setActiveTab(stats.activeCount > 0 ? 'active' : 'list');
   }, [pageState, stats, activeTab]);
 
@@ -607,7 +614,11 @@ export default function MarketplaceClient() {
           {activeTab === 'settings' && (
             <div className="space-y-5">
               <EbayPolicySettings />
-              <DisconnectPanel username={ebayUsername} onDisconnected={() => refreshAll()} />
+              <DisconnectPanel
+                username={ebayUsername}
+                onDisconnected={() => refreshAll()}
+                onSwitch={() => { refreshAll(); startEbayConnect(); }}
+              />
             </div>
           )}
         </div>
@@ -719,15 +730,18 @@ function SyncStatusPill({ syncState }: { syncState:
 function DisconnectPanel({
   username,
   onDisconnected,
+  onSwitch,
 }: {
   username: string | null;
   onDisconnected: () => void;
+  /** Called after a successful disconnect when the person chose "Switch". */
+  onSwitch: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<null | 'disconnect' | 'switch'>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const disconnect = async () => {
+  const disconnect = async (mode: 'disconnect' | 'switch') => {
     setBusy(true);
     setError(null);
     try {
@@ -738,8 +752,9 @@ function DisconnectPanel({
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) throw new Error('failed');
-      setConfirming(false);
-      onDisconnected();
+      setConfirming(null);
+      if (mode === 'switch') onSwitch();
+      else onDisconnected();
     } catch {
       setError('Could not disconnect. Please try again.');
     } finally {
@@ -757,7 +772,33 @@ function DisconnectPanel({
         </p>
       </header>
       <div className="p-4 space-y-3">
-        {confirming ? (
+        {confirming === 'switch' ? (
+          <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 space-y-3">
+            <p className="text-sm text-blue-900">
+              Switch eBay accounts? We will disconnect {username ? <strong>{username}</strong> : 'this account'} and
+              open eBay&apos;s sign-in so you can choose a different account. Listings already
+              published stay on the old account.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => disconnect('switch')}
+                disabled={busy}
+                className="px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {busy ? 'Switching…' : 'Yes, switch account'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirming(null); setError(null); }}
+                disabled={busy}
+                className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : confirming === 'disconnect' ? (
           <div className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-3">
             <p className="text-sm text-red-900">
               Disconnect this eBay account? DCM stops syncing your listings and you will have to
@@ -766,7 +807,7 @@ function DisconnectPanel({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={disconnect}
+                onClick={() => disconnect('disconnect')}
                 disabled={busy}
                 className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
@@ -774,7 +815,7 @@ function DisconnectPanel({
               </button>
               <button
                 type="button"
-                onClick={() => { setConfirming(false); setError(null); }}
+                onClick={() => { setConfirming(null); setError(null); }}
                 disabled={busy}
                 className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50"
               >
@@ -783,13 +824,22 @@ function DisconnectPanel({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="text-sm text-gray-600 hover:text-red-700 font-semibold"
-          >
-            Disconnect eBay
-          </button>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <button
+              type="button"
+              onClick={() => setConfirming('switch')}
+              className="text-sm text-blue-700 hover:text-blue-900 font-semibold"
+            >
+              Switch eBay account
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming('disconnect')}
+              className="text-sm text-gray-600 hover:text-red-700 font-semibold"
+            >
+              Disconnect eBay
+            </button>
+          </div>
         )}
         {error && <p className="text-xs text-red-700">{error}</p>}
       </div>

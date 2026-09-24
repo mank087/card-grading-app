@@ -93,6 +93,11 @@ export function getAuthorizationUrl(state: string, scopes: string[]): string {
     response_type: 'code',
     scope: scopes.join(' '),
     state: state,
+    // Always show eBay's login screen. Without this, a browser that is still
+    // signed in to eBay (and has consented to DCM before) is approved silently,
+    // so a second DCM account got linked to whoever was last signed in to eBay
+    // without the person ever choosing an account.
+    prompt: 'login',
   });
 
   return `${baseUrl}?${params.toString()}`;
@@ -213,13 +218,16 @@ export async function getEbayUserInfo(accessToken: string): Promise<{
   userId: string;
   username: string;
 }> {
+  // The Identity API lives on apiz.*, not api.*. Calling api.ebay.com failed on
+  // every connection, which is why every account showed the "eBay User"
+  // placeholder instead of its username.
   const apiUrl = EBAY_CONFIG.sandbox
-    ? 'https://api.sandbox.ebay.com'
-    : 'https://api.ebay.com';
+    ? 'https://apiz.sandbox.ebay.com'
+    : 'https://apiz.ebay.com';
 
   try {
     // Use the Commerce Identity API
-    const response = await fetch(`${apiUrl}/commerce/identity/v1/user`, {
+    const response = await fetch(`${apiUrl}/commerce/identity/v1/user/`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',

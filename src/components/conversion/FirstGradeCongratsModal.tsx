@@ -7,32 +7,63 @@ interface FirstGradeCongratsModalProps {
   isFirstPurchase: boolean
   onDismiss: () => void
   onStartTour?: () => void // New prop to trigger the guided tour
-  variant?: 'signup' | 'first-grade' // Controls header copy and dismiss key
+  /**
+   * Controls header copy and dismiss key.
+   * - signup: just created an account
+   * - first-grade: out of credits after the free grades (promo code)
+   * - free-grade-left: first grade done, a free credit still left (welcome,
+   *   what the grade means, tour, grade the next card free)
+   */
+  variant?: 'signup' | 'first-grade' | 'free-grade-left'
+  /** free-grade-left only: how many free grades remain. */
+  freeCreditsLeft?: number
 }
 
 const PROMO_CODE = 'Grade10'
 const SIGNUP_DISMISSED_KEY = 'dcm_welcome_promo_signup_dismissed'
 const FIRST_GRADE_DISMISSED_KEY = 'dcm_welcome_promo_first_grade_dismissed'
+const FREE_GRADE_LEFT_DISMISSED_KEY = 'dcm_welcome_free_grade_left_dismissed'
 // Legacy key kept for backward compat — if user already dismissed the old modal,
 // we won't pester them again with the first-grade variant.
 const LEGACY_DISMISSED_KEY = 'dcm_first_grade_modal_dismissed'
+
+type CongratsVariant = NonNullable<FirstGradeCongratsModalProps['variant']>
+
+function dismissKeyFor(variant: CongratsVariant): string {
+  if (variant === 'signup') return SIGNUP_DISMISSED_KEY
+  if (variant === 'free-grade-left') return FREE_GRADE_LEFT_DISMISSED_KEY
+  return FIRST_GRADE_DISMISSED_KEY
+}
+
+/**
+ * True when this variant was already dismissed in this browser. Callers check
+ * it BEFORE mounting the modal: the modal renders nothing once dismissed, but a
+ * parent that still thinks it is open keeps the page scroll-locked.
+ */
+export function isCongratsModalDismissed(variant: CongratsVariant = 'first-grade'): boolean {
+  try {
+    if (localStorage.getItem(dismissKeyFor(variant))) return true
+    if (variant === 'first-grade' && localStorage.getItem(LEGACY_DISMISSED_KEY)) return true
+    return false
+  } catch {
+    return false
+  }
+}
 
 export function FirstGradeCongratsModal({
   isFirstPurchase,
   onDismiss,
   onStartTour,
-  variant = 'first-grade'
+  variant = 'first-grade',
+  freeCreditsLeft = 1,
 }: FirstGradeCongratsModalProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const dismissKey = variant === 'signup' ? SIGNUP_DISMISSED_KEY : FIRST_GRADE_DISMISSED_KEY
+  const dismissKey = dismissKeyFor(variant)
 
   useEffect(() => {
-    // Check if this variant of the modal was already dismissed
-    const wasDismissed = localStorage.getItem(dismissKey)
-    const wasLegacyDismissed = variant === 'first-grade' && localStorage.getItem(LEGACY_DISMISSED_KEY)
-    if (!wasDismissed && !wasLegacyDismissed) {
+    if (!isCongratsModalDismissed(variant)) {
       // Small delay for better UX - let the page load first
       const timer = setTimeout(() => setIsVisible(true), 500)
       return () => clearTimeout(timer)
@@ -87,10 +118,18 @@ export function FirstGradeCongratsModal({
   if (!isVisible) return null
 
   const isSignup = variant === 'signup'
-  const headerTitle = isSignup ? 'Welcome to DCM Grading' : 'Nice first grade'
+  const isFreeGradeLeft = variant === 'free-grade-left'
+  const freeLeftLabel = freeCreditsLeft === 1 ? '1 free grade' : `${freeCreditsLeft} free grades`
+  const headerTitle = isSignup
+    ? 'Welcome to DCM Grading'
+    : isFreeGradeLeft
+      ? 'Your first grade is in'
+      : 'Nice first grade'
   const headerSubtitle = isSignup
     ? 'Your 2 free credits are ready to use.'
-    : 'Here’s a thank-you gift for grading your first card.'
+    : isFreeGradeLeft
+      ? `Welcome to DCM Grading. You still have ${freeLeftLabel} left.`
+      : 'Here’s a thank-you gift for grading your first card.'
 
   return (
     <div className="dcm-brand fixed inset-0 z-50 overflow-y-auto animate-fadeIn" style={{ background: 'rgba(20, 35, 59, 0.6)' }}>
@@ -119,7 +158,53 @@ export function FirstGradeCongratsModal({
           </div>
 
           <div className="p-6">
-            {isSignup ? (
+            {isFreeGradeLeft ? (
+              <>
+                <p className="text-sm mb-4" style={{ color: 'var(--dcm-ink, #14233b)', lineHeight: 1.7 }}>
+                  DCM Optic&trade; graded your card from your photos on the 1&ndash;10 scale collectors
+                  know. Here is how to read your report:
+                </p>
+
+                <ul className="space-y-2 mb-6 text-sm" style={{ color: 'var(--dcm-ink, #14233b)' }}>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Four subgrades: centering, corners, edges and surface</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>The weakest subgrade sets the grade, and the report shows what held it back</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span aria-hidden="true" style={{ color: 'var(--dcm-purple-text, #7624b5)' }}>&#10003;</span>
+                    <span>Market value, printable slab labels and eBay InstaList are all on this page</span>
+                  </li>
+                </ul>
+
+                <div className="flex flex-col gap-2">
+                  <ActionLink href="/upload" variant="primary" onClick={handleDismiss} className="w-full">
+                    Grade my next card free
+                  </ActionLink>
+                  <ActionButton variant="secondary" onClick={handleStartTour} className="w-full">
+                    Show me around this page
+                  </ActionButton>
+                  <ActionButton variant="text" onClick={handleDismiss} className="w-full">
+                    Maybe later
+                  </ActionButton>
+                </div>
+
+                <p className="text-xs mt-5 text-center" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.7 }}>
+                  Grading a stack?{' '}
+                  <a
+                    href="/credits"
+                    onClick={handleDismiss}
+                    style={{ color: 'var(--dcm-purple-text, #7624b5)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                  >
+                    Credit packs
+                  </a>{' '}
+                  start at $2.99, and larger packs cost less per card.
+                </p>
+              </>
+            ) : isSignup ? (
               <>
                 <p className="text-sm mb-5" style={{ color: 'var(--dcm-ink, #14233b)', lineHeight: 1.7 }}>
                   Upload photos of a card&rsquo;s front and back and you will have a full grade report in about a
@@ -244,6 +329,7 @@ export function FirstGradeCongratsModal({
 export {
   SIGNUP_DISMISSED_KEY,
   FIRST_GRADE_DISMISSED_KEY,
+  FREE_GRADE_LEFT_DISMISSED_KEY,
   LEGACY_DISMISSED_KEY as MODAL_DISMISSED_KEY,
   PROMO_CODE
 }
