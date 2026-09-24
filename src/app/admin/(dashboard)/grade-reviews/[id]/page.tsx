@@ -9,7 +9,9 @@ const detailLabels:Record<string,string>={card_name:'Card name',set_name:'Set',y
 // The print-run serial is free text; "none" clears one the grader invented.
 const detailHints:Partial<Record<typeof detailFields[number],string>>={serial_number:'Print-run serial, e.g. 325/825. Type "none" if the card is not serialized.'};
 type Detail={review:{review_mode:string;admin_reviewed_at:string|null;admin_notes:string|null;status:string;note:string;customer_result:string|null;concerns:{category:string;side:string}[]};snapshot:{report:string;grade:number};isCurrent:boolean;photos:{side:string;url:string|null}[];notifications:{kind:string;sent_at:string|null;failed_at:string|null;last_error:string|null}[];
-  details?:{current:Record<string,string|null>;claim:Record<string,string>|null;changes:{field:string;from:string|null;to:string|null}[]|null;applied_at:string|null;category:string}};
+  details?:{current:Record<string,string|null>;claim:Record<string,string>|null;changes:{field:string;from:string|null;to:string|null}[]|null;applied_at:string|null;category:string};
+  /** Why this review can no longer be completed; null when it can. */
+  blocked?:string|null};
 export default function ManualGradeReviewPage(){
   const {id}=useParams<{id:string}>(),[data,setData]=useState<Detail|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
   const [verdict,setVerdict]=useState('confirm'),[notes,setNotes]=useState(''),[scores,setScores]=useState<Record<string,string>>({}),[cap,setCap]=useState(''),[structural,setStructural]=useState(false);
@@ -23,11 +25,15 @@ export default function ManualGradeReviewPage(){
     const body={verdict,notes,...(verdict==='propose_change'?{scores:Object.fromEntries(fields.map(f=>[f,Number(scores[f])])),cap:Number(cap),structuralConfirmed:structural}:{}),...(Object.keys(changedDetails).length?{details:changedDetails}:{})};
     const r=await fetch(`/api/admin/grade-reviews/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw Error(result.error);setSaved(result);setRefresh(v=>v+1);
   }catch(e){setError(e instanceof Error?e.message:'Unable to save review.');}finally{setBusy(false);}}
+  async function closeReview(){if(busy)return;setBusy(true);setError('');try{
+    const r=await fetch(`/api/admin/grade-reviews/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'close'})});const result=await r.json();if(!r.ok)throw Error(result.error);setRefresh(v=>v+1);
+  }catch(e){setError(e instanceof Error?e.message:'Unable to close review.');}finally{setBusy(false);}}
   const proposed=Math.min(Number(cap)||10,...fields.map(f=>Number(scores[f])||10));
   const original=(()=>{try{return JSON.parse(data?.snapshot.report??'{}');}catch{return {};}})();
   return <main className="space-y-6 text-gray-900"><Link className="text-purple-700 underline" href="/admin/grade-reviews">Back to review queue</Link><h1 className="text-2xl font-bold">Manual Grade Review</h1>
     {error&&<p role="alert" className="rounded bg-red-50 p-4 text-red-800">{error}</p>}
     {!data?<p>Loading review...</p>:<><p>Original grade: <strong>{data.snapshot.grade}</strong>. Status: {data.review.status.replaceAll('_',' ')}.</p><p className="text-sm">Manual reviews can take up to two business days.</p>
+    {data.blocked&&<section role="alert" className="rounded border border-amber-300 bg-amber-50 p-4"><h2 className="font-bold text-amber-900">This review can no longer be completed</h2><p className="mt-1 text-sm text-amber-900">{data.blocked}</p><p className="mt-1 text-sm text-amber-900">Closing it removes it from the queue. No email is sent to the customer.</p><button type="button" onClick={closeReview} disabled={busy} className="mt-3 rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-50">{busy?'Closing...':'Close review'}</button></section>}
     <section className="rounded border bg-white p-4"><h2 className="font-bold">Customer concern</h2>
       <p className="text-sm text-gray-600">{data.review.concerns?.some(c=>c.category!=='details')?'Grade review requested (all four subgrades).':'Card details only; the grade is not disputed.'}</p>
       <p className="whitespace-pre-wrap">{data.review.note||'No additional note.'}</p>
@@ -45,7 +51,7 @@ export default function ManualGradeReviewPage(){
     </section>
     <details className="rounded border bg-white p-4"><summary className="cursor-pointer font-semibold">Complete original report</summary><pre className="mt-4 max-h-[500px] overflow-auto whitespace-pre-wrap break-words text-xs">{data.snapshot.report}</pre></details>
     {data.review.customer_result&&<p className="whitespace-pre-wrap rounded bg-purple-50 p-4">{data.review.customer_result}</p>}
-    {data.review.review_mode==='manual'&&!data.review.admin_reviewed_at&&data.isCurrent&&['queued','processing'].includes(data.review.status)?<form onSubmit={submit} className="space-y-4 rounded border bg-white p-5">
+    {data.review.review_mode==='manual'&&!data.review.admin_reviewed_at&&data.isCurrent&&!data.blocked&&['queued','processing'].includes(data.review.status)?<form onSubmit={submit} className="space-y-4 rounded border bg-white p-5">
       <label className="block font-semibold">Verdict<select value={verdict} onChange={e=>setVerdict(e.target.value)} className="mt-2 block w-full rounded border p-2"><option value="confirm">Confirm original grade</option><option value="clarify">Clarify the grading explanation</option><option value="request_photos">Unable to verify; better photos needed</option><option value="propose_change">Propose a grade change</option></select></label>
       {verdict==='propose_change'&&<fieldset className="space-y-3"><legend className="font-bold">Review all face scores</legend><div className="grid grid-cols-2 gap-3">{fields.map(f=><label key={f} className="capitalize">{f.replace('_',' ')}<input required type="number" min="1" max="10" step="1" value={scores[f]??''} onChange={e=>setScores(v=>({...v,[f]:e.target.value}))} className="block w-full rounded border p-2"/></label>)}</div>
       <label className="block">Independent grade cap (10 means no additional cap)<input required type="number" min="1" max="10" step="1" value={cap} onChange={e=>setCap(e.target.value)} className="ml-2 w-20 rounded border p-2"/></label>

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
     const pending=request.nextUrl.searchParams.get('view')!=='all';
     let query = supabaseServer().from('card_grade_reviews')
-      .select('id, card_id, requester_id, grade_run_id, requested_at, status, concerns, note, customer_result, outcome, completed_at, original_grade, proposed_grade, owner_decision, decided_at, attempt_count, last_error_code, cards(serial, category, card_name)');
+      .select('id, card_id, requester_id, grade_run_id, requested_at, status, concerns, note, customer_result, outcome, completed_at, original_grade, proposed_grade, owner_decision, decided_at, attempt_count, last_error_code, cards(serial, category, card_name, deleted_at)');
     if(pending)query=query.eq('review_mode','manual').in('status',['queued','processing']);
     const { data, error } = await query.order('requested_at', { ascending: pending }).order('id', { ascending: pending })
       .range(page * 50, page * 50 + 50);

@@ -8,7 +8,7 @@ type Entry = ReviewSummary & {
   card_id: string;
   requester_id: string;
   grade_run_id: string;
-  cards: { serial: string | null; category: string | null; card_name: string | null } | null;
+  cards: { serial: string | null; category: string | null; card_name: string | null; deleted_at?: string | null } | null;
   attempt_count: number;
   last_error_code: string | null;
 };
@@ -47,7 +47,7 @@ export default function GradeReviewsPage() {
       {entries.map(entry => <article key={entry.id} className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap justify-between gap-2">
           <h2 className="font-semibold text-gray-900">{entry.cards?.card_name || entry.cards?.serial || entry.card_id}</h2>
-          <span className="text-sm font-medium text-purple-800">{reviewStatusLabels[entry.status]}</span>
+          <span className="text-sm font-medium text-purple-800">{entry.cards?.deleted_at && ['queued', 'processing'].includes(entry.status) ? <span className="mr-2 rounded bg-amber-100 px-2 py-0.5 text-amber-900">Card deleted by owner</span> : null}{reviewStatusLabels[entry.status]}</span>
         </div>
         <p className="mt-2 text-sm text-gray-600">Requested {new Date(entry.requested_at).toLocaleString()} · Serial {entry.cards?.serial || 'Unavailable'}</p>
         <p className="mt-2 break-all text-xs text-gray-500">Customer: {entry.requester_id} · Card: {entry.card_id}</p>
