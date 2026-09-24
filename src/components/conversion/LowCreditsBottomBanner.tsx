@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
+import { BASE_PRICE_PER_CREDIT, VIP_PACKAGE } from '@/lib/creditPackages'
 
 interface LowCreditsBottomBannerProps {
   /** Credit balance. Undefined or null means "not known yet". */
@@ -16,16 +17,21 @@ interface LowCreditsBottomBannerProps {
    * one who is out of credits.
    */
   ownerId?: string | null
+  /**
+   * CSS length the bar sits above, e.g. the card page's mobile action bar
+   * height. Defaults to the bottom of the screen.
+   */
+  bottomOffset?: string
 }
 
 const BANNER_DISMISSED_KEY = 'dcm_low_credits_banner_dismissed'
-const BANNER_DISMISS_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 export function LowCreditsBottomBanner({
   balance,
   isFirstPurchase = false,
   loading = false,
   ownerId,
+  bottomOffset = '0px',
 }: LowCreditsBottomBannerProps) {
   const [isDismissed, setIsDismissed] = useState(true) // Start hidden to prevent flash
   // Signed-out visitors were being told they had 0 credits, because the
@@ -51,20 +57,11 @@ export function LowCreditsBottomBanner({
   const isOutOfCredits = balanceLoaded && balance === 0
   const shouldShow = isEligible && isOutOfCredits
 
+  // Owner request (Sept 24 2026): the bar stays up on every page view while
+  // the balance is 0. Closing it hides it for this page view only; there is
+  // no longer a 24-hour snooze.
   useEffect(() => {
-    if (!shouldShow) return
-    // Check if banner was dismissed recently
-    const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
-    if (dismissedAt) {
-      const dismissedTime = parseInt(dismissedAt, 10)
-      const now = Date.now()
-      // If dismissed less than 24 hours ago, keep it hidden
-      if (now - dismissedTime < BANNER_DISMISS_DURATION) {
-        setIsDismissed(true)
-        return
-      }
-    }
-    setIsDismissed(false)
+    setIsDismissed(!shouldShow)
   }, [shouldShow])
 
   // Fire paywall_seen once per page lifetime when the banner actually renders.
@@ -91,7 +88,6 @@ export function LowCreditsBottomBanner({
   }, [isDismissed, shouldShow, isFirstPurchase])
 
   const handleDismiss = () => {
-    localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())
     setIsDismissed(true)
   }
 
@@ -99,7 +95,10 @@ export function LowCreditsBottomBanner({
   if (isDismissed || !shouldShow) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 animate-slideUpBanner">
+    <>
+    {/* Keeps the last of the page scrollable into view above the fixed bar. */}
+    <div aria-hidden="true" className="h-24 sm:h-16" />
+    <div className="fixed left-0 right-0 z-40 animate-slideUpBanner" style={{ bottom: bottomOffset }}>
       <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 shadow-lg shadow-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -111,13 +110,15 @@ export function LowCreditsBottomBanner({
                 </svg>
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium text-sm sm:text-base truncate">
-                  You have <span className="font-bold">0 credits</span> &mdash; save 10% with code{' '}
-                  <span className="font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded">Grade10</span>
+                <p className="text-white font-medium text-sm sm:text-base">
+                  You&rsquo;re out of credits.{' '}
+                  <span className="font-normal text-purple-100">
+                    Packs from ${BASE_PRICE_PER_CREDIT.toFixed(2)}, down to ${VIP_PACKAGE.perGradeCost.toFixed(2)} a grade, or credits every month with Card Lovers.
+                  </span>
                 </p>
                 {isFirstPurchase && (
                   <p className="text-purple-100 text-xs sm:text-sm hidden sm:block">
-                    First-time graders also get bonus credits on their first purchase!
+                    Your first pack comes with bonus credits.
                   </p>
                 )}
               </div>
@@ -129,7 +130,7 @@ export function LowCreditsBottomBanner({
                 href="/credits"
                 className="inline-flex items-center px-4 py-2 bg-white text-purple-700 font-semibold text-sm rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
               >
-                Buy Credits
+                See all options
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -148,6 +149,7 @@ export function LowCreditsBottomBanner({
         </div>
       </div>
     </div>
+    </>
   )
 }
 

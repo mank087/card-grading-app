@@ -51,7 +51,6 @@ import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { FirstGradeCongratsModal, isCongratsModalDismissed } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
-import { usePostResultOfferEligible } from '@/components/conversion/PostResultOffer';
 import { useCredits } from '@/contexts/CreditsContext';
 import { getStoredSession } from '@/lib/directAuth';
 
@@ -360,13 +359,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
     instaListActive: routing.active === 'instalist',
   });
 
-  // Same rule as legacy: one ask per page for an empty balance.
-  const postResultOfferEligible = usePostResultOfferEligible({
-    ownerId: card?.user_id ?? null,
-    gradeComplete: !loading && isCardGradeComplete(card),
-    orgId: (card as { org_id?: string | null } | null)?.org_id ?? null,
-  });
-
   /*
    * The genuinely MODAL dialogs — read twice: here to hold the page still
    * behind them (audit item A3), and far below to stand the mobile action bar
@@ -392,15 +384,19 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const narrowViewport = useNarrowViewport();
   useScrollLock(modalOpen || (downloadMenuOpen && narrowViewport));
 
-  // Owner only, balance 0, and not already covered by the post-result offer.
+  // Out of credits: owner only, finished grade, balance 0. Owner request
+  // (Sept 24 2026): the popup, the bottom bar and the in-page options panel
+  // all show together now; they used to suppress each other, which left a
+  // person who had just used both free grades with no visible prompt at all.
   useEffect(() => {
-    if (card && !loading && balance === 0 && !postResultOfferEligible) {
-      const session = getStoredSession();
-      if (session?.user?.id && card.user_id && session.user.id === card.user_id && !isCongratsModalDismissed('first-grade')) {
-        setShowFirstGradeModal(true);
-      }
+    if (!card || loading || creditsLoading || balance !== 0) return;
+    if (!isCardGradeComplete(card)) return;
+    if ((card as { org_id?: string | null }).org_id) return;
+    const session = getStoredSession();
+    if (session?.user?.id && card.user_id && session.user.id === card.user_id && !isCongratsModalDismissed('out-of-credits')) {
+      setShowFirstGradeModal(true);
     }
-  }, [card, loading, balance, postResultOfferEligible]);
+  }, [card, loading, creditsLoading, balance]);
 
   // Owner on free credits (never paid, not a subscriber, not an org card) with
   // a finished grade and at least one free grade left. Held while the identity
@@ -963,6 +959,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
       {showFirstGradeModal && (
         <FirstGradeCongratsModal
+          variant="out-of-credits"
+          neverPurchased={totalPurchased === 0}
           isFirstPurchase={isFirstPurchase}
           onDismiss={() => setShowFirstGradeModal(false)}
           onStartTour={() => {
@@ -993,14 +991,14 @@ export function CardDetailShell(props: CardDetailShellProps) {
         onBeforeStep={routing.revealAnchor}
       />
 
-      {!postResultOfferEligible && (
-        <LowCreditsBottomBanner
-          balance={balance}
-          isFirstPurchase={isFirstPurchase}
-          ownerId={card?.user_id ?? null}
-          loading={creditsLoading}
-        />
-      )}
+      {/* Sits above the phone action bar, which is 0px tall on desktop. */}
+      <LowCreditsBottomBanner
+        balance={balance}
+        isFirstPurchase={isFirstPurchase}
+        ownerId={card?.user_id ?? null}
+        loading={creditsLoading}
+        bottomOffset="var(--cd-mobile-bar-height, 0px)"
+      />
     </div>
     </ModalPortalProvider>
   );

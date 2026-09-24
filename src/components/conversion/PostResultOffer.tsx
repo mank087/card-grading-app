@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { ActionButton, ActionLink } from '@/components/design/Primitives'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
-import { CARD_LOVERS_PLANS, pricingTiers } from '@/lib/creditPackages'
+import { GradingOptionsList, creditsHref } from '@/components/conversion/GradingOptions'
 
 /**
  * Post-result offer (2026-09-09).
@@ -36,9 +36,9 @@ function dismissKey(userId: string) {
 }
 
 /**
- * The one eligibility rule. The card page also uses it to suppress the low
- * credits banner and the balance-0 congrats modal, so the same person is never
- * asked to buy three times on one screen.
+ * Who sees the in-page panel. Since Sept 24 2026 the V2 card page no longer
+ * uses this to hide the low-credits bar or the out-of-credits popup: the owner
+ * wants all three visible when the free grades run out.
  */
 export function usePostResultOfferEligible({ ownerId, gradeComplete, orgId }: PostResultOfferProps): boolean {
   const { balance, isLoading, totalPurchased, isCardLover, isVip } = useCredits()
@@ -60,6 +60,7 @@ export function usePostResultOfferEligible({ ownerId, gradeComplete, orgId }: Po
 
 export function PostResultOffer(props: PostResultOfferProps) {
   const eligible = usePostResultOfferEligible(props)
+  const { isFirstPurchase } = useCredits()
   const { ownerId } = props
   const [dismissed, setDismissed] = useState(true) // start hidden, avoids a flash
 
@@ -77,8 +78,6 @@ export function PostResultOffer(props: PostResultOfferProps) {
 
   if (!eligible || dismissed) return null
 
-  const monthly = CARD_LOVERS_PLANS.monthly
-  const pro = pricingTiers.find(tier => tier.id === 'pro')
 
   const handleDismiss = () => {
     if (ownerId) {
@@ -107,29 +106,19 @@ export function PostResultOffer(props: PostResultOfferProps) {
         className="text-xl font-bold"
         style={{ color: 'var(--dcm-ink, #14233b)', letterSpacing: '-0.02em' }}
       >
-        Keep grading with Card Lovers
+        Ways to keep grading
       </h3>
-      <p className="text-sm mt-2" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.6 }}>
-        {monthly.credits} credits every month for ${monthly.price}, plus member benefits. Credits do not expire.
+      <p className="text-sm mt-2 mb-4" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.6 }}>
+        Buy a pack when you need it or join Card Lovers for credits every month. Bigger packs
+        cost less per card, and credits never expire.
       </p>
 
+      <GradingOptionsList showFirstPurchaseBonus={isFirstPurchase} withPromo />
+
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <ActionLink href="/card-lovers" variant="primary">See Card Lovers plans</ActionLink>
-        <ActionLink href="/credits" variant="secondary">Compare one-time packs</ActionLink>
+        <ActionLink href={creditsHref(undefined, true)} variant="primary">Compare all options</ActionLink>
         <ActionButton variant="text" onClick={handleDismiss}>Not now</ActionButton>
       </div>
-
-      {pro && (
-        <p className="text-xs mt-4" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.7 }}>
-          Or start small:{' '}
-          <a
-            href="/credits"
-            style={{ color: 'var(--dcm-purple-text, #7624b5)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
-          >
-            {pro.credits} credits for ${pro.price.toFixed(2)}
-          </a>
-        </p>
-      )}
     </div>
   )
 }

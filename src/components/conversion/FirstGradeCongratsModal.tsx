@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ActionButton, ActionLink } from '@/components/design/Primitives'
+import { GradingOptionsList, creditsHref } from '@/components/conversion/GradingOptions'
 
 interface FirstGradeCongratsModalProps {
   isFirstPurchase: boolean
@@ -13,16 +14,25 @@ interface FirstGradeCongratsModalProps {
    * - first-grade: out of credits after the free grades (promo code)
    * - free-grade-left: first grade done, a free credit still left (welcome,
    *   what the grade means, tour, grade the next card free)
+   * - out-of-credits: balance hit 0 on the card page. Lays out EVERY way to
+   *   keep grading (packs, VIP, Card Lovers) rather than one product.
    */
-  variant?: 'signup' | 'first-grade' | 'free-grade-left'
+  variant?: 'signup' | 'first-grade' | 'free-grade-left' | 'out-of-credits'
   /** free-grade-left only: how many free grades remain. */
   freeCreditsLeft?: number
+  /** out-of-credits only: true when the account has never bought anything. */
+  neverPurchased?: boolean
 }
 
 const PROMO_CODE = 'Grade10'
 const SIGNUP_DISMISSED_KEY = 'dcm_welcome_promo_signup_dismissed'
 const FIRST_GRADE_DISMISSED_KEY = 'dcm_welcome_promo_first_grade_dismissed'
 const FREE_GRADE_LEFT_DISMISSED_KEY = 'dcm_welcome_free_grade_left_dismissed'
+const OUT_OF_CREDITS_DISMISSED_KEY = 'dcm_out_of_credits_modal_dismissed'
+// The out-of-credits popup comes back after this long, so someone who closed
+// it and returns days later at 0 credits is reminded once more. The other
+// variants are once per browser.
+const OUT_OF_CREDITS_SNOOZE_MS = 3 * 24 * 60 * 60 * 1000
 // Legacy key kept for backward compat — if user already dismissed the old modal,
 // we won't pester them again with the first-grade variant.
 const LEGACY_DISMISSED_KEY = 'dcm_first_grade_modal_dismissed'
@@ -32,6 +42,7 @@ type CongratsVariant = NonNullable<FirstGradeCongratsModalProps['variant']>
 function dismissKeyFor(variant: CongratsVariant): string {
   if (variant === 'signup') return SIGNUP_DISMISSED_KEY
   if (variant === 'free-grade-left') return FREE_GRADE_LEFT_DISMISSED_KEY
+  if (variant === 'out-of-credits') return OUT_OF_CREDITS_DISMISSED_KEY
   return FIRST_GRADE_DISMISSED_KEY
 }
 
@@ -42,7 +53,12 @@ function dismissKeyFor(variant: CongratsVariant): string {
  */
 export function isCongratsModalDismissed(variant: CongratsVariant = 'first-grade'): boolean {
   try {
-    if (localStorage.getItem(dismissKeyFor(variant))) return true
+    const stored = localStorage.getItem(dismissKeyFor(variant))
+    if (variant === 'out-of-credits') {
+      const at = stored ? parseInt(stored, 10) : 0
+      return Boolean(at) && Date.now() - at < OUT_OF_CREDITS_SNOOZE_MS
+    }
+    if (stored) return true
     if (variant === 'first-grade' && localStorage.getItem(LEGACY_DISMISSED_KEY)) return true
     return false
   } catch {
@@ -56,6 +72,7 @@ export function FirstGradeCongratsModal({
   onStartTour,
   variant = 'first-grade',
   freeCreditsLeft = 1,
+  neverPurchased = false,
 }: FirstGradeCongratsModalProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -70,14 +87,16 @@ export function FirstGradeCongratsModal({
     }
   }, [dismissKey, variant])
 
+  const dismissValue = variant === 'out-of-credits' ? Date.now().toString() : 'true'
+
   const handleDismiss = () => {
-    localStorage.setItem(dismissKey, 'true')
+    localStorage.setItem(dismissKey, dismissValue)
     setIsVisible(false)
     onDismiss()
   }
 
   const handleStartTour = () => {
-    localStorage.setItem(dismissKey, 'true')
+    localStorage.setItem(dismissKey, dismissValue)
     setIsVisible(false)
     if (onStartTour) {
       onStartTour()
@@ -119,17 +138,27 @@ export function FirstGradeCongratsModal({
 
   const isSignup = variant === 'signup'
   const isFreeGradeLeft = variant === 'free-grade-left'
+  const isOutOfCredits = variant === 'out-of-credits'
   const freeLeftLabel = freeCreditsLeft === 1 ? '1 free grade' : `${freeCreditsLeft} free grades`
   const headerTitle = isSignup
     ? 'Welcome to DCM Grading'
     : isFreeGradeLeft
       ? 'Your first grade is in'
-      : 'Nice first grade'
+      : isOutOfCredits
+        ? (neverPurchased ? 'You’ve used your free grades' : 'You’re out of credits')
+        : 'Nice first grade'
   const headerSubtitle = isSignup
     ? 'Your 2 free credits are ready to use.'
     : isFreeGradeLeft
       ? `Welcome to DCM Grading. You still have ${freeLeftLabel} left.`
-      : 'Here’s a thank-you gift for grading your first card.'
+      : isOutOfCredits
+        ? 'There’s more than one way to keep grading. Pick what fits how many cards you have.'
+        : 'Here’s a thank-you gift for grading your first card.'
+  const eyebrow = isSignup
+    ? 'Account created'
+    : isOutOfCredits
+      ? 'Keep grading'
+      : 'First grade complete'
 
   return (
     <div className="dcm-brand fixed inset-0 z-50 overflow-y-auto animate-fadeIn" style={{ background: 'rgba(20, 35, 59, 0.6)' }}>
@@ -147,7 +176,7 @@ export function FirstGradeCongratsModal({
           {/* Header */}
           <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid var(--dcm-border, #dfe3eb)' }}>
             <p className="dcm-eyebrow" style={{ marginBottom: '8px' }}>
-              {isSignup ? 'Account created' : 'First grade complete'}
+              {eyebrow}
             </p>
             <h2 className="text-2xl font-bold" style={{ color: 'var(--dcm-ink, #14233b)', letterSpacing: '-0.02em' }}>
               {headerTitle}
@@ -158,7 +187,43 @@ export function FirstGradeCongratsModal({
           </div>
 
           <div className="p-6">
-            {isFreeGradeLeft ? (
+            {isOutOfCredits ? (
+              <>
+                <GradingOptionsList
+                  showFirstPurchaseBonus={isFirstPurchase}
+                  withPromo={neverPurchased}
+                  onNavigate={handleDismiss}
+                />
+
+                <p className="text-xs mt-4" style={{ color: 'var(--dcm-muted, #596579)', lineHeight: 1.7 }}>
+                  Credits never expire and work on every card type.
+                  {neverPurchased && (
+                    <>
+                      {' '}Code{' '}
+                      <button
+                        type="button"
+                        onClick={handleCopyCode}
+                        title="Copy promo code"
+                        className="font-mono font-semibold"
+                        style={{ color: 'var(--dcm-purple-text, #7624b5)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                      >
+                        {PROMO_CODE}
+                      </button>{' '}
+                      takes 10% off a credit pack. {copied ? 'Copied.' : ''}
+                    </>
+                  )}
+                </p>
+
+                <div className="flex flex-col gap-2 mt-5">
+                  <ActionLink href={creditsHref(undefined, neverPurchased)} variant="primary" onClick={handleDismiss} className="w-full">
+                    Compare all options
+                  </ActionLink>
+                  <ActionButton variant="text" onClick={handleDismiss} className="w-full">
+                    Not now
+                  </ActionButton>
+                </div>
+              </>
+            ) : isFreeGradeLeft ? (
               <>
                 <p className="text-sm mb-4" style={{ color: 'var(--dcm-ink, #14233b)', lineHeight: 1.7 }}>
                   DCM Optic&trade; graded your card from your photos on the 1&ndash;10 scale collectors
@@ -330,6 +395,7 @@ export {
   SIGNUP_DISMISSED_KEY,
   FIRST_GRADE_DISMISSED_KEY,
   FREE_GRADE_LEFT_DISMISSED_KEY,
+  OUT_OF_CREDITS_DISMISSED_KEY,
   LEGACY_DISMISSED_KEY as MODAL_DISMISSED_KEY,
   PROMO_CODE
 }
