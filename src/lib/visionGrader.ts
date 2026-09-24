@@ -42,6 +42,7 @@ import { buildClampNote, buildGateDragNote, decideClampExplanation } from './gra
 import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
+import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
@@ -62,7 +63,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.28'; // v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a corners/edges/surface score of 4 or below is re-inspected when the evaluations split by 4+ or zoom found nothing there (grading/severeScoreCheck.ts). v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -2051,7 +2052,13 @@ Provide detailed analysis as markdown with all required sections.`
     // temperature/top_p rather than ignoring them, so without this every
     // canary grade fails outright. `n` and `seed` are preserved, so the
     // ensemble stays intact.
-    const { config: compatConfig, stripped: strippedParams } = applyModelCompat(apiConfig, model);
+    // Sept 24 2026: the ensemble's reasoning effort is its own setting. Measured on
+    // the calibration set, medium matched low on accuracy (no card improved; the
+    // one miss reproduced at low) and added ~40% latency, so the default stays low.
+    // GRADING_ENSEMBLE_REASONING_EFFORT=medium switches it without a code change.
+    const ensembleEffort = process.env.GRADING_ENSEMBLE_REASONING_EFFORT || undefined;
+    const { config: compatConfig, stripped: strippedParams, reasoningEffort: appliedEffort } = applyModelCompat(apiConfig, model, { reasoningEffort: ensembleEffort });
+    if (appliedEffort) console.log(`[CONVERSATIONAL] ${model}: reasoning_effort=${appliedEffort}`);
     if (strippedParams.length) {
       console.log(`[CONVERSATIONAL] ${model}: stripped unsupported params [${strippedParams.join(', ')}]`);
     }
@@ -2072,7 +2079,7 @@ Provide detailed analysis as markdown with all required sections.`
       model,
       usage,
       durationMs: Date.now() - ensembleCallStart,
-      metadata: { card_type: cardType, n: apiConfig.n, attempt, output_format: outputFormat },
+      metadata: { card_type: cardType, n: apiConfig.n, attempt, output_format: outputFormat, reasoning_effort: appliedEffort ?? null },
     });
 
     // Extract response with detailed error logging
@@ -3144,6 +3151,98 @@ Provide detailed analysis as markdown with all required sections.`
               }
             }
           }
+        }
+
+        // Step 3.95 (Sept 2026): LOW-SCORE VERIFICATION. Every other gate guards the
+        // way up; this one guards the way down. A corners/edges/surface score of 4 or
+        // below is re-checked when the evaluations split by 4+ points on it or the
+        // magnified inspection found nothing there (grading/severeScoreCheck.ts).
+        // Refuted -> the category takes the evaluations' clean reading; unknown ->
+        // the score stands and the record says so. Never throws.
+        try {
+          const severeTriggers = severeScoreTriggers({
+            scores: { corners: serverRounded.corners, edges: serverRounded.edges, surface: serverRounded.surface },
+            passScores: { corners: rawPassCats.corners, edges: rawPassCats.edges, surface: rawPassCats.surface },
+            zoomDefectCategories: zoom?.ok ? new Set(zoom.defects.map(d => String(d.category))) : null,
+            structuralDetected,
+          });
+          const severeRecords: any[] = [];
+          for (const trigger of severeTriggers) {
+            const passDefects = [pass1, pass2, pass3]
+              .flatMap((p: any) => Array.isArray(p?.defects_noted) ? p.defects_noted : [])
+              .filter((d: any) => typeof d === 'string' && d.toLowerCase().startsWith(trigger.cat));
+            const claims = [...new Set(passDefects as string[])];
+            const verifierImages = await loadOriginals().catch(() => undefined);
+            // Medium reasoning is required here: on the Espeon anchor the verifier at
+            // low confirmed the printed outline as "marker" 3/3; at medium it read
+            // printed design 3/3. It runs on a handful of cards, so the cost is small.
+            const severeEffort = process.env.SEVERE_VERIFY_REASONING_EFFORT || 'medium';
+            let verdict = await verifySevereClaim(frontImageUrl, backImageUrl, trigger.cat, claims, { model, images: verifierImages, reasoningEffort: severeEffort });
+            if (!verdict.ok) verdict = await verifySevereClaim(frontImageUrl, backImageUrl, trigger.cat, claims, { model, images: verifierImages, reasoningEffort: severeEffort });
+            const faceCaps = ['front', 'back'].map(f => appliedFaceCaps[`${trigger.cat}_${f}`]).filter((n): n is number => typeof n === 'number');
+            const zoomCap = faceCaps.length ? Math.min(...faceCaps) : null;
+            const newScore = resolveSevereScore(trigger, verdict, zoomCap);
+            const outcome = verdict.confirmed === true ? 'confirmed' : verdict.confirmed === false ? 'refuted' : 'unverified';
+            console.log(`[GRADE RECALC] 🔍 low-score check: ${trigger.cat} ${trigger.score} (${trigger.reasons.join('; ')}) → ${outcome}${newScore !== trigger.score ? `, ${trigger.score} → ${newScore}` : ''} — ${verdict.reason}`);
+            severeRecords.push({ category: trigger.cat, score_before: trigger.score, score_after: newScore, outcome,
+              triggers: trigger.reasons, pass_scores: trigger.passScores, votes: verdict.votes ?? null, reason: verdict.reason });
+            if (newScore > trigger.score) {
+              serverRounded[trigger.cat] = newScore;
+              // The per-face scores were clamped to the refuted reading; lift them with it.
+              if (jsonData.raw_sub_scores) {
+                for (const face of ['front', 'back']) {
+                  const key = `${trigger.cat}_${face}`;
+                  if (typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] < newScore) jsonData.raw_sub_scores[key] = newScore;
+                }
+              }
+              // Mark the refuted defects so the report does not present them as
+              // findings: every serious one, and any lesser entry of the same type
+              // (the same printed feature, described more mildly). The face prose was
+              // written around them, so it is replaced where it cited one.
+              const SERIOUS = ['heavy', 'severe', 'major', 'moderate'];
+              const refutedTypes = new Set<string>();
+              for (const face of ['front', 'back']) {
+                for (const d of (jsonData?.[trigger.cat]?.[face]?.defects || [])) {
+                  if (d && typeof d === 'object' && SERIOUS.includes(String(d.severity || '').toLowerCase())) refutedTypes.add(String(d.type || ''));
+                }
+              }
+              for (const face of ['front', 'back']) {
+                const section = jsonData?.[trigger.cat]?.[face];
+                if (!section || !Array.isArray(section.defects)) continue;
+                let touched = false;
+                for (const d of section.defects) {
+                  if (d && typeof d === 'object' && (SERIOUS.includes(String(d.severity || '').toLowerCase()) || refutedTypes.has(String(d.type || '')))) {
+                    d.unconfirmed = true;
+                    d.severity = 'none';
+                    touched = true;
+                  }
+                }
+                if (touched) {
+                  const note = `A re-inspection found the mark flagged here is part of the card's printed design or the photo, not damage (${verdict.reason}).`;
+                  section.summary = note;
+                  section.condition = note;
+                  if (typeof section.score === 'number' && section.score < newScore) section.score = newScore;
+                }
+              }
+              if (jsonData.final_grade && jsonData.final_grade.dominant_defect === trigger.cat) {
+                jsonData.final_grade.model_summary = `The ${trigger.cat} flaw that drove the evaluations' low score was re-inspected and found to be printed design or a photo artifact, not damage.`;
+              }
+              // The pass finals carried the same refuted flaw; take the clean evaluation's final.
+              serverRounded.final = Math.max(serverRounded.final, Math.max(f1, f2, f3));
+              if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+                jsonData.grading_passes.consensus_notes.push(
+                  `Low-score check: ${trigger.cat} was scored ${trigger.score} (${trigger.reasons.join('; ')}). A dedicated re-inspection found the flagged mark is not damage (${verdict.reason}), so ${trigger.cat} uses the clean reading of ${newScore}.`
+                );
+              }
+            } else if (outcome === 'unverified' && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(
+                `Low-score check: ${trigger.cat} was scored ${trigger.score} while ${trigger.reasons.join(' and ')}. A re-inspection could not settle whether the flagged mark is damage, so the score stands.`
+              );
+            }
+          }
+          if (severeRecords.length) jsonData.severe_score_check = severeRecords;
+        } catch (e: any) {
+          console.warn('[GRADE RECALC] low-score check skipped:', e?.message || e);
         }
 
         // Step 4: Apply dominant defect control (weakest subgrade caps the final)

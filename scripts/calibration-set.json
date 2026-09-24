@@ -9,7 +9,8 @@
     "2026-07-10: added 5 cards from the grade-10-influx investigation (docs/GRADING_TEN_INFLUX_2026-07-10.md):",
     "  - two repeat-flap cards (same card graded 10 AND 7 from different shots within the hour),",
     "  - a cased card that scored 10 through rigid plastic, and two glare-foil 10s.",
-    "  Their `expected` anchors the pre-fix over-graded value DOWN to the defensible grade."
+    "  Their `expected` anchors the pre-fix over-graded value DOWN to the defensible grade.",
+    "2026-09-24: added Espeon-GX full art a9eca6ef (customer card, web crop in a top loader). Production graded it 1 on surface passes 1/10/1: two evaluations read the artwork's printed cyan outline as handwritten marks while magnified inspection was clean. Checks the downward low-score gate AND identity (true card sm1-140, printed 140/149; production misread 150/149 and matched sm1-152)."
   ],
   "cards": [
     {
@@ -119,6 +120,17 @@
       "tolerance": 1,
       "must_detect": [],
       "note": "ESCAPE-HATCH anchor — strict unanimity gate (fix A) should demote this to 9"
+    },
+    {
+      "id": "a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4",
+      "label": "Espeon-GX 140/149 full art (Sun & Moon) - printed cyan outline read as marker, graded 1",
+      "cardType": "pokemon",
+      "expected": 9,
+      "tolerance": 1,
+      "must_detect": [],
+      "must_not_detect": ["print_line", "handwrit", "marker"],
+      "expected_identity": { "card_number": "140" },
+      "note": "DOWNWARD-GATE + IDENTITY anchor. The cyan lines run UNDER the attack text (text printed cleanly on top) = printed artwork, not damage. Low-res crop in a top loader, so a 10 is not defensible; 8-10 passes. Grade 1-4 or card_number 150 = FAIL. Customer-owned: if the card is deleted, re-seed from a copy of its photos."
     }
   ]
 }

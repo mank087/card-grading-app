@@ -32,6 +32,10 @@ interface CalCard {
   expected: number;
   tolerance: number;
   must_detect: string[];
+  /** Terms that must NOT appear as live findings (e.g. artwork misread as a defect). */
+  must_not_detect?: string[];
+  /** Identity the grading call should read off the card (checked against card_info). */
+  expected_identity?: { card_number?: string; card_name?: string };
 }
 
 (async () => {
@@ -48,7 +52,7 @@ interface CalCard {
   const sample = resolveGradingModel(cards[0]?.id);
   console.log(`\nGOLDEN CALIBRATION RUN — ${cards.length} card(s)`);
   console.log(`model: ${describeDecision(sample)}`);
-  console.log(`baseline=${BASELINE_MODEL}  canary=${CANARY_MODEL}  image detail=${imageDetail()}`);
+  console.log(`baseline=${BASELINE_MODEL}  canary=${CANARY_MODEL}  image detail=${imageDetail()}  ensemble effort=${process.env.GRADING_ENSEMBLE_REASONING_EFFORT || process.env.GRADING_CANARY_REASONING_EFFORT || 'low'}`);
   console.log('='.repeat(70));
   let pass = 0, fail = 0;
   const rows: string[] = [];
@@ -64,8 +68,11 @@ interface CalCard {
       // routingKey is REQUIRED here. Without it resolveGradingModel() falls
       // back to BASELINE, so a run intended to measure the canary silently
       // measured the baseline instead — and the report gave no way to tell.
+      // Not the bare card id: the engine writes diagnostics (first look, capture
+      // quality, CV centering, model) back to the card row keyed by it, and these
+      // are real customers' cards. A non-UUID key skips those writes.
       const result: any = await gradeCardConversational(
-        f!.signedUrl, b!.signedUrl, c.cardType as any, { routingKey: c.id },
+        f!.signedUrl, b!.signedUrl, c.cardType as any, { routingKey: `calibration:${c.id}` },
       );
       const j = JSON.parse(result.markdown_report);
       const grade = result.extracted_grade?.decimal_grade;
@@ -78,14 +85,28 @@ interface CalCard {
         JSON.stringify(j.grading_passes?.consensus_notes || []),
       ].join(' ').toLowerCase();
       const missedDetections = c.must_detect.filter(term => !haystack.includes(term.toLowerCase()));
-      const detectOk = missedDetections.length === 0;
+      // Findings the low-score check refuted are marked unconfirmed and do not count.
+      const liveFindings = JSON.stringify([j.surface, j.corners, j.edges], (_k, v) =>
+        v && typeof v === 'object' && v.unconfirmed === true ? undefined : v).toLowerCase();
+      const falseDetections = (c.must_not_detect || []).filter(term => liveFindings.includes(term.toLowerCase()));
+      const info = j.card_info || {};
+      const identityMisses = Object.entries(c.expected_identity || {})
+        .filter(([k, v]) => !String(info[k] ?? '').toLowerCase().includes(String(v).toLowerCase()))
+        .map(([k, v]) => `${k}: expected "${v}", read "${info[k] ?? ''}"`);
+      // Identity is reported, not scored: this harness exercises only the grading
+      // call, and production identity comes from first look + the catalog.
+      const detectOk = missedDetections.length === 0 && falseDetections.length === 0;
 
       const status = gradeOk && detectOk ? '✓ PASS' : '✗ FAIL';
       if (gradeOk && detectOk) pass++; else fail++;
       rows.push(
         `${status}  ${c.label}\n` +
         `        expected ${c.expected}±${c.tolerance} → got ${grade} (${result.extracted_grade?.uncertainty}) in ${secs}s` +
-        `${!detectOk ? `\n        MISSED DETECTIONS: ${missedDetections.join(', ')}` : ''}` +
+        `${missedDetections.length ? `\n        MISSED DETECTIONS: ${missedDetections.join(', ')}` : ''}` +
+        `${falseDetections.length ? `\n        FALSE DETECTIONS: ${falseDetections.join(', ')}` : ''}` +
+        `${identityMisses.length ? `\n        IDENTITY (grading call read, not scored): ${identityMisses.join('; ')}` : ''}` +
+        `${j.severe_score_check ? `\n        low-score check: ${JSON.stringify(j.severe_score_check.map((r: any) => ({ cat: r.category, outcome: r.outcome, from: r.score_before, to: r.score_after, votes: r.votes })))}` : ''}` +
+        `\n        pass finals: ${['pass_1', 'pass_2', 'pass_3'].map(k => j.grading_passes?.[k]?.final).join('/')}` +
         `\n        subgrades: C=${j.weighted_scores?.centering_weighted} Co=${j.weighted_scores?.corners_weighted} E=${j.weighted_scores?.edges_weighted} S=${j.weighted_scores?.surface_weighted}  label="${j.final_grade?.condition_label}"`
       );
     } catch (e: any) {

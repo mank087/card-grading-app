@@ -122,7 +122,9 @@ export function resolveGradingModel(routingKey?: string | null): ModelDecision {
  */
 export function applyModelCompat<T extends Record<string, any>>(
   config: T,
-  model: string
+  model: string,
+  /** Per-call effort (e.g. the main grading ensemble). Falls back to the env default. */
+  opts?: { reasoningEffort?: string }
 ): { config: T; stripped: string[]; reasoningEffort?: string } {
   if (!REASONING_MODELS.has(model)) return { config, stripped: [] };
 
@@ -135,7 +137,7 @@ export function applyModelCompat<T extends Record<string, any>>(
   // Luna defaults to HIGH reasoning. Measured Aug 1: 56% of its output tokens
   // were reasoning, and reasoning bills as output — which is 69% of our spend.
   // Overridable so the effort level can itself be tuned without a code change.
-  const effort = process.env.GRADING_CANARY_REASONING_EFFORT || 'low';
+  const effort = opts?.reasoningEffort || process.env.GRADING_CANARY_REASONING_EFFORT || 'low';
   if (effort !== 'default') next.reasoning_effort = effort;
 
   // Aug 17: production evicts the low-traffic model's cache entries within
