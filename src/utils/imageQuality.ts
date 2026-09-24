@@ -207,7 +207,7 @@ function checkBlur(luma: Float32Array, width: number, height: number): QualityCh
   return {
     passed: false,
     score: Math.max(0, Math.round((variance / BLUR_MIN_USABLE) * 40)),
-    message: 'Too blurry to grade — hold steady and tap the card to focus',
+    message: 'Too blurry to grade — hold steady and move the phone back a little so it can focus',
   };
 }
 
@@ -304,7 +304,7 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
 
   const suggestions: string[] = [];
   if (!blurCheck.passed) {
-    suggestions.push('Hold the camera steady and tap the card to focus');
+    suggestions.push('Hold the camera steady, and if the card looks soft, move the phone back a little so it can focus');
   }
   if (!brightnessCheck.passed) {
     suggestions.push(

@@ -54,7 +54,7 @@ export interface ViewportGuideContext {
   streamW: number;
   streamH: number;
   /** Maps stream coordinates onto the capture canvas (identity for frame grabs). */
-  streamTransform: { scale: number; offsetX: number; offsetY: number };
+  streamTransform: { scale: number; scaleY?: number; offsetX: number; offsetY: number };
 }
 
 /**
@@ -64,9 +64,10 @@ export interface ViewportGuideContext {
  * uniformly scaled to COVER the viewport and center-cropped. Inverting that
  * mapping takes the guide box from viewport CSS pixels to stream pixels; the
  * capture's streamTransform then takes stream pixels to canvas pixels (identity
- * for frame grabs, centered-crop mapping for true stills).
+ * for frame grabs; for true stills, the aligned model, possibly with a separate
+ * vertical scale).
  */
-function computeViewportCropRect(
+export function computeViewportCropRect(
   W: number,
   H: number,
   ctx: ViewportGuideContext,
@@ -92,10 +93,11 @@ function computeViewportCropRect(
 
   // Stream -> canvas coordinates
   const { scale, offsetX, offsetY } = streamTransform;
+  const scaleY = streamTransform.scaleY ?? scale;
   let cropX = sX * scale + offsetX;
-  let cropY = sY * scale + offsetY;
+  let cropY = sY * scaleY + offsetY;
   let cropW = sW * scale;
-  let cropH = sH * scale;
+  let cropH = sH * scaleY;
 
   // Padding beyond the guide so a card slightly over the line isn't clipped
   const padX = cropW * paddingPercent;

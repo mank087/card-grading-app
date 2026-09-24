@@ -152,7 +152,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       let qualityCanvas: HTMLCanvasElement;
       recordLocalCaptureAudit({ captureId, stage: 'frame', side, orientation,
         frame: { width: captured.canvas.width, height: captured.canvas.height },
-        stream: captured.streamSize, transform: captured.streamTransform, source: captured.captureSource });
+        stream: captured.streamSize, transform: captured.streamTransform, source: captured.captureSource,
+        alignment: captured.alignment });
 
       try {
         // v9.10 geometry-aware crop: measure the real video element and guide
@@ -178,7 +179,10 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           : undefined;
 
         const cropResult = await cropCanvasToGuideFrame(captured.canvas, {
-          paddingPercent: 0.05, // 5% padding around the card guide
+          // 13% padding per side (was 5%): cards drift past the guide as the
+          // shutter is tapped, and a clipped edge cannot be graded. The grader
+          // finds the card inside the photo, so margin costs nothing.
+          paddingPercent: 0.13,
           orientation: orientation,
           maxDimension: 3000, // matches the old compression pipeline's max size
           quality: 0.9,

@@ -20,9 +20,17 @@ describe('offline Phase 0 baseline', () => {
     // else still matches it, and the guide now fits. A blanket "differs from the baseline"
     // would let any future regression through.
     const frozen = JSON.parse(readFileSync('docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json', 'utf8'));
-    const { mobileGuide: frozenGuide, ...frozenRest } = frozen;
-    const { mobileGuide, ...observedRest } = manifest.probes.observed;
+    const { mobileGuide: frozenGuide, webPortraitCrop: frozenWebCrop, ...frozenRest } = frozen;
+    const { mobileGuide, webPortraitCrop, ...observedRest } = manifest.probes.observed;
     expect(observedRest).toEqual(frozenRest);
+    // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
+    // screen so cards stop being clipped at the shutter. The crop is the same shape and centre,
+    // scaled by 0.78/0.98.
+    const ratio = 0.78 / 0.98;
+    expect(Math.abs(webPortraitCrop.cropW - frozenWebCrop.cropW * ratio)).toBeLessThanOrEqual(2);
+    expect(Math.abs(webPortraitCrop.cropH - frozenWebCrop.cropH * ratio)).toBeLessThanOrEqual(2);
+    expect(Math.abs((webPortraitCrop.cropX + webPortraitCrop.cropW / 2) - (frozenWebCrop.cropX + frozenWebCrop.cropW / 2))).toBeLessThanOrEqual(2);
+    expect(Math.abs((webPortraitCrop.cropY + webPortraitCrop.cropH / 2) - (frozenWebCrop.cropY + frozenWebCrop.cropH / 2))).toBeLessThanOrEqual(2);
     expect(frozenGuide.some((g: any) => g.exceedsViewport)).toBe(true);
     expect(mobileGuide.every((g: any) => !g.exceedsViewport)).toBe(true);
     // The portrait phone case, which is what nearly every capture uses, is unchanged.

@@ -20,6 +20,9 @@
 export const GUIDE_CHROME_TOP = 88;
 export const GUIDE_CHROME_BOTTOM = 130;
 
+/** Share of the available width (or height) the guide fills. */
+export const GUIDE_FILL_FRACTION = 0.78;
+
 export interface GuideLayout {
   width: number;
   height: number;
@@ -53,12 +56,16 @@ export function computeGuideLayoutPx(
   const centerOffsetY =
     GUIDE_CHROME_TOP + availableHeight / 2 - viewportHeight / 2;
 
-  // Width-constrained: use 98% of available width
-  const widthBasedWidth = availableWidth * 0.98;
+  // The guide used to fill 98% of the screen. Users fit the card to it, so the
+  // card sat against the frame edges: any drift at the shutter cut an edge off
+  // the crop, and holding the phone that close put the card inside the
+  // camera's close-focus limit (blur). Sept 2026 review of mobile-web crops:
+  // clipped edges were the most common defect. A smaller guide leaves margin
+  // for drift and keeps the phone at a distance the lens can focus.
+  const widthBasedWidth = availableWidth * GUIDE_FILL_FRACTION;
   const widthBasedHeight = widthBasedWidth / cardAspectRatio;
 
-  // Height-constrained: use 98% of available height
-  const heightBasedHeight = availableHeight * 0.98;
+  const heightBasedHeight = availableHeight * GUIDE_FILL_FRACTION;
   const heightBasedWidth = heightBasedHeight * cardAspectRatio;
 
   // Use whichever constraint allows the LARGER guide

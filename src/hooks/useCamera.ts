@@ -2,6 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CapturedFrame } from '@/types/camera';
+import { laplacianVariance, sourceLuma } from '@/utils/captureSharpness';
+import { alignmentError, candidateTransforms, chooseStillTransform } from '@/utils/captureAlignment';
+
+// Shutter burst: frames grabbed, and the spacing when requestVideoFrameCallback
+// is unavailable. ~4 frames at 30 fps is ~130 ms — long enough to outlast the
+// tap's jolt, short enough that the user does not notice.
+const BURST_FRAMES = 4;
+const BURST_INTERVAL_MS = 50;
 
 // Detect iOS for constraint compatibility
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -198,11 +206,16 @@ export const useCamera = () => {
   // returned photo isn't actually larger than the stream.
   //
   // The returned streamTransform maps PREVIEW-STREAM coordinates onto the
-  // capture canvas: identity for a frame grab; for a still photo we assume the
-  // preview field of view is a centered crop of the photo (the standard
-  // relationship between a 16:9 stream and a 4:3 sensor still), i.e. uniform
-  // scale min(pW/sW, pH/sH), centered. The guide crop computes its rectangle
-  // in stream coordinates (what the user actually saw) and converts.
+  // capture canvas: identity for a frame grab. For a still photo it USED to
+  // assume the preview was a centered crop of the photo; Sept 2026 data showed
+  // that is wrong on many Android devices (cut-off card edges, 52% low photo
+  // confidence), so the still is now aligned against the preview and used only
+  // when a field-of-view model measurably matches (utils/captureAlignment.ts).
+  // The guide crop computes its rectangle in stream coordinates (what the user
+  // actually saw) and converts.
+  //
+  // Sept 2026 burst: the preview frame is the sharpest of a short burst, not
+  // the one frame at the instant the shutter was tapped (when the phone moves).
   const captureImage = useCallback(async (): Promise<CapturedFrame | null> => {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return null;
@@ -210,23 +223,54 @@ export const useCamera = () => {
     const streamW = video.videoWidth;
     const streamH = video.videoHeight;
 
-    const frameGrab = (): CapturedFrame | null => {
-      const canvas = document.createElement('canvas');
+    const drawFrame = (canvas: HTMLCanvasElement): boolean => {
       canvas.width = streamW;
       canvas.height = streamH;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
+      if (!ctx) return false;
       ctx.drawImage(video, 0, 0);
-      return {
-        canvas,
-        width: canvas.width,
-        height: canvas.height,
-        timestamp: Date.now(),
-        captureSource: 'frame',
-        streamSize: { width: streamW, height: streamH },
-        streamTransform: { scale: 1, offsetX: 0, offsetY: 0 },
-      };
+      return true;
     };
+    // Wait for the next decoded preview frame (so burst frames are distinct).
+    const nextFrame = () => new Promise<void>((resolve) => {
+      const done = () => resolve();
+      const v = video as any;
+      if (typeof v.requestVideoFrameCallback === 'function') {
+        const timer = setTimeout(done, 150);
+        v.requestVideoFrameCallback(() => { clearTimeout(timer); done(); });
+      } else {
+        setTimeout(done, BURST_INTERVAL_MS);
+      }
+    });
+
+    // Burst: keep only the best and the current canvas (4K frames are ~33 MB each).
+    let best: HTMLCanvasElement | null = null;
+    let bestScore = -1;
+    let spare: HTMLCanvasElement = document.createElement('canvas');
+    for (let i = 0; i < BURST_FRAMES; i++) {
+      if (i > 0) await nextFrame();
+      if (!drawFrame(spare)) break;
+      const l = sourceLuma(spare, streamW, streamH, 256, { w: 0.6, h: 0.6 });
+      const score = l ? laplacianVariance(l.luma, l.width, l.height) : 0;
+      if (score > bestScore) {
+        const previous = best;
+        best = spare;
+        bestScore = score;
+        spare = previous ?? document.createElement('canvas');
+      }
+    }
+    if (!best) return null;
+    const previewCanvas = best;
+
+    const frameGrab = (): CapturedFrame => ({
+      canvas: previewCanvas,
+      width: previewCanvas.width,
+      height: previewCanvas.height,
+      timestamp: Date.now(),
+      captureSource: 'frame',
+      streamSize: { width: streamW, height: streamH },
+      streamTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+    });
 
     // Attempt a true still capture where the API exists.
     const ImageCaptureCtor = (window as any).ImageCapture;
@@ -252,20 +296,30 @@ export const useCamera = () => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.drawImage(bitmap, 0, 0);
-              const scale = Math.min(bitmap.width / streamW, bitmap.height / streamH);
-              return {
-                canvas,
-                width: canvas.width,
-                height: canvas.height,
-                timestamp: Date.now(),
-                captureSource: 'photo',
-                streamSize: { width: streamW, height: streamH },
-                streamTransform: {
-                  scale,
-                  offsetX: (bitmap.width - streamW * scale) / 2,
-                  offsetY: (bitmap.height - streamH * scale) / 2,
-                },
-              };
+              // Which part of the still did the user frame? Measure it.
+              const pv = sourceLuma(previewCanvas, streamW, streamH, 192);
+              const st = sourceLuma(canvas, bitmap.width, bitmap.height, 256);
+              const photo = { width: bitmap.width, height: bitmap.height };
+              const stream = { width: streamW, height: streamH };
+              const scored = pv && st
+                ? candidateTransforms(streamW, streamH, bitmap.width, bitmap.height)
+                    .map((c) => ({ ...c, error: alignmentError(pv, st, stream, photo, c.transform) }))
+                : [];
+              const chosen = chooseStillTransform(scored);
+              console.log('[Camera] still alignment', scored.map((s) => `${s.model}=${s.error.toFixed(3)}`).join(' '),
+                chosen ? `-> ${chosen.model}` : '-> none, using preview frame');
+              if (chosen) {
+                return {
+                  canvas,
+                  width: canvas.width,
+                  height: canvas.height,
+                  timestamp: Date.now(),
+                  captureSource: 'photo',
+                  streamSize: stream,
+                  streamTransform: chosen.transform,
+                  alignment: { model: chosen.model, error: chosen.error },
+                };
+              }
             }
           }
         } finally {

@@ -11,7 +11,8 @@ export interface CaptureAuditEvent {
   viewport?: { width: number; height: number };
   frame?: { width: number; height: number };
   stream?: { width: number; height: number };
-  transform?: { scale: number; offsetX: number; offsetY: number };
+  transform?: { scale: number; scaleY?: number; offsetX: number; offsetY: number };
+  alignment?: { model: string; error: number };
   guide?: { width: number; height: number; centerOffsetY: number };
   crop?: { x: number; y: number; width: number; height: number };
   output?: { width: number; height: number };

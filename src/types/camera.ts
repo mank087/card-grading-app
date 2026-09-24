@@ -34,10 +34,13 @@ export interface CapturedFrame {
   streamSize: { width: number; height: number };
   /**
    * Maps preview-stream coordinates onto this capture canvas:
-   * canvasX = streamX * scale + offsetX. Identity for frame grabs; for stills
-   * the preview FoV is assumed to be a centered crop of the photo.
+   * canvasX = streamX * scale + offsetX, canvasY = streamY * (scaleY ?? scale)
+   * + offsetY. Identity for frame grabs; for stills it is the model the
+   * alignment check (utils/captureAlignment.ts) measured to match the preview.
    */
-  streamTransform: { scale: number; offsetX: number; offsetY: number };
+  streamTransform: { scale: number; scaleY?: number; offsetX: number; offsetY: number };
+  /** Stills only: which field-of-view model matched, and its alignment error. */
+  alignment?: { model: string; error: number };
 }
 
 /**
