@@ -694,18 +694,55 @@ export async function lookupMtgCard(
     }
   }
 
+  // Strategy 1c (Sept 2026): no set code, but a name and a set NAME. Old-frame
+  // cards (Tempest, Urza's block, Planeshift, Judgment...) print no set code, so
+  // the grader and the owner supply the set by name. Searching the collector
+  // number across every set first returned an unrelated card at low confidence
+  // ("Snap" #43 -> Lakeshore Apothecary) and the name+set search never ran.
+  // Take the card when exactly one printing of that name exists in that set, or
+  // when the collector number picks one of several.
+  if (!setCode && name && setName?.trim()) {
+    const inSet = (await searchByNameAndSet(name.trim(), setName.trim()))
+      .filter(c => Math.max(calculateSimilarity(c.name, name), c.flavor_name ? calculateSimilarity(c.flavor_name, name) : 0) >= 0.9);
+    const byNumber = collectorNumber
+      ? inSet.filter(c => normalizeCollectorNumber(c.collector_number) === normalizeCollectorNumber(collectorNumber))
+      : [];
+    const pick = inSet.length === 1 ? inSet[0] : byNumber.length === 1 ? byNumber[0] : null;
+    if (pick) {
+      console.log(`[MTG Matcher] Name + set-name match: ${pick.name} (${pick.set_name}) #${pick.collector_number}`);
+      return {
+        card: pick,
+        score: 0.95,
+        confidence: {
+          setCodeMatched: false, setCodeScore: 0.9,
+          numberMatched: byNumber.length === 1, numberScore: byNumber.length === 1 ? 1 : 0,
+          nameMatched: true, nameScore: 1,
+          overallConfidence: 'high',
+          matchedFeatures: byNumber.length === 1 ? 3 : 2, totalFeatures: 3,
+          warnings: inSet.length === 1 ? [] : [`${inSet.length} printings in the set; collector number chose one`],
+        },
+      };
+    }
+    if (inSet.length > 1) {
+      console.log(`[MTG Matcher] Name + set-name: ${inSet.length} printings, number did not choose — continuing`);
+    }
+  }
+
   // Strategy 2: Search by collector number (if we have it but not set code)
   if (collectorNumber && !setCode) {
     const numberResults = await searchByCollectorNumber(collectorNumber);
     if (numberResults.length > 0) {
-      // If we also have a name, use it to refine
+      // If we also have a name, use it to refine. A low-confidence pick across
+      // every set is not a match: fall through to the name searches below
+      // instead of returning it (it hid them for every set-code-less card).
       if (name) {
-        return findBestMatchWithConfidence(numberResults, {
+        const byNumber = findBestMatchWithConfidence(numberResults, {
           collectorNumber,
           name,
           set: setName
         });
-      }
+        if (byNumber.card && byNumber.confidence.overallConfidence !== 'low') return byNumber;
+      } else {
       // Otherwise return first result with medium confidence
       return {
         card: numberResults[0],
@@ -723,6 +760,7 @@ export async function lookupMtgCard(
           warnings: ['Set code not provided, matched by collector number only']
         }
       };
+      }
     }
   }
 

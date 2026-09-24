@@ -4,8 +4,9 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { generateLabelData } from "@/lib/labelDataGenerator";
 import { isUuid } from "@/lib/uuid";
 import { isRecordLocked, LOCKED_RECORD_ERROR } from "@/lib/cards/ownership";
-import { saveCardIdentity, IDENTITY_CONTROL_KEYS } from "@/lib/identity/saveCardIdentity";
-import { catalogRelinkNeeded, verifyAndSavePokemonCard } from "@/lib/identity/pokemonCatalogLink";
+import { saveCardIdentity, IDENTITY_CONTROL_KEYS, MATERIAL_IDENTITY_FIELDS } from "@/lib/identity/saveCardIdentity";
+import { verifyAndSavePokemonCard } from "@/lib/identity/pokemonCatalogLink";
+import { relinkCatalog, RELINK_CATEGORIES } from "@/lib/identity/catalogRelink";
 
 // Fields that are protected and cannot be edited
 const PROTECTED_FIELDS = [
@@ -265,18 +266,28 @@ export async function PATCH(
       }
     }
 
-    // 8b. Pokémon catalog link. pokemon_api_* describes the card the grading read
-    // named; after the owner changes the name, number or set it may describe a
-    // different card (Espeon-GX stayed linked to sm1-152 after the owner's fix).
-    // Re-verify from the owner's identity: link-only, it never rewrites what the
-    // owner saved, and it clears the link when the new identity has no single
-    // catalog card. Other categories' catalog links are left alone for now.
-    if (catalogRelinkNeeded(card.category, saved.changedFields)) {
+    // 8b. Catalog link. Any material identity change moves identity_revision, and
+    // the identity_catalog_invalidation trigger then clears every catalog link on
+    // the row (pokemon_api_*, mtg_card_id, lorcana_card_id, onepiece_card_id...).
+    // Re-link from the owner's saved identity: link-only, it never rewrites what the
+    // owner saved, and no single confident match leaves the link cleared. Keyed on
+    // the material change, not on name/number/set only: parallel_type or year edits
+    // wiped links too and nothing restored them (Sept 25: 0 of 19 edited MTG cards
+    // and 39 of 124 edited Pokemon cards still linked).
+    const materialChange = (saved.changedFields || []).some(f => MATERIAL_IDENTITY_FIELDS.includes(f));
+    if (materialChange && card.category === 'Pokemon') {
       try {
         const relink = await verifyAndSavePokemonCard(supabase, cardId, { force: true, linkOnly: true, trigger: 'owner-edit' });
         console.log(`[Edit Card Details] Pokemon catalog relink: ${relink.body?.success ? relink.body.pokemon_api_id : 'no single match — link cleared'}`);
       } catch (relinkError: any) {
         console.error('[Edit Card Details] Pokemon catalog relink failed (identity saved):', relinkError?.message);
+      }
+    } else if (materialChange && (RELINK_CATEGORIES as readonly string[]).includes(card.category)) {
+      try {
+        const relink = await relinkCatalog(supabase, cardId);
+        console.log(`[Edit Card Details] ${card.category} catalog relink: ${relink.status === 'linked' ? `${relink.name} (${relink.catalogId}, ${relink.confidence})` : `${relink.status} — ${relink.reason}`}`);
+      } catch (relinkError: any) {
+        console.error(`[Edit Card Details] ${card.category} catalog relink failed (identity saved):`, relinkError?.message);
       }
     }
 

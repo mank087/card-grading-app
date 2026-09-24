@@ -238,6 +238,10 @@ export async function recordFirstLook(
       try {
         const { reconcileFirstLookNumber } = await import('../identity/pokemonCatalogLink');
         await reconcileFirstLookNumber(client as any, cardId);
+        // MTG / Lorcana / One Piece: link an unlinked graded card from this read.
+        const { linkFromFirstLook } = await import('../identity/catalogRelink');
+        const linked = await linkFromFirstLook(client as any, cardId);
+        if (linked.status === 'linked') console.log(`[first-look] catalog linked from first look: ${linked.name} (${linked.catalogId})`);
       } catch (e: any) {
         console.warn('[first-look] catalog reconcile skipped:', e?.message || e);
       }

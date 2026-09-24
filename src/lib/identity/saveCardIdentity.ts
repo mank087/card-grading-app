@@ -339,7 +339,16 @@ export function buildIdentityPatch(
     }
   }
 
-  const materialFields = changedFields.filter(f => MATERIAL_IDENTITY_FIELDS.includes(f));
+  // The confirm dialog fills a blank `featured` with the card's own name (MTG, TCGs).
+  // That names the same card, but counting it as material moved identity_revision,
+  // and the catalog-invalidation trigger then wiped a correct link (Sept 23: every
+  // "Looks correct" on an MTG card did this).
+  const cardNameAfter = 'card_name' in after ? after.card_name : currentIdentityValue(card, 'card_name');
+  const featuredIsNameFill = changedFields.includes('featured')
+    && normalizeIdentityValue(before.featured) === null
+    && normalizeIdentityValue(after.featured) !== null
+    && normalizeIdentityValue(after.featured) === normalizeIdentityValue(cardNameAfter);
+  const materialFields = changedFields.filter(f => MATERIAL_IDENTITY_FIELDS.includes(f) && !(f === 'featured' && featuredIsNameFill));
   return {
     columnPatch,
     cardInfo: touchedJson ? info : null,

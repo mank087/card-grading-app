@@ -1,4 +1,6 @@
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
+import { linkFromFirstLook } from "@/lib/identity/catalogRelink";
+import { keepAliveAfterResponse } from "@/lib/identification/firstLookRunner";
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
@@ -1339,6 +1341,11 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         credit_refunded: failure.refunded, credit_refund_status: failure.refundStatus
       }, { status: 500 });
     }
+
+    // Sept 2026: when the grading read matched no catalog card, first look's read
+    // of the same card may (identity/catalogRelink.ts). Skips linked cards.
+    keepAliveAfterResponse(linkFromFirstLook(supabase, cardId, { afterGradeSave: true })
+      .then(r => { if (r.status === 'linked') console.log(`[GET /api/mtg/${cardId}] catalog linked from first look: ${r.name}`); }));
 
     // 🎨 Color Extraction (Post-Grading, fire-and-forget)
     if (card.front_path) {
