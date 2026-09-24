@@ -820,7 +820,16 @@ export async function lookupMtgCard(
   ) {
     const prints = await getAllPrints(best.card);
 
-    if (prints.length === 1) {
+    // The only catalog print must not contradict a set the card states. Sept 25:
+    // "Cytoplast Manipulator" read as Teenage Mutant Ninja Turtles #5 was accepted
+    // as the Dissension print, because the catalog has no TMNT printing yet.
+    const statedSet = String(setName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const printSet = String(prints[0]?.set_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const setContradicts = !!statedSet && !!printSet && !statedSet.includes(printSet) && !printSet.includes(statedSet)
+      && calculateSimilarity(statedSet, printSet) < 0.8;
+    if (prints.length === 1 && setContradicts) {
+      console.log(`[MTG Matcher] Single print ${prints[0].name} (${prints[0].set_name}) contradicts the stated set "${setName}" — not accepted`);
+    } else if (prints.length === 1) {
       // Only one print exists — the name alone identifies the card completely
       console.log(`[MTG Matcher] Name-only match accepted (single print): ${prints[0].name} (${prints[0].set_name})`);
       return {
