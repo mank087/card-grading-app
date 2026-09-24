@@ -64,7 +64,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (print line, ink, stain) (grading/severeScoreCheck.ts). v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3085,7 +3085,17 @@ Provide detailed analysis as markdown with all required sections.`
         // the grade proceeds normally (with raised uncertainty).
         const structuralVotes = structuralDetectors.length;
         const zoomStructural = !!(zoom?.ok && zoom.structuralFindings.length > 0);
-        const structuralCorroborated = structuralVotes >= Math.ceil(scored.length / 2) || zoomStructural;
+        // Sept 2026: the magnified inspection alone no longer corroborates. Of the 123
+        // crease caps in the 30 days to Sept 24, 29 came ONLY from zoom crops (no whole-
+        // card evaluation saw a crease, and each is told to check flatness and lines on
+        // both faces). Every one that could be judged by eye was printed design or not
+        // the card: the Pokemon Trainer header divider (Misty's Vitality x2, Gwynn), the
+        // printed crumpled-paper backs of 1993 Fleer Ultra All-Stars, a Hi-Pro two-panel
+        // divider, a Topps scroll back, a holder edge, background leather. The verifier
+        // confirmed all 29 with "strong" evidence, so it cannot be the safeguard here.
+        // A zoom finding now needs at least one whole-card evaluation to agree; alone it
+        // is recorded as unconfirmed (the v9.8 Pokemon-back guard, generalised).
+        const structuralCorroborated = structuralVotes >= Math.ceil(scored.length / 2) || (zoomStructural && structuralVotes >= 1);
 
         // v9.1 STRUCTURAL VERIFICATION: even unanimous crease/bend claims can be a
         // lighting/reflection band on glossy or metallic cards (a broad tonal step,
@@ -3170,7 +3180,9 @@ Provide detailed analysis as markdown with all required sections.`
           if (jsonData.structural_damage) {
             jsonData.structural_damage.detected = false;
             jsonData.structural_damage.unconfirmed = true;
-            jsonData.structural_damage.unconfirmed_note = 'A possible surface line was flagged by a single evaluation but not corroborated by the other evaluations or the magnified inspection — treated as unconfirmed (common on reflective/foil/embossed cards). Grade not capped.';
+            jsonData.structural_damage.unconfirmed_note = structuralVotes === 0 && zoomStructural
+              ? 'The magnified inspection flagged a possible crease, but none of the whole-card evaluations saw one. Lines found only at magnification are usually printed design (dividers, textures, panel lines), a holder edge or the background — treated as unconfirmed. Grade not capped.'
+              : 'A possible surface line was flagged by a single evaluation but not corroborated by the other evaluations or the magnified inspection — treated as unconfirmed (common on reflective/foil/embossed cards). Grade not capped.';
           }
         }
 

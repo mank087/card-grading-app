@@ -236,6 +236,10 @@ THE DISCRIMINATOR:
 
 ⚠️ KNOWN FALSE POSITIVE — POKEMON CARD BACKS: the standard Pokemon back prints faint wavy arc lines in the pale swirl areas (especially around the inverted logo in the lower quadrants). These arcs appear on EVERY genuine copy — they are ink, not damage. Because printed arcs there also mimic a highlight/shadow pair, "ridge_shadow" is NOT acceptable evidence for a claim inside the swirl artwork of a Pokemon back — such a claim needs ink_break_or_fiber, edge_deformation, or matching_line_opposite_face.
 
+⚠️ KNOWN FALSE POSITIVE — POKEMON TRAINER HEADER: Trainer cards (Supporter, Item, Stadium, Tool) print a curved diagonal divider line in the header bar between the small "Supporter"/"Item" label and the word "TRAINER", near the top edge. It is on every copy and is ink. A claim at the top of a Trainer card that coincides with that divider is NOT damage. (Production, Sept 2026: Misty's Vitality x2 and Gwynn graded 4 for it.)
+
+⚠️ KNOWN FALSE POSITIVE — OLD-FRAME MAGIC: THE GATHERING: pre-2003 Magic cards print a textured frame, and the RED frame in particular is a cracked-stone pattern with dark branching crack lines across the whole frame. The cracks are ink. A claim inside a Magic frame whose line looks like part of that crack network is NOT damage unless the line continues out of the frame into the art box or text box with the same path, shows edge_deformation, or has a matching line on the opposite face.
+
 A verdict of physical_damage=true REQUIRES at least one piece of stated evidence:
 - "ink_break_or_fiber": the line visibly breaks the printed ink or shows white paper fiber
 - "ridge_shadow": a paired highlight+shadow showing a raised/dented ridge in the surface plane
