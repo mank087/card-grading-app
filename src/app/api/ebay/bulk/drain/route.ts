@@ -343,7 +343,7 @@ type ItemOutcome =
   | { kind: 'skipped' }
   | { kind: 'failed' }
   /** Stop the batch: the problem is the account, not this card. */
-  | { kind: 'pause'; reason: 'disclaimer_required' | 'ebay_reconnect' | 'listing_limit' };
+  | { kind: 'pause'; reason: 'disclaimer_required' | 'ebay_reconnect' | 'listing_limit' | 'ebay_busy' };
 
 async function publishOne(
   supabase: ServerClient,
@@ -477,6 +477,11 @@ async function publishOne(
       if (kind === 'ebay_reconnect') {
         await requeue(supabase, item.id);
         return { kind: 'pause', reason: 'ebay_reconnect' };
+      }
+      if (kind === 'ebay_busy') {
+        // Not this card's fault and not the seller's: hold it for a resume.
+        await requeue(supabase, item.id);
+        return { kind: 'pause', reason: 'ebay_busy' };
       }
       break;
     }

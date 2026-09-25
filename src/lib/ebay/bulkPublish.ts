@@ -197,6 +197,8 @@ export type BulkFailureKind =
   | 'listing_limit'
   /** eBay refused the token. Pause and ask for a reconnect; fail nothing. */
   | 'ebay_reconnect'
+  /** DCM's app-wide daily eBay call allowance is used up (error 518). Pause; fail nothing. */
+  | 'ebay_busy'
   /** This row's own problem (category, aspect, price, photo). Fail the row. */
   | 'item';
 
@@ -229,12 +231,16 @@ const LISTING_LIMIT_RE = /(listing|selling|monthly)\s+limit|limit for (this|your
 const TOKEN_RE = /(auth|token).*(invalid|expired|failed)|invalid.*(auth|token)|iaf token|hard expired/i;
 const TOKEN_CODES = new Set(['931', '932', '16110', '21916984', '17470']);
 
+/** Trading API error 518 (same as EBAY_QUOTA_ERROR_CODE in tradingApi.ts; not imported so this client-shared module stays free of the API client). */
+const EBAY_QUOTA_ERROR_CODE = '518';
+
 export function classifyEbayErrors(
   errors: Array<{ code?: string; message?: string }> | undefined
 ): BulkFailureKind {
   for (const err of errors ?? []) {
     const code = String(err?.code ?? '');
     const message = err?.message ?? '';
+    if (code === EBAY_QUOTA_ERROR_CODE) return 'ebay_busy';
     if (LISTING_LIMIT_CODES.has(code) || LISTING_LIMIT_RE.test(message)) return 'listing_limit';
     if (TOKEN_CODES.has(code) || TOKEN_RE.test(message)) return 'ebay_reconnect';
   }
@@ -247,6 +253,9 @@ export const PAUSE_REASONS: Record<string, string> = {
     'Accept the InstaList seller terms to carry on. Nothing was lost — resume and the rest of the batch continues.',
   ebay_reconnect:
     'eBay stopped accepting our connection to your account. Reconnect and resume; no cards were failed.',
+  ebay_busy:
+    'eBay is limiting how many requests DCM can send right now, so the rest of this batch is on hold. ' +
+    'Nothing was failed. Resume in a few hours.',
   listing_limit:
     "You have reached your eBay listing allowance, so the remaining cards were held rather than failed. " +
     "Ask eBay to raise your selling limit (Seller Hub → Overview → Monthly limits → Request higher limit), " +

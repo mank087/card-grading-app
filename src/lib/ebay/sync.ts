@@ -27,6 +27,7 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getEbayConnection, getValidAccessToken } from '@/lib/ebay/auth';
 import { getMyEbaySelling, getItemDetailOutcome, type EbaySellingItem } from '@/lib/ebay/sellApi';
+import { EbayQuotaError } from '@/lib/ebay/tradingApi';
 
 /**
  * Final sale price for a sold listing, or null when eBay didn't expose one.
@@ -293,6 +294,10 @@ export async function syncUser(
     if (getItemCalls >= getItemBudget) break;
     const outcome = await getItemDetailOutcome(apiConfig, orphan.listing_id);
     getItemCalls++;
+
+    // The app's daily eBay allowance is used up: every further call fails and
+    // still counts. Stop here; the caller stops the whole run.
+    if (outcome.kind === 'error' && outcome.quota) throw new EbayQuotaError('GetItem');
 
     // No answer from eBay (timeout, rate limit, token trouble), or an answer
     // we cannot read: leave the status alone and try again next run. Ending

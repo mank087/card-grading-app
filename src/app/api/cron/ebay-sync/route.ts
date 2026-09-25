@@ -1,22 +1,29 @@
 /**
  * eBay Listings Sync Cron
  *
- * Runs every 15 minutes. For each user with active eBay listings,
+ * Runs hourly (vercel.json). For each user with active eBay listings,
  * reconciles ebay_listings against the live state of their eBay account
  * via the shared syncUser helper in src/lib/ebay/sync.ts.
  *
  * Budget allocation:
- *   - TOTAL_CAP = 200 GetItem fallback calls per cron run (Vercel Pro
- *     timeout = 300s; 200 × 500ms = 100s with headroom).
- *   - PER_USER_CAP = 60 GetItem calls per user per cron run.
+ *   - TOTAL_CAP GetItem fallback calls per cron run.
+ *   - PER_USER_CAP GetItem calls per user per cron run.
  *
  * Per-user cap matters because a single power-user with hundreds of stale
  * orphans would otherwise consume the entire run's budget and starve
- * every other user. With 60 each and 200 total, we comfortably handle
- * 3-4 power-users per cron OR many lighter users sharing fairly.
+ * every other user.
  *
  * Users are picked in stalest-first order so the longest-broken data
  * heals first.
+ *
+ * Sept 25 2026 call budget: eBay caps the Trading API calls the whole DCM
+ * app may make per day (error 518), shared with customers LISTING cards. At
+ * every 15 minutes with 50 users and 200 GetItem calls per run, this sync
+ * alone could spend 5,000-24,000 calls a day, and listings failed with eBay's
+ * "exceeded usage limit" text. Now: hourly, 30 users, 40 GetItem calls (15 per
+ * user), users with active listings only except one daily run that includes
+ * everyone (Pass 0b revives wrongly-ended rows), and the run stops at the
+ * first 518. Worst case ~70 calls/run, ~1,700/day.
  *
  * Auth: Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}` —
  * matches the pattern in /api/cron/send-scheduled-emails.
@@ -25,11 +32,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { syncUser } from '@/lib/ebay/sync';
+import { EbayQuotaError } from '@/lib/ebay/tradingApi';
 import { requireCron } from '@/lib/cronAuth';
 
-const MAX_USERS_PER_RUN = 50;
-const TOTAL_CAP = 200;
-const PER_USER_CAP = 60;
+const MAX_USERS_PER_RUN = 30;
+const TOTAL_CAP = 40;
+const PER_USER_CAP = 15;
+/** UTC hour of the one daily run that also syncs users with no active listings. */
+const FULL_SWEEP_HOUR_UTC = 9;
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +48,8 @@ export async function GET(request: NextRequest) {
 
     console.log('[ebay-sync] Starting cron run');
 
-    const userIds = await pickUsersToSync(MAX_USERS_PER_RUN);
+    const fullSweep = new Date().getUTCHours() === FULL_SWEEP_HOUR_UTC;
+    const userIds = await pickUsersToSync(MAX_USERS_PER_RUN, fullSweep);
     if (userIds.length === 0) {
       console.log('[ebay-sync] No users with active listings to sync');
       return NextResponse.json({ success: true, usersProcessed: 0 });
@@ -51,6 +62,7 @@ export async function GET(request: NextRequest) {
     let listingsMarkedEnded = 0;
     let getItemCallsUsed = 0;
     let userFailures = 0;
+    let quotaReached = false;
 
     for (const userId of userIds) {
       const remainingBudget = TOTAL_CAP - getItemCallsUsed;
@@ -68,6 +80,13 @@ export async function GET(request: NextRequest) {
         listingsMarkedEnded += result.ended;
         getItemCallsUsed += result.getItemCalls;
       } catch (err: any) {
+        if (err instanceof EbayQuotaError) {
+          // Every further call would fail and still count against the app's
+          // daily allowance, which customers need for listing. Stop.
+          quotaReached = true;
+          console.error('[ebay-sync] eBay call limit reached (518); stopping this run');
+          break;
+        }
         userFailures++;
         console.error(`[ebay-sync] User ${userId} failed:`, err.message || err);
       }
@@ -77,7 +96,8 @@ export async function GET(request: NextRequest) {
 
     console.log(`[ebay-sync] Done: ${usersProcessed} users, ${listingsUpdated} updated, ` +
                 `${listingsMarkedSold} sold, ${listingsMarkedEnded} ended, ` +
-                `${getItemCallsUsed} GetItem calls, ${userFailures} failures`);
+                `${getItemCallsUsed} GetItem calls, ${userFailures} failures` +
+                (quotaReached ? ', STOPPED at eBay call limit' : ''));
 
     return NextResponse.json({
       success: true,
@@ -87,6 +107,8 @@ export async function GET(request: NextRequest) {
       listingsMarkedEnded,
       getItemCallsUsed,
       userFailures,
+      quotaReached,
+      fullSweep,
     });
   } catch (err: any) {
     console.error('[ebay-sync] Job failed:', err);
@@ -111,10 +133,14 @@ export async function GET(request: NextRequest) {
  * The TOTAL_CAP + PER_USER_CAP budgets in the caller still protect us
  * against expensive runs.
  */
-async function pickUsersToSync(limit: number): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
+async function pickUsersToSync(limit: number, includeInactive: boolean): Promise<string[]> {
+  let query = supabaseAdmin
     .from('ebay_listings')
-    .select('user_id, last_synced_at')
+    .select('user_id, last_synced_at');
+  // Hourly runs only need sellers with something live; the daily sweep keeps
+  // the all-status behaviour described above.
+  if (!includeInactive) query = query.eq('status', 'active');
+  const { data, error } = await query
     .order('last_synced_at', { ascending: true, nullsFirst: true })
     .limit(limit * 20);
 

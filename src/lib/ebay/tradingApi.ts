@@ -529,6 +529,42 @@ function escapeXml(str: string): string {
 }
 
 /**
+ * eBay Trading API error 518: the APPLICATION has used up its call allowance
+ * ("Your application has exceeded usage limit on this call"). It is shared by
+ * every DCM user and resets daily, so it is never the seller's fault. Sept 25
+ * 2026: the 15-minute listing sync exhausted it and customers' listings failed
+ * with eBay's raw text.
+ */
+export const EBAY_QUOTA_ERROR_CODE = '518';
+export const EBAY_QUOTA_MESSAGE =
+  'eBay is limiting how many requests DCM can send right now, so nothing was listed. Please try again in a few hours.';
+
+export function isQuotaErrorXml(xml: string): boolean {
+  return /<ErrorCode>\s*518\s*<\/ErrorCode>/i.test(xml);
+}
+
+/** Thrown when eBay answers with error 518; callers stop making calls. */
+export class EbayQuotaError extends Error {
+  constructor(callName: string) {
+    super(`eBay call limit reached (${callName}, error 518)`);
+    this.name = 'EbayQuotaError';
+  }
+}
+
+/**
+ * Throw when a Trading API response is not a success. Bulk reads must not
+ * treat a failed call as "no listings": the sync did, and a quota failure
+ * turned every active listing into an orphan and a GetItem call.
+ */
+export function assertTradingSuccess(callName: string, xml: string): void {
+  const ack = xml.match(/<Ack>([^<]*)<\/Ack>/i)?.[1] ?? '';
+  if (ack === 'Success' || ack === 'Warning') return;
+  if (isQuotaErrorXml(xml)) throw new EbayQuotaError(callName);
+  const codes = [...xml.matchAll(/<ErrorCode>(\d+)<\/ErrorCode>/gi)].map(m => m[1]);
+  throw new Error(`${callName} ${ack || 'no Ack'} ${codes.join(',')}`.trim());
+}
+
+/**
  * Parse XML response from Trading API
  */
 function parseAddItemResponse(xmlResponse: string): AddItemResponse {
@@ -548,7 +584,9 @@ function parseAddItemResponse(xmlResponse: string): AddItemResponse {
   for (const match of errorMatches) {
     const errorBlock = match[1];
     const code = getTagValue(errorBlock, 'ErrorCode') || '';
-    const message = getTagValue(errorBlock, 'LongMessage') || getTagValue(errorBlock, 'ShortMessage') || '';
+    const message = code === EBAY_QUOTA_ERROR_CODE
+      ? EBAY_QUOTA_MESSAGE
+      : getTagValue(errorBlock, 'LongMessage') || getTagValue(errorBlock, 'ShortMessage') || '';
     const severity = getTagValue(errorBlock, 'SeverityCode') || 'Error';
     if (severity === 'Error') {
       errors.push({ code, message, severity });

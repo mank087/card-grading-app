@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./tradingApi', () => ({ callTradingApi: vi.fn() }));
+// Keep the real response helpers (assertTradingSuccess, isQuotaErrorXml); fake only the network call.
+vi.mock('./tradingApi', async (importOriginal) => ({ ...(await importOriginal<typeof import('./tradingApi')>()), callTradingApi: vi.fn() }));
 
-import { callTradingApi } from './tradingApi';
+import { callTradingApi, EbayQuotaError } from './tradingApi';
 import { getItemDetailOutcome, getMyEbaySelling } from './sellApi';
 
 const call = vi.mocked(callTradingApi);
@@ -35,8 +36,14 @@ describe('getItemDetailOutcome', () => {
   });
 
   it('any other eBay failure is "no answer", never "gone" (Sept 23: live listings were ended)', async () => {
-    call.mockResolvedValue('<Ack>Failure</Ack><Errors><ErrorCode>518</ErrorCode></Errors>');
+    call.mockResolvedValue('<Ack>Failure</Ack><Errors><ErrorCode>10007</ErrorCode></Errors>');
     expect((await getItemDetailOutcome(config, '1')).kind).toBe('error');
+  });
+
+  it('flags the app-wide call limit (518) so the sync can stop (Sept 25)', async () => {
+    call.mockResolvedValue('<Ack>Failure</Ack><Errors><ErrorCode>518</ErrorCode></Errors>');
+    const out = await getItemDetailOutcome(config, '1');
+    expect(out.kind === 'error' && out.quota).toBe(true);
   });
 });
 
@@ -57,5 +64,12 @@ describe('getMyEbaySelling active paging', () => {
     expect(res.active.map(i => i.itemId)).toEqual(['a', 'b', 'c']);
     expect(call).toHaveBeenCalledTimes(3);
     expect(String(call.mock.calls[2][2])).toContain('<PageNumber>3</PageNumber>');
+  });
+
+  it('a failed call is an error, never an empty account (Sept 25: every listing became a GetItem call)', async () => {
+    call.mockResolvedValue('<Ack>Failure</Ack><Errors><ErrorCode>518</ErrorCode></Errors>');
+    await expect(getMyEbaySelling(config, { includeFlags: { active: true } })).rejects.toBeInstanceOf(EbayQuotaError);
+    call.mockResolvedValue('<Ack>Failure</Ack><Errors><ErrorCode>931</ErrorCode></Errors>');
+    await expect(getMyEbaySelling(config, { includeFlags: { active: true } })).rejects.toThrow(/GetMyeBaySelling Failure 931/);
   });
 });

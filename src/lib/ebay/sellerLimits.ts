@@ -14,7 +14,7 @@
  * the publish path depends on this value.
  */
 
-import { callTradingApi, type TradingApiConfig } from '@/lib/ebay/tradingApi';
+import { assertTradingSuccess, callTradingApi, type TradingApiConfig } from '@/lib/ebay/tradingApi';
 
 export interface SellerListingAllowance {
   /** Listings the seller may still create this period, or null if unknown. */
@@ -60,6 +60,7 @@ export async function getSellerListingAllowance(
 </GetMyeBaySellingRequest>`;
 
   const response = await callTradingApi(config, 'GetMyeBaySelling', xml);
+  assertTradingSuccess('GetMyeBaySelling', response);
 
   return {
     available: readNumber(response, 'QuantityLimitRemaining'),

@@ -10,7 +10,7 @@
  * This module is pure XML build + parse + normalize.
  */
 
-import { callTradingApi, type TradingApiConfig } from './tradingApi';
+import { assertTradingSuccess, callTradingApi, isQuotaErrorXml, type TradingApiConfig } from './tradingApi';
 
 const TRADING_API_VERSION = '1349';
 
@@ -51,7 +51,8 @@ export async function getItemDetail(
 export type ItemDetailOutcome =
   | { kind: 'found'; detail: EbayItemDetail }
   | { kind: 'not_found' }
-  | { kind: 'error'; reason: string };
+  /** quota: eBay error 518, the app's daily call allowance is used up. */
+  | { kind: 'error'; reason: string; quota?: boolean };
 
 /** eBay's "item not found / cannot be accessed" error codes. */
 const ITEM_NOT_FOUND_CODES = new Set(['17']);
@@ -82,6 +83,7 @@ export async function getItemDetailOutcome(
   if (ack !== 'Success' && ack !== 'Warning') {
     const codes = [...response.matchAll(/<ErrorCode>(\d+)<\/ErrorCode>/gi)].map(m => m[1]);
     if (codes.some(c => ITEM_NOT_FOUND_CODES.has(c))) return { kind: 'not_found' };
+    if (isQuotaErrorXml(response)) return { kind: 'error', reason: 'GetItem call limit reached (518)', quota: true };
     return { kind: 'error', reason: `GetItem ${ack || 'no Ack'} ${codes.join(',')}`.trim() };
   }
 
@@ -178,6 +180,8 @@ export async function getMyEbaySelling(
   });
 
   const responseXml = await callTradingApi(config, 'GetMyeBaySelling', xml);
+  // A failed call must not read as an empty account (see assertTradingSuccess).
+  assertTradingSuccess('GetMyeBaySelling', responseXml);
 
   const active = flags.active ? parseItemArray(extractContainer(responseXml, 'ActiveList')) : [];
   if (flags.active && options.allActivePages) {
@@ -191,6 +195,7 @@ export async function getMyEbaySelling(
         'GetMyeBaySelling',
         buildGetMyEbaySellingXml({ activeEntries, soldEntries: 0, unsoldEntries: 0, activePage: page })
       );
+      assertTradingSuccess('GetMyeBaySelling', pageXml);
       active.push(...parseItemArray(extractContainer(pageXml, 'ActiveList')));
     }
   }
