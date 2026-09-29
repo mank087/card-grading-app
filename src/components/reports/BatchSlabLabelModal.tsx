@@ -11,6 +11,18 @@ import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelSt
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveSheetGeometry, type SheetDensity } from '@/lib/labels/sheetGeometry';
+import {
+  readSheetCalibration,
+  saveSheetCalibration,
+  sheetLayoutFor,
+  isDefaultSheetCalibration,
+  toDisplayUnit,
+  fromDisplayUnit,
+  DEFAULT_SHEET_CALIBRATION,
+  MAX_SHEET_OFFSET_IN,
+  MM_PER_IN,
+  type SheetCalibration,
+} from '@/lib/labels/sheetCalibration';
 
 interface CardData {
   id: string;
@@ -75,11 +87,20 @@ const DENSITY_STORAGE_KEY = 'dcm.labelSheetDensity';
 function readStoredDensity(): SheetDensity {
   if (typeof window === 'undefined') return 'standard';
   try {
-    return window.localStorage.getItem(DENSITY_STORAGE_KEY) === 'dense' ? 'dense' : 'standard';
+    const v = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+    return v === 'dense' || v === 'up30' ? v : 'standard';
   } catch {
     return 'standard';
   }
 }
+
+type OffsetKey = keyof SheetCalibration['offsetsIn'];
+const OFFSET_FIELDS: Array<{ key: OffsetKey; label: string; hint: string }> = [
+  { key: 'globalX', label: 'Both sides X', hint: '+ moves right' },
+  { key: 'globalY', label: 'Both sides Y', hint: '+ moves down' },
+  { key: 'backX', label: 'Back only X', hint: '+ moves right (seen from the back)' },
+  { key: 'backY', label: 'Back only Y', hint: '+ moves down' },
+];
 
 export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   isOpen,
@@ -96,8 +117,15 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover'>('duplex');
-  // 10 or 20 labels per duplex sheet; fold-over owns its own layout.
+  // 10, 20 or 30 (pre-perforated) labels per duplex sheet; fold-over owns its own layout.
   const [density, setDensity] = useState<SheetDensity>('standard');
+  // Duplex flip edge + printer calibration (saved in this browser).
+  const [calibration, setCalibration] = useState<SheetCalibration>(DEFAULT_SHEET_CALIBRATION);
+  const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [calibrationSaved, setCalibrationSaved] = useState(false);
+  // Bumped when stored values replace what the inputs show (open, unit, reset),
+  // so the uncontrolled offset inputs re-seed without fighting the user's typing.
+  const [calibrationNonce, setCalibrationNonce] = useState(0);
 
   // Use shared hook for style + custom styles
   const { labelStyle: hookLabelStyle, customStyles, activeConfig, switchStyle } = useCustomLabelStyle();
@@ -114,6 +142,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       setProgress(0);
       setLocalStyle((labelStyleProp as LabelStyleId) || hookLabelStyle || 'modern');
       setDensity(readStoredDensity());
+      setCalibration(readSheetCalibration());
+      setCalibrationSaved(false);
+      setCalibrationNonce(n => n + 1);
     }
   }, [isOpen, labelStyleProp, hookLabelStyle]);
 
@@ -128,6 +159,34 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const chooseDensity = (next: SheetDensity) => {
     setDensity(next);
     try { window.localStorage.setItem(DENSITY_STORAGE_KEY, next); } catch { /* private mode */ }
+  };
+
+  const updateCalibration = (patch: Partial<SheetCalibration>) => {
+    setCalibration(prev => ({ ...prev, ...patch, offsetsIn: { ...prev.offsetsIn, ...(patch.offsetsIn || {}) } }));
+    setCalibrationSaved(false);
+  };
+
+  const setOffsetFromInput = (key: OffsetKey, raw: string) => {
+    const n = parseFloat(raw);
+    const inches = isFinite(n) ? fromDisplayUnit(n, calibration.unit) : 0;
+    const clamped = Math.max(-MAX_SHEET_OFFSET_IN, Math.min(MAX_SHEET_OFFSET_IN, inches));
+    updateCalibration({ offsetsIn: { ...calibration.offsetsIn, [key]: clamped } });
+  };
+
+  const persistCalibration = () => {
+    setCalibration(saveSheetCalibration(calibration));
+    setCalibrationSaved(true);
+  };
+
+  const resetCalibration = () => {
+    setCalibration(saveSheetCalibration({ ...DEFAULT_SHEET_CALIBRATION, unit: calibration.unit }));
+    setCalibrationSaved(true);
+    setCalibrationNonce(n => n + 1);
+  };
+
+  const downloadAlignmentTest = async () => {
+    const { downloadPerforatedCalibrationSheet } = await import('@/lib/labels/sheetCalibrationPdf');
+    downloadPerforatedCalibrationSheet({ duplexFlip: calibration.duplexFlip, offsetsIn: calibration.offsetsIn });
   };
 
   const handleStyleSwitch = (id: LabelStyleId) => {
@@ -207,6 +266,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       setProgress(85);
 
       let blob: Blob;
+      // Density + the saved duplex flip / printer calibration. Default
+      // calibration passes the bare density, so those sheets are unchanged.
+      const sheetLayout = sheetLayoutFor(density, calibration);
 
       // Heritage — built-in id or a saved custom config with style 'heritage'.
       // Its band palette is per-card, so it can't ride the config generators.
@@ -237,7 +299,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           : undefined;
         blob = printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims)
-          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims, density);
+          : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims, sheetLayout);
       } else {
         // Modern/custom dark labels render the whiteLogoDataUrl slot; the
         // on-screen previews show the Brand Setup mark there for org cards,
@@ -256,11 +318,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           }
         } else if (localActiveConfig) {
           // Custom style — use batch generator with same multi-up grid layout as standard
-          blob = await generateBatchCustomSlabLabels(printArray, localActiveConfig, density);
+          blob = await generateBatchCustomSlabLabels(printArray, localActiveConfig, sheetLayout);
         } else {
           // Built-in style — use standard batch generator
           const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
-          blob = await generateBatchSlabLabels(printArray, builtInStyle, density);
+          blob = await generateBatchSlabLabels(printArray, builtInStyle, sheetLayout);
         }
       }
 
@@ -288,7 +350,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, density, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, density, calibration, buildSlabLabelData, onClose]);
 
   // Fold-over: ~10 labels per page (single-sided). Duplex: 10 per sheet at
   // standard density, 20 when the user picks the dense sheet — for a
@@ -296,6 +358,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const FOLDOVER_ROWS_PER_PAGE = 10;
   const duplexPerSheet = useMemo(() => {
     if (density === 'standard') return LABELS_PER_PAGE;
+    if (density === 'up30') return 30;
     return resolveSheetGeometry({
       labelWIn: localActiveConfig?.width || 2.8,
       labelHIn: localActiveConfig?.height || 0.8,
@@ -320,7 +383,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               <p className="text-purple-200 text-sm">
                 {printFormat === 'foldover'
                   ? '5.6\u201d × 0.8\u201d — Single-sided fold-over with cut guides'
-                  : '2.8\u201d × 0.8\u201d — Duplex printing with cut guides'}
+                  : density === 'up30'
+                    ? '2.625\u201d × 1\u201d — 30 per pre-perforated duplex sheet'
+                    : '2.8\u201d × 0.8\u201d — Duplex printing with cut guides'}
               </p>
             </div>
             <button
@@ -380,10 +445,19 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
             <p className="font-medium mb-1">Print Instructions:</p>
             <ul className="space-y-0.5 text-xs text-blue-700">
-              <li>1. Print duplex (double-sided), flip on <strong>long edge</strong></li>
+              <li>1. Print duplex (double-sided), flip on <strong>{calibration.duplexFlip === 'short' ? 'short edge' : 'long edge'}</strong>, at 100% scale</li>
               <li>2. Front labels print on odd pages, back labels on even pages</li>
-              <li>3. Cut along the dotted lines (scissor marks at corners)</li>
-              <li>4. Each label fits your slab&apos;s 2.8&quot; × 0.8&quot; label slot</li>
+              {density === 'up30' ? (
+                <>
+                  <li>3. Load the pre-perforated 30-up sheets (2.625&quot; × 1&quot;, Avery 5160 layout) — no cutting</li>
+                  <li>4. Print the alignment test under Duplex alignment before the first run</li>
+                </>
+              ) : (
+                <>
+                  <li>3. Cut along the dotted lines (scissor marks at corners)</li>
+                  <li>4. Each label fits your slab&apos;s 2.8&quot; × 0.8&quot; label slot</li>
+                </>
+              )}
             </ul>
           </div>
 
@@ -463,10 +537,127 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               >
                 20 per sheet
               </button>
+              <button
+                onClick={() => chooseDensity('up30')}
+                className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                  density === 'up30'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                    : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                }`}
+              >
+                30 per sheet
+              </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              20 per sheet prints closer to the page edge; test one sheet first.
+              {density === 'up30'
+                ? '30 per sheet is for pre-perforated 2.625" × 1" stock (Avery 5160 layout). The label design is scaled to 94% to fit.'
+                : '20 per sheet prints closer to the page edge; test one sheet first.'}
             </p>
+
+            {/* Duplex alignment — flip edge + printer calibration, saved in this browser */}
+            <div className="mt-3 rounded-lg border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setCalibrationOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-600"
+              >
+                <span>
+                  Duplex alignment
+                  {!isDefaultSheetCalibration(calibration) && (
+                    <span className="ml-2 font-normal text-purple-600">custom</span>
+                  )}
+                </span>
+                <span>{calibrationOpen ? '−' : '+'}</span>
+              </button>
+              {calibrationOpen && (
+                <div className="px-3 pb-3 space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Printer flips on</p>
+                    <div className="flex gap-2">
+                      {(['long', 'short'] as const).map(edge => (
+                        <button
+                          key={edge}
+                          type="button"
+                          onClick={() => updateCalibration({ duplexFlip: edge })}
+                          className={`flex-1 text-xs py-1.5 px-2 rounded-md border ${
+                            calibration.duplexFlip === edge
+                              ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                              : 'border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          {edge === 'long' ? 'Long edge (default)' : 'Short edge'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-600">Offsets</p>
+                    <div className="flex gap-1">
+                      {(['in', 'mm'] as const).map(u => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => { updateCalibration({ unit: u }); setCalibrationNonce(n => n + 1); }}
+                          className={`text-xs px-2 py-0.5 rounded border ${
+                            calibration.unit === u ? 'border-purple-500 text-purple-700' : 'border-gray-200 text-gray-500'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {OFFSET_FIELDS.map(f => (
+                      <label key={f.key} className="text-xs text-gray-600">
+                        <span className="block">{f.label} ({calibration.unit})</span>
+                        <input
+                          key={`${f.key}-${calibrationNonce}`}
+                          type="number"
+                          step={calibration.unit === 'mm' ? 0.1 : 0.005}
+                          min={-toDisplayUnit(MAX_SHEET_OFFSET_IN, calibration.unit)}
+                          max={toDisplayUnit(MAX_SHEET_OFFSET_IN, calibration.unit)}
+                          defaultValue={toDisplayUnit(calibration.offsetsIn[f.key], calibration.unit)}
+                          onChange={e => setOffsetFromInput(f.key, e.target.value)}
+                          className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs text-gray-800"
+                        />
+                        <span className="block text-[10px] text-gray-400">{f.hint}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    &quot;Both sides&quot; moves fronts and backs; &quot;Back only&quot; moves the backs page to line it up
+                    behind the fronts. Max ±{MAX_SHEET_OFFSET_IN}&quot; ({(MAX_SHEET_OFFSET_IN * MM_PER_IN).toFixed(1)} mm).
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={persistCalibration}
+                      className="text-xs px-3 py-1.5 rounded-md bg-purple-600 text-white hover:bg-purple-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetCalibration}
+                      className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-700"
+                    >
+                      Reset
+                    </button>
+                    {density === 'up30' && (
+                      <button
+                        type="button"
+                        onClick={downloadAlignmentTest}
+                        className="text-xs px-3 py-1.5 rounded-md border border-purple-300 text-purple-700"
+                      >
+                        Download 30-up alignment test
+                      </button>
+                    )}
+                    {calibrationSaved && <span className="text-xs text-green-600 self-center">Saved</span>}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

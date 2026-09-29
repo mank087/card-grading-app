@@ -28,6 +28,14 @@
  *                                                   20 labels per sheet
  *                                                   (2 × 10) instead of the
  *                                                   default 10 (2 × 5).
+ *                                                   `density=30` (or up30)
+ *                                                   = 30 per pre-perforated
+ *                                                   2.625" × 1" sheet (3 × 10).
+ *   &flip=short                                  — slab DUPLEX sheets: printer
+ *                                                   flips on the short edge.
+ *                                                   Absent = long edge, or the
+ *                                                   flip/calibration saved in
+ *                                                   this browser (label modal).
  *                                                   Anything else, including
  *                                                   absent, = 10 per sheet.
  *                                                   Ignored for foldover and
@@ -79,7 +87,8 @@ import { BatchCardGradingReport, type ReportCardData } from '@/components/report
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
-import { parseSheetDensity } from '@/lib/labels/sheetGeometry';
+import { parseSheetDensity, parseDuplexFlip } from '@/lib/labels/sheetGeometry';
+import { readSheetCalibration, sheetLayoutFor } from '@/lib/labels/sheetCalibration';
 
 declare global {
   interface Window {
@@ -161,6 +170,7 @@ function BatchLabelExportInner() {
   // the Avery compact sheets own their own layouts and ignore it.
   const densityParam = sp.get('density');
   const density = parseSheetDensity(densityParam);
+  const flipParam = sp.get('flip');
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
   const inlineCustomConfigRaw = sp.get('customConfig');
@@ -189,6 +199,12 @@ function BatchLabelExportInner() {
 
   useEffect(() => {
     let cancelled = false;
+    // Density + duplex flip / printer calibration saved in this browser by the
+    // label modal; `&flip=` overrides the flip. Default = the bare density.
+    const savedCalibration = readSheetCalibration();
+    const sheetLayout = sheetLayoutFor(density, flipParam
+      ? { ...savedCalibration, duplexFlip: parseDuplexFlip(flipParam) }
+      : savedCalibration);
     (async () => {
       try {
         if (!token) throw new Error('Missing token');
@@ -413,7 +429,7 @@ function BatchLabelExportInner() {
           })();
           const blob = format === 'foldover'
             ? await gen.generateBatchHeritageFoldOverLabelsVector(items, pattern, gradeColors, heritageDims)
-            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors, heritageDims, density);
+            : await gen.generateBatchHeritageSlabLabelsVector(items, pattern, gradeColors, heritageDims, sheetLayout);
           blobs.push({
             name: `DCM-Slab-heritage-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -451,7 +467,7 @@ function BatchLabelExportInner() {
           }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverSlabLabels(slabPayloads, slabStyle)
-            : await generateBatchSlabLabels(slabPayloads, slabStyle, density);
+            : await generateBatchSlabLabels(slabPayloads, slabStyle, sheetLayout);
           blobs.push({
             name: `DCM-Slab-${slabStyle}-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -499,7 +515,7 @@ function BatchLabelExportInner() {
           }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverCustomLabels(slabPayloads, config)
-            : await generateBatchCustomSlabLabels(slabPayloads, config, density);
+            : await generateBatchCustomSlabLabels(slabPayloads, config, sheetLayout);
           blobs.push({
             name: `DCM-Slab-Custom-${format}-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -916,7 +932,7 @@ function BatchLabelExportInner() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, cardIdsParam, type, format, density, positionsParam, inlineCustomConfigRaw, labelStyleParam, downloadMode]);
+  }, [token, cardIdsParam, type, format, density, flipParam, positionsParam, inlineCustomConfigRaw, labelStyleParam, downloadMode]);
 
   if (downloadMode) {
     return (

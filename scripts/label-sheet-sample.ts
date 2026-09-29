@@ -1,7 +1,8 @@
 /**
  * Sample slab-label SHEETS for a test print.
  *
- * Renders the 10-per-sheet (standard) and 20-per-sheet (dense) duplex sheets
+ * Renders the 10-per-sheet (standard), 20-per-sheet (dense) and 30-per-sheet
+ * pre-perforated (up30, 2.625" × 1") duplex sheets
  * for the Modern, Traditional and Heritage styles, at both the standard
  * 2.8" × 0.8" slot and the Zion Mag Pro 2.51" × 0.76" slot, so the owner can
  * print one of each and check the trim and the duplex registration before the
@@ -94,6 +95,11 @@ async function main() {
 
   const data = await sampleData()
   const bands = ['#7c3aed', '#4c1d95', '#a855f7']
+  const data30 = [...data, ...data.slice(0, 10).map(d => ({ ...d, serial: d.serial.replace('DCM-', 'DCM-9') }))]
+  const heritage30 = data30.map(d => ({
+    data: d,
+    bandColors: resolveHeritageBandColors(null) ?? ['#7c3aed', '#4c1d95', '#a855f7'],
+  }))
   const heritageItems = data.map(d => ({
     data: d,
     bandColors: resolveHeritageBandColors(null) ?? bands,
@@ -126,6 +132,25 @@ async function main() {
       file: 'heritage-zion-2.51x0.76-standard-10up.pdf',
       doc: () => heritage.buildBatchHeritageSlabLabelsDoc(
         heritageItems, 'diamond', null, { widthIn: 2.51, heightIn: 0.76 }, 'standard'),
+    },
+    // 30-up pre-perforated (Avery 5160 geometry, 2.625" × 1"): 30 sample
+    // labels so the whole sheet fills. Long-edge and short-edge duplex.
+    {
+      file: 'modern-up30-30up.pdf',
+      doc: async () => vector.buildBatchSlabLabelsDoc(data30, 'modern', 'up30'),
+    },
+    {
+      file: 'traditional-up30-30up.pdf',
+      doc: async () => vector.buildBatchClassicSlabLabelsDoc(data30, {}, 'up30'),
+    },
+    {
+      file: 'heritage-up30-30up.pdf',
+      doc: () => heritage.buildBatchHeritageSlabLabelsDoc(
+        heritage30, 'diamond', null, { widthIn: 2.8, heightIn: 0.8 }, 'up30'),
+    },
+    {
+      file: 'modern-up30-short-edge.pdf',
+      doc: async () => vector.buildBatchSlabLabelsDoc(data30, 'modern', { density: 'up30', duplexFlip: 'short' }),
     },
   ]
 

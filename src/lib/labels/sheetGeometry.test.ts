@@ -6,6 +6,13 @@ import {
   STANDARD_SLAB_GEOMETRY,
   MIN_EDGE_MARGIN_IN,
   INCH,
+  PAGE_W_PT,
+  PAGE_H_PT,
+  UP30_PRESET,
+  geometryFromPreset,
+  withPrintOptions,
+  backPageRotated,
+  backPlacement,
 } from './sheetGeometry'
 
 describe('resolveSheetGeometry — standard (10 per sheet)', () => {
@@ -123,5 +130,128 @@ describe('parseSheetDensity', () => {
     expect(parseSheetDensity(null)).toBe('standard')
     expect(parseSheetDensity(undefined)).toBe('standard')
     expect(parseSheetDensity('nonsense')).toBe('standard')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Regression pin: every label position of the historic 10-up and 20-up sheets
+// (front + mirrored back) must stay exactly where it printed before the
+// layout presets / duplex options existed. Values in points.
+// ---------------------------------------------------------------------------
+describe('regression — standard and dense positions are unchanged', () => {
+  const cases: Array<[string, number, number, 'standard' | 'dense', number[][]]> = [
+    ['standard 2.8x0.8', 2.8, 0.8, 'standard', [
+      [86.4, 180], [324, 180], [86.4, 273.6], [324, 273.6], [86.4, 367.2],
+      [324, 367.2], [86.4, 460.8], [324, 460.8], [86.4, 554.4], [324, 554.4],
+    ]],
+    ['dense 2.8x0.8', 2.8, 0.8, 'dense', Array.from({ length: 20 }, (_, i) => [
+      i % 2 === 0 ? 86.4 : 324, 27 + Math.floor(i / 2) * 75.6,
+    ])],
+    ['dense zion 2.51x0.76', 2.51, 0.76, 'dense', Array.from({ length: 20 }, (_, i) => [
+      i % 2 === 0 ? 107.28 : 324, 41.4 + Math.floor(i / 2) * 72.72,
+    ])],
+  ]
+  for (const [name, w, h, density, expected] of cases) {
+    it(name, () => {
+      const g = resolveSheetGeometry({ labelWIn: w, labelHIn: h, density })
+      expected.forEach(([ex, ey], i) => {
+        const p = labelPos(g, i, false)
+        expect(p.x).toBeCloseTo(ex, 9)
+        expect(p.y).toBeCloseTo(ey, 9)
+        const m = labelPos(g, i, true)
+        const mex = expected[i % 2 === 0 ? i + 1 : i - 1][0]
+        expect(m.x).toBeCloseTo(mex, 9)
+        expect(m.y).toBeCloseTo(ey, 9)
+      })
+      // Default print options are a no-op.
+      expect(g.duplexFlip).toBe('long')
+      expect(g.offsets).toEqual({ frontX: 0, frontY: 0, backX: 0, backY: 0 })
+      expect(g.perforated).toBe(false)
+      expect(withPrintOptions(g, density)).toBe(g)
+    })
+  }
+})
+
+describe('up30 — 30 per sheet (Avery 5160 geometry)', () => {
+  const g = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density: 'up30' })
+
+  it('is 3 × 10 of 2.625" × 1" with 0.5" top, 0.1875" left, 0.125" column gap, no row gap', () => {
+    expect(g.cols).toBe(3)
+    expect(g.rows).toBe(10)
+    expect(g.labelsPerPage).toBe(30)
+    expect(g.labelW).toBeCloseTo(2.625 * INCH, 10)
+    expect(g.labelH).toBeCloseTo(1 * INCH, 10)
+    expect(g.gapX).toBeCloseTo(0.125 * INCH, 10)
+    expect(g.gapY).toBe(0)
+    expect(g.firstLabelX).toBeCloseTo(0.1875 * INCH, 10)
+    expect(g.firstLabelY).toBeCloseTo(0.5 * INCH, 10)
+    expect(g.marginTopIn).toBe(0.5)
+    expect(g.marginBottomIn).toBe(0.5)
+    expect(g.perforated).toBe(true)
+    expect(g.maxBleedY).toBe(0)
+    expect(g.maxBleedX).toBeCloseTo(0.0625 * INCH, 10)
+    expect(parseSheetDensity('30')).toBe('up30')
+    expect(parseSheetDensity('up30')).toBe('up30')
+    expect(parseSheetDensity('avery5160')).toBe('up30')
+  })
+
+  it('places every label on the 5160 grid, ignoring the design size', () => {
+    const other = resolveSheetGeometry({ labelWIn: 2.51, labelHIn: 0.76, density: 'up30' })
+    for (let i = 0; i < 30; i++) {
+      const col = i % 3
+      const row = Math.floor(i / 3)
+      const p = labelPos(g, i, false)
+      expect(p.x).toBeCloseTo((0.1875 + col * 2.75) * INCH, 9)
+      expect(p.y).toBeCloseTo((0.5 + row) * INCH, 9)
+      expect(labelPos(other, i, false)).toEqual(p)
+    }
+    const last = labelPos(g, 29, false)
+    expect((last.x + g.labelW) / INCH).toBeCloseTo(8.5 - 0.1875, 9)
+    expect((last.y + g.labelH) / INCH).toBeCloseTo(10.5, 9)
+  })
+
+  it('long-edge backs mirror the 3 columns (col 0 <-> col 2, middle stays)', () => {
+    for (let i = 0; i < 30; i++) {
+      const f = labelPos(g, i, false)
+      const b = labelPos(g, i, true)
+      // Behind the front once the sheet is flipped over its long (vertical) edge.
+      expect(b.x).toBeCloseTo(PAGE_W_PT - f.x - g.labelW, 9)
+      expect(b.y).toBeCloseTo(f.y, 9)
+    }
+  })
+
+  it('short-edge backs land behind the front after the page turn', () => {
+    const s = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density: 'up30', duplexFlip: 'short' })
+    expect(backPageRotated(s)).toBe(true)
+    for (let i = 0; i < 30; i++) {
+      const f = labelPos(s, i, false)
+      const b = backPlacement(s, i, s.labelW, s.labelH)
+      // Flipped over the short (horizontal) edge: same x, y reflected.
+      expect(b.rotate180).toBe(true)
+      expect(b.x).toBeCloseTo(f.x, 9)
+      expect(b.y).toBeCloseTo(PAGE_H_PT - f.y - s.labelH, 9)
+    }
+  })
+
+  it('calibration: global shifts both pages, back shifts backs only, in printed coordinates', () => {
+    const offsetsIn = { globalX: 0.02, globalY: -0.03, backX: 0.05, backY: 0.01 }
+    for (const duplexFlip of ['long', 'short'] as const) {
+      const base = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density: 'up30', duplexFlip })
+      const cal = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density: 'up30', duplexFlip, offsetsIn })
+      for (const i of [0, 4, 29]) {
+        const f0 = labelPos(base, i, false)
+        const f1 = labelPos(cal, i, false)
+        expect(f1.x - f0.x).toBeCloseTo(0.02 * INCH, 9)
+        expect(f1.y - f0.y).toBeCloseTo(-0.03 * INCH, 9)
+        const b0 = backPlacement(base, i, base.labelW, base.labelH)
+        const b1 = backPlacement(cal, i, cal.labelW, cal.labelH)
+        expect(b1.x - b0.x).toBeCloseTo(0.07 * INCH, 9)
+        expect(b1.y - b0.y).toBeCloseTo(-0.02 * INCH, 9)
+      }
+    }
+  })
+
+  it('geometryFromPreset rejects a grid that does not fit on Letter', () => {
+    expect(() => geometryFromPreset({ ...UP30_PRESET, cols: 4 })).toThrow()
   })
 })

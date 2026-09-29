@@ -36,13 +36,20 @@ import {
   gridPos,
   SINGLE_X,
   SINGLE_Y,
+  BackTurn,
+  PerforatedDuplexDoc,
+  FittedDesign,
+  slotBleed,
 } from '@/lib/labels/vectorSlabGenerator'
 import {
-  resolveSheetGeometry,
+  resolveSheetLayout,
+  withPrintOptions,
+  sheetDensityOf,
   STANDARD_SLAB_GEOMETRY,
-  type SheetDensity,
+  type SheetLayoutArg,
   type SheetGeometry,
 } from '@/lib/labels/sheetGeometry'
+import { fitDesignToSlot } from '@/lib/labels/sheetFit'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
 
@@ -505,31 +512,104 @@ async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern
  * gap between rows and equal top/bottom margins (3/8" at 0.8", 0.575" at
  * 0.76") — so no centring offset is needed.
  */
-function batchGeometry(d: HeritageDims, density: SheetDensity): {
+function batchGeometry(d: HeritageDims, layout: SheetLayoutArg): {
   geometry: SheetGeometry; offX: number; offY: number
 } {
-  if (density === 'dense') {
+  if (sheetDensityOf(layout) !== 'standard') {
     return {
-      geometry: resolveSheetGeometry({ labelWIn: d.widthIn, labelHIn: d.heightIn, density: 'dense' }),
+      geometry: resolveSheetLayout(layout, d.widthIn, d.heightIn),
       offX: 0,
       offY: 0,
     }
   }
   const std = isStdDims(d)
   return {
-    geometry: STANDARD_SLAB_GEOMETRY,
+    geometry: withPrintOptions(STANDARD_SLAB_GEOMETRY, layout),
     offX: std ? 0 : (LABEL_W - d.widthIn * INCH) / 2,
     offY: std ? 0 : (LABEL_H - d.heightIn * INCH) / 2,
   }
 }
 
+/**
+ * 30-up slot: the standard-authored Heritage panel fitted uniformly into the
+ * 2.625" × 1" slot. Field, band extension and edge border are painted HERE at
+ * the true slot size (outside the scale transform — see ScaledPanel for the
+ * react-pdf gotcha); the panel renders bare inside FittedDesign. Where the
+ * band touches the design's top/bottom (the stock left band spans the full
+ * height) it is extended in its first colour across the 0.125" letterbox, so
+ * the band still runs edge to edge on the finished label.
+ */
+function HeritageFittedSlot({ inputs, geometry, children }: {
+  inputs: HeritageInputs; geometry: SheetGeometry; children: React.ReactNode
+}) {
+  const { bx, by } = slotBleed(geometry)
+  const w = geometry.labelW
+  const h = geometry.labelH
+  const T = heritageTheme(!!inputs.printHardened)
+  const f = fitDesignToSlot(LABEL_W, LABEL_H, w, h)
+  const g = heritageGeometry(inputs.design)
+  const kx = (LABEL_W / HERITAGE_PX.W) * f.s
+  const ky = (LABEL_H / HERITAGE_PX.H) * f.s
+  const band = inputs.bandColors?.[0] || '#101014'
+  const strips: React.ReactElement[] = []
+  if (g.band.position !== 'none' && g.band.w > 0) {
+    const x0 = f.padX + g.band.x * kx
+    const bw = g.band.w * kx
+    const yTop = f.padY + g.band.y * ky
+    const yBot = f.padY + (g.band.y + g.band.h) * ky
+    const eps = 0.5
+    const touchTop = g.band.y <= eps
+    const touchBottom = g.band.y + g.band.h >= HERITAGE_PX.H - eps
+    if (touchTop) strips.push(<View key="t" style={{ position: 'absolute', left: x0, top: -by, width: bw, height: yTop + by + 0.3, backgroundColor: band }} />)
+    if (touchBottom) strips.push(<View key="b" style={{ position: 'absolute', left: x0, top: yBot - 0.3, width: bw, height: h + by - yBot + 0.3, backgroundColor: band }} />)
+    const top = touchTop ? -by : yTop
+    const bottom = touchBottom ? h + by : yBot
+    if (g.band.x <= eps) strips.push(<View key="l" style={{ position: 'absolute', left: -bx, top, width: bx + f.padX + 0.3, height: bottom - top, backgroundColor: band }} />)
+    if (g.band.x + g.band.w >= HERITAGE_PX.W - eps) strips.push(<View key="r" style={{ position: 'absolute', left: x0 + bw - 0.3, top, width: w + bx - (x0 + bw) + 0.3, height: bottom - top, backgroundColor: band }} />)
+  }
+  return (
+    <>
+      <View style={{ position: 'absolute', left: -bx, top: -by, width: w + bx * 2, height: h + by * 2, backgroundColor: T.field }} />
+      {strips}
+      <FittedDesign geometry={geometry}>
+        {React.Children.map(children, child =>
+          React.isValidElement(child) ? React.cloneElement(child as React.ReactElement<{ bare?: boolean }>, { bare: true }) : child,
+        )}
+      </FittedDesign>
+      <View style={{ position: 'absolute', left: 0, top: 0, width: w, height: h, border: `${T.edgeWidth}pt solid ${T.edge}` }} />
+    </>
+  )
+}
+
 function HeritageBatchDuplexDoc({
-  entries, d, density = 'standard',
-}: { entries: HeritageInputs[]; d: HeritageDims; density?: SheetDensity }) {
+  entries, d, layout = 'standard',
+}: { entries: HeritageInputs[]; d: HeritageDims; layout?: SheetLayoutArg }) {
   const std = isStdDims(d)
+  const density = sheetDensityOf(layout)
   // Non-standard labels centre inside the standard grid cell — the cells are
   // page-symmetric, so long-edge-flip duplex mirroring stays exact.
-  const { geometry, offX, offY } = batchGeometry(d, density)
+  const { geometry, offX, offY } = batchGeometry(d, layout)
+
+  // 30-up pre-perforated sheet: the slot is the physical label whatever `d` is.
+  if (geometry.perforated) {
+    return (
+      <PerforatedDuplexDoc
+        entries={entries}
+        geometry={geometry}
+        dims={`${geometry.summary} — Heritage`}
+        renderFront={(inputs) => (
+          <HeritageFittedSlot inputs={inputs} geometry={geometry}>
+            <HeritageFront i={inputs} chip={heritageChip(inputs)} />
+          </HeritageFittedSlot>
+        )}
+        renderBack={(inputs) => (
+          <HeritageFittedSlot inputs={inputs} geometry={geometry}>
+            <HeritageBack i={inputs} chip={heritageChip(inputs)} />
+          </HeritageFittedSlot>
+        )}
+      />
+    )
+  }
   // Non-standard sheets name their size; dense sheets also name the layout.
   const dimsHeader = density === 'dense'
     ? `${dimsLabel(d)} — Heritage · ${geometry.labelsPerPage} per sheet`
@@ -571,6 +651,7 @@ function HeritageBatchDuplexDoc({
         {std
           ? <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" geometry={geometry} />
           : <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={dimsHeader} geometry={geometry} />}
+        <BackTurn geometry={geometry}>
         {slice.map((inputs, i) => {
           const { x, y } = gridPos(i, true, geometry)
           const chip = heritageChip(inputs)
@@ -591,6 +672,7 @@ function HeritageBatchDuplexDoc({
               : <DimsGuides key={i} x={x + offX} y={y + offY} d={d} cornersOnly />
           })}
         </GuidesLayer>
+        </BackTurn>
       </Page>,
     )
   }
@@ -650,14 +732,14 @@ export async function buildBatchHeritageSlabLabelsDoc(
   pattern: BandPattern,
   gradeColors?: Record<string, string> | null,
   dims?: HeritageDims,
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): Promise<React.ReactElement> {
   const entries = await buildBatchInputs(items, pattern, gradeColors)
   return (
     <HeritageBatchDuplexDoc
       entries={entries}
       d={resolveDims(dims ?? designDims(items[0]?.design))}
-      density={density}
+      layout={layout}
     />
   )
 }
@@ -673,9 +755,9 @@ export async function generateBatchHeritageSlabLabelsVector(
   pattern: BandPattern,
   gradeColors?: Record<string, string> | null,
   dims?: HeritageDims,
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): Promise<Blob> {
-  return pdf(await buildBatchHeritageSlabLabelsDoc(items, pattern, gradeColors, dims, density) as any).toBlob()
+  return pdf(await buildBatchHeritageSlabLabelsDoc(items, pattern, gradeColors, dims, layout) as any).toBlob()
 }
 
 /** Batch fold-over sheets (single-sided). */

@@ -17,10 +17,15 @@ import type { SlabLabelData } from './slabLabelGenerator';
 import { modernLogoSize } from './labels/logoScale';
 import { resolveConfigTextPolarity, resolveGradeColor, resolveFontScale, type CustomLabelConfig } from './labelPresets';
 import {
-  resolveSheetGeometry,
+  resolveSheetLayout,
+  withPrintOptions,
+  sheetDensityOf,
   labelPos,
+  backPageRotated,
+  duplexFlipText,
+  rotateRect180,
   STANDARD_SLAB_GEOMETRY,
-  type SheetDensity,
+  type SheetLayoutArg,
   type SheetGeometry,
 } from './labels/sheetGeometry';
 
@@ -1473,8 +1478,8 @@ function batchDrawPageHeader(
   const dimsText = isStandardSheet ? dims : `${dims} — ${geometry.labelsPerPage} per sheet`;
   doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Custom Label \u2014 Page ${pageNum} of ${totalPages}`, geometry.gridStartX, headerY);
   const instructions = pageType === 'front'
-    ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
-    : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
+    ? `Print duplex (${duplexFlipText(geometry)}) \u2022 Cut along dotted lines`
+    : `BACK SIDE \u2022 Print duplex (${duplexFlipText(geometry)})`;
   doc.text(instructions, BATCH_PAGE_WIDTH / 2, headerY, { align: 'center' });
   doc.text(`Label: ${dimsText}`, BATCH_PAGE_WIDTH - geometry.gridStartX, headerY, { align: 'right' });
 }
@@ -1544,8 +1549,12 @@ function batchDrawFrontCutGuides(
 export async function generateBatchCustomSlabLabels(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
-  /** 'dense' = 20 labels per sheet (2×10). Default 'standard' = 10 (2×5). */
-  density: SheetDensity = 'standard'
+  /**
+   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up30' =
+   * 30 on pre-perforated 2.625" × 1" stock — or SheetPrintOptions (adds the
+   * duplex flip edge and printer calibration).
+   */
+  layout: SheetLayoutArg = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
@@ -1566,7 +1575,7 @@ export async function generateBatchCustomSlabLabels(
         console.log('[customSlabLabel] style needs text halo — using raster batch path');
       } else {
         console.log('[customSlabLabel] using vector batch path');
-        return await vector.generateBatchCustomSlabLabelsVector(dataArray, config, density);
+        return await vector.generateBatchCustomSlabLabelsVector(dataArray, config, layout);
       }
     } catch (err) {
       console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
@@ -1574,16 +1583,35 @@ export async function generateBatchCustomSlabLabels(
   } else {
     console.log(`[customSlabLabel] non-standard dims ${config.width}"×${config.height}" — using raster batch path`);
   }
-  return generateBatchCustomSlabLabelsRaster(dataArray, config, density);
+  return generateBatchCustomSlabLabelsRaster(dataArray, config, layout);
 }
 
 /** The original raster batch path, kept as the vector fallback. */
 export async function generateBatchCustomSlabLabelsRaster(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
-  density: SheetDensity = 'standard'
+  layout: SheetLayoutArg = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
+  const density = sheetDensityOf(layout);
+
+  // 30-up pre-perforated stock: the config's design (any size) is fitted into
+  // the 2.625" × 1" slot, even for a single label.
+  if (density === 'up30') {
+    const geometry = resolveSheetLayout(layout, config.width, config.height);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    const { drawPerforatedRasterSheets } = await import('./labels/sheetFit');
+    await drawPerforatedRasterSheets(doc, {
+      count: dataArray.length,
+      geometry,
+      srcWIn: config.width,
+      srcHIn: config.height,
+      srcBleedIn: BATCH_BLEED_IN,
+      renderFront: async (i) => (await renderFrontCanvas(dataArray[i], config, BATCH_DPI)).toDataURL('image/jpeg', 0.92),
+      renderBack: async (i) => (await renderBackCanvas(dataArray[i], config, BATCH_DPI)).toDataURL('image/jpeg', 0.92),
+    });
+    return doc.output('blob');
+  }
 
   // Single label: use centered layout
   if (dataArray.length === 1) {
@@ -1606,8 +1634,8 @@ export async function generateBatchCustomSlabLabelsRaster(
   // design prints 20 up at 2.51" × 0.76" with 0.575" top/bottom margins and
   // needs no centring offset.
   const geometry = density === 'dense'
-    ? resolveSheetGeometry({ labelWIn: config.width, labelHIn: config.height, density: 'dense' })
-    : BATCH_STANDARD_GEOMETRY;
+    ? resolveSheetLayout(layout, config.width, config.height)
+    : withPrintOptions(BATCH_STANDARD_GEOMETRY, layout);
   const offX = density === 'dense' ? 0 : (BATCH_LABEL_WIDTH - labelWPt) / 2;
   const offY = density === 'dense' ? 0 : (BATCH_LABEL_HEIGHT - labelHPt) / 2;
 
@@ -1640,6 +1668,14 @@ export async function generateBatchCustomSlabLabelsRaster(
       const { labelX, labelY } = batchGetMirroredLabelPosition(gridIdx, geometry);
       const backCanvas = await renderBackCanvas(dataArray[i], config, BATCH_DPI);
       const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
+      if (backPageRotated(geometry)) {
+        // Short-edge duplex: the back lands turned 180° at the rotated spot.
+        const { rotateDataUrl180 } = await import('./labels/sheetFit');
+        const r = rotateRect180(labelX + offX, labelY + offY, labelWPt, labelHPt);
+        batchPlaceLabelImage(doc, await rotateDataUrl180(backImg), r.x, r.y, labelWPt, labelHPt);
+        batchDrawCornerMarks(doc, r.x, r.y, config, labelWPt, labelHPt);
+        continue;
+      }
       batchPlaceLabelImage(doc, backImg, labelX + offX, labelY + offY, labelWPt, labelHPt);
       batchDrawCornerMarks(doc, labelX + offX, labelY + offY, config, labelWPt, labelHPt);
     }

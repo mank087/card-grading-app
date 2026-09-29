@@ -24,10 +24,13 @@
 import { jsPDF } from 'jspdf';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 import {
-  resolveSheetGeometry,
+  resolveSheetLayout,
   labelPos,
+  backPageRotated,
+  duplexFlipText,
+  rotateRect180,
   STANDARD_SLAB_GEOMETRY,
-  type SheetDensity,
+  type SheetLayoutArg,
   type SheetGeometry,
 } from './labels/sheetGeometry';
 
@@ -872,8 +875,8 @@ function drawPageHeader(
   doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Page ${pageNum} of ${totalPages}`, geometry.gridStartX, headerY);
 
   const instructions = pageType === 'front'
-    ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
-    : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
+    ? `Print duplex (${duplexFlipText(geometry)}) \u2022 Cut along dotted lines`
+    : `BACK SIDE \u2022 Print duplex (${duplexFlipText(geometry)})`;
   doc.text(instructions, PAGE_WIDTH / 2, headerY, { align: 'center' });
   doc.text(isStandardSheet ? 'Label: 2.8" \u00D7 0.8"' : geometry.summary,
     PAGE_WIDTH - geometry.gridStartX, headerY, { align: 'right' });
@@ -957,17 +960,21 @@ export async function generateSlabLabelRaster(
 export async function generateBatchSlabLabels(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
-  /** 'dense' = 20 labels per sheet (2×10). Default 'standard' = 10 (2×5). */
-  density: SheetDensity = 'standard'
+  /**
+   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up30' =
+   * 30 on pre-perforated 2.625" × 1" stock (3×10) — or a SheetPrintOptions
+   * object that also carries the duplex flip edge and printer calibration.
+   */
+  layout: SheetLayoutArg = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
   try {
     const vector = await import('./labels/vectorSlabGenerator');
-    return await vector.generateBatchSlabLabelsVector(dataArray, style, density);
+    return await vector.generateBatchSlabLabelsVector(dataArray, style, layout);
   } catch (err) {
     console.warn('[slabLabel] vector batch failed, falling back to raster:', err);
-    return generateBatchSlabLabelsRaster(dataArray, style, density);
+    return generateBatchSlabLabelsRaster(dataArray, style, layout);
   }
 }
 
@@ -975,9 +982,27 @@ export async function generateBatchSlabLabels(
 export async function generateBatchSlabLabelsRaster(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
-  density: SheetDensity = 'standard'
+  layout: SheetLayoutArg = 'standard'
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
+
+  const geometry = resolveSheetLayout(layout, LABEL_WIDTH_IN, LABEL_HEIGHT_IN);
+
+  // 30-up pre-perforated stock: fitted into the grid, even a single label.
+  if (geometry.perforated) {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    const { drawPerforatedRasterSheets } = await import('./labels/sheetFit');
+    await drawPerforatedRasterSheets(doc, {
+      count: dataArray.length,
+      geometry,
+      srcWIn: LABEL_WIDTH_IN,
+      srcHIn: LABEL_HEIGHT_IN,
+      srcBleedIn: BLEED_IN,
+      renderFront: (i) => renderFrontLabelCanvas(dataArray[i], style),
+      renderBack: (i) => renderBackLabelCanvas(dataArray[i], style),
+    });
+    return doc.output('blob');
+  }
 
   // Single label: use centered layout (symmetric — works with any duplex setting)
   if (dataArray.length === 1) {
@@ -985,12 +1010,6 @@ export async function generateBatchSlabLabelsRaster(
   }
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-
-  const geometry = resolveSheetGeometry({
-    labelWIn: LABEL_WIDTH_IN,
-    labelHIn: LABEL_HEIGHT_IN,
-    density,
-  });
   const perPage = geometry.labelsPerPage;
   const totalSheets = Math.ceil(dataArray.length / perPage);
 
@@ -1017,6 +1036,13 @@ export async function generateBatchSlabLabelsRaster(
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getMirroredLabelPosition(gridIdx, geometry);
       const backImg = await renderBackLabelCanvas(dataArray[i], style);
+      if (backPageRotated(geometry)) {
+        // Short-edge duplex: the back lands turned 180° at the rotated spot.
+        const r = rotateRect180(labelX, labelY, LABEL_WIDTH, LABEL_HEIGHT);
+        placeLabelImage(doc, await flipImage180(backImg), r.x, r.y);
+        drawCornerMarks(doc, r.x, r.y, style);
+        continue;
+      }
       placeLabelImage(doc, backImg, labelX, labelY);
       drawCornerMarks(doc, labelX, labelY, style);
     }

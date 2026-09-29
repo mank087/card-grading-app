@@ -23,8 +23,11 @@ Font.registerHyphenationCallback((word) => [word])
 import {
   CustomSlabLabelBlock,
   CustomSlabBackBlock,
+  SpecBackground,
+  SpecBorder,
   type SlabBackInputs,
 } from '@/lib/labelLab/customSlabPdfBlock'
+import { fitDesignToSlot } from '@/lib/labels/sheetFit'
 import { presetSpec, specFromCustomConfig, type LabStyleSpec } from '@/lib/labelLab/labStyleSpecs'
 import { ClassicFront, ClassicBack, type ClassicInputs } from '@/lib/labelLab/classicSlabPdfDoc'
 import { CLASSIC_PURPLE } from '@/lib/labelLab/classicLayout'
@@ -46,11 +49,15 @@ import {
 // density option does not touch.
 
 import {
-  resolveSheetGeometry,
+  resolveSheetLayout,
+  withPrintOptions,
+  sheetDensityOf,
+  backPageRotated,
+  duplexFlipText,
   labelPos,
   STANDARD_SLAB_GEOMETRY,
   type SheetGeometry,
-  type SheetDensity,
+  type SheetLayoutArg,
 } from '@/lib/labels/sheetGeometry'
 
 const INCH = 72
@@ -185,6 +192,29 @@ function PageHeader({
   dims?: string
   geometry?: SheetGeometry
 }) {
+  if (geometry.perforated) {
+    // 30-up pre-perforated stock: only 1/2" of paper above row 1.
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: Math.max(6, geometry.firstLabelY - 22),
+          left: geometry.firstLabelX,
+          width: PAGE_W - geometry.firstLabelX * 2,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Text style={{ fontSize: 7, color: '#9ca3af' }}>
+          {pageType === 'front' ? 'FRONT' : 'BACK'} — Page {pageNum} of {totalPages}
+        </Text>
+        <Text style={{ fontSize: 7, color: '#9ca3af' }}>
+          {pageType === 'front' ? 'Print duplex' : 'BACK SIDE • Print duplex'} ({duplexFlipText(geometry)}) • 100% scale • pre-perforated sheet
+        </Text>
+        <Text style={{ fontSize: 7, color: '#9ca3af' }}>{dims || geometry.summary}</Text>
+      </View>
+    )
+  }
   if (variant === 'custom') {
     return (
       <View style={{ position: 'absolute', top: 33, left: 50, right: 50, flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -196,8 +226,8 @@ function PageHeader({
     )
   }
   const instructions = pageType === 'front'
-    ? 'Print duplex (flip on long edge) • Cut along dotted lines'
-    : 'BACK SIDE • Print duplex (flip on long edge)'
+    ? `Print duplex (${duplexFlipText(geometry)}) • Cut along dotted lines`
+    : `BACK SIDE • Print duplex (${duplexFlipText(geometry)})`
   // Standard sheets keep their historic header position and wording so the
   // 10-up PDF is byte-identical to what shipped before the density option.
   // Dense sheets have only 3/8" of paper above the first label, so the header
@@ -305,6 +335,159 @@ function LabelAt({
   )
 }
 
+// ------- Duplex backs + 30-up pre-perforated sheets -------
+
+/**
+ * Backs-page content wrapper. Long-edge duplex (the default): a plain
+ * fragment, so the output is exactly what it always was. Short-edge duplex:
+ * the whole page content is turned 180° about the page centre — gridPos()
+ * already returned the long-edge mirrored (pre-turn) positions, and the back
+ * calibration offset was pre-negated there, so after the turn every back lands
+ * behind its front. `active={false}` passes through (shared front/back loops).
+ */
+function BackTurn({ geometry, active = true, children }: {
+  geometry: SheetGeometry; active?: boolean; children: React.ReactNode
+}) {
+  if (!active || !backPageRotated(geometry)) return <>{children}</>
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, width: PAGE_W, height: PAGE_H, transform: 'rotate(180deg)' }}>
+      {children}
+    </View>
+  )
+}
+
+/** Bleed allowed past a slot: the usual 0.08", capped at half the gap (0 vertically on 30-up). */
+function slotBleed(geometry: SheetGeometry): { bx: number; by: number } {
+  return { bx: Math.min(BLEED, geometry.maxBleedX), by: Math.min(BLEED, geometry.maxBleedY) }
+}
+const classicSlotBleed = slotBleed
+
+/**
+ * One 30-up slot at (x, y). Children draw in SLOT coordinates (0,0 = slot
+ * top-left, size geometry.labelW × labelH) and may paint up to slotBleed()
+ * past the edges; anything further is clipped so no label ever paints onto
+ * its neighbour (rows abut on the perforated sheet).
+ */
+function PerfSlot({ x, y, geometry, children }: {
+  x: number; y: number; geometry: SheetGeometry; children: React.ReactNode
+}) {
+  const { bx, by } = slotBleed(geometry)
+  return (
+    <View style={{ position: 'absolute', left: x - bx, top: y - by, width: geometry.labelW + bx * 2, height: geometry.labelH + by * 2, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', left: bx, top: by, width: geometry.labelW, height: geometry.labelH }}>
+        {children}
+      </View>
+    </View>
+  )
+}
+
+/**
+ * The standard-authored 2.8" × 0.8" design, scaled UNIFORMLY to fit the slot
+ * and centred (0.9375 → 2.625" × 0.75" on 30-up). The transform sits on a
+ * wrapper with no background/border of its own (react-pdf scale gotcha);
+ * children must render `bare`, the caller paints chrome at slot size.
+ */
+function FittedDesign({ geometry, children }: { geometry: SheetGeometry; children: React.ReactNode }) {
+  const f = fitDesignToSlot(LABEL_W, LABEL_H, geometry.labelW, geometry.labelH)
+  return (
+    <View style={{ position: 'absolute', left: f.padX, top: f.padY, width: LABEL_W, height: LABEL_H, transform: `scale(${f.s})`, transformOrigin: '0 0' }}>
+      {children}
+    </View>
+  )
+}
+
+/** Spec (Modern / custom) slot: background + border at the TRUE slot size, design fitted inside. */
+function SpecFittedSlot({ spec, geometry, idSuffix, children }: {
+  spec: LabStyleSpec; geometry: SheetGeometry; idSuffix: string; children: React.ReactNode
+}) {
+  const { bx, by } = slotBleed(geometry)
+  const w = geometry.labelW
+  const h = geometry.labelH
+  return (
+    <>
+      <SpecBackground spec={spec} idSuffix={`${idSuffix}bg`} w={w + bx * 2} h={h + by * 2} offsetX={bx} offsetY={by} />
+      <SpecBorder spec={spec} w={w} h={h} />
+      <FittedDesign geometry={geometry}>{children}</FittedDesign>
+    </>
+  )
+}
+
+/**
+ * Front-page registration ticks in the paper margins at every column and row
+ * boundary (where the vendor's perforations run). Nothing is drawn on the
+ * labels themselves — the sheet is pre-perforated.
+ */
+function PerforationTicks({ geometry }: { geometry: SheetGeometry }) {
+  const first = labelPos(geometry, 0, false)
+  const top = first.y
+  const bottom = first.y + (geometry.rows - 1) * geometry.cellH + geometry.labelH
+  const left = first.x
+  const right = first.x + (geometry.cols - 1) * geometry.cellW + geometry.labelW
+  const xs: number[] = []
+  for (let c = 0; c < geometry.cols; c++) {
+    const x = first.x + c * geometry.cellW
+    xs.push(x, x + geometry.labelW)
+  }
+  const ys: number[] = []
+  for (let r = 0; r <= geometry.rows; r++) ys.push(first.y + r * geometry.cellH - (r === geometry.rows ? geometry.gapY : 0))
+  const c = '#9ca3af'
+  const out: React.ReactElement[] = []
+  xs.forEach((x, i) => {
+    out.push(<Line key={`t${i}`} x1={x} y1={Math.max(1, top - 12)} x2={x} y2={top - 3} stroke={c} strokeWidth={0.4} />)
+    out.push(<Line key={`b${i}`} x1={x} y1={bottom + 3} x2={x} y2={Math.min(PAGE_H - 1, bottom + 12)} stroke={c} strokeWidth={0.4} />)
+  })
+  ys.forEach((y, i) => {
+    out.push(<Line key={`l${i}`} x1={Math.max(1, left - 11)} y1={y} x2={left - 3} y2={y} stroke={c} strokeWidth={0.4} />)
+    out.push(<Line key={`r${i}`} x1={right + 3} y1={y} x2={Math.min(PAGE_W - 1, right + 11)} y2={y} stroke={c} strokeWidth={0.4} />)
+  })
+  return <>{out}</>
+}
+
+/**
+ * Duplex document for a pre-perforated sheet (30-up). Every count, even a
+ * single label, fills the grid from slot 1; fronts on odd pages, backs on even
+ * pages mirrored for the flip edge (and turned 180° for short-edge).
+ * renderFront/renderBack draw in slot coordinates (see PerfSlot).
+ */
+function PerforatedDuplexDoc<T>({ entries, geometry, dims, renderFront, renderBack }: {
+  entries: T[]
+  geometry: SheetGeometry
+  dims?: string
+  renderFront: (entry: T, key: string) => React.ReactNode
+  renderBack: (entry: T, key: string) => React.ReactNode
+}) {
+  const perPage = geometry.labelsPerPage
+  const totalSheets = Math.max(1, Math.ceil(entries.length / perPage))
+  const pages: React.ReactElement[] = []
+  for (let sheet = 0; sheet < totalSheets; sheet++) {
+    const slice = entries.slice(sheet * perPage, (sheet + 1) * perPage)
+    pages.push(
+      <Page key={`f-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+        <PageHeader pageType="front" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" dims={dims} geometry={geometry} />
+        {slice.map((e, i) => {
+          const { x, y } = gridPos(i, false, geometry)
+          return <PerfSlot key={i} x={x} y={y} geometry={geometry}>{renderFront(e, `pf${sheet}-${i}`)}</PerfSlot>
+        })}
+        <GuidesLayer>
+          <PerforationTicks geometry={geometry} />
+        </GuidesLayer>
+      </Page>,
+    )
+    pages.push(
+      <Page key={`b-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
+        <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant="standard" dims={dims} geometry={geometry} />
+        <BackTurn geometry={geometry}>
+          {slice.map((e, i) => {
+            const { x, y } = gridPos(i, true, geometry)
+            return <PerfSlot key={i} x={x} y={y} geometry={geometry}>{renderBack(e, `pb${sheet}-${i}`)}</PerfSlot>
+          })}
+        </BackTurn>
+      </Page>,
+    )
+  }
+  return <Document>{pages}</Document>
+}
+
 // ------- Documents -------
 
 interface VectorEntry {
@@ -326,6 +509,27 @@ function SlabVectorDoc({
   /** Sheet layout. Defaults to today's 10-per-sheet 2.8" × 0.8" grid. */
   geometry?: SheetGeometry
 }) {
+  // 30-up pre-perforated sheet: every count (even one) goes on the grid, with
+  // the 2.8" design fitted into the 2.625" × 1" slot.
+  if (geometry.perforated) {
+    return (
+      <PerforatedDuplexDoc
+        entries={entries}
+        geometry={geometry}
+        renderFront={(e, key) => (
+          <SpecFittedSlot spec={spec} geometry={geometry} idSuffix={key}>
+            <CustomSlabLabelBlock inputs={e.front} spec={spec} idSuffix={key} bare />
+          </SpecFittedSlot>
+        )}
+        renderBack={(e, key) => (
+          <SpecFittedSlot spec={spec} geometry={geometry} idSuffix={key}>
+            <CustomSlabBackBlock inputs={e.back} spec={spec} idSuffix={key} bare />
+          </SpecFittedSlot>
+        )}
+      />
+    )
+  }
+
   // Single label: centered layout (symmetric — works with any duplex setting)
   if (entries.length === 1) {
     const e = entries[0]
@@ -383,20 +587,22 @@ function SlabVectorDoc({
     pages.push(
       <Page key={`b-${sheet}`} size="LETTER" style={{ backgroundColor: '#FFFFFF' }}>
         <PageHeader pageType="back" pageNum={sheet + 1} totalPages={totalSheets} variant={variant} geometry={geometry} />
-        {slice.map((e, i) => {
-          const { x, y } = gridPos(i, true, geometry)
-          return (
-            <LabelAt key={i} x={x} y={y} w={geometry.labelW} h={geometry.labelH}>
-              <CustomSlabBackBlock inputs={e.back} spec={spec} idSuffix={`b${sheet}-${i}`} bleedPt={BLEED} />
-            </LabelAt>
-          )
-        })}
-        <GuidesLayer>
-          {slice.map((_, i) => {
+        <BackTurn geometry={geometry}>
+          {slice.map((e, i) => {
             const { x, y } = gridPos(i, true, geometry)
-            return <CornerMarks key={i} x={x} y={y} color={guideColor} w={geometry.labelW} h={geometry.labelH} />
+            return (
+              <LabelAt key={i} x={x} y={y} w={geometry.labelW} h={geometry.labelH}>
+                <CustomSlabBackBlock inputs={e.back} spec={spec} idSuffix={`b${sheet}-${i}`} bleedPt={BLEED} />
+              </LabelAt>
+            )
           })}
-        </GuidesLayer>
+          <GuidesLayer>
+            {slice.map((_, i) => {
+              const { x, y } = gridPos(i, true, geometry)
+              return <CornerMarks key={i} x={x} y={y} color={guideColor} w={geometry.labelW} h={geometry.labelH} />
+            })}
+          </GuidesLayer>
+        </BackTurn>
       </Page>,
     )
   }
@@ -742,6 +948,30 @@ function ClassicDuplexDoc({ entries, d, geometry }: {
   const std = isClassicStd(d)
   const header = `${classicDimsLabel(d)} — Traditional`
 
+  // 30-up pre-perforated sheet: the standard-authored panel is fitted into
+  // the slot whatever `d` is (the slot IS the physical label there).
+  if (geometry?.perforated) {
+    const B = classicSlotBleed(geometry)
+    return (
+      <PerforatedDuplexDoc
+        entries={entries}
+        geometry={geometry}
+        renderFront={(i, key) => (
+          <>
+            <View style={{ position: 'absolute', left: -B.bx, top: -B.by, width: geometry.labelW + B.bx * 2, height: geometry.labelH + B.by * 2, backgroundColor: CLASSIC_PURPLE }} />
+            <FittedDesign geometry={geometry}><ClassicFront i={i} idSuffix={key} bare /></FittedDesign>
+          </>
+        )}
+        renderBack={(i, key) => (
+          <>
+            <View style={{ position: 'absolute', left: -B.bx, top: -B.by, width: geometry.labelW + B.bx * 2, height: geometry.labelH + B.by * 2, backgroundColor: CLASSIC_PURPLE }} />
+            <FittedDesign geometry={geometry}><ClassicBack i={i} idSuffix={key} bare /></FittedDesign>
+          </>
+        )}
+      />
+    )
+  }
+
   // Single label: centred on the page (symmetric, so duplex mirroring is exact).
   if (entries.length === 1) {
     const i = entries[0]
@@ -795,6 +1025,7 @@ function ClassicDuplexDoc({ entries, d, geometry }: {
           {std
             ? <PageHeader pageType={side} pageNum={sheet + 1} totalPages={totalSheets} variant="standard" geometry={geo} />
             : <PageHeader pageType={side} pageNum={sheet + 1} totalPages={totalSheets} variant="custom" dims={header} geometry={geo} />}
+          <BackTurn geometry={geo} active={mirrored}>
           {slice.map((i, idx) => {
             const { x, y } = gridPos(idx, mirrored, geo)
             return (
@@ -817,6 +1048,7 @@ function ClassicDuplexDoc({ entries, d, geometry }: {
                 : <FrontCutGuides key={idx} x={x} y={y} color={CLASSIC_GUIDE} w={geo.labelW} h={geo.labelH} />
             })}
           </GuidesLayer>
+          </BackTurn>
         </Page>,
       )
     }
@@ -929,13 +1161,13 @@ async function buildClassicBatch(dataArray: SlabLabelData[], opts: ClassicRender
 export async function buildBatchClassicSlabLabelsDoc(
   dataArray: SlabLabelData[],
   opts: ClassicRenderOptions = {},
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): Promise<React.ReactElement> {
   const d = resolveClassicDims(opts.dims)
   const entries = await buildClassicBatch(dataArray, opts)
-  const geometry = density === 'dense'
-    ? resolveSheetGeometry({ labelWIn: d.widthIn, labelHIn: d.heightIn, density: 'dense' })
-    : STANDARD_SLAB_GEOMETRY
+  const geometry = sheetDensityOf(layout) === 'standard'
+    ? withPrintOptions(STANDARD_SLAB_GEOMETRY, layout)
+    : resolveSheetLayout(layout, d.widthIn, d.heightIn)
   return <ClassicDuplexDoc entries={entries} d={d} geometry={geometry} />
 }
 
@@ -965,6 +1197,7 @@ export async function buildClassicFoldOverDoc(
 // (labels/heritageSlabGenerator), so all slab styles print with identical
 // sheets, guides, and duplex behaviour.
 export { PageHeader, CornerMarks, FrontCutGuides, GuidesLayer, LabelAt, gridPos, SINGLE_X, SINGLE_Y }
+export { BackTurn, PerforatedDuplexDoc, FittedDesign, slotBleed }
 
 async function renderDocToBlob(doc: React.ReactElement): Promise<Blob> {
   const { pdf } = await import('@react-pdf/renderer')
@@ -1000,12 +1233,12 @@ export async function generateSlabLabelVector(
 export function buildBatchSlabLabelsDoc(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): React.ReactElement {
   const spec = specForStyle(style)
   const guideColor = style === 'modern' ? '#ffffff' : '#000000'
   const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
-  const geometry = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density })
+  const geometry = resolveSheetLayout(layout, 2.8, 0.8)
   return (
     <SlabVectorDoc entries={entries} spec={spec} variant="standard" guideColor={guideColor} geometry={geometry} />
   )
@@ -1019,13 +1252,13 @@ export function buildBatchSlabLabelsDoc(
 export async function generateBatchSlabLabelsVector(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
   opts: ClassicRenderOptions = {},
 ): Promise<Blob> {
   if (style === 'traditional') {
-    return renderDocToBlob(await buildBatchClassicSlabLabelsDoc(dataArray, opts, density))
+    return renderDocToBlob(await buildBatchClassicSlabLabelsDoc(dataArray, opts, layout))
   }
-  return renderDocToBlob(buildBatchSlabLabelsDoc(dataArray, style, density))
+  return renderDocToBlob(buildBatchSlabLabelsDoc(dataArray, style, layout))
 }
 
 /**
@@ -1057,12 +1290,12 @@ export async function generateCustomSlabLabelVector(
 export function buildBatchCustomSlabLabelsDoc(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): React.ReactElement {
   const spec = specFromCustomConfig({ ...config, width: 2.8, height: 0.8 })
   const guideColor = config.style === 'modern' ? '#ffffff' : '#000000'
   const entries = dataArray.map(d => ({ front: mapFrontInputs(d), back: mapBackInputs(d) }))
-  const geometry = resolveSheetGeometry({ labelWIn: 2.8, labelHIn: 0.8, density })
+  const geometry = resolveSheetLayout(layout, 2.8, 0.8)
   return (
     <SlabVectorDoc entries={entries} spec={spec} variant="custom" guideColor={guideColor} geometry={geometry} />
   )
@@ -1072,7 +1305,7 @@ export function buildBatchCustomSlabLabelsDoc(
 export async function generateBatchCustomSlabLabelsVector(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
-  density: SheetDensity = 'standard',
+  layout: SheetLayoutArg = 'standard',
 ): Promise<Blob> {
-  return renderDocToBlob(buildBatchCustomSlabLabelsDoc(dataArray, config, density))
+  return renderDocToBlob(buildBatchCustomSlabLabelsDoc(dataArray, config, layout))
 }
