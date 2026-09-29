@@ -63,6 +63,7 @@ import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_ST
 import { useIsFocused } from '@react-navigation/native'
 import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
+import PendingGradeChangeBanner from '@/components/gradeReview/PendingGradeChangeBanner'
 
 /**
  * Resolve the grade uncertainty string for display.
@@ -832,6 +833,10 @@ export default function CardDetailScreen() {
       // the rate the consumer needs.
       scrollEventThrottle={32}
     >
+
+      {/* A manual review proposed a new grade: the owner accepts or keeps it
+          here (mirrors the web card page; Sept 2026). */}
+      <PendingGradeChangeBanner cardId={card.id} isOwner={isOwner} onDecided={fetchCard} />
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
           on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
