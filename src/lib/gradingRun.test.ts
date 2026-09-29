@@ -61,3 +61,12 @@ describe('notes profiles', () => {
     expect(normalizeNotesProfiles(null)).toEqual([])
   })
 })
+
+describe('run lock expiry', () => {
+  const raw = (savedAt: number) => JSON.stringify({ category: { type: 'Sports', subCategory: '' }, notes: null, savedAt });
+  it('keeps a lock set within 12 hours and drops an older one', () => {
+    const now = Date.UTC(2026, 8, 28, 20);
+    expect(parseRunLock(raw(now - 11 * 3600_000), now).category?.type).toBe('Sports');
+    expect(parseRunLock(raw(now - 13 * 3600_000), now)).toEqual(EMPTY_RUN_LOCK);
+  });
+});

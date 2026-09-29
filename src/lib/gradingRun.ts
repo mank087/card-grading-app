@@ -41,7 +41,13 @@ export function isRunActive(lock: GradingRunLock | null | undefined): boolean {
 }
 
 /** Validate whatever is in storage; anything unexpected reads as "no lock". */
-export function parseRunLock(raw: string | null | undefined): GradingRunLock {
+/**
+ * A lock left over from an earlier session must not silently override a later
+ * visit (e.g. a ?category= link a week later): locks expire 12 hours after set.
+ */
+export const RUN_LOCK_TTL_MS = 12 * 60 * 60 * 1000;
+
+export function parseRunLock(raw: string | null | undefined, now: number = Date.now()): GradingRunLock {
   if (!raw) return EMPTY_RUN_LOCK;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untrusted JSON, validated field by field below
   let v: any;
@@ -51,6 +57,7 @@ export function parseRunLock(raw: string | null | undefined): GradingRunLock {
     return EMPTY_RUN_LOCK;
   }
   if (!v || typeof v !== 'object') return EMPTY_RUN_LOCK;
+  if (typeof v.savedAt === 'number' && now - v.savedAt > RUN_LOCK_TTL_MS) return EMPTY_RUN_LOCK;
 
   let category: RunCategoryLock | null = null;
   const c = v.category;
@@ -86,7 +93,7 @@ export function writeRunLock(userId: string | null | undefined, lock: GradingRun
   if (!userId || typeof window === 'undefined') return;
   try {
     if (isRunActive(lock)) {
-      window.localStorage.setItem(runStorageKey(userId), JSON.stringify(lock));
+      window.localStorage.setItem(runStorageKey(userId), JSON.stringify({ ...lock, savedAt: Date.now() }));
     } else {
       window.localStorage.removeItem(runStorageKey(userId));
     }

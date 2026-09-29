@@ -1,6 +1,6 @@
 'use client';
 
-import { NOT_STANDARD_CARD_LABEL, isNonStandardItemType, nonStandardExplanation, ownerConfirmedIdentity } from '@/lib/identification/itemType';
+import { NOT_STANDARD_CARD_LABEL, isNonStandardItemType, nonStandardExplanation, ownerPickedProduct } from '@/lib/identification/itemType';
 
 /**
  * Owner policy (Sept 17 2026): an item that is not a standard trading card is
@@ -17,7 +17,7 @@ export default function NotStandardCardNotice({ card, className = '' }: { card: 
   return (
     <div className={`rounded-xl border-2 border-slate-300 bg-slate-50 p-4 ${className}`} role="note">
       <p className="text-sm font-bold text-slate-900">{NOT_STANDARD_CARD_LABEL}</p>
-      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{nonStandardExplanation(itemType, ownerConfirmedIdentity(card))}</p>
+      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{nonStandardExplanation(itemType, ownerPickedProduct(card))}</p>
     </div>
   );
 }
@@ -26,7 +26,7 @@ export default function NotStandardCardNotice({ card, className = '' }: { card: 
 export function NotStandardCardTag({ card }: { card: NoticeCard | null | undefined }) {
   if (!isNonStandardItemType(card?.item_type)) return null;
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300" title={nonStandardExplanation(card?.item_type, ownerConfirmedIdentity(card)) || undefined}>
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300" title={nonStandardExplanation(card?.item_type, ownerPickedProduct(card)) || undefined}>
       Not a standard card
     </span>
   );

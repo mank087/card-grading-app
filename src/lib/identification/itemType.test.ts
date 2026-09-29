@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
-import { actionableItemType, hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerConfirmedIdentity } from './itemType';
+import { actionableItemType, hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerPickedProduct } from './itemType';
 
 const rec = (finalType: string, firstType?: string | null) => ({ result: { photos: { item_type: finalType } }, ...(firstType !== undefined ? { contract_item_type: firstType } : {}) });
 
@@ -16,14 +16,15 @@ describe('non-standard item policy', () => {
     expect(nonStandardExplanation('sticker_or_decal')).toBeNull();
     expect(hidesMarketValue({ item_type: 'sticker_or_decal' })).toBe(false);
   });
-  it('hides the market value of a non-standard item only until the owner confirms it', () => {
+  it('hides the market value of a non-standard item until the owner picks the pricing product', () => {
     expect(hidesMarketValue({ item_type: 'custom_or_fan_made' })).toBe(true);
-    expect(hidesMarketValue({ item_type: 'custom_or_fan_made', identity_confirmed_revision: 0 })).toBe(false);
+    // A plain identity confirmation (one tap on the post-grade popup) is not enough.
+    expect(hidesMarketValue({ item_type: 'custom_or_fan_made', identity_confirmed_revision: 0 } as any)).toBe(true);
     expect(hidesMarketValue({ item_type: 'custom_or_fan_made', dcm_selected_product_id: 'pc-123' })).toBe(false);
     expect(hidesMarketValue({ item_type: 'custom_or_fan_made', dcm_selected_product_id: ' unknown ', identity_confirmed_revision: null })).toBe(true);
     expect(hidesMarketValue({ item_type: 'trading_card' })).toBe(false);
     expect(hidesMarketValue(null)).toBe(false);
-    expect(ownerConfirmedIdentity(undefined)).toBe(false);
+    expect(ownerPickedProduct(undefined)).toBe(false);
     expect(nonStandardExplanation('custom_or_fan_made', true)).not.toContain('no market value');
   });
   it('still records a sticker read, so the kind is not lost', () => {

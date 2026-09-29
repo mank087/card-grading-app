@@ -24,7 +24,7 @@ export function conditionStepState(damageOpen: boolean, defectCount: number): Mo
 /**
  * user_condition_report as the mobile app writes it. Collapsed = the old
  * "No visible defects" payload: { noDefectsConfirmed, cardDescription } when
- * there are notes, otherwise nothing. Open = the full report with the notes.
+ * there are notes, otherwise nothing. Open = the full report, notes as cardDescription.
  * The server's ensureProcessedConditionReport() processes either shape.
  */
 export function buildConditionPayload(
@@ -35,5 +35,7 @@ export function buildConditionPayload(
   if (!damageOpen) {
     return notes ? { noDefectsConfirmed: true, cardDescription: notes } : null
   }
-  return { ...report, notes }
+  // Notes go as cardDescription (context only), as on web: a locked profile such
+  // as "refractor lines are the finish" must not be parsed into reported defects.
+  return notes ? { ...report, cardDescription: notes } : { ...report }
 }

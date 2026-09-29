@@ -21,10 +21,10 @@ describe('"Not a standard trading card" label', () => {
     expect(html(React.createElement(NotStandardCardTag, { card: sticker }))).toBe('');
   });
   it('keeps the label but drops "no market value" once the owner confirms the item', () => {
-    const text = html(React.createElement(NotStandardCardNotice, { card: { item_type: 'custom_or_fan_made', identity_confirmed_revision: 2 } }));
+    const text = html(React.createElement(NotStandardCardNotice, { card: { item_type: 'custom_or_fan_made', dcm_selected_product_id: 'pc-2' } }));
     expect(text).toContain('Not a standard trading card');
     expect(text).not.toContain('no market value');
-    expect(text).toContain('owner confirmed');
+    expect(text).toContain('owner chose the pricing product');
   });
   it('renders nothing for a standard card, an unknown read, or before the column exists', () => {
     for (const card of [{ item_type: 'trading_card' }, { item_type: null }, {}, null, { item_type: 'already_graded_slab' }]) {

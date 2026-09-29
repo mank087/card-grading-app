@@ -178,11 +178,11 @@ describe('items that are not standard trading cards', () => {
     expect(assessValueTrust(divider, 22.77)).toEqual({ trusted: false, reason: 'not_standard_card' });
     expect(assessValueTrust({ ...divider, dcm_selected_product_id: '  ' }, 22.77).trusted).toBe(false);
   });
-  it('lifts the block for an owner-confirmed custom item, as it lifts the thin-identity guard', async () => {
+  it('lifts the block for a custom item only when the owner picked the pricing product', async () => {
     const { assessValueTrust } = await import('./valueGuard');
     const custom = { item_type: 'custom_or_fan_made', card_set: null, release_date: null, category: 'Other' };
-    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 45)).toEqual({ trusted: true, reason: 'below_threshold' });
-    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 2500)).toEqual({ trusted: true, reason: 'owner_confirmed' });
+    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 45)).toEqual({ trusted: false, reason: 'not_standard_card' });
+    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 2500)).toEqual({ trusted: false, reason: 'not_standard_card' });
     expect(assessValueTrust({ ...custom, dcm_selected_product_id: 'pc-9' }, 2500)).toEqual({ trusted: true, reason: 'owner_confirmed' });
   });
   it('prices a licensed sticker like a card (1987 Fleer Basketball Stickers, Jordan #2)', async () => {
@@ -193,11 +193,11 @@ describe('items that are not standard trading cards', () => {
     // A sticker with a thin identity is held back for the ordinary reason, not as non-standard.
     expect(assessValueTrust({ ...sticker, card_set: null }, 39000)).toEqual({ trusted: false, reason: 'thin_identity' });
   });
-  it('agrees with ownerConfirmedIdentity in itemType.ts', async () => {
-    const { isOwnerConfirmed } = await import('./valueGuard');
-    const { ownerConfirmedIdentity } = await import('../identification/itemType');
+  it('agrees with ownerPickedProduct in itemType.ts', async () => {
+    const { hasPickedProduct } = await import('./valueGuard');
+    const { ownerPickedProduct } = await import('../identification/itemType');
     for (const c of [{}, { identity_confirmed_revision: 0 }, { identity_confirmed_revision: null }, { dcm_selected_product_id: 'x' }, { dcm_selected_product_id: 'N/A' }, { dcm_selected_product_id: '' }, { dcm_selected_product_id: null, identity_confirmed_revision: 4 }]) {
-      expect(isOwnerConfirmed(c as any)).toBe(ownerConfirmedIdentity(c as any));
+      expect(hasPickedProduct(c as any)).toBe(ownerPickedProduct(c as any));
     }
   });
   it('leaves standard cards, unknown reads and slabbed cards alone', async () => {

@@ -29,7 +29,7 @@ describe('resolveCardValue', () => {
   it('shows the stored price on a custom item once the owner confirms it', () => {
     const custom = { category: 'Other', item_type: 'custom_or_fan_made', card_set: 'Fan Set', release_date: '2024', dcm_price_estimate: 60 } as CardForPricing;
     expect(resolveCardValue(custom).withheldReason).toBe('not_standard_card');
-    expect(resolveCardValue({ ...custom, identity_confirmed_revision: 1 } as CardForPricing)).toEqual({ value: 60, source: 'dcm-estimate' });
+    expect(resolveCardValue({ ...custom, dcm_selected_product_id: 'pc-1' } as CardForPricing)).toEqual({ value: 60, source: 'dcm-estimate' });
   });
 
   it('still resolves an ordinary priced card', () => {

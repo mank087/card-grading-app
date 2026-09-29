@@ -104,6 +104,16 @@ describe('mobile condition step parity', () => {
     expect(fromWeb?.total_defects_reported).toBe(0)
   })
 
+  it('mobile with damage reported keeps profile notes as context, not defects (as on web)', () => {
+    const report = { ...MOBILE_EMPTY_REPORT, front: { ...MOBILE_EMPTY_REPORT.front, corners: { ...MOBILE_EMPTY_REPORT.front.corners, whitening: true } } }
+    const profile = 'Refractor surface lines are the finish. Light scratch look is the pattern.'
+    const payload = mobileBuildConditionPayload(true, report, profile) as Record<string, unknown>
+    expect(payload.cardDescription).toBe(profile)
+    expect(payload.notes).toBe('')
+    const processed = ensureProcessedConditionReport(payload, null)
+    expect(processed?.total_defects_reported).toBe(1)
+  })
+
   it('web processed report is stable apart from its timestamp', () => {
     const a = buildUserConditionFields(EMPTY_CONDITION_REPORT, 'abc')
     const b = buildUserConditionFields(EMPTY_CONDITION_REPORT, 'abc')

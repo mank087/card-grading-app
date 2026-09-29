@@ -12,9 +12,8 @@
  * had hidden up to ~$39k of real value. A sticker is still RECORDED as
  * item_type 'sticker_or_decal'; it is simply neither labelled nor unpriced.
  *
- * An owner who has confirmed the card (identity_confirmed_revision set, or a
- * pricing product picked by hand) lifts the no-value rule: see
- * ownerConfirmedIdentity / hidesMarketValue below and assessValueTrust.
+ * An owner who picks the pricing product by hand lifts the no-value rule: see
+ * ownerPickedProduct / hidesMarketValue below and assessValueTrust.
  *
  * Pure and dependency-free: copied verbatim to dcm-mobile/lib/itemType.ts.
  */
@@ -58,34 +57,31 @@ export function isNonStandardItemType(itemType: unknown): boolean {
 }
 
 /**
- * The owner has vouched for this card's identity: confirmed it at some revision,
- * or picked the pricing product by hand. The same test the thin-identity guard in
- * valueGuard.ts applies (inline there because both files are copied verbatim;
- * a test holds them equal).
+ * The owner picked the pricing product by hand. Only this lifts the no-value rule:
+ * a plain identity confirmation is one tap on the post-grade popup, too easy to
+ * give for a fan-made Charizard that would then borrow the real card's price.
+ * Mirrors hasPickedProduct in valueGuard.ts (inline there because both files are
+ * copied verbatim; a test holds them equal).
  */
-export function ownerConfirmedIdentity(card: {
+export function ownerPickedProduct(card: {
   dcm_selected_product_id?: string | null;
-  identity_confirmed_revision?: number | null;
 } | null | undefined): boolean {
-  if (!card) return false;
-  const product = card.dcm_selected_product_id;
-  if (typeof product === 'string' && !['', 'unknown', 'n/a', 'na', 'none', 'null', 'undefined'].includes(product.trim().toLowerCase())) return true;
-  return card.identity_confirmed_revision !== null && card.identity_confirmed_revision !== undefined;
+  const product = card?.dcm_selected_product_id;
+  return typeof product === 'string' && !['', 'unknown', 'n/a', 'na', 'none', 'null', 'undefined'].includes(product.trim().toLowerCase());
 }
 
-/** True when the market value must not be shown: a non-standard item the owner has not confirmed. */
+/** True when the market value must not be shown: a non-standard item without an owner-picked product. */
 export function hidesMarketValue(card: {
   item_type?: string | null;
   dcm_selected_product_id?: string | null;
-  identity_confirmed_revision?: number | null;
 } | null | undefined): boolean {
-  return isNonStandardItemType(card?.item_type) && !ownerConfirmedIdentity(card);
+  return isNonStandardItemType(card?.item_type) && !ownerPickedProduct(card);
 }
 
 /** "DCM Optic read this as a custom or fan made item." — calm, one sentence, for the card page. */
 export function nonStandardExplanation(itemType: unknown, ownerConfirmed = false): string | null {
   if (!isNonStandardItemType(itemType)) return null;
-  if (ownerConfirmed) return `DCM Optic read this as ${PLAIN_WORDS[itemType as string]}. It is graded for condition, and its market value is shown because the owner confirmed the item.`;
+  if (ownerConfirmed) return `DCM Optic read this as ${PLAIN_WORDS[itemType as string]}. It is graded for condition, and its market value is shown because the owner chose the pricing product.`;
   return `DCM Optic read this as ${PLAIN_WORDS[itemType as string]}, so it is graded for condition but has no market value here.`;
 }
 

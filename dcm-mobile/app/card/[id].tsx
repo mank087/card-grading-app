@@ -59,7 +59,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
-import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerConfirmedIdentity } from '@/lib/itemType'
+import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerPickedProduct } from '@/lib/itemType'
 import { useIsFocused } from '@react-navigation/native'
 import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
@@ -1998,7 +1998,7 @@ export default function CardDetailScreen() {
         {isNonStandardItemType((card as any).item_type) && (
           <View style={s.notStandardCard}>
             <Text style={s.notStandardTitle}>{NOT_STANDARD_CARD_LABEL}</Text>
-            <Text style={s.notStandardText}>{nonStandardExplanation((card as any).item_type, ownerConfirmedIdentity(card as any))}</Text>
+            <Text style={s.notStandardText}>{nonStandardExplanation((card as any).item_type, ownerPickedProduct(card as any))}</Text>
           </View>
         )}
 

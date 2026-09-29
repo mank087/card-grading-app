@@ -140,11 +140,19 @@ export function isOwnerConfirmed(card: CardIdentityForGuard): boolean {
   return confirmedRevision !== null && confirmedRevision !== undefined;
 }
 
+/**
+ * The owner picked the pricing product by hand. Mirrors ownerPickedProduct in
+ * itemType.ts (a test holds them equal).
+ */
+export function hasPickedProduct(card: CardIdentityForGuard): boolean {
+  return !isBlankIdentityText(card.dcm_selected_product_id);
+}
+
 export function assessValueTrust(card: CardIdentityForGuard, value: number): ValueTrust {
   // Owner policy (Sept 17 2026): graded, labelled "Not a standard trading card", no
-  // price. An owner confirmation lifts it (Sept 28 2026), as it lifts the thin-identity
-  // guard below: the owner has said what the item is and which product prices it.
-  if (typeof card.item_type === 'string' && NO_VALUE_ITEM_TYPES.includes(card.item_type) && !isOwnerConfirmed(card)) {
+  // price. Only a hand-picked pricing product lifts it (Sept 28 2026): a plain identity
+  // confirmation is one tap on the post-grade popup, too easy for a fan-made item.
+  if (typeof card.item_type === 'string' && NO_VALUE_ITEM_TYPES.includes(card.item_type) && !hasPickedProduct(card)) {
     return { trusted: false, reason: 'not_standard_card' };
   }
 

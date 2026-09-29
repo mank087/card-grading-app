@@ -80,6 +80,17 @@ describe('estimateGradedValue', () => {
     expect(e.value).toBeGreaterThanOrEqual(50);
   });
 
+  it('grade 9 with only a higher-grade comp does not borrow the 10 (review finding)', () => {
+    const onlyTen = table({ raw: 20, psa: { '10': 500 } });
+    const nine = estimateGradedValue(onlyTen, 9)!;
+    expect(nine.method).toBe('raw-multiple');
+    expect(nine.value).toBe(60); // raw × 3, as before the fix, not ~$332
+    // Capped at the cheapest higher comp, floored at raw.
+    // cgc 10 $45: the 9 is capped by the grade-10 estimate (20 + 25 × 0.70).
+    expect(estimateGradedValue(table({ raw: 20, cgc: { '10': 45 } }), 9)!.value).toBe(37.5);
+    expect(estimateGradedValue(table({ raw: 20, cgc: { '10': 15 } }), 9)!.value).toBe(20);
+  });
+
   it('grade < 9 with no matching comp is never above the cheapest higher-grade comp', () => {
     expect(estimateGradedValue(UMA_229, 8)!.value).toBeLessThanOrEqual(73);
   });

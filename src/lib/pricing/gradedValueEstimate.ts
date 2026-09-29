@@ -14,8 +14,9 @@
  *   above its own PSA 10 ($354.44). Now:
  *     grade < 9  → at or below raw (scaled down for low grades) and never above
  *                  the cheapest known higher-grade comp (PSA, else other graders);
- *     grade >= 9 → the nearest known graded comp; raw × 3 only when the product
- *                  has no graded prices at all.
+ *     grade >= 9 → the nearest known graded comp at or below the grade; raw × 3
+ *                  (capped at the cheapest higher comp, floored at raw) when
+ *                  only higher grades are known or there are no graded prices.
  * - The premium is floored at zero. A PSA 10 that sells below raw (thin or odd
  *   comps) no longer drags a grade-10 estimate under the ungraded price.
  * - Monotonic: a lower grade never estimates above a higher grade of the same
@@ -161,6 +162,12 @@ function baseEstimate(prices: GradedPriceTable, grade: number): Omit<GradedValue
     const anchors = compAnchors(prices);
     if (anchors.length === 0) {
       return { value: round2(raw * RAW_ONLY_HIGH_GRADE_MULTIPLE), method: 'raw-multiple', multiplier: null, compPrice: null };
+    }
+    // Only higher grades are known (e.g. a 9 with just a PSA 10): don't borrow the
+    // 10's price. Keep the legacy multiple, capped at the cheapest higher comp.
+    if (anchors[0].grade > grade) {
+      const cap = Math.min(...anchors.map(a => a.price));
+      return { value: round2(Math.max(raw, Math.min(raw * RAW_ONLY_HIGH_GRADE_MULTIPLE, cap))), method: 'raw-multiple', multiplier: null, compPrice: null };
     }
     const nearest = compAtGrade(anchors, grade);
     const multiplier = dcmPremiumMultiplier(grade);
