@@ -17,14 +17,20 @@
  *        edge crop does not count against that corner or edge. The surface crops own
  *        surface marks, exactly as the surface cap already ignores border-wear types.
  *      - edge wear described in a corner crop ("a run along the left cut edge near the
- *        corner") while the adjoining edge strip on the same face already reports wear
- *        is the same wear counted twice; it stays with the edge.
+ *        corner") is EDGE wear: it is re-filed to the adjoining edge it names (or, if it
+ *        names none, the adjoining edge strip that also reports wear). It then counts
+ *        once, against edges - the edge cap dedups by physical side. (First version
+ *        dropped it outright, so when rule (a) later removed the edge strip's own
+ *        finding the wear vanished from both categories; measured on the Score Adams.)
  *      - a finding whose text names a card location the crop cannot contain ("top-left
  *        corner" in the bottom-right corner crop) is dropped.
  *  (a) corroboration - applied in the grader, where the whole-card evaluations exist:
- *      a zoom-only finding lowers a face only when a whole-card evaluation also noted a
- *      defect (or scored below 10) for that face and category, OR a clear majority of
- *      the zoom samples that inspected the region reported it.
+ *      a zoom-only MODERATE or HEAVY finding lowers a face only when a whole-card
+ *      evaluation also noted a defect (or scored below 10) for that face and category, OR
+ *      a clear majority of the zoom samples that inspected the region reported it.
+ *      MINOR findings are exempt: they already need 3 of 5 votes, cap no lower than 9,
+ *      and are what correctly holds a clean-looking chrome card at 9 (measured Sept 29:
+ *      gating them let a true-9 Topps Chrome Adams reach 10 in 2 of 4 runs).
  *
  * Every dropped finding is returned with its reason; nothing is silently discarded.
  */
@@ -164,9 +170,12 @@ function adjoiningEdges(region: string): string[] {
  * (b) Attribution. Returns the findings that keep counting (category forced from the
  * crop) and the ones dropped, each with a reason.
  */
-export function attributeZoomDefects<T extends CorroborationDefect>(defects: T[]): { kept: T[]; dropped: DroppedFinding[] } {
+export interface RefiledFinding { from: string; to: string; type: string; severity: string; reason: string }
+
+export function attributeZoomDefects<T extends CorroborationDefect>(defects: T[]): { kept: T[]; dropped: DroppedFinding[]; refiled: RefiledFinding[] } {
   const kept: T[] = [];
   const dropped: DroppedFinding[] = [];
+  const refiled: RefiledFinding[] = [];
   const drop = (d: T, reason: string) => dropped.push({ region: d.region, face: d.face, category: d.category, type: d.type,
     severity: d.severity, votes: d.votes, samples: d.samples, reason });
   const physicalEdge = (region: string) => region.replace(/^([FB]-EDG-[TBLR])-\d+$/, '$1');
@@ -186,14 +195,22 @@ export function attributeZoomDefects<T extends CorroborationDefect>(defects: T[]
     }
     const contradiction = locationContradiction(d.region, d.description);
     if (contradiction) { drop(forced, contradiction); continue; }
-    if (kind === 'corner' && EDGE_RUN.test(d.description) && !CORNER_TIP.test(d.description)
-      && adjoiningEdges(d.region).some(e => edgeRegionsWithWear.has(e))) {
-      drop(forced, 'edge wear described in a corner crop is already counted by the adjoining edge strip');
-      continue;
+    if (kind === 'corner' && EDGE_RUN.test(d.description) && !CORNER_TIP.test(d.description)) {
+      const adjoining = adjoiningEdges(d.region);
+      const named = namedCardLocations(d.description).sides
+        .map(side => adjoining.find(e => e.endsWith(`-${side[0].toUpperCase()}`)))
+        .find((e): e is string => !!e);
+      const target = named ?? adjoining.find(e => edgeRegionsWithWear.has(e));
+      if (target) {
+        const reason = `edge wear described in a corner crop is filed under the ${target.slice(-1) === 'T' ? 'top' : target.slice(-1) === 'B' ? 'bottom' : target.slice(-1) === 'L' ? 'left' : 'right'} edge`;
+        refiled.push({ from: d.region, to: target, type: d.type, severity: d.severity, reason });
+        kept.push({ ...forced, region: target, category: 'edges' } as T);
+        continue;
+      }
     }
     kept.push(forced);
   }
-  return { kept, dropped };
+  return { kept, dropped, refiled };
 }
 
 // ── (a) whole-card corroboration ─────────────────────────────────────────────
@@ -235,6 +252,7 @@ export function corroborateZoomDefects<T extends CorroborationDefect>(
   const dropped: DroppedFinding[] = [];
   for (const d of defects) {
     if (d.category === 'structural') { kept.push(d); continue; } // structural has its own corroboration gate
+    if (String(d.severity).toLowerCase() === 'minor') { kept.push(d); continue; } // minor: exempt, caps at 9 at most
     if (evidence[`${d.category}_${d.face}`]) { kept.push(d); continue; }
     const votes = d.votes ?? 0;
     const samples = d.samples ?? 0;

@@ -22,7 +22,7 @@ import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
-import { attributeZoomDefects, zoomCorroborationEnabled, ZOOM_DESIGN_ARTIFACT_EXCLUSIONS, type DroppedFinding } from './grading/zoomCorroboration';
+import { attributeZoomDefects, zoomCorroborationEnabled, ZOOM_DESIGN_ARTIFACT_EXCLUSIONS, type DroppedFinding, type RefiledFinding } from './grading/zoomCorroboration';
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
@@ -91,7 +91,7 @@ export interface ZoomResult {
   /** v9.5 measured centering per face; null/undefined = low confidence, model estimate stands */
   centering?: { front: CenteringMeasurement | null; back: CenteringMeasurement | null };
   /** ZOOM_CORROBORATION_V1 only: findings the attribution rules removed, with reasons. */
-  corroboration?: { dropped: DroppedFinding[] };
+  corroboration?: { dropped: DroppedFinding[]; refiled: RefiledFinding[] };
   /**
    * Capture-gate P0: what the geometry gate saw.
    *
@@ -1192,15 +1192,16 @@ export async function runZoomInspection(
     }
     // ZOOM_CORROBORATION_V1 (b): category from the crop, surface marks out of corner/edge
     // crops, corner-crop edge runs deduplicated, contradictory locations dropped.
-    let attributionDropped: DroppedFinding[] | undefined;
+    let attribution: { dropped: DroppedFinding[]; refiled: RefiledFinding[] } | undefined;
     if (corroborationOn && defects.length > 0) {
-      const { kept, dropped } = attributeZoomDefects(defects);
+      const { kept, dropped, refiled } = attributeZoomDefects(defects);
       for (const d of dropped) console.log(`[ZOOM] attribution: dropped ${d.severity} ${d.type} at ${d.region} (${d.votes}/${d.samples} votes) - ${d.reason}`);
       defects.length = 0;
       defects.push(...kept);
-      attributionDropped = dropped;
+      for (const r of refiled) console.log(`[ZOOM] attribution: ${r.severity} ${r.type} at ${r.from} -> ${r.to} - ${r.reason}`);
+      attribution = { dropped, refiled };
     } else if (corroborationOn) {
-      attributionDropped = [];
+      attribution = { dropped: [], refiled: [] };
     }
     if (backgroundSuppressed > 0) {
       const bgRegions = [...cardAreaVotes.entries()].filter(([id]) => !regionIsCard(id)).map(([id]) => id);
@@ -1243,7 +1244,7 @@ export async function runZoomInspection(
 
     return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture,
       ...(tolerable ? { uninspectedRegions: missing } : {}),
-      ...(attributionDropped ? { corroboration: { dropped: attributionDropped } } : {}) };
+      ...(attribution ? { corroboration: attribution } : {}) };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };

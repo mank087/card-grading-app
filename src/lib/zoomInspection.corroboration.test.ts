@@ -97,9 +97,12 @@ describe('ZOOM_CORROBORATION_V1 on', () => {
     mocks.create.mockImplementation(respond(FINDINGS));
     const result = await runZoomInspection('u', 'u', options());
     expect(result.ok).toBe(true);
-    expect(result.defects).toEqual([expect.objectContaining({ region: 'F-EDG-B-2', category: 'edges', votes: 4, samples: 5 })]);
+    expect(result.defects.map(d => `${d.region}:${d.category}:${d.votes}/${d.samples}`).sort())
+      .toEqual(['F-EDG-B-2:edges:4/5', 'F-EDG-B:edges:4/5']);
+    // the corner-crop run and the edge strip are one physical side: counted once
     expect(result.faceCaps).toEqual({ edges_front: 8 });
-    expect(result.corroboration?.dropped.map(d => d.region).sort()).toEqual(['F-COR-BL', 'F-COR-BR']);
+    expect(result.corroboration?.dropped.map(d => d.region)).toEqual(['F-COR-BR']);
+    expect(result.corroboration?.refiled).toEqual([expect.objectContaining({ from: 'F-COR-BL', to: 'F-EDG-B' })]);
   });
 });
 

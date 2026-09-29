@@ -2565,7 +2565,7 @@ Provide detailed analysis as markdown with all required sections.`
           zoom.defects = kept;
           zoom.faceCaps = computeZoomFaceCaps(kept);
           jsonData.inspection_status.zoom_corroboration = { version: 'zoom-corroboration-v1', majority_share: share,
-            attribution_dropped: zoom.corroboration?.dropped ?? [], corroboration_dropped: dropped };
+            attribution_dropped: zoom.corroboration?.dropped ?? [], attribution_refiled: zoom.corroboration?.refiled ?? [], corroboration_dropped: dropped };
         }
         // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull

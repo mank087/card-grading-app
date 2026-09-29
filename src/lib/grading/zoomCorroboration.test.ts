@@ -65,16 +65,25 @@ describe('(b) attribution', () => {
     const { dropped } = attributeZoomDefects([d('B-EDG-B-2', 'stain', 'minor', 'Tiny dark spot on the tan bottom border.')]);
     expect(dropped).toHaveLength(1);
   });
-  it('moves an edge run seen in a corner crop to the edge that already reports it (Strata / Score cases)', () => {
-    const { kept, dropped } = attributeZoomDefects([
+  it('re-files an edge run seen in a corner crop to the edge it names (Strata / Score cases)', () => {
+    const { kept, dropped, refiled } = attributeZoomDefects([
       d('F-COR-TL', 'whitening', 'moderate', 'Multiple white exposed fibers and roughness run along the left cut edge near the corner.'),
       d('F-EDG-L', 'whitening', 'moderate', 'A continuous jagged run of exposed white cardstock is visible along the left edge.'),
     ]);
-    expect(kept.map(k => k.region)).toEqual(['F-EDG-L']);
-    expect(dropped[0].reason).toMatch(/adjoining edge strip/);
+    expect(dropped).toEqual([]);
+    expect(kept.map(k => `${k.region}:${k.category}`)).toEqual(['F-EDG-L:edges', 'F-EDG-L:edges']);
+    expect(refiled).toEqual([expect.objectContaining({ from: 'F-COR-TL', to: 'F-EDG-L', reason: expect.stringMatching(/left edge/) })]);
   });
-  it('keeps the corner finding when no adjoining edge reports wear, or when it describes the tip', () => {
-    expect(attributeZoomDefects([d('F-COR-TL', 'whitening', 'moderate', 'Roughness runs along the left cut edge near the corner.')]).kept).toHaveLength(1);
+  it('re-files even when the edge strip saw nothing, so the wear is never lost', () => {
+    const { kept } = attributeZoomDefects([d('F-COR-BL', 'whitening', 'moderate', 'A run of white flecks along the lower dark edge near the corner.')]);
+    expect(kept).toEqual([expect.objectContaining({ region: 'F-EDG-B', category: 'edges', severity: 'moderate' })]);
+  });
+  it('without a named side, re-files only to an adjoining edge that reports wear', () => {
+    const run = d('F-COR-TL', 'whitening', 'minor', 'Fibers run along the cut edge.');
+    expect(attributeZoomDefects([run]).kept[0].region).toBe('F-COR-TL');
+    expect(attributeZoomDefects([run, d('F-EDG-T-1', 'whitening', 'minor', 'x')]).kept[0].region).toBe('F-EDG-T');
+  });
+  it('keeps the corner finding when it describes the tip', () => {
     expect(attributeZoomDefects([
       d('F-COR-TL', 'whitening', 'moderate', 'Whitening at the corner tip, running along the top edge.'),
       d('F-EDG-T-1', 'whitening', 'moderate', 'Whitening along the top edge.'),
@@ -115,7 +124,11 @@ describe('(a) whole-card corroboration', () => {
     expect(kept.map(k => k.region)).toEqual(['F-COR-TL', 'B-EDG-L', 'F-SUR-Q1']);
     expect(dropped).toEqual([expect.objectContaining({ region: 'F-EDG-B', reason: expect.stringMatching(/3 of 5 zoom samples is below the 80% majority/) })]);
   });
-  it('a finding with no vote record needs whole-card evidence', () => {
+  it('a moderate/heavy finding with no vote record needs whole-card evidence', () => {
     expect(corroborateZoomDefects([d('F-EDG-B', 'whitening', 'heavy', 'x')], {}).kept).toEqual([]);
+  });
+  it('minor findings are exempt (Topps Chrome Adams true-9 case)', () => {
+    const minor = d('B-COR-BL', 'softening', 'minor', 'tip slightly rounded', { votes: 3, samples: 5 });
+    expect(corroborateZoomDefects([minor], {}, 0.8)).toEqual({ kept: [minor], dropped: [] });
   });
 });
