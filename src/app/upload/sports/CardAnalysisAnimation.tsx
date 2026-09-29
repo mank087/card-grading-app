@@ -13,9 +13,13 @@ interface CardAnalysisAnimationProps {
   category?: string
   allowNavigation?: boolean
   onGradeAnother?: () => void
+  /** A locked grading run is in progress: stay here instead of jumping to the report. */
+  runActive?: boolean
+  /** Ends the run ("Finished grading"). */
+  onFinishRun?: () => void
 }
 
-export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId, category, allowNavigation = true, onGradeAnother }: CardAnalysisAnimationProps) {
+export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId, category, allowNavigation = true, onGradeAnother, runActive = false, onFinishRun }: CardAnalysisAnimationProps) {
   const router = useRouter()
   const { queue } = useGradingQueue()
   const [waitedLong, setWaitedLong] = useState(false)
@@ -65,10 +69,11 @@ export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId,
         console.log('[CardAnalysisAnimation] grade_complete event tracked:', category)
       }
 
-      // Redirect immediately for faster UX
-      router.push(queueCard.resultUrl!)
+      // Redirect immediately for faster UX — except mid-run, where the owner
+      // is about to shoot the next card and the report would pull them away.
+      if (!runActive) router.push(queueCard.resultUrl!)
     }
-  }, [queue, cardId, category, router])
+  }, [queue, cardId, category, router, runActive])
   return (
     <main className="dcm-brand dcm-grading-wait">
       <div className="dcm-grading-wait__layout">
@@ -90,7 +95,12 @@ export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId,
             <p>{failed ? 'We could not confirm a completed grade. Check My Collection before submitting again. If the card is still pending, contact support.' : complete ? 'Your grade and condition report are ready to review.' : uploading ? 'Keep this page open while your photos finish uploading.' : slow ? 'This is taking longer than usual. Check My Collection for the latest status; please avoid submitting the same card again while it is pending.' : 'Your report will open here when grading finishes. Processing time varies by card and demand.'}</p>
           </div>
           <GradingWaitFeatures mode="benefits" active={!failed && !complete && !uploading} />
-          {allowNavigation && !uploading && <div className="dcm-grading-wait__actions">
+          {allowNavigation && !uploading && runActive && <div className="dcm-grading-wait__actions">
+            <button type="button" className="dcm-button dcm-button--primary" onClick={() => onGradeAnother ? onGradeAnother() : router.push('/upload')}>Grade next card</button>
+            <button type="button" className="dcm-button dcm-button--secondary" onClick={() => onFinishRun ? onFinishRun() : router.push('/collection')}>Finished grading</button>
+            {complete && queueCard?.resultUrl && <Link href={queueCard.resultUrl} className="underline">View this report</Link>}
+          </div>}
+          {allowNavigation && !uploading && !runActive && <div className="dcm-grading-wait__actions">
             <Link href="/collection" className="dcm-button dcm-button--primary">My Collection</Link>
             <button type="button" className="dcm-button dcm-button--secondary" onClick={() => onGradeAnother ? onGradeAnother() : router.push('/upload')}>Grade another card</button>
           </div>}

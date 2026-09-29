@@ -12,6 +12,7 @@ import { incompleteInspectionMessage, incompleteInspectionFromErrorMessage } fro
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
+import { useGradingRun } from '@/hooks/useGradingRun'
 
 const CATEGORY_ROUTES: Record<string, string> = {
   Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg',
@@ -32,7 +33,9 @@ const STEPS = [
 
 export default function ProcessingScreen() {
   const router = useRouter()
-  const params = useLocalSearchParams<{ cardId: string; category: string; frontUri: string }>()
+  const params = useLocalSearchParams<{ cardId: string; category: string; subCategory?: string; frontUri: string; mode?: string }>()
+  // Locked grading run: "Grade Next Card" goes straight back to capture.
+  const run = useGradingRun()
   const [currentStep, setCurrentStep] = useState(0)
   const insets = useSafeAreaInsets()
   const scanAnim = useRef(new Animated.Value(0)).current
@@ -155,7 +158,28 @@ export default function ProcessingScreen() {
   }
 
   const handleGradeAnother = () => {
+    const locked = run.lock.category
+    if (run.active && (locked || params.category)) {
+      // Pop back to the bottom of the grade stack, then replace it with a
+      // fresh capture screen — keeps exactly one capture mounted per run.
+      if (router.canDismiss()) router.dismissAll()
+      router.replace({
+        pathname: '/grade/capture',
+        params: {
+          category: locked?.category ?? params.category,
+          subCategory: locked ? locked.subCategory : (params.subCategory || ''),
+          mode: params.mode === 'gallery' ? 'gallery' : 'camera',
+          tipsAcked: '1',
+        },
+      } as any)
+      return
+    }
     router.replace('/(tabs)/grade')
+  }
+
+  const handleFinishRun = async () => {
+    await run.endRun()
+    router.replace('/(tabs)/collection')
   }
 
   const scanTranslateY = scanAnim.interpolate({
@@ -187,10 +211,17 @@ export default function ProcessingScreen() {
       <BenefitCarousel />
 
       {/* Navigation Options */}
-      <View style={styles.navButtons}>
-        <Button title="Grade Another" variant="secondary" size="sm" onPress={handleGradeAnother} style={{ flex: 1 }} />
-        <Button title="My Collection" variant="secondary" size="sm" onPress={() => router.replace('/(tabs)/collection')} style={{ flex: 1 }} />
-      </View>
+      {run.active ? (
+        <View style={styles.navButtons}>
+          <Button title="Grade Next Card" size="sm" onPress={handleGradeAnother} style={{ flex: 1 }} />
+          <Button title="Finished Grading" variant="secondary" size="sm" onPress={handleFinishRun} style={{ flex: 1 }} />
+        </View>
+      ) : (
+        <View style={styles.navButtons}>
+          <Button title="Grade Another" variant="secondary" size="sm" onPress={handleGradeAnother} style={{ flex: 1 }} />
+          <Button title="My Collection" variant="secondary" size="sm" onPress={() => router.replace('/(tabs)/collection')} style={{ flex: 1 }} />
+        </View>
+      )}
 
       {/* Card with scanning animation */}
       <View style={styles.cardSection}>

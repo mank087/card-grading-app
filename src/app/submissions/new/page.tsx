@@ -14,6 +14,9 @@ import Link from 'next/link'
 import { getStoredSession, getValidSession, getAuthenticatedClient } from '@/lib/directAuth'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useToast } from '@/hooks/useToast'
+import { useGradingRun } from '@/hooks/useGradingRun'
+import CardNotesField from '@/components/grading/CardNotesField'
+import RunLockChip from '@/components/grading/RunLockChip'
 import {
   compressImage,
   ensureBrowserDecodableImage,
@@ -54,6 +57,7 @@ interface DraftMeta {
   subCategory: string
   binderId: string | null
   pairCount: number
+  cardNotes?: string
 }
 
 type Stage = 'pick' | 'review' | 'uploading'
@@ -215,6 +219,28 @@ function SubmissionsNewInner() {
   )
   const [subCategory, setSubCategory] = useState<string>(subCategoryParam)
 
+  // Same grading-run lock as /upload: a locked card type pins the type here
+  // too, and a locked notes profile pre-fills the notes for every card.
+  const run = useGradingRun()
+  const categoryLock = run.lock.category
+  // Card notes applied to every card in this submission. Saved on the
+  // submission and copied onto each card as the same user_condition_* fields
+  // a single upload writes, so the grader sees them identically.
+  const [cardNotes, setCardNotes] = useState('')
+
+  useEffect(() => {
+    if (!categoryLock) return
+    if (categoryLock.type in CARD_TYPES && selectedType !== categoryLock.type) {
+      setSelectedType(categoryLock.type as CardType)
+    }
+    if (subCategory !== categoryLock.subCategory) setSubCategory(categoryLock.subCategory)
+  }, [categoryLock, selectedType, subCategory])
+
+  useEffect(() => {
+    if (run.loaded && run.lock.notes) setCardNotes(prev => prev || run.lock.notes!.text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.loaded])
+
   const [stage, setStage] = useState<Stage>('pick')
   const [files, setFiles] = useState<PickedFile[]>([])
   const [convention, setConvention] = useState<SubmissionConvention>('alternating')
@@ -269,6 +295,7 @@ function SubmissionsNewInner() {
       if (draft.category && draft.category in CARD_TYPES) setSelectedType(draft.category)
       if (draft.subCategory) setSubCategory(draft.subCategory)
       if (draft.binderId) setSelectedBinderId(draft.binderId)
+      if (draft.cardNotes) setCardNotes(draft.cardNotes)
       setRestoredNotice(true)
       sessionStorage.removeItem(DRAFT_KEY)
     } catch {
@@ -797,6 +824,7 @@ function SubmissionsNewInner() {
       subCategory,
       binderId: selectedBinderId || null,
       pairCount: required,
+      cardNotes,
     }
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
@@ -942,6 +970,7 @@ function SubmissionsNewInner() {
           category: config.category,
           sub_category: selectedType === 'Naruto' ? 'Naruto / Kayou' : (config.category === 'Other' ? subCategory : undefined),
           binder_id: binderId,
+          card_notes: cardNotes.trim() || undefined,
           source: 'bulk_upload',
           items: itemsPayload,
         }),
@@ -1076,7 +1105,13 @@ function SubmissionsNewInner() {
         )}
 
         <div className="bg-white rounded-xl shadow-lg p-4 md:p-6 space-y-6">
-          {/* Card type / sub-category */}
+          {/* Card type / sub-category — the lock chip replaces the pickers during a locked run */}
+          {categoryLock ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-gray-700">Card Type</span>
+              <RunLockChip lock={categoryLock} onUnlock={run.unlockCategory} disabled={stage === 'uploading'} />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Card Type</label>
@@ -1112,6 +1147,29 @@ function SubmissionsNewInner() {
               </div>
             )}
           </div>
+          )}
+          {!categoryLock && stage !== 'uploading' && (
+            <button
+              type="button"
+              onClick={() => run.lockCategory(selectedType, selectedType === 'Other' ? subCategory : '')}
+              disabled={selectedType === 'Other' && !subCategory}
+              className="-mt-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              🔒 Lock this card type for my next cards
+            </button>
+          )}
+
+          {/* Card notes for every card in this submission */}
+          <CardNotesField
+            value={cardNotes}
+            onChange={setCardNotes}
+            lockedNotes={run.lock.notes}
+            onLock={run.lockNotes}
+            onUnlock={run.unlockNotes}
+            label="Card notes for every card"
+            hint="Applied to each card in this batch to guide grading — e.g. the finish or parallel that could be mistaken for damage. Context only; it never raises a grade."
+            disabled={stage === 'uploading'}
+          />
 
           {stage === 'pick' && (
             <div className="space-y-4">

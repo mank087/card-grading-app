@@ -7,6 +7,8 @@ import { useCredits } from '@/contexts/CreditsContext'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import CategoryPicker from '@/components/CategoryPicker'
+import RunLockChip from '@/components/RunLockChip'
+import { useGradingRun } from '@/hooks/useGradingRun'
 
 export default function GradeScreen() {
   const router = useRouter()
@@ -19,6 +21,17 @@ export default function GradeScreen() {
   useFocusEffect(useCallback(() => { refresh() }, [refresh]))
   const [selectedCategory, setSelectedCategory] = useState('')
   const [subCategory, setSubCategory] = useState('')
+
+  // Grading run: a locked card type skips the picker for every card until
+  // unlocked or "Finished grading".
+  const run = useGradingRun()
+  const categoryLock = run.lock.category
+  useEffect(() => {
+    if (!categoryLock) return
+    setSelectedCategory(categoryLock.category)
+    setSubCategory(categoryLock.subCategory)
+  }, [categoryLock])
+  const canLockCategory = selectedCategory !== '' && (selectedCategory !== 'Other' || subCategory !== '')
 
   const canGrade = balance >= 1
     && selectedCategory !== ''
@@ -87,12 +100,50 @@ export default function GradeScreen() {
           have to pick before they can move on (sports was being
           auto-graded as the wrong category). */}
       <View style={styles.section}>
-        <CategoryPicker
-          category={selectedCategory}
-          subCategory={subCategory}
-          onCategoryChange={setSelectedCategory}
-          onSubCategoryChange={setSubCategory}
-        />
+        {categoryLock ? (
+          <>
+            <Text style={styles.sectionLabel}>Card Type</Text>
+            <RunLockChip lock={categoryLock} onUnlock={run.unlockCategory} />
+            <Text style={styles.lockHint}>Every card in this run is graded as this type. Tap ✕ to change it.</Text>
+          </>
+        ) : (
+          <>
+            <CategoryPicker
+              category={selectedCategory}
+              subCategory={subCategory}
+              onCategoryChange={setSelectedCategory}
+              onSubCategoryChange={setSubCategory}
+            />
+            <TouchableOpacity
+              style={styles.lockBtn}
+              onPress={() => run.lockCategory(selectedCategory, selectedCategory === 'Other' ? subCategory : '')}
+              disabled={!canLockCategory}
+              accessibilityRole="button"
+              accessibilityLabel="Lock card type for this run"
+            >
+              <Ionicons name="lock-closed-outline" size={15} color={canLockCategory ? Colors.purple[600] : Colors.gray[400]} />
+              <Text style={[styles.lockBtnText, !canLockCategory && { color: Colors.gray[400] }]}>Lock card type for this run</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        {run.lock.notes && (
+          <View style={styles.notesChip}>
+            <Ionicons name="document-text-outline" size={13} color={Colors.purple[700]} />
+            <Text style={styles.notesChipText} numberOfLines={1}>Notes: {run.lock.notes.name}</Text>
+            <TouchableOpacity onPress={run.unlockNotes} hitSlop={8} accessibilityLabel="Unlock notes">
+              <Ionicons name="close" size={15} color={Colors.purple[700]} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {run.active && (
+          <Button
+            title="Finished Grading"
+            variant="secondary"
+            size="sm"
+            onPress={() => { run.endRun(); router.push('/(tabs)/collection' as any) }}
+            style={{ marginTop: 12 }}
+          />
+        )}
       </View>
 
       {/* Upload Actions */}
@@ -230,6 +281,11 @@ const styles = StyleSheet.create({
   section: { marginHorizontal: 16, marginTop: 20 },
   sectionLabel: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], marginBottom: 8 },
   sectionHint: { fontSize: 13, color: Colors.gray[500], marginBottom: 12 },
+  lockHint: { fontSize: 12, color: Colors.gray[500], marginTop: 6 },
+  lockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
+  lockBtnText: { fontSize: 13, fontWeight: '600', color: Colors.purple[600] },
+  notesChip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: Colors.purple[50], borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10, maxWidth: '100%' },
+  notesChipText: { fontSize: 12, fontWeight: '700', color: Colors.purple[700], flexShrink: 1 },
 
   // Category pills
   categoryDropdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     subCategory: typeof body?.sub_category === 'string' ? body.sub_category : null,
     binderId: typeof body?.binder_id === 'string' ? body.binder_id : null,
     source: typeof body?.source === 'string' ? body.source : 'upload',
+    cardNotes: typeof body?.card_notes === 'string' ? body.card_notes : null,
     items: parsed,
   });
 

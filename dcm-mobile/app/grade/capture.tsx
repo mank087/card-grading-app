@@ -500,6 +500,8 @@ export default function CaptureScreen() {
           // hide an unusable back behind a good front.
           frontSource: captureSources.front || '',
           backSource: captureSources.back || '',
+          // A locked grading run sends the next card back the same way.
+          mode,
         },
       })
     }

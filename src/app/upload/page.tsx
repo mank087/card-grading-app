@@ -33,7 +33,10 @@ import UserConditionReport from '@/components/UserConditionReport'
 import OrgScopeBadge from '@/components/OrgScopeBadge'
 import WizardProgressIndicator from '@/components/WizardProgressIndicator'
 import { UserConditionReportInput, EMPTY_CONDITION_REPORT, hasAnyConditionData, countDefects } from '@/types/conditionReport'
-import { processConditionReport } from '@/lib/conditionReportProcessor'
+import { buildUserConditionFields, conditionStepState } from '@/lib/userConditionFields'
+import { useGradingRun } from '@/hooks/useGradingRun'
+import CardNotesField from '@/components/grading/CardNotesField'
+import RunLockChip from '@/components/grading/RunLockChip'
 
 interface CompressionInfo {
   originalSize: number;
@@ -168,10 +171,18 @@ function UniversalUploadPageContent() {
   // Wizard step state for review flow (1 = Category, 2 = Photos, 3 = Condition)
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
 
-  // "No defects" acknowledgment checkbox state
-  const [noDefectsConfirmed, setNoDefectsConfirmed] = useState(false);
-  // Optional card description to guide AI (visible when "no defects" checked)
+  // Card damage section. Collapsed (the default) means "no card damage" and
+  // sends exactly what the old "No visible defects" checkbox sent: the empty
+  // report. Opening it asks for at least one defect.
+  const [damageOpen, setDamageOpen] = useState(false);
+  // Card notes to guide the grader (sent as cardDescription). Pre-filled from
+  // a locked notes profile during a run.
   const [cardDescription, setCardDescription] = useState('');
+
+  // Grading run: a locked card type skips category selection for every card
+  // until unlocked, and a locked notes profile pre-fills each card's notes.
+  const run = useGradingRun();
+  const categoryLock = run.lock.category;
 
   // Crop state for Step 2 photo review
   const [croppingSide, setCroppingSide] = useState<'front' | 'back' | null>(null);
@@ -207,7 +218,7 @@ function UniversalUploadPageContent() {
         setUploadedCardCategory(null);
         setUploadMode('select');
         setWizardStep(1);
-        setNoDefectsConfirmed(false);
+        setDamageOpen(false);
         setConditionReport(EMPTY_CONDITION_REPORT);
         setSubCategory('');
       }
@@ -222,10 +233,32 @@ function UniversalUploadPageContent() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       // Reset wizard when going back to select
       setWizardStep(1);
-      setNoDefectsConfirmed(false);
-      setCardDescription('');
+      setDamageOpen(false);
+      setCardDescription(run.lock.notes?.text ?? '');
     }
+    // A locked card type needs no confirming: open the review on the photos.
+    if (uploadMode === 'review' && categoryLock) {
+      setWizardStep(step => (step === 1 ? 2 : step));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadMode]);
+
+  // Enforce the run's card-type lock over the URL param and every picker.
+  useEffect(() => {
+    if (!categoryLock) return;
+    if (categoryLock.type in CARD_TYPES && selectedType !== categoryLock.type) {
+      setSelectedType(categoryLock.type as CardType);
+    }
+    if (subCategory !== categoryLock.subCategory) setSubCategory(categoryLock.subCategory);
+  }, [categoryLock, selectedType, subCategory]);
+
+  // Once the stored run loads, pre-fill the first card's notes from it.
+  useEffect(() => {
+    if (run.loaded && run.lock.notes) {
+      setCardDescription(prev => prev || run.lock.notes!.text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.loaded]);
 
   // Scroll to top when wizard step changes
   useEffect(() => {
@@ -714,18 +747,17 @@ function UniversalUploadPageContent() {
 
       console.log('[Upload] Saving to database...')
 
-      // Process condition report if user provided any data
-      // Include card description in the condition report for AI context
-      const reportWithDescription = {
-        ...conditionReport,
-        cardDescription: cardDescription.trim() || undefined,
-      }
-      const hasConditionData = hasAnyConditionData(conditionReport)
-      const hasCardDescription = cardDescription.trim().length > 0
-      const processedConditionReport = (hasConditionData || hasCardDescription) ? processConditionReport(reportWithDescription) : null
+      // Condition report + card notes -> the user_condition_* columns. Shared
+      // with bulk submissions (src/lib/userConditionFields.ts) so both send
+      // the grader the same thing. A collapsed damage section is the empty
+      // report — identical to the old explicit "No visible defects".
+      const conditionFields = buildUserConditionFields(
+        damageOpen ? conditionReport : EMPTY_CONDITION_REPORT,
+        cardDescription
+      )
 
-      if (hasConditionData) {
-        console.log('[Upload] User condition report provided:', processedConditionReport?.total_defects_reported, 'defects reported')
+      if (damageOpen && hasAnyConditionData(conditionReport)) {
+        console.log('[Upload] User condition report provided:', conditionFields.user_condition_processed?.total_defects_reported, 'defects reported')
       }
 
       // Save record in DB with selected category (use authenticated client).
@@ -749,9 +781,7 @@ function UniversalUploadPageContent() {
             : {}),
           visibility: 'public', // Cards are public by default so grading API can access them
           // User condition report fields
-          user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
-          user_condition_processed: processedConditionReport,
-          has_user_condition_report: hasConditionData || hasCardDescription,
+          ...conditionFields,
           // CAPTURE-GATE P0 — how each side was obtained. See captureSources.
           capture_source: {
             client_surface: isMobileDevice || isTabletDevice ? 'web_mobile' : 'web_desktop',
@@ -1091,10 +1121,26 @@ function UniversalUploadPageContent() {
     setStatus('')
     setUploadedCardId(null)
     setUploadedCardCategory(null)
-    setUploadMode('select')
     setConditionReport(EMPTY_CONDITION_REPORT)
-    setCardDescription('')
+    setCardDescription(run.lock.notes?.text ?? '')
+    setDamageOpen(false)
+    setWizardStep(1)
+    setPhotoCheckIssue(null)
+    setCaptureSources({})
+    if (run.active && showCameraOption) {
+      // Locked run: straight back to front/back capture, no category screen.
+      setCurrentSide('front')
+      setUploadMode(originalUploadMethod)
+    } else {
+      setUploadMode('select')
+    }
     console.log('[Upload] Reset upload state - ready for new card')
+  }
+
+  // "Finished grading": end the run and go see the results.
+  const handleFinishRun = () => {
+    run.endRun()
+    router.push('/collection')
   }
 
   const handleCameraCapture = (file: File, meta?: { captureMethod: WebCaptureMethod }) => {
@@ -1316,6 +1362,8 @@ function UniversalUploadPageContent() {
         cardId={uploadedCardId || undefined}
         category={uploadedCardCategory || undefined}
         onGradeAnother={handleResetUpload}
+        runActive={run.active}
+        onFinishRun={handleFinishRun}
       />
     )
   }
@@ -1355,7 +1403,9 @@ function UniversalUploadPageContent() {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value as CardType)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                disabled={!!categoryLock}
+                title={categoryLock ? 'Card type is locked for this run' : undefined}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 disabled:bg-gray-100"
               >
                 {Object.entries(CARD_TYPES).map(([key, value]) => (
                   <option key={key} value={key}>
@@ -1509,7 +1559,7 @@ function UniversalUploadPageContent() {
     ];
 
     const defectCount = countDefects(conditionReport);
-    const hasConditionData = hasAnyConditionData(conditionReport);
+    const conditionStep = conditionStepState(damageOpen, conditionReport);
 
     // Get card type icon based on category
     const getCategoryIcon = (type: CardType) => {
@@ -1593,6 +1643,16 @@ function UniversalUploadPageContent() {
                   </div>
                 </div>
 
+                {/* Locked run: the type is pinned until unlocked */}
+                {categoryLock ? (
+                  <div className="bg-white rounded-xl border border-indigo-200 p-4 text-center">
+                    <RunLockChip lock={categoryLock} onUnlock={run.unlockCategory} />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Card type is locked for this run. Unlock it to pick a different type.
+                    </p>
+                  </div>
+                ) : (
+                <>
                 {/* Category Selector */}
                 <div className="bg-white rounded-xl border border-gray-200 p-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1637,6 +1697,25 @@ function UniversalUploadPageContent() {
                       Required — helps categorize your card for population reports and collection organization.
                     </p>
                   </div>
+                )}
+
+                {/* Lock this type for the next cards */}
+                <label className="flex items-start gap-3 mt-4 bg-white rounded-xl border border-gray-200 p-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    disabled={selectedType === 'Other' && !subCategory}
+                    onChange={() => run.lockCategory(selectedType, selectedType === 'Other' ? subCategory : '')}
+                    className="w-5 h-5 mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-800">Lock this card type for my next cards</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Grading a stack of the same kind? Skip this step until you unlock it or finish grading.
+                    </span>
+                  </span>
+                </label>
+                </>
                 )}
               </div>
             )}
@@ -1879,109 +1958,76 @@ function UniversalUploadPageContent() {
                   </div>
                 </div>
 
-                {/* "No Defects" Acknowledgment - Moved up for visibility */}
-                <div className={`border-2 rounded-xl p-4 mb-4 transition-colors ${
-                  noDefectsConfirmed
-                    ? 'bg-green-50 border-green-300'
-                    : 'bg-white border-gray-200 hover:border-gray-300'
-                }`}>
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={noDefectsConfirmed}
-                      onChange={(e) => {
-                        setNoDefectsConfirmed(e.target.checked)
-                        // Clear condition report when "no defects" is checked
-                        if (e.target.checked) {
-                          setConditionReport(EMPTY_CONDITION_REPORT)
-                        }
-                      }}
-                      className="w-5 h-5 mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
-                    />
-                    <div>
-                      <span className={`font-semibold ${noDefectsConfirmed ? 'text-green-800' : 'text-gray-800'} group-hover:text-gray-900`}>
-                        No visible defects to report
-                      </span>
-                      <p className={`text-xs mt-1 ${noDefectsConfirmed ? 'text-green-600' : 'text-gray-500'}`}>
-                        Check this if you&apos;ve reviewed your card and don&apos;t see any defects worth mentioning.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Optional card description - shown when no defects checked */}
-                  {noDefectsConfirmed && (
-                    <div className="mt-3 pt-3 border-t border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-green-800">Card details for grading guidance</span>
-                        <span className="px-1.5 py-0.5 bg-green-200 text-green-700 text-[10px] font-semibold rounded-full uppercase">Optional</span>
-                      </div>
-                      <p className="text-xs text-green-600 mb-2">
-                        Describe unique art styles, textures, serial numbering, or features that could be mistaken for defects.
-                      </p>
-                      <textarea
-                        value={cardDescription}
-                        onChange={(e) => setCardDescription(e.target.value.slice(0, 500))}
-                        placeholder="e.g., &quot;This card has a textured holofoil surface with intentional crosshatch pattern&quot; or &quot;Full art card with dark borders that are part of the design&quot; or &quot;Serial numbered /100 stamped on front&quot;"
-                        className="w-full px-3 py-2 text-sm border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white placeholder-gray-400 resize-none"
-                        rows={3}
-                        maxLength={500}
-                      />
-                      <div className="flex justify-end mt-1">
-                        <span className={`text-xs ${cardDescription.length > 450 ? 'text-amber-600' : 'text-gray-400'}`}>
-                          {cardDescription.length}/500
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                {/* Card notes — pre-filled from a locked notes profile during a run */}
+                <div className="mb-4">
+                  <CardNotesField
+                    value={cardDescription}
+                    onChange={setCardDescription}
+                    lockedNotes={run.lock.notes}
+                    onLock={run.lockNotes}
+                    onUnlock={run.unlockNotes}
+                    label="Card details for grading guidance"
+                  />
                 </div>
 
-                {/* Divider with OR */}
-                {!noDefectsConfirmed && (
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex-1 h-px bg-gray-200"></div>
-                    <span className="text-xs font-medium text-gray-400 uppercase">or report defects below</span>
-                    <div className="flex-1 h-px bg-gray-200"></div>
+                {/* Card damage — collapsed by default; collapsed = no card damage */}
+                {!damageOpen ? (
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">No card damage to report</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Seen a scratch, crease, or whitening the photos might miss? Add it here.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDamageOpen(true)}
+                      className="px-4 py-2 text-sm font-semibold border-2 border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >
+                      + Add card damage
+                    </button>
                   </div>
-                )}
-
-                {/* Condition Report - Expanded by Default, hidden when no defects checked */}
-                {!noDefectsConfirmed && (
+                ) : (
                   <div className="mb-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-semibold text-gray-800">Card damage</span>
+                      <button
+                        type="button"
+                        onClick={() => { setDamageOpen(false); setConditionReport(EMPTY_CONDITION_REPORT) }}
+                        className="text-xs font-semibold text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                      >
+                        No card damage
+                      </button>
+                    </div>
                     <UserConditionReport
                       value={conditionReport}
-                      onChange={(newReport) => {
-                        setConditionReport(newReport)
-                        // Uncheck "no defects" if user starts reporting defects
-                        if (hasAnyConditionData(newReport)) {
-                          setNoDefectsConfirmed(false)
-                        }
-                      }}
+                      onChange={setConditionReport}
                       defaultExpanded={true}
                     />
                   </div>
                 )}
 
                 {/* Validation Message */}
-                {!noDefectsConfirmed && !hasConditionData && (
+                {!conditionStep.ok && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
                     <div className="flex items-center gap-2">
                       <span className="text-amber-500 text-lg">⚠️</span>
                       <span className="text-sm font-medium text-amber-800">
-                        Please check &quot;No visible defects&quot; or report at least one defect to continue.
+                        Select at least one defect, or tap &quot;No card damage&quot; to continue.
                       </span>
                     </div>
                   </div>
                 )}
 
                 {/* Summary - shown when complete */}
-                {(hasConditionData || noDefectsConfirmed) && (
+                {conditionStep.ok && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-green-500 text-lg">✓</span>
                       <span className="font-medium text-green-800">
-                        {hasConditionData
+                        {conditionStep.kind === 'damage_reported'
                           ? `${defectCount} defect${defectCount !== 1 ? 's' : ''} reported`
-                          : 'No defects reported - ready to submit'}
+                          : 'No card damage reported - ready to submit'}
                       </span>
                     </div>
                   </div>
@@ -2060,15 +2106,15 @@ function UniversalUploadPageContent() {
                 </div>
                 <button
                   onClick={handleUpload}
-                  disabled={!frontCompressed || !backCompressed || isCompressing || isUploading || (!noDefectsConfirmed && !hasConditionData)}
+                  disabled={!frontCompressed || !backCompressed || isCompressing || isUploading || !conditionStep.ok}
                   className="w-full px-4 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold text-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2"
                 >
                   {isCompressing ? (
                     'Processing Images...'
                   ) : isUploading ? (
                     'Uploading...'
-                  ) : !noDefectsConfirmed && !hasConditionData ? (
-                    'Complete Condition Report to Submit'
+                  ) : !conditionStep.ok ? (
+                    'Select a Defect or Choose No Card Damage'
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2196,7 +2242,14 @@ function UniversalUploadPageContent() {
         {/* Upload Form - Show first on mobile, after info sections on desktop */}
         <div className="order-1 w-full space-y-6 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="dcm-photo-guidance"><strong>Before you upload</strong><p>Use even lighting, avoid glare and keep all four edges visible. Make sure the front and back photos belong to the same card.</p><Link href="/get-started" target="_blank" rel="noopener noreferrer">Photo guide →</Link></div>
-        {/* Card Type Selector */}
+        {/* Card Type Selector — replaced by the lock chip during a locked run */}
+        {categoryLock ? (
+          <div className="text-center space-y-2">
+            <RunLockChip lock={categoryLock} onUnlock={run.unlockCategory} />
+            <p className="text-xs text-gray-500">Every card in this run is graded as this type. Tap ✕ to change it.</p>
+          </div>
+        ) : (
+        <>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Card Type:
@@ -2219,11 +2272,53 @@ function UniversalUploadPageContent() {
           </select>
         </div>
 
-        <div className="text-center">
+        {/* "Other" needs its sub-category before the type can be locked */}
+        {selectedType === 'Other' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sub-Category:</label>
+            <select
+              value={subCategory}
+              onChange={(e) => setSubCategory(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors bg-white text-gray-900 font-medium"
+            >
+              <option value="">Select a sub-category...</option>
+              {Object.entries(OTHER_SUB_CATEGORIES).map(([group, items]) => (
+                <optgroup key={group} label={group}>
+                  {items.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <div className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
             {selectedType}
           </div>
+          <button
+            type="button"
+            onClick={() => run.lockCategory(selectedType, selectedType === 'Other' ? subCategory : '')}
+            disabled={selectedType === 'Other' && !subCategory}
+            title="Skip the card-type step for every card until you unlock it"
+            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+          >
+            🔒 Lock for this run
+          </button>
         </div>
+        </>
+        )}
+
+        {run.lock.notes && (
+          <div className="text-center">
+            <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-800 px-3 py-1 rounded-full text-xs font-semibold">
+              <span aria-hidden="true">📝</span>
+              Notes: {run.lock.notes.name}
+              <button type="button" onClick={run.unlockNotes} aria-label="Unlock notes" className="ml-1 text-indigo-600 hover:text-indigo-900">✕</button>
+            </span>
+          </div>
+        )}
 
         {/* Upload Method Selector or File Upload - Show selector only when both images not uploaded */}
         {!frontFile && !backFile && showCameraOption && uploadMode === 'select' ? (
@@ -2406,6 +2501,16 @@ function UniversalUploadPageContent() {
             className="w-full px-4 py-4 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-semibold text-lg"
           >
             Select Both Images to Continue
+          </button>
+        )}
+
+        {run.active && (
+          <button
+            type="button"
+            onClick={handleFinishRun}
+            className="w-full px-4 py-3 bg-gray-100 text-gray-800 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Finished grading — see my cards
           </button>
         )}
 

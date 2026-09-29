@@ -18,6 +18,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { getUserCredits } from '@/lib/credits';
 import { getOrgForUser } from '@/lib/organizations';
 import { generateNextSerial } from '@/lib/serialGenerator';
+import { buildUserConditionFields, CARD_NOTES_MAX_LENGTH } from '@/lib/userConditionFields';
 import {
   ACTIVE_ITEM_STATUSES,
   MAX_SUBMISSION_ITEMS,
@@ -218,6 +219,8 @@ export interface CreateDraftInput {
   subCategory?: string | null;
   binderId?: string | null;
   source?: string | null;
+  /** Card notes applied to every card (same field single upload's notes use). */
+  cardNotes?: string | null;
   items?: SubmissionItemInput[];
 }
 
@@ -244,6 +247,8 @@ export async function createDraftSubmission(
     });
   }
 
+  const cardNotes = (input.cardNotes ?? '').slice(0, CARD_NOTES_MAX_LENGTH).trim();
+
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from('submissions')
@@ -256,9 +261,20 @@ export async function createDraftSubmission(
       source: input.source || 'upload',
       status: 'draft',
       card_count: items.length || null,
+      // Only written when present, so a submission without notes still works
+      // before migration 20260928_grading_notes_profiles.sql adds the column.
+      ...(cardNotes ? { card_notes: cardNotes } : {}),
     })
     .select(SUBMISSION_COLUMNS)
     .maybeSingle();
+
+  if (cardNotes && error && (error.code === '42703' || error.code === 'PGRST204')) {
+    console.error(`${LOG} submissions.card_notes column missing — migration not applied`);
+    return fail({
+      code: 'invalid',
+      message: 'Card notes for bulk submissions are not available yet. Clear the notes and try again.',
+    });
+  }
 
   if (error || !data) {
     console.error(`${LOG} create failed:`, error?.message);
@@ -481,12 +497,45 @@ function cardIdFromPath(path: string | null): string | null {
   return match ? match[1] : null;
 }
 
-async function createCardsForItems(
+/**
+ * The submission's card notes (null when none, or before the column exists).
+ * Any other read failure fails the commit rather than grading every card
+ * without the notes the owner asked for; the commit is resumable.
+ */
+async function loadSubmissionCardNotes(
+  submissionId: string
+): Promise<{ ok: true; notes: string | null } | { ok: false }> {
+  const { data, error } = await supabaseServer()
+    .from('submissions')
+    .select('card_notes')
+    .eq('id', submissionId)
+    .maybeSingle();
+  if (error) {
+    if (error.code === '42703') return { ok: true, notes: null };
+    console.error(`${LOG} card notes lookup failed for ${submissionId}:`, error.message);
+    return { ok: false };
+  }
+  const notes = (data as any)?.card_notes;
+  return { ok: true, notes: typeof notes === 'string' && notes.trim() ? notes : null };
+}
+
+export async function createCardsForItems(
   submission: SubmissionRow,
   items: SubmissionItemRow[]
 ): Promise<SubmissionResult<{ cardsCreated: number }>> {
   const supabase = supabaseServer();
   let cardsCreated = 0;
+
+  // The submission's card notes become each card's user_condition_* fields,
+  // built by the same helper single upload uses — the drain grades through the
+  // per-category GET routes, which read exactly these columns. Read separately
+  // (not via SUBMISSION_COLUMNS) so every other submission read keeps working
+  // before the column exists.
+  const notesLookup = await loadSubmissionCardNotes(submission.id);
+  if (!notesLookup.ok) {
+    return fail({ code: 'internal', message: 'Could not read the submission card notes' });
+  }
+  const conditionFields = buildUserConditionFields(null, notesLookup.notes);
 
   for (const item of items) {
     if (item.card_id) continue; // resumed commit — this item already has a card
@@ -513,6 +562,7 @@ async function createCardsForItems(
           // API reads the row and single upload does exactly this.
           visibility: 'public',
           submission_id: submission.id,
+          ...(conditionFields.has_user_condition_report ? conditionFields : {}),
           // Same per-side shape upload/page.tsx writes (CAPTURE-GATE P0), so
           // "which capture path produces the bad photos" stays answerable
           // once bulk intake exists.

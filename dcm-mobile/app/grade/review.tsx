@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Switch, Platform } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Platform } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Crypto from 'expo-crypto'
@@ -7,6 +7,10 @@ import { Colors, CardCategories } from '@/lib/constants'
 import { reportUploadEvent } from '@/lib/uploadTelemetry'
 import { incompleteInspectionMessage } from '@/lib/inspectionMessage'
 import CategoryPicker from '@/components/CategoryPicker'
+import CardNotesField from '@/components/CardNotesField'
+import RunLockChip from '@/components/RunLockChip'
+import { useGradingRun } from '@/hooks/useGradingRun'
+import { conditionStepState, buildConditionPayload } from '@/lib/conditionStep'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
@@ -55,6 +59,8 @@ export default function ReviewScreen() {
     /** CAPTURE-GATE P0: 'camera' | 'gallery' per side, forwarded from capture. */
     frontSource?: string
     backSource?: string
+    /** 'camera' | 'gallery' — forwarded so a locked run returns the same way. */
+    mode?: string
   }>()
   const { user, session } = useAuth()
   const { balance, refresh: refreshCredits } = useCredits()
@@ -64,13 +70,31 @@ export default function ReviewScreen() {
   // Pre-fill from the previous screen's selection — never default to Sports.
   const [category, setCategory] = useState(params.category || '')
   const [subCategory, setSubCategory] = useState(params.subCategory || '')
-  const [noDefects, setNoDefects] = useState(false)
+  // Card damage starts collapsed; collapsed = "no card damage" and sends the
+  // same payload the old "No visible defects" switch did.
+  const [damageOpen, setDamageOpen] = useState(false)
   const [conditionReport, setConditionReport] = useState<ConditionReportData>(EMPTY_REPORT)
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Grading run: a locked card type skips step 1; locked notes pre-fill.
+  const run = useGradingRun()
+  const categoryLock = run.lock.category
+  const runApplied = useRef(false)
+  useEffect(() => {
+    if (!run.loaded || runApplied.current) return
+    runApplied.current = true
+    if (run.lock.category) {
+      setCategory(run.lock.category.category)
+      setSubCategory(run.lock.category.subCategory)
+      setStep(s => (s === 1 ? 2 : s))
+    }
+    if (run.lock.notes) setNotes(prev => prev || run.lock.notes!.text)
+  }, [run.loaded, run.lock])
+
   const defectCount = countDefects(conditionReport)
-  const isConditionValid = noDefects || defectCount > 0
+  const conditionStep = conditionStepState(damageOpen, defectCount)
+  const isConditionValid = conditionStep.ok
   const canSubmit = params.frontUri && params.backUri && isConditionValid && balance >= 1
 
   const handleSubmit = async () => {
@@ -154,10 +178,9 @@ export default function ReviewScreen() {
 
       if (__DEV__) console.log('[Upload] Serial:', serial)
 
-      // Build condition report payload
-      const conditionPayload = noDefects
-        ? (notes ? { noDefectsConfirmed: true, cardDescription: notes } : null)
-        : { ...conditionReport, notes }
+      // Build condition report payload (collapsed damage = the old
+      // "No visible defects" payload; see lib/conditionStep.ts)
+      const conditionPayload = buildConditionPayload(damageOpen, conditionReport, notes)
 
       // Insert card record. Serial assignment is check-then-insert, so a
       // concurrent upload can grab the same serial — on a serial unique
@@ -289,7 +312,7 @@ export default function ReviewScreen() {
       })
       router.replace({
         pathname: '/grade/processing',
-        params: { cardId, category, frontUri: params.frontUri },
+        params: { cardId, category, subCategory, frontUri: params.frontUri, mode: params.mode || 'camera' },
       } as any)
     } catch (err: any) {
       console.error('[Upload] Submit error:', err)
@@ -348,12 +371,30 @@ export default function ReviewScreen() {
           <Text style={styles.stepHint}>
             We use this to apply the right grading rubric. Tap to change if needed.
           </Text>
-          <CategoryPicker
-            category={category}
-            subCategory={subCategory}
-            onCategoryChange={setCategory}
-            onSubCategoryChange={setSubCategory}
-          />
+          {categoryLock ? (
+            <View>
+              <RunLockChip lock={categoryLock} onUnlock={run.unlockCategory} />
+              <Text style={styles.stepHint}>Card type is locked for this run. Unlock it to pick a different type.</Text>
+            </View>
+          ) : (
+            <>
+              <CategoryPicker
+                category={category}
+                subCategory={subCategory}
+                onCategoryChange={setCategory}
+                onSubCategoryChange={setSubCategory}
+              />
+              <TouchableOpacity
+                style={styles.lockRow}
+                onPress={() => run.lockCategory(category, category === 'Other' ? subCategory : '')}
+                disabled={!category || (category === 'Other' && !subCategory)}
+                accessibilityRole="button"
+              >
+                <Ionicons name="lock-closed-outline" size={15} color={Colors.purple[600]} />
+                <Text style={styles.lockRowText}>Lock this card type for my next cards</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <Button
             title="Continue to Photos"
             onPress={() => setStep(2)}
@@ -403,31 +444,32 @@ export default function ReviewScreen() {
           <Text style={styles.stepTitle}>Report Card Condition</Text>
           <Text style={styles.stepSubtitle}>Optional — helps DCM Optic™ grade more accurately</Text>
 
-          <View style={styles.noDefectsRow}>
-            <Switch value={noDefects} onValueChange={(v) => { setNoDefects(v); if (v) setConditionReport(EMPTY_REPORT) }}
-              trackColor={{ false: Colors.gray[300], true: Colors.green[500] }} />
-            <Text style={styles.noDefectsLabel}>No visible defects to report</Text>
-          </View>
+          <CardNotesField
+            value={notes}
+            onChange={setNotes}
+            lockedNotes={run.lock.notes}
+            onLock={run.lockNotes}
+            onUnlock={run.unlockNotes}
+          />
 
-          {/* Optional description — always shown (even with no defects) */}
-          {noDefects && (
-            <View style={styles.defectSide}>
-              <Text style={styles.defectGroupTitle}>Card Details for Grading Guidance (Optional)</Text>
-              <TextInput
-                style={styles.notesInput}
-                placeholder="E.g., 'This card has a textured holofoil surface', 'Vintage card from 1997'..."
-                placeholderTextColor={Colors.gray[400]}
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                maxLength={500}
-              />
-              <Text style={styles.charCount}>{notes.length}/500</Text>
+          {!damageOpen ? (
+            <View style={styles.noDamageBox}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.noDefectsLabel}>No card damage to report</Text>
+                <Text style={styles.noDamageHint}>Seen damage the photos might miss? Add it here.</Text>
+              </View>
+              <TouchableOpacity style={styles.addDamageBtn} onPress={() => setDamageOpen(true)} accessibilityRole="button">
+                <Text style={styles.addDamageText}>+ Add card damage</Text>
+              </TouchableOpacity>
             </View>
-          )}
-
-          {!noDefects && (
+          ) : (
             <>
+              <View style={styles.damageHeader}>
+                <Text style={styles.defectSideTitle}>Card Damage</Text>
+                <TouchableOpacity onPress={() => { setDamageOpen(false); setConditionReport(EMPTY_REPORT) }} accessibilityRole="button">
+                  <Text style={styles.noDamageLink}>No card damage</Text>
+                </TouchableOpacity>
+              </View>
               {(['front', 'back'] as const).map(side => (
                 <View key={side} style={styles.defectSide}>
                   <Text style={styles.defectSideTitle}>{side === 'front' ? 'Front' : 'Back'}</Text>
@@ -468,25 +510,13 @@ export default function ReviewScreen() {
                   checked={(conditionReport.factory as any)[key]}
                   onToggle={() => toggleFactory(key)} />
               ))}
-
-              <Text style={styles.defectGroupTitle}>Additional Notes</Text>
-              <TextInput
-                style={styles.notesInput}
-                placeholder="E.g., 'Light scratch near center of front'..."
-                placeholderTextColor={Colors.gray[400]}
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                maxLength={500}
-              />
-              <Text style={styles.charCount}>{notes.length}/500</Text>
             </>
           )}
 
           {!isConditionValid && (
             <View style={styles.validationWarning}>
               <Ionicons name="warning" size={16} color={Colors.amber[600]} />
-              <Text style={styles.validationText}>Check 'No visible defects' or report at least one defect</Text>
+              <Text style={styles.validationText}>Select at least one defect, or tap 'No card damage'</Text>
             </View>
           )}
 
@@ -494,7 +524,7 @@ export default function ReviewScreen() {
             <View style={styles.validationSuccess}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.green[600]} />
               <Text style={styles.validationSuccessText}>
-                {noDefects ? 'No defects reported — ready to submit' : `${defectCount} defect(s) reported — ready to submit`}
+                {conditionStep.kind === 'no_damage' ? 'No card damage reported — ready to submit' : `${defectCount} defect(s) reported — ready to submit`}
               </Text>
             </View>
           )}
@@ -560,6 +590,14 @@ const styles = StyleSheet.create({
   placeholderText: { color: Colors.gray[400], fontSize: 12 },
   retakeLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   retakeLinkText: { fontSize: 13, color: Colors.purple[600], fontWeight: '600' },
+  noDamageBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.gray[200], marginTop: 12, marginBottom: 4 },
+  noDamageHint: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  addDamageBtn: { borderWidth: 1.5, borderColor: Colors.purple[200], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  addDamageText: { fontSize: 13, fontWeight: '700', color: Colors.purple[700] },
+  damageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 },
+  noDamageLink: { fontSize: 13, fontWeight: '600', color: Colors.gray[600], textDecorationLine: 'underline' },
+  lockRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, alignSelf: 'flex-start' },
+  lockRowText: { fontSize: 13, fontWeight: '600', color: Colors.purple[600] },
   noDefectsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.gray[200], marginBottom: 16 },
   noDefectsLabel: { fontSize: 15, fontWeight: '500', color: Colors.gray[800], flex: 1 },
   defectSide: { backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200], marginBottom: 12 },
