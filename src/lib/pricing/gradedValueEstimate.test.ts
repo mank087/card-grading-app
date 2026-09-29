@@ -91,6 +91,12 @@ describe('estimateGradedValue', () => {
     expect(estimateGradedValue(table({ raw: 20, cgc: { '10': 15 } }), 9)!.value).toBe(20);
   });
 
+  it('grades below 9 keep a PSA comp that sells under raw (no zero floor)', () => {
+    // Production card: raw 61.72, PSA 7 $12 → 61.72 + (12 - 61.72) × 0.45 = 39.35, as before.
+    const p = table({ raw: 61.72, psa: { '7': 12, '8': 49, '9': 69.99, '10': 176.42, '9.5': 87.56 } });
+    expect(estimateGradedValue(p, 7)!.value).toBe(39.35);
+  });
+
   it('grade < 9 with no matching comp is never above the cheapest higher-grade comp', () => {
     expect(estimateGradedValue(UMA_229, 8)!.value).toBeLessThanOrEqual(73);
   });

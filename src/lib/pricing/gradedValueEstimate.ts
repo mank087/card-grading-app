@@ -17,7 +17,7 @@
  *     grade >= 9 → the nearest known graded comp at or below the grade; raw × 3
  *                  (capped at the cheapest higher comp, floored at raw) when
  *                  only higher grades are known or there are no graded prices.
- * - The premium is floored at zero. A PSA 10 that sells below raw (thin or odd
+ * - For grades 9-10 the premium is floored at zero. A PSA 10 that sells below raw (thin or odd
  *   comps) no longer drags a grade-10 estimate under the ungraded price.
  * - Monotonic: a lower grade never estimates above a higher grade of the same
  *   product (each grade is capped by every higher whole grade's estimate).
@@ -152,7 +152,9 @@ function baseEstimate(prices: GradedPriceTable, grade: number): Omit<GradedValue
       return { value: round2(comp * NO_RAW_COMP_FACTOR), method: 'comp-no-raw', multiplier: null, compPrice: comp };
     }
     const multiplier = dcmPremiumMultiplier(grade);
-    const premium = Math.max(0, comp - raw);
+    // Floor only for 9-10: a PSA 7 that sells under raw is real signal that a
+    // grade 7 is worth less than an ungraded near-mint copy.
+    const premium = grade >= 9 ? Math.max(0, comp - raw) : comp - raw;
     return { value: round2(raw + premium * multiplier), method: 'comp', multiplier, compPrice: comp };
   }
 
