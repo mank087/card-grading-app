@@ -4123,6 +4123,7 @@ Provide detailed analysis as markdown with all required sections.`
                   zoomPhrases: zoomFacePhrases[`${cat}_${face}`] ?? null,
                   zoomCapApplied: typeof appliedFaceCaps[`${cat}_${face}`] === 'number',
                   holdReason: jsonData.grade_hold?.held ? (jsonData.grade_hold.reason ?? null) : null,
+                  heldGrade: jsonData.grade_hold?.held ? (jsonData.grade_hold.to ?? null) : null,
                   structural: structuralDetected,
                   dissentScore: dissentReflectedCats.get(cat) ?? null,
                 })}`;

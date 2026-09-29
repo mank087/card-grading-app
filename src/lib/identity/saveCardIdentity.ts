@@ -15,7 +15,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  applyCardNumberToInfo, applySetNameToInfo, applyYearToInfo, foilFollowOn, normalizePokemonNumberForSet,
+  applyCardNumberToInfo, applySetNameToInfo, applyYearToInfo, foilFollowOn, normalizePokemonNumberForSet, sameNumberStem,
 } from './identityFieldSync';
 
 /** Request keys that steer the save. They are never card data. */
@@ -317,11 +317,18 @@ export function buildIdentityPatch(
       value = normalizePokemonNumberForSet(value, card, 'card_set' in body ? (body.card_set === '' ? null : body.card_set) : undefined);
     }
     const currentValue = currentIdentityValue(card, key);
-    if (normalizeIdentityValue(currentValue) !== normalizeIdentityValue(value)) {
+    const changed = normalizeIdentityValue(currentValue) !== normalizeIdentityValue(value);
+    if (changed) {
       changedFields.push(key);
       before[key] = currentValue ?? null;
       after[key] = value ?? null;
     }
+    // The edit form sends every field. An untouched number or year must not
+    // resync the card-info blob: the column often holds the bare "129" while the
+    // blob has "129/280", so fixing the artist would strip the label's total.
+    // A value the owner typed differently (e.g. "173/215" stored as "173") still syncs.
+    const untouchedSync = !changed && raw === value && (key === 'release_date' ||
+      (key === 'card_number' && sameNumberStem(String(info.card_number_raw ?? info.card_number ?? ''), value as string | null)));
 
     if (mapping.column) {
       if (FORBIDDEN_IDENTITY_COLUMNS.includes(mapping.column)) {
@@ -329,13 +336,13 @@ export function buildIdentityPatch(
       }
       columnPatch[mapping.column] = value;
     }
-    if (mapping.json) {
+    if (mapping.json && !untouchedSync) {
       info[mapping.json] = value;
       touchedJson = true;
     }
     // Defect A: keep every card-number key in step (card_number, _raw,
     // _text_seen, collector_number, set_total). Consumers read any of them.
-    if (key === 'card_number') {
+    if (key === 'card_number' && !untouchedSync) {
       applyCardNumberToInfo(info, value, 'owner_edit');
     }
     // A different set invalidates the set codes read with the old one.
@@ -343,7 +350,7 @@ export function buildIdentityPatch(
       info.set_name = current.set_name;
       applySetNameToInfo(info, value);
     }
-    if (key === 'release_date') {
+    if (key === 'release_date' && !untouchedSync) {
       applyYearToInfo(info, value, 'owner_edit');
     }
     // The detail page reads `subset`, the editor writes `rarity_or_variant`.

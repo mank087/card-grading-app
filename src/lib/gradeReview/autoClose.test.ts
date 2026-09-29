@@ -74,3 +74,13 @@ it('leaves reviews alone on unrelated card edits and leaves finished reviews alo
   expect((await reviewRow(review)).status).toBe('completed');
   expect(await closeEvents(review)).toHaveLength(0);
 });
+
+it.each([
+  ['failed', "status='failed',lease_token=NULL,lease_expires_at=NULL"],
+  ['awaiting_owner', "status='awaiting_owner',admin_reviewed_at=now(),lease_token=NULL,lease_expires_at=NULL"],
+])('also closes a %s review when the card is deleted (review finding)', async (_label, set) => {
+  const { card, review } = await reviewedCard();
+  await db.query(`UPDATE card_grade_reviews SET ${set} WHERE id=$1`, [review]);
+  await db.query('UPDATE cards SET deleted_at=now() WHERE id=$1', [card]);
+  expect((await reviewRow(review)).status).toBe('superseded');
+});

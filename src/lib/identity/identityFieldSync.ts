@@ -25,6 +25,14 @@ const squash = (v: unknown) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/
  * set_total follows the new denominator (or is cleared when the new number has
  * none, so the old denominator cannot be re-attached by the editor).
  */
+/** Same printed number ignoring a "/total", "#" and leading zeros ("129/280" ~ "129", "075" ~ "75"). */
+export function sameNumberStem(a: string | null | undefined, b: string | null | undefined): boolean {
+  const stem = (v: string | null | undefined) => String(v ?? '').trim().replace(/^#/, '').split('/')[0]
+    .trim().toUpperCase().replace(/^([A-Z]*)0+(?=\d)/, '$1');
+  const x = stem(a), y = stem(b);
+  return !!x && !!y && x === y;
+}
+
 export function applyCardNumberToInfo(info: Info, value: string | null, source: string): Info {
   info.card_number = value;
   info.card_number_raw = value;

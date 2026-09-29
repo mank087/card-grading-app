@@ -8,9 +8,14 @@ describe('describeFaceAdjustment never blames magnification for a hold', () => {
       .toBe('Magnified inspection found faint whitening (left edge) and set this face to 9/10 — see the magnified evidence photo for this section.');
   });
   it('a Gem Mint hold names the hold reason (Mike Evans case)', () => {
-    const s = describeFaceAdjustment({ ...base, holdReason: 'one of the three independent evaluations scored the surface at 7.' });
+    const s = describeFaceAdjustment({ ...base, holdReason: 'one of the three independent evaluations scored the surface at 7.', heldGrade: 9 });
     expect(s).toBe('This face shows 9/10 because the overall grade is held at 9: one of the three independent evaluations scored the surface at 7.');
     expect(s).not.toMatch(/magnified/i);
+  });
+  it('a hold only explains a face at the held grade (review finding: an 8 face on a 10->9 hold)', () => {
+    const s = describeFaceAdjustment({ ...base, cap: 8, holdReason: 'photos limit a 10', heldGrade: 9, dissentScore: 8 });
+    expect(s).not.toMatch(/held at/);
+    expect(s).toMatch(/scored the edges at 8/);
   });
   it('structural, dissent and consensus causes each say so', () => {
     expect(describeFaceAdjustment({ ...base, cat: 'surface', cap: 4, structural: true })).toMatch(/structural damage/);

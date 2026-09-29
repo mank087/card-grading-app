@@ -135,3 +135,15 @@ describe('helpers', () => {
     expect(foilFollowOn({ is_foil: true, foil_type: 'etched' })).toEqual({});
   });
 });
+
+describe('owner edit leaves an untouched number alone (review finding)', () => {
+  it('MTG: fixing another field keeps "129/280" and set_total in the card info', () => {
+    const card = { id: 'c1', category: 'MTG', card_name: 'X', card_set: 'Set', card_number: '129', release_date: '2020',
+      conversational_card_info: { card_number: '129/280', card_number_raw: '129/280', set_total: '280', year_source: 'copyright' } } as any;
+    const p = buildIdentityPatch({ card_number: '129', release_date: '2020', card_name: 'Y' }, card);
+    expect(p.changedFields).toEqual(['card_name']);
+    expect(p.cardInfo?.card_number_raw ?? '129/280').toBe('129/280');
+    expect(p.cardInfo?.set_total ?? '280').toBe('280');
+    expect(p.cardInfo?.year_source ?? 'copyright').toBe('copyright');
+  });
+});

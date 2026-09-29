@@ -34,6 +34,8 @@ export interface FaceAdjustmentInput {
   zoomCapApplied?: boolean;
   /** Plain-language reason clause of a Gem Mint hold (grade_hold.reason), if one fired. */
   holdReason?: string | null;
+  /** The grade the hold set (grade_hold.to). The hold only explains a face at that score. */
+  heldGrade?: number | null;
   /** Confirmed structural damage capped the surface. */
   structural?: boolean;
   /** The low-score check or a dissenting evaluation put this value in the tile. */
@@ -52,8 +54,8 @@ export function describeFaceAdjustment(input: FaceAdjustmentInput): string {
   if (input.structural && cat === 'surface') {
     return `This face shows ${cap}/10 because confirmed structural damage (a crease or bend) caps the surface.`;
   }
-  if (input.holdReason) {
-    return `This face shows ${cap}/10 because the overall grade is held at ${cap}: ${stripTrailingPeriod(input.holdReason)}.`;
+  if (input.holdReason && input.heldGrade === cap) {
+    return `This face shows ${cap}/10 because the overall grade is held at ${input.heldGrade}: ${stripTrailingPeriod(input.holdReason)}.`;
   }
   if (typeof input.dissentScore === 'number') {
     return `This face shows ${cap}/10 because one of the three independent evaluations scored the ${cat} at ${input.dissentScore}.`;

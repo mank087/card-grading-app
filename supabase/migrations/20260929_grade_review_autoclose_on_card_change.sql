@@ -45,8 +45,10 @@ BEGIN
     UPDATE public.card_grade_reviews
        SET status = 'superseded', lease_token = NULL, lease_expires_at = NULL
      WHERE card_id = NEW.id
-       AND status IN ('queued', 'processing')
-       AND admin_reviewed_at IS NULL
+       -- Open work, plus a proposed change still waiting on an owner who no
+       -- longer holds the card (review finding, Sept 29).
+       AND ((status IN ('queued', 'processing', 'failed') AND admin_reviewed_at IS NULL)
+            OR status = 'awaiting_owner')
     RETURNING id
   LOOP
     INSERT INTO public.card_grade_review_events(review_id, event_type, metadata)
@@ -69,8 +71,8 @@ WITH stranded AS (
      SET status = 'superseded', lease_token = NULL, lease_expires_at = NULL
     FROM public.cards c
    WHERE c.id = r.card_id
-     AND r.status IN ('queued', 'processing')
-     AND r.admin_reviewed_at IS NULL
+     AND ((r.status IN ('queued', 'processing', 'failed') AND r.admin_reviewed_at IS NULL)
+          OR r.status = 'awaiting_owner')
      AND (c.deleted_at IS NOT NULL
           OR coalesce(c.ownership_status, 'owned') <> 'owned'
           OR c.user_id IS DISTINCT FROM r.requester_id)
