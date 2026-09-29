@@ -30,6 +30,8 @@ import {
 import { preserveIdentityOnRegrade } from '@/lib/grading/preserveIdentity';
 import { generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator';
 import { firstLookCandidate, firstLookResultOf } from './reviewPrefill';
+import { relinkCatalog, RELINK_CATEGORIES } from './catalogRelink';
+import { isPokemonPromoSetId } from '@/lib/pokemonPromoNumber';
 
 export interface VerifyPokemonOptions {
   /** Re-verify a card that is already verified. */
@@ -206,6 +208,9 @@ export async function verifyAndSavePokemonCard(
         };
         const { error } = await supabase.from('cards').update(updateData).eq('id', cardId);
         if (error) console.error(`${tag} link update failed:`, error.message);
+        // The label reads the linked set (its printed total, promo or not), so a
+        // new link means a new label.
+        else await rebuildLabels(supabase, cardId, tag);
       } else {
         const updatedCardInfo: Record<string, any> = {
           ...withoutCandidates(convInfo),
@@ -228,6 +233,8 @@ export async function verifyAndSavePokemonCard(
           updatedCardInfo.card_number = updateData.card_number;
           updatedCardInfo.card_number_raw = updateData.card_number;
         }
+        // A promo set has no "of N"; a set_total read or derived earlier is stale.
+        if (isPokemonPromoSetId(verification.pokemon_api_data.set?.id)) updatedCardInfo.set_total = null;
 
         // Aug 25 2026: keep a pre-override snapshot so any rewrite is reversible.
         if (overridesIdentity && !card.ai_card_info_original) {
@@ -299,6 +306,7 @@ export async function verifyAndSavePokemonCard(
     };
     const { error } = await supabase.from('cards').update(updateData).eq('id', cardId);
     if (error) console.error(`${tag} could not clear the stale link:`, error.message);
+    else if (card.pokemon_api_verified) await rebuildLabels(supabase, cardId, tag);
   } else if (verification.candidates?.length) {
     const { error } = await supabase.from('cards').update({
       conversational_card_info: {
@@ -327,6 +335,50 @@ export async function verifyAndSavePokemonCard(
       processing_time_ms: Date.now() - startTime,
     },
   };
+}
+
+/**
+ * Regenerate label_data (and original_label_data when the card has one) from the
+ * saved row. One card, read whole; never throws.
+ */
+export async function rebuildLabels(supabase: SupabaseClient<any, any, any>, cardId: string, tag = '[labels]'): Promise<void> {
+  try {
+    const { data: row, error } = await supabase.from('cards').select('*').eq('id', cardId).maybeSingle();
+    if (error || !row || row.label_data == null) return;
+    const label = generateLabelData(row as unknown as CardForLabel);
+    const cols: Record<string, any> = { label_data: label };
+    if (row.original_label_data != null) cols.original_label_data = label;
+    const { error: writeError } = await supabase.from('cards').update(cols).eq('id', cardId);
+    if (writeError) console.warn(`${tag} label rebuild failed: ${writeError.message}`);
+  } catch (e: any) {
+    console.warn(`${tag} label rebuild failed: ${e?.message || e}`);
+  }
+}
+
+/**
+ * After an identity correction that did not go through the owner save (the
+ * admin details correction in a manual grade review): the catalog link still
+ * describes the card as first identified. Relink from the corrected columns,
+ * link-only, and rebuild the label from the new link. Never throws.
+ */
+export async function relinkAfterIdentityCorrection(
+  supabase: SupabaseClient<any, any, any>,
+  cardId: string,
+  category: string | null | undefined,
+): Promise<string> {
+  try {
+    if (category === 'Pokemon') {
+      const r = await verifyAndSavePokemonCard(supabase, cardId, { force: true, linkOnly: true, trigger: 'details-correction' });
+      return r.body?.success ? `linked ${r.body.pokemon_api_id}` : 'no single match, link cleared';
+    }
+    if ((RELINK_CATEGORIES as readonly string[]).includes(category || '')) {
+      const r = await relinkCatalog(supabase, cardId);
+      return r.status === 'linked' ? `linked ${r.catalogId}` : `${r.status}: ${r.reason}`;
+    }
+    return 'no catalog for category';
+  } catch (e: any) {
+    return `relink failed: ${e?.message || e}`;
+  }
 }
 
 /** Fields whose change makes the stored catalog link describe a different card. */

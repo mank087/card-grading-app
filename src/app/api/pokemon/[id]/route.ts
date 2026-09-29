@@ -1,4 +1,5 @@
 import { prechargeBlockedResponse } from '@/lib/grading/prechargeGate';
+import { softDeleteOwnedCard } from "@/lib/cards/softDeleteCard";
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +16,7 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 // SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 import { anniversarySetIds } from "@/lib/pokemonAnniversary";
+import { isPokemonPromoSetId, isPokemonPromoSetName, pokemonNumberForSet } from "@/lib/pokemonPromoNumber";
 import { verifyPokemonCard } from "@/lib/pokemonApiVerification";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
@@ -1288,9 +1290,14 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 console.log(`  - Year: AI="${cardInfo.year}" → DB="${dbYear}"`);
 
                 // Correct ALL card_info values with database values
-                if (dbSetTotal) {
+                // Promo sets (svp, swshp, ...) are never printed "of N": the catalog's
+                // printedTotal must not become a set total or a "173/215" fraction.
+                if (isPokemonPromoSetId(bestMatch.set_id)) {
+                  cardInfo.set_total = null;
+                  cardInfo.card_number_raw = String(cardNumber);
+                } else if (dbSetTotal) {
                   cardInfo.set_total = dbSetTotal;
-                  cardInfo.card_number_raw = `${cardNumber}/${dbSetTotal}`;
+                  cardInfo.card_number_raw = pokemonNumberForSet(cardNumber, bestMatch.set_id, dbSetTotal);
                 }
                 cardInfo.set_name = bestMatch.set_name;
                 if (dbYear) {
@@ -1335,9 +1342,12 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                   const fixedTotal = fix.set_printed_total?.toString();
                   console.log(`[GET /api/pokemon/${cardId}] 🔢 DIGIT-MISREAD CORRECTED: "${aiNum}" → "${fix.number}" (${fix.name}, ${fix.set_name})`);
                   cardInfo.card_number = String(fix.number);
-                  if (fixedTotal) {
+                  if (isPokemonPromoSetId(fix.set_id)) {
+                    cardInfo.set_total = null;
+                    cardInfo.card_number_raw = String(fix.number);
+                  } else if (fixedTotal) {
                     cardInfo.set_total = fixedTotal;
-                    cardInfo.card_number_raw = `${fix.number}/${fixedTotal}`;
+                    cardInfo.card_number_raw = pokemonNumberForSet(fix.number, fix.set_id, fixedTotal);
                   }
                   cardInfo.set_name = fix.set_name;
                   const yr = fix.set_release_date?.toString().match(/^(\d{4})/)?.[1];
@@ -1691,7 +1701,10 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     // Sept 18 2026. card_info.card_number stays the numerator because the lookups
     // above key on it; pricing and the label both accept the full form.
     const printedFraction = String(conversationalGradingData?.card_info?.card_number_raw || '').trim();
-    if (/^[A-Za-z]{0,6}\d+[A-Za-z]?\s*\/\s*[A-Za-z]{0,6}\d+$/.test(printedFraction)) {
+    // Promo cards are never "of N" (Sept 29: ~450 promos stored "173/215").
+    const promoCard = isPokemonPromoSetId(conversationalGradingData?.card_info?.set_id)
+      || isPokemonPromoSetName(conversationalGradingData?.card_info?.set_name);
+    if (!promoCard && /^[A-Za-z]{0,6}\d+[A-Za-z]?\s*\/\s*[A-Za-z]{0,6}\d+$/.test(printedFraction)) {
       (updateData as any).card_number = printedFraction.replace(/\s+/g, '');
     }
 
@@ -1916,68 +1929,25 @@ export async function PATCH(request: NextRequest, { params }: PokemonCardGrading
   }
 }
 
-// DELETE handler for removing Pokemon cards
+// DELETE /api/pokemon/[id] — legacy per-category delete. It used to hard-delete
+// the row and purge both images with no sold lock; it now runs the same
+// restorable soft delete as DELETE /api/cards/[id]. No current client calls
+// it (web moved to /api/cards/[id] in 250558b0); kept so any stale caller
+// gets the safe behaviour instead of a 405.
 export async function DELETE(request: NextRequest, { params }: PokemonCardGradingRequest) {
   const { id: cardId } = await params;
-  if (!isUuid(cardId)) {
-    return NextResponse.json({ error: "Card not found" }, { status: 404 });
-  }
-
-  console.log(`[DELETE /api/pokemon/${cardId}] Starting Pokemon card deletion request`);
-
   try {
-    // Verify authentication
-    const auth = await verifyAuth(request);
-    if (!auth.authenticated || !auth.userId) {
-      return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
+    const result = await softDeleteOwnedCard(request, cardId);
+    if (!result.ok) {
+      return NextResponse.json({ success: false, ...result.body }, { status: result.status });
     }
-
-    const supabase = supabaseServer();
-
-    // Get the Pokemon card and verify ownership
-    const { data: card, error: fetchError } = await supabase
-      .from("cards")
-      .select("front_path, back_path, user_id")
-      .eq("id", cardId)
-      .single();
-
-    if (fetchError || !card) {
-      console.error(`[DELETE /api/pokemon/${cardId}] Pokemon card not found:`, fetchError);
-      return NextResponse.json({ error: "Pokemon card not found" }, { status: 404 });
-    }
-
-    // Verify user owns this card
-    if (card.user_id !== auth.userId) {
-      return NextResponse.json({ error: "You can only delete your own cards" }, { status: 403 });
-    }
-
-    // Delete images from storage
-    if (card.front_path) {
-      await supabase.storage.from("cards").remove([card.front_path]);
-    }
-    if (card.back_path) {
-      await supabase.storage.from("cards").remove([card.back_path]);
-    }
-
-    // Delete Pokemon card record
-    const { error: deleteError } = await supabase
-      .from("cards")
-      .delete()
-      .eq("id", cardId);
-
-    if (deleteError) {
-      console.error(`[DELETE /api/pokemon/${cardId}] Deletion failed:`, deleteError);
-      return NextResponse.json({ error: "Failed to delete Pokemon card" }, { status: 500 });
-    }
-
-    console.log(`[DELETE /api/pokemon/${cardId}] Pokemon card deleted successfully`);
-    return NextResponse.json({ success: true, message: "Pokemon card deleted successfully" });
-
+    return NextResponse.json({
+      success: true,
+      message: "Pokemon card deleted successfully",
+      restorable: true,
+    });
   } catch (error: any) {
-    console.error(`[DELETE /api/pokemon/${cardId}] Error:`, error.message);
-    return NextResponse.json(
-      { error: "Failed to delete Pokemon card: " + error.message },
-      { status: 500 }
-    );
+    console.error(`[DELETE /api/pokemon/${cardId}] Error:`, error?.message);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }

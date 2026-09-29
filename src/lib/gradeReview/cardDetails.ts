@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator';
+import { applyCardNumberToInfo, applySetNameToInfo, applyYearToInfo, normalizePokemonNumberForSet } from '@/lib/identity/identityFieldSync';
 
 /** What an owner may claim is wrong. Free text; the admin decides what to apply. */
 export const detailsClaimSchema = z.object({
@@ -69,7 +70,9 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
   for (const field of DETAILS_FIELDS) {
     const raw = input[field];
     if (raw === undefined) continue;
-    const to = field === 'serial_number' && NO_SERIAL.test(raw) ? null : raw;
+    let to: string | null = field === 'serial_number' && NO_SERIAL.test(raw) ? null : raw;
+    // A promo card is never numbered "of N" (SVP 173, not 173/215).
+    if (field === 'card_number') to = normalizePokemonNumberForSet(to, card, input.set_name);
     if (to !== before[field]) changes.push({ field, from: before[field], to });
   }
   if (changes.length === 0) throw Error('no_change');
@@ -92,10 +95,12 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
     if (!raw) return raw;
     const info: Record<string, unknown> = { ...raw };
     if (applied.card_name !== undefined) { info.card_name = applied.card_name; if (raw.player_or_character == null || raw.player_or_character === raw.card_name) info.player_or_character = applied.card_name; }
-    if (applied.set_name !== undefined) info.set_name = applied.set_name;
-    if (applied.year !== undefined) { info.year = applied.year; info.year_source = 'manual_correction'; info.year_text_seen = null;
+    // Shared with the owner save: every neighbouring key takes the correction
+    // (set codes on a set change, set_year, collector_number, set_total...).
+    if (applied.set_name !== undefined) applySetNameToInfo(info, applied.set_name);
+    if (applied.year !== undefined) { applyYearToInfo(info, applied.year, 'manual_correction');
       info._year_guard = { ...obj(raw._year_guard), outcome: 'manually_corrected', source: 'manual_correction', text_seen: null, original_year: str(raw.year), reason: note }; }
-    if (applied.card_number !== undefined) { info.card_number = applied.card_number; info.card_number_raw = applied.card_number; info.card_number_text_seen = applied.card_number; info.card_number_source = 'manual_correction'; }
+    if (applied.card_number !== undefined) applyCardNumberToInfo(info, applied.card_number, 'manual_correction');
     if (applied.manufacturer !== undefined) info.manufacturer = applied.manufacturer;
     if (applied.serial_number !== undefined) {
       info.serial_number = applied.serial_number;
@@ -118,7 +123,11 @@ export function buildDetailsPatch(card: Record<string, unknown>, snapshotReport:
   if (ai && ai['Card Information']) { ai['Card Information'] = fixInfo(parseMaybe(ai['Card Information'])); columns.ai_grading = ai; }
 
   // Regenerate both label-data blobs from the corrected row, exactly as a grading run would.
-  const corrected = { ...card, ...columns } as Record<string, unknown>;
+  // A catalog link describes the card as it was identified before this
+  // correction; the label must not borrow its set total (the grade-review route
+  // relinks after saving and the relink rebuilds the label from the new link).
+  const identityMoved = applied.card_name !== undefined || applied.set_name !== undefined || applied.card_number !== undefined;
+  const corrected = { ...card, ...columns, ...(identityMoved ? { pokemon_api_data: null } : {}) } as Record<string, unknown>;
   const label = generateLabelData(corrected as unknown as CardForLabel);
   if (card.label_data != null) columns.label_data = label;
   if (card.original_label_data != null) columns.original_label_data = label;
@@ -135,3 +144,24 @@ export const detailsFieldLabels: Record<DetailsChange['field'], string> = {
 export const detailsClaimLabels: Record<keyof DetailsClaim, string> = {
   card_name: 'Card name', set_name: 'Set', year: 'Year', card_number: 'Card number', serial_number: 'Serial number', other: 'Other',
 };
+
+/**
+ * A custom label wins over label_data at render time, so a correction must reach
+ * it too (same rule as the owner edit route). Only fields the correction changed
+ * and the custom label carries are rewritten; the name only while it still
+ * matched the old name. Returns null when there is nothing to write.
+ */
+export function customLabelDetailsPatch(custom: unknown, changes: DetailsChange[], oldCardName: unknown): Record<string, unknown> | null {
+  if (!custom || typeof custom !== 'object' || Array.isArray(custom)) return null;
+  const next: Record<string, unknown> = { ...(custom as Record<string, unknown>) };
+  const keyOf: Partial<Record<DetailsChange['field'], string>> = { card_number: 'cardNumber', set_name: 'setName', year: 'year', card_name: 'primaryName' };
+  let changed = false;
+  for (const c of changes) {
+    const key = keyOf[c.field];
+    if (!key || next[key] == null) continue;
+    if (c.field === 'card_name' && next[key] !== oldCardName) continue;
+    next[key] = c.to;
+    changed = true;
+  }
+  return changed ? next : null;
+}

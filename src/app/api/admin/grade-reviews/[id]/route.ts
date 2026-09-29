@@ -3,8 +3,9 @@ import { verifyAdminSession } from '@/lib/admin/adminAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isUuid } from '@/lib/uuid';
 import { buildManualResult, manualVerdictSchema } from '@/lib/gradeReview/manualReview';
-import { buildDetailsPatch, currentDetails, detailsCorrectionSchema } from '@/lib/gradeReview/cardDetails';
+import { buildDetailsPatch, currentDetails, customLabelDetailsPatch, detailsCorrectionSchema } from '@/lib/gradeReview/cardDetails';
 import { refreshPricesAfterDetails } from '@/lib/gradeReview/detailsPricing';
+import { relinkAfterIdentityCorrection } from '@/lib/identity/pokemonCatalogLink';
 import { revalidatePath } from 'next/cache';
 import { blockedReason } from '@/lib/gradeReview/blockedReason';
 const DETAILS_SELECT='id,category,serial,card_name,card_set,card_number,release_date,featured,manufacturer_name,serial_numbering';
@@ -84,6 +85,9 @@ export async function POST(request:NextRequest,{params}:Context){
         const {data:applied,error:applyError}=await db.rpc('apply_grade_review_details',{p_id:id,p_admin_id:admin.id,p_patch:details.patch,p_expected:details.expected,p_changes:details.changes});
         if(applyError)throw applyError;if(applied?.stale)return reply(await staleReply(db,review),409);
         detailsApplied=true;
+        // A custom label outranks label_data on every render; carry the correction into it.
+        const custom=customLabelDetailsPatch((card as Record<string,unknown>).custom_label_data,details.changes,(card as Record<string,unknown>).card_name);
+        if(custom){const {error:customError}=await db.from('cards').update({custom_label_data:custom}).eq('id',review.card_id);if(customError)console.error('[grade-review details] custom label',customError.message);}
         // The grade verdict below must be built against the corrected row and snapshot.
         [{data:card,error:cardError},{data:run,error:runError}]=await Promise.all([
           db.from('cards').select('*').eq('id',review.card_id).single(),db.from('card_grade_runs').select('snapshot').eq('id',review.grade_run_id).single()]);
@@ -98,6 +102,9 @@ export async function POST(request:NextRequest,{params}:Context){
     // Cached market data described the old identity; refresh it now, best-effort.
     // Every field this route can correct (name, set, year, number, manufacturer)
     // is a material identity field, so an applied correction is always material.
+    // The catalog link (pokemon_api_*, mtg_card_id...) still describes the card as first
+    // identified; relink from the corrected row and rebuild the label from the new link.
+    if(detailsApplied)console.log(`[grade-review ${id}] catalog relink: ${await relinkAfterIdentityCorrection(db,review.card_id,card?.category)}`);
     const pricing=detailsApplied?await refreshPricesAfterDetails(db,review.card_id,{materialChange:true}):null;
     return reply({...data,details_applied:detailsApplied,pricing});
   }catch{return reply({error:'Unable to confirm the saved review. Reload before retrying; duplicate completion will not send another email.'},503);}

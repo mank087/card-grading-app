@@ -1,10 +1,12 @@
 import printedNumbers from './pokemonAnniversaryPrintedNumbers.json';
+import { pokemonNumberForSet, pokemonSetIdOfCardId } from './pokemonPromoNumber';
 
 // Public Scrydex card-page printed_number values, captured 2026-09-16.
 // Classic reprints keep their original fractions; RGB cards have no numeric total.
 // This small exception catalog avoids inventing fractions from expansion size.
+// Promo sets (svp, swshp, ...) print the bare number: never "173/215".
 export function pokemonPrintedNumber(id: string, number: string, total: number): string {
-  return (printedNumbers as Record<string, string>)[id] || (total ? `${number}/${total}` : number);
+  return (printedNumbers as Record<string, string>)[id] || pokemonNumberForSet(number, pokemonSetIdOfCardId(id), total);
 }
 
 export function anniversaryNumber(value: string): string | null {

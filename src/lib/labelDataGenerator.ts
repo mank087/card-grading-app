@@ -21,6 +21,7 @@
 
 import { getConditionFromGrade } from './conditionAssessment';
 import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from './grading/autographPolicy';
+import { isPokemonPromoSetId, isPokemonPromoSetName, stripPromoTotal } from './pokemonPromoNumber';
 
 // ============================================================================
 // CJK/UNICODE HANDLING FOR PDF/CANVAS
@@ -1185,6 +1186,19 @@ export function generateLabelData(card: CardForLabel): LabelData {
                     stripMarkdown(cardInfo.card_number) ||
                     stripMarkdown(cardInfo.collector_number) ||
                     null;
+  } else if (category === 'MTG' || isSportsCard) {
+    const infoNumber = stripMarkdown(cardInfo.card_number_raw) ||
+                    stripMarkdown(cardInfo.card_number) ||
+                    stripMarkdown(cardInfo.collector_number) ||
+                    null;
+    // MTG/sports: the column holds the printed number and is what every
+    // correction writes. The JSON keeps the fuller printed form ("94/102" over
+    // "94") only while it names the SAME number; once they disagree the JSON is
+    // a stale read (Mana Vault: column U29, JSON "129/040"). Not for One Piece
+    // or Yu-Gi-Oh, whose column holds a catalog id or passcode.
+    rawCardNumber = card.card_number && !sameCardNumber(infoNumber, card.card_number)
+      ? card.card_number
+      : infoNumber || card.card_number || null;
   } else {
     rawCardNumber = stripMarkdown(cardInfo.card_number_raw) ||
                     stripMarkdown(cardInfo.card_number) ||
@@ -1193,7 +1207,14 @@ export function generateLabelData(card: CardForLabel): LabelData {
                     null;
   }
   // Clean card number - remove explanatory text like "(printed as 125/094★...)"
-  const cardNumber = getCleanValue(rawCardNumber);
+  let cardNumber = getCleanValue(rawCardNumber);
+  // Pokemon promos are never "of N": a stored "173/215" or "SWSH262/307" was
+  // invented from the promo set's catalog total (Sept 29).
+  if (category === 'Pokemon' && cardNumber) {
+    const linkedSet = card.pokemon_api_data?.set;
+    if (linkedSet && isPokemonPromoSetId(linkedSet.id)) cardNumber = stripPromoTotal(cardNumber, linkedSet.printedTotal);
+    else if (!linkedSet && isPokemonPromoSetName(card.card_set)) cardNumber = stripPromoTotal(cardNumber);
+  }
 
   // Format the card number for display in the context line ("#" prefix,
   // Pokemon fraction/promo handling). Shared with custom-label override rebuilds.
@@ -1341,6 +1362,14 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
  * Idempotent: values already starting with "#" are returned unchanged, so it is
  * safe to run on user-edited overrides that were initialized from formatted values.
  */
+/** "#094/102", "94" and "94/102" name the same printed number; "U29" and "129/040" do not. */
+export function sameCardNumber(a: string | null | undefined, b: string | null | undefined): boolean {
+  const stem = (v: string | null | undefined) => String(v ?? '').trim().replace(/^#/, '').split('/')[0]
+    .trim().toUpperCase().replace(/^([A-Z]*)0+(?=\d)/, '$1');
+  const x = stem(a), y = stem(b);
+  return !x || !y || x === y;
+}
+
 /**
  * The set total to print after a bare Pokemon number, or null. Black Star promo
  * sets (catalog ids ending in "p": svp, swshp, smp, xyp, ...) carry a catalog
@@ -1350,7 +1379,7 @@ export function pokemonPrintedTotalForLabel(
   set: { id?: string | null; printedTotal?: number | string | null } | null | undefined
 ): number | string | null {
   if (!set) return null;
-  if (typeof set.id === 'string' && /p$/i.test(set.id)) return null;
+  if (isPokemonPromoSetId(set.id)) return null;
   return set.printedTotal ?? null;
 }
 

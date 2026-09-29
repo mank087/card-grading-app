@@ -309,9 +309,13 @@ export async function PATCH(
       labelData = generateLabelData(updatedCard);
 
       // Save label data to database
+      // original_label_data is what "reset custom label" restores; it must not
+      // keep the pre-correction identity either.
       await supabase
         .from('cards')
-        .update({ label_data: labelData })
+        .update(updatedCard.original_label_data != null
+          ? { label_data: labelData, original_label_data: labelData }
+          : { label_data: labelData })
         .eq('id', cardId);
     } catch (labelError) {
       console.error('[Edit Card Details] Label generation error:', labelError);

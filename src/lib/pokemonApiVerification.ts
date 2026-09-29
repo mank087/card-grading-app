@@ -17,6 +17,7 @@ import { namesAgree, speciesKey, type NameAgreement } from './identity/nameAgree
 import { findUniqueDigitVariant, positionsOff } from './cardNumberUtils';
 import type { CatalogCandidate } from './identity/catalogCandidates';
 import { anniversaryNumber, anniversarySetIds, pokemonPrintedNumber, printedDenominatorMatches } from './pokemonAnniversary';
+import { pokemonNumberForSet } from './pokemonPromoNumber';
 
 export interface PokemonApiVerificationResult {
   success: boolean;
@@ -401,7 +402,7 @@ async function queryBySetIdAndNumberChecked(
     const variant = findUniqueDigitVariant(agreeing, c => String(c.number), normalizeCardNumber(cardNumber));
     if (variant) {
       console.log(`[Pokemon Local Verification] 🔢 number misread corrected within set ${setId}: "${cardNumber}" → "${variant.number}" (${variant.name})`);
-      result.corrections.push({ field: 'card_number', original: cardNumber, corrected: `${variant.number}/${variant.set.printedTotal}` });
+      result.corrections.push({ field: 'card_number', original: cardNumber, corrected: variant.printedNumber || pokemonNumberForSet(variant.number, variant.set.id, variant.set.printedTotal) });
       result.name_agreement = namesAgree(aiName, variant.name);
       return { card: variant, corrected: true };
     }

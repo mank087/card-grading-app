@@ -14,6 +14,9 @@
  * transaction under a row lock.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  applyCardNumberToInfo, applySetNameToInfo, applyYearToInfo, foilFollowOn, normalizePokemonNumberForSet,
+} from './identityFieldSync';
 
 /** Request keys that steer the save. They are never card data. */
 export const IDENTITY_CONTROL_KEYS = ['confirm', 'dismiss', 'expected_identity_revision'] as const;
@@ -289,7 +292,8 @@ export function buildIdentityPatch(
 ): IdentityPatch {
   const allowed = allowedFieldsForCategory(card.category);
   const columnPatch: Record<string, any> = {};
-  const info = { ...asRecord(card.conversational_card_info) };
+  const current = asRecord(card.conversational_card_info);
+  const info = { ...current };
   const changedFields: string[] = [];
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
@@ -307,7 +311,11 @@ export function buildIdentityPatch(
     if (!allowed.has(key)) continue;
 
     const raw = body[key];
-    const value = raw === '' ? null : raw;
+    let value = raw === '' ? null : raw;
+    // A promo card is never numbered "of N" (SVP 173, not 173/215).
+    if (key === 'card_number') {
+      value = normalizePokemonNumberForSet(value, card, 'card_set' in body ? (body.card_set === '' ? null : body.card_set) : undefined);
+    }
     const currentValue = currentIdentityValue(card, key);
     if (normalizeIdentityValue(currentValue) !== normalizeIdentityValue(value)) {
       changedFields.push(key);
@@ -325,9 +333,18 @@ export function buildIdentityPatch(
       info[mapping.json] = value;
       touchedJson = true;
     }
-    // Defect A: keep the two card-number keys in step. Consumers read either.
+    // Defect A: keep every card-number key in step (card_number, _raw,
+    // _text_seen, collector_number, set_total). Consumers read any of them.
     if (key === 'card_number') {
-      info.card_number = value;
+      applyCardNumberToInfo(info, value, 'owner_edit');
+    }
+    // A different set invalidates the set codes read with the old one.
+    if (key === 'card_set') {
+      info.set_name = current.set_name;
+      applySetNameToInfo(info, value);
+    }
+    if (key === 'release_date') {
+      applyYearToInfo(info, value, 'owner_edit');
     }
     // The detail page reads `subset`, the editor writes `rarity_or_variant`.
     if (key === 'subset_variant') {
@@ -337,6 +354,20 @@ export function buildIdentityPatch(
     if (key === 'featured' && card.category === 'Pokemon') {
       columnPatch.pokemon_featured = value;
     }
+  }
+
+  // Foil flag and foil type are one fact: "not foil" clears the type.
+  if (allowed.has('is_foil')) {
+    const follow = foilFollowOn(Object.fromEntries(['is_foil', 'foil_type'].filter(k => k in body).map(k => [k, body[k]])));
+    for (const [k, v] of Object.entries(follow)) { columnPatch[k] = v; info[k] = v; touchedJson = true; }
+  }
+  // MTG: a set change the owner did not pair with a new set code drops the old
+  // code, or the relink looks the card up in the OLD set (catalogRelink prefers
+  // the mtg_set_code column).
+  if (card.category === 'MTG' && changedFields.includes('card_set') && !changedFields.includes('mtg_set_code')) {
+    columnPatch.mtg_set_code = null;
+    info.expansion_code = null;
+    touchedJson = true;
   }
 
   // The confirm dialog fills a blank `featured` with the card's own name (MTG, TCGs).

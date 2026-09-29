@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { anniversaryNumber, pokemonPrintedNumber } from './pokemonAnniversary';
+import { pokemonNumberForSet } from './pokemonPromoNumber';
 
 /**
  * Sept 2026: name filter for the local catalog searches. With CATALOG_NAME_SEARCH=1
@@ -1914,7 +1915,7 @@ export function convertApiCardToMetadata(apiCard: PokemonCard) {
     card_name: apiCard.name,
     player_or_character: apiCard.name,
     set_name: apiCard.set.name,
-    card_number: `${apiCard.number}/${apiCard.set.printedTotal}`,
+    card_number: pokemonNumberForSet(apiCard.number, apiCard.set.id, apiCard.set.printedTotal),
     year: apiCard.set.releaseDate?.split('/')[0] || null,
     manufacturer: apiCard.set.releaseDate && apiCard.set.releaseDate.startsWith('199')
       ? 'Wizards of the Coast'

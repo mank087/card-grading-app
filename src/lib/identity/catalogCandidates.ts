@@ -8,6 +8,7 @@
  * reviewClient.ts on purpose: that file is copied byte for byte to the mobile
  * app, and the mobile picker is not built yet.
  */
+import { pokemonNumberForSet } from '../pokemonPromoNumber';
 
 /** One catalog card offered by the picker. */
 export interface CatalogCandidate {
@@ -22,9 +23,10 @@ export interface CatalogCandidate {
 }
 
 /** "140/149" for a candidate: its number over the set's printed total, when known. */
-export function catalogCandidateNumber(candidate: Pick<CatalogCandidate, 'number' | 'printed_total'>): string {
+export function catalogCandidateNumber(candidate: Pick<CatalogCandidate, 'number' | 'printed_total'> & { set_id?: string | null }): string {
   const number = String(candidate.number || '').trim();
-  return candidate.printed_total && /^\d+$/.test(number) ? `${number}/${candidate.printed_total}` : number;
+  // Promo sets print the bare number (SVP 173, not 173/215).
+  return /^\d+$/.test(number) ? pokemonNumberForSet(number, candidate.set_id, candidate.printed_total) : number;
 }
 
 /** The stored candidates, cleaned: anything malformed is dropped, at most six. */

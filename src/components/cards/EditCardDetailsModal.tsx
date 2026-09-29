@@ -230,11 +230,13 @@ export default function EditCardDetailsModal({
       const rarityDesc = card.rarity_description || info.rarity_description || info.rarity_or_variant || '';
 
       // Parse card number into parts
-      const cardNumParts = parseCardNumber(
-        info.card_number || card.card_number,
-        info.card_number_raw,
-        info.set_total
-      );
+      // The card_number column is the corrected value; the card-info keys can hold
+      // the pre-correction read. A stored set_total is only a fallback denominator
+      // when there is no column value: re-saving a corrected bare promo number
+      // ("173") must not turn it into "173/215" (Sept 29).
+      const cardNumParts = card.card_number
+        ? parseCardNumber(card.card_number, card.card_number, null)
+        : parseCardNumber(info.card_number, info.card_number_raw, info.set_total);
 
       // Get holofoil value, checking multiple sources
       const holofoilValue = card.holofoil || info.holofoil || '';
