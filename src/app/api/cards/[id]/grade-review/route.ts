@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { isUuid } from '@/lib/uuid';
 import { canRequestReview, ownsReviewCard } from '@/lib/gradeReview/eligibility';
-import { gradeReviewEnabled, hasDetailsClaim, reviewRequestSchema, type ReviewChange } from '@/lib/gradeReview/types';
+import { gradeReviewEnabled, gradeReviewNoteProblem, hasDetailsClaim, reviewRequestSchema, type ReviewChange } from '@/lib/gradeReview/types';
 import { hasManualReviewAccess } from '@/lib/gradeReview/manualReview';
 
 const fields = 'id, requested_at, status, concerns, note, customer_result, outcome, completed_at, original_grade, proposed_grade, owner_decision, decided_at, details_claim, details_changes, details_applied_at';
@@ -84,6 +84,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try { body = JSON.parse(raw); } catch { return json({ error: 'Invalid review request.' }, 400); }
     const parsed = reviewRequestSchema.safeParse(body);
     if (!parsed.success) return json({ error: 'Select your concerns and keep your note under 1,000 characters.' }, 400);
+    const noteProblem = gradeReviewNoteProblem(parsed.data);
+    if (noteProblem) return json({ error: noteProblem, code: 'note_required' }, 400);
     const db = supabaseServer();
     const details = hasDetailsClaim(parsed.data.details) ? Object.fromEntries(Object.entries(parsed.data.details!).filter(([, v]) => v && v.trim()).map(([k, v]) => [k, v!.trim()])) : null;
     const concerns = [

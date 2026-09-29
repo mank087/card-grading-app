@@ -9,7 +9,7 @@ import { GET, POST } from './route';
 const cardId = '6b292489-42d8-41d4-a00a-d9c9b267d66b';
 const runId = 'c38c3452-a535-4e3a-9a2c-eebdd1aef5f6';
 const context = { params: Promise.resolve({ id: cardId }) };
-const valid = { gradeRunId: runId, concerns: [{ category: 'centering', side: 'front' }], note: '' };
+const valid = { gradeRunId: runId, concerns: [{ category: 'centering', side: 'front' }], note: 'Back top-left corner looks sharp, not soft' };
 function request(body: unknown = valid) {
   return new NextRequest(`http://localhost/api/cards/${cardId}/grade-review`, { method: 'POST', body: JSON.stringify(body) });
 }
@@ -68,7 +68,7 @@ describe('grade review API', () => {
     expect(response.status).toBe(202);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(mocks.rpc).toHaveBeenCalledWith('request_card_grade_review', {
-      p_card_id: cardId, p_user_id: 'verified-owner', p_run_id: runId, p_concerns: ['centering','corners','edges','surface'].map(category=>({category,side:'both'})), p_note: '', p_details: null,
+      p_card_id: cardId, p_user_id: 'verified-owner', p_run_id: runId, p_concerns: ['centering','corners','edges','surface'].map(category=>({category,side:'both'})), p_note: 'Back top-left corner looks sharp, not soft', p_details: null,
     });
   });
   it('reports a stale or unauthorized run without exposing database detail', async () => {
@@ -101,5 +101,23 @@ describe('grade review API', () => {
       .mockReturnValueOnce(readChain({ data: { id: runId, grader_user_id: 'verified-owner' }, error: null }))
       .mockReturnValueOnce(readChain({ data: { id: 'saved-review', status: 'processing' }, error: null }));
     expect(await (await GET(new NextRequest('http://localhost'), context)).json()).toMatchObject({ enabled: false, eligible: false, review: { id: 'saved-review' } });
+  });
+  it('rejects a grade review that names no specific concern, before intake', async () => {
+    for (const note of ['', '   ', 'wrong grade', '  too low!!     ']) {
+      const response = await POST(request({ ...valid, note }), context);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'note_required', error: expect.stringContaining('at least 15 characters') });
+    }
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it('accepts a 15-character note and keeps details-only requests note-free', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'review-id', error: null });
+    mocks.from.mockReturnValue(readChain({ data: { id: 'review-id', status: 'queued' }, error: null }));
+    expect((await POST(request({ ...valid, note: 'x'.repeat(15) }), context)).status).toBe(202);
+    const detailsOnly = await POST(request({ ...valid, note: '', reviewGrade: false, details: { card_name: 'Mickey Mantle' } }), context);
+    expect(detailsOnly.status).toBe(202);
+    expect(mocks.rpc).toHaveBeenLastCalledWith('request_card_grade_review', expect.objectContaining({
+      p_concerns: [{ category: 'details', side: 'both' }], p_note: '',
+    }));
   });
 });

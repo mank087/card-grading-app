@@ -24,6 +24,19 @@ export const reviewRequestSchema = z.object({
   /** Owner's claimed correct identification; free text, applied by an admin. */
   details: detailsClaimSchema.optional(),
 }).strict().refine(v => v.reviewGrade || (v.details && Object.values(v.details).some(x => x && x.trim())), 'Choose the grade, the card details, or both.');
+/**
+ * A grade review must say what looks wrong. Sept 26, 2026: one customer filed
+ * 12 requests with no note, so the reviewer had nothing to check against and
+ * every request re-checked all four subgrades blind. Details-only requests
+ * are exempt (the details fields ARE the concern).
+ */
+export const GRADE_REVIEW_NOTE_MIN = 15;
+export const GRADE_REVIEW_NOTE_HELP = `Tell us what looks wrong, for example which corner or which side's centering (at least ${GRADE_REVIEW_NOTE_MIN} characters).`;
+/** Error message when a grade review request lacks a specific concern; null when fine. */
+export function gradeReviewNoteProblem(request: { reviewGrade: boolean; note?: string | null }): string | null {
+  if (!request.reviewGrade) return null;
+  return (request.note ?? '').trim().length >= GRADE_REVIEW_NOTE_MIN ? null : `To review the grade, ${GRADE_REVIEW_NOTE_HELP.charAt(0).toLowerCase()}${GRADE_REVIEW_NOTE_HELP.slice(1)}`;
+}
 export const hasDetailsClaim = (details: DetailsClaim | null | undefined) => Boolean(details && Object.values(details).some(x => x && String(x).trim()));
 
 export type ReviewRequest = z.infer<typeof reviewRequestSchema>;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AUTH_STATE_CHANGE_EVENT, getStoredSession } from '@/lib/directAuth';
-import { concernLabels, reviewStatusLabels, type ReviewRequest, type ReviewState } from '@/lib/gradeReview/types';
+import { concernLabels, GRADE_REVIEW_NOTE_HELP, GRADE_REVIEW_NOTE_MIN, reviewStatusLabels, type ReviewRequest, type ReviewState } from '@/lib/gradeReview/types';
 import { detailsClaimLabels, detailsFieldLabels } from '@/lib/gradeReview/cardDetails';
 
 export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId: string | null | undefined }) {
@@ -20,7 +20,11 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
   const lowConfidence = state?.identificationConfidence === 'low' && !state?.review;
   const [claim, setClaim] = useState<Record<string, string>>({ card_name: '', set_name: '', year: '', card_number: '', serial_number: '', other: '' });
   const claimFilled = Object.values(claim).some(v => v.trim());
-  const canSubmit = (reviewGrade && gradeAllowed) || (disputeDetails && claimFilled);
+  // A grade review must name what looks wrong (server enforces the same rule).
+  const wantsGrade = reviewGrade && gradeAllowed;
+  const noteLength = note.trim().length;
+  const noteShort = wantsGrade && noteLength < GRADE_REVIEW_NOTE_MIN;
+  const canSubmit = (wantsGrade && !noteShort) || (!wantsGrade && disputeDetails && claimFilled);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const inFlight = useRef(false);
@@ -99,7 +103,7 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
     try {
       const response = await fetch(`/api/cards/${cardId}/grade-review`, {
         method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gradeRunId: state.gradeRunId, concerns, note, reviewGrade, ...(disputeDetails && claimFilled ? { details: Object.fromEntries(Object.entries(claim).filter(([, v]) => v.trim())) } : {}) }),
+        body: JSON.stringify({ gradeRunId: state.gradeRunId, concerns, note, reviewGrade: wantsGrade, ...(disputeDetails && claimFilled ? { details: Object.fromEntries(Object.entries(claim).filter(([, v]) => v.trim())) } : {}) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to request a review. Please try again.');
@@ -222,8 +226,10 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
                   ))}
                 </div>
               )}
-              <label className="block text-sm font-medium">Additional details (optional)
-                <textarea maxLength={1000} value={note} onChange={event => setNote(event.target.value)} rows={3} className="mt-2 w-full rounded-lg border p-3 font-normal" placeholder="For example: The front left/right centering appears different from the reported measurement." />
+              <label className="block text-sm font-medium">{wantsGrade ? 'What looks wrong? (required)' : 'Additional details (optional)'}
+                {wantsGrade && <span className="mt-1 block text-xs font-normal text-gray-600">{GRADE_REVIEW_NOTE_HELP}</span>}
+                <textarea maxLength={1000} value={note} onChange={event => setNote(event.target.value)} rows={3} aria-describedby="grade-review-note-count" className="mt-2 w-full rounded-lg border p-3 font-normal" placeholder="For example: The back top-left corner is sharp in person, but the report says it is soft." />
+                {wantsGrade && <span id="grade-review-note-count" className={`block text-xs font-normal ${noteShort ? 'text-gray-600' : 'text-green-700'}`}>{noteShort ? `${GRADE_REVIEW_NOTE_MIN - noteLength} more character${GRADE_REVIEW_NOTE_MIN - noteLength === 1 ? '' : 's'} needed` : 'Thanks, that gives the reviewer something specific to check.'}</span>}
               </label>
             </fieldset>
             <p className="text-xs text-gray-600">A suggested grade change needs your approval before it is applied. Our team may clarify your report without changing the grade. One complimentary review is available for this grade.</p>

@@ -321,6 +321,9 @@ export const PAUSE_REASONS: Record<string, string> = {
     'Accept the InstaList seller terms to carry on. Nothing was lost — resume and the rest of the batch continues.',
   ebay_reconnect:
     'eBay stopped accepting our connection to your account. Reconnect and resume; no cards were failed.',
+  ebay_busy:
+    'eBay is limiting how many requests DCM can send right now, so the rest of this batch is on hold. ' +
+    'Nothing was failed. Resume in a few hours.',
   listing_limit:
     "You have reached your eBay listing allowance, so the remaining cards were held rather than failed. " +
     "Ask eBay to raise your selling limit (Seller Hub → Overview → Monthly limits → Request higher limit), " +
