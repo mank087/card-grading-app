@@ -1200,7 +1200,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
   const formattedCardNumber = formatCardNumberForContext(
     cardNumber,
     category,
-    card.pokemon_api_data?.set?.printedTotal
+    pokemonPrintedTotalForLabel(card.pokemon_api_data?.set)
   );
 
   // For Lorcana and Pokemon cards, prioritize database column (verified from internal database or OCR override)
@@ -1341,6 +1341,19 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
  * Idempotent: values already starting with "#" are returned unchanged, so it is
  * safe to run on user-edited overrides that were initialized from formatted values.
  */
+/**
+ * The set total to print after a bare Pokemon number, or null. Black Star promo
+ * sets (catalog ids ending in "p": svp, swshp, smp, xyp, ...) carry a catalog
+ * "printedTotal", but promos are never numbered "of N": SVP 173 is not 173/150.
+ */
+export function pokemonPrintedTotalForLabel(
+  set: { id?: string | null; printedTotal?: number | string | null } | null | undefined
+): number | string | null {
+  if (!set) return null;
+  if (typeof set.id === 'string' && /p$/i.test(set.id)) return null;
+  return set.printedTotal ?? null;
+}
+
 export function formatCardNumberForContext(
   cardNumber: string | null | undefined,
   category?: string | null,
