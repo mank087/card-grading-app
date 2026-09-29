@@ -49,22 +49,24 @@ export function reviewEmail(notice:Notice){
         bodyHtml:`<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px 0;">A customer requested a manual grade review for <strong>${escapeHtml(p.card_name)}</strong>.</p>${claimHtml}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px 0;">Manual reviews can take up to two business days. Log in to review the original photos, report and customer notes.</p><p style="color:#6b7280;font-size:13px;margin:0;">Card page: <a href="${cardUrl}" style="color:#7c3aed;">${cardUrl}</a></p>`,
         cta:{label:'Open the review',url:adminUrl}})};
   }
+  // A pending decision links straight to the Accept / Keep banner (PendingGradeChangeBanner).
+  const customerUrl=p.awaiting_owner?`${cardUrl}?review=decide`:cardUrl;
   const labels:Record<string,string>={confirm:'Original grade confirmed',clarify:'Grading explanation clarified',request_photos:'Unable to verify from the original photos',propose_change:'Grade change proposed'};
   const verdict=(p.details_changes?.length&&p.verdict==='confirm')?'Card details corrected; original grade confirmed':(labels[p.verdict??'']??'Review completed');
   const outcome=p.awaiting_owner
-    ?`We propose changing your grade from ${p.original_grade} to ${p.proposed_grade}. Your original grade remains in place until you accept. Open your card to accept the change or keep your original grade.`
+    ?`We propose changing your grade from ${p.original_grade} to ${p.proposed_grade}. Your original grade remains in place until you accept. Open your card (signed in to your DCM account) and choose Accept or Keep original at the top of the page.`
     :`Your original grade remains ${p.original_grade}.`;
   const changes=p.details_changes??[];
   const changesText=changes.length?`\n\nCard details corrected:\n${changes.map(c=>`- ${detailLabels[c.field]??c.field}: ${c.from??'(blank)'} -> ${c.to??'(none)'}`).join('\n')}\nThe market value has been refreshed for the corrected card.`:'';
   const changesHtml=changes.length?`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px 0;"><tr><td bgcolor="#ecfdf5" style="padding:14px 18px;border-radius:10px;border:1px solid #a7f3d0;"><p style="color:#065f46;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px 0;">Card details corrected</p><ul style="color:#111827;font-size:14px;line-height:1.6;margin:0;padding-left:20px;">${changes.map(c=>`<li>${escapeHtml(detailLabels[c.field]??c.field)}: ${escapeHtml(c.from??'(blank)')} &rarr; <strong>${escapeHtml(c.to??'(none)')}</strong></li>`).join('')}</ul><p style="color:#374151;font-size:13px;margin:8px 0 0 0;">The market value has been refreshed for the corrected card.</p></td></tr></table>`:'';
-  const text=`Our team has evaluated ${p.card_name}.\n\nVerdict: ${verdict}${changesText}\n\n${p.notes??''}\n\n${outcome}\n\nView your card and review:\n${cardUrl}`;
+  const text=`Our team has evaluated ${p.card_name}.\n\nVerdict: ${verdict}${changesText}\n\n${p.notes??''}\n\n${outcome}\n\nView your card and review:\n${customerUrl}`;
   const gradeRow=p.awaiting_owner
     ?`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px 0;"><tr><td align="center" bgcolor="#f5f3ff" style="padding:18px;border-radius:10px;border:1px solid #ddd6fe;"><p style="color:#5b21b6;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px 0;">Proposed grade change</p><p style="color:#111827;font-size:30px;font-weight:800;margin:0;">${escapeHtml(p.original_grade)} &rarr; ${escapeHtml(p.proposed_grade)}</p><p style="color:#6b7280;font-size:13px;margin:8px 0 0 0;">Your grade stays at ${escapeHtml(p.original_grade)} until you accept.</p></td></tr></table>`
     :`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px 0;"><tr><td align="center" bgcolor="#f9fafb" style="padding:18px;border-radius:10px;border:1px solid #e5e7eb;"><p style="color:#6b7280;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px 0;">Your grade</p><p style="color:#111827;font-size:30px;font-weight:800;margin:0;">${escapeHtml(p.original_grade)}</p></td></tr></table>`;
   return{subject:'Your card grade review is ready',text,
     html:brandedEmail({preheader:`${verdict} for ${p.card_name}`,eyebrow:'Manual grade review',heading:'Your card grade review is ready',
       bodyHtml:`<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 6px 0;">Our team has evaluated <strong>${escapeHtml(p.card_name)}</strong>.</p><p style="color:#111827;font-size:15px;font-weight:700;margin:0 0 18px 0;">Verdict: ${escapeHtml(verdict)}</p>${changesHtml}${gradeRow}<p style="color:#6b7280;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px 0;">Note from the DCM review team</p>${paragraphs(p.notes??'')}<p style="color:#374151;font-size:15px;line-height:1.6;margin:12px 0 0 0;">${escapeHtml(outcome)}</p>`,
-      cta:{label:p.awaiting_owner?'Review and decide on your card':'View your card and review',url:cardUrl},
+      cta:{label:p.awaiting_owner?'Review and decide on your card':'View your card and review',url:customerUrl},
       footnote:'You received this email because you requested a manual grade review on DCM Grading.'})};
 }
 export async function deliverReviewNotifications(){
