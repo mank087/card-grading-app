@@ -127,7 +127,14 @@ export function EvidenceCorners({ card, frontUrl, backUrl }: EvidenceConditionPr
         return (
           <div className="cd-face" key={side}>
             <SideHeading side={side} score={corners.sub_score} />
-            {url && <CornerZoomCrops imageUrl={url} side={side} slabDetected={slabbed} />}
+            {url && (
+              <CornerZoomCrops
+                imageUrl={url}
+                side={side}
+                slabDetected={slabbed}
+                captureQuality={card?.capture_quality}
+              />
+            )}
             <Findings
               entries={[
                 ['Top left', corners.top_left],

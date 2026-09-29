@@ -1,44 +1,69 @@
+import { useEffect, useState } from 'react'
 import { View, Text, Image, StyleSheet } from 'react-native'
 import { Colors } from '@/lib/constants'
+import { resolveCornerTiles } from '@/lib/cornerTiles'
 
 /**
- * CornerZoomGrid — 2x2 grid showing zoomed-in views of each corner.
- * Uses Image component with specific crop regions to simulate
- * the web's CSS backgroundSize/backgroundPosition technique.
+ * CornerZoomGrid — 2x2 grid of close-ups of each CARD corner.
+ *
+ * Tiles are cropped around the card corners the grading engine detected
+ * (cards.capture_quality — see lib/cornerTiles.ts). The old version zoomed the
+ * photo's own corners, which on a typical phone shot (card ~50% of the frame,
+ * on a mat) showed only the mat. With no detected corners the grid is hidden,
+ * matching the web.
  */
 
 interface CornerZoomGridProps {
   imageUrl: string
   side: 'Front' | 'Back'
+  captureQuality?: unknown
 }
 
-// Zoom factor 5x (matches web's CSS backgroundSize: '500% 500%').
-// Offsets are -400% so each corner of the source image lands in the visible window.
-const corners = [
-  { label: 'Top Left', offset: { top: 0, left: 0 } },
-  { label: 'Top Right', offset: { top: 0, left: '-400%' } },
-  { label: 'Bottom Left', offset: { top: '-400%', left: 0 } },
-  { label: 'Bottom Right', offset: { top: '-400%', left: '-400%' } },
-]
+export default function CornerZoomGrid({ imageUrl, side, captureQuality }: CornerZoomGridProps) {
+  const tiles = resolveCornerTiles(captureQuality, side === 'Front' ? 'front' : 'back')
+  // height / width of the photo — needed to lay the image out at square pixels.
+  const [aspect, setAspect] = useState<number | null>(null)
 
-export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) {
+  useEffect(() => {
+    if (!tiles) return
+    let cancelled = false
+    setAspect(null)
+    Image.getSize(
+      imageUrl,
+      (w, h) => { if (!cancelled && w > 0 && h > 0) setAspect(h / w) },
+      () => {},
+    )
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl, !!tiles])
+
+  if (!tiles || aspect === null) return null
+
   return (
     <View>
       <Text style={styles.title}>{side} Corners</Text>
       <View style={styles.grid}>
-        {corners.map((corner) => (
-          <View key={corner.label} style={styles.cornerCell}>
-            <View style={styles.imageWrapper}>
-              {/* Overflow hidden container shows only corner region */}
-              <Image
-                source={{ uri: imageUrl }}
-                style={[styles.zoomedImage, { top: corner.offset.top, left: corner.offset.left } as any]}
-                resizeMode="stretch"
-              />
+        {tiles.map((tile) => {
+          // The square window spans `tile.size` of the image width, so the image
+          // is drawn 1/size window-widths wide; percentages below are of the
+          // (square) window.
+          const widthPct = 100 / tile.size
+          const heightPct = widthPct * aspect
+          const left = (0.5 - tile.cx / tile.size) * 100
+          const top = (0.5 - (tile.cy * aspect) / tile.size) * 100
+          return (
+            <View key={tile.key} style={styles.cornerCell}>
+              <View style={styles.imageWrapper}>
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={[styles.zoomedImage, { width: `${widthPct}%`, height: `${heightPct}%`, left: `${left}%`, top: `${top}%` } as any]}
+                  resizeMode="stretch"
+                />
+              </View>
+              <Text style={styles.cornerLabel}>{tile.label}</Text>
             </View>
-            <Text style={styles.cornerLabel}>{corner.label}</Text>
-          </View>
-        ))}
+          )
+        })}
       </View>
     </View>
   )
@@ -71,8 +96,6 @@ const styles = StyleSheet.create({
   },
   zoomedImage: {
     position: 'absolute',
-    width: '500%',
-    height: '500%',
   },
   cornerLabel: {
     fontSize: 10,

@@ -96,6 +96,8 @@ export interface OrgReportCard {
   conversational_case_detection?: Record<string, any> | null;
   conversational_slab_detection?: Record<string, any> | null;
   slab_detected?: boolean | null;
+  /** Detected card corners only (pickCornerGeometry) — drives the corner close-ups. */
+  capture_quality?: Record<string, any> | null;
   // Legacy top-level fallbacks (pre-conversational cards)
   card_name?: string | null;
   card_set?: string | null;
@@ -763,7 +765,7 @@ export default function OrgCardReport({
                     <h3 className="text-lg font-bold">{col.side} Side</h3>
                   </div>
 
-                  {col.url && <CornerZoomCrops imageUrl={col.url} side={col.cropSide} slabDetected={slabDetected} />}
+                  {col.url && <CornerZoomCrops imageUrl={col.url} side={col.cropSide} slabDetected={slabDetected} captureQuality={card.capture_quality} />}
 
                   {/* Corners */}
                   {Object.keys(col.corners).length > 0 && (

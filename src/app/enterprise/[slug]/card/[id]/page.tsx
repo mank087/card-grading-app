@@ -7,6 +7,7 @@ import { orgBrandPalette } from '../../data';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveOrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import OrgCardReport, { type OrgReportCard } from './OrgCardReport';
+import { pickCornerGeometry } from '@/lib/grading/cornerTiles';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 
 export const revalidate = 60;
@@ -183,6 +184,9 @@ export default async function StorefrontCardPage({
     conversational_case_detection: card.conversational_case_detection ?? null,
     conversational_slab_detection: card.conversational_slab_detection ?? null,
     slab_detected: card.slab_detected ?? null,
+    // Only the detected card corners (for the corner close-up tiles) — not the
+    // rest of the capture-gate record (model name, zoom errors).
+    capture_quality: pickCornerGeometry(card.capture_quality),
     card_name: card.card_name ?? null,
     card_set: card.card_set ?? null,
     featured: card.featured ?? null,
