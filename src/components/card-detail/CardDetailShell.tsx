@@ -107,6 +107,7 @@ import CardDetailIdentity from './CardDetailIdentity';
 import CardIdentityNotice from './CardIdentityNotice';
 import { readIdentityConcern } from '@/lib/cardDetail/identityConcern';
 import GradeDetailsSection, { type EvidenceKey } from './sections/GradeDetailsSection';
+import { PendingGradeChangeBanner } from '@/components/grade-review/PendingGradeChangeBanner';
 import MarketSection, { type MarketPriceMatch } from './sections/MarketSection';
 import {
   CardNotFoundPage,
@@ -645,6 +646,10 @@ export function CardDetailShell(props: CardDetailShellProps) {
           onDelete={() => setShowDeleteModal(true)}
           labelStudioHref={`/labels?card=${encodeURIComponent(vm.identity.serial)}`}
         />
+
+        {/* A proposed grade change from a manual review waits on the owner.
+            Above the tabs so it shows on every one (Sept 2026). */}
+        <PendingGradeChangeBanner cardId={card.id} ownerId={card.user_id ?? null} />
 
         {/* Sold: the record is locked and stays online for the buyer. */}
         {isSold && (
