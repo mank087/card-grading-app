@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { buildUserConditionFields, conditionStepState } from './userConditionFields'
 import { ensureProcessedConditionReport } from './conditionReportProcessor'
 import { EMPTY_CONDITION_REPORT, type UserConditionReportInput } from '@/types/conditionReport'
-// The mobile app's copy of the condition-step rules (pure TS, no RN imports).
+import { readFileSync } from 'fs'
+// Verbatim copy of the mobile app's condition-step rules (text-compared below).
 import {
   conditionStepState as mobileConditionStepState,
   buildConditionPayload as mobileBuildConditionPayload,
-} from '../../dcm-mobile/lib/conditionStep'
-import { EMPTY_REPORT as MOBILE_EMPTY_REPORT } from '../../dcm-mobile/lib/conditionReport'
+} from './grading/mobileConditionStep'
+
+// The mobile report has the same shape as web's (dcm-mobile/lib/conditionReport.ts).
+const MOBILE_EMPTY_REPORT = EMPTY_CONDITION_REPORT
 
 function withCornerWhitening(): UserConditionReportInput {
   return {
@@ -118,5 +121,12 @@ describe('mobile condition step parity', () => {
     const a = buildUserConditionFields(EMPTY_CONDITION_REPORT, 'abc')
     const b = buildUserConditionFields(EMPTY_CONDITION_REPORT, 'abc')
     expect(stripTimestamp(a.user_condition_processed)).toEqual(stripTimestamp(b.user_condition_processed))
+  })
+})
+
+describe('mobile condition-step copy', () => {
+  it('dcm-mobile/lib/conditionStep.ts matches src/lib/grading/mobileConditionStep.ts', () => {
+    const read = (f: string) => readFileSync(f, 'utf8').replace(/\r\n/g, '\n')
+    expect(read('dcm-mobile/lib/conditionStep.ts')).toBe(read('src/lib/grading/mobileConditionStep.ts'))
   })
 })
