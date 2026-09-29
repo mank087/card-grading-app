@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabase } from '@/lib/supabaseClient'
 
 // Update flag status (resolve/dismiss)
@@ -41,16 +41,7 @@ export async function PATCH(
       }
 
       // Log the action
-      await supabase
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'resolve_flag',
-          resource_type: 'card_flag',
-          resource_id: id,
-          details: { notes },
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'resolve_flag', 'card_flag', id, { notes }, clientIp(request))
 
       return NextResponse.json({
         message: 'Flag resolved successfully'
@@ -72,16 +63,7 @@ export async function PATCH(
       }
 
       // Log the action
-      await supabase
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'dismiss_flag',
-          resource_type: 'card_flag',
-          resource_id: id,
-          details: { notes },
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'dismiss_flag', 'card_flag', id, { notes }, clientIp(request))
 
       return NextResponse.json({
         message: 'Flag dismissed successfully'

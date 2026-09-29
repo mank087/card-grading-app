@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 // Get single user details
@@ -102,16 +102,7 @@ export async function PATCH(
       // For now, we'll log the action in admin_activity_log
 
       // Log the suspension action
-      await supabaseAdmin
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'suspend_user',
-          resource_type: 'user',
-          resource_id: id,
-          details: { reason },
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'suspend_user', 'user', id, { reason }, clientIp(request))
 
       return NextResponse.json({
         message: 'User suspended successfully',
@@ -119,16 +110,7 @@ export async function PATCH(
       }, { status: 200 })
     } else if (action === 'activate') {
       // Log the activation action
-      await supabaseAdmin
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'activate_user',
-          resource_type: 'user',
-          resource_id: id,
-          details: { reason },
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'activate_user', 'user', id, { reason }, clientIp(request))
 
       return NextResponse.json({
         message: 'User activated successfully'
@@ -232,16 +214,7 @@ export async function DELETE(
     }
 
     // Log the deletion
-    await supabaseAdmin
-      .from('admin_activity_log')
-      .insert({
-        admin_id: admin.id,
-        action: 'delete_user',
-        resource_type: 'user',
-        resource_id: id,
-        details: { reason },
-        ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-      })
+    await logAdminActivity(admin.id, admin.email, 'delete_user', 'user', id, { reason }, clientIp(request))
 
     return NextResponse.json({
       message: 'User and associated cards deleted successfully'

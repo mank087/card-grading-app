@@ -311,7 +311,10 @@ export async function logAdminActivity(
   ipAddress?: string | null
 ): Promise<void> {
   try {
-    await supabase.from('admin_activity_log').insert({
+    // Supabase returns insert errors instead of throwing; check it, or a bad
+    // column silently drops the audit row (Sept 2026: eight admin actions,
+    // including hard card deletes, had never been logged).
+    const { error } = await supabase.from('admin_activity_log').insert({
       admin_user_id: adminUserId,
       admin_email: adminEmail,
       action,
@@ -320,9 +323,15 @@ export async function logAdminActivity(
       details,
       ip_address: ipAddress
     })
+    if (error) console.error(`Error logging admin activity (${action}):`, error.message)
   } catch (error) {
     console.error('Error logging admin activity:', error)
   }
+}
+
+/** First address in x-forwarded-for (the client), or null. */
+export function clientIp(request: { headers: { get(name: string): string | null } }): string | null {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
 }
 
 /**

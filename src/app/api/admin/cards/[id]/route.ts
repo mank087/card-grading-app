@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabase } from '@/lib/supabaseClient'
 
 // Get single card details
@@ -104,16 +104,7 @@ export async function PATCH(
       }
 
       // Log the action
-      await supabase
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'flag_card',
-          resource_type: 'card',
-          resource_id: id,
-          details: { reason, severity },
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'flag_card', 'card', id, { reason, severity }, clientIp(request))
 
       return NextResponse.json({
         message: 'Card flagged successfully'
@@ -131,15 +122,7 @@ export async function PATCH(
       }
 
       // Log the action
-      await supabase
-        .from('admin_activity_log')
-        .insert({
-          admin_id: admin.id,
-          action: 'unflag_card',
-          resource_type: 'card',
-          resource_id: id,
-          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-        })
+      await logAdminActivity(admin.id, admin.email, 'unflag_card', 'card', id, {}, clientIp(request))
 
       return NextResponse.json({
         message: 'Card unflagged successfully'
@@ -190,16 +173,7 @@ export async function DELETE(
     }
 
     // Log the deletion
-    await supabase
-      .from('admin_activity_log')
-      .insert({
-        admin_id: admin.id,
-        action: 'delete_card',
-        resource_type: 'card',
-        resource_id: id,
-        details: { reason },
-        ip_address: request.headers.get('x-forwarded-for') || 'unknown'
-      })
+    await logAdminActivity(admin.id, admin.email, 'delete_card', 'card', id, { reason }, clientIp(request))
 
     return NextResponse.json({
       message: 'Card deleted successfully'
