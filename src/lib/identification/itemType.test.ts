@@ -1,15 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
-import { actionableItemType, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL } from './itemType';
+import { actionableItemType, hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerConfirmedIdentity } from './itemType';
 
 const rec = (finalType: string, firstType?: string | null) => ({ result: { photos: { item_type: finalType } }, ...(firstType !== undefined ? { contract_item_type: firstType } : {}) });
 
 describe('non-standard item policy', () => {
-  it('labels dividers, stickers, jumbos, customs, marked reprints and screen photos', () => {
-    for (const t of ['accessory_not_a_card', 'sticker_or_decal', 'oversized_or_jumbo', 'custom_or_fan_made', 'reproduction_or_reprint_marked', 'photo_of_a_screen_or_printout', 'not_a_collectible']) expect(isNonStandardItemType(t)).toBe(true);
+  it('labels dividers, jumbos, customs, marked reprints and screen photos', () => {
+    for (const t of ['accessory_not_a_card', 'oversized_or_jumbo', 'custom_or_fan_made', 'reproduction_or_reprint_marked', 'photo_of_a_screen_or_printout', 'not_a_collectible']) expect(isNonStandardItemType(t)).toBe(true);
   });
   it('never labels a trading card, an unsure read, or a card inside a grading slab', () => {
     for (const t of ['trading_card', 'cannot_tell', 'already_graded_slab', '', null, undefined, 42]) expect(isNonStandardItemType(t)).toBe(false);
+  });
+  it('does not label a licensed sticker (1987 Fleer Basketball Stickers are catalogued and priced)', () => {
+    expect(isNonStandardItemType('sticker_or_decal')).toBe(false);
+    expect(nonStandardExplanation('sticker_or_decal')).toBeNull();
+    expect(hidesMarketValue({ item_type: 'sticker_or_decal' })).toBe(false);
+  });
+  it('hides the market value of a non-standard item only until the owner confirms it', () => {
+    expect(hidesMarketValue({ item_type: 'custom_or_fan_made' })).toBe(true);
+    expect(hidesMarketValue({ item_type: 'custom_or_fan_made', identity_confirmed_revision: 0 })).toBe(false);
+    expect(hidesMarketValue({ item_type: 'custom_or_fan_made', dcm_selected_product_id: 'pc-123' })).toBe(false);
+    expect(hidesMarketValue({ item_type: 'custom_or_fan_made', dcm_selected_product_id: ' unknown ', identity_confirmed_revision: null })).toBe(true);
+    expect(hidesMarketValue({ item_type: 'trading_card' })).toBe(false);
+    expect(hidesMarketValue(null)).toBe(false);
+    expect(ownerConfirmedIdentity(undefined)).toBe(false);
+    expect(nonStandardExplanation('custom_or_fan_made', true)).not.toContain('no market value');
+  });
+  it('still records a sticker read, so the kind is not lost', () => {
+    expect(actionableItemType(rec('sticker_or_decal'))).toBe('sticker_or_decal');
   });
   it('acts on a single pass, but needs both passes to agree when two ran', () => {
     expect(actionableItemType(rec('accessory_not_a_card'))).toBe('accessory_not_a_card');

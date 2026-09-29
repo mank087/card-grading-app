@@ -26,6 +26,7 @@
 
 import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
 import { capMatchConfidence } from './pricing/valueGuard';
+import { estimateGradedValueNumber } from './pricing/gradedValueEstimate';
 
 // PriceCharting API base URL
 const API_BASE_URL = 'https://www.pricecharting.com/api';
@@ -336,55 +337,15 @@ export function normalizeMTGPrices(product: MTGPriceResult): NormalizedMTGPrices
 }
 
 /**
- * Estimate DCM grade equivalent value based on graded prices
- * DCM values are calculated as a percentage of the PSA premium over raw
+ * Estimate DCM grade equivalent value based on graded prices.
+ * Shared, grade-aware implementation (src/lib/pricing/gradedValueEstimate.ts):
+ * premium floored at zero, no raw × 3 below grade 9, monotonic across grades.
  */
 export function estimateMTGDcmValue(
   prices: NormalizedMTGPrices,
   dcmGrade: number
 ): number | null {
-  const raw = prices.raw;
-
-  // Get PSA equivalent price for the grade
-  const roundedGrade = Math.round(dcmGrade).toString();
-  const halfGrade = dcmGrade >= 9 ? '9.5' : null;
-  const psaEquivalentPrice = prices.psa[roundedGrade] || (halfGrade ? prices.psa[halfGrade] : null) || null;
-
-  // Fallback: if no graded equivalent, use raw × 3
-  if (!psaEquivalentPrice && raw) {
-    return Math.round(raw * 3 * 100) / 100;
-  }
-
-  if (!raw || !psaEquivalentPrice) {
-    // If we have PSA price but no raw, just return a discounted PSA price
-    if (psaEquivalentPrice) {
-      // Apply a 30% discount (DCM is 70% of PSA value)
-      return Math.round(psaEquivalentPrice * 0.70 * 100) / 100;
-    }
-    return null;
-  }
-
-  // DCM multiplier: represents market premium over raw
-  // Higher grades get closer to PSA values, lower grades closer to raw
-  // This is a conservative estimate since DCM is establishing market presence
-  let dcmMultiplier: number;
-  if (dcmGrade >= 9.5) {
-    dcmMultiplier = 0.70; // 70% of PSA premium over raw
-  } else if (dcmGrade >= 9) {
-    dcmMultiplier = 0.65; // 65% of PSA premium
-  } else if (dcmGrade >= 8) {
-    dcmMultiplier = 0.55; // 55% of PSA premium
-  } else if (dcmGrade >= 7) {
-    dcmMultiplier = 0.45; // 45% of PSA premium
-  } else {
-    dcmMultiplier = 0.35; // 35% of PSA premium for lower grades
-  }
-
-  // Calculate: Raw + (PSA premium × DCM multiplier)
-  const psaPremium = psaEquivalentPrice - raw;
-  const dcmValue = raw + (psaPremium * dcmMultiplier);
-
-  return Math.round(dcmValue * 100) / 100;
+  return estimateGradedValueNumber(prices, dcmGrade);
 }
 
 /**

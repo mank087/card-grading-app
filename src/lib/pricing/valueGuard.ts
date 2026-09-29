@@ -113,14 +113,14 @@ function yearMattersFor(category?: string | null): boolean {
  *      is what separates an original from a reprint
  */
 /**
- * item_type values that never show a market value, at ANY amount, and that an
- * owner confirmation cannot lift: a deck divider or a photo of a screen must not
- * borrow a real card's price. Kept inline because this file is copied verbatim
- * to mobile; a test holds it equal to NON_STANDARD_ITEM_TYPES in
- * src/lib/identification/itemType.ts.
+ * item_type values that show no market value, at ANY amount, until the owner
+ * confirms the item: a deck divider or a photo of a screen must not borrow a real
+ * card's price on DCM Optic's say-so alone. Kept inline because this file is
+ * copied verbatim to mobile; a test holds it equal to NON_STANDARD_ITEM_TYPES in
+ * src/lib/identification/itemType.ts. 'sticker_or_decal' is deliberately absent:
+ * licensed stickers (1986-89 Fleer) are catalogued and priced like cards.
  */
 export const NO_VALUE_ITEM_TYPES: readonly string[] = [
-  'sticker_or_decal',
   'accessory_not_a_card',
   'oversized_or_jumbo',
   'custom_or_fan_made',
@@ -129,9 +129,22 @@ export const NO_VALUE_ITEM_TYPES: readonly string[] = [
   'not_a_collectible',
 ];
 
+/**
+ * The owner has vouched for this card: picked the pricing product by hand or
+ * confirmed the identity at some revision. Mirrors ownerConfirmedIdentity in
+ * itemType.ts (a test holds them equal).
+ */
+export function isOwnerConfirmed(card: CardIdentityForGuard): boolean {
+  if (!isBlankIdentityText(card.dcm_selected_product_id)) return true;
+  const confirmedRevision = card.identity_confirmed_revision;
+  return confirmedRevision !== null && confirmedRevision !== undefined;
+}
+
 export function assessValueTrust(card: CardIdentityForGuard, value: number): ValueTrust {
-  // Owner policy (Sept 17 2026): graded, labelled "Not a standard trading card", no price.
-  if (typeof card.item_type === 'string' && NO_VALUE_ITEM_TYPES.includes(card.item_type)) {
+  // Owner policy (Sept 17 2026): graded, labelled "Not a standard trading card", no
+  // price. An owner confirmation lifts it (Sept 28 2026), as it lifts the thin-identity
+  // guard below: the owner has said what the item is and which product prices it.
+  if (typeof card.item_type === 'string' && NO_VALUE_ITEM_TYPES.includes(card.item_type) && !isOwnerConfirmed(card)) {
     return { trusted: false, reason: 'not_standard_card' };
   }
 
@@ -140,11 +153,7 @@ export function assessValueTrust(card: CardIdentityForGuard, value: number): Val
   }
 
   // The owner has already vouched for this card, one way or the other.
-  if (!isBlankIdentityText(card.dcm_selected_product_id)) {
-    return { trusted: true, reason: 'owner_confirmed' };
-  }
-  const confirmedRevision = card.identity_confirmed_revision;
-  if (confirmedRevision !== null && confirmedRevision !== undefined) {
+  if (isOwnerConfirmed(card)) {
     return { trusted: true, reason: 'owner_confirmed' };
   }
 

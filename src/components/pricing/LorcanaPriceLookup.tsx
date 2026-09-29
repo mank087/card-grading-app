@@ -1,6 +1,6 @@
 'use client';
 
-import { isNonStandardItemType } from '@/lib/identification/itemType';
+import { hidesMarketValue } from '@/lib/identification/itemType';
 import { useState, useEffect, useRef } from 'react';
 import { assessValueTrust, type CardIdentityForGuard } from '@/lib/pricing/valueGuard';
 import { priceRevisionPayload, isStalePriceResponse } from '@/lib/pricing/clientPriceRevisions';
@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { estimateGradedValue } from '@/lib/pricing/gradedValueEstimate';
 
 interface NormalizedLorcanaPrices {
   raw: number | null;
@@ -657,45 +658,15 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
   const getDcmEstimatedValue = () => {
     if (!priceData?.prices || !dcmGrade) return null;
 
-    const raw = priceData.prices.raw;
-    const psaGrades = priceData.prices.psa;
-
-    const roundedGrade = Math.round(dcmGrade).toString();
-    const halfGrade = dcmGrade >= 9 ? '9.5' : null;
-    const psaEquivalentPrice = psaGrades[roundedGrade] || (halfGrade && psaGrades[halfGrade]) || null;
-
-    if (!psaEquivalentPrice && raw) {
-      return {
-        value: Math.round(raw * 3 * 100) / 100,
-        multiplier: null,
-        rawPrice: raw,
-        psaPrice: null,
-      };
-    }
-
-    if (!raw || !psaEquivalentPrice) return null;
-
-    let dcmMultiplier: number;
-    if (dcmGrade >= 9.5) {
-      dcmMultiplier = 0.70;
-    } else if (dcmGrade >= 9) {
-      dcmMultiplier = 0.65;
-    } else if (dcmGrade >= 8) {
-      dcmMultiplier = 0.55;
-    } else if (dcmGrade >= 7) {
-      dcmMultiplier = 0.45;
-    } else {
-      dcmMultiplier = 0.35;
-    }
-
-    const psaPremium = psaEquivalentPrice - raw;
-    const dcmValue = raw + (psaPremium * dcmMultiplier);
+    // Same shared estimator the server saves (src/lib/pricing/gradedValueEstimate.ts)
+    const estimate = estimateGradedValue(priceData.prices, dcmGrade);
+    if (!estimate) return null;
 
     return {
-      value: Math.round(dcmValue * 100) / 100,
-      multiplier: dcmMultiplier,
-      rawPrice: raw,
-      psaPrice: psaEquivalentPrice,
+      value: estimate.value,
+      multiplier: estimate.multiplier,
+      rawPrice: priceData.prices.raw,
+      psaPrice: estimate.compPrice,
     };
   };
 
@@ -722,8 +693,9 @@ export function LorcanaPriceLookup({ card, dcmGrade, isOwner = false, guardIdent
   // A withheld card shows the public nothing from the matched listing either: its
   // price range and graded-price tables belong to a product this card may not be.
   if (valueWithheld && !isOwner) return null;
-  // Not a standard trading card: graded and labelled, and no market pricing for anyone.
-  if (isNonStandardItemType((guardIdentity as { item_type?: string | null } | undefined)?.item_type)) return null;
+  // Not a standard trading card: graded and labelled, and no market pricing for anyone
+  // until the owner confirms the item. Licensed stickers are priced like cards.
+  if (hidesMarketValue(guardIdentity)) return null;
   const chartData = getChartData(valueWithheld ? null : dcmEstimate?.value);
 
   return (

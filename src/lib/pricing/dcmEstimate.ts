@@ -83,6 +83,23 @@ export function estimateDcmValue(
   dcmGrade: number,
   options: DcmEstimateOptions = {}
 ): DcmEstimateResult | null {
+  const base = baseDcmEstimate(prices, dcmGrade, options);
+  if (!base) return null;
+  // Monotonic (Sept 28): a lower grade never estimates above a higher whole grade
+  // of the same product.
+  let estimate = base.estimate;
+  for (let h = Math.floor(dcmGrade) + 1; h <= 10; h++) {
+    const higher = baseDcmEstimate(prices, h, options);
+    if (higher && higher.estimate < estimate) estimate = higher.estimate;
+  }
+  return { ...base, estimate: round2(estimate) };
+}
+
+function baseDcmEstimate(
+  prices: NormalizedPrices,
+  dcmGrade: number,
+  options: DcmEstimateOptions
+): DcmEstimateResult | null {
   const raw = prices.raw && prices.raw > 0 ? prices.raw : null;
   const salesVolume = prices.salesVolume != null ? parseInt(String(prices.salesVolume), 10) : null;
   const lowData = !!options.gradeWasDefaulted || (salesVolume !== null && !Number.isNaN(salesVolume) && salesVolume < 3);
@@ -106,7 +123,30 @@ export function estimateDcmValue(
     return { estimate: round2(raw), method: 'raw-only', lowData };
   }
 
+  // Below grade 9 with no comp at or below the grade, the interpolation would
+  // clamp UP to a higher grade's comp (a grade 8 priced off a PSA 10). Value it
+  // at raw instead, never above the cheapest known higher-grade comp (Sept 28).
+  const lowestAnchor = lowestTierGrade(prices.psa);
+  if (dcmGrade < 9 && lowestAnchor !== null && dcmGrade < lowestAnchor) {
+    const cheapestHigher = cheapestCompAbove(prices.psa, dcmGrade);
+    const capped = cheapestHigher !== null ? Math.min(raw, cheapestHigher) : raw;
+    return { estimate: round2(capped), method: 'raw-only', lowData };
+  }
+
   const premium = Math.max(0, comp - raw);
   const estimate = raw + premium * dcmMultiplier(dcmGrade);
   return { estimate: round2(estimate), method: 'interpolated', lowData };
+}
+
+function lowestTierGrade(psa: Record<string, number>): number | null {
+  const grades = TIER_GRADES.filter(g => typeof psa[String(g)] === 'number' && psa[String(g)] > 0);
+  return grades.length ? grades[0] : null;
+}
+
+function cheapestCompAbove(psa: Record<string, number>, grade: number): number | null {
+  const higher = TIER_GRADES
+    .filter(g => g > grade)
+    .map(g => psa[String(g)])
+    .filter((p): p is number => typeof p === 'number' && p > 0);
+  return higher.length ? Math.min(...higher) : null;
 }

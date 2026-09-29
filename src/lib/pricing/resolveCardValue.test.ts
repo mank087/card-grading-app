@@ -21,6 +21,17 @@ const thin = {
 };
 
 describe('resolveCardValue', () => {
+  it('shows the stored price on a licensed sticker (1987 Fleer Basketball Stickers)', () => {
+    const sticker = { category: 'Sports', item_type: 'sticker_or_decal', card_set: '1987 Fleer Basketball Stickers', release_date: '1987', dcm_price_estimate: 39000 } as CardForPricing;
+    expect(resolveCardValue(sticker)).toEqual({ value: 39000, source: 'dcm-estimate' });
+  });
+
+  it('shows the stored price on a custom item once the owner confirms it', () => {
+    const custom = { category: 'Other', item_type: 'custom_or_fan_made', card_set: 'Fan Set', release_date: '2024', dcm_price_estimate: 60 } as CardForPricing;
+    expect(resolveCardValue(custom).withheldReason).toBe('not_standard_card');
+    expect(resolveCardValue({ ...custom, identity_confirmed_revision: 1 } as CardForPricing)).toEqual({ value: 60, source: 'dcm-estimate' });
+  });
+
   it('still resolves an ordinary priced card', () => {
     const resolved = resolveCardValue({
       category: 'Pokemon',

@@ -59,7 +59,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { listBinders, getCardBinders, addCardsToBinder, removeCardsFromBinder, type Binder } from '@/lib/bindersApi'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
-import { isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL } from '@/lib/itemType'
+import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_STANDARD_CARD_LABEL, ownerConfirmedIdentity } from '@/lib/itemType'
 import { useIsFocused } from '@react-navigation/native'
 import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
@@ -1991,13 +1991,14 @@ export default function CardDetailScreen() {
           </View>
         )}
 
-        {/* Not a standard trading card (deck divider, sticker, jumbo, custom,
-            marked reprint, photo of a screen): graded for condition, labelled,
-            and never priced. Shown to everyone. See @/lib/itemType. */}
+        {/* Not a standard trading card (deck divider, jumbo, custom, marked
+            reprint, photo of a screen): graded for condition, labelled, and not
+            priced until the owner confirms it. Licensed stickers are priced like
+            cards. Shown to everyone. See @/lib/itemType. */}
         {isNonStandardItemType((card as any).item_type) && (
           <View style={s.notStandardCard}>
             <Text style={s.notStandardTitle}>{NOT_STANDARD_CARD_LABEL}</Text>
-            <Text style={s.notStandardText}>{nonStandardExplanation((card as any).item_type)}</Text>
+            <Text style={s.notStandardText}>{nonStandardExplanation((card as any).item_type, ownerConfirmedIdentity(card as any))}</Text>
           </View>
         )}
 
@@ -2245,7 +2246,7 @@ export default function CardDetailScreen() {
                   {/* Corner zoom images */}
                   {imageUrl && !card.slab_detected && (
                     <View style={{ marginBottom: 10 }}>
-                      <CornerZoomGrid imageUrl={imageUrl} side={side === 'front' ? 'Front' : 'Back'} />
+                      <CornerZoomGrid imageUrl={imageUrl} side={side === 'front' ? 'Front' : 'Back'} captureQuality={(card as any).capture_quality} />
                     </View>
                   )}
 
@@ -2472,8 +2473,8 @@ export default function CardDetailScreen() {
         </View>
 
         {/* ══════ 5. MARKET VALUE ══════
-            Not shown for an item that is not a standard trading card: it has no market value here. */}
-        {!isNonStandardItemType((card as any).item_type) && (
+            Not shown for an item that is not a standard trading card, until the owner confirms it. */}
+        {!hidesMarketValue(card as any) && (
         <View ref={tourRefs['market-value']} collapsable={false}>
         <CollapsibleSection
           title={`Market Value${card.dcm_price_estimate && resolveCardValue(card as any).source !== 'withheld' ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`}

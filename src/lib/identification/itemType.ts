@@ -3,8 +3,18 @@
  *
  * Owner policy (Sept 17 2026): GRADE it, LABEL it "Not a standard trading card",
  * and SHOW NO MARKET PRICE. Nothing is refused and no credit is refunded: the
- * point is that a deck divider, a sticker, a jumbo, a custom card, a marked
- * reprint or a photo of a screen can never borrow a real card's identity or value.
+ * point is that a deck divider, a jumbo, a custom card, a marked reprint or a
+ * photo of a screen can never borrow a real card's identity or value.
+ *
+ * Stickers are NOT in the no-value set (Sept 28 2026): licensed sticker issues
+ * (1986-89 Fleer basketball stickers, "(c) 1987 FLEER CORP.") are catalogued and
+ * priced by SportsCardsPro/PriceCharting like any card, and the Sept 17 policy
+ * had hidden up to ~$39k of real value. A sticker is still RECORDED as
+ * item_type 'sticker_or_decal'; it is simply neither labelled nor unpriced.
+ *
+ * An owner who has confirmed the card (identity_confirmed_revision set, or a
+ * pricing product picked by hand) lifts the no-value rule: see
+ * ownerConfirmedIdentity / hidesMarketValue below and assessValueTrust.
  *
  * Pure and dependency-free: copied verbatim to dcm-mobile/lib/itemType.ts.
  */
@@ -13,7 +23,6 @@ export const NOT_STANDARD_CARD_LABEL = 'Not a standard trading card';
 
 /** item_type values (see firstLook.ts) that carry the label and lose the price. */
 export const NON_STANDARD_ITEM_TYPES = [
-  'sticker_or_decal',
   'accessory_not_a_card',
   'oversized_or_jumbo',
   'custom_or_fan_made',
@@ -23,9 +32,12 @@ export const NON_STANDARD_ITEM_TYPES = [
 ] as const;
 // Deliberately absent: 'trading_card', 'cannot_tell', and 'already_graded_slab'
 // (a slabbed card is still a standard card; the holder is handled by the case gate).
+// 'sticker_or_decal' is also absent: licensed stickers are priced (see above).
+
+/** item_type values actionableItemType stores: the no-value set plus stickers. */
+export const RECORDED_ITEM_TYPES: readonly string[] = [...NON_STANDARD_ITEM_TYPES, 'sticker_or_decal'];
 
 const PLAIN_WORDS: Record<string, string> = {
-  sticker_or_decal: 'a sticker',
   accessory_not_a_card: 'an accessory such as a deck divider, token or code card',
   oversized_or_jumbo: 'an oversized or jumbo item',
   custom_or_fan_made: 'a custom or fan made item',
@@ -45,9 +57,35 @@ export function isNonStandardItemType(itemType: unknown): boolean {
   return typeof itemType === 'string' && (NON_STANDARD_ITEM_TYPES as readonly string[]).includes(itemType);
 }
 
-/** "DCM Optic read this as a sticker." — calm, one sentence, for the card page. */
-export function nonStandardExplanation(itemType: unknown): string | null {
+/**
+ * The owner has vouched for this card's identity: confirmed it at some revision,
+ * or picked the pricing product by hand. The same test the thin-identity guard in
+ * valueGuard.ts applies (inline there because both files are copied verbatim;
+ * a test holds them equal).
+ */
+export function ownerConfirmedIdentity(card: {
+  dcm_selected_product_id?: string | null;
+  identity_confirmed_revision?: number | null;
+} | null | undefined): boolean {
+  if (!card) return false;
+  const product = card.dcm_selected_product_id;
+  if (typeof product === 'string' && !['', 'unknown', 'n/a', 'na', 'none', 'null', 'undefined'].includes(product.trim().toLowerCase())) return true;
+  return card.identity_confirmed_revision !== null && card.identity_confirmed_revision !== undefined;
+}
+
+/** True when the market value must not be shown: a non-standard item the owner has not confirmed. */
+export function hidesMarketValue(card: {
+  item_type?: string | null;
+  dcm_selected_product_id?: string | null;
+  identity_confirmed_revision?: number | null;
+} | null | undefined): boolean {
+  return isNonStandardItemType(card?.item_type) && !ownerConfirmedIdentity(card);
+}
+
+/** "DCM Optic read this as a custom or fan made item." — calm, one sentence, for the card page. */
+export function nonStandardExplanation(itemType: unknown, ownerConfirmed = false): string | null {
   if (!isNonStandardItemType(itemType)) return null;
+  if (ownerConfirmed) return `DCM Optic read this as ${PLAIN_WORDS[itemType as string]}. It is graded for condition, and its market value is shown because the owner confirmed the item.`;
   return `DCM Optic read this as ${PLAIN_WORDS[itemType as string]}, so it is graded for condition but has no market value here.`;
 }
 
@@ -72,7 +110,8 @@ export function actionableItemType(record: {
   if ((finalType === 'custom_or_fan_made' || finalType === 'not_a_collectible')
     && hasOfficialCopyright(record?.result?.printed_text?.copyright_line)) return null;
   const firstType = record?.contract_item_type;
-  if (firstType === undefined || firstType === null) return isNonStandardItemType(finalType) ? (finalType as string) : null;
-  if (isNonStandardItemType(firstType) && isNonStandardItemType(finalType)) return firstType;
+  const recorded = (t: unknown) => typeof t === 'string' && RECORDED_ITEM_TYPES.includes(t);
+  if (firstType === undefined || firstType === null) return recorded(finalType) ? (finalType as string) : null;
+  if (recorded(firstType) && recorded(finalType)) return firstType;
   return null;
 }

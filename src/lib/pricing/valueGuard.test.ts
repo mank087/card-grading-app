@@ -172,11 +172,33 @@ describe('capMatchConfidence', () => {
 });
 
 describe('items that are not standard trading cards', () => {
-  it('never shows a value, at any amount, and owner confirmation does not lift it', async () => {
+  it('shows no value, at any amount, until the owner confirms the item', async () => {
     const { assessValueTrust } = await import('./valueGuard');
     const divider = { item_type: 'accessory_not_a_card', card_set: 'Lost Origin', release_date: '2022', category: 'Pokemon' };
     expect(assessValueTrust(divider, 22.77)).toEqual({ trusted: false, reason: 'not_standard_card' });
-    expect(assessValueTrust({ ...divider, dcm_selected_product_id: '123', identity_confirmed_revision: 3 }, 22.77).trusted).toBe(false);
+    expect(assessValueTrust({ ...divider, dcm_selected_product_id: '  ' }, 22.77).trusted).toBe(false);
+  });
+  it('lifts the block for an owner-confirmed custom item, as it lifts the thin-identity guard', async () => {
+    const { assessValueTrust } = await import('./valueGuard');
+    const custom = { item_type: 'custom_or_fan_made', card_set: null, release_date: null, category: 'Other' };
+    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 45)).toEqual({ trusted: true, reason: 'below_threshold' });
+    expect(assessValueTrust({ ...custom, identity_confirmed_revision: 1 }, 2500)).toEqual({ trusted: true, reason: 'owner_confirmed' });
+    expect(assessValueTrust({ ...custom, dcm_selected_product_id: 'pc-9' }, 2500)).toEqual({ trusted: true, reason: 'owner_confirmed' });
+  });
+  it('prices a licensed sticker like a card (1987 Fleer Basketball Stickers, Jordan #2)', async () => {
+    const { assessValueTrust } = await import('./valueGuard');
+    const sticker = { item_type: 'sticker_or_decal', card_set: '1987 Fleer Basketball Stickers', release_date: '1987', category: 'Sports' };
+    expect(assessValueTrust(sticker, 39000)).toEqual({ trusted: true, reason: 'ok' });
+    expect(assessValueTrust(sticker, 120)).toEqual({ trusted: true, reason: 'below_threshold' });
+    // A sticker with a thin identity is held back for the ordinary reason, not as non-standard.
+    expect(assessValueTrust({ ...sticker, card_set: null }, 39000)).toEqual({ trusted: false, reason: 'thin_identity' });
+  });
+  it('agrees with ownerConfirmedIdentity in itemType.ts', async () => {
+    const { isOwnerConfirmed } = await import('./valueGuard');
+    const { ownerConfirmedIdentity } = await import('../identification/itemType');
+    for (const c of [{}, { identity_confirmed_revision: 0 }, { identity_confirmed_revision: null }, { dcm_selected_product_id: 'x' }, { dcm_selected_product_id: 'N/A' }, { dcm_selected_product_id: '' }, { dcm_selected_product_id: null, identity_confirmed_revision: 4 }]) {
+      expect(isOwnerConfirmed(c as any)).toBe(ownerConfirmedIdentity(c as any));
+    }
   });
   it('leaves standard cards, unknown reads and slabbed cards alone', async () => {
     const { assessValueTrust } = await import('./valueGuard');
