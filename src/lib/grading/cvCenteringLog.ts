@@ -12,6 +12,7 @@
  */
 
 import type { CenteringMeasurement } from '../zoomInspection';
+import type { CenteringDisagreement } from './cvCenteringGate';
 
 export interface CvCenteringRecord {
   measured_at: string;
@@ -23,6 +24,12 @@ export interface CvCenteringRecord {
   /** The ensemble's own visual estimate, for offline agreement analysis */
   model_front: { left_right: string | null; top_bottom: string | null } | null;
   model_back: { left_right: string | null; top_bottom: string | null } | null;
+  /**
+   * CV_CENTERING_GATE_V1 only: faces where a quality-gated CV reading
+   * disagreed enough to change the centering subgrade. Absent when the flag
+   * is off; [] when on and nothing fired. Query: cv_centering->disagreement.
+   */
+  disagreement?: CenteringDisagreement[];
 }
 
 export function recordCvCentering(cardId: string | null | undefined, record: CvCenteringRecord): void {

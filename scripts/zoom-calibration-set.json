@@ -1,0 +1,241 @@
+{
+  "_readme": [
+    "FROZEN GRADING REGRESSION SET - customer-disputed grades hand-verified against the photos on Sept 29 2026.",
+    "Photos are the ORIGINAL grade-run snapshot (card_grade_runs.snapshot front_path/back_path), not the current card row:",
+    "several of these cards now carry manual corrections or replaced photos. Paths are frozen here so the set never drifts.",
+    "expected_grade is the hand verdict (whole grade). expected_subgrades are [front, back] per category where the reviewer",
+    "recorded them. expected_limiting lists the categories that should set the grade (any of them at the minimum is a match).",
+    "false_positive describes the specific misread the engine made on this card; the runner flags a recurrence when a",
+    "zoom-inspection finding matching it is present in a run (and, when subgrade_at_or_below is set, the face subgrade fell to it).",
+    "must_detect is a negative control: a real defect the corroboration gate must NOT suppress.",
+    "Runner: npx tsx scripts/run-zoom-calibration.ts --n 2 --tag baseline   (see the script header)."
+  ],
+  "cards": [
+    {
+      "key": "adams-85-chrome",
+      "review_id": "5fc230ba-3d3b-4988-b605-df03fbaa90c9",
+      "card_id": "36084907-6283-4674-a985-f846e75a2e5a",
+      "grade_run_id": "d4ba9a62-3794-4242-ade9-7c8b1c063696",
+      "label": "2014 Topps Chrome ('85 design) Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/36084907-6283-4674-a985-f846e75a2e5a/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/36084907-6283-4674-a985-f846e75a2e5a/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 9,
+      "expected_subgrades": { "centering": [10, 10], "corners": [9, 9], "edges": [9, 9], "surface": [10, 9] },
+      "expected_limiting": ["corners", "edges", "surface"],
+      "false_positive": {
+        "note": "Back corner 'softening' and back edge 'whitening' at moderate severity were glossy-edge reflections.",
+        "face": "back", "categories": ["corners", "edges"], "types": ["softening", "whitening"], "min_severity": "moderate"
+      }
+    },
+    {
+      "key": "adams-score",
+      "review_id": "98655c44-ed9e-4e7f-8226-dc58549d5f66",
+      "card_id": "bdef109e-cade-4725-ada3-e17290131b61",
+      "grade_run_id": "5df074cd-52bf-4a60-9ce7-1fde0423b140",
+      "label": "2014 Score Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/bdef109e-cade-4725-ada3-e17290131b61/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/bdef109e-cade-4725-ada3-e17290131b61/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 9,
+      "expected_subgrades": { "centering": [10, 10], "corners": [9, 9], "edges": [9, 9], "surface": [10, 10] },
+      "expected_limiting": ["corners", "edges"],
+      "false_positive": {
+        "note": "'White flecks along the dark bottom edge' were the printed silver foil stripe.",
+        "face": "front", "categories": ["corners", "edges"], "types": ["whitening", "chip", "nick"], "min_severity": "moderate",
+        "regions": ["bottom"]
+      }
+    },
+    {
+      "key": "mchale-81",
+      "review_id": "f77fe7a9-f3ba-49ab-a00c-be21b7ca702d",
+      "card_id": "b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4",
+      "grade_run_id": "3924d95d-cb31-4f89-8d7d-a408e9862e44",
+      "label": "1981 Topps Kevin McHale",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": { "centering": [10, 10], "corners": [8, 8], "edges": [7, 7], "surface": [8, 8] },
+      "expected_limiting": ["edges"],
+      "false_positive": {
+        "note": "Back 'stain' was normal cardstock mottling on a 1981 back.",
+        "face": "back", "categories": ["surface"], "types": ["stain", "discoloration", "toning"], "min_severity": "minor"
+      }
+    },
+    {
+      "key": "aaron-76",
+      "review_id": "1700bc92-a681-4dba-b490-fc5731b0617a",
+      "card_id": "3af00703-d12a-44f2-8c0e-e7e8bb46a123",
+      "grade_run_id": "3616a82f-eca6-4a26-9722-10786b2cf886",
+      "label": "1976 Topps Hank Aaron",
+      "cardType": "sports",
+      "front_path": "7ee4f1b2-c52e-4a45-867e-92c3b91f0b0b/3af00703-d12a-44f2-8c0e-e7e8bb46a123/front.jpg",
+      "back_path": "7ee4f1b2-c52e-4a45-867e-92c3b91f0b0b/3af00703-d12a-44f2-8c0e-e7e8bb46a123/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": { "centering": [9, 10], "corners": [7, 7], "edges": [7, 7], "surface": [7, 7] },
+      "expected_limiting": ["corners", "edges", "surface"],
+      "false_positive": {
+        "note": "Dark specks on the tan border were 1976 print speckle, not stains.",
+        "face": "any", "categories": ["edges", "surface"], "types": ["stain", "speck", "spot"], "min_severity": "minor"
+      }
+    },
+    {
+      "key": "adams-chrome-refractor",
+      "review_id": "e7d75cae-3570-484b-b973-0d80868ac3d3",
+      "card_id": "17cc03bc-622a-4fec-94b9-3db489bb8da3",
+      "grade_run_id": "e38bf4fa-d295-4a2c-b7ea-584d5dd3368f",
+      "label": "Topps Chrome Refractor Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/17cc03bc-622a-4fec-94b9-3db489bb8da3/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/17cc03bc-622a-4fec-94b9-3db489bb8da3/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "A surface scratch described 'near the center-left' was filed under the front bottom-right CORNER.",
+        "face": "front", "categories": ["corners"], "types": ["scratch", "scuff", "print_line", "stain"], "min_severity": "minor"
+      }
+    },
+    {
+      "key": "evans-chrome",
+      "review_id": "ad43f57d-cda0-4121-ba15-b960f2a43f92",
+      "card_id": "8a66d848-dd79-47e3-a588-6f4edcd0faff",
+      "grade_run_id": "6d350f04-9f01-498c-abeb-03a1b684a4f8",
+      "label": "2014 Topps Chrome Mike Evans",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/8a66d848-dd79-47e3-a588-6f4edcd0faff/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/8a66d848-dd79-47e3-a588-6f4edcd0faff/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "hold_must_name_reason": true,
+      "false_positive": null
+    },
+    {
+      "key": "evans-strata",
+      "review_id": "b2e8b6cb-8649-42ff-b3c2-07c3f3df06fe",
+      "card_id": "a5da95b5-ee24-4c08-b430-fed6ad2ed74d",
+      "grade_run_id": "40002790-72de-4e99-96b1-ca4b35d55021",
+      "label": "2014 Topps Strata Mike Evans",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/a5da95b5-ee24-4c08-b430-fed6ad2ed74d/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/a5da95b5-ee24-4c08-b430-fed6ad2ed74d/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": { "edges": [8, null] },
+      "expected_limiting": ["edges"],
+      "false_positive": {
+        "note": "The front-left EDGE rough cut was filed under the front top-left CORNER (the limiting factor is the edge).",
+        "face": "front", "categories": ["corners"], "types": ["whitening", "chip", "nick", "fraying", "fray"], "min_severity": "moderate",
+        "description_contains": ["edge"]
+      },
+      "must_detect": { "face": "front", "categories": ["edges"], "min_severity": "minor", "note": "real rough cut on the front left edge" }
+    },
+    {
+      "key": "brady-fleer-tradition",
+      "review_id": "24c3e9e9-4a66-4856-b34f-667ecb3daeff",
+      "card_id": "56cb0be2-6471-4285-b9cd-452b3d3a85e7",
+      "grade_run_id": "4332c8ad-67aa-419a-b09e-28d692eec6cf",
+      "label": "2004 Fleer Tradition Tom Brady",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/56cb0be2-6471-4285-b9cd-452b3d3a85e7/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/56cb0be2-6471-4285-b9cd-452b3d3a85e7/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": { "centering": [9, null] },
+      "expected_limiting": ["centering"],
+      "false_positive": null,
+      "centering_note": "Front centering is ~60/40; the report said 52/48. Centering is out of scope for the zoom work (owned elsewhere) - tracked, not scored."
+    },
+    {
+      "key": "adams-platinum",
+      "review_id": "92dfd8ec-1b9b-44d0-84e4-a7f3c082e161",
+      "card_id": "b2ae6e0a-e23a-4362-a14d-4b3ab0b83c87",
+      "grade_run_id": "6f9ae4ac-7876-4dad-9c2f-bfd8b2bb5edf",
+      "label": "Topps Platinum Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/b2ae6e0a-e23a-4362-a14d-4b3ab0b83c87/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/b2ae6e0a-e23a-4362-a14d-4b3ab0b83c87/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null
+    },
+    {
+      "key": "adams-chrome-chips",
+      "review_id": "1c1ee4b5-c19c-4f06-8a5c-f9b2e79e42c5",
+      "card_id": "eafe4123-0797-45d7-8657-ee4d927cfa76",
+      "grade_run_id": "38770d9a-7eb6-49ae-8014-7850cdd56e73",
+      "label": "Topps Chrome Davante Adams (real edge chips)",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/eafe4123-0797-45d7-8657-ee4d927cfa76/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/eafe4123-0797-45d7-8657-ee4d927cfa76/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": ["edges", "corners"],
+      "false_positive": null,
+      "must_detect": { "face": "front", "categories": ["edges", "corners"], "min_severity": "minor", "note": "real chrome edge chips along the top of the front" }
+    },
+    {
+      "key": "adams-chrome-9",
+      "review_id": "1a8f7f92-14e1-470a-9fe8-a569e30a1df0",
+      "card_id": "11c2224f-890e-4439-8203-6ef341403675",
+      "grade_run_id": "32597a89-83d9-4b7a-a507-a032434d1dbd",
+      "label": "Topps Chrome Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/11c2224f-890e-4439-8203-6ef341403675/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/11c2224f-890e-4439-8203-6ef341403675/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null
+    },
+    {
+      "key": "eevee-svp173",
+      "review_id": "01a211e0-eaa4-4489-88e7-6231a2d4e3d8",
+      "card_id": "fbef5e7e-eb49-47d3-9d43-2aa9e3070c94",
+      "grade_run_id": "e7fefe03-2811-42c2-807e-f4518fd54974",
+      "label": "Eevee SVP 173 promo",
+      "cardType": "pokemon",
+      "front_path": "4413e540-b29e-4f64-a4b7-6bd1bc48c503/fbef5e7e-eb49-47d3-9d43-2aa9e3070c94/front.jpg",
+      "back_path": "4413e540-b29e-4f64-a4b7-6bd1bc48c503/fbef5e7e-eb49-47d3-9d43-2aa9e3070c94/back.jpg",
+      "engine_grade": 10,
+      "expected_grade": 10,
+      "expected_subgrades": { "centering": [10, 10], "corners": [10, 10], "edges": [10, 10], "surface": [10, 10] },
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "Clean Gem Mint: any magnified-only finding on this card is a false positive.",
+        "face": "any", "categories": ["corners", "edges", "surface"], "types": null, "min_severity": "minor"
+      }
+    },
+    {
+      "key": "berra-95-collectors-edge",
+      "review_id": null,
+      "card_id": "f3d8b035-9e1a-4c68-b808-4e2ac3aa733f",
+      "grade_run_id": "d4d7aaf4-9524-40e4-8331-eb681bac173c",
+      "label": "1995 Collector's Edge Yogi Berra (Bob's card)",
+      "cardType": "sports",
+      "front_path": "6cc6e18b-9a2f-48ce-8f9c-d6a82b447c40/f3d8b035-9e1a-4c68-b808-4e2ac3aa733f/front.jpg",
+      "back_path": "6cc6e18b-9a2f-48ce-8f9c-d6a82b447c40/f3d8b035-9e1a-4c68-b808-4e2ac3aa733f/back.jpg",
+      "engine_grade": 5,
+      "expected_grade": 7,
+      "expected_subgrades": { "centering": [10, 10], "corners": [7, 8], "edges": [7, 7], "surface": [8, 8] },
+      "expected_limiting": ["corners", "edges"],
+      "false_positive": {
+        "note": "Printed marbled 'aged stone' border and sepia back read as staining. In production this came from the WHOLE-CARD passes, not zoom - the runner checks all defect sources for this card.",
+        "face": "any", "categories": ["surface"], "types": ["stain", "discoloration", "toning"], "min_severity": "moderate",
+        "any_source": true
+      }
+    }
+  ]
+}

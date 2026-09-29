@@ -26,7 +26,9 @@ import {
 import { ProcessedConditionReport } from '@/types/conditionReport';
 import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
-import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
+import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, computeZoomFaceCaps, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
+import { corroborateZoomDefects, majorityShare, wholeCardEvidence, zoomCorroborationEnabled } from './grading/zoomCorroboration';
+import { describeDissent, describeFaceAdjustment, finishHoldReason, reflectiveFinish } from './grading/holdNarration';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
 import { verifyClippedCorners } from './grading/frameEdgeCheck';
 import { caseConsensus } from './grading/caseConsensus';
@@ -37,6 +39,7 @@ import { completedChoice, IncompleteInspectionError, requireCompleteZoom, requir
 import { createCardOriginalsLoader, type CardOriginals } from './images/originalImages';
 import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
+import { applyCvCenteringGate } from './grading/cvCenteringGate';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
 import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
@@ -2552,6 +2555,18 @@ Provide detailed analysis as markdown with all required sections.`
             `Magnified inspection could not see ${uninspectedRegions.length} edge or corner area(s) clearly enough (${uninspectedRegions.map(humanizeZoomRegion).join(', ')}); those areas were judged from the whole-card evaluations only.`
           );
         }
+        // ZOOM_CORROBORATION_V1 (default OFF; grading/zoomCorroboration.ts): a zoom-only
+        // cosmetic finding lowers a face only when a whole-card evaluation also noted a
+        // defect there or a clear majority of zoom samples reported it. Off, nothing here runs.
+        if (zoom?.ok && zoomCorroborationEnabled()) {
+          const share = majorityShare();
+          const { kept, dropped } = corroborateZoomDefects(zoom.defects, wholeCardEvidence(scored.map(x => x.j)), share);
+          for (const d of dropped) console.log(`[GRADE RECALC] 🔎 zoom corroboration: dropped ${d.severity} ${d.type} at ${d.region} - ${d.reason}`);
+          zoom.defects = kept;
+          zoom.faceCaps = computeZoomFaceCaps(kept);
+          jsonData.inspection_status.zoom_corroboration = { version: 'zoom-corroboration-v1', majority_share: share,
+            attribution_dropped: zoom.corroboration?.dropped ?? [], corroboration_dropped: dropped };
+        }
         // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
         // displayed pass rows below the consensus when a cap was corroboration-limited.
@@ -2769,8 +2784,23 @@ Provide detailed analysis as markdown with all required sections.`
         // v9.13: persist the measurement + the model's estimate on the card row
         // (fire-and-forget). This is the production dataset the whole CV-centering
         // effort has been missing — until now shadow readings evaporated into logs.
+        // ── CV_CENTERING_GATE_V1 (default OFF → returns null, touches nothing) ──
+        // Quality-gated CV vs model disagreement: records both readings and flags
+        // the card for a human centering check. Never changes a score or ratio.
+        // See src/lib/grading/cvCenteringGate.ts for the data behind it.
+        const cvGate = applyCvCenteringGate({
+          jsonData,
+          centering: zoom?.centering,
+          quads: zoom?.capture ? { front: zoom.capture.frontQuad, back: zoom.capture.backQuad } : null,
+          rigidCase: !!rigidCaseForZoom,
+        });
+        if (cvGate && cvGate.length) {
+          console.log(`[GRADE RECALC] 📐 CV centering disagreement flagged for review: ${cvGate.map(d => `${d.face} ${d.axis} model ${d.model_ratio} vs CV ${d.cv_ratio}`).join(' | ')}`);
+        }
+        // ── end CV_CENTERING_GATE_V1 ──
         if (zoom?.centering && (zoom.centering.front || zoom.centering.back)) {
           recordCvCentering(options?.routingKey, {
+            ...(cvGate ? { disagreement: cvGate } : {}),
             measured_at: new Date().toISOString(),
             mode: cvAdvisorySection ? 'advisory' : 'shadow',
             grading_model: model,
@@ -2813,7 +2843,10 @@ Provide detailed analysis as markdown with all required sections.`
               if (m.topBottom) sec.top_bottom = m.topBottom;
               sec.quality_tier = tierFromWorstPct(m.worstAxisPct);
               sec.score = faceScores[face];
-              sec.measured = true;
+              // Only a BOTH-axis measurement may be quoted as "the borders measure
+              // X and Y" (gradeNarrator): on a partial one the other axis is still
+              // the visual estimate, and quoting it as measured overstates it.
+              sec.measured = m.bothAxes;
               sec.measurements = `Measured from card geometry: ${ratioText}${m.bothAxes ? '' : ' (one axis measured; the other retains the visual estimate)'}.`;
               sec.analysis = `Centering measured deterministically from the card's detected corner geometry: ${ratioText} — ${tierFromWorstPct(m.worstAxisPct)} (score ${faceScores[face]}).`;
             }
@@ -3622,7 +3655,13 @@ Provide detailed analysis as markdown with all required sections.`
           } else if (uncertaintyValue >= 2) {
             // v9.26: say the TRUE reason. This used to read "the photos are not clear enough"
             // even when the cause was a clipped corner, a holder or disagreeing evaluations.
-            const hold = explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread, imageNotes: jsonData.image_quality?.notes });
+            const hold = { ...explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread, imageNotes: jsonData.image_quality?.notes }) };
+            // Sept 29 2026 (grading/holdNarration.ts): name WHAT disagreed, and say why a
+            // reflective finish cannot be confirmed, instead of a generic clause. Words only.
+            const finish = hold.cause === 'image_quality' ? reflectiveFinish(jsonData.card_info) : null;
+            const namedReason = hold.cause === 'evaluations_disagree' ? describeDissent([pass1, pass2, pass3])
+              : finish ? finishHoldReason(finish) : null;
+            if (namedReason) hold.reason = namedReason;
             gradeCapReason = hold.reason;
             gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9.${hold.advice ? ' ' + hold.advice : ''}`;
             jsonData.grade_hold = { held: true, from: 10, to: 9, cause: hold.cause, reason: hold.reason, advice: hold.advice,
@@ -3646,6 +3685,9 @@ Provide detailed analysis as markdown with all required sections.`
             // the final grade so weakest-link display is never violated), and the
             // face scores/prose follow via the reconciliation below.
             const dissentCats: string[] = [];
+            // Sept 29 2026: what the dissenting evaluation scored and cited, in plain words
+            // (read before the reflection below edits the tiles; the pass rows are untouched).
+            const namedDissent = describeDissent([pass1, pass2, pass3]);
             for (const cat of ['centering', 'corners', 'edges', 'surface'] as const) {
               const minAcross = Math.min(pass1[cat] ?? 10, pass2[cat] ?? 10, pass3[cat] ?? 10);
               if (minAcross < serverRounded[cat]) {
@@ -3664,19 +3706,23 @@ Provide detailed analysis as markdown with all required sections.`
             threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
             if (dissentCats.length > 0) {
               const catList = dissentCats.join(' and ');
-              gradeCapNote = `The card presents at Gem Mint level, but one of the three independent evaluations scored the ${catList} at ${finalGrade} - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+              gradeCapNote = namedDissent
+                ? `The card presents at Gem Mint level, but ${namedDissent} - the grade is held at 9.`
+                : `The card presents at Gem Mint level, but one of the three independent evaluations scored the ${catList} at ${finalGrade} - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
               if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
                 jsonData.grading_passes.consensus_notes.push(
                   `Gem Mint unanimity: pass finals ${f1}/${f2}/${f3} — the ${catList} subgrade shows the dissenting evaluation's score.`
                 );
               }
             } else {
-              gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+              gradeCapNote = namedDissent
+                ? `The card presents at Gem Mint level, but ${namedDissent} - the grade is held at 9.`
+                : `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
             }
             console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}; dissent shown in: ${dissentCats.join(',') || 'none identified'})`);
             // v9.26: recorded like the other holds so the report can show it as one.
             jsonData.grade_hold = { held: true, from: 10, to: 9, cause: 'evaluation_dissent',
-              reason: dissentCats.length
+              reason: namedDissent ? namedDissent : dissentCats.length
                 ? `one of the three independent evaluations scored the ${dissentCats.join(' and ')} lower, and Gem Mint requires the evaluations to confirm each other`
                 : 'not every independent evaluation confirmed a 10, and Gem Mint requires the evaluations to confirm each other',
               advice: null, evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
@@ -4068,10 +4114,18 @@ Provide detailed analysis as markdown with all required sections.`
                 // narrated in the final summary, so this line was the only place a
                 // customer could learn why "no confirmed corner defect" scored 9 — and
                 // it pointed at nothing (customer report Aug 25 2026).
-                const phrases = zoomFacePhrases[`${cat}_${face}`];
-                fsec.summary = phrases
-                  ? `${fsec.summary.trim()} Magnified inspection found ${phrases} and set this face to ${cap}/10 — see the magnified evidence photo for this section.`
-                  : `${fsec.summary.trim()} Magnified inspection adjusted this face to ${cap}/10 — see the limiting factors and condition summary above.`;
+                // Sept 29 2026: every zoom-capped face has phrases, so the old bare
+                // "Magnified inspection adjusted this face" fallback only ever fired when
+                // something else moved the face (a Gem Mint hold, a dissent, the structural
+                // cap, the evaluations' consensus). Name that cause (grading/holdNarration.ts).
+                fsec.summary = `${fsec.summary.trim()} ${describeFaceAdjustment({
+                  cat, face, cap,
+                  zoomPhrases: zoomFacePhrases[`${cat}_${face}`] ?? null,
+                  zoomCapApplied: typeof appliedFaceCaps[`${cat}_${face}`] === 'number',
+                  holdReason: jsonData.grade_hold?.held ? (jsonData.grade_hold.reason ?? null) : null,
+                  structural: structuralDetected,
+                  dissentScore: dissentReflectedCats.get(cat) ?? null,
+                })}`;
               }
             }
           }

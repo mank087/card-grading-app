@@ -22,6 +22,7 @@ import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
+import { attributeZoomDefects, zoomCorroborationEnabled, ZOOM_DESIGN_ARTIFACT_EXCLUSIONS, type DroppedFinding } from './grading/zoomCorroboration';
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
@@ -40,6 +41,9 @@ export interface ZoomDefect {
    *  magnified crop this finding was made from ("see it for yourself"). */
   evidencePath?: string;
   evidenceUrl?: string;
+  /** ZOOM_CORROBORATION_V1 only: samples that reported this finding / samples that saw the region. */
+  votes?: number;
+  samples?: number;
 }
 
 /**
@@ -86,6 +90,8 @@ export interface ZoomResult {
   structuralFindings: Array<{ type: string; location: string; description: string }>;
   /** v9.5 measured centering per face; null/undefined = low confidence, model estimate stands */
   centering?: { front: CenteringMeasurement | null; back: CenteringMeasurement | null };
+  /** ZOOM_CORROBORATION_V1 only: findings the attribution rules removed, with reasons. */
+  corroboration?: { dropped: DroppedFinding[] };
   /**
    * Capture-gate P0: what the geometry gate saw.
    *
@@ -739,6 +745,15 @@ card_area is decided FIRST for each findings entry, before its defects:
 When card_area is "some" or "none", the crop is dominated by the surface the card is lying on — fabric weave, leather grain, desk texture. Fibers, specks and shadows there belong to the BACKGROUND, not the card. Only report a defect from such a crop if it is unmistakably ON the card portion.`;
 
 /**
+ * The zoom system prompt. With ZOOM_CORROBORATION_V1 off this is exactly
+ * ZOOM_SYSTEM_PROMPT (the default path's text is unchanged); on, the printed-design
+ * and photo-artifact exclusions are appended.
+ */
+export function zoomSystemPrompt(corroborationOn: boolean = zoomCorroborationEnabled()): string {
+  return corroborationOn ? ZOOM_SYSTEM_PROMPT + ZOOM_DESIGN_ARTIFACT_EXCLUSIONS : ZOOM_SYSTEM_PROMPT;
+}
+
+/**
  * Card geometry from the gate call: frame-fill percentages + corner quads.
  * Exported so the CV-centering advisory path can run the gate BEFORE the
  * grading ensemble and hand the result to runZoomInspection (which then
@@ -836,6 +851,7 @@ export async function runZoomInspection(
 ): Promise<ZoomResult> {
   const empty: ZoomResult = { ok: false, regionsInspected: 0, defects: [], faceCaps: {}, structuralFindings: [] };
   const roundedCorners = hasFactoryRoundedCorners(options?.cardType);
+  const corroborationOn = zoomCorroborationEnabled();
   const cardTypeLabel = CARD_TYPE_LABEL[String(options?.cardType || '').toLowerCase()] || String(options?.cardType || 'trading card');
   try {
     const { front: frontBuf, back: backBuf } =
@@ -1026,7 +1042,7 @@ export async function runZoomInspection(
         max_completion_tokens: 6000,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: ZOOM_SYSTEM_PROMPT },
+          { role: 'system', content: zoomSystemPrompt(corroborationOn) },
           { role: 'user', content },
         ],
       }, options?.model || BASELINE_MODEL);
@@ -1138,11 +1154,14 @@ export async function runZoomInspection(
         : voteThreshold;
       if (v.severities.length < required) { minorityDropped++; continue; }
       const region = key.split('|')[0];
+      // ZOOM_CORROBORATION_V1: carry the vote count so the grader can apply its
+      // majority rule. Off, the defect objects are exactly as before.
+      const tally = corroborationOn ? { votes: v.severities.length, samples: cardAreaVotes.get(region)?.total ?? samples.length } : {};
       if (STRUCTURAL_TYPES.has(v.type)) {
-        defects.push({ region, face: v.spec.face, category: 'structural', type: v.type, severity, description: v.description });
+        defects.push({ region, face: v.spec.face, category: 'structural', type: v.type, severity, description: v.description, ...tally });
         structuralFindings.push({ type: v.type, location: v.spec.label, description: v.description });
       } else {
-        defects.push({ region, face: v.spec.face, category: v.spec.category, type: v.type, severity, description: v.description });
+        defects.push({ region, face: v.spec.face, category: v.spec.category, type: v.type, severity, description: v.description, ...tally });
       }
     }
     if (minorityDropped > 0) {
@@ -1171,23 +1190,23 @@ export async function runZoomInspection(
         defects.push(...kept);
       }
     }
+    // ZOOM_CORROBORATION_V1 (b): category from the crop, surface marks out of corner/edge
+    // crops, corner-crop edge runs deduplicated, contradictory locations dropped.
+    let attributionDropped: DroppedFinding[] | undefined;
+    if (corroborationOn && defects.length > 0) {
+      const { kept, dropped } = attributeZoomDefects(defects);
+      for (const d of dropped) console.log(`[ZOOM] attribution: dropped ${d.severity} ${d.type} at ${d.region} (${d.votes}/${d.samples} votes) - ${d.reason}`);
+      defects.length = 0;
+      defects.push(...kept);
+      attributionDropped = dropped;
+    } else if (corroborationOn) {
+      attributionDropped = [];
+    }
     if (backgroundSuppressed > 0) {
       const bgRegions = [...cardAreaVotes.entries()].filter(([id]) => !regionIsCard(id)).map(([id]) => id);
       console.log(`[ZOOM] background gate: ${backgroundSuppressed} cosmetic finding(s) suppressed from ${bgRegions.length} background-dominated region(s): ${bgRegions.join(', ')}`);
     }
 
-    // Deterministic face caps from the ladders (v9.3 recalibrated for overlapping crops).
-    // Regions physically OVERLAP (edge segments share ends with corner crops; surface
-    // quadrants contain both) — so the same worn corner used to register as 3+ "distinct
-    // regions" and trigger the spread penalty, and quadrant-reported border wear was
-    // capping the SURFACE category (measured: a clean-Gem control fell 10→8 on region
-    // double-counting alone). Rules:
-    //  - each category caps ONLY from its NATIVE crops (corners from COR, edges from EDG);
-    //  - edge segments dedup to their physical side (EDG-L-2 → EDG-L);
-    //  - surface caps ONLY from true surface defect types in SUR crops — border-wear
-    //    types there duplicate what the sharper COR/EDG crops already report;
-    //  - worst severity sets the cap; 3+ distinct PHYSICAL locations lowers it one more.
-    const BORDER_WEAR_TYPES = new Set(['whitening', 'softening', 'chip', 'nick', 'fray', 'fraying']);
     // v9.4.2 EVIDENCE CROPS: persist the exact magnified crop behind every surviving
     // finding, so reports can SHOW the defect instead of asserting it ("minor
     // whitening" disputes → shared look at the actual crop). One upload per flagged
@@ -1218,41 +1237,61 @@ export async function runZoomInspection(
       }
     }
 
-    const physicalLocation = (region: string) => region.replace(/^([FB]-EDG-[TBLR])-\d+$/, '$1');
-    const nativePrefix: Record<string, string> = { corners: 'COR', edges: 'EDG', surface: 'SUR' };
-    const faceCaps: Record<string, number> = {};
-    for (const face of ['front', 'back'] as const) {
-      for (const category of ['corners', 'edges', 'surface'] as const) {
-        const hits = defects.filter(d =>
-          d.face === face &&
-          d.category === category &&
-          d.region.includes(`-${nativePrefix[category]}-`) &&
-          (category !== 'surface' || !BORDER_WEAR_TYPES.has(d.type))
-        );
-        if (hits.length === 0) continue;
-        const worst = Math.min(...hits.map(d => SEVERITY_CAP[d.severity]));
-        const distinctLocations = new Set(hits.map(d => physicalLocation(d.region))).size;
-        // Structure-based bias gate (docs/COSMETIC_VERIFICATION_REFINEMENT_SCOPE.md §4):
-        // UNIFORM MINOR findings — "minor" everywhere, nothing moderate+ — are the
-        // fingerprint of the detector's border bias, not damage (real handling wear is
-        // uneven: specific spots, mixed severities). Minor-only never caps below 9.
-        // KNOWN GAP: a genuinely evenly-worn card whose wear reads all-minor also gets
-        // the benefit of the doubt (a 9 instead of 8) — border-color scoping needs the
-        // card-quad geometry port (grading-v9.2-joey-fixes branch) to fix properly.
-        // The spread penalty (3+ locations → one lower) applies to moderate/heavy only.
-        const minorOnly = hits.every(d => d.severity === 'minor');
-        faceCaps[`${category}_${face}`] = minorOnly
-          ? SEVERITY_CAP.minor
-          : Math.max(1, distinctLocations >= 3 ? worst - 1 : worst);
-      }
-    }
+    const faceCaps = computeZoomFaceCaps(defects);
 
     console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
     return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture,
-      ...(tolerable ? { uninspectedRegions: missing } : {}) };
+      ...(tolerable ? { uninspectedRegions: missing } : {}),
+      ...(attributionDropped ? { corroboration: { dropped: attributionDropped } } : {}) };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };
   }
+}
+
+// Deterministic face caps from the ladders (v9.3 recalibrated for overlapping crops).
+// Regions physically OVERLAP (edge segments share ends with corner crops; surface
+// quadrants contain both) — so the same worn corner used to register as 3+ "distinct
+// regions" and trigger the spread penalty, and quadrant-reported border wear was
+// capping the SURFACE category (measured: a clean-Gem control fell 10→8 on region
+// double-counting alone). Rules:
+//  - each category caps ONLY from its NATIVE crops (corners from COR, edges from EDG);
+//  - edge segments dedup to their physical side (EDG-L-2 → EDG-L);
+//  - surface caps ONLY from true surface defect types in SUR crops — border-wear
+//    types there duplicate what the sharper COR/EDG crops already report;
+//  - worst severity sets the cap; 3+ distinct PHYSICAL locations lowers it one more.
+// Exported (Sept 2026) so the grader can recompute caps after ZOOM_CORROBORATION_V1
+// removes uncorroborated findings; the rules are unchanged.
+const BORDER_WEAR_TYPES = new Set(['whitening', 'softening', 'chip', 'nick', 'fray', 'fraying']);
+export function computeZoomFaceCaps(defects: ZoomDefect[]): Record<string, number> {
+  const physicalLocation = (region: string) => region.replace(/^([FB]-EDG-[TBLR])-\d+$/, '$1');
+  const nativePrefix: Record<string, string> = { corners: 'COR', edges: 'EDG', surface: 'SUR' };
+  const faceCaps: Record<string, number> = {};
+  for (const face of ['front', 'back'] as const) {
+    for (const category of ['corners', 'edges', 'surface'] as const) {
+      const hits = defects.filter(d =>
+        d.face === face &&
+        d.category === category &&
+        d.region.includes(`-${nativePrefix[category]}-`) &&
+        (category !== 'surface' || !BORDER_WEAR_TYPES.has(d.type))
+      );
+      if (hits.length === 0) continue;
+      const worst = Math.min(...hits.map(d => SEVERITY_CAP[d.severity]));
+      const distinctLocations = new Set(hits.map(d => physicalLocation(d.region))).size;
+      // Structure-based bias gate (docs/COSMETIC_VERIFICATION_REFINEMENT_SCOPE.md §4):
+      // UNIFORM MINOR findings — "minor" everywhere, nothing moderate+ — are the
+      // fingerprint of the detector's border bias, not damage (real handling wear is
+      // uneven: specific spots, mixed severities). Minor-only never caps below 9.
+      // KNOWN GAP: a genuinely evenly-worn card whose wear reads all-minor also gets
+      // the benefit of the doubt (a 9 instead of 8) — border-color scoping needs the
+      // card-quad geometry port (grading-v9.2-joey-fixes branch) to fix properly.
+      // The spread penalty (3+ locations → one lower) applies to moderate/heavy only.
+      const minorOnly = hits.every(d => d.severity === 'minor');
+      faceCaps[`${category}_${face}`] = minorOnly
+        ? SEVERITY_CAP.minor
+        : Math.max(1, distinctLocations >= 3 ? worst - 1 : worst);
+    }
+  }
+  return faceCaps;
 }
