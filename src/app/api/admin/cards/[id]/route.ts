@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+// Service-role client. This used the ANON client server-side, which under RLS
+// ("Users can delete own cards": auth.uid() = user_id) matched 0 rows on
+// DELETE and still answered "deleted successfully"; card_flags writes were
+// equally at the mercy of anon policies.
+import { supabaseAdmin as supabase } from '@/lib/supabaseAdmin'
+import { isUuid } from '@/lib/uuid'
 
 // Get single card details
 export async function GET(
@@ -46,7 +51,8 @@ export async function GET(
       .select('*')
       .eq('card_id', id)
       .eq('status', 'pending')
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     return NextResponse.json({
       card: {
@@ -139,7 +145,15 @@ export async function PATCH(
   }
 }
 
-// Delete card
+/**
+ * DELETE /api/admin/cards/[id]?reason=... — admin SOFT delete.
+ *
+ * Same write as the owner path (DELETE /api/cards/[id]): deleted_at + forced
+ * private visibility, images kept, restorable. The DB trigger
+ * close_grade_reviews_on_card_change closes any open grade review in the same
+ * write. Unlike the owner path, sold cards are not refused: moderation can
+ * need to pull one; the audit row records the ownership state.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -147,37 +161,55 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Verify admin session
     const token = request.cookies.get('admin_token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     const admin = await verifyAdminSession(token)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Get reason from query params
-    const searchParams = request.nextUrl.searchParams
-    const reason = searchParams.get('reason') || 'No reason provided'
-
-    // Delete card
-    const { error: cardError } = await supabase
-      .from('cards')
-      .delete()
-      .eq('id', id)
-
-    if (cardError) {
-      throw cardError
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
-    // Log the deletion
-    await logAdminActivity(admin.id, admin.email, 'delete_card', 'card', id, { reason }, clientIp(request))
+    const reason = request.nextUrl.searchParams.get('reason') || 'No reason provided'
 
-    return NextResponse.json({
-      message: 'Card deleted successfully'
-    }, { status: 200 })
+    const { data: card, error: fetchError } = await supabase
+      .from('cards')
+      .select('id, user_id, serial, visibility, ownership_status, deleted_at')
+      .eq('id', id)
+      .maybeSingle()
+    if (fetchError) throw fetchError
+    if (!card) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+    }
+    if (card.deleted_at) {
+      return NextResponse.json({ message: 'Card was already deleted', already_deleted: true, restorable: true }, { status: 200 })
+    }
+
+    const { data: updated, error: deleteError } = await supabase
+      .from('cards')
+      .update({ deleted_at: new Date().toISOString(), visibility: 'private' })
+      .eq('id', id)
+      .is('deleted_at', null)
+      .select('id')
+    if (deleteError) throw deleteError
+    if (!updated?.length) {
+      // Lost a race with another delete; nothing changed here.
+      return NextResponse.json({ message: 'Card was already deleted', already_deleted: true, restorable: true }, { status: 200 })
+    }
+
+    await logAdminActivity(admin.id, admin.email, 'delete_card', 'card', id, {
+      reason,
+      soft_delete: true,
+      serial: card.serial,
+      owner_id: card.user_id,
+      previous_visibility: card.visibility,
+      ownership_status: card.ownership_status,
+    }, clientIp(request))
+
+    return NextResponse.json({ message: 'Card deleted successfully', restorable: true }, { status: 200 })
   } catch (error) {
     console.error('Error deleting card:', error)
     return NextResponse.json(

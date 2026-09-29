@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { parseFacebookSignedRequest } from '@/lib/auth/facebookSignedRequest'
 
 // Facebook Data Deletion Callback
 // This endpoint is called by Facebook when a user requests data deletion
@@ -7,40 +8,44 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function POST(request: NextRequest) {
   try {
+    // Fail closed: without the app secret we cannot tell a real Facebook
+    // callback from a forged one, and a forged one deletes an account.
+    const appSecret = process.env.FACEBOOK_APP_SECRET
+    if (!appSecret) {
+      console.error(
+        '[facebook-deletion] FACEBOOK_APP_SECRET is not set — refusing to process ' +
+        'data deletion requests until it is configured.'
+      )
+      return NextResponse.json(
+        { error: 'Data deletion callback is not configured' },
+        { status: 500 }
+      )
+    }
+
     // Facebook sends data as form-urlencoded, not JSON
     const formData = await request.formData()
-    const signedRequest = formData.get('signed_request') as string
+    const signedRequest = formData.get('signed_request')
 
-    if (!signedRequest) {
+    if (typeof signedRequest !== 'string' || !signedRequest) {
       return NextResponse.json(
         { error: 'Missing signed_request parameter' },
         { status: 400 }
       )
     }
 
-    // Parse the signed request (format: signature.payload)
-    const [signature, payload] = signedRequest.split('.')
-
-    if (!payload) {
+    // Verify the HMAC-SHA256 signature BEFORE trusting anything in the payload.
+    const verified = parseFacebookSignedRequest(signedRequest, appSecret)
+    if (!verified.ok) {
+      console.warn(`[facebook-deletion] rejected signed_request: ${verified.reason}`)
+      const status = verified.reason === 'bad signature' ? 403 : 400
       return NextResponse.json(
-        { error: 'Invalid signed_request format' },
-        { status: 400 }
+        { error: 'Invalid signed_request' },
+        { status }
       )
     }
-
-    // Decode the payload (Base64)
-    const decodedPayload = Buffer.from(payload, 'base64').toString('utf-8')
-    const data = JSON.parse(decodedPayload)
 
     // Extract user ID from Facebook
-    const facebookUserId = data.user_id
-
-    if (!facebookUserId) {
-      return NextResponse.json(
-        { error: 'Missing user_id in request' },
-        { status: 400 }
-      )
-    }
+    const facebookUserId = verified.payload.user_id
 
     console.log(`Facebook data deletion request for user: ${facebookUserId}`)
 

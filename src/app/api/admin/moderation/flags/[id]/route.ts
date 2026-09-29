@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+// Service-role client: the anon client matched 0 rows under RLS server-side.
+import { supabaseAdmin as supabase } from '@/lib/supabaseAdmin'
 
 // Update flag status (resolve/dismiss)
 export async function PATCH(

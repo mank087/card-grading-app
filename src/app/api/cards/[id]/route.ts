@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabaseServer'
 import { verifyAuth } from '@/lib/serverAuth'
 import { isUuid } from '@/lib/uuid'
-import { isMissingColumnError, isRecordLocked } from '@/lib/cards/ownership'
+import { isMissingColumnError } from '@/lib/cards/ownership'
+import { softDeleteOwnedCard } from '@/lib/cards/softDeleteCard'
 
 /**
  * DELETE /api/cards/[id] — soft delete.
@@ -18,6 +19,8 @@ import { isMissingColumnError, isRecordLocked } from '@/lib/cards/ownership'
  * purge images later, once the decision has had time to be regretted.
  *
  * Sold cards can't be deleted at all — see the lock in Phase 2.
+ * The logic lives in src/lib/cards/softDeleteCard.ts (shared with the legacy
+ * per-category DELETE routes).
  */
 export async function DELETE(
   request: NextRequest,
@@ -25,89 +28,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-
-    if (!isUuid(id)) {
-      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+    // Auth, ownership, sold lock and the soft-delete write all live in the
+    // shared helper so the legacy per-category DELETE routes can't drift.
+    const result = await softDeleteOwnedCard(request, id)
+    if (!result.ok) {
+      return NextResponse.json(result.body, { status: result.status })
     }
-
-    // Verify authentication - get user ID from token, not query params
-    const auth = await verifyAuth(request)
-    if (!auth.authenticated || !auth.userId) {
-      return NextResponse.json({ error: auth.error || 'Authentication required' }, { status: 401 })
-    }
-    const userId = auth.userId
-
-    const supabase = supabaseServer()
-
-    // Get card to verify ownership
-    const { data: card, error: cardError } = await supabase
-      .from('cards')
-      .select('id, user_id, serial, front_path, back_path, ownership_status')
-      .eq('id', id)
-      .single()
-
-    if (cardError || !card) {
-      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
-    }
-
-    // Verify user owns the card
-    if (card.user_id !== userId) {
-      return NextResponse.json({ error: 'Unauthorized - You can only delete your own cards' }, { status: 403 })
-    }
-
-    // A sold card belongs to the record now, not just to the seller — the
-    // buyer verifies it by scanning the label.
-    if (isRecordLocked(card)) {
-      return NextResponse.json(
-        {
-          error:
-            "This card is marked as sold and can't be deleted — the buyer verifies " +
-            "it by scanning the label on the slab. Move it back to your collection " +
-            "with \"Still mine\" first if you really need to remove it.",
-          code: 'card_sold_locked',
-        },
-        { status: 423 }
-      )
-    }
-
-    // Soft delete. Images are deliberately NOT purged — that's what made the
-    // old behaviour unrecoverable. A retention sweep handles them later.
-    //
-    // visibility is forced private in the same write. Sixty-odd read paths
-    // touch the cards table; rather than teach every one of them about
-    // deleted_at, this reuses the public-visibility gate they ALREADY have, so
-    // a deleted card stops being publicly reachable everywhere at once —
-    // including the eight card-detail routes and /verify. The owner still sees
-    // it (owner reads bypass the gate), which is what restore needs.
-    const { error: deleteError } = await supabase
-      .from('cards')
-      .update({ deleted_at: new Date().toISOString(), visibility: 'private' })
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (deleteError) {
-      // Migration window: fall back to the old hard delete so the button
-      // doesn't simply stop working before the columns land.
-      if (isMissingColumnError(deleteError)) {
-        console.warn('[Delete Card] deleted_at column missing — falling back to hard delete.')
-        try {
-          if (card.front_path) await supabase.storage.from('cards').remove([card.front_path])
-          if (card.back_path) await supabase.storage.from('cards').remove([card.back_path])
-        } catch (storageError) {
-          console.warn('Failed to delete card images from storage:', storageError)
-        }
-        const { error: hardErr } = await supabase.from('cards').delete().eq('id', id)
-        if (hardErr) {
-          console.error('Error deleting card from database:', hardErr)
-          return NextResponse.json({ error: 'Failed to delete card' }, { status: 500 })
-        }
-        return NextResponse.json({ message: 'Card deleted successfully', restorable: false }, { status: 200 })
-      }
-      console.error('Error deleting card from database:', deleteError)
-      return NextResponse.json({ error: 'Failed to delete card' }, { status: 500 })
-    }
-
-    console.log(`[Delete Card] ${card.serial} soft-deleted (restorable)`)
     return NextResponse.json({
       message: 'Card deleted successfully',
       restorable: true,

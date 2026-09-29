@@ -76,6 +76,9 @@ export async function GET(request: NextRequest) {
         identity_confirmed_revision,
         item_type
       `, { count: 'exact' })
+      // Soft-deleted cards (owner or admin delete) leave the moderation list,
+      // same as every other view; otherwise an admin delete looks like a no-op.
+      .is('deleted_at', null)
 
     // Apply category filter (consolidate sports subcategories)
     if (category === 'Sports') {

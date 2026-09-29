@@ -1,4 +1,5 @@
 import { prechargeBlockedResponse } from '@/lib/grading/prechargeGate';
+import { softDeleteOwnedCard } from "@/lib/cards/softDeleteCard";
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { linkFromFirstLook } from "@/lib/identity/catalogRelink";
 import { keepAliveAfterResponse } from "@/lib/identification/firstLookRunner";
@@ -1297,68 +1298,25 @@ export async function PATCH(request: NextRequest, { params }: OnePieceCardGradin
   }
 }
 
-// DELETE handler for removing One Piece cards
+// DELETE /api/onepiece/[id] — legacy per-category delete. It used to hard-delete
+// the row and purge both images with no sold lock; it now runs the same
+// restorable soft delete as DELETE /api/cards/[id]. No current client calls
+// it (web moved to /api/cards/[id] in 250558b0); kept so any stale caller
+// gets the safe behaviour instead of a 405.
 export async function DELETE(request: NextRequest, { params }: OnePieceCardGradingRequest) {
   const { id: cardId } = await params;
-  if (!isUuid(cardId)) {
-    return NextResponse.json({ error: "Card not found" }, { status: 404 });
-  }
-
-  console.log(`[DELETE /api/onepiece/${cardId}] Starting One Piece card deletion request`);
-
   try {
-    // Verify authentication
-    const auth = await verifyAuth(request);
-    if (!auth.authenticated || !auth.userId) {
-      return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
+    const result = await softDeleteOwnedCard(request, cardId);
+    if (!result.ok) {
+      return NextResponse.json({ success: false, ...result.body }, { status: result.status });
     }
-
-    const supabase = supabaseServer();
-
-    // Get the One Piece card and verify ownership
-    const { data: card, error: fetchError } = await supabase
-      .from("cards")
-      .select("front_path, back_path, user_id")
-      .eq("id", cardId)
-      .single();
-
-    if (fetchError || !card) {
-      console.error(`[DELETE /api/onepiece/${cardId}] One Piece card not found:`, fetchError);
-      return NextResponse.json({ error: "One Piece card not found" }, { status: 404 });
-    }
-
-    // Verify user owns this card
-    if (card.user_id !== auth.userId) {
-      return NextResponse.json({ error: "You can only delete your own cards" }, { status: 403 });
-    }
-
-    // Delete images from storage
-    if (card.front_path) {
-      await supabase.storage.from("cards").remove([card.front_path]);
-    }
-    if (card.back_path) {
-      await supabase.storage.from("cards").remove([card.back_path]);
-    }
-
-    // Delete One Piece card record
-    const { error: deleteError } = await supabase
-      .from("cards")
-      .delete()
-      .eq("id", cardId);
-
-    if (deleteError) {
-      console.error(`[DELETE /api/onepiece/${cardId}] Deletion failed:`, deleteError);
-      return NextResponse.json({ error: "Failed to delete One Piece card" }, { status: 500 });
-    }
-
-    console.log(`[DELETE /api/onepiece/${cardId}] One Piece card deleted successfully`);
-    return NextResponse.json({ success: true, message: "One Piece card deleted successfully" });
-
+    return NextResponse.json({
+      success: true,
+      message: "One Piece card deleted successfully",
+      restorable: true,
+    });
   } catch (error: any) {
-    console.error(`[DELETE /api/onepiece/${cardId}] Error:`, error.message);
-    return NextResponse.json(
-      { error: "Failed to delete One Piece card: " + error.message },
-      { status: 500 }
-    );
+    console.error(`[DELETE /api/onepiece/${cardId}] Error:`, error?.message);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }
