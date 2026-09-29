@@ -218,7 +218,7 @@ export default function ResetPasswordPage() {
         {/* Help text */}
         <p className="mt-6 text-center text-sm text-gray-500">
           Need help?{' '}
-          <a href="mailto:support@dcmgrading.com" className="text-purple-600 hover:text-purple-800">
+          <a href="mailto:admin@dcmgrading.com" className="text-purple-600 hover:text-purple-800">
             Contact support
           </a>
         </p>

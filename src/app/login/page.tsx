@@ -17,6 +17,10 @@ declare global {
   }
 }
 
+// ISP mailboxes that often hold or spam-file mail from new senders
+// (Sept 2026: a cox.net signup never received its confirmation link).
+const STRICT_MAIL_PROVIDERS = /@(cox\.net|aol\.com|att\.net|sbcglobal\.net|bellsouth\.net|verizon\.net|comcast\.net|charter\.net|earthlink\.net|juno\.com|netzero\.net)$/i
+
 // Inner component that uses useSearchParams
 function LoginPageContent() {
   const router = useRouter()
@@ -255,6 +259,14 @@ function LoginPageContent() {
                 </p>
                 <p className="text-sm mt-4" style={{ color: 'var(--dcm-muted)', lineHeight: 1.7 }}>
                   Nothing yet? Check your spam folder, then send it again.
+                </p>
+                {STRICT_MAIL_PROVIDERS.test(confirmationSentTo) && (
+                  <p className="text-sm mt-4" style={{ color: 'var(--dcm-muted)', lineHeight: 1.7 }}>
+                    Your email provider sometimes holds mail from new senders for several minutes, or files it as spam.
+                  </p>
+                )}
+                <p className="text-sm mt-4" style={{ color: 'var(--dcm-muted)', lineHeight: 1.7 }}>
+                  Still stuck? Email <a href="mailto:admin@dcmgrading.com" className="underline">admin@dcmgrading.com</a> and we will confirm your account for you.
                 </p>
 
                 {resendState === 'sent' && (
