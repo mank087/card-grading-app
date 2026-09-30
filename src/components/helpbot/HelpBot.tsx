@@ -41,7 +41,10 @@ function buildEscalationMessage(): HelpBotMessageData {
     id: genId(),
     role: 'bot',
     text: "I couldn't find a match for that. You can try rephrasing your question, or reach out to our team directly at admin@dcmgrading.com.",
-    links: [{ label: 'Contact support', href: '/contact' }],
+    links: [
+      { label: 'Email admin@dcmgrading.com', href: 'mailto:admin@dcmgrading.com' },
+      { label: 'Contact support', href: '/contact' },
+    ],
   }
 }
 

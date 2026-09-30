@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Animated, Keyboard, KeyboardAvoidingView, Platform, AppState } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Animated, Keyboard, KeyboardAvoidingView, Platform, AppState, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -39,7 +39,8 @@ const KB: KBEntry[] = [
       ? 'Card Lovers is our premium membership tier. Members get bonus credits each cycle, the full Market Pricing dashboard, member-only label emblems, and early access to new features.'
       : 'Card Lovers is a subscription plan ($49.99/mo or $449/yr) that includes credits, 20% off purchases, market pricing access, and exclusive features.',
     keywords: ['card lovers', 'subscription', 'monthly'], cat: 'pricing' },
-  { id: '15', q: 'How do I contact support?', a: 'Go to Menu > Contact Us, or email admin@dcmgrading.com directly. We respond within 24 hours.', keywords: ['contact', 'support', 'help', 'email'], cat: 'account' },
+  { id: '15', q: 'How do I contact support?', a: 'Open the Account tab and tap Contact Us, or email admin@dcmgrading.com directly. We respond within 24 hours.', keywords: ['contact', 'support', 'help', 'email'], cat: 'account' },
+  { id: '18', q: "I didn't get my confirmation email, or I can't sign in", a: 'After you sign up we email a confirmation link, and you can sign in once you tap it. Check your spam or junk folder first; some providers (Cox, AOL, AT&T, Comcast) hold mail from new senders for a while. Still nothing after a few minutes? Email admin@dcmgrading.com from the address you signed up with and we will confirm your account by hand.', keywords: ['confirmation', 'confirm', 'verify', 'verification', 'sign in', 'log in', 'login', "can't", 'spam', 'not received', 'never got', 'rejected'], cat: 'account' },
   { id: '16', q: "I'm new to DCM. How do I get started?", a: "Welcome! 👋 Tap Grade at the bottom of the screen to grade your first card. Pick your card's category, snap photos of the front and back, and DCM Optic™ does the rest in under 2 minutes. Want a guided walkthrough? Open Account → tap Replay Welcome Tour.", keywords: ['new', 'start', 'getting started', 'how to', 'first', 'begin', 'tutorial'], cat: 'account' },
   { id: '17', q: 'How do I see the welcome tour again?', a: "You can replay the full welcome tour anytime — open the Account tab and tap Replay Welcome Tour at the top of the menu. We'll walk you through each main screen again.", keywords: ['welcome', 'tour', 'walkthrough', 'replay', 'again', 'onboarding'], cat: 'account' },
 ]
@@ -177,6 +178,7 @@ export default function HelpBot() {
         text: "I couldn't find a match. Try rephrasing or contact our team.",
         buttons: [
           { label: '📧 Contact Support', action: 'nav:contact' },
+          { label: '✉️ Email admin@dcmgrading.com', action: 'mail:admin@dcmgrading.com' },
           { label: '🏠 Back to Topics', action: 'home' },
         ],
       })
@@ -193,6 +195,9 @@ export default function HelpBot() {
         text: 'Pick a topic:',
         buttons: CATEGORIES.map(c => ({ label: `${c.emoji} ${c.label}`, action: `cat:${c.id}` })),
       })
+    }
+    else if (action.startsWith('mail:')) {
+      Linking.openURL(`mailto:${action.slice(5)}`).catch(() => {})
     }
     else if (action.startsWith('nav:')) {
       close()

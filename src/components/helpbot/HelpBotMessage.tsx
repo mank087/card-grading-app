@@ -32,7 +32,11 @@ export default function HelpBotMessage({ message, onTopicSelect, onFeedback }: P
 
         {message.links && message.links.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {message.links.map((link) => (
+            {message.links.map((link) => link.href.startsWith('mailto:') ? (
+              <a key={link.href} href={link.href} className="text-xs text-purple-600 underline hover:text-purple-800">
+                {link.label}
+              </a>
+            ) : (
               <Link
                 key={link.href}
                 href={link.href}

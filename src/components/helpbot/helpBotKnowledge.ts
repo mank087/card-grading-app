@@ -479,10 +479,24 @@ export const knowledgeBase: KnowledgeEntry[] = [
     keywords: ['contact', 'support', 'help', 'email', 'admin', 'question', 'issue', 'problem', 'reach', 'bug'],
     category: 'account-collection',
     links: [
+      { label: 'Email admin@dcmgrading.com', href: 'mailto:admin@dcmgrading.com' },
       { label: 'Contact page', href: '/contact' },
       { label: 'FAQ', href: '/faq' },
     ],
-    relatedIds: [],
+    relatedIds: ['confirmation-email'],
+  },
+  {
+    id: 'confirmation-email',
+    question: "I didn't get my confirmation email, or I can't sign in",
+    answer:
+      'After you sign up we email a confirmation link, and you can sign in once you click it. Check your spam or junk folder first; some providers (Cox, AOL, AT&T, Comcast) hold mail from new senders for a while. On the sign-in page you can resend the link. Still nothing after a few minutes? Email admin@dcmgrading.com from the address you signed up with and we will confirm your account by hand.',
+    keywords: ['confirmation', 'confirm', 'verify', 'verification', 'activation', 'email', 'link', 'sign in', 'signin', 'log in', 'login', "can't", 'cannot', 'account', 'spam', 'rejected', 'bounced', 'not received', 'never got'],
+    category: 'account-collection',
+    links: [
+      { label: 'Email admin@dcmgrading.com', href: 'mailto:admin@dcmgrading.com' },
+      { label: 'Sign in', href: '/login' },
+    ],
+    relatedIds: ['contact-support'],
   },
 
   // ── Labels & Reports ──
