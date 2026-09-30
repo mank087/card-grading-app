@@ -88,7 +88,11 @@ export default async function PopReportPage() {
       '@type': 'Dataset',
       name: `${c.displayName} population report`,
       url: `https://dcmgrading.com/pop/${c.slug}`,
-      description: `${c.totalGraded.toLocaleString()} ${c.displayName} cards graded by DCM across ${c.uniqueCards.toLocaleString()} unique cards.`,
+      // Google rejects a Dataset description under 50 characters; the fixed
+      // wording keeps small categories (e.g. "5 TCG cards...") well above it.
+      description:
+        `Grade distribution for ${c.totalGraded.toLocaleString()} ${c.displayName} cards graded by DCM Grading ` +
+        `across ${c.uniqueCards.toLocaleString()} unique cards, on the whole-number 1 to 10 scale.`,
     })),
   };
 

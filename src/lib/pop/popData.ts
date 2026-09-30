@@ -114,6 +114,14 @@ export async function fetchPopCategories(): Promise<{
   for (const row of (subCatResult.data || []) as { sub_category: string | null }[]) {
     const sc = row.sub_category;
     if (!sc) continue;
+    // A sub-category whose slug is already a real category ("Other", "Racing")
+    // can't have its own page: resolveCategory sends that slug to the
+    // top-level category. Splitting it out made a duplicate tile that linked
+    // to the wrong report, so those cards stay counted in "Other".
+    const meta = POP_CATEGORIES.find((c) => c.dbSubCategory === sc);
+    const scSlug = meta?.slug || slugifySubCategory(sc);
+    const slugOwner = getCategoryMeta(scSlug);
+    if (slugOwner && slugOwner.dbSubCategory !== sc) continue;
     subCatCounts.set(sc, (subCatCounts.get(sc) || 0) + 1);
   }
   let subCategoryTotal = 0;
