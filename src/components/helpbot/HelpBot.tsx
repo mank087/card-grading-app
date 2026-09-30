@@ -247,10 +247,11 @@ export default function HelpBot() {
         id: r.entry.id,
         label: r.entry.question,
       }))
+      // A related entry is often also a search hit; list each question once.
       const relatedButtons = [
         ...otherResults,
         ...related.slice(0, 2).map((r) => ({ id: r.id, label: r.question })),
-      ].slice(0, 3)
+      ].filter((b, i, all) => b.id !== best.id && all.findIndex((x) => x.id === b.id) === i).slice(0, 3)
 
       setMessages((prev) => [
         ...prev,
