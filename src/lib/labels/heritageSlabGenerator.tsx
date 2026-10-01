@@ -38,8 +38,6 @@ import {
   SINGLE_Y,
   BackTurn,
   PerforatedDuplexDoc,
-  FittedDesign,
-  slotBleed,
 } from '@/lib/labels/vectorSlabGenerator'
 import {
   resolveSheetLayout,
@@ -49,7 +47,6 @@ import {
   type SheetLayoutArg,
   type SheetGeometry,
 } from '@/lib/labels/sheetGeometry'
-import { fitDesignToSlot } from '@/lib/labels/sheetFit'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import { loadBlackLogoAsBase64 } from '@/lib/foldableLabelGenerator'
 
@@ -530,57 +527,6 @@ function batchGeometry(d: HeritageDims, layout: SheetLayoutArg): {
   }
 }
 
-/**
- * 30-up slot: the standard-authored Heritage panel fitted uniformly into the
- * 2.625" × 1" slot. Field, band extension and edge border are painted HERE at
- * the true slot size (outside the scale transform — see ScaledPanel for the
- * react-pdf gotcha); the panel renders bare inside FittedDesign. Where the
- * band touches the design's top/bottom (the stock left band spans the full
- * height) it is extended in its first colour across the 0.125" letterbox, so
- * the band still runs edge to edge on the finished label.
- */
-function HeritageFittedSlot({ inputs, geometry, children }: {
-  inputs: HeritageInputs; geometry: SheetGeometry; children: React.ReactNode
-}) {
-  const { bx, by } = slotBleed(geometry)
-  const w = geometry.labelW
-  const h = geometry.labelH
-  const T = heritageTheme(!!inputs.printHardened)
-  const f = fitDesignToSlot(LABEL_W, LABEL_H, w, h)
-  const g = heritageGeometry(inputs.design)
-  const kx = (LABEL_W / HERITAGE_PX.W) * f.s
-  const ky = (LABEL_H / HERITAGE_PX.H) * f.s
-  const band = inputs.bandColors?.[0] || '#101014'
-  const strips: React.ReactElement[] = []
-  if (g.band.position !== 'none' && g.band.w > 0) {
-    const x0 = f.padX + g.band.x * kx
-    const bw = g.band.w * kx
-    const yTop = f.padY + g.band.y * ky
-    const yBot = f.padY + (g.band.y + g.band.h) * ky
-    const eps = 0.5
-    const touchTop = g.band.y <= eps
-    const touchBottom = g.band.y + g.band.h >= HERITAGE_PX.H - eps
-    if (touchTop) strips.push(<View key="t" style={{ position: 'absolute', left: x0, top: -by, width: bw, height: yTop + by + 0.3, backgroundColor: band }} />)
-    if (touchBottom) strips.push(<View key="b" style={{ position: 'absolute', left: x0, top: yBot - 0.3, width: bw, height: h + by - yBot + 0.3, backgroundColor: band }} />)
-    const top = touchTop ? -by : yTop
-    const bottom = touchBottom ? h + by : yBot
-    if (g.band.x <= eps) strips.push(<View key="l" style={{ position: 'absolute', left: -bx, top, width: bx + f.padX + 0.3, height: bottom - top, backgroundColor: band }} />)
-    if (g.band.x + g.band.w >= HERITAGE_PX.W - eps) strips.push(<View key="r" style={{ position: 'absolute', left: x0 + bw - 0.3, top, width: w + bx - (x0 + bw) + 0.3, height: bottom - top, backgroundColor: band }} />)
-  }
-  return (
-    <>
-      <View style={{ position: 'absolute', left: -bx, top: -by, width: w + bx * 2, height: h + by * 2, backgroundColor: T.field }} />
-      {strips}
-      <FittedDesign geometry={geometry}>
-        {React.Children.map(children, child =>
-          React.isValidElement(child) ? React.cloneElement(child as React.ReactElement<{ bare?: boolean }>, { bare: true }) : child,
-        )}
-      </FittedDesign>
-      <View style={{ position: 'absolute', left: 0, top: 0, width: w, height: h, border: `${T.edgeWidth}pt solid ${T.edge}` }} />
-    </>
-  )
-}
-
 function HeritageBatchDuplexDoc({
   entries, d, layout = 'standard',
 }: { entries: HeritageInputs[]; d: HeritageDims; layout?: SheetLayoutArg }) {
@@ -590,22 +536,27 @@ function HeritageBatchDuplexDoc({
   // page-symmetric, so long-edge-flip duplex mirroring stays exact.
   const { geometry, offX, offY } = batchGeometry(d, layout)
 
-  // 30-up pre-perforated sheet: the slot is the physical label whatever `d` is.
+  // True-size pre-perforated sheet (26 / 30 per sheet): every label prints
+  // at its real size, never scaled. A standard design fills the 2.8" × 0.8"
+  // slot exactly; a non-standard size (Zion) prints at ITS real size centred
+  // in the slot (the same rule the 10-up sheet uses).
   if (geometry.perforated) {
+    const ox = (geometry.designW - d.widthIn * INCH) / 2
+    const oy = (geometry.designH - d.heightIn * INCH) / 2
     return (
       <PerforatedDuplexDoc
         entries={entries}
         geometry={geometry}
         dims={`${geometry.summary} — Heritage`}
         renderFront={(inputs) => (
-          <HeritageFittedSlot inputs={inputs} geometry={geometry}>
+          <HeritageLabelAt x={ox} y={oy} d={d}>
             <HeritageFront i={inputs} chip={heritageChip(inputs)} />
-          </HeritageFittedSlot>
+          </HeritageLabelAt>
         )}
         renderBack={(inputs) => (
-          <HeritageFittedSlot inputs={inputs} geometry={geometry}>
+          <HeritageLabelAt x={ox} y={oy} d={d}>
             <HeritageBack i={inputs} chip={heritageChip(inputs)} />
-          </HeritageFittedSlot>
+          </HeritageLabelAt>
         )}
       />
     )

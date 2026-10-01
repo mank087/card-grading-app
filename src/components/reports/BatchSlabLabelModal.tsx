@@ -10,7 +10,7 @@ import { toSlabLabelData } from '@/lib/labels/slabLabelDataAdapter';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
-import { resolveSheetGeometry, type SheetDensity } from '@/lib/labels/sheetGeometry';
+import { resolveSheetGeometry, isTrueSizeDensity, type SheetDensity } from '@/lib/labels/sheetGeometry';
 import {
   readSheetCalibration,
   saveSheetCalibration,
@@ -88,7 +88,7 @@ function readStoredDensity(): SheetDensity {
   if (typeof window === 'undefined') return 'standard';
   try {
     const v = window.localStorage.getItem(DENSITY_STORAGE_KEY);
-    return v === 'dense' || v === 'up30' ? v : 'standard';
+    return v === 'dense' || v === 'up26' || v === 'up30' ? v : 'standard';
   } catch {
     return 'standard';
   }
@@ -117,7 +117,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover'>('duplex');
-  // 10, 20 or 30 (pre-perforated) labels per duplex sheet; fold-over owns its own layout.
+  // 10, 20, 26 or 30 (true-size, pre-perforated) labels per duplex sheet; fold-over owns its own layout.
   const [density, setDensity] = useState<SheetDensity>('standard');
   // Duplex flip edge + printer calibration (saved in this browser).
   const [calibration, setCalibration] = useState<SheetCalibration>(DEFAULT_SHEET_CALIBRATION);
@@ -186,7 +186,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
   const downloadAlignmentTest = async () => {
     const { downloadPerforatedCalibrationSheet } = await import('@/lib/labels/sheetCalibrationPdf');
-    downloadPerforatedCalibrationSheet({ duplexFlip: calibration.duplexFlip, offsetsIn: calibration.offsetsIn });
+    downloadPerforatedCalibrationSheet({
+      density: density === 'up26' ? 'up26' : 'up30',
+      duplexFlip: calibration.duplexFlip,
+      offsetsIn: calibration.offsetsIn,
+    });
   };
 
   const handleStyleSwitch = (id: LabelStyleId) => {
@@ -358,6 +362,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const FOLDOVER_ROWS_PER_PAGE = 10;
   const duplexPerSheet = useMemo(() => {
     if (density === 'standard') return LABELS_PER_PAGE;
+    if (density === 'up26') return 26;
     if (density === 'up30') return 30;
     return resolveSheetGeometry({
       labelWIn: localActiveConfig?.width || 2.8,
@@ -383,8 +388,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               <p className="text-purple-200 text-sm">
                 {printFormat === 'foldover'
                   ? '5.6\u201d × 0.8\u201d — Single-sided fold-over with cut guides'
-                  : density === 'up30'
-                    ? '2.625\u201d × 1\u201d — 30 per pre-perforated duplex sheet'
+                  : isTrueSizeDensity(density)
+                    ? `2.8\u201d × 0.8\u201d true size — ${density === 'up26' ? 26 : 30} per pre-perforated duplex sheet`
                     : '2.8\u201d × 0.8\u201d — Duplex printing with cut guides'}
               </p>
             </div>
@@ -447,9 +452,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             <ul className="space-y-0.5 text-xs text-blue-700">
               <li>1. Print duplex (double-sided), flip on <strong>{calibration.duplexFlip === 'short' ? 'short edge' : 'long edge'}</strong>, at 100% scale</li>
               <li>2. Front labels print on odd pages, back labels on even pages</li>
-              {density === 'up30' ? (
+              {isTrueSizeDensity(density) ? (
                 <>
-                  <li>3. Load the pre-perforated 30-up sheets (2.625&quot; × 1&quot;, Avery 5160 layout) — no cutting</li>
+                  <li>3. Load the pre-perforated {density === 'up26' ? '26' : '30'}-up sheets (2.8&quot; × 0.8&quot; labels{density === 'up30' ? ', printed sideways' : ''}) — no cutting</li>
                   <li>4. Print the alignment test under Duplex alignment before the first run</li>
                 </>
               ) : (
@@ -538,20 +543,34 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
                 20 per sheet
               </button>
               <button
+                onClick={() => chooseDensity('up26')}
+                className={`flex-1 text-xs py-2 px-2 rounded-lg border-2 transition-colors ${
+                  density === 'up26'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                    : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                }`}
+              >
+                26 per sheet
+                <span className="block text-[10px] font-normal text-gray-500">true size</span>
+              </button>
+              <button
                 onClick={() => chooseDensity('up30')}
-                className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                className={`flex-1 text-xs py-2 px-2 rounded-lg border-2 transition-colors ${
                   density === 'up30'
                     ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
                     : 'border-gray-200 text-gray-600 hover:border-purple-300'
                 }`}
               >
                 30 per sheet
+                <span className="block text-[10px] font-normal text-gray-500">true size, sideways</span>
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              {density === 'up30'
-                ? '30 per sheet is for pre-perforated 2.625" × 1" stock (Avery 5160 layout). The label design is scaled to 94% to fit.'
-                : '20 per sheet prints closer to the page edge; test one sheet first.'}
+              {density === 'up26'
+                ? '26 per sheet: full-size 2.8" × 0.8" labels, 2 across × 13 down, for pre-perforated sheets. No cutting.'
+                : density === 'up30'
+                  ? '30 per sheet: full-size 2.8" × 0.8" labels turned sideways, 10 across × 3 down, for pre-perforated sheets. No cutting.'
+                  : '20 per sheet prints closer to the page edge; test one sheet first.'}
             </p>
 
             {/* Duplex alignment — flip edge + printer calibration, saved in this browser */}
@@ -644,13 +663,13 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
                     >
                       Reset
                     </button>
-                    {density === 'up30' && (
+                    {isTrueSizeDensity(density) && (
                       <button
                         type="button"
                         onClick={downloadAlignmentTest}
                         className="text-xs px-3 py-1.5 rounded-md border border-purple-300 text-purple-700"
                       >
-                        Download 30-up alignment test
+                        Download {density === 'up26' ? '26' : '30'}-up alignment test
                       </button>
                     )}
                     {calibrationSaved && <span className="text-xs text-green-600 self-center">Saved</span>}

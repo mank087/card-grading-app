@@ -1550,8 +1550,9 @@ export async function generateBatchCustomSlabLabels(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig,
   /**
-   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up30' =
-   * 30 on pre-perforated 2.625" × 1" stock — or SheetPrintOptions (adds the
+   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up26' /
+   * 'up30' = 26 / 30 true-size 2.8" × 0.8" labels on pre-perforated stock
+   * (30 = sideways) — or SheetPrintOptions (adds the
    * duplex flip edge and printer calibration).
    */
   layout: SheetLayoutArg = 'standard'
@@ -1595,12 +1596,13 @@ export async function generateBatchCustomSlabLabelsRaster(
   if (dataArray.length === 0) throw new Error('No label data provided');
   const density = sheetDensityOf(layout);
 
-  // 30-up pre-perforated stock: the config's design (any size) is fitted into
-  // the 2.625" × 1" slot, even for a single label.
-  if (density === 'up30') {
+  // True-size pre-perforated stock (26 / 30): every label at its real size
+  // in a 2.8" × 0.8" slot (a non-standard config size prints at that size,
+  // centred — never scaled), even for a single label.
+  if (density === 'up26' || density === 'up30') {
     const geometry = resolveSheetLayout(layout, config.width, config.height);
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-    const { drawPerforatedRasterSheets } = await import('./labels/sheetFit');
+    const { drawPerforatedRasterSheets } = await import('./labels/trueSizeRaster');
     await drawPerforatedRasterSheets(doc, {
       count: dataArray.length,
       geometry,
@@ -1670,7 +1672,7 @@ export async function generateBatchCustomSlabLabelsRaster(
       const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
       if (backPageRotated(geometry)) {
         // Short-edge duplex: the back lands turned 180° at the rotated spot.
-        const { rotateDataUrl180 } = await import('./labels/sheetFit');
+        const { rotateDataUrl180 } = await import('./labels/trueSizeRaster');
         const r = rotateRect180(labelX + offX, labelY + offY, labelWPt, labelHPt);
         batchPlaceLabelImage(doc, await rotateDataUrl180(backImg), r.x, r.y, labelWPt, labelHPt);
         batchDrawCornerMarks(doc, r.x, r.y, config, labelWPt, labelHPt);

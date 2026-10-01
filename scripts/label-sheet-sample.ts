@@ -1,8 +1,10 @@
 /**
  * Sample slab-label SHEETS for a test print.
  *
- * Renders the 10-per-sheet (standard), 20-per-sheet (dense) and 30-per-sheet
- * pre-perforated (up30, 2.625" × 1") duplex sheets
+ * Renders the 10-per-sheet (standard) and 20-per-sheet (dense) duplex sheets,
+ * plus the TRUE-SIZE pre-perforated sheets — 26 per sheet (upright, 2 × 13)
+ * and 30 per sheet (sideways, 10 × 3), every label exactly 2.8" × 0.8", with
+ * long- and short-edge backs and the duplex alignment test for each —
  * for the Modern, Traditional and Heritage styles, at both the standard
  * 2.8" × 0.8" slot and the Zion Mag Pro 2.51" × 0.76" slot, so the owner can
  * print one of each and check the trim and the duplex registration before the
@@ -96,7 +98,8 @@ async function main() {
   const data = await sampleData()
   const bands = ['#7c3aed', '#4c1d95', '#a855f7']
   const data30 = [...data, ...data.slice(0, 10).map(d => ({ ...d, serial: d.serial.replace('DCM-', 'DCM-9') }))]
-  const heritage30 = data30.map(d => ({
+  const data26 = data30.slice(0, 26)
+  const heritageOf = (arr: SlabLabelData[]) => arr.map(d => ({
     data: d,
     bandColors: resolveHeritageBandColors(null) ?? ['#7c3aed', '#4c1d95', '#a855f7'],
   }))
@@ -133,25 +136,23 @@ async function main() {
       doc: () => heritage.buildBatchHeritageSlabLabelsDoc(
         heritageItems, 'diamond', null, { widthIn: 2.51, heightIn: 0.76 }, 'standard'),
     },
-    // 30-up pre-perforated (Avery 5160 geometry, 2.625" × 1"): 30 sample
-    // labels so the whole sheet fills. Long-edge and short-edge duplex.
-    {
-      file: 'modern-up30-30up.pdf',
-      doc: async () => vector.buildBatchSlabLabelsDoc(data30, 'modern', 'up30'),
-    },
-    {
-      file: 'traditional-up30-30up.pdf',
-      doc: async () => vector.buildBatchClassicSlabLabelsDoc(data30, {}, 'up30'),
-    },
-    {
-      file: 'heritage-up30-30up.pdf',
-      doc: () => heritage.buildBatchHeritageSlabLabelsDoc(
-        heritage30, 'diamond', null, { widthIn: 2.8, heightIn: 0.8 }, 'up30'),
-    },
-    {
-      file: 'modern-up30-short-edge.pdf',
-      doc: async () => vector.buildBatchSlabLabelsDoc(data30, 'modern', { density: 'up30', duplexFlip: 'short' }),
-    },
+    // True-size pre-perforated sheets: full sheets of sample labels.
+    ...(['up26', 'up30'] as const).flatMap(density => {
+      const n = density === 'up26' ? 26 : 30
+      const d = density === 'up26' ? data26 : data30
+      return (['long', 'short'] as const).flatMap(flip => {
+        const layout = { density, duplexFlip: flip }
+        const tag = `${n}up-truesize-${flip}-edge`
+        return [
+          { file: `modern-${tag}.pdf`, doc: async () => vector.buildBatchSlabLabelsDoc(d, 'modern', layout) },
+          { file: `traditional-${tag}.pdf`, doc: async () => vector.buildBatchClassicSlabLabelsDoc(d, {}, layout) },
+          {
+            file: `heritage-${tag}.pdf`,
+            doc: () => heritage.buildBatchHeritageSlabLabelsDoc(heritageOf(d), 'diamond', null, { widthIn: 2.8, heightIn: 0.8 }, layout),
+          },
+        ]
+      })
+    }),
   ]
 
   for (const job of jobs) {
@@ -159,6 +160,17 @@ async function main() {
     const dest = path.join(outDir, job.file)
     fs.writeFileSync(dest, buf)
     console.log(`${dest}  ${(buf.length / 1024).toFixed(1)} KB`)
+  }
+
+  // Duplex alignment test + vendor spec for each true-size sheet (jsPDF).
+  const { buildPerforatedCalibrationDoc } = await import('../src/lib/labels/sheetCalibrationPdf')
+  for (const density of ['up26', 'up30'] as const) {
+    for (const duplexFlip of ['long', 'short'] as const) {
+      const doc = buildPerforatedCalibrationDoc({ density, duplexFlip })
+      const dest = path.join(outDir, `alignment-test-${density === 'up26' ? 26 : 30}up-${duplexFlip}-edge.pdf`)
+      fs.writeFileSync(dest, Buffer.from(doc.output('arraybuffer')))
+      console.log(dest)
+    }
   }
 
   for (const [w, h] of [[2.8, 0.8], [2.51, 0.76]] as const) {

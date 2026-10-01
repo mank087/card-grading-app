@@ -961,8 +961,9 @@ export async function generateBatchSlabLabels(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional',
   /**
-   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up30' =
-   * 30 on pre-perforated 2.625" × 1" stock (3×10) — or a SheetPrintOptions
+   * 'standard' = 10 per sheet (2×5, default), 'dense' = 20 (2×10), 'up26' /
+   * 'up30' = 26 / 30 true-size 2.8" × 0.8" labels on pre-perforated stock
+   * (30 = sideways) — or a SheetPrintOptions
    * object that also carries the duplex flip edge and printer calibration.
    */
   layout: SheetLayoutArg = 'standard'
@@ -988,10 +989,10 @@ export async function generateBatchSlabLabelsRaster(
 
   const geometry = resolveSheetLayout(layout, LABEL_WIDTH_IN, LABEL_HEIGHT_IN);
 
-  // 30-up pre-perforated stock: fitted into the grid, even a single label.
+  // True-size pre-perforated stock (26 / 30): on the grid, even a single label.
   if (geometry.perforated) {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-    const { drawPerforatedRasterSheets } = await import('./labels/sheetFit');
+    const { drawPerforatedRasterSheets } = await import('./labels/trueSizeRaster');
     await drawPerforatedRasterSheets(doc, {
       count: dataArray.length,
       geometry,

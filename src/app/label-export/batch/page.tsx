@@ -28,9 +28,14 @@
  *                                                   20 labels per sheet
  *                                                   (2 × 10) instead of the
  *                                                   default 10 (2 × 5).
+ *                                                   `density=26` (or up26)
+ *                                                   = 26 true-size 2.8" × 0.8"
+ *                                                   labels (2 × 13) on a
+ *                                                   pre-perforated sheet;
  *                                                   `density=30` (or up30)
- *                                                   = 30 per pre-perforated
- *                                                   2.625" × 1" sheet (3 × 10).
+ *                                                   = 30 true-size labels
+ *                                                   SIDEWAYS (10 × 3). Slab
+ *                                                   labels are never scaled.
  *   &flip=short                                  — slab DUPLEX sheets: printer
  *                                                   flips on the short edge.
  *                                                   Absent = long edge, or the
@@ -166,7 +171,8 @@ function BatchLabelExportInner() {
   const type = suffixHeritage ? rawType.slice(0, -'-heritage'.length) : rawType;
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   // Sheet density for the slab DUPLEX sheets: `density=dense` (or `=20`)
-  // prints 20 labels per sheet; anything else keeps today's 10. Fold-over and
+  // prints 20 labels per sheet, `=26` / `=30` the true-size pre-perforated
+  // sheets; anything else keeps today's 10. Fold-over and
   // the Avery compact sheets own their own layouts and ignore it.
   const densityParam = sp.get('density');
   const density = parseSheetDensity(densityParam);

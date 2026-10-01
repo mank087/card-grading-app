@@ -95,7 +95,6 @@ export function CustomSlabLabelBlock({
   spec,
   idSuffix,
   bleedPt = 0,
-  bare = false,
 }: {
   inputs: Omit<SlabLabelInputs, 'theme'>
   spec: LabStyleSpec
@@ -103,13 +102,7 @@ export function CustomSlabLabelBlock({
   /** When set, the background paints bleedPt past the label rect on every
       side (print docs). The parent must not clip. */
   bleedPt?: number
-  /** Content only — no background, no border. The caller paints those at the
-      true slot size (30-up sheets fit the design into a 2.625" x 1" slot). */
-  bare?: boolean
 }) {
-  if (bare) {
-    return <SlabFrontContentRow inputs={inputs} palette={paletteFromSpec(spec)} fontScale={spec.fontScale || 1} />
-  }
   return (
     <>
       <SpecBackground
@@ -208,19 +201,19 @@ export function SpecBackground({
  * drawBorder) — separate from SpecBackground so the background can expand
  * into the bleed while the border stays fully inside the trimmed label.
  */
-export function SpecBorder({ spec, w = W, h = H }: { spec: LabStyleSpec; w?: number; h?: number }) {
+export function SpecBorder({ spec }: { spec: LabStyleSpec }) {
   if (!spec.border) return null
   const borderPt = Math.max(0.5, spec.border.widthIn * INCH)
   return (
     <Svg
-      style={{ position: 'absolute', top: 0, left: 0, width: w, height: h }}
-      viewBox={`0 0 ${w} ${h}`}
+      style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }}
+      viewBox={`0 0 ${W} ${H}`}
     >
       <Rect
         x={borderPt / 2}
         y={borderPt / 2}
-        width={w - borderPt}
-        height={h - borderPt}
+        width={W - borderPt}
+        height={H - borderPt}
         fill="none"
         stroke={spec.border.color}
         strokeWidth={borderPt}
@@ -465,14 +458,11 @@ export function CustomSlabBackBlock({
   spec,
   idSuffix,
   bleedPt = 0,
-  bare = false,
 }: {
   inputs: SlabBackInputs
   spec: LabStyleSpec
   idSuffix: string
   bleedPt?: number
-  /** Skip background + border (the caller paints them at slot size). */
-  bare?: boolean
 }) {
   const lightText = specHasLightText(spec)
   const gradeColor = spec.gradeColor || (lightText ? '#FFFFFF' : '#7c3aed')
@@ -483,17 +473,15 @@ export function CustomSlabBackBlock({
 
   return (
     <>
-      {bare ? null : (
-        <SpecBackground
-          spec={spec}
-          idSuffix={idSuffix}
-          w={W + bleedPt * 2}
-          h={H + bleedPt * 2}
-          offsetX={bleedPt}
-          offsetY={bleedPt}
-        />
-      )}
-      {bare ? null : <SpecBorder spec={spec} />}
+      <SpecBackground
+        spec={spec}
+        idSuffix={idSuffix}
+        w={W + bleedPt * 2}
+        h={H + bleedPt * 2}
+        offsetX={bleedPt}
+        offsetY={bleedPt}
+      />
+      <SpecBorder spec={spec} />
 
       {/* Layer 1: QR + emblems (left) */}
       <View

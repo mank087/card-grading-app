@@ -12,6 +12,7 @@ describe('sheet calibration', () => {
   it('default calibration passes the bare density (sheets stay byte-identical)', () => {
     expect(sheetLayoutFor('standard', DEFAULT_SHEET_CALIBRATION)).toBe('standard')
     expect(sheetLayoutFor('up30', null)).toBe('up30')
+    expect(sheetLayoutFor('up26', null)).toBe('up26')
   })
 
   it('non-default calibration becomes print options', () => {
