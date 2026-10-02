@@ -19,6 +19,7 @@
  */
 
 import {
+  hasUnverifiedAutograph,
   hasUnverifiedAutographDesignation,
   UNVERIFIED_AUTOGRAPH_DESIGNATION,
 } from '@/lib/grading/autographPolicy';
@@ -76,9 +77,16 @@ export interface ListingFields {
    * "Altered - Unverified Autograph". It does NOT suppress the grade: those
    * cards keep their full numeric grade on the slab, on the label and in
    * eBay's 27502 condition descriptor, so the listing must say the same
-   * number. null when the card carries no notation.
+   * number. null when the card carries no notation — always null while the
+   * autographPolicy display switch is off (Oct 2026).
    */
   designation: string | null;
+  /**
+   * The autograph was judged to have no manufacturer authentication. Internal
+   * verdict, independent of the display switch: it keeps "Signed By" empty so
+   * the listing never names a signer DCM could not establish.
+   */
+  unverifiedAutograph: boolean;
   /** null only when the card genuinely has no numeric grade. */
   grade: number | null;
   conditionLabel: string;
@@ -424,6 +432,7 @@ export function resolveListingFields(card: any, cardType?: string): ListingField
     rookie: truthyFlag(ci.rookie, card?.rookie_card, card?.first_print_rookie, ci.rookie_card),
     autograph: hasAutograph(card),
     autographFormat: resolveAutographFormat(card),
+    unverifiedAutograph: hasUnverifiedAutograph(card || {}),
     serialNumbering,
     serialDenominator: getSerialDenominator(serialNumbering) || '',
     language,

@@ -407,18 +407,18 @@ describe('classicLines + real label data', () => {
     expect(classicLines(toSlabLabelData(labelData)).right.grade).toBe('N/A')
   })
 
-  it('carries the v9.23 designation from the card row into line four', () => {
+  it('leaves line four empty for an unverified autograph while the designation is off', () => {
     const labelData = getCardLabelData({
       ...authenticCard,
       conversational_decimal_grade: 9,
       conversational_condition_label: 'Mint',
       autograph_type: 'unverified',
     })
-    expect(labelData.designation).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION)
+    expect(labelData.designation).toBeNull()
 
     const slab = toSlabLabelData(labelData)
-    expect(slab.designation).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION)
-    expect(classicLines(slab).left[3]).toBe(UNVERIFIED_AUTOGRAPH_DESIGNATION.toUpperCase())
+    expect(slab.designation).toBeNull()
+    expect(classicLines(slab).left[3]).toBe('')
   })
 
   it('keeps the structured identification fields the adapter forwards', () => {

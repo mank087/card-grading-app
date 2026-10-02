@@ -363,7 +363,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'autographed',
     question: 'Can DCM grade autographed cards?',
     answer:
-      'Yes. Manufacturer-certified autographs (Topps Certified, Panini Authentic and similar) are graded normally. A hand-signed or otherwise unverified autograph still receives its full numeric condition grade, and the report and label carry an "Altered - Unverified Autograph" notation because DCM cannot authenticate a signature from a photo.',
+      'Yes. Manufacturer-certified autographs (Topps Certified, Panini Authentic and similar) are graded normally. A hand-signed or otherwise unverified autograph also receives its full numeric condition grade, with surface scored as if the ink were absent. DCM grades condition only and does not authenticate signatures, so a grade is not a statement that a signature is genuine.',
     keywords: ['autograph', 'signed', 'signature', 'auto', 'authenticated', 'certified', 'hand-signed', 'unverified'],
     category: 'special-cases',
     links: [],

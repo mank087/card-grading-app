@@ -348,8 +348,8 @@ export default function GradingLimitationsPage() {
               </ul>
               <p className="text-xs text-gray-600 mt-3">
                 Autographs are not on this list. A signed card is graded in full, with surface
-                scored as if the ink were absent; an unauthenticated signature simply adds the
-                notation &quot;Altered - Unverified Autograph&quot; to the grade.
+                scored as if the ink were absent. DCM does not authenticate signatures, so a
+                grade is not a statement that a signature is genuine.
               </p>
             </div>
 

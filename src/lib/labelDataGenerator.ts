@@ -20,7 +20,7 @@
  */
 
 import { getConditionFromGrade } from './conditionAssessment';
-import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from './grading/autographPolicy';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION, visibleDesignation } from './grading/autographPolicy';
 import { isPokemonPromoSetId, isPokemonPromoSetName, stripPromoTotal } from './pokemonPromoNumber';
 
 // ============================================================================
@@ -1339,9 +1339,10 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
       primaryName: titleCaseShoutyWords(card.label_data.primaryName || 'Card'),
       ...(card.org_serial_display ? { serial: card.org_serial_display } : {}),
       // Blobs stored before v9.23 have no designation — derive it from the card row so
-      // existing cards show the notation without a label_data backfill.
+      // existing cards show the notation without a label_data backfill. Stored values
+      // pass through the display switch (autographPolicy) so old blobs obey it too.
       designation: card.label_data.designation !== undefined
-        ? card.label_data.designation
+        ? visibleDesignation(card.label_data.designation)
         : (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null),
     };
   }

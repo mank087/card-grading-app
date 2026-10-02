@@ -224,12 +224,18 @@ export function normalizeListingCategory(value: string | null | undefined): List
   return 'other'
 }
 
+const AUTOGRAPH_DESIGNATION_ENABLED = false
+
 /**
  * Does this card carry the v9.23 unverified-autograph designation? Inlined
  * copy of src/lib/grading/autographPolicy.hasUnverifiedAutographDesignation —
  * mobile has no access to the grading library.
  */
 function hasUnverifiedAutographDesignation(card: any): boolean {
+  // Display switch, mirroring autographPolicy.AUTOGRAPH_DESIGNATION_ENABLED: the
+  // notation is OFF since Oct 2026 (more than half the designations were false).
+  // Mobile has no env access here, so it is a constant; flip both together.
+  if (!AUTOGRAPH_DESIGNATION_ENABLED) return false
   if (card?.autograph_type === 'unverified') return true
   const haystack = `${card?.conversational_condition_label || ''} ${card?.conversational_final_grade_summary || ''}`.toLowerCase()
   return haystack.includes('unverified autograph')

@@ -80,7 +80,7 @@ import IdentityReview, { ConfirmCardDetailsCalloutButton } from '@/components/ca
 import NotStandardCardNotice from '@/components/cards/NotStandardCardNotice';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 import { DesignationBadge } from '@/components/grading/DesignationBadge';
-import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION, visibleDesignation } from '@/lib/grading/autographPolicy';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -3334,7 +3334,7 @@ export function MTGCardDetails() {
 
                 {/* v9.23: unverified-autograph designation — a notation beside the score */}
                 {(() => {
-                  const designation = card.label_data?.designation
+                  const designation = visibleDesignation(card.label_data?.designation)
                     || (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null);
                   return designation ? (
                     <div className="mt-2">

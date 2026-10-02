@@ -186,8 +186,9 @@ describe('altered-authentic', () => {
     expect(vm.grade.condition).toBe('Authentic');
   });
 
-  // v9.23: the unverified-autograph designation rides ALONGSIDE a full grade.
-  it('keeps the numeric grade for an unverified autograph and carries the designation', () => {
+  // v9.23: an unverified autograph keeps its full grade. The designation itself is
+  // switched off (autographPolicy, Oct 2026), so nothing says "Altered".
+  it('keeps the numeric grade for an unverified autograph and shows no designation', () => {
     const vm = build({
       conversational_condition_label: 'Altered - Unverified Autograph',
       autographed: true,
@@ -195,7 +196,7 @@ describe('altered-authentic', () => {
     });
     expect(vm.grade.status).toBe('graded');
     expect(vm.grade.grade).toBe(9);
-    expect(vm.grade.designation).toBe('Altered - Unverified Autograph');
+    expect(vm.grade.designation).toBeNull();
   });
 });
 

@@ -377,7 +377,7 @@ const faqs: FAQItem[] = [
         <p className="mb-3">Yes. An autograph is never treated as a surface defect, and it never blocks a numeric grade.</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li><strong>Manufacturer-authenticated autographs:</strong> Cards with official autograph certification (hologram, printed authentication) are graded normally. The signature is a feature of the card, not damage.</li>
-          <li><strong>Unverified signatures:</strong> A card signed with no on-card claim of authenticity still receives a full numeric grade with all four subgrades. Surface is scored as if the ink were absent — we judge the stock and gloss around and beneath the strokes. The grade then carries the notation <strong>&quot;Altered - Unverified Autograph&quot;</strong> on the grade record and the label, so a buyer knows the signature has not been authenticated.</li>
+          <li><strong>Unverified signatures:</strong> A card signed with no on-card claim of authenticity still receives a full numeric grade with all four subgrades. Surface is scored as if the ink were absent — we judge the stock and gloss around and beneath the strokes. DCM grades the card&apos;s condition; it does not authenticate signatures, so a DCM grade is not a statement that a signature is genuine.</li>
         </ul>
         <p>We look for authentication markers like holograms, &quot;Certified Autograph Issue&quot; text, and official autograph card numbering.</p>
       </>
@@ -396,7 +396,7 @@ const faqs: FAQItem[] = [
           <li>Adhesive residue or sticker damage</li>
           <li>Color enhancement or restoration</li>
         </ul>
-        <p className="mb-3">An <strong>autograph is the exception</strong>. A signed card is graded in full — all four subgrades, surface scored as if the ink were absent — and an autograph with no on-card claim of authenticity simply carries the notation &quot;Altered - Unverified Autograph&quot; alongside its numeric grade.</p>
+        <p className="mb-3">An <strong>autograph is the exception</strong>. A signed card is graded in full — all four subgrades, surface scored as if the ink were absent — including when the autograph has no on-card claim of authenticity. DCM does not authenticate signatures.</p>
         <p>In every case we provide a full analysis explaining what was detected and how it affected the outcome.</p>
       </>
     ),

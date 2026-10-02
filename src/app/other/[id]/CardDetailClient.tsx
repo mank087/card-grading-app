@@ -78,7 +78,7 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout'
 import { getSlabWrapperStyle } from '@/lib/labelPresets';
 import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 import { DesignationBadge } from '@/components/grading/DesignationBadge';
-import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION } from '@/lib/grading/autographPolicy';
+import { hasUnverifiedAutographDesignation, UNVERIFIED_AUTOGRAPH_DESIGNATION, visibleDesignation } from '@/lib/grading/autographPolicy';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -3260,7 +3260,7 @@ export function OtherCardDetails() {
 
                 {/* v9.23: unverified-autograph designation — a notation beside the score */}
                 {(() => {
-                  const designation = card.label_data?.designation
+                  const designation = visibleDesignation(card.label_data?.designation)
                     || (hasUnverifiedAutographDesignation(card) ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null);
                   return designation ? (
                     <div className="mt-2">

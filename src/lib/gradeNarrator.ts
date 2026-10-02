@@ -248,7 +248,9 @@ export function buildFinalSummary(input: NarratorInput): string {
   // WITH the tail so the length budget can never trim it away — a designation is a
   // fact about the card, not an optional flourish. Kept as a NOTATION: it explains the
   // designation without qualifying or apologising for the numeric grade, which stands.
-  const designationNote = resolveAutographVerdict(jsonData).unverified
+  // Keyed on .designation, not .unverified, so the autographPolicy display switch
+  // (off since Oct 2026) removes the note along with every other surface.
+  const designationNote = resolveAutographVerdict(jsonData).designation
     ? `Note: the card carries a hand-applied autograph with no manufacturer authentication and is designated ${UNVERIFIED_AUTOGRAPH_DESIGNATION}.`
     : '';
 

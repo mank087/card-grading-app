@@ -990,8 +990,9 @@ export function recommendedAspectValues(fields: ListingFields): Record<string, s
     'Sport': fields.sport,
     // "Signed By" names the SIGNER. On a v9.23 unverified-autograph card the
     // signer is exactly what we could not establish, so filling in the card's
-    // subject would assert that the player signed it — omitted instead.
-    'Signed By': fields.autograph && !fields.designation ? fields.name : '',
+    // subject would assert that the player signed it — omitted instead. Keyed
+    // on the internal verdict, not the (now hidden) designation text.
+    'Signed By': fields.autograph && !fields.unverifiedAutograph ? fields.name : '',
     'Autograph Format': fields.autograph ? fields.autographFormat : '',
     // Policy: DCM grades the card, it does not authenticate signatures.
     'Autograph Authentication': fields.autograph ? 'Not Authenticated' : '',

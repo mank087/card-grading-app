@@ -15,9 +15,36 @@
  * `alteration_detection.autograph`, `card_info.autographed`), and the verified/unverified
  * signal has been spelled `authenticated`, `verified` and encoded into `type`. All of
  * those are tolerated here so legacy rows and canary models resolve the same way.
+ *
+ * DISPLAY SWITCH (Oct 2026): the designation is OFF. The by-eye review of the 87
+ * September designations found more than half were false (printed design signatures,
+ * manufacturer-certified issues), and photos cannot reliably separate printed from
+ * hand-applied ink. With the switch off nothing customer-facing says "Altered":
+ * resolveAutographVerdict returns designation null, hasUnverifiedAutographDesignation
+ * returns false, and visibleDesignation drops the text from stored label blobs. The
+ * internal verdict (unverified / autograph_type 'unverified') is still resolved and
+ * stored, and the grading protection (ink never a defect, never N/A) is unchanged.
+ * Set NEXT_PUBLIC_AUTOGRAPH_DESIGNATION=on to restore the notation everywhere.
  */
 
 export const UNVERIFIED_AUTOGRAPH_DESIGNATION = 'Altered - Unverified Autograph';
+
+/** Whether the "Altered - Unverified Autograph" notation is shown anywhere. Off by default. */
+export const AUTOGRAPH_DESIGNATION_ENABLED =
+  process.env.NEXT_PUBLIC_AUTOGRAPH_DESIGNATION === 'on';
+
+/**
+ * Filter a designation read from a stored blob (label_data.designation) through the
+ * display switch. Only the unverified-autograph notation is suppressed; any other
+ * designation passes through untouched.
+ */
+export function visibleDesignation(designation: string | null | undefined): string | null {
+  if (!designation) return null;
+  if (!AUTOGRAPH_DESIGNATION_ENABLED && designation.toLowerCase().includes('unverified autograph')) {
+    return null;
+  }
+  return designation;
+}
 
 /** Matches RarityClassification.autograph_type in conversationalGradingV3_3.ts */
 export type AutographTypeValue = 'on-card' | 'sticker' | 'unverified' | 'none';
@@ -98,20 +125,32 @@ export function resolveAutographVerdict(jsonData: any): AutographVerdict {
     verified,
     unverified,
     autographType,
-    designation: unverified ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null,
+    designation: unverified && AUTOGRAPH_DESIGNATION_ENABLED ? UNVERIFIED_AUTOGRAPH_DESIGNATION : null,
   };
+}
+
+type AutographRow = {
+  autograph_type?: string | null;
+  conversational_condition_label?: string | null;
+  conversational_final_grade_summary?: string | null;
+};
+
+/**
+ * Was this card's autograph judged unverified, from the persisted card row? This is the
+ * internal verdict and ignores the display switch — eBay uses it to avoid naming a
+ * signer DCM could not establish.
+ */
+export function hasUnverifiedAutograph(card: AutographRow): boolean {
+  if (card.autograph_type === 'unverified') return true;
+  const haystack = `${card.conversational_condition_label || ''} ${card.conversational_final_grade_summary || ''}`.toLowerCase();
+  return haystack.includes('unverified autograph');
 }
 
 /**
  * Does this card carry the unverified-autograph designation, judged from the persisted
- * card row rather than the raw grading JSON? Used by the label generator.
+ * card row rather than the raw grading JSON? Used by the label generator. Always false
+ * while the display switch is off.
  */
-export function hasUnverifiedAutographDesignation(card: {
-  autograph_type?: string | null;
-  conversational_condition_label?: string | null;
-  conversational_final_grade_summary?: string | null;
-}): boolean {
-  if (card.autograph_type === 'unverified') return true;
-  const haystack = `${card.conversational_condition_label || ''} ${card.conversational_final_grade_summary || ''}`.toLowerCase();
-  return haystack.includes('unverified autograph');
+export function hasUnverifiedAutographDesignation(card: AutographRow): boolean {
+  return AUTOGRAPH_DESIGNATION_ENABLED && hasUnverifiedAutograph(card);
 }
