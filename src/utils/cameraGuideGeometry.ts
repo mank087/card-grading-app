@@ -18,7 +18,7 @@
 // Top: 48px translucent header + ~40px band for the FRONT/BACK label that
 // renders just above the guide (keeping it off the card AND out of the header).
 export const GUIDE_CHROME_TOP = 88;
-export const GUIDE_CHROME_BOTTOM = 130;
+export const GUIDE_CHROME_BOTTOM = 170;
 
 /** Share of the available width (or height) the guide fills. */
 export const GUIDE_FILL_FRACTION = 0.78;

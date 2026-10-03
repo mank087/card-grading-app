@@ -24,13 +24,16 @@ describe('offline Phase 0 baseline', () => {
     const { mobileGuide, webPortraitCrop, ...observedRest } = manifest.probes.observed;
     expect(observedRest).toEqual(frozenRest);
     // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
-    // screen so cards stop being clipped at the shutter. The crop is the same shape and centre,
+    // screen so cards stop being clipped at the shutter. The crop is the same shape,
     // scaled by 0.78/0.98.
     const ratio = 0.78 / 0.98;
     expect(Math.abs(webPortraitCrop.cropW - frozenWebCrop.cropW * ratio)).toBeLessThanOrEqual(2);
     expect(Math.abs(webPortraitCrop.cropH - frozenWebCrop.cropH * ratio)).toBeLessThanOrEqual(2);
     expect(Math.abs((webPortraitCrop.cropX + webPortraitCrop.cropW / 2) - (frozenWebCrop.cropX + frozenWebCrop.cropW / 2))).toBeLessThanOrEqual(2);
-    expect(Math.abs((webPortraitCrop.cropY + webPortraitCrop.cropH / 2) - (frozenWebCrop.cropY + frozenWebCrop.cropH / 2))).toBeLessThanOrEqual(2);
+    // Oct 2026: bottom controls reserve another 40 CSS px for Phone Camera.
+    // The guide center moves up 20 CSS px, mapped into this 2160px/844px probe.
+    const verticalShift = -20 * 2160 / 844;
+    expect(Math.abs((webPortraitCrop.cropY + webPortraitCrop.cropH / 2) - (frozenWebCrop.cropY + frozenWebCrop.cropH / 2) - verticalShift)).toBeLessThanOrEqual(2);
     expect(frozenGuide.some((g: any) => g.exceedsViewport)).toBe(true);
     expect(mobileGuide.every((g: any) => !g.exceedsViewport)).toBe(true);
     // The portrait phone case, which is what nearly every capture uses, is unchanged.

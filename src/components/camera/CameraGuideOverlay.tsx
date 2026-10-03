@@ -52,14 +52,11 @@ export default function CameraGuideOverlay({
           {/* Single label ABOVE the guide — nothing overlays the card itself.
               (The old center FRONT/BACK pill and the in-guide "Fill card to
               edges" pill both sat on top of the card being framed.) */}
-          {/* "fill card to edges" was too soft to change behaviour — people
-              read it as "roughly centred" and still shot from too far away,
-              which is the top cause of cards the grader cannot identify.
-              Name the target the eye can actually check against. */}
+          {/* Leave a visible margin rather than encouraging a distance the lens cannot focus at. */}
           <div className="absolute -top-9 left-0 right-0 flex justify-center">
             <div className="bg-black/50 backdrop-blur-sm text-white/90 px-3 py-1 rounded-full whitespace-nowrap">
               <span className="text-xs font-semibold tracking-wide">
-                {side === 'front' ? 'FRONT' : 'BACK'} · move close, reach all 4 corners
+                {side === 'front' ? 'FRONT' : 'BACK'} · keep all 4 edges inside
               </span>
             </div>
           </div>

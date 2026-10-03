@@ -68,3 +68,27 @@ export function sourceLuma(
   ctx.drawImage(source, rx, ry, rw, rh, 0, 0, w, h);
   return { luma: rgbaToLuma(ctx.getImageData(0, 0, w, h).data, w, h), width: w, height: h };
 }
+
+/** Sample exactly the framed region at explicit dimensions so still/preview scores are comparable. */
+export function sampleCaptureRegion(
+  source: CanvasImageSource,
+  region: { x: number; y: number; width: number; height: number },
+  size: { width: number; height: number },
+): { luma: Float32Array; width: number; height: number; sharpness: number } | null {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, region.x, region.y, region.width, region.height, 0, 0, size.width, size.height);
+    const luma = rgbaToLuma(ctx.getImageData(0, 0, size.width, size.height).data, size.width, size.height);
+    const mean = luma.reduce((sum, x) => sum + x, 0) / luma.length;
+    const variance = luma.reduce((sum, x) => sum + (x - mean) ** 2, 0) / luma.length;
+    // Normalize contrast differences between the preview and still pipelines.
+    const sharpness = variance >= 4 ? laplacianVariance(luma, size.width, size.height) / variance : 0;
+    return { luma, ...size, sharpness };
+  } catch { return null; }
+}

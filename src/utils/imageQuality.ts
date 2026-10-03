@@ -274,14 +274,15 @@ function checkBrightness(luma: Float32Array): QualityCheckResult {
  * can still flatter a blurry card. Measuring inside the detected card region is
  * the server-side gate's job; this is the cheap client-side first pass.
  */
-export function validateImageQuality(imageData: ImageData): ImageQualityValidation {
-  const working = toWorkingLuma(imageData);
+export function validateImageQuality(imageData: ImageData | null): ImageQualityValidation {
+  const working = imageData ? toWorkingLuma(imageData) : null;
 
   // Analysis unavailable (no canvas context, degenerate dimensions). Fail open
   // with a neutral result rather than blocking on our own inability to measure.
   if (!working) {
     const unknown: QualityCheckResult = { passed: true, score: 70, message: 'Quality could not be assessed' };
     return {
+      status: 'unknown',
       isValid: true,
       overallScore: 70,
       checks: { blur: unknown, brightness: unknown },
@@ -321,6 +322,7 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
   }
 
   return {
+    status: isValid ? 'pass' : 'warn',
     isValid,
     overallScore,
     checks: { blur: blurCheck, brightness: brightnessCheck },

@@ -75,10 +75,12 @@ export function alignmentError(
   if (outside > grid * grid * 0.5 || pairs.length < 16) return Infinity;
   const stats = (k: 0 | 1) => {
     const m = pairs.reduce((s, p) => s + p[k], 0) / pairs.length;
-    const sd = Math.sqrt(pairs.reduce((s, p) => s + (p[k] - m) ** 2, 0) / pairs.length) || 1;
+    const sd = Math.sqrt(pairs.reduce((s, p) => s + (p[k] - m) ** 2, 0) / pairs.length);
     return { m, sd };
   };
   const A = stats(0), B = stats(1);
+  // Flat frames carry no alignment evidence, including when there is only one model.
+  if (A.sd < 2 || B.sd < 2) return Infinity;
   return pairs.reduce((s, [a, b]) => s + Math.abs((a - A.m) / A.sd - (b - B.m) / B.sd), 0) / pairs.length;
 }
 

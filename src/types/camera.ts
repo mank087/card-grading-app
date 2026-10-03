@@ -41,6 +41,14 @@ export interface CapturedFrame {
   streamTransform: { scale: number; scaleY?: number; offsetX: number; offsetY: number };
   /** Stills only: which field-of-view model matched, and its alignment error. */
   alignment?: { model: string; error: number };
+  diagnostics?: {
+    version: 'capture-v2';
+    selection: string;
+    previewSharpness: number | null;
+    stillSharpness: number | null;
+    guideWidth: number;
+    guideHeight: number;
+  };
 }
 
 /**
@@ -62,6 +70,8 @@ export interface QualityCheckResult {
 }
 
 export interface ImageQualityValidation {
+  /** An unavailable measurement must never be presented as a successful check. */
+  status?: 'pass' | 'warn' | 'unknown';
   isValid: boolean;
   overallScore: number;
   checks: {

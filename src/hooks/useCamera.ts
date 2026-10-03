@@ -2,14 +2,23 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CapturedFrame } from '@/types/camera';
-import { laplacianVariance, sourceLuma } from '@/utils/captureSharpness';
+import { sampleCaptureRegion, sourceLuma } from '@/utils/captureSharpness';
 import { alignmentError, candidateTransforms, chooseStillTransform } from '@/utils/captureAlignment';
+import { getCaptureRegion, mapCaptureRegion, preferStill } from '@/utils/captureSelection';
 
 // Shutter burst: frames grabbed, and the spacing when requestVideoFrameCallback
 // is unavailable. ~4 frames at 30 fps is ~130 ms — long enough to outlast the
 // tap's jolt, short enough that the user does not notice.
 const BURST_FRAMES = 4;
 const BURST_INTERVAL_MS = 50;
+interface StillPhotoSettings { imageWidth: number; imageHeight: number }
+interface StillImageCapture {
+  getPhotoCapabilities?: () => Promise<{
+    imageWidth?: { min: number; max: number };
+    imageHeight?: { min: number; max: number };
+  }>;
+  takePhoto: (settings?: StillPhotoSettings) => Promise<Blob>;
+}
 
 // Detect iOS for constraint compatibility
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -18,6 +27,7 @@ const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(naviga
  * Get camera constraints optimized for card photography
  */
 const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints => {
+  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
   return {
     video: {
       facingMode: isIOS ? facingMode : { ideal: facingMode },
@@ -26,8 +36,8 @@ const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamCo
       // portrait card crop from the landscape stream came out ~1037px on the long edge
       // (borderline for the 1000px minimum-resolution grading gate) and the 720p
       // fallback produced ~690px captures that the gate rightly rejects.
-      width: { ideal: 3840, min: 1280 },
-      height: { ideal: 2160, min: 720 },
+      width: { ideal: portrait ? 2160 : 3840 },
+      height: { ideal: portrait ? 3840 : 2160 },
       frameRate: { ideal: 30 },
     }
   };
@@ -36,11 +46,22 @@ const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamCo
 /**
  * Fallback constraints if optimal fails
  */
-const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints[] => [
-  { video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } } },
-  { video: { facingMode } },
-  { video: true },
-];
+const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints[] => {
+  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+  return [
+    { video: { facingMode, width: { ideal: portrait ? 1080 : 1920 }, height: { ideal: portrait ? 1920 : 1080 } } },
+    { video: { facingMode } },
+  ];
+};
+
+async function cameraTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([promise, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Camera request timed out')), ms);
+    })]);
+  } finally { clearTimeout(timer); }
+}
 
 /**
  * Apply continuous focus/exposure/white-balance where the camera supports it.
@@ -82,10 +103,10 @@ export const useCamera = () => {
   const [streamResolution, setStreamResolution] = useState<{ width: number; height: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraSession = useRef(0);
 
   const startCamera = async (facingMode: 'user' | 'environment' = 'environment') => {
-    if (isStarting) return;
-
+    const session = ++cameraSession.current;
     setIsStarting(true);
     setError(null);
 
@@ -102,6 +123,7 @@ export const useCamera = () => {
       }
 
       await new Promise(resolve => setTimeout(resolve, 100));
+      if (session !== cameraSession.current) return;
 
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera API not supported');
@@ -112,14 +134,19 @@ export const useCamera = () => {
       // Try optimal constraints first
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia(getCameraConstraints(facingMode));
-      } catch {
+      } catch (failure) {
+        if (session !== cameraSession.current) return;
+        // A denied permission is not a resolution-negotiation failure.
+        if (['NotAllowedError', 'SecurityError'].includes((failure as Error).name)) throw failure;
         // Try fallbacks
         const fallbacks = getFallbackConstraints(facingMode);
         for (const constraints of fallbacks) {
+          if (session !== cameraSession.current) return;
           try {
             mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             break;
-          } catch {
+          } catch (failure) {
+            if (['NotAllowedError', 'SecurityError'].includes((failure as Error).name)) throw failure;
             continue;
           }
         }
@@ -129,12 +156,18 @@ export const useCamera = () => {
         throw new Error('Could not access camera');
       }
 
+      if (session !== cameraSession.current) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       streamRef.current = mediaStream;
       setStream(mediaStream);
       setHasPermission(true);
 
       // Nudge the camera into continuous AF/AE/AWB where supported.
       await applyFocusConstraints(mediaStream);
+      if (session !== cameraSession.current) return;
 
       // Record what resolution was ACTUALLY negotiated — the fallback ladder can
       // silently land on 1080p or the device default, and the UI warns before
@@ -159,7 +192,9 @@ export const useCamera = () => {
         });
       }
 
-    } catch (err: any) {
+    } catch (failure) {
+      if (session !== cameraSession.current) return;
+      const err = failure instanceof Error ? failure : new Error(String(failure));
       console.error('[Camera] Error:', err);
 
       let message = 'Failed to access camera';
@@ -176,11 +211,12 @@ export const useCamera = () => {
       setError(message);
       setHasPermission(false);
     } finally {
-      setIsStarting(false);
+      if (session === cameraSession.current) setIsStarting(false);
     }
   };
 
   const stopCamera = useCallback(() => {
+    cameraSession.current++;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -203,7 +239,7 @@ export const useCamera = () => {
   // photo processing pipeline — instead of grabbing a preview video frame
   // capped at the negotiated stream mode. Falls back to the frame grab on
   // browsers without ImageCapture (iOS Safari), on timeout, or when the
-  // returned photo isn't actually larger than the stream.
+  // returned photo cannot be aligned or is softer than the selected preview.
   //
   // The returned streamTransform maps PREVIEW-STREAM coordinates onto the
   // capture canvas: identity for a frame grab. For a still photo it USED to
@@ -216,12 +252,22 @@ export const useCamera = () => {
   //
   // Sept 2026 burst: the preview frame is the sharpest of a short burst, not
   // the one frame at the instant the shutter was tapped (when the phone moves).
-  const captureImage = useCallback(async (): Promise<CapturedFrame | null> => {
+  const captureImage = useCallback(async (orientation: 'portrait' | 'landscape' = 'portrait'): Promise<CapturedFrame | null> => {
+    const session = cameraSession.current;
     const video = videoRef.current;
-    if (!video || !video.videoWidth || !video.videoHeight) return null;
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
 
     const streamW = video.videoWidth;
     const streamH = video.videoHeight;
+    const view = video.getBoundingClientRect();
+    if (!(view.width > 0 && view.height > 0)) return null;
+    const region = getCaptureRegion(streamW, streamH, view.width, view.height, orientation);
+    const sampleScale = Math.min(1, 256 / Math.max(region.width, region.height));
+    const sampleSize = { width: Math.max(3, Math.round(region.width * sampleScale)), height: Math.max(3, Math.round(region.height * sampleScale)) };
+    const diagnostics: NonNullable<CapturedFrame['diagnostics']> = {
+      version: 'capture-v2', selection: 'preview_only', previewSharpness: null,
+      stillSharpness: null, guideWidth: region.width, guideHeight: region.height,
+    };
 
     const drawFrame = (canvas: HTMLCanvasElement): boolean => {
       canvas.width = streamW;
@@ -234,10 +280,10 @@ export const useCamera = () => {
     // Wait for the next decoded preview frame (so burst frames are distinct).
     const nextFrame = () => new Promise<void>((resolve) => {
       const done = () => resolve();
-      const v = video as any;
+      const v = video;
       if (typeof v.requestVideoFrameCallback === 'function') {
-        const timer = setTimeout(done, 150);
-        v.requestVideoFrameCallback(() => { clearTimeout(timer); done(); });
+        const callback = v.requestVideoFrameCallback(() => { clearTimeout(timer); done(); });
+        const timer = setTimeout(() => { v.cancelVideoFrameCallback?.(callback); done(); }, 150);
       } else {
         setTimeout(done, BURST_INTERVAL_MS);
       }
@@ -249,9 +295,9 @@ export const useCamera = () => {
     let spare: HTMLCanvasElement = document.createElement('canvas');
     for (let i = 0; i < BURST_FRAMES; i++) {
       if (i > 0) await nextFrame();
+      if (session !== cameraSession.current) return null;
       if (!drawFrame(spare)) break;
-      const l = sourceLuma(spare, streamW, streamH, 256, { w: 0.6, h: 0.6 });
-      const score = l ? laplacianVariance(l.luma, l.width, l.height) : 0;
+      const score = sampleCaptureRegion(spare, region, sampleSize)?.sharpness ?? 0;
       if (score > bestScore) {
         const previous = best;
         best = spare;
@@ -261,6 +307,9 @@ export const useCamera = () => {
     }
     if (!best) return null;
     const previewCanvas = best;
+    diagnostics.previewSharpness = bestScore;
+    // Release the losing full-resolution buffer before allocating the still.
+    spare.width = spare.height = 0;
 
     const frameGrab = (): CapturedFrame => ({
       canvas: previewCanvas,
@@ -270,26 +319,46 @@ export const useCamera = () => {
       captureSource: 'frame',
       streamSize: { width: streamW, height: streamH },
       streamTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+      diagnostics,
     });
 
     // Attempt a true still capture where the API exists.
-    const ImageCaptureCtor = (window as any).ImageCapture;
+    const ImageCaptureCtor = (window as Window & {
+      ImageCapture?: new (track: MediaStreamTrack) => StillImageCapture;
+    }).ImageCapture;
     const track = streamRef.current?.getVideoTracks()[0];
     if (ImageCaptureCtor && track && track.readyState === 'live') {
       try {
         const imageCapture = new ImageCaptureCtor(track);
+        let photoSettings: StillPhotoSettings | undefined;
+        try {
+          const caps = await cameraTimeout(imageCapture.getPhotoCapabilities?.() ?? Promise.reject(new Error('Photo capabilities unavailable')), 750);
+          const w = caps.imageWidth?.max, h = caps.imageHeight?.max;
+          if (w && h && Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+            // Bound decode memory while still requesting a photographic-resolution image.
+            const scale = Math.min(1, Math.sqrt(12_000_000 / (w * h)));
+            photoSettings = { imageWidth: Math.max(caps.imageWidth?.min || 1, Math.round(w * scale)),
+              imageHeight: Math.max(caps.imageHeight?.min || 1, Math.round(h * scale)) };
+          }
+        } catch { /* Optional API: the camera's default still remains usable. */ }
         // takePhoto can hang on some devices — race it against a timeout and
         // fall back to the instant frame grab rather than blocking the shutter.
-        const blob: Blob = await Promise.race([
-          imageCapture.takePhoto(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('takePhoto timeout')), 4000)),
-        ]);
+        let blob: Blob;
+        try {
+          blob = await cameraTimeout(imageCapture.takePhoto(photoSettings), 4000);
+        } catch (failure) {
+          if (!photoSettings || !['OverconstrainedError', 'NotSupportedError'].includes((failure as Error).name)) throw failure;
+          if (session !== cameraSession.current) return null;
+          // Some devices advertise a range but accept only discrete photo sizes.
+          blob = await cameraTimeout(imageCapture.takePhoto(), 4000);
+        }
+        if (session !== cameraSession.current) return null;
         const bitmap = await createImageBitmap(blob);
         try {
-          // Sanity: only use the still if it genuinely beats the preview stream.
-          // Some devices return stills at or below stream resolution — the frame
-          // grab is then equivalent and its geometry is exactly WYSIWYG.
-          if (bitmap.width * bitmap.height > streamW * streamH * 1.05) {
+          if (session !== cameraSession.current) return null;
+          // Compare matched guide regions, including equal-resolution photos.
+          diagnostics.selection = 'still_too_large';
+          if (bitmap.width > 0 && bitmap.height > 0 && bitmap.width * bitmap.height <= 25_000_000) {
             const canvas = document.createElement('canvas');
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
@@ -308,7 +377,20 @@ export const useCamera = () => {
               const chosen = chooseStillTransform(scored);
               console.log('[Camera] still alignment', scored.map((s) => `${s.model}=${s.error.toFixed(3)}`).join(' '),
                 chosen ? `-> ${chosen.model}` : '-> none, using preview frame');
-              if (chosen) {
+              diagnostics.selection = 'still_alignment_unknown';
+              const stillRegion = chosen && mapCaptureRegion(region, chosen.transform, bitmap.width, bitmap.height);
+              if (chosen && stillRegion) {
+                const stillScore = sampleCaptureRegion(canvas, stillRegion, sampleSize)?.sharpness ?? 0;
+                diagnostics.stillSharpness = stillScore;
+                diagnostics.selection = 'preview_sharper_or_larger';
+                if (!preferStill({ sharpness: bestScore, ...region }, { sharpness: stillScore, ...stillRegion })) {
+                  canvas.width = canvas.height = 0;
+                  return frameGrab();
+                }
+                diagnostics.selection = 'aligned_sharp_still';
+                diagnostics.guideWidth = stillRegion.width;
+                diagnostics.guideHeight = stillRegion.height;
+                previewCanvas.width = previewCanvas.height = 0;
                 return {
                   canvas,
                   width: canvas.width,
@@ -318,24 +400,30 @@ export const useCamera = () => {
                   streamSize: stream,
                   streamTransform: chosen.transform,
                   alignment: { model: chosen.model, error: chosen.error },
+                  diagnostics,
                 };
               }
+              canvas.width = canvas.height = 0;
             }
           }
         } finally {
           bitmap.close();
         }
       } catch (err) {
+        diagnostics.selection = 'still_request_failed';
         console.warn('[Camera] takePhoto failed, using frame grab:', err);
       }
     }
-
+    if (session !== cameraSession.current) return null;
     return frameGrab();
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
+    // Invalidate the latest asynchronous request, not the number at mount.
+    const sessionCounter = cameraSession;
     return () => {
+      sessionCounter.current++;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }

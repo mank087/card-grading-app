@@ -12,6 +12,10 @@ import { computeGuideLayoutPx } from '@/utils/cameraGuideGeometry';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
+import { useCaptureFeedback } from '@/hooks/useCaptureFeedback';
+import { MIN_CAPTURE_EDGE } from '@/utils/captureSelection';
+import { prepareSystemCameraPhoto } from '@/utils/systemCameraPhoto';
+import { reportUploadEvent } from '@/lib/uploadTelemetry';
 
 /**
  * How the browser actually produced the frame.
@@ -23,7 +27,7 @@ import { useToast } from '@/hooks/useToast';
  * until now the distinction was computed and then discarded — so nothing could
  * tell whether poor photos correlated with the fallback path.
  */
-export type WebCaptureMethod = 'image_capture_still' | 'video_frame_grab';
+export type WebCaptureMethod = 'image_capture_still' | 'video_frame_grab' | 'system_camera';
 
 interface MobileCameraProps {
   side: 'front' | 'back';
@@ -37,7 +41,6 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     stream,
     error,
     hasPermission,
-    streamResolution,
     startCamera,
     stopCamera,
     captureImage,
@@ -59,6 +62,45 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const captureCanvas = useRef<HTMLCanvasElement | null>(null);
   const quarterTurns = useRef(0);
   const [framingWarning, setFramingWarning] = useState<string | null>(null);
+  const systemCameraInput = useRef<HTMLInputElement>(null);
+  const captureBusy = useRef(false);
+  const lifecycle = useRef(0);
+  const feedback = useCaptureFeedback(videoRef, !!stream && !capturedImageUrl && !isProcessing, orientation);
+  useEffect(() => () => {
+    lifecycle.current++;
+    if (captureCanvas.current) captureCanvas.current.width = captureCanvas.current.height = 0;
+  }, []);
+  useEffect(() => () => {
+    if (capturedImageUrl?.startsWith('blob:')) URL.revokeObjectURL(capturedImageUrl);
+  }, [capturedImageUrl]);
+
+  const handleSystemPhoto = async (file?: File) => {
+    if (!file || captureBusy.current) return;
+    captureBusy.current = true;
+    const generation = lifecycle.current;
+    setIsProcessing(true);
+    try {
+      const photo = await prepareSystemCameraPhoto(file);
+      if (generation !== lifecycle.current) { URL.revokeObjectURL(photo.previewUrl); return; }
+      if (Math.max(photo.canvas.width, photo.canvas.height) < MIN_CAPTURE_EDGE) {
+        URL.revokeObjectURL(photo.previewUrl);
+        toast.error('This photo is too small. Use an original full-resolution photo.');
+        return;
+      }
+      auditCaptureId.current = `${Date.now()}-system`;
+      captureCanvas.current = photo.canvas;
+      quarterTurns.current = 0;
+      setCapturedFile(photo.file);
+      setCapturedImageUrl(photo.previewUrl);
+      setCaptureMethod('system_camera');
+      setFramingWarning(null);
+      setQualityValidation(validateImageQuality(getImageDataFromCanvas(photo.canvas)));
+      reportUploadEvent({ event: 'capture_attempted', side, capture_source: 'camera', capture_method: 'system_camera',
+        image_width: photo.canvas.width, image_height: photo.canvas.height });
+      stopCamera();
+    } catch { if (generation === lifecycle.current) toast.error('Could not open this photo. Try another photo or Gallery.'); }
+    finally { captureBusy.current = false; setIsProcessing(false); }
+  };
 
   const rotatePreview = async () => {
     if (!captureCanvas.current || isProcessing) return;
@@ -90,6 +132,22 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     }
   }, [stream, videoRef]);
 
+  // Returning from the phone camera/picker can pause or end the browser stream.
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState === 'hidden' || capturedImageUrl || captureBusy.current || !stream) return;
+      const track = stream.getVideoTracks()[0];
+      if (!track || track.readyState === 'ended') void startCamera(facingMode);
+      else void videoRef.current?.play().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('focus', resume);
+    return () => {
+      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('focus', resume);
+    };
+  }, [stream, capturedImageUrl, facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Torch (flashlight) support detection — graceful no-op where unsupported (e.g. iOS Safari)
   useEffect(() => {
     setTorchOn(false);
@@ -107,7 +165,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   }, [stream]);
 
   const toggleTorch = useCallback(async () => {
-    if (!stream) return;
+    if (!stream || captureBusy.current) return;
     const track = stream.getVideoTracks()[0];
     if (!track) return;
     const next = !torchOn;
@@ -128,7 +186,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   // and cropCanvasToGuideFrame does crop+resize+encode in ONE step. The upload
   // page skips re-compression for camera files, so this is the only lossy encode.
   const handleCapture = useCallback(async () => {
-    if (isProcessing) return;
+    if (captureBusy.current || !feedback.ready) return;
+    captureBusy.current = true;
+    const generation = lifecycle.current;
 
     setIsProcessing(true);
     setFramingWarning(null);
@@ -139,7 +199,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       viewport: shutterRect ? { width: shutterRect.width, height: shutterRect.height } : undefined });
 
     try {
-      const captured = await captureImage();
+      const captured = await captureImage(orientation);
+      if (generation !== lifecycle.current) return;
       if (!captured) {
         recordLocalCaptureAudit({ captureId, stage: 'failed', side, orientation });
         toast.error('Failed to capture image. Please try again.');
@@ -160,8 +221,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         // box so the crop is exactly what the user framed (plus padding),
         // instead of the old fixed-percentage assumption that ignored the
         // video's object-cover letterboxing.
-        const videoEl = videoRef.current;
-        const rect = videoEl?.getBoundingClientRect();
+        const rect = shutterRect;
         const viewContext = rect && rect.width > 0 && rect.height > 0
           ? (() => {
               const g = computeGuideLayoutPx(rect.width, rect.height, orientation);
@@ -208,12 +268,22 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           output: { width: fallback.canvas.width, height: fallback.canvas.height } });
       }
 
+      if (generation !== lifecycle.current) { URL.revokeObjectURL(previewUrl); return; }
+      if (captured.canvas !== qualityCanvas) captured.canvas.width = captured.canvas.height = 0;
       captureCanvas.current = qualityCanvas;
       quarterTurns.current = 0;
       setCapturedImageUrl(previewUrl);
       setCapturedFile(file);
       setCaptureMethod(captured.captureSource === 'photo' ? 'image_capture_still' : 'video_frame_grab');
+      reportUploadEvent({ event: 'capture_attempted', side, capture_source: 'camera',
+        capture_method: captured.captureSource === 'photo' ? 'image_capture_still' : 'video_frame_grab',
+        image_width: qualityCanvas.width, image_height: qualityCanvas.height,
+        metadata: { ...captured.diagnostics, stream: captured.streamSize, facingMode, torchOn } });
+      if (captured.diagnostics && Math.max(captured.diagnostics.guideWidth, captured.diagnostics.guideHeight) < MIN_CAPTURE_EDGE) {
+        setFramingWarning('The framed card has limited detail. For a clearer photo, try your phone camera or an original photo from Gallery.');
+      }
       setIsProcessing(false);
+      stopCamera();
 
       // Validate quality directly from the final canvas (no re-decode of the
       // JPEG). Read it down to analysis size rather than pulling the full
@@ -223,19 +293,21 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       // worst photos.
       try {
         const imageData = getImageDataFromCanvas(qualityCanvas);
-        if (imageData) {
-          setQualityValidation(validateImageQuality(imageData));
-        }
+        setQualityValidation(validateImageQuality(imageData));
       } catch (err) {
+        setQualityValidation(validateImageQuality(null));
         console.warn('[MobileCamera] Quality validation failed:', err);
       }
     } catch (err) {
       recordLocalCaptureAudit({ captureId, stage: 'failed', side, orientation });
+      if (generation !== lifecycle.current) return;
       console.error('Capture error:', err);
       toast.error('Failed to capture image. Please try again.');
       setIsProcessing(false);
+    } finally {
+      captureBusy.current = false;
     }
-  }, [captureImage, orientation, isProcessing, toast, side, videoRef]);
+  }, [captureImage, orientation, feedback.ready, toast, side, videoRef, facingMode, torchOn, stopCamera]);
 
   const handleConfirm = () => {
     if (capturedFile && !isProcessing) {
@@ -252,15 +324,20 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     setCapturedImageUrl(null);
     setCapturedFile(null);
     setQualityValidation(null);
+    setFramingWarning(null);
+    if (captureCanvas.current) captureCanvas.current.width = captureCanvas.current.height = 0;
+    captureCanvas.current = null;
     stopCamera();
-    setTimeout(() => startCamera(facingMode), 100);
+    void startCamera(facingMode);
   };
 
   const handleSwitchCamera = () => {
+    if (captureBusy.current) return;
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
   const toggleOrientation = () => {
+    if (captureBusy.current) return;
     setOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait');
   };
 
@@ -306,7 +383,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
               <button
                 onClick={() => {
                   stopCamera();
-                  setTimeout(() => startCamera(facingMode), 200);
+                  void startCamera(facingMode);
                 }}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold"
               >
@@ -380,6 +457,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           <div className="flex items-center gap-1.5">
             <button
               onClick={toggleOrientation}
+              disabled={isProcessing}
               className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
               title={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} guide`}
               aria-label={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} guide`}
@@ -397,6 +475,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             {torchSupported && (
               <button
                 onClick={toggleTorch}
+                disabled={isProcessing}
                 className={`p-1.5 rounded-full transition-colors ${
                   torchOn
                     ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
@@ -414,6 +493,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             )}
             <button
               onClick={handleSwitchCamera}
+              disabled={isProcessing}
               className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
               title="Switch Camera"
             >
@@ -430,37 +510,26 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           The fallback constraint ladder can silently negotiate 1080p or worse;
           card crops from those streams sit at or below the 1000px grading
           minimum. Warn BEFORE the shutter. */}
-      {streamResolution && Math.max(streamResolution.width, streamResolution.height) < 1920 && (
+      {feedback.guideEdge !== null && feedback.guideEdge < MIN_CAPTURE_EDGE && (
         <div className="absolute left-0 right-0 z-20 flex justify-center px-4" style={{ top: '52px' }}>
           <div className="bg-amber-500/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded-lg text-xs font-medium text-center max-w-sm">
-            ⚠️ Camera opened at low resolution ({streamResolution.width}×{streamResolution.height}). Photos may be too small to grade — try the gallery upload with your phone&apos;s camera app instead.
+            Preview detail is limited at this framing. Try Phone Camera if the saved photo is small or soft.
           </div>
         </div>
       )}
 
       {/* Overlaid Capture Controls - bottom, compact design */}
       <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-4">
-        {/* Tips row - compact */}
-        <div className="flex justify-center gap-1.5 mb-3 px-2">
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-            <span className="text-[10px]">☀️</span>
-            <span className="text-[9px] font-medium">Light</span>
-          </div>
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-            <span className="text-[10px]">🚫</span>
-            <span className="text-[9px] font-medium">Glare</span>
-          </div>
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-            <span className="text-[10px]">🎯</span>
-            <span className="text-[9px] font-medium">Focus</span>
-          </div>
-        </div>
-
+        <p role="status" className="mx-auto mb-2 max-w-sm px-4 text-center text-xs text-white bg-black/60">
+          {isProcessing ? 'Saving photo — hold steady…' : feedback.ready ? feedback.message : 'Waiting for camera…'}
+        </p>
+        <input ref={systemCameraInput} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={e => { void handleSystemPhoto(e.target.files?.[0]); e.target.value = ''; }} />
         {/* Capture button - slightly smaller */}
         <div className="flex justify-center">
           <button
             onClick={handleCapture}
-            disabled={isProcessing}
+            disabled={isProcessing || !feedback.ready}
             className={`w-18 h-18 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm
               hover:bg-white/30 active:scale-95 transition-all shadow-2xl
               ${isProcessing ? 'opacity-50' : ''}`}
@@ -470,6 +539,10 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             <div className="w-full h-full rounded-full bg-white/90" />
           </button>
         </div>
+        <button type="button" disabled={isProcessing} onClick={() => systemCameraInput.current?.click()}
+          className="block mx-auto mt-2 px-3 py-1 rounded-full bg-black/60 text-white text-xs disabled:opacity-50">
+          Use Phone Camera
+        </button>
       </div>
     </div>
   );

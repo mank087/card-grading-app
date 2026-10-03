@@ -22,6 +22,8 @@ export default function ImagePreview({
   onRetake, onRotate, busy = false, framingWarning,
 }: ImagePreviewProps) {
   const hasQualityIssues = qualityValidation && !qualityValidation.isValid;
+  const qualityUnknown = qualityValidation?.status === 'unknown';
+  const qualityPassed = qualityValidation?.isValid && !qualityUnknown;
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -56,7 +58,7 @@ export default function ImagePreview({
       {qualityValidation && (
         <div className="px-4 py-3 bg-gray-800 max-h-[38vh] overflow-y-auto">
           <div className={`rounded-lg p-3 ${
-            qualityValidation.isValid
+            qualityPassed
               ? 'bg-green-900/50 border border-green-500'
               : 'bg-yellow-900/50 border border-yellow-500'
           }`}>
@@ -69,13 +71,13 @@ export default function ImagePreview({
                 only from grading. */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">
-                {qualityValidation.isValid ? '✓' : '⚠️'}
+                {qualityPassed ? '✓' : '⚠️'}
               </span>
               <div className="flex-1">
                 <p className={`font-semibold ${
-                  qualityValidation.isValid ? 'text-green-300' : 'text-yellow-300'
+                  qualityPassed ? 'text-green-300' : 'text-yellow-300'
                 }`}>
-                  {qualityValidation.isValid ? 'Focus and lighting look good' : 'Focus or lighting needs attention'}
+                  {qualityUnknown ? 'Check the photo before continuing' : qualityPassed ? 'Focus and lighting look good' : 'Focus or lighting needs attention'}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Glare, framing and corner visibility are assessed by DCM Optic™ during grading.
@@ -86,15 +88,15 @@ export default function ImagePreview({
             {/* Quality Check Details */}
             <div className="space-y-1 text-xs">
               <div className={`flex items-center gap-2 ${
-                qualityValidation.checks.blur.passed ? 'text-green-400' : 'text-yellow-400'
+                qualityValidation.checks.blur.passed && !qualityUnknown ? 'text-green-400' : 'text-yellow-400'
               }`}>
-                <span>{qualityValidation.checks.blur.passed ? '✓' : '⚠'}</span>
+                <span>{qualityValidation.checks.blur.passed && !qualityUnknown ? '✓' : '⚠'}</span>
                 <span>{qualityValidation.checks.blur.message}</span>
               </div>
               <div className={`flex items-center gap-2 ${
-                qualityValidation.checks.brightness.passed ? 'text-green-400' : 'text-yellow-400'
+                qualityValidation.checks.brightness.passed && !qualityUnknown ? 'text-green-400' : 'text-yellow-400'
               }`}>
-                <span>{qualityValidation.checks.brightness.passed ? '✓' : '⚠'}</span>
+                <span>{qualityValidation.checks.brightness.passed && !qualityUnknown ? '✓' : '⚠'}</span>
                 <span>{qualityValidation.checks.brightness.message}</span>
               </div>
             </div>
@@ -147,12 +149,12 @@ export default function ImagePreview({
             onClick={onConfirm}
             disabled={busy}
             className={`flex-1 px-6 py-4 rounded-lg font-semibold transition-colors ${
-              qualityValidation?.isValid
+              qualityPassed
                 ? 'bg-green-600 hover:bg-green-700 text-white'
                 : 'bg-yellow-600 hover:bg-yellow-700 text-white'
             }`}
           >
-            {qualityValidation?.isValid ? '✓ Use This Image' : '⚠️ Use Anyway'}
+            {qualityUnknown || !qualityValidation ? 'Use This Image' : qualityPassed ? '✓ Use This Image' : '⚠️ Use Anyway'}
           </button>
         </div>
       </div>
