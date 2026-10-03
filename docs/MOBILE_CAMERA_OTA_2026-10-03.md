@@ -1,5 +1,31 @@
 # Mobile camera OTA release — October 3, 2026
 
+## Current release: restore tap-to-refocus
+
+The initial release below removed the installed app's useful autofocus restart gesture. After the user reported that focus still did not work, commit `2295abd187e1a47251d094a4882f3812d9c02942` restored tap-to-refocus and added Phone Camera. This supersedes the initial OTA on all four supported platform/runtime combinations.
+
+Legacy taps briefly request single autofocus (150 ms), return to continuous AF, and keep the shutter disabled until the settling allowance ends. Backgrounding and camera changes clear the pulse. This is a refocus request, not proof of sharpness or focus at the tapped coordinates. The installed Android implementation uses a fixed metering point; precise point metering still requires the separate native build. The earlier removal of the zoom prop also did not remove Expo's native `setZoomRatio(1)` on camera binding, so automatic macro lens switching must not be assumed.
+
+Phone Camera uses the existing `expo-image-picker` camera API at quality 1 without editing. The embedded camera unmounts first, and the result uses the existing uncropped photo-processing and review flow. The UI recovers on cancellation, permission denial, or launch failure; late results after unmount are ignored. No native dependencies or binaries changed.
+
+| Platform | Runtime | Hotfix update group | Update ID |
+| --- | --- | --- | --- |
+| Android | 1.0.2 | `0ba1f997-6c7e-4aa2-b451-28fb090ebe2a` | `01a10418-e358-74cd-a45b-524e75e2efcc` |
+| iOS | 1.0.2 | `4578bf40-8fc1-407a-a73a-feef8d30a201` | `01a1041b-921d-71fc-ad21-9a1975390374` |
+| Android | 1.0.0 | `5c27ef51-c1c7-479f-be52-780a3097526e` | `01a1041c-7156-7efa-b6b5-3888f94a8b27` |
+| iOS | 1.0.1 | `bf72f774-b699-4504-aefe-374a4de0e856` | `01a1041d-40eb-7140-afc1-9dd1ecdf0d0b` |
+
+All four production manifests and downloaded CDN bundles were verified against the validated exports:
+
+- Android: `e8f0bd7b0b941b6aa76769c548e7942d93481be76dd08ffd01243f6b1e6bb592` (6,775,234 bytes).
+- iOS: `e56aa1850e1c0bdf99b6371b0c3288aafa4ce3956790014209b3d2fbb6e96d10` (6,786,858 bytes).
+
+Eighteen focused regression tests passed, including the restored tap action on both platforms, return to continuous AF, shutter protection, background reset, uncropped system-camera results, permission denial/cancellation/failure, and ignoring results after leaving. Both complete platform exports passed with production environment values verified. The four pre-existing mobile TypeScript errors listed below remain unchanged. Physical-device optical sharpness and the system camera UI still require user/device testing; publication and test success do not establish that the original close-up blur is resolved. The hotfix is also copied into the pending native build checkout to preserve this behavior.
+
+To identify the hotfix on a device, reopen the app and look for **Tap to refocus** and the **Phone Camera** button. A second restart may be needed after download. For rollback, prefer the pre-initial-release groups at the end of this document over reintroducing the initial OTA's removed tap gesture.
+
+## Initial release (superseded)
+
 Published to Expo project `382e423a-3284-4156-b21a-e9578f2a2f99`, production channel/branch. Source commit: `bdacdc421f16048f96f3bec5ff33c3d204f912a1`, branch `codex/camera-ota-production`, based on deployed web commit `f2d41e23` and the previous mobile release source `931e7c02`.
 
 ## Published updates
