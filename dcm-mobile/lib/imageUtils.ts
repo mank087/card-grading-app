@@ -1,5 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as Crypto from 'expo-crypto'
+import type { PictureRef } from 'expo-camera'
 
 export interface QualityResult {
   score: number
@@ -195,7 +196,7 @@ export interface PreviewViewInfo {
 export { computeGuideWidthFraction } from './captureGeometry'
 
 export async function processCardCapture(
-  uri: string,
+  uri: string | PictureRef,
   orientation: 'portrait' | 'landscape' = 'portrait',
   sensorHints?: { width: number; height: number },
   viewInfo?: PreviewViewInfo,
@@ -206,6 +207,7 @@ export async function processCardCapture(
   let sensorW = sensorHints?.width
   let sensorH = sensorHints?.height
   if (sensorW == null || sensorH == null) {
+    if (typeof uri !== 'string') throw new Error('Native capture dimensions are required')
     const probe = await ImageManipulator.manipulateAsync(uri, [], {
       format: ImageManipulator.SaveFormat.JPEG,
     })
@@ -233,10 +235,25 @@ export async function processCardCapture(
     else actions.push({ resize: { height: MAX_LONG_EDGE } })
   }
 
-  const result = await ImageManipulator.manipulateAsync(uri, actions, {
-    compress: 0.9,
-    format: ImageManipulator.SaveFormat.JPEG,
-  })
+  let result: ImageManipulator.ImageResult
+  if (typeof uri === 'string') {
+    // OTA builds retain the existing file API and combine transforms in one
+    // pass. They never need the new native image-reference capture bridge.
+    result = await ImageManipulator.manipulateAsync(uri, actions, {
+      compress: 0.92, format: ImageManipulator.SaveFormat.JPEG,
+    })
+  } else {
+    const context = ImageManipulator.ImageManipulator.manipulate(uri)
+    let image: Awaited<ReturnType<typeof context.renderAsync>> | undefined
+    try {
+      for (const action of actions) {
+        if ('crop' in action) context.crop(action.crop)
+        if ('resize' in action) context.resize(action.resize)
+      }
+      image = await context.renderAsync()
+      result = await image.saveAsync({ compress: 0.92, format: ImageManipulator.SaveFormat.JPEG })
+    } finally { image?.release(); context.release() }
+  }
 
   const fileSize = Math.round(result.width * result.height * 0.15)
   return {
@@ -396,7 +413,7 @@ export function assessQuality(compressed: CompressedImage, sourceAspect?: number
   else if (megapixels >= 2) score += 8
   else {
     score -= 20
-    suggestions.push('Image resolution is very low — move the phone closer to the card')
+    suggestions.push('Image resolution is low — use an original full-resolution photo')
   }
 
   if (width >= 1500 && height >= 1500) score += 5
@@ -454,14 +471,14 @@ export function assessQuality(compressed: CompressedImage, sourceAspect?: number
   let resolutionLabel = ''
   if (score < 60) {
     resolutionLabel = 'Low resolution'
-    suggestions.push('Move closer and retake — this photo is too low-resolution to grade reliably')
+    suggestions.push('Use an original full-resolution photo. Moving closer cannot fix a low-resolution camera output.')
   } else if (score < 75) {
     resolutionLabel = 'Low-ish resolution'
   }
 
   // Always shown, because framing is the failure this module cannot see and
   // the one most often responsible for an ungradeable submission.
-  suggestions.push('Check the card fills the frame — a distant card cannot be graded accurately')
+  suggestions.push('Keep all four edges visible with a small margin. If text looks soft, move back slightly before retaking.')
 
   return {
     score,

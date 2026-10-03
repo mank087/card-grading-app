@@ -1,7 +1,7 @@
 import * as ImageManipulator from 'expo-image-manipulator'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, Image, Alert, Platform, ScrollView, useWindowDimensions } from 'react-native'
-import { CameraView, useCameraPermissions } from 'expo-camera'
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Image, Alert, Platform, ScrollView, useWindowDimensions, AppState } from 'react-native'
+import { CameraView, useCameraPermissions, type PictureRef } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,6 +15,7 @@ import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import { reportUploadEvent, beginCaptureAttempt } from '@/lib/uploadTelemetry'
 import { useResponsive } from '@/hooks/useResponsive'
+import { cancelCameraFocus, focusCamera, hasCaptureControls, type FocusStatus } from '@/lib/cameraControls'
 
 export default function CaptureScreen() {
   const router = useRouter()
@@ -30,43 +31,59 @@ export default function CaptureScreen() {
   const [isCapturing, setIsCapturing] = useState(false)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const { isTablet } = useResponsive()
-  // expo-camera's default pictureSize is conservative (often 1920x1080 or
-  // lower). On large screens like iPad that looks visibly soft. After the
-  // camera is ready we ask the device for its full list of available sizes
-  // and pin pictureSize to the highest one. Undefined on first render so
-  // the camera initializes with its safe default; flips to the max once
-  // onCameraReady fires.
-  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined)
+  // Set the iOS photographic preset at mount, avoiding a second session setup.
+  // Android already negotiates its highest compatible still size.
+  const pictureSize = Platform.OS === 'ios' ? 'Photo' : undefined
+  const [cameraReady, setCameraReady] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameraActive, setCameraActive] = useState(AppState.currentState == null || AppState.currentState === 'active')
+  const [cameraKey, setCameraKey] = useState(0)
+  const captureLock = useRef(false)
+  const captureGeneration = useRef(0)
+  const focusRequest = useRef(0)
+  const [focusStatus, setFocusStatus] = useState<FocusStatus | 'focusing' | null>(null)
+  const nativeControls = hasCaptureControls()
 
-  /**
-   * Tap-to-refocus.
-   *
-   * expo-camera exposes no focus method and no metering point, so true
-   * tap-to-point focus is not available. What IS available: flipping the
-   * autofocus prop off -> on -> off makes the native side run
-   * startFocusMetering() and then cancelFocusAndMetering(), and that cancel
-   * hands control back to continuous AF, which re-converges. So a tap is a
-   * "refocus now" kick rather than "focus here" — which is the useful half
-   * anyway when the lens has settled on the wrong thing.
-   */
-  const [autofocusMode, setAutofocusMode] = useState<'on' | 'off'>('off')
+  // Only show a focus reticle when this binary has real point metering.
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
   const focusTimers = useRef<Array<ReturnType<typeof setTimeout>>>([])
 
-  const handleTapFocus = useCallback((e: { nativeEvent: { locationX: number; locationY: number } }) => {
+  const handleTapFocus = useCallback(async (e: { nativeEvent: { locationX: number; locationY: number } }) => {
+    const layout = cameraLayoutRef.current
+    if (!nativeControls || !cameraReady || captureLock.current || !layout) return
     const { locationX, locationY } = e.nativeEvent
+    const request = ++focusRequest.current
     focusTimers.current.forEach(clearTimeout)
     focusTimers.current = []
     setFocusPoint({ x: locationX, y: locationY })
-    setAutofocusMode('on')
+    setFocusStatus('focusing')
     Haptics.selectionAsync().catch(() => { /* haptics are optional */ })
-    // Back to 'off' = cancelFocusAndMetering() = resume continuous AF.
-    focusTimers.current.push(setTimeout(() => setAutofocusMode('off'), 150))
-    focusTimers.current.push(setTimeout(() => setFocusPoint(null), 900))
-  }, [])
+    const result = await focusCamera(cameraRef.current, locationX / layout.containerW, locationY / layout.containerH)
+    if (request !== focusRequest.current) return
+    setFocusStatus(result.status)
+    focusTimers.current.push(setTimeout(() => { setFocusPoint(null); setFocusStatus(null) }, 2200))
+  }, [nativeControls, cameraReady])
 
   // Timers outlive the screen if the user backs out mid-focus.
-  useEffect(() => () => { focusTimers.current.forEach(clearTimeout) }, [])
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      setCameraActive(state === 'active')
+      setCameraReady(false)
+      captureGeneration.current++
+      focusRequest.current++
+      focusTimers.current.forEach(clearTimeout)
+      cancelCameraFocus(cameraRef.current)
+      setFocusPoint(null)
+      setFocusStatus(null)
+    })
+    return () => {
+      subscription.remove()
+      captureGeneration.current++
+      focusRequest.current++
+      focusTimers.current.forEach(clearTimeout)
+      cancelCameraFocus(cameraRef.current)
+    }
+  }, [])
 
   // CAPTURE-GATE P0: open a capture attempt on mount. Every telemetry event
   // from here through grade start carries this id, which is what makes
@@ -112,9 +129,20 @@ export default function CaptureScreen() {
    * proceed, it just relabels the primary action.
    */
   const [previewIsSoft, setPreviewIsSoft] = useState(false)
+  const [previewFocusUnknown, setPreviewFocusUnknown] = useState(false)
 
   // Method (camera vs gallery) — pre-selected from the main grade screen, defaults to camera
   const [mode, setMode] = useState<'camera' | 'gallery'>(params.mode === 'gallery' ? 'gallery' : 'camera')
+  useEffect(() => {
+    setCameraReady(false)
+    setCameraError(null)
+    focusRequest.current++
+    captureGeneration.current++
+    cancelCameraFocus(cameraRef.current)
+    setFocusPoint(null)
+    setFocusStatus(null)
+    focusTimers.current.forEach(clearTimeout)
+  }, [facing, mode, previewUri, cameraKey])
 
   // Pro Tip modal — only gates here when the main grade screen didn't already show it
   // (signaled by tipsAcked=1 in query params). Otherwise users would see the tips twice.
@@ -180,6 +208,7 @@ export default function CaptureScreen() {
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
       setPreviewIsSoft(sharpness?.isSoft === true)
+      setPreviewFocusUnknown(sharpness === null)
       setCaptureSources(prev => ({ ...prev, [currentSide]: 'gallery' }))
       reportUploadEvent({
         event: 'capture_attempted',
@@ -262,88 +291,49 @@ export default function CaptureScreen() {
     }
   }
 
-  // When the camera initializes, query supported picture sizes and pick the
-  // largest by total pixel count. Sizes come back as strings like "1920x1080"
-  // or "3840x2160"; we parse, rank, and apply. Silently no-op if the device
-  // returns an empty list (rare — has happened on some older Androids).
-  // Defined before early returns to keep hook order stable across renders.
-  const handleCameraReady = useCallback(async () => {
-    if (!cameraRef.current || pictureSize) return
-    /**
-     * ANDROID: do not touch pictureSize. It buys nothing and breaks focus.
-     *
-     * expo-camera's buildResolutionSelector() already falls back to
-     * ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY when pictureSize is empty,
-     * so Android is ALREADY capturing at the maximum the sensor offers. Setting
-     * it explicitly selects the same resolution — but assigning the prop sets
-     * shouldCreateCamera = true, which tears down and rebinds the whole CameraX
-     * session moments after onCameraReady.
-     *
-     * That rebind is why the preview would not focus. createCamera() restores
-     * zoom afterwards but never re-applies focus state, and the autoFocus
-     * setter is a no-op while `camera` is null (which it is when props first
-     * apply), so nothing re-establishes continuous AF after the rebind.
-     *
-     * The "expo default is 1920x1080 or lower" note below is true on iOS, which
-     * is why the 'Photo' preset is still needed there. It is not true on Android.
-     */
-    if (Platform.OS === 'android') return
-    try {
-      const sizes = await cameraRef.current.getAvailablePictureSizesAsync()
-      if (!sizes || sizes.length === 0) return
-      // v9.10: on iOS the list is preset NAMES, and "Photo" is the full-sensor
-      // still preset (~12MP 4:3 on iPhone). The numeric ranking below scored it
-      // 0 and picked "3840x2160" (8.3MP, 16:9) on every iPhone — losing ~31%
-      // of pixels AND cropping the 4:3 field of view. Prefer "Photo" outright.
-      if (sizes.includes('Photo')) {
-        setPictureSize('Photo')
-        return
-      }
-      const ranked = sizes
-        .map(label => {
-          const m = /^(\d+)x(\d+)$/.exec(label)
-          return { label, px: m ? Number(m[1]) * Number(m[2]) : 0 }
-        })
-        .sort((a, b) => b.px - a.px)
-      const best = ranked[0]?.label
-      if (best) setPictureSize(best)
-    } catch {
-      // Fall back to default if querying fails — capture still works,
-      // just at the camera's stock resolution.
-    }
-  }, [pictureSize])
+  const handleCameraReady = useCallback(() => {
+    setCameraReady(true)
+    setCameraError(null)
+  }, [])
 
-  if (!permission) return <View style={styles.container} />
+  if (mode === 'camera' && !permission) return <View style={styles.container} />
 
-  if (!permission.granted) {
+  if (mode === 'camera' && !permission?.granted) {
     return (
       <View style={styles.permissionContainer}>
         <Ionicons name="camera-outline" size={64} color={Colors.gray[400]} />
         <Text style={styles.permissionTitle}>Camera Access Required</Text>
         <Text style={styles.permissionText}>We need camera access to photograph your card for grading.</Text>
         <Button title="Grant Camera Access" onPress={requestPermission} />
+        <Button title="Use Gallery" onPress={() => setMode('gallery')} />
       </View>
     )
   }
 
   const handleCapture = async () => {
-    if (!cameraRef.current || isCapturing) return
+    if (!cameraRef.current || captureLock.current || !cameraReady || !cameraActive || focusStatus === 'focusing') return
+    captureLock.current = true
+    const generation = captureGeneration.current
+    let imageRef: PictureRef | undefined
     setIsCapturing(true)
     setPreviewIsSoft(false)
+    setPreviewFocusUnknown(false)
 
     try {
-      // Give the lens time to settle before the shutter fires. This delay
-      // matters more now that focus is CONTINUOUS (see autofocus="off" on the
-      // CameraView): the lens may be mid-sweep when the user taps, and a
-      // continuous-AF sweep on Android typically takes 300-500ms — well past
-      // the 180ms this used to allow, which is why Android capture could still
-      // land blurry. iOS converges faster and keeps the shorter delay.
-      // shutterSound: false suppresses the system camera click (Japanese and
-      // Korean Android devices force it on by law, so the flag is ignored there).
-      const settleMs = Platform.OS === 'android' ? 450 : isTablet ? 250 : 180
-      await new Promise(r => setTimeout(r, settleMs))
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, shutterSound: false })
-      if (!photo?.uri) throw new Error('Capture failed')
+      let shutterFocus: FocusStatus | null = focusStatus === 'focused' || focusStatus === 'settled' ? focusStatus : null
+      if (nativeControls && !shutterFocus) {
+        shutterFocus = (await focusCamera(cameraRef.current, 0.5, 0.5)).status
+      } else if (!nativeControls) {
+        // Compatibility path: continuous AF, with a short allowance for shutter movement.
+        // This delay is not reported as a successful focus measurement.
+        await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 450 : 250))
+      }
+      if (generation !== captureGeneration.current || !cameraRef.current) return
+      const photo = nativeControls
+        ? (imageRef = await cameraRef.current.takePictureAsync({ pictureRef: true, shutterSound: false }))
+        : await cameraRef.current.takePictureAsync({ quality: 1, shutterSound: false })
+      if (!photo || !photo.width || !photo.height) throw new Error('Capture failed')
+      if (generation !== captureGeneration.current) return
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       setIsProcessing(true)
@@ -353,7 +343,7 @@ export default function CaptureScreen() {
       // probe → cropToCardAspect → compressImage which compounded
       // JPEG re-encodes and softened the final photo.
       const compressed = await processCardCapture(
-        photo.uri,
+        imageRef ?? (photo as { uri: string }).uri,
         orientation,
         photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
         cameraLayoutRef.current
@@ -367,12 +357,13 @@ export default function CaptureScreen() {
             }
           : undefined,
       )
+      if (generation !== captureGeneration.current) return
 
       // v8.9 MINIMUM-RESOLUTION GATE (matches web/gallery)
       if (Math.max(compressed.width, compressed.height) < 1000) {
         Alert.alert(
           'Capture Too Small',
-          'The captured photo resolution is too low for accurate grading. Move closer to the card and retake.'
+          'This camera output is too small for grading. Use a full-resolution photo from your phone camera through Gallery. Moving closer will not increase the camera output resolution.'
         )
         setIsCapturing(false)
         setIsProcessing(false)
@@ -390,16 +381,17 @@ export default function CaptureScreen() {
 
       // Focus check — runs while the "Processing…" state is still up, before
       // the preview appears and therefore before the user can spend a credit.
-      // Measures the cropped file, so the card fills the frame and a sharp
-      // background cannot rescue a soft card. Null = measurement failed =
-      // treat as sharp; see lib/blurCheck.ts.
+      // Measures the guide crop, which can still contain background. This is
+      // advisory; a failed measurement is shown as unknown, never as sharp.
       const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
+      if (generation !== captureGeneration.current) return
 
       rotationSource.current = compressed
       rotationTurns.current = 0
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
       setPreviewIsSoft(sharpness?.isSoft === true)
+      setPreviewFocusUnknown(sharpness === null)
       setCaptureSources(prev => ({ ...prev, [currentSide]: 'camera' }))
       reportUploadEvent({
         event: 'capture_attempted',
@@ -407,6 +399,11 @@ export default function CaptureScreen() {
         capture_source: 'camera',
         image_width: compressed.width,
         image_height: compressed.height,
+        capture_method: imageRef ? 'native_image_reference' : 'native_camera_file',
+        metadata: { capture_version: 'capture-v2', native_controls: nativeControls, focus_result: shutterFocus,
+          sharpness: sharpness?.variance ?? null, sharpness_status: sharpness ? sharpness.isSoft ? 'warn' : 'pass' : 'unknown',
+          analysis_ms: sharpness?.elapsedMs ?? null, photo_width: photo.width, photo_height: photo.height,
+          facing, torch: torchOn, orientation },
       })
 
       // Store for current side
@@ -432,9 +429,12 @@ export default function CaptureScreen() {
         setBackHash(hash)
       }
     } catch (err) {
+      if (generation !== captureGeneration.current) return
       console.error('Capture error:', err)
       Alert.alert('Capture Failed', 'Please try again.')
     } finally {
+      imageRef?.release()
+      captureLock.current = false
       setIsCapturing(false)
       setIsProcessing(false)
     }
@@ -595,11 +595,12 @@ export default function CaptureScreen() {
               lib/blurCheck actually measured the image and it fell below the
               calibrated threshold — never on a measurement that failed. No
               animation, matching the rest of this screen. */}
-          {previewIsSoft && (
+          {(previewIsSoft || previewFocusUnknown) && (
             <View style={styles.softBanner} accessibilityRole="alert">
               <Ionicons name="alert-circle" size={18} color={Colors.amber[500]} />
               <Text style={styles.softBannerText}>
-                This photo looks soft — a sharper photo usually means a more confident grade.
+                {previewFocusUnknown ? 'Focus could not be checked. Inspect the printed text and every corner before continuing.'
+                  : 'This photo looks soft. Move back slightly if needed, hold steady, and retake in diffuse light.'}
               </Text>
             </View>
           )}
@@ -709,6 +710,7 @@ export default function CaptureScreen() {
         {mode === 'camera' ? (
           <TouchableOpacity
             onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
+            disabled={isCapturing || isProcessing}
             style={styles.headerButton}
             accessibilityLabel={facing === 'back' ? 'Switch to front-facing camera' : 'Switch to rear camera'}
             accessibilityRole="button"
@@ -724,6 +726,7 @@ export default function CaptureScreen() {
         <TouchableOpacity
           style={[styles.methodTab, mode === 'camera' && styles.methodTabActive]}
           onPress={() => setMode('camera')}
+          disabled={isCapturing || isProcessing}
           accessibilityLabel="Camera mode"
           accessibilityRole="tab"
           accessibilityState={{ selected: mode === 'camera' }}
@@ -734,6 +737,7 @@ export default function CaptureScreen() {
         <TouchableOpacity
           style={[styles.methodTab, mode === 'gallery' && styles.methodTabActive]}
           onPress={() => setMode('gallery')}
+          disabled={isCapturing || isProcessing}
           accessibilityLabel="Gallery mode"
           accessibilityRole="tab"
           accessibilityState={{ selected: mode === 'gallery' }}
@@ -761,49 +765,24 @@ export default function CaptureScreen() {
               )
             }}
           >
-            <CameraView
+            {cameraActive && <CameraView
+              key={`${facing}-${cameraKey}`}
               ref={cameraRef}
               style={styles.camera}
               facing={facing}
               enableTorch={torchOn && facing === 'back'}
-              /**
-               * "off" means CONTINUOUS autofocus. The prop's semantics are the
-               * opposite of what the name suggests, per Expo's own docs:
-               *   "on"  — autofocus once and then LOCK the focus
-               *   "off" — automatically focus when needed
-               *
-               * We had "on", so the camera fired a single focus sweep at mount,
-               * before the card was in frame, and locked there. On Android it is
-               * worse than it sounds: ExpoCameraView.startFocusMetering() meters
-               * at createPoint(1f, 1f) — the BOTTOM-RIGHT CORNER of the preview,
-               * not the centre where the card guide is — so the one sweep it did
-               * get locked onto the background. Setting OFF makes the native side
-               * call cancelFocusAndMetering(), handing focus back to CameraX's
-               * continuous AF, which is what a card in a guide box needs.
-               */
-              autofocus={autofocusMode}
-              /**
-               * NO zoom prop. Passing zoom={0} looks like "no zoom", but
-               * setCameraZoom() computes max(1f, 0 * maxZoomRatio) and issues an
-               * explicit setZoomRatio(1f) on every bind. That pins the main wide
-               * sensor at exactly 1x and suppresses the automatic lens switching
-               * phones use for close subjects — and a main sensor typically
-               * cannot focus closer than ~10-15cm, which is inside the distance
-               * a card fills the guide box at. Omitting the prop leaves the
-               * device free to choose, the way getUserMedia does on mobile web.
-               */
+              autofocus="off"
               pictureSize={pictureSize}
               onCameraReady={handleCameraReady}
-            />
-            {/* Tap to refocus. expo-camera accepts no metering point, so this
-                cannot focus on the tapped SPOT — it kicks AF and hands control
-                back to continuous focus, which re-converges on the scene. The
-                reticle is placed at the tap purely as feedback. */}
-            <Pressable style={StyleSheet.absoluteFill} onPress={handleTapFocus} />
+              onMountError={event => { setCameraReady(false); setCameraError(event.message || 'Camera could not start') }}
+            />}
+            {nativeControls && <Pressable style={StyleSheet.absoluteFill} onPress={handleTapFocus}
+              disabled={!cameraReady || isCapturing || isProcessing} accessibilityLabel="Tap the card to focus" />}
             {focusPoint && (
               <View
                 pointerEvents="none"
-                style={[styles.focusRing, { left: focusPoint.x - 36, top: focusPoint.y - 36 }]}
+                style={[styles.focusRing, { left: focusPoint.x - 36, top: focusPoint.y - 36,
+                  borderColor: focusStatus === 'focused' ? '#86efac' : focusStatus === 'focusing' || focusStatus === 'settled' ? '#ffffff' : '#fbbf24' }]}
               />
             )}
             <View style={styles.guideContainer} pointerEvents="none">
@@ -825,6 +804,11 @@ export default function CaptureScreen() {
                 <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
               </View>
             </View>
+            {cameraError && <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000d', padding: 24 }]}>
+              <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 12 }}>Camera could not start. Try again or use a photo from Gallery.</Text>
+              <Button title="Try Again" onPress={() => setCameraKey(k => k + 1)} />
+              <Button title="Use Gallery" onPress={() => setMode('gallery')} />
+            </View>}
           </View>
         </View>
       ) : (
@@ -865,7 +849,12 @@ export default function CaptureScreen() {
             reach for when picking from the gallery. */}
         {mode === 'camera' && (
           <Text style={styles.framingHint}>
-            Move close — the card should reach all four corners
+            {isCapturing || isProcessing ? 'Saving photo — hold steady…'
+              : !cameraReady ? 'Starting camera…'
+              : focusStatus === 'focusing' ? 'Focusing…'
+              : focusStatus && !['focused', 'settled'].includes(focusStatus) ? 'Focus could not settle. Move back slightly and try again.'
+              : nativeControls ? 'Tap the card to focus. Keep every edge visible; move back if text looks soft.'
+              : 'Autofocus is automatic. Keep every edge visible; move back if text looks soft.'}
           </Text>
         )}
         <View style={styles.capturedIndicators}>
@@ -884,10 +873,10 @@ export default function CaptureScreen() {
           <TouchableOpacity
             onPress={() => setTorchOn(t => !t)}
             style={styles.controlButton}
-            disabled={facing === 'front'}
+            disabled={facing === 'front' || isCapturing || isProcessing}
             accessibilityLabel={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
             accessibilityRole="button"
-            accessibilityState={{ disabled: facing === 'front', selected: torchOn }}
+            accessibilityState={{ disabled: facing === 'front' || isCapturing || isProcessing, selected: torchOn }}
           >
             <Ionicons
               name={torchOn ? 'flashlight' : 'flashlight-outline'}
@@ -901,6 +890,7 @@ export default function CaptureScreen() {
 
           <TouchableOpacity
             onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
+            disabled={isCapturing || isProcessing}
             style={styles.controlButton}
             accessibilityLabel={orientation === 'portrait' ? 'Switch guide to landscape' : 'Switch guide to portrait'}
             accessibilityRole="button"
@@ -911,17 +901,18 @@ export default function CaptureScreen() {
           <TouchableOpacity
             style={styles.captureButton}
             onPress={requestCapture}
-            disabled={isCapturing || isProcessing}
+            disabled={isCapturing || isProcessing || !cameraReady || !cameraActive || focusStatus === 'focusing'}
             activeOpacity={0.7}
             accessibilityLabel={`Capture ${currentSide} photo`}
             accessibilityRole="button"
-            accessibilityState={{ disabled: isCapturing || isProcessing, busy: isCapturing || isProcessing }}
+            accessibilityState={{ disabled: isCapturing || isProcessing || !cameraReady || !cameraActive || focusStatus === 'focusing', busy: isCapturing || isProcessing }}
           >
             <View style={[styles.captureInner, (isCapturing || isProcessing) && { opacity: 0.5 }]} />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
+            disabled={isCapturing || isProcessing}
             style={styles.controlButton}
             accessibilityLabel={`Switch to capturing the ${currentSide === 'front' ? 'back' : 'front'} of the card`}
             accessibilityRole="button"
@@ -935,6 +926,7 @@ export default function CaptureScreen() {
         <View style={[styles.galleryControls, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
             onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
+            disabled={isCapturing || isProcessing}
             style={styles.gallerySwitchBtn}
             accessibilityLabel={`Switch to selecting the ${currentSide === 'front' ? 'back' : 'front'} of the card`}
             accessibilityRole="button"
