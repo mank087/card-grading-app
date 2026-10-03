@@ -36,6 +36,9 @@ async function mount(platform = 'android', granted = true) {
   const takePictureAsync = vi.fn().mockResolvedValue({ uri: 'file://capture.jpg', width: 3000, height: 4000 });
   const photo = { uri: 'file://processed.jpg', width: 2000, height: 2800, fileSize: 840000 };
   const processCardCapture = vi.fn().mockResolvedValue(photo);
+  const compressImage = vi.fn().mockResolvedValue(photo);
+  const launchCameraAsync = vi.fn().mockResolvedValue({ canceled: true });
+  const requestCameraPermissionsAsync = vi.fn().mockResolvedValue({ granted: true });
   const focusCamera = vi.fn();
   const reportUploadEvent = vi.fn();
   const CameraView = React.forwardRef((props: any, ref: any) => {
@@ -57,12 +60,13 @@ async function mount(platform = 'android', granted = true) {
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({ category: 'sports', tipsAcked: '1' }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '@expo/vector-icons': { Ionicons: 'Icon' },
-    'expo-haptics': { impactAsync: vi.fn(), ImpactFeedbackStyle: { Medium: 'medium' } },
-    'expo-image-picker': {}, 'expo-image-manipulator': {}, 'expo-status-bar': { StatusBar: 'StatusBar' },
+    'expo-haptics': { impactAsync: vi.fn(), selectionAsync: vi.fn().mockResolvedValue(undefined), ImpactFeedbackStyle: { Medium: 'medium' } },
+    'expo-image-picker': { launchCameraAsync, requestCameraPermissionsAsync, CameraType: { back: 'back' } },
+    'expo-image-manipulator': {}, 'expo-status-bar': { StatusBar: 'StatusBar' },
     '@/lib/constants': { Colors: new Proxy({}, { get: () => shades }) },
     '@/assets/images/dcm-logo.png': 1,
     '@/lib/imageUtils': {
-      processCardCapture, assessQuality: () => ({ score: 90, resolutionLabel: '2000 × 2800', width: 2000, height: 2800, suggestions: [] }),
+      processCardCapture, compressImage, assessQuality: () => ({ score: 90, resolutionLabel: '2000 × 2800', width: 2000, height: 2800, suggestions: [] }),
       hashImage: async () => 'hash', computeGuideWidthFraction: () => 0.7,
     },
     '@/lib/blurCheck': { measureSharpness: async () => null },
@@ -74,14 +78,89 @@ async function mount(platform = 'android', granted = true) {
   }).default;
   await act(() => { tree = create(React.createElement(Screen)); });
   return {
-    takePictureAsync, processCardCapture, focusCamera, reportUploadEvent,
+    takePictureAsync, processCardCapture, compressImage, focusCamera, reportUploadEvent, launchCameraAsync, requestCameraPermissionsAsync,
     appState: (state: string) => appStateChanged(state),
     shutter: () => tree.root.findByProps({ accessibilityLabel: 'Capture front photo' }),
+    tap: () => tree.root.findByProps({ accessibilityLabel: 'Tap to refocus' }),
+    phoneCamera: () => tree.root.findByProps({ accessibilityLabel: 'Use Phone Camera' }),
     ready: async () => { await act(() => tree.root.findByType('CameraView').props.onCameraReady()); },
   };
 }
 
 describe('camera OTA on existing native binaries', () => {
+  it.each(['ios', 'android'])('restores tap-to-refocus on %s and returns to continuous AF without claiming a focus result', async platform => {
+    const app = await mount(platform);
+    expect(app.tap().props.disabled).toBe(true);
+    await app.ready();
+    await act(() => app.tap().props.onPress({ nativeEvent: { locationX: 120, locationY: 200 } }));
+    expect(tree.root.findByType('CameraView').props.autofocus).toBe('on');
+    expect(app.shutter().props.disabled).toBe(true);
+    // Same-render taps cannot bypass the shutter's refocus guard.
+    await act(() => app.shutter().props.onPress());
+    await act(() => vi.advanceTimersByTimeAsync(150));
+    expect(tree.root.findByType('CameraView').props.autofocus).toBe('off');
+    expect(app.shutter().props.disabled).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(550));
+    expect(app.shutter().props.disabled).toBe(false);
+    expect(app.focusCamera).not.toHaveBeenCalled();
+    expect(app.takePictureAsync).not.toHaveBeenCalled();
+    expect(app.reportUploadEvent).not.toHaveBeenCalled();
+  });
+
+  it('resets a pending tap-refocus when the app backgrounds', async () => {
+    const app = await mount();
+    await app.ready();
+    await act(() => app.tap().props.onPress({ nativeEvent: { locationX: 100, locationY: 100 } }));
+    await act(() => app.appState('background'));
+    expect(vi.getTimerCount()).toBe(0);
+    await act(() => app.appState('active'));
+    expect(tree.root.findByType('CameraView').props.autofocus).toBe('off');
+    await app.ready();
+    expect(app.shutter().props.disabled).toBe(false);
+  });
+
+  it('releases the embedded camera and preserves the full system-camera composition', async () => {
+    const app = await mount();
+    app.launchCameraAsync.mockImplementation(async () => {
+      expect(tree.root.findAllByType('CameraView')).toHaveLength(0);
+      return { canceled: false, assets: [{ uri: 'file://phone.jpg', width: 4000, height: 3000 }] };
+    });
+    await act(() => { app.phoneCamera().props.onPress(); });
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(app.launchCameraAsync).toHaveBeenCalledWith({ mediaTypes: ['images'], cameraType: 'back', allowsEditing: false, quality: 1, exif: false });
+    expect(app.compressImage).toHaveBeenCalledWith('file://phone.jpg', { width: 4000, height: 3000 });
+    expect(app.processCardCapture).not.toHaveBeenCalled();
+    expect(app.reportUploadEvent).toHaveBeenCalledWith(expect.objectContaining({ capture_source: 'camera', capture_method: 'native_system_camera' }));
+    expect(JSON.stringify(tree.toJSON())).toContain('Front');
+  });
+
+  it.each(['cancelled', 'denied', 'failed'])('recovers the embedded camera after a %s system camera attempt', async outcome => {
+    const app = await mount();
+    if (outcome === 'denied') app.requestCameraPermissionsAsync.mockResolvedValue({ granted: false });
+    if (outcome === 'failed') app.launchCameraAsync.mockRejectedValue(new Error('Camera unavailable'));
+    await act(() => app.phoneCamera().props.onPress());
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(tree.root.findAllByType('CameraView')).toHaveLength(1);
+    expect(app.shutter().props.disabled).toBe(true);
+    await app.ready();
+    expect(app.shutter().props.disabled).toBe(false);
+    expect(app.compressImage).not.toHaveBeenCalled();
+    if (outcome === 'denied') expect(app.launchCameraAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not process a system-camera result after leaving the screen', async () => {
+    const app = await mount();
+    let finish: (value: any) => void = () => {};
+    app.launchCameraAsync.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await act(() => app.phoneCamera().props.onPress());
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    await act(() => tree.unmount());
+    tree = undefined;
+    await act(() => finish({ canceled: false, assets: [{ uri: 'file://stale.jpg', width: 4000, height: 3000 }] }));
+    expect(app.compressImage).not.toHaveBeenCalled();
+    expect(app.reportUploadEvent).not.toHaveBeenCalled();
+  });
+
   it.each(['ios', 'android'])('captures on %s using only the supported file API and guards duplicate taps', async platform => {
     const app = await mount(platform);
     expect(app.shutter().props.disabled).toBe(true);

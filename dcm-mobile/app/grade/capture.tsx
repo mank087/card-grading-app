@@ -39,18 +39,24 @@ export default function CaptureScreen() {
   const [cameraActive, setCameraActive] = useState(AppState.currentState == null || AppState.currentState === 'active')
   const [cameraKey, setCameraKey] = useState(0)
   const captureLock = useRef(false)
+  const screenMounted = useRef(true)
+  const [usingPhoneCamera, setUsingPhoneCamera] = useState(false)
   const captureGeneration = useRef(0)
   const focusRequest = useRef(0)
   const [focusStatus, setFocusStatus] = useState<FocusStatus | 'focusing' | null>(null)
   const nativeControls = hasCaptureControls()
+  const [autofocusMode, setAutofocusMode] = useState<'on' | 'off'>('off')
+  const refocusing = useRef(false)
 
-  // Only show a focus reticle when this binary has real point metering.
+  // Legacy taps restart AF. Only the new bridge can meter a specific point
+  // and report focus success; feedback on older binaries stays neutral.
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null)
   const focusTimers = useRef<Array<ReturnType<typeof setTimeout>>>([])
 
   const handleTapFocus = useCallback(async (e: { nativeEvent: { locationX: number; locationY: number } }) => {
     const layout = cameraLayoutRef.current
-    if (!nativeControls || !cameraReady || captureLock.current || !layout) return
+    if (!cameraReady || captureLock.current || refocusing.current) return
+    if (nativeControls && !layout) return
     const { locationX, locationY } = e.nativeEvent
     const request = ++focusRequest.current
     focusTimers.current.forEach(clearTimeout)
@@ -58,7 +64,20 @@ export default function CaptureScreen() {
     setFocusPoint({ x: locationX, y: locationY })
     setFocusStatus('focusing')
     Haptics.selectionAsync().catch(() => { /* haptics are optional */ })
-    const result = await focusCamera(cameraRef.current, locationX / layout.containerW, locationY / layout.containerH)
+    if (!nativeControls) {
+      // Preserve the existing binary's refocus trigger. Return promptly to
+      // continuous AF so Expo's fixed metering point cannot stay locked.
+      refocusing.current = true
+      setAutofocusMode('on')
+      focusTimers.current.push(setTimeout(() => setAutofocusMode('off'), 150))
+      focusTimers.current.push(setTimeout(() => {
+        refocusing.current = false
+        setFocusPoint(null)
+        setFocusStatus(null)
+      }, 700))
+      return
+    }
+    const result = await focusCamera(cameraRef.current, locationX / layout!.containerW, locationY / layout!.containerH)
     if (request !== focusRequest.current) return
     setFocusStatus(result.status)
     focusTimers.current.push(setTimeout(() => { setFocusPoint(null); setFocusStatus(null) }, 2200))
@@ -66,17 +85,21 @@ export default function CaptureScreen() {
 
   // Timers outlive the screen if the user backs out mid-focus.
   useEffect(() => {
+    screenMounted.current = true
     const subscription = AppState.addEventListener('change', state => {
       setCameraActive(state === 'active')
       setCameraReady(false)
       captureGeneration.current++
       focusRequest.current++
       focusTimers.current.forEach(clearTimeout)
+      refocusing.current = false
+      setAutofocusMode('off')
       cancelCameraFocus(cameraRef.current)
       setFocusPoint(null)
       setFocusStatus(null)
     })
     return () => {
+      screenMounted.current = false
       subscription.remove()
       captureGeneration.current++
       focusRequest.current++
@@ -142,6 +165,8 @@ export default function CaptureScreen() {
     setFocusPoint(null)
     setFocusStatus(null)
     focusTimers.current.forEach(clearTimeout)
+    refocusing.current = false
+    setAutofocusMode('off')
   }, [facing, mode, previewUri, cameraKey])
 
   // Pro Tip modal — only gates here when the main grade screen didn't already show it
@@ -149,7 +174,7 @@ export default function CaptureScreen() {
   const [tipsVisible, setTipsVisible] = useState(false)
   const [tipsLoaded, setTipsLoaded] = useState(false)
   const [shouldGateOnTips, setShouldGateOnTips] = useState(true)
-  const [pendingAction, setPendingAction] = useState<'capture' | 'gallery' | null>(null)
+  const [pendingAction, setPendingAction] = useState<'capture' | 'gallery' | 'phone_camera' | null>(null)
 
   useEffect(() => {
     if (params.tipsAcked === '1') {
@@ -167,7 +192,7 @@ export default function CaptureScreen() {
   // Run a picked image through the compress → quality → hash pipeline
   // and stash it as the current side. GALLERY PATH ONLY — the camera path
   // uses processCardCapture directly in handleCapture.
-  const processImage = async (rawUri: string, knownDims?: { width: number; height: number }) => {
+  const processImage = async (rawUri: string, knownDims?: { width: number; height: number }, source: 'gallery' | 'phone_camera' = 'gallery') => {
     setIsProcessing(true)
     setPreviewIsSoft(false)
     try {
@@ -180,6 +205,7 @@ export default function CaptureScreen() {
       // v9.10: pass the picker asset's dimensions so compressImage skips its
       // probe pass (which was a full extra JPEG re-encode just to read size).
       const compressed = await compressImage(rawUri, knownDims)
+      if (!screenMounted.current) return
 
       // v8.9 MINIMUM-RESOLUTION GATE (matches web): below ~1000px the grading AI
       // physically cannot resolve edge whitening, corner wear, or fine print.
@@ -203,17 +229,19 @@ export default function CaptureScreen() {
       // one off the sensor. Null (measurement failed) means "no opinion".
       const sharpness = await measureSharpness(compressed.uri, { width: compressed.width, height: compressed.height })
 
+      if (!screenMounted.current) return
       rotationSource.current = compressed
       rotationTurns.current = 0
       setPreviewUri(compressed.uri)
       setPreviewQuality(quality)
       setPreviewIsSoft(sharpness?.isSoft === true)
       setPreviewFocusUnknown(sharpness === null)
-      setCaptureSources(prev => ({ ...prev, [currentSide]: 'gallery' }))
+      setCaptureSources(prev => ({ ...prev, [currentSide]: source === 'phone_camera' ? 'camera' : 'gallery' }))
       reportUploadEvent({
         event: 'capture_attempted',
         side: currentSide,
-        capture_source: 'gallery',
+        capture_source: source === 'phone_camera' ? 'camera' : 'gallery',
+        capture_method: source === 'phone_camera' ? 'native_system_camera' : 'native_gallery',
         image_width: compressed.width,
         image_height: compressed.height,
       })
@@ -238,10 +266,11 @@ export default function CaptureScreen() {
         setBackHash(hash)
       }
     } catch (err) {
+      if (!screenMounted.current) return
       console.error('[capture] processImage error:', err)
       Alert.alert('Processing Failed', 'Could not process that image. Try a different one.')
     } finally {
-      setIsProcessing(false)
+      if (screenMounted.current) setIsProcessing(false)
     }
   }
 
@@ -291,10 +320,68 @@ export default function CaptureScreen() {
     }
   }
 
+  const captureWithPhoneCamera = async () => {
+    if (captureLock.current || isProcessing) return
+    captureLock.current = true
+    setIsCapturing(true)
+    setCameraReady(false)
+    focusRequest.current++
+    focusTimers.current.forEach(clearTimeout)
+    refocusing.current = false
+    setAutofocusMode('off')
+    setFocusPoint(null)
+    setFocusStatus(null)
+    cancelCameraFocus(cameraRef.current)
+    setUsingPhoneCamera(true)
+    try {
+      // Allow the embedded view to unmount before opening the OS camera.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      if (!screenMounted.current) return
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync()
+      if (!screenMounted.current) return
+      if (!cameraPermission.granted) {
+        Alert.alert('Camera permission needed', 'Allow camera access to take a photo, or choose an existing photo from Gallery.')
+        return
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'], cameraType: ImagePicker.CameraType.back,
+        allowsEditing: false, quality: 1, exif: false,
+      })
+      if (!screenMounted.current || result.canceled) return
+      const asset = result.assets?.[0]
+      if (asset?.uri) await processImage(asset.uri,
+        asset.width && asset.height ? { width: asset.width, height: asset.height } : undefined, 'phone_camera')
+    } catch {
+      if (screenMounted.current) Alert.alert('Camera could not open', 'Try again, or take a photo with your camera app and select it from Gallery.')
+    } finally {
+      captureLock.current = false
+      if (screenMounted.current) {
+        setUsingPhoneCamera(false)
+        setIsCapturing(false)
+      }
+    }
+  }
+
+  const requestPhoneCamera = () => {
+    if (shouldGateOnTips && tipsLoaded) {
+      setPendingAction('phone_camera')
+      setTipsVisible(true)
+    } else {
+      void captureWithPhoneCamera()
+    }
+  }
+
   const handleCameraReady = useCallback(() => {
     setCameraReady(true)
     setCameraError(null)
   }, [])
+
+  if (usingPhoneCamera) return (
+    <View style={styles.permissionContainer}>
+      <Text style={styles.permissionTitle}>{isProcessing ? 'Preparing your photo…' : 'Phone camera'}</Text>
+      <Text style={styles.permissionText}>Keep every card edge visible and check that the printed text is sharp.</Text>
+    </View>
+  )
 
   if (mode === 'camera' && !permission) return <View style={styles.container} />
 
@@ -311,7 +398,7 @@ export default function CaptureScreen() {
   }
 
   const handleCapture = async () => {
-    if (!cameraRef.current || captureLock.current || !cameraReady || !cameraActive || focusStatus === 'focusing') return
+    if (!cameraRef.current || captureLock.current || refocusing.current || !cameraReady || !cameraActive || focusStatus === 'focusing') return
     captureLock.current = true
     const generation = captureGeneration.current
     let imageRef: PictureRef | undefined
@@ -400,7 +487,7 @@ export default function CaptureScreen() {
         image_width: compressed.width,
         image_height: compressed.height,
         capture_method: imageRef ? 'native_image_reference' : 'native_camera_file',
-        metadata: { capture_version: 'capture-v2', native_controls: nativeControls, focus_result: shutterFocus,
+        metadata: { capture_version: 'capture-v3-refocus', native_controls: nativeControls, focus_result: shutterFocus,
           sharpness: sharpness?.variance ?? null, sharpness_status: sharpness ? sharpness.isSoft ? 'warn' : 'pass' : 'unknown',
           analysis_ms: sharpness?.elapsedMs ?? null, photo_width: photo.width, photo_height: photo.height,
           facing, torch: torchOn, orientation },
@@ -721,7 +808,7 @@ export default function CaptureScreen() {
         ) : <View style={styles.headerButton} />}
       </View>
 
-      {/* Method toggle: Camera | Gallery */}
+      {/* Embedded camera, existing photos, or the phone's system camera. */}
       <View style={styles.methodToggle}>
         <TouchableOpacity
           style={[styles.methodTab, mode === 'camera' && styles.methodTabActive]}
@@ -744,6 +831,11 @@ export default function CaptureScreen() {
         >
           <Ionicons name="images" size={16} color={mode === 'gallery' ? '#fff' : Colors.gray[400]} />
           <Text style={[styles.methodTabText, mode === 'gallery' && styles.methodTabTextActive]}>Gallery</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.methodTab} onPress={requestPhoneCamera}
+          disabled={isCapturing || isProcessing} accessibilityLabel="Use Phone Camera" accessibilityRole="button">
+          <Ionicons name="camera-outline" size={16} color={Colors.gray[400]} />
+          <Text style={styles.methodTabText}>Phone Camera</Text>
         </TouchableOpacity>
       </View>
 
@@ -771,13 +863,13 @@ export default function CaptureScreen() {
               style={styles.camera}
               facing={facing}
               enableTorch={torchOn && facing === 'back'}
-              autofocus="off"
+              autofocus={autofocusMode}
               pictureSize={pictureSize}
               onCameraReady={handleCameraReady}
               onMountError={event => { setCameraReady(false); setCameraError(event.message || 'Camera could not start') }}
             />}
-            {nativeControls && <Pressable style={StyleSheet.absoluteFill} onPress={handleTapFocus}
-              disabled={!cameraReady || isCapturing || isProcessing} accessibilityLabel="Tap the card to focus" />}
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleTapFocus}
+              disabled={!cameraReady || isCapturing || isProcessing} accessibilityLabel={nativeControls ? 'Tap the card to focus' : 'Tap to refocus'} />
             {focusPoint && (
               <View
                 pointerEvents="none"
@@ -851,10 +943,10 @@ export default function CaptureScreen() {
           <Text style={styles.framingHint}>
             {isCapturing || isProcessing ? 'Saving photo — hold steady…'
               : !cameraReady ? 'Starting camera…'
-              : focusStatus === 'focusing' ? 'Focusing…'
+              : focusStatus === 'focusing' ? 'Refocusing — hold steady…'
               : focusStatus && !['focused', 'settled'].includes(focusStatus) ? 'Focus could not settle. Move back slightly and try again.'
               : nativeControls ? 'Tap the card to focus. Keep every edge visible; move back if text looks soft.'
-              : 'Autofocus is automatic. Keep every edge visible; move back if text looks soft.'}
+              : 'Tap to refocus. If text stays soft, try Phone Camera or move back slightly.'}
           </Text>
         )}
         <View style={styles.capturedIndicators}>
@@ -948,6 +1040,7 @@ export default function CaptureScreen() {
           setPendingAction(null)
           if (action === 'capture') handleCapture()
           else if (action === 'gallery') pickFromGallery()
+          else if (action === 'phone_camera') void captureWithPhoneCamera()
         }}
       />
     </View>
@@ -963,8 +1056,8 @@ const styles = StyleSheet.create({
   permissionText: { fontSize: 14, color: Colors.gray[500], textAlign: 'center' },
 
   // Camera / Gallery method toggle
-  methodToggle: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.7)' },
-  methodTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 7, borderRadius: 18, borderWidth: 1, borderColor: Colors.gray[700], backgroundColor: 'rgba(0,0,0,0.4)' },
+  methodToggle: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.7)' },
+  methodTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 18, borderWidth: 1, borderColor: Colors.gray[700], backgroundColor: 'rgba(0,0,0,0.4)' },
   methodTabActive: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[400] },
   methodTabText: { color: Colors.gray[400], fontSize: 13, fontWeight: '600' },
   methodTabTextActive: { color: '#fff' },
