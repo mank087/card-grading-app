@@ -69,6 +69,10 @@ function patchCamera(directory = path.join(base, 'node_modules/expo-camera'), ch
   return [...files.keys()];
 }
 if (require.main === module) {
+  const app = JSON.parse(fs.readFileSync(path.join(base, 'package.json'), 'utf8'));
+  if (!app.expo?.autolinking?.android?.buildFromSource?.includes('expo-camera')) {
+    throw new Error('Native camera patch requires expo.autolinking.android.buildFromSource to include expo-camera; otherwise Android links the unpatched prebuilt library.');
+  }
   const check = process.argv.includes('--check');
   console.log(`Camera capture patch ${check ? 'verified' : 'applied'}: ${patchCamera(undefined, check).length} native files`);
 }
