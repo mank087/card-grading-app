@@ -1,0 +1,31 @@
+# EAS builds only the standalone mobile application in this repository.
+/*
+!/dcm-mobile
+
+# .easignore replaces .gitignore, so retain the app's local/generated exclusions.
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+credentials.json
+*service-account*.json
+.env*
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.tsbuildinfo
+/dcm-mobile/ios/
+/dcm-mobile/android/
+/dcm-mobile/assets/images-originals/
+/dcm-mobile/tmp/
