@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -27,6 +28,20 @@ afterEach(() => {
 });
 
 describe('pinned Expo native camera patch', () => {
+  it('resolves the camera as a source build instead of an unpatched prebuilt library', () => {
+    const autolinking = JSON.parse(execFileSync(process.execPath, [
+      resolve('dcm-mobile/node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js'),
+      'resolve', '--platform', 'android', '--json',
+    ], { cwd: resolve('dcm-mobile'), encoding: 'utf8' }));
+    const camera = autolinking.modules.find((module: { packageName: string }) => module.packageName === 'expo-camera');
+    expect(camera?.packageVersion).toBe('17.0.10');
+    // Match the resolved Gradle project names, as Expo's SettingsManager does.
+    for (const project of camera.projects) {
+      expect(autolinking.configuration.buildFromSource.some((pattern: string) =>
+        new RegExp(`^(?:${pattern})$`).test(project.name))).toBe(true);
+    }
+    expect(camera.projects.length).toBeGreaterThan(0);
+  });
   it('applies the complete patch and is idempotent', () => {
     const directory = fixture();
     expect(patchCamera(directory)).toEqual(paths);
