@@ -57,6 +57,12 @@
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
+    },
+    "camera-validation-simulator": {
+      "extends": "camera-validation",
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {
