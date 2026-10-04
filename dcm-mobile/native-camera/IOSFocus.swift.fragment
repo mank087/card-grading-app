@@ -1,0 +1,92 @@
+  // DCM capture controls v1. State is confined to sessionQueue. AVFoundation
+  // reports lens adjustment, not optical success, so iOS returns "settled".
+  private var dcmFocusGeneration = 0
+  private var dcmFocusPromise: Promise?
+
+  private func dcmRestoreFocus(_ device: AVCaptureDevice) {
+    do {
+      try device.lockForConfiguration()
+      defer { device.unlockForConfiguration() }
+      if device.isFocusPointOfInterestSupported {
+        device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+      }
+      if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+      if device.isExposurePointOfInterestSupported {
+        device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
+      }
+      if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+    } catch { /* Session may already have stopped. */ }
+  }
+
+  func dcmCancelFocus() {
+    sessionQueue.async {
+      self.dcmFocusGeneration += 1
+      self.dcmFocusPromise?.resolve(["status": "cancelled"])
+      self.dcmFocusPromise = nil
+      if let input = self.session.inputs.compactMap({ $0 as? AVCaptureDeviceInput }).first(where: { $0.device.hasMediaType(.video) }) {
+        self.dcmRestoreFocus(input.device)
+      }
+    }
+  }
+
+  func dcmFocusAtPoint(_ x: Double, _ y: Double, promise: Promise) {
+    DispatchQueue.main.async {
+      guard x.isFinite, y.isFinite, self.window != nil, self.previewLayer.bounds.width > 0, self.previewLayer.bounds.height > 0 else {
+        promise.resolve(["status": "unavailable"])
+        return
+      }
+      let point = self.previewLayer.captureDevicePointConverted(fromLayerPoint: CGPoint(
+        x: CGFloat(min(1, max(0, x))) * self.previewLayer.bounds.width,
+        y: CGFloat(min(1, max(0, y))) * self.previewLayer.bounds.height
+      ))
+      self.sessionQueue.async {
+        self.dcmFocusGeneration += 1
+        let generation = self.dcmFocusGeneration
+        self.dcmFocusPromise?.resolve(["status": "cancelled"])
+        self.dcmFocusPromise = nil
+        guard self.session.isRunning,
+          let input = self.session.inputs.compactMap({ $0 as? AVCaptureDeviceInput }).first(where: { $0.device.hasMediaType(.video) }) else {
+          promise.resolve(["status": "unavailable"])
+          return
+        }
+        let device = input.device
+        guard device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) else {
+          promise.resolve(["status": "unsupported"])
+          return
+        }
+        do {
+          try device.lockForConfiguration()
+          device.focusPointOfInterest = point
+          device.focusMode = .autoFocus
+          if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = point }
+          if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+          device.unlockForConfiguration()
+        } catch {
+          promise.resolve(["status": "unavailable"])
+          return
+        }
+        self.dcmFocusPromise = promise
+        self.dcmPollFocus(device, generation: generation, started: Date())
+        // .autoFocus holds the chosen lens position after settling. Release it
+        // on an explicit new tap, capture/retake, or session exit, never a timer.
+      }
+    }
+  }
+
+  private func dcmPollFocus(_ device: AVCaptureDevice, generation: Int, started: Date) {
+    sessionQueue.asyncAfter(deadline: .now() + 0.05) {
+      guard generation == self.dcmFocusGeneration, self.dcmFocusPromise != nil else { return }
+      let elapsed = Date().timeIntervalSince(started)
+      let current = self.session.inputs.compactMap { $0 as? AVCaptureDeviceInput }.contains { $0.device === device }
+      let status: String?
+      if !self.session.isRunning || !current { status = "cancelled" }
+      else if elapsed >= 2.5 { status = "timeout" }
+      else if elapsed >= 0.25 && !device.isAdjustingFocus { status = "settled" }
+      else { status = nil }
+      if let status {
+        self.dcmFocusPromise?.resolve(["status": status])
+        self.dcmFocusPromise = nil
+        if status != "settled" { self.dcmRestoreFocus(device) }
+      } else { self.dcmPollFocus(device, generation: generation, started: started) }
+    }
+  }

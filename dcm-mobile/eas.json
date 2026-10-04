@@ -4,6 +4,14 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "camera-validation": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "camera-validation",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",

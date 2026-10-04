@@ -1,0 +1,67 @@
+  // DCM capture controls v1. Coordinates are fractions of the visible preview,
+  // not sensor coordinates; PreviewView handles its rotation and aspect-fill.
+  private var dcmFocusPromise: Promise? = null
+  private var dcmFocusTimeout: Runnable? = null
+
+  fun dcmCancelFocus() {
+    dcmFocusTimeout?.let { removeCallbacks(it) }
+    dcmFocusTimeout = null
+    val pending = dcmFocusPromise
+    dcmFocusPromise = null
+    pending?.resolve(mapOf("status" to "cancelled"))
+    camera?.cameraControl?.cancelFocusAndMetering()
+  }
+
+  fun dcmFocusAtPoint(x: Float, y: Float, promise: Promise) {
+    dcmCancelFocus()
+    val current = camera
+    if (current == null || previewView.width <= 0 || previewView.height <= 0 || !x.isFinite() || !y.isFinite()) {
+      promise.resolve(mapOf("status" to "unavailable"))
+      return
+    }
+    val point = previewView.meteringPointFactory.createPoint(
+      x.coerceIn(0f, 1f) * previewView.width,
+      y.coerceIn(0f, 1f) * previewView.height
+    )
+    val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+      .disableAutoCancel()
+      .build()
+    if (!current.cameraInfo.isFocusMeteringSupported(action)) {
+      promise.resolve(mapOf("status" to "unsupported"))
+      return
+    }
+    dcmFocusPromise = promise
+    val timeout = Runnable {
+      if (dcmFocusPromise === promise) {
+        dcmFocusPromise = null
+        dcmFocusTimeout = null
+        current.cameraControl.cancelFocusAndMetering()
+        promise.resolve(mapOf("status" to "timeout"))
+      }
+    }
+    dcmFocusTimeout = timeout
+    postDelayed(timeout, 2500)
+    try {
+      val future = current.cameraControl.startFocusAndMetering(action)
+      future.addListener({
+        if (dcmFocusPromise === promise) {
+          removeCallbacks(timeout)
+          dcmFocusPromise = null
+          dcmFocusTimeout = null
+          val status = try {
+            if (future.get().isFocusSuccessful) "focused" else "unfocused"
+          } catch (_: Exception) { "unavailable" }
+          if (status != "focused") current.cameraControl.cancelFocusAndMetering()
+          // Keep successful focus until capture/retake, another tap, or session
+          // exit explicitly cancels it. A timer must not restart lens hunting.
+          promise.resolve(mapOf("status" to status))
+        }
+      }, ContextCompat.getMainExecutor(context))
+    } catch (_: Exception) {
+      removeCallbacks(timeout)
+      dcmFocusTimeout = null
+      dcmFocusPromise = null
+      current.cameraControl.cancelFocusAndMetering()
+      promise.resolve(mapOf("status" to "unavailable"))
+    }
+  }
