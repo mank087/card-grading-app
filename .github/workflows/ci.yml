@@ -22,12 +22,20 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dcm-mobile/package-lock.json
 
       - name: Keep experimental grading out of releases
         run: node scripts/check-grading-isolation.cjs
 
       - name: Install
         run: npm ci
+
+      # Patch tests need pristine Expo native source, but no native binaries or
+      # mobile postinstall side effects. They patch isolated temporary copies.
+      - name: Install mobile sources for camera patch tests
+        run: npm ci --prefix dcm-mobile --ignore-scripts
 
       # Gate 1. The build already fails on type errors (ignoreBuildErrors is
       # false and must stay that way), so this catches them before a deploy.
