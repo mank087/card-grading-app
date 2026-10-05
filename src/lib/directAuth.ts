@@ -1,6 +1,7 @@
 // Direct authentication using fetch - bypasses Supabase client library
 // This works around the "Invalid value" fetch error in the Supabase library
 
+import { isNativeHost, expectsNativeSession, refreshNativeSession } from './nativeAppBridge'
 import { createClient, Session } from '@supabase/supabase-js'
 import { readPurchaseIntent, encodePurchaseIntentParam } from './purchaseIntent'
 
@@ -43,8 +44,8 @@ type OAuthProvider = 'google' | 'facebook' | 'apple'
 // Using implicit flow (not PKCE) for simpler callback handling
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    autoRefreshToken: true,
-    persistSession: true,
+    autoRefreshToken: !(isNativeHost() || expectsNativeSession()),
+    persistSession: !(isNativeHost() || expectsNativeSession()),
     detectSessionInUrl: true,
     flowType: 'implicit'  // Use implicit flow - tokens come back in URL hash
   }
@@ -158,6 +159,8 @@ function getStoredSessionRaw() {
 
 // Refresh the session using the refresh token
 export async function refreshSession(): Promise<{ success: boolean; error?: string }> {
+  // The native SDK owns refresh-token rotation for the shared app session.
+  if (isNativeHost()) return refreshNativeSession()
   if (isRefreshing) {
     console.log('[Auth] Refresh already in progress, skipping...')
     return { success: false, error: 'Refresh in progress' }
@@ -237,6 +240,7 @@ export function getStoredSession() {
 
     // Check if token is expired
     if (sessionIsExpired(session)) {
+      if (isNativeHost()) { void refreshSession(); return session }
       console.log('[Auth] Session expired, clearing...')
       localStorage.removeItem(SESSION_STORAGE_KEY)
       return null
@@ -473,6 +477,7 @@ export function getAuthenticatedClient() {
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
     {
+      auth: { autoRefreshToken: !(isNativeHost() || expectsNativeSession()), persistSession: !(isNativeHost() || expectsNativeSession()), detectSessionInUrl: !(isNativeHost() || expectsNativeSession()) },
       global: {
         headers: session?.access_token ? {
           Authorization: `Bearer ${session.access_token}`

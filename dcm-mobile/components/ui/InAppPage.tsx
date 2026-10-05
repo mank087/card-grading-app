@@ -1,284 +1,197 @@
-import { View, StyleSheet, ActivityIndicator, BackHandler } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, BackHandler, TouchableOpacity, Platform, Alert, Linking } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useRouter, useSegments, useNavigation } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import * as WebBrowser from 'expo-web-browser'
+import * as FileSystem from 'expo-file-system/legacy'
+import * as Sharing from 'expo-sharing'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCredits } from '@/contexts/CreditsContext'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { APP_USER_AGENT_SUFFIX, withEmbeddedParams } from '@/lib/embeddedWeb'
+import { embeddedDestination, isAppOrigin, sessionInjection } from '@/lib/embeddedNavigation'
+import { inAppChromeInjection } from '@/lib/embeddedChrome'
 
 const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+interface InAppPageProps { path: string; title?: string }
 
-interface InAppPageProps {
-  path: string
-  /** Optional title shown in the in-app top bar. Defaults to "DCM Grading". */
-  title?: string
-}
-
-/**
- * Renders a DCM web page inside the app using WebView.
- * Injects the user's auth session BEFORE page load so authenticated
- * features (Label Studio, Market Pricing, Account) work correctly.
- */
 export default function InAppPage({ path, title }: InAppPageProps) {
   const router = useRouter()
-  // Some tabs (e.g. Pricing) re-export an InAppPage-backed /pages screen
-  // so the tab and the standalone route share one implementation. When
-  // mounted as a tab, the (tabs) layout already provides AppHeaderBar +
-  // tab bar, so suppress our inline chrome to avoid stacking two of each.
   const segments = useSegments()
-  const isTabContext = segments[0] === '(tabs)'
   const navigation = useNavigation()
+  const { session, isLoading: authLoading, signOut } = useAuth()
+  const { refresh } = useCredits()
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const isTabContext = segments[0] === '(tabs)'
+  const initialUrl = useMemo(() => withEmbeddedParams(new URL(path.startsWith('/') && !path.startsWith('//') ? path : '/', WEB_URL).href), [path])
+  const [url, setUrl] = useState(initialUrl)
   const [loading, setLoading] = useState(true)
-  const [session, setSession] = useState<{ access_token: string; refresh_token: string; user: any } | null>(null)
-  const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [canGoBack, setCanGoBack] = useState(false)
   const webViewRef = useRef<WebView>(null)
-  // `app=1` tells the web side to render in embedded mode (see lib/embeddedWeb.ts).
-  const url = useMemo(() => withEmbeddedParams(`${WEB_URL}${path}`), [path])
+  const currentUrl = useRef(initialUrl)
+  const lastAppUrl = useRef(initialUrl)
+  const downloadBusy = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => { setUrl(initialUrl); setLoading(true); setError(null); setCanGoBack(false) }, [initialUrl])
+  useEffect(() => {
+    if (!loading) return
+    const timer = setTimeout(() => { setLoading(false); setError('This page is taking too long to load. Check your connection and retry.') }, 30000)
+    return () => clearTimeout(timer)
+  }, [loading, url])
+  const injection = useMemo(() => sessionInjection(WEB_URL, session), [session])
+  useEffect(() => { webViewRef.current?.injectJavaScript(injection) }, [injection])
 
-  const handleBack = () => {
-    // Inside the WebView, walk back through web nav history first; if the
-    // user is at the page they entered on, exit to the previous app screen.
-    if (canGoBack) {
-      webViewRef.current?.goBack()
-    } else {
-      router.back()
+  const syncSession = useCallback(async () => {
+    const owner = sessionRef.current?.user.id
+    try {
+      let { data: { session: latest } } = await supabase.auth.getSession()
+      if (latest && (latest.expires_at ?? 0) < Date.now() / 1000 + 300) {
+        const result = await supabase.auth.refreshSession()
+        if (result.error) throw result.error
+        latest = result.data.session
+      }
+      if (mounted.current && owner === sessionRef.current?.user.id) webViewRef.current?.injectJavaScript(sessionInjection(WEB_URL, latest))
+    } catch { if (mounted.current) setError('Your session could not be refreshed. Check your connection and retry.') }
+  }, [])
+  useFocusEffect(useCallback(() => {
+    void syncSession(); void refresh()
+    if (isAppOrigin(currentUrl.current, WEB_URL)) webViewRef.current?.injectJavaScript("window.dispatchEvent(new Event('focus')); true;")
+  }, [syncSession, refresh]))
+
+  const back = () => {
+    if (canGoBack) webViewRef.current?.goBack()
+    else if (router.canGoBack()) router.back()
+    else router.replace('/')
+  }
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!canGoBack) return false
+      webViewRef.current?.goBack(); return true
+    })
+    return () => sub.remove()
+  }, [canGoBack]))
+  useEffect(() => {
+    if (!isTabContext) return
+    return navigation.addListener('tabPress' as never, () => {
+      setUrl(initialUrl)
+      webViewRef.current?.injectJavaScript(`location.replace(${JSON.stringify(initialUrl)}); true;`)
+    })
+  }, [isTabContext, navigation, initialUrl])
+
+  const navigate = useCallback((raw: string, loadWeb = false): boolean => {
+    const destination = embeddedDestination(raw, WEB_URL, Platform.OS, !!sessionRef.current)
+    // A purchase launched from another page gets its own native stack screen on both platforms.
+    // Returning leaves the batch's selected File objects intact; Android's screen still uses Stripe.
+    const separateCredits = loadWeb && isAppOrigin(raw, WEB_URL) && new URL(raw).pathname === '/credits' && new URL(initialUrl).pathname !== '/credits'
+    if (destination.kind === 'native' || separateCredits) {
+      // Fallback for programmatic SPA navigation: do not leave a web purchase page behind the native screen.
+      webViewRef.current?.injectJavaScript(`if(location.href===${JSON.stringify(raw)} && location.href!==${JSON.stringify(lastAppUrl.current)}) location.replace(${JSON.stringify(lastAppUrl.current)}); true;`)
+      router.push((destination.kind === 'native' ? destination.href : '/pages/credits') as never)
+      return false
+    }
+    if (destination.kind === 'external') {
+      const open = /^https?:/.test(destination.url) ? WebBrowser.openBrowserAsync(destination.url) : Linking.openURL(destination.url)
+      void open.then(() => { void refresh() }).catch(() => Alert.alert('Unable to open link', 'Please try again.'))
+      return false
+    }
+    if (destination.kind === 'blocked') return false
+    if (isAppOrigin(destination.url, WEB_URL)) lastAppUrl.current = destination.url
+    if (loadWeb) { setLoading(true); setError(null); setUrl(isAppOrigin(destination.url, WEB_URL) ? withEmbeddedParams(destination.url) : destination.url) }
+    return true
+  }, [router, refresh, initialUrl])
+
+  const download = async (message: { name?: string; dataUrl?: string; url?: string }) => {
+    if (downloadBusy.current) return
+    downloadBusy.current = true
+    let file: string | null = null
+    try {
+      const name = (message.name || 'dcm-export').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'dcm-export'
+      file = `${FileSystem.cacheDirectory}dcm-${Date.now()}-${name}`
+      if (message.dataUrl) {
+        const match = message.dataUrl.match(/^data:(application\/(?:pdf|zip)|text\/csv|image\/(?:png|jpeg))(?:;charset=[a-zA-Z0-9_-]+)?;base64,([a-zA-Z0-9+/=\r\n]+)$/)
+        if (!match || message.dataUrl.length > 28 * 1024 * 1024) throw Error('Unsupported file. Try exporting fewer cards.')
+        await FileSystem.writeAsStringAsync(file, match[2], { encoding: FileSystem.EncodingType.Base64 })
+      } else if (message.url && isAppOrigin(message.url, WEB_URL)) {
+        // No token on the URL and no bearer forwarded across a redirect. Signed file endpoints own authorization.
+        const response = await FileSystem.downloadAsync(message.url, file)
+        if (response.status !== 200) throw Error('The file could not be downloaded. Please regenerate it.')
+      } else throw Error('Use the label or report export controls to download this file.')
+      if (!await Sharing.isAvailableAsync()) throw Error('Sharing is unavailable on this device.')
+      await Sharing.shareAsync(file)
+    } catch (reason) { Alert.alert('Download unavailable', reason instanceof Error ? reason.message : 'Please try again.') }
+    finally {
+      if (file) void FileSystem.deleteAsync(file, { idempotent: true }).catch(() => {})
+      downloadBusy.current = false
     }
   }
 
-  // Tab re-tap: when the user is already on this tab and taps it again
-  // in the bottom nav, snap the WebView back to its start URL. Without
-  // this, SPA navigations inside the WebView (e.g. Portfolio → a card
-  // detail page on the web side) leave the user stranded — the tab
-  // press is a no-op because expo-router considers them "already there."
+  // Payment links must resolve through the platform router before any web checkout is rendered on iOS.
+  const initialDestination = embeddedDestination(initialUrl, WEB_URL, Platform.OS, !!session)
   useEffect(() => {
-    if (!isTabContext) return
-    const unsub = navigation.addListener('tabPress' as any, () => {
-      webViewRef.current?.injectJavaScript(
-        `try { window.location.replace(${JSON.stringify(url)}); } catch(e) {} true;`,
-      )
-    })
-    return unsub
-  }, [isTabContext, navigation, url])
+    if (!authLoading && initialDestination.kind === 'native') router.replace(initialDestination.href as never)
+  }, [authLoading, initialDestination.kind, initialDestination.kind === 'native' ? initialDestination.href : '', router])
 
-  // Android hardware back: when this screen is focused, prefer walking
-  // the WebView's own history before letting expo-router pop. Otherwise
-  // tapping back from inside a SPA-navigated page exits the tab instead
-  // of returning to the page the user came from.
-  useFocusEffect(
-    useCallback(() => {
-      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (canGoBack) {
-          webViewRef.current?.goBack()
-          return true
-        }
-        return false
-      })
-      return () => sub.remove()
-    }, [canGoBack]),
-  )
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s) {
-        setSession({
-          access_token: s.access_token,
-          refresh_token: s.refresh_token,
-          user: s.user,
-        })
-      }
-      setReady(true)
-    })
-  }, [])
-
-  // Inject auth BEFORE page content loads — ensures authenticated state on first render
-  const injectedBeforeLoad = session ? `
-    (function() {
-      try {
-        var sessionData = {
-          access_token: '${session.access_token}',
-          refresh_token: '${session.refresh_token}',
-          expires_at: ${Math.floor(Date.now() / 1000) + 3600},
-          user: ${JSON.stringify(session.user)}
-        };
-        localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
-      } catch(e) {}
-    })();
-    true;
-  ` : 'true;'
-
-  // After load: hide *global* chrome (site nav/footer/helpbot) for a clean
-  // in-app look, without eating real page content.
-  //
-  // Two eras of web deployment are supported:
-  //
-  //  A) NEW web (sets `html[data-embedded="1"]` when it sees `?app=1` or the
-  //     `DCMGradingApp/<version>` user agent). It marks only global chrome
-  //     with `data-site-chrome`, so we hide exactly that. In-content
-  //     `<header>`s (Pricing/Reports intros) and section `<nav>`s
-  //     (Reports, Pop, Portfolio, Why DCM) survive.
-  //
-  //  B) OLD web (no `data-embedded`). We fall back to the historical blanket
-  //     `header, nav, footer` rule so already-shipped pages still look right.
-  //     This branch is the one that can eat content, which is exactly why it
-  //     is gated on the absence of the new contract.
-  //
-  // dcmgrading.com is a Next.js SPA — client-side routing tears down and
-  // re-mounts chrome, and `data-embedded` may be stamped by a client effect
-  // *after* our first run. So the decision is re-evaluated on every DOM
-  // mutation (cheap: it is one dataset read) and the stylesheet text is
-  // rewritten only when the verdict actually changes. The observer is
-  // mounted once and persists across SPA navigations via `window`.
-  const injectedAfterLoad = `
-    (function() {
-      if (window.__dcmInAppHideInstalled) {
-        // Re-entry after a full page load in the same WebView: make sure the
-        // rule still reflects the current document.
-        if (window.__dcmInAppApplyChrome) { window.__dcmInAppApplyChrome(); }
-        return;
-      }
-      window.__dcmInAppHideInstalled = true;
-
-      var SHARED = [
-        'main { padding-top: 16px !important; }',
-        // Explicitly-marked global chrome (new web contract).
-        '[data-site-chrome] { display: none !important; }',
-        // HelpBot floating button (fixed bottom-right, high z-index)
-        '.fixed.bottom-6.right-6 { display: none !important; }',
-        '[class*="fixed"][class*="bottom-6"][class*="right-6"] { display: none !important; }',
-        // Site-wide "Download the app" launch banner — redundant in-app.
-        // Selector is set on src/components/LaunchBanner.tsx (web).
-        '[data-dcm-launch-banner] { display: none !important; }',
-      ];
-      // Legacy blanket rule. Applied ONLY when the page does not advertise
-      // the data-embedded contract.
-      var LEGACY = 'header, nav, footer { display: none !important; }';
-
-      var style = document.createElement('style');
-      style.id = '__dcm-in-app-hide';
-      (document.head || document.documentElement).appendChild(style);
-
-      var lastMode = null;
-      function applyChrome() {
-        var docEl = document.documentElement;
-        var embedded = docEl && docEl.getAttribute('data-embedded') === '1';
-        var mode = embedded ? 'marked' : 'legacy';
-        if (mode === lastMode) { return; }
-        lastMode = mode;
-        var rules = SHARED.slice();
-        if (!embedded) { rules.unshift(LEGACY); }
-        style.textContent = rules.join('\\n');
-      }
-      window.__dcmInAppApplyChrome = applyChrome;
-      applyChrome();
-
-      // Belt-and-suspenders: anything HelpBot-shaped that escapes the
-      // class selectors gets hidden by computed-style sweep. Never sweeps
-      // non-fixed content, so it cannot hide page copy.
-      //
-      // Opt-out: the web side marks real fixed-position UI that must survive
-      // in the app (the package-artwork lightbox on /credits, /vip and
-      // /card-lovers) with \`data-dcm-keep\`. That overlay is inset:0 with
-      // z-index 1000, so bottom/right are both 0 and it matched the HelpBot
-      // shape exactly — it used to be hidden the instant it opened. Anything
-      // carrying the attribute, or inside something that does, is skipped.
-      function sweepFloating() {
-        document.querySelectorAll('.fixed').forEach(function(el) {
-          if (el.closest && el.closest('[data-dcm-keep]')) { return; }
-          var s = window.getComputedStyle(el);
-          if (s.position === 'fixed'
-              && parseInt(s.bottom) < 50
-              && parseInt(s.right) < 50
-              && parseInt(s.zIndex) >= 40) {
-            el.style.display = 'none';
-          }
-        });
-      }
-      sweepFloating();
-
-      // Watch for DOM changes (Next.js client-side route transitions swap
-      // out the page tree, and the embedded flag can be stamped late) and
-      // re-run both the chrome decision and the floating-element sweep.
-      var obs = new MutationObserver(function() {
-        applyChrome();
-        sweepFloating();
-      });
-      obs.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-embedded'],
-      });
-    })();
-    true;
-  `
-
-  // Wait for session check before rendering WebView
-  if (!ready) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color={Colors.purple[600]} />
-      </View>
-    )
-  }
-
-  return (
-    <View style={styles.container}>
-      {/* Shared header — DCM logo + page title + credits badge. The back
-          handler walks WebView history first, then exits to the previous
-          app screen, so users can step back through SPA navigations
-          without leaving the page entirely. Skipped in tab context — the
-          tab's own header already provides the same chrome. */}
-      {!isTabContext && <AppHeaderBar showBack title={title} onBack={handleBack} />}
-      {loading && (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={Colors.purple[600]} />
-        </View>
-      )}
+  if (authLoading || initialDestination.kind === 'native') return <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading page" /></View>
+  return <View style={styles.container}>
+    {!isTabContext && <AppHeaderBar showBack title={title} onBack={back} />}
+    <View style={{ flex: 1 }}>
       <WebView
+        key={session?.user.id || 'guest'}
         ref={webViewRef}
         source={{ uri: url }}
         style={styles.webview}
-        // Appended to (not replacing) the platform's default WebView UA, so
-        // the web side can detect the app via `DCMGradingApp/<version>`.
         applicationNameForUserAgent={APP_USER_AGENT_SUFFIX}
+        originWhitelist={['https://*', 'http://*', 'mailto:*', 'tel:*']}
+        injectedJavaScriptBeforeContentLoaded={injection}
+        injectedJavaScript={`${injection}\n${inAppChromeInjection}`}
+        onLoadStart={() => { setLoading(true); setError(null) }}
         onLoadEnd={() => setLoading(false)}
-        // Re-inject on every navigation. injectedJavaScript only fires on
-        // initial load on iOS; this catches any edge cases where the
-        // observer didn't get installed (full-page reloads, errors, etc.).
-        onLoad={() => webViewRef.current?.injectJavaScript(injectedAfterLoad)}
-        onNavigationStateChange={(state) => setCanGoBack(state.canGoBack)}
-        injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
-        injectedJavaScript={injectedAfterLoad}
-        javaScriptEnabled
-        domStorageEnabled
-        startInLoadingState={false}
-        showsVerticalScrollIndicator={false}
-        allowFileAccess
-        allowFileAccessFromFileURLs
-        // Share cookies/storage within the app
-        sharedCookiesEnabled
-        // iOS: enable the native edge-swipe back/forward gesture so
-        // users can swipe-back through WebView history the same way they
-        // would in Safari. No-op on Android.
-        allowsBackForwardNavigationGestures
+        onLoad={() => webViewRef.current?.injectJavaScript(`${injection}\n${inAppChromeInjection}`)}
+        onError={() => { setLoading(false); setError('This page could not load. Check your connection and retry.') }}
+        onHttpError={event => { if (event.nativeEvent.url === currentUrl.current) { setLoading(false); setError('This page is temporarily unavailable. Please retry.') } }}
+        onContentProcessDidTerminate={() => { setLoading(false); setError('The page was interrupted. Reload to continue.') }}
+        onRenderProcessGone={() => { setLoading(false); setError('The page was interrupted. Reload to continue.') }}
+        onShouldStartLoadWithRequest={request => request.isTopFrame === false || navigate(request.url)}
+        onOpenWindow={event => { navigate(event.nativeEvent.targetUrl, true) }}
+        onNavigationStateChange={state => { currentUrl.current = state.url; setCanGoBack(state.canGoBack) }}
+        onMessage={event => {
+          if (!isAppOrigin(event.nativeEvent.url, WEB_URL)) return
+          try {
+            const message = JSON.parse(event.nativeEvent.data)
+            if (message.version !== 1) return
+            if (message.type === 'ready' || message.type === 'auth-refresh') void syncSession()
+            else if (message.type === 'auth-sign-out') void signOut()
+            else if (message.type === 'credits-changed') void refresh()
+            else if (['navigate', 'navigation'].includes(message.type) && typeof message.url === 'string') navigate(message.url, message.type === 'navigate')
+            else if (message.type === 'download') void download(message)
+            else if (message.type === 'download-error') Alert.alert('Download unavailable', 'Please try exporting fewer cards, or regenerate the file.')
+          } catch { /* Ignore messages outside the versioned app contract. */ }
+        }}
+        javaScriptEnabled domStorageEnabled sharedCookiesEnabled allowsBackForwardNavigationGestures
+        allowFileAccess={false} allowFileAccessFromFileURLs={false} mixedContentMode="never"
       />
-      {!isTabContext && <MobileTabBar />}
+      {loading && !error && <View pointerEvents="none" style={styles.overlay}><ActivityIndicator size="large" color={Colors.purple[600]} accessibilityLabel="Loading page" /></View>}
+      {error && <View style={styles.overlay} accessibilityLiveRegion="polite">
+        <Text style={styles.error}>{error}</Text>
+        <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={() => { setError(null); setLoading(true); void syncSession(); webViewRef.current?.reload() }}><Text style={styles.buttonText}>Retry</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={back}><Text style={styles.buttonText}>Go back</Text></TouchableOpacity>
+      </View>}
     </View>
-  )
+    {!isTabContext && <MobileTabBar />}
+  </View>
 }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  loader: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.gray[50],
-    zIndex: 10,
-  },
-  webview: { flex: 1 },
+  container: { flex: 1, backgroundColor: Colors.white }, webview: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: Colors.gray[50] },
+  error: { color: Colors.gray[800], fontSize: 16, textAlign: 'center', marginBottom: 16 },
+  button: { backgroundColor: Colors.purple[600], padding: 14, borderRadius: 8, marginBottom: 10, minWidth: 120 },
+  buttonText: { color: '#fff', textAlign: 'center', fontWeight: '600' },
 })

@@ -42,6 +42,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Mobile typecheck
+        run: npm run typecheck --prefix dcm-mobile
+
+      - name: Web and mobile consistency
+        run: npm run check:twin-drift
+
       # Gate 2. Unit tests only — node environment, no network. Grading calls
       # cost money and are nondeterministic, so live-model evaluation lives in
       # scripts/repeatability-harness.ts and is run deliberately, never here.

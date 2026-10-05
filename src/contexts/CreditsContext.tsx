@@ -1,5 +1,6 @@
 'use client'
 
+import { postNativeMessage } from '@/lib/nativeAppBridge'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { getStoredSession, AUTH_STATE_CHANGE_EVENT } from '@/lib/directAuth'
 
@@ -48,6 +49,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setBalance(data.balance)
+        postNativeMessage('credits-changed')
         setIsFirstPurchase(data.firstPurchaseBonusAvailable)
         setTotalPurchased(typeof data.totalPurchased === 'number' ? data.totalPurchased : 0)
         setIsCardLover(Boolean(data.isCardLover))

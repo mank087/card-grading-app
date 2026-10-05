@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "typecheck": "tsc --noEmit --incremental false",
     "postinstall": "node scripts/patch-camera.cjs",
     "check:camera-patch": "node scripts/patch-camera.cjs --check",
     "start": "expo start",

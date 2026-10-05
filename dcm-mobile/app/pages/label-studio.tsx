@@ -1181,7 +1181,6 @@ export default function LabelStudioScreen() {
     }
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const params = new URLSearchParams()
-    params.set('token', session.access_token)
     params.set('type', exportType)
     if (opts?.format) params.set('format', opts.format)
     if (opts?.position != null) params.set('position', String(opts.position))

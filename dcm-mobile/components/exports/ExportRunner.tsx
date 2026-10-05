@@ -1,3 +1,6 @@
+import { useAuth } from '@/contexts/AuthContext'
+import { authBridgeInjection } from '@/lib/webviewAuthBridge'
+import { isAppOrigin } from '@/lib/embeddedNavigation'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { View, Text, Image, Modal, Pressable, TouchableOpacity, ActivityIndicator, Alert, Platform, StyleSheet, Linking } from 'react-native'
 import { WebView } from 'react-native-webview'
@@ -39,6 +42,8 @@ type Props = {
  */
 export default function ExportRunner({ source, onClose }: Props) {
   const insets = useSafeAreaInsets()
+  const { session } = useAuth()
+  const webRef = useRef<WebView>(null)
   const [files, setFiles] = useState<ExportFile[]>([])
   const [previewIdx, setPreviewIdx] = useState(0)
   const [status, setStatus] = useState<string>('')
@@ -252,11 +257,15 @@ export default function ExportRunner({ source, onClose }: Props) {
           {source && !error && files.length === 0 && (
             <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
               <WebView
+                ref={webRef}
+                onLoadEnd={() => { const js = authBridgeInjection(session?.access_token); if (js) webRef.current?.injectJavaScript(js) }}
+                onShouldStartLoadWithRequest={request => isAppOrigin(request.url, process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com')}
                 source={{ uri: source.url }}
                 originWhitelist={['*']}
                 javaScriptEnabled
                 onLoadStart={() => setStatus('Loading export page…')}
                 onMessage={async (e) => {
+                  if (!isAppOrigin(e.nativeEvent.url, process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com')) return
                   try {
                     const msg = JSON.parse(e.nativeEvent.data)
                     if (msg.type === 'status' && msg.message) {

@@ -24,6 +24,7 @@ import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { WelcomeTourProvider, useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import WelcomeTour from '@/components/onboarding/WelcomeTour'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
+import { isPublicAppPath } from '@/lib/embeddedNavigation'
 import { Colors } from '@/lib/constants'
 import { supabase, hasActiveSession } from '@/lib/supabase'
 import {
@@ -111,7 +112,7 @@ import { Text as RNText, TextInput as RNTextInput } from 'react-native'
 // carousel rather than exiting the app.
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
-  const segments = useSegments()
+  const segments: readonly string[] = useSegments()
   const router = useRouter()
   const pathname = usePathname()
   const globalParams = useGlobalSearchParams()
@@ -134,7 +135,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return
     }
     if (inAuthGroup) return
-    if (!pathname || pathname === '/') return
+    if (!pathname || pathname === '/' || pathname === '/reset-password') return
     const qs = Object.entries(globalParams || {})
       .filter(([k, v]) => k !== 'redirect' && v != null && v !== '')
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(Array.isArray(v) ? v[0] : String(v))}`)
@@ -150,7 +151,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return
     const inAuthGroup = segments[0] === '(auth)'
-    if (!user || !inAuthGroup) return
+    if (!user || !inAuthGroup || pathname === '/forgot-password') return
     let cancelled = false
     ;(async () => {
       const returnTo = consumePendingRedirect()
@@ -175,7 +176,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
     })()
     return () => { cancelled = true }
-  }, [user, isLoading, segments, router])
+  }, [user, isLoading, segments, router, pathname])
 
   const handleGetStarted = useCallback(() => {
     router.push('/(auth)/register' as any)
@@ -191,9 +192,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // sign-up acknowledgment links. Logging out drops them back here.
   if (!isLoading && !user) {
     const inAuthGroup = segments[0] === '(auth)'
-    const isPublicLegalPage =
-      segments[0] === 'pages' && (segments[1] === 'terms' || segments[1] === 'privacy')
-    if (!inAuthGroup && !isPublicLegalPage) {
+    if (!inAuthGroup && !isPublicAppPath(pathname)) {
       // Suspense fallback matches the carousel's bg color (#0f0a1a) so
       // the 1-frame load gap looks like the carousel is just appearing,
       // not a flash of white.
@@ -209,7 +208,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 // Hide HelpBot on:
-//   - WebView pages (pages/*) — web has its own HelpBot, would duplicate
+//   Embedded web chrome is hidden; keep the native HelpBot available on pages/*.
 //   - Grade flow (grade/*) and Grade tab — focused task; floating button
 //     overlaps the camera capture UI
 //   - Auth screens ((auth)/*) — user isn't signed in, can't open a
@@ -220,11 +219,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 //     card and the "Next" button gets covered. Also a distraction
 //     during a guided walkthrough.
 function ConditionalHelpBot() {
-  const segments = useSegments()
+  const segments: readonly string[] = useSegments()
   const tour = useWelcomeTour()
+  const { user } = useAuth()
   const top = segments[0]
-  if (tour.active) return null
-  if (top === 'pages' || top === 'grade' || top === '(auth)') return null
+  if (tour.active || !user) return null
+  if (top === 'grade' || top === '(auth)' || top === 'reset-password') return null
   // (tabs)/grade — hide while in the grade tab too
   if (top === '(tabs)' && segments[1] === 'grade') return null
   return <HelpBot />

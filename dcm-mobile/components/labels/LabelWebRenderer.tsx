@@ -1,3 +1,4 @@
+import { isAppOrigin } from '@/lib/embeddedNavigation'
 /**
  * LabelWebRenderer
  *
@@ -9,7 +10,7 @@
  *
  * Flow:
  *   1. Mount → WebView loads /label-preview/[cardId] with the initial config
- *      embedded in the URL (token, type, side, customConfig).
+ *      embedded in the URL (type, side, customConfig); authentication is injected separately.
  *   2. Page renders the canvas + posts back the PNG data URL via
  *      window.ReactNativeWebView.postMessage.
  *   3. On every subsequent config change, mobile sends the updated config
@@ -141,9 +142,7 @@ export default function LabelWebRenderer({
   // baked in, the label came back showing the FRONT while the card image stayed
   // on the back.
   //
-  // The access token is handed over via lib/webviewAuthBridge.ts. Today that
-  // still appends `&token=`; when the web accepts a `dcm-auth` postMessage
-  // the flag flips and no bearer token appears in this URL at all.
+  // The access token is injected separately by the native host, never placed in the URL.
   const url = cardId && token && initialRef.current
     ? `${API_BASE}/label-preview/${cardId}?type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}${bridgeTokenParam(token)}`
     : ''
@@ -228,7 +227,7 @@ export default function LabelWebRenderer({
     readyRef.current = true
     reloadAttemptsRef.current = 0
     setPageReady(true)
-    // Out-of-band auth hand-off (no-op while USE_POSTMESSAGE_BRIDGE is off).
+    // Supply authentication before applying the live preview configuration.
     // Must run before pushConfigNow so the page has a session by the time it
     // is asked to re-render.
     const authJs = authBridgeInjection(token)
@@ -268,7 +267,8 @@ export default function LabelWebRenderer({
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled
-        onMessage={handleMessage}
+        onShouldStartLoadWithRequest={request => isAppOrigin(request.url, API_BASE)}
+        onMessage={event => { if (isAppOrigin(event.nativeEvent.url, API_BASE)) handleMessage(event) }}
         onLoad={handleLoad}
         onError={(e) => handleLoadFailure(e.nativeEvent?.description || 'WebView load error')}
         onContentProcessDidTerminate={() => handleLoadFailure('WebView content process terminated')}

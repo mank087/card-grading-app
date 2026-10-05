@@ -1,3 +1,4 @@
+import { isAppOrigin } from '@/lib/embeddedNavigation'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
 import { Image as ExpoImage } from 'expo-image'
@@ -63,7 +64,8 @@ import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_ST
 import { useIsFocused } from '@react-navigation/native'
 import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
-import PendingGradeChangeBanner from '@/components/gradeReview/PendingGradeChangeBanner'
+import GradeReview from '@/components/gradeReview/GradeReview'
+import InAppPage from '@/components/ui/InAppPage'
 
 /**
  * Resolve the grade uncertainty string for display.
@@ -99,7 +101,15 @@ function resolveUncertainty(
   return serverValue || '±1'
 }
 
-export default function CardDetailScreen() {
+export default function CardDetailRoute() {
+  const { session, isLoading } = useAuth()
+  const { id } = useLocalSearchParams<{ id: string }>()
+  if (isLoading) return <ActivityIndicator accessibilityLabel="Loading card" />
+  if (!session) return <InAppPage path={`/card/${encodeURIComponent(id || '')}`} title="Card Details" />
+  return <CardDetailScreen key={session.user.id} />
+}
+
+function CardDetailScreen() {
   const { balance: creditBalance, isLoading: creditsLoading } = useCredits()
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
@@ -823,6 +833,19 @@ export default function CardDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
     <AppHeaderBar showBack title="Card Details" />
+    <View style={{ backgroundColor: '#fff' }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+        {[
+          { label: 'Overview', ref: cardImagesRef }, { label: 'Grade Details', ref: gradeScoreRef },
+          { label: 'Market Value', ref: marketValueRef }, { label: 'Reports & Labels', ref: downloadButtonsRef },
+          ...(isOwner ? [{ label: 'InstaList', ref: instaListRef }] : []),
+        ].map(section => <TouchableOpacity key={section.label} accessibilityRole="button" accessibilityLabel={`Jump to ${section.label}`} style={{ padding: 12, minHeight: 44 }} onPress={() => {
+          scrollRef.current?.getNativeScrollRef()?.measureInWindow((_x, scrollY) => section.ref.current?.measureInWindow((_a, targetY) => {
+            scrollRef.current?.scrollTo({ y: Math.max(0, scrollOffsetRef.current + targetY - scrollY), animated: true })
+          }))
+        }}><Text style={{ fontSize: 14, fontWeight: '600', color: Colors.purple[700] }}>{section.label}</Text></TouchableOpacity>)}
+      </ScrollView>
+    </View>
     <ScrollView
       ref={scrollRef}
       style={s.container}
@@ -836,7 +859,7 @@ export default function CardDetailScreen() {
 
       {/* A manual review proposed a new grade: the owner accepts or keeps it
           here (mirrors the web card page; Sept 2026). */}
-      <PendingGradeChangeBanner cardId={card.id} isOwner={isOwner} onDecided={fetchCard} />
+      <GradeReview cardId={card.id} ownerId={card.user_id} onChanged={fetchCard} />
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
           on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
@@ -896,7 +919,7 @@ export default function CardDetailScreen() {
                   <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.gray[900] }}>{item.name}</Text>
-                    <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
+                    <Text style={{ fontSize: 12, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
                   </View>
                   <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
                 </TouchableOpacity>
@@ -965,7 +988,7 @@ export default function CardDetailScreen() {
                   <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.gray[900] }}>{item.name}</Text>
-                    <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
+                    <Text style={{ fontSize: 12, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
                   </View>
                   <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
                 </TouchableOpacity>
@@ -977,7 +1000,7 @@ export default function CardDetailScreen() {
                 <Ionicons name="color-palette" size={20} color={Colors.purple[700]} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.purple[700] }}>Open Label Studio</Text>
-                  <Text style={{ fontSize: 10, color: Colors.purple[600], marginTop: 2 }}>Customize colors, layouts, and styles</Text>
+                  <Text style={{ fontSize: 12, color: Colors.purple[600], marginTop: 2 }}>Customize colors, layouts, and styles</Text>
                 </View>
               </TouchableOpacity>
             </ScrollView>
@@ -1222,7 +1245,7 @@ export default function CardDetailScreen() {
                   </TouchableOpacity>
                 </View>
                 {(!Print || !IntentLauncher) && (
-                  <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
+                  <Text style={{ fontSize: 12, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
                     Tip: `npx expo install expo-print expo-intent-launcher` for native print + PDF chooser.
                   </Text>
                 )}
@@ -1240,20 +1263,19 @@ export default function CardDetailScreen() {
                 <WebView
                   ref={exportWebViewRef}
                   source={{
-                    // Token hand-off goes through lib/webviewAuthBridge.ts.
-                    // Today that still means `&token=` in the URL; when the
-                    // web accepts `dcm-auth` postMessage the flag flips and
-                    // this URL carries no bearer token at all.
+                    // The host supplies authentication separately, keeping it out of URLs.
                     uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'}/label-export/${card.id}?type=${exportTask.type}${bridgeTokenParam(session.access_token)}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled
+                  onShouldStartLoadWithRequest={request => isAppOrigin(request.url, process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com')}
                   onLoadStart={() => setExportStatus('Loading export page…')}
                   onLoadEnd={() => {
                     const js = authBridgeInjection(session.access_token)
                     if (js) exportWebViewRef.current?.injectJavaScript(js)
                   }}
                   onMessage={async (e) => {
+                    if (!isAppOrigin(e.nativeEvent.url, process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com')) return
                     try {
                       const msg = JSON.parse(e.nativeEvent.data)
                       if (msg.type === 'status' && msg.message) {
@@ -1645,7 +1667,7 @@ export default function CardDetailScreen() {
           />
         </TouchableOpacity>
         </View>
-        <Text style={{ fontSize: 9, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Swipe to flip · Tap to zoom</Text>
+        <Text style={{ fontSize: 12, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Swipe to flip · Tap to zoom</Text>
         <View style={s.imageToggle}>
           {['front', 'back'].map(side => (
             <TouchableOpacity key={side} style={[s.toggleBtn, activeImage === side && s.toggleBtnActive]} onPress={() => setActiveImage(side as any)}>
@@ -1671,13 +1693,13 @@ export default function CardDetailScreen() {
         {isOwner && ['C', 'D'].includes((confidence || '').toUpperCase().trim()) && (
           <TouchableOpacity
             style={s.retakeBanner}
-            onPress={() => router.push('/(tabs)/grade')}
+            onPress={() => Alert.alert('Start a new grade?', 'New photos create a new grading submission and use a grading credit. Your existing card and report remain available.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Take New Photos', onPress: () => router.push('/(tabs)/grade') }])}
             accessibilityRole="button"
-            accessibilityLabel="Image quality limited this grade. Retake your photos for a better result."
+            accessibilityLabel="Image quality limited this grade. Take clearer photos for a new grade using a grading credit."
           >
             <Ionicons name="camera-outline" size={18} color={Colors.amber[600]} />
             <Text style={s.retakeBannerText}>
-              Image quality limited this grade — retake your photos for a better result
+              Image quality limited this grade. Clearer photos can help; a new grade uses a grading credit.
             </Text>
             <Ionicons name="chevron-forward" size={16} color={Colors.amber[600]} />
           </TouchableOpacity>
@@ -1981,18 +2003,18 @@ export default function CardDetailScreen() {
             <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.amber[600], marginBottom: 8 }}>Professional Grade Detected</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.amber[200] }}>
-                <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>{card.slab_company}</Text>
+                <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>{card.slab_company}</Text>
                 <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.amber[600] }}>{card.slab_grade || 'N/A'}</Text>
-                <Text style={{ fontSize: 8, color: Colors.gray[400] }}>Professional Grade</Text>
+                <Text style={{ fontSize: 12, color: Colors.gray[400] }}>Professional Grade</Text>
               </View>
               <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.purple[200] }}>
-                <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>DCM Optic™</Text>
+                <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>DCM Optic™</Text>
                 <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.purple[600] }}>{grade != null ? Math.round(grade) : 'N/A'}</Text>
-                <Text style={{ fontSize: 8, color: Colors.gray[400] }}>Independent Grade</Text>
+                <Text style={{ fontSize: 12, color: Colors.gray[400] }}>Independent Grade</Text>
               </View>
             </View>
-            {card.slab_cert_number && <Text style={{ fontSize: 9, color: Colors.gray[500], marginTop: 6 }}>Cert #: {card.slab_cert_number}</Text>}
-            <Text style={{ fontSize: 8, color: Colors.gray[400], marginTop: 4 }}>DCM analysis grade is provided as independent verification of the professional grade.</Text>
+            {card.slab_cert_number && <Text style={{ fontSize: 12, color: Colors.gray[500], marginTop: 6 }}>Cert #: {card.slab_cert_number}</Text>}
+            <Text style={{ fontSize: 12, color: Colors.gray[400], marginTop: 4 }}>DCM analysis grade is provided as independent verification of the professional grade.</Text>
           </View>
         )}
 
@@ -2127,7 +2149,7 @@ export default function CardDetailScreen() {
                       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
                         {/* Score display */}
                         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>Centering Score</Text>
+                          <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>Centering Score</Text>
                           <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{scoreVal ?? 'N/A'}<Text style={{ fontSize: 14, color: Colors.gray[400] }}>/10</Text></Text>
                         </View>
                         {/* Card image */}
@@ -2141,39 +2163,39 @@ export default function CardDetailScreen() {
                       {/* DCM Optic Analysis box */}
                       <View style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: Colors.purple[200] }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[700] }}>DCM Optic™ Analysis</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.purple[700] }}>DCM Optic™ Analysis</Text>
                           {tier && <Text style={{ fontSize: 12 }}>{tierIcon}</Text>}
                         </View>
 
                         {/* Ratio info box */}
                         <View style={{ backgroundColor: Colors.gray[50], borderRadius: 8, padding: 8, gap: 4 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Horizontal (L/R):</Text>
+                            <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>Horizontal (L/R):</Text>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.purple[700] }}>{lr}</Text>
                           </View>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Vertical (T/B):</Text>
+                            <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>Vertical (T/B):</Text>
                             <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.purple[700] }}>{tb}</Text>
                           </View>
                           {tier && (
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Quality:</Text>
+                              <Text style={{ fontSize: 12, color: Colors.gray[500], fontWeight: '600' }}>Quality:</Text>
                               <View style={{ backgroundColor: tierBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: tierColor }}>{tier}</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: tierColor }}>{tier}</Text>
                               </View>
                             </View>
                           )}
                         </View>
 
                         {/* Analysis text */}
-                        {analysis && <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15, marginTop: 6 }}>{analysis}</Text>}
+                        {analysis && <Text style={{ fontSize: 12, color: Colors.gray[600], lineHeight: 15, marginTop: 6 }}>{analysis}</Text>}
                       </View>
 
                       {/* Card type + measurements */}
                       {(cardType || measurements) && (
                         <View style={{ marginTop: 6 }}>
-                          {cardType && <Text style={{ fontSize: 9, color: Colors.gray[400] }}>Card type: {cardType}. {measureMethod || ''}</Text>}
-                          {measurements && <Text style={{ fontSize: 9, color: Colors.gray[400] }}>{measurements}</Text>}
+                          {cardType && <Text style={{ fontSize: 12, color: Colors.gray[400] }}>Card type: {cardType}. {measureMethod || ''}</Text>}
+                          {measurements && <Text style={{ fontSize: 12, color: Colors.gray[400] }}>{measurements}</Text>}
                         </View>
                       )}
                     </View>
@@ -2188,7 +2210,7 @@ export default function CardDetailScreen() {
                 if (!worstAxis) return null
                 return (
                   <View style={{ backgroundColor: '#eef2ff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#c7d2fe', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#4338ca', marginBottom: 4 }}>Card Orientation</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#4338ca', marginBottom: 4 }}>Card Orientation</Text>
                     <InfoRow label="Worst Axis" value={worstAxis.replace('_', ' ')} />
                   </View>
                 )
@@ -2211,7 +2233,7 @@ export default function CardDetailScreen() {
                 return (
                   <View key={sg.label} style={[s.subBox, { flex: 1 }]}>
                     <Text style={[s.subBoxScore, { fontSize: 16, color: (val ?? 0) >= 9 ? Colors.green[600] : (val ?? 0) >= 7 ? Colors.blue[600] : Colors.amber[600] }]}>{val ?? 'N/A'}</Text>
-                    <Text style={[s.subBoxLabel, { fontSize: 9 }]}>{sg.label}</Text>
+                    <Text style={[s.subBoxLabel, { fontSize: 12 }]}>{sg.label}</Text>
                   </View>
                 )
               })}
@@ -2271,7 +2293,7 @@ export default function CardDetailScreen() {
                           <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Defect Map</Text>
                           <TouchableOpacity onPress={() => setHideMarkers(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.gray[100], borderRadius: 6 }}>
                             <Ionicons name={hideMarkers ? 'eye-off' : 'eye'} size={12} color={Colors.gray[600]} />
-                            <Text style={{ fontSize: 10, color: Colors.gray[600], fontWeight: '600' }}>{hideMarkers ? 'Show Markers' : 'Hide Markers'}</Text>
+                            <Text style={{ fontSize: 12, color: Colors.gray[600], fontWeight: '600' }}>{hideMarkers ? 'Show Markers' : 'Hide Markers'}</Text>
                           </TouchableOpacity>
                         </View>
                         {/* Image with overlaid markers */}
@@ -2289,15 +2311,15 @@ export default function CardDetailScreen() {
                             if (!items || items.length === 0) return null
                             return (
                               <View key={cat}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: themeText, marginTop: 4 }}>{cat}</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: themeText, marginTop: 4 }}>{cat}</Text>
                                 {items.map(m => {
                                   const dotColor = m.severity === 'heavy' ? Colors.red[500] : m.severity === 'moderate' ? Colors.amber[500] : Colors.green[500]
                                   return (
                                     <View key={m.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 3 }}>
                                       <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: dotColor, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                                        <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{m.id}</Text>
+                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{m.id}</Text>
                                       </View>
-                                      <Text style={{ flex: 1, fontSize: 9, color: Colors.gray[700], lineHeight: 13 }}>
+                                      <Text style={{ flex: 1, fontSize: 12, color: Colors.gray[700], lineHeight: 13 }}>
                                         <Text style={{ fontWeight: '700' }}>#{m.id} </Text>
                                         <Text style={{ fontWeight: '700', textTransform: 'capitalize' }}>{m.type.replace(/^(Corner|Edge) \(/, '').replace(/\)$/, '')}</Text>
                                         {' '}<Text style={{ fontWeight: '600', color: dotColor }}>({m.severity})</Text>
@@ -2332,18 +2354,18 @@ export default function CardDetailScreen() {
                           return (
                             <View key={pos} style={{ width: '48%', backgroundColor: '#fff', borderRadius: 6, padding: 6, borderWidth: 1, borderColor: themeBorder }}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
-                                {score != null && <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>{score}/10</Text>}
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
+                                {score != null && <Text style={{ fontSize: 12, fontWeight: '700', color: themeText }}>{score}/10</Text>}
                               </View>
-                              {text && <Text style={{ fontSize: 8, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
+                              {text && <Text style={{ fontSize: 12, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
                             </View>
                           )
                         })}
                       </View>
                       {cornersData.summary && (
                         <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
-                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{cornersData.summary}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 12, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{cornersData.summary}</Text>
                         </View>
                       )}
                     </View>
@@ -2366,18 +2388,18 @@ export default function CardDetailScreen() {
                           return (
                             <View key={pos} style={{ width: '48%', backgroundColor: '#fff', borderRadius: 6, padding: 6, borderWidth: 1, borderColor: themeBorder }}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
-                                {score != null && <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>{score}/10</Text>}
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
+                                {score != null && <Text style={{ fontSize: 12, fontWeight: '700', color: themeText }}>{score}/10</Text>}
                               </View>
-                              {text && <Text style={{ fontSize: 8, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
+                              {text && <Text style={{ fontSize: 12, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
                             </View>
                           )
                         })}
                       </View>
                       {edgesData.summary && (
                         <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
-                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{edgesData.summary}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 12, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{edgesData.summary}</Text>
                         </View>
                       )}
                     </View>
@@ -2390,23 +2412,23 @@ export default function CardDetailScreen() {
                         <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Surface</Text>
                         {surfaceData.score != null && <Text style={{ fontSize: 13, fontWeight: '800', color: themeText }}>{surfaceData.score}/10</Text>}
                       </View>
-                      {surfaceData.finish_type && <Text style={{ fontSize: 9, color: Colors.gray[500], marginBottom: 4 }}>Finish: {surfaceData.finish_type}</Text>}
-                      {surfaceData.condition && <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13 }}>{surfaceData.condition}</Text>}
+                      {surfaceData.finish_type && <Text style={{ fontSize: 12, color: Colors.gray[500], marginBottom: 4 }}>Finish: {surfaceData.finish_type}</Text>}
+                      {surfaceData.condition && <Text style={{ fontSize: 12, color: Colors.gray[600], lineHeight: 13 }}>{surfaceData.condition}</Text>}
                       {surfaceData.defects && Array.isArray(surfaceData.defects) && surfaceData.defects.length > 0 && (
                         <View style={{ marginTop: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700], marginBottom: 2 }}>Defects:</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[700], marginBottom: 2 }}>Defects:</Text>
                           {surfaceData.defects.map((d: any, i: number) => (
                             <View key={i} style={{ backgroundColor: '#fff', borderRadius: 4, padding: 4, marginTop: 2, borderWidth: 1, borderColor: themeBorder }}>
-                              <Text style={{ fontSize: 8, fontWeight: '600', color: Colors.gray[700] }}>{d.type} ({d.severity})</Text>
-                              {d.location && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>Location: {d.location}</Text>}
-                              {d.description && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>{d.description}</Text>}
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.gray[700] }}>{d.type} ({d.severity})</Text>
+                              {d.location && <Text style={{ fontSize: 12, color: Colors.gray[500] }}>Location: {d.location}</Text>}
+                              {d.description && <Text style={{ fontSize: 12, color: Colors.gray[500] }}>{d.description}</Text>}
                               {/* The magnified crop the finding was actually made
                                   from. The web detail page has linked this since
                                   v9.4.2; the app did not, so app users were told a
                                   defect existed with no way to look at it. */}
                               {d.evidence_url && (
                                 <Text
-                                  style={{ fontSize: 8, color: Colors.blue[500], marginTop: 2, textDecorationLine: 'underline' }}
+                                  style={{ fontSize: 12, color: Colors.blue[500], marginTop: 2, textDecorationLine: 'underline' }}
                                   onPress={() => Linking.openURL(d.evidence_url).catch(() => {})}
                                 >
                                   View magnified evidence photo
@@ -2418,8 +2440,8 @@ export default function CardDetailScreen() {
                       )}
                       {surfaceData.summary && (
                         <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
-                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{surfaceData.summary}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 12, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{surfaceData.summary}</Text>
                         </View>
                       )}
                     </View>
@@ -2588,27 +2610,27 @@ export default function CardDetailScreen() {
                     <Text style={[s.priceNote, { marginBottom: 8 }]}>Market prices from raw to graded</Text>
                     {chartData.map((d, i) => (
                       <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                        <Text style={{ width: 55, fontSize: 10, color: Colors.gray[600], fontWeight: '500' }}>{d.label}</Text>
+                        <Text style={{ width: 55, fontSize: 12, color: Colors.gray[600], fontWeight: '500' }}>{d.label}</Text>
                         <View style={{ flex: 1, height: 18, backgroundColor: Colors.gray[100], borderRadius: 4, overflow: 'hidden' }}>
                           <View style={{ width: `${Math.max(5, (d.price / maxPrice) * 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 4, justifyContent: 'center', paddingLeft: 4 }}>
-                            {d.price >= maxPrice * 0.15 && <Text style={{ fontSize: 8, color: '#fff', fontWeight: '700' }}>${d.price.toFixed(2)}</Text>}
+                            {d.price >= maxPrice * 0.15 && <Text style={{ fontSize: 12, color: '#fff', fontWeight: '700' }}>${d.price.toFixed(2)}</Text>}
                           </View>
                         </View>
-                        {d.price < maxPrice * 0.15 && <Text style={{ fontSize: 8, color: Colors.gray[500], marginLeft: 4 }}>${d.price.toFixed(2)}</Text>}
+                        {d.price < maxPrice * 0.15 && <Text style={{ fontSize: 12, color: Colors.gray[500], marginLeft: 4 }}>${d.price.toFixed(2)}</Text>}
                       </View>
                     ))}
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.amber[500] }} />
-                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>Raw</Text>
+                        <Text style={{ fontSize: 12, color: Colors.gray[500] }}>Raw</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.purple[600] }} />
-                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>DCM</Text>
+                        <Text style={{ fontSize: 12, color: Colors.gray[500] }}>DCM</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.green[500] }} />
-                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>PSA/BGS/CGC</Text>
+                        <Text style={{ fontSize: 12, color: Colors.gray[500] }}>PSA/BGS/CGC</Text>
                       </View>
                     </View>
                   </View>
@@ -2627,7 +2649,7 @@ export default function CardDetailScreen() {
                           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                             {sorted.map(([g, p]) => (
                               <View key={g} style={{ backgroundColor: parseFloat(g) >= 9 ? Colors.green[50] : Colors.gray[50], borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: parseFloat(g) >= 9 ? Colors.green[100] : Colors.gray[200] }}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>Grade {g}</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[700] }}>Grade {g}</Text>
                                 <Text style={{ fontSize: 11, fontWeight: '700', color: parseFloat(g) >= 9 ? Colors.green[600] : Colors.gray[800] }}>${(p as number).toFixed(2)}</Text>
                               </View>
                             ))}
@@ -2760,7 +2782,7 @@ export default function CardDetailScreen() {
                   const ebaySold = `${ebayActive}&LH_Sold=1&LH_Complete=1`
                   return (
                     <View style={{ marginTop: 14, gap: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.gray[600], marginBottom: 2 }}>Look up this card</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[600], marginBottom: 2 }}>Look up this card</Text>
                       <TouchableOpacity
                         style={s.marketLinkRow}
                         onPress={() => Linking.openURL(pricingUrl).catch(() => Alert.alert('Could not open link', pricingUrl))}
@@ -2882,14 +2904,14 @@ export default function CardDetailScreen() {
                 {info.game && <InfoRow label="Game" value={info.game} />}
                 {info.card_front_text && (
                   <View style={{ marginTop: 4 }}>
-                    <Text style={{ fontSize: 9, fontWeight: '600', color: Colors.gray[500] }}>Card Front Text:</Text>
-                    <Text style={[s.analysisText, { fontSize: 10 }]}>{info.card_front_text}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.gray[500] }}>Card Front Text:</Text>
+                    <Text style={[s.analysisText, { fontSize: 12 }]}>{info.card_front_text}</Text>
                   </View>
                 )}
                 {info.card_back_text && (
                   <View style={{ marginTop: 4 }}>
-                    <Text style={{ fontSize: 9, fontWeight: '600', color: Colors.gray[500] }}>Card Back Text:</Text>
-                    <Text style={[s.analysisText, { fontSize: 10 }]}>{info.card_back_text}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.gray[500] }}>Card Back Text:</Text>
+                    <Text style={[s.analysisText, { fontSize: 12 }]}>{info.card_back_text}</Text>
                   </View>
                 )}
               </View>
@@ -2914,12 +2936,12 @@ export default function CardDetailScreen() {
               <View style={{ marginTop: 8, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden' }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', backgroundColor: Colors.gray[100], paddingVertical: 6, paddingHorizontal: 8 }}>
-                  <Text style={{ flex: 1, fontSize: 9, fontWeight: '700', color: Colors.gray[600] }}>Pass</Text>
-                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>C</Text>
-                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Co</Text>
-                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>E</Text>
-                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>S</Text>
-                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Final</Text>
+                  <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: Colors.gray[600] }}>Pass</Text>
+                  <Text style={{ width: 36, fontSize: 12, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>C</Text>
+                  <Text style={{ width: 36, fontSize: 12, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Co</Text>
+                  <Text style={{ width: 36, fontSize: 12, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>E</Text>
+                  <Text style={{ width: 36, fontSize: 12, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>S</Text>
+                  <Text style={{ width: 36, fontSize: 12, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Final</Text>
                 </View>
                 {/* Pass rows */}
                 {[1, 2, 3].map(passNum => {
@@ -2928,24 +2950,24 @@ export default function CardDetailScreen() {
                   const sc = pass.sub_scores || pass
                   return (
                     <View key={passNum} style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: Colors.gray[100] }}>
-                      <Text style={{ flex: 1, fontSize: 10, color: Colors.gray[700] }}>Pass {passNum}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.centering ?? '-'}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.corners ?? '-'}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.edges ?? '-'}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.surface ?? '-'}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '700' }}>{passFinal(pass) ?? '-'}</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: Colors.gray[700] }}>Pass {passNum}</Text>
+                      <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.centering ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.corners ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.edges ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.surface ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 12, color: Colors.purple[600], textAlign: 'center', fontWeight: '700' }}>{passFinal(pass) ?? '-'}</Text>
                     </View>
                   )
                 })}
                 {/* Consensus row */}
                 {ar && (
                   <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: Colors.gray[200], backgroundColor: Colors.purple[50] }}>
-                    <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: Colors.gray[800] }}>Consensus</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.centering ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.corners ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.edges ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.surface ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '800' }}>{ar.final ?? '-'}</Text>
+                    <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: Colors.gray[800] }}>Consensus</Text>
+                    <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.centering ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.corners ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.edges ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 12, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.surface ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 12, color: Colors.purple[600], textAlign: 'center', fontWeight: '800' }}>{ar.final ?? '-'}</Text>
                   </View>
                 )}
               </View>
@@ -3019,8 +3041,8 @@ export default function CardDetailScreen() {
                       const text = typeof cd === 'object' ? cd.condition : (typeof cd === 'string' ? cd : null)
                       return (
                         <View key={corner} style={{ marginTop: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: Colors.purple[200] }}>
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
-                          {text && <Text style={[s.analysisText, { fontSize: 10 }]}>{text}</Text>}
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
+                          {text && <Text style={[s.analysisText, { fontSize: 12 }]}>{text}</Text>}
                         </View>
                       )
                     })}
@@ -3052,8 +3074,8 @@ export default function CardDetailScreen() {
                       const text = typeof ed === 'object' ? ed.condition : (typeof ed === 'string' ? ed : null)
                       return (
                         <View key={edge} style={{ marginTop: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: Colors.purple[200] }}>
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
-                          {text && <Text style={[s.analysisText, { fontSize: 10 }]}>{text}</Text>}
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
+                          {text && <Text style={[s.analysisText, { fontSize: 12 }]}>{text}</Text>}
                         </View>
                       )
                     })}
@@ -3095,7 +3117,7 @@ export default function CardDetailScreen() {
                   {/* Use the same grade-derived column the header uses (server writes
                       getConditionFromGrade) rather than the raw JSON's pre-cap AI label,
                       so this never contradicts the header label on the same screen. */}
-                  <Text style={{ fontSize: 10, color: Colors.gray[500] }}>{card.conversational_condition_label || gradingJson.final_grade.condition_label}</Text>
+                  <Text style={{ fontSize: 12, color: Colors.gray[500] }}>{card.conversational_condition_label || gradingJson.final_grade.condition_label}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   {gradingJson.final_grade.decimal_grade != null && (
@@ -3438,7 +3460,7 @@ const s = StyleSheet.create({
   valueAmount: { fontSize: 28, fontWeight: '800', color: Colors.green[600], marginTop: 4 },
   marketLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.gray[50], borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8 },
   marketLinkLabel: { fontSize: 12, fontWeight: '700', color: Colors.gray[800] },
-  marketLinkSub: { fontSize: 9, color: Colors.gray[500], marginTop: 1 },
+  marketLinkSub: { fontSize: 12, color: Colors.gray[500], marginTop: 1 },
 
   // Edit modal
   editBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
@@ -3480,14 +3502,14 @@ const s = StyleSheet.create({
   userReportHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
   userReportTitle: { fontSize: 13, fontWeight: '700', color: Colors.amber[600], flexShrink: 1 },
   userReportInfluencedBadge: { paddingHorizontal: 8, paddingVertical: 2, backgroundColor: Colors.amber[100], borderRadius: 10 },
-  userReportInfluencedText: { fontSize: 10, fontWeight: '700', color: Colors.amber[600] },
+  userReportInfluencedText: { fontSize: 12, fontWeight: '700', color: Colors.amber[600] },
   userReportSectionLabel: { fontSize: 12, fontWeight: '600', color: Colors.amber[600] },
   userReportSectionValue: { fontSize: 12, color: Colors.amber[600], lineHeight: 17 },
 
   // Serial
   serialRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 12, padding: 12, backgroundColor: Colors.white, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[200] },
   serialChip: { alignSelf: 'center', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 18, marginHorizontal: 12, marginBottom: 10, backgroundColor: Colors.purple[50], borderRadius: 10, borderWidth: 1, borderColor: Colors.purple[200] },
-  serialLabel: { fontSize: 10, color: Colors.purple[600], fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  serialLabel: { fontSize: 12, color: Colors.purple[600], fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   serialValue: { fontSize: 14, fontWeight: '800', color: Colors.purple[700], fontFamily: 'SpaceMono', marginTop: 2, letterSpacing: 1 },
 
   // Share
@@ -3543,7 +3565,7 @@ const s = StyleSheet.create({
   proRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   proGrade: { fontSize: 18, fontWeight: '800', color: Colors.purple[600] },
   proBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  proConfText: { fontSize: 10, fontWeight: '700' },
+  proConfText: { fontSize: 12, fontWeight: '700' },
   disclaimer: { fontSize: 11, color: Colors.gray[400], fontStyle: 'italic', marginTop: 8 },
 
   // eBay

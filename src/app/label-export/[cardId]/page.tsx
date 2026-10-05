@@ -1,4 +1,5 @@
 'use client';
+import { useNativeExportToken } from '@/lib/useNativeExportToken';
 
 /**
  * Label Export page — loaded in a hidden WebView from the mobile card detail page.
@@ -115,7 +116,7 @@ async function imageToJpegBase64(imageUrl: string): Promise<string> {
 export default function LabelExportPage() {
   const { cardId } = useParams<{ cardId: string }>();
   const sp = useSearchParams();
-  const token = sp.get('token') || '';
+  const token = useNativeExportToken(sp.get('token'));
   const rawType = sp.get('type') || 'slab-modern';
   // Heritage Compact on the small holders — see the batch route for the full
   // note. The account's own label style now decides: when it resolves to
@@ -159,6 +160,7 @@ export default function LabelExportPage() {
   };
 
   useEffect(() => {
+    if (!token) return; // Wait for the native handoff before accessing protected data.
     let cancelled = false;
     (async () => {
       try {

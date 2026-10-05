@@ -64,6 +64,14 @@
       "ios": {
         "simulator": true
       }
+    },
+    "release-validation": {
+      "extends": "production",
+      "distribution": "store",
+      "channel": "camera-validation",
+      "ios": {
+        "simulator": false
+      }
     }
   },
   "submit": {

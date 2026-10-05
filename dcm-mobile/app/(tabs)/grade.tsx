@@ -12,7 +12,7 @@ import { useGradingRun } from '@/hooks/useGradingRun'
 
 export default function GradeScreen() {
   const router = useRouter()
-  const { balance, refresh } = useCredits()
+  const { balance, refresh, error: creditError, hasBalance } = useCredits()
 
   // Refresh the credit balance whenever the screen comes into focus —
   // covers the case where the user just bought credits via /pages/credits
@@ -33,7 +33,7 @@ export default function GradeScreen() {
   }, [categoryLock])
   const canLockCategory = selectedCategory !== '' && (selectedCategory !== 'Other' || subCategory !== '')
 
-  const canGrade = balance >= 1
+  const canGrade = hasBalance && !creditError && balance >= 1
     && selectedCategory !== ''
     && (selectedCategory !== 'Other' || subCategory !== '')
 
@@ -198,11 +198,17 @@ export default function GradeScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Button title="Grade Multiple Cards" variant="secondary" onPress={() => router.push({ pathname: '/pages/bulk-grade', params: { category: selectedCategory, sub_category: subCategory } } as never)} />
+        <Text style={styles.sectionHint}>Select front and back photos for several cards, review the pairs, and check the credit total before submitting.</Text>
+      </View>
+      {creditError && <View style={styles.section}><Text accessibilityRole="alert" style={styles.sectionHint}>{creditError}</Text><Button title="Retry Credit Balance" onPress={() => void refresh()} /></View>}
+
       {/* Credit purchase CTA — routes to /pages/credits which loads the
           web's credits page in a WebView. Stripe checkout there is
           already battle-tested and webhook-driven; reusing it instead of
           maintaining a parallel native PaymentSheet integration. */}
-      {balance < 3 && (
+      {hasBalance && !creditError && balance < 3 && (
         <View style={styles.creditsSection}>
           {balance < 1 && (
             <View style={styles.noCredits}>
@@ -243,7 +249,7 @@ export default function GradeScreen() {
         </View>
         <View style={styles.tipRow}>
           <Ionicons name="scan" size={16} color={Colors.green[500]} />
-          <Text style={styles.tipText}>Fill the frame with the card — minimize background</Text>
+          <Text style={styles.tipText}>Keep all four edges visible. Move back slightly if the text looks soft.</Text>
         </View>
         <View style={styles.tipRow}>
           <Ionicons name="flash-off" size={16} color={Colors.red[500]} />
