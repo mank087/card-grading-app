@@ -34,6 +34,7 @@ import { bridgeTokenParam, authBridgeInjection } from '@/lib/webviewAuthBridge'
 
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import { displayImagePath } from '@/lib/displayPath'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
@@ -49,7 +50,7 @@ type Step = 'connect' | 'details' | 'specifics' | 'shipping' | 'review' | 'publi
  */
 const LISTING_CARD_COLUMNS = [
   'id', 'user_id', 'card_name', 'category', 'sub_category', 'serial',
-  'front_path', 'back_path', 'org_id', 'org_serial_display',
+  'front_path', 'back_path', 'display_crop:capture_quality->display', 'org_id', 'org_serial_display',
   'conversational_whole_grade', 'conversational_decimal_grade',
   'conversational_condition_label', 'conversational_card_info',
   'conversational_sub_scores', 'conversational_weighted_sub_scores',
@@ -317,12 +318,15 @@ export default function EbayListScreen() {
         const resolved = resolveCardValue(data)
         if (resolved.value > 0) setPrice(prev => prev || resolved.value.toFixed(2))
         // Get signed URLs
-        const paths = [data.front_path, data.back_path].filter(Boolean)
+        // Listing photos use the trimmed display copy when the card has one.
+        const frontShown = displayImagePath(data, 'front')
+        const backShown = displayImagePath(data, 'back')
+        const paths = [frontShown, backShown].filter(Boolean) as string[]
         if (paths.length > 0) {
           const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
           urls?.forEach(u => {
-            if (u.path === data.front_path) setFrontUrl(u.signedUrl)
-            if (u.path === data.back_path) setBackUrl(u.signedUrl)
+            if (u.path === frontShown) setFrontUrl(u.signedUrl)
+            if (u.path === backShown) setBackUrl(u.signedUrl)
           })
         }
       }
