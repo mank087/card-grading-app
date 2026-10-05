@@ -650,6 +650,39 @@ export default function CardDetailScreen() {
   if (card.conversational_whole_grade == null && (card as any).grade_status === 'failed') {
     const failureMessage = incompleteInspectionFromErrorMessage((card as any).error_message)
       ?? 'We could not finish grading this card. Please try again with new photos. If it keeps happening, contact support.'
+    // Oct 2026: owners wrote in because an ungraded card could not be removed —
+    // this screen had no delete and the collection has none either. Same
+    // server soft delete as the graded-card Delete (DELETE /api/cards/[id]).
+    const ownsFailedCard = !!session?.user?.id && session.user.id === card.user_id
+    const removeFailedCard = () => {
+      Alert.alert(
+        'Remove this card?',
+        'It was not graded, so no grading credit was used. It will be removed from your collection.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { data: { session: current } } = await supabase.auth.getSession()
+                if (!current?.access_token) throw new Error('Please sign in again.')
+                const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+                const res = await fetch(`${apiBase}/api/cards/${card.id}`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${current.access_token}` },
+                })
+                const json = await res.json().catch(() => ({}))
+                if (!res.ok) throw new Error(json.error || 'Could not remove this card. Please try again.')
+                router.back()
+              } catch (err: any) {
+                Alert.alert('Remove failed', err?.message || 'Could not remove this card. Please try again.')
+              }
+            },
+          },
+        ]
+      )
+    }
     return (
       <View style={[s.loading, { paddingHorizontal: 24 }]}>
         <Ionicons name="alert-circle" size={36} color={Colors.amber[500]} />
@@ -657,6 +690,11 @@ export default function CardDetailScreen() {
         <Text style={{ fontSize: 14, color: Colors.gray[600], marginTop: 8, textAlign: 'center', lineHeight: 20 }}>{failureMessage}</Text>
         <Button title="Retake Photos" onPress={() => router.replace('/(tabs)/grade')} style={{ marginTop: 16, alignSelf: 'stretch' }} />
         <Button title="Contact Support" variant="secondary" onPress={() => router.push('/pages/contact')} style={{ marginTop: 8, alignSelf: 'stretch' }} />
+        {ownsFailedCard && (
+          <TouchableOpacity onPress={removeFailedCard} accessibilityRole="button" style={{ marginTop: 16, padding: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.red[600], textAlign: 'center' }}>Remove from collection</Text>
+          </TouchableOpacity>
+        )}
       </View>
     )
   }
