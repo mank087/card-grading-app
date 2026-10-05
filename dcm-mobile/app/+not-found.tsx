@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Stack, useRouter, usePathname, useGlobalSearchParams, Link } from 'expo-router'
 import { View, Text, StyleSheet } from 'react-native'
 
+import { useAuth } from '@/contexts/AuthContext'
 import InAppPage from '@/components/ui/InAppPage'
 import { Colors } from '@/lib/constants'
 import { resolveDeepLink } from '@/lib/deepLinks'
@@ -31,6 +32,7 @@ import { resolveDeepLink } from '@/lib/deepLinks'
  */
 
 export default function NotFoundScreen() {
+  const { user } = useAuth()
   const pathname = usePathname()
   // usePathname() strips the query string. Universal links to /search,
   // /pop and label previews are meaningless without it, so rebuild the
@@ -51,11 +53,11 @@ export default function NotFoundScreen() {
   useEffect(() => {
     // The native /card/[id] screen handles every card type uniformly, so
     // /sports/<id>, /pokemon/<id>, etc. all funnel into the same screen.
-    if (resolved.kind === 'card' || resolved.kind === 'native-page') {
+    if ((resolved.kind === 'card' && user) || resolved.kind === 'native-page') {
       router.replace(resolved.href as any)
       setRouted(true)
     }
-  }, [resolved, router])
+  }, [resolved, router, user])
 
   // While redirecting, show a blank background instead of the not-found UI
   // so there's no visual flash before the redirect.
@@ -69,8 +71,8 @@ export default function NotFoundScreen() {
   // /labels/<id>, etc. The InAppPage WebView injects the user's session
   // before page load so logged-in views work, and the query string is
   // carried through.
-  if (resolved.kind === 'embedded-web') {
-    return <InAppPage path={resolved.href} title="DCM Grading" />
+  if (resolved.kind === 'embedded-web' || (resolved.kind === 'card' && !user)) {
+    return <InAppPage path={resolved.kind === 'card' ? `${resolved.path}${resolved.search}` : resolved.href} title="DCM Grading" />
   }
 
   // True "nowhere to go" fallback — keep the original error UX.

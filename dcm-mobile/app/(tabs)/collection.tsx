@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
+import CollectionShare from '@/components/CollectionShare'
 import BinderStrip from '@/components/BinderStrip'
 import CardActionSheet from '@/components/CardActionSheet'
 import MarkAsSoldModal from '@/components/MarkAsSoldModal'
@@ -823,7 +824,6 @@ export default function CollectionScreen() {
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
     const cardIds = Array.from(selectedIds).join(',')
     const params = new URLSearchParams()
-    params.set('token', session.access_token)
     params.set('cardIds', cardIds)
     params.set('type', type)
     if (opts?.format) params.set('format', opts.format)
@@ -1117,6 +1117,7 @@ export default function CollectionScreen() {
         </View>
       )}
 
+      {!selectionMode && <CollectionShare />}
       {/* Search + Sort + View Toggle */}
       <View style={st.toolbar}>
         <View style={st.searchContainer}>

@@ -38,7 +38,7 @@ export default function CollapsibleSection({ title, children, defaultOpen = fals
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.header} onPress={toggle} activeOpacity={0.7}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ expanded: isOpen }} style={styles.header} onPress={toggle} activeOpacity={0.7}>
         <View style={styles.headerLeft}>
           {icon && <Ionicons name={icon} size={18} color={Colors.purple[600]} style={{ marginRight: 8 }} />}
           <Text style={styles.title}>{title}</Text>

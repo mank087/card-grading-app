@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
+import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 
 interface AppHeaderBarProps {
@@ -37,7 +38,8 @@ interface AppHeaderBarProps {
 export default function AppHeaderBar({ showBack, onBack, title, showGrade }: AppHeaderBarProps) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { balance } = useCredits()
+  const { balance, error, hasBalance, isLoading, refresh } = useCredits()
+  const { user } = useAuth()
 
   // Credit badge color: green if 3+, amber if 1-2, red if 0
   const creditColor = balance >= 3 ? Colors.green[600] : balance >= 1 ? Colors.amber[600] : Colors.red[600]
@@ -90,15 +92,15 @@ export default function AppHeaderBar({ showBack, onBack, title, showGrade }: App
 
         <TouchableOpacity
           style={[styles.creditBadge, { backgroundColor: creditBg }]}
-          onPress={() => router.push('/pages/credits' as any)}
+          onPress={() => { if (!user) router.push('/(auth)/login'); else if (error) void refresh(); else router.push('/pages/credits' as any) }}
           activeOpacity={0.7}
-          accessibilityLabel={`${balance} grading credits remaining. Tap to purchase more.`}
+          accessibilityLabel={!user ? 'Sign in' : error || (hasBalance ? `${balance} grading credits remaining. Tap to purchase more.` : 'Loading credits')}
           accessibilityRole="button"
         >
           <Ionicons name="diamond" size={13} color={creditColor} />
           <Text style={[styles.creditBadgeText, { color: creditColor }]}>
-            {balance}
-            <Text style={styles.creditBadgeUnit}> {balance === 1 ? 'credit' : 'credits'}</Text>
+            {!user ? 'Sign in' : error ? (hasBalance ? `${balance} · Retry` : 'Retry') : !hasBalance && isLoading ? '…' : balance}
+            {user && !error && hasBalance && <Text style={styles.creditBadgeUnit}> {balance === 1 ? 'credit' : 'credits'}</Text>}
           </Text>
         </TouchableOpacity>
       </View>

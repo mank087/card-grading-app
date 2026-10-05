@@ -8,6 +8,8 @@
 // gate). Server contracts: src/lib/submissions/{types,service}.ts and
 // src/app/api/submissions/**, both read-only from here.
 
+import { createUploadAttempt, runUploadAttempt } from '@/lib/submissions/uploadAttempt'
+import { awaitNativeSession, isNativeHost, postNativeMessage } from '@/lib/nativeAppBridge'
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -201,14 +203,18 @@ function SubmissionsNewInner() {
   // at commit. Same pattern as /upload, with ?redirect= so they land back here
   // after signing in (honored by /login and by the OAuth callback).
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [sessionError, setSessionError] = useState('')
   useEffect(() => {
-    const session = getStoredSession()
-    if (!session?.user) {
-      setIsAuthenticated(false)
-      router.push(`/login?redirect=${encodeURIComponent('/submissions/new')}`)
-    } else {
-      setIsAuthenticated(true)
-    }
+    let cancelled = false
+    void awaitNativeSession().then(() => {
+      if (cancelled) return
+      const session = getStoredSession()
+      if (!session?.user) {
+        setIsAuthenticated(false)
+        router.push(`/login?redirect=${encodeURIComponent('/submissions/new')}`)
+      } else setIsAuthenticated(true)
+    }).catch(reason => { if (!cancelled) setSessionError(reason instanceof Error ? reason.message : 'Unable to load your session.') })
+    return () => { cancelled = true }
   }, [router])
 
   const categoryParam = searchParams?.get('category') || ''
@@ -263,6 +269,10 @@ function SubmissionsNewInner() {
   const [trimmedTo, setTrimmedTo] = useState<number | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
+  const submitGuard = useRef(false)
+  const uploadAttempt = useRef(createUploadAttempt())
+  const attemptFingerprint = useRef<string | null>(null)
+  const maxIntakeItems = isNativeHost() ? 20 : MAX_SUBMISSION_ITEMS
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [gateBlock, setGateBlock] = useState<{ required: number; balance: number; affordable: number } | null>(null)
   // The balance the SERVER's commit gate judges against (personal + org pool).
@@ -270,13 +280,14 @@ function SubmissionsNewInner() {
   // blocks org members whose store pool has credits.
   const [authBalance, setAuthBalance] = useState<number | null>(null)
   useEffect(() => {
+    if (!isAuthenticated) return
     const session = getStoredSession()
     if (!session?.access_token) return
     fetch('/api/submissions/balance', { headers: { Authorization: `Bearer ${session.access_token}` } })
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (d?.success && typeof d.balance === 'number') setAuthBalance(d.balance) })
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated, balance])
 
   const [uploadState, setUploadState] = useState<Map<number, PairUploadState>>(new Map())
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'creating' | 'uploading' | 'committing' | 'done' | 'error'>('idle')
@@ -337,7 +348,7 @@ function SubmissionsNewInner() {
     }
   }, [])
 
-  useEffect(() => { void loadBinders() }, [loadBinders])
+  useEffect(() => { if (isAuthenticated) void loadBinders() }, [loadBinders, isAuthenticated])
 
   // Reload on reaching review — the first moment the picker is on screen, and
   // long enough after mount that a token which needed refreshing has one.
@@ -424,8 +435,8 @@ function SubmissionsNewInner() {
       toast.error('Select at least two images (one front, one back).')
       return
     }
-    if (files.length > MAX_SUBMISSION_ITEMS * 2) {
-      toast.error(`A submission holds at most ${MAX_SUBMISSION_ITEMS} cards (${MAX_SUBMISSION_ITEMS * 2} images).`)
+    if (files.length > maxIntakeItems * 2) {
+      toast.error(`A submission holds at most ${maxIntakeItems} cards (${maxIntakeItems * 2} images).`)
       return
     }
     const detected = detectConvention(files)
@@ -819,6 +830,10 @@ function SubmissionsNewInner() {
   const insufficientLocally = !creditsLoading && required > 0 && effectiveBalance < required
 
   const persistDraftAndGoToCredits = () => {
+    if (isNativeHost()) {
+      postNativeMessage('navigate', { url: new URL('/credits', window.location.origin).href })
+      return
+    }
     const draft: DraftMeta = {
       category: selectedType,
       subCategory,
@@ -887,7 +902,7 @@ function SubmissionsNewInner() {
     throw lastErr || new Error(`Upload failed for ${side}`)
   }
 
-  const startGrading = async () => {
+  const performStartGrading = async () => {
     if (incompletePairs.length) {
       toast.error(`${incompletePairs.length} card${incompletePairs.length === 1 ? ' is' : 's are'} missing a front or back. Fix or remove them first.`)
       return
@@ -900,13 +915,13 @@ function SubmissionsNewInner() {
       toast.error('Pick a sub-category for these cards.')
       return
     }
-    const session = getStoredSession()
+    const session = await getValidSession()
     if (!session?.user) {
       toast.error('You must be logged in.')
       router.push('/login')
       return
     }
-    if (effectiveBalance < completePairs.length) {
+    if (!uploadAttempt.current.id && effectiveBalance < completePairs.length) {
       setGateBlock({ required: completePairs.length, balance: effectiveBalance, affordable: Math.max(0, effectiveBalance) })
       return
     }
@@ -933,12 +948,16 @@ function SubmissionsNewInner() {
     const authClient = getAuthenticatedClient()
 
     try {
+      const fingerprint = JSON.stringify([selectedType, subCategory, binderId, cardNotes, completePairs.map(pair => [pair.front?.id, pair.back?.id, rotations.get(pair.front?.id || '') || 0, rotations.get(pair.back?.id || '') || 0])])
+      if (!uploadAttempt.current.id && attemptFingerprint.current !== fingerprint) cardIdByPositionRef.current.clear()
+      if (uploadAttempt.current.id && attemptFingerprint.current && attemptFingerprint.current !== fingerprint) throw new Error('This upload is already in progress. Restore the original pairing and settings before retrying, or open its progress page.')
+      attemptFingerprint.current = fingerprint
       // Mint card ids + storage paths BEFORE creating the draft, so the items
       // we hand the server already carry the paths the upload step will fill.
       const withIds = completePairs.map((p, i) => ({
         position: i,
         pair: p,
-        cardId: genId(),
+        cardId: cardIdByPositionRef.current.get(i) || genId(),
       }))
       cardIdByPositionRef.current = new Map(withIds.map((w) => [w.position, w.cardId]))
 
@@ -960,77 +979,94 @@ function SubmissionsNewInner() {
         })
       )
 
-      const createRes = await fetch('/api/submissions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+      const submissionId = await runUploadAttempt(uploadAttempt.current, {
+        create: async () => {
+          const createRes = await fetch('/api/submissions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              category: config.category,
+              sub_category: selectedType === 'Naruto' ? 'Naruto / Kayou' : (config.category === 'Other' ? subCategory : undefined),
+              binder_id: binderId,
+              card_notes: cardNotes.trim() || undefined,
+              source: 'bulk_upload',
+              items: itemsPayload,
+            }),
+          })
+          const createData = await createRes.json().catch(() => null)
+          if (!createRes.ok || !createData?.submission?.id) {
+            if (createData?.code === 'insufficient_credits') {
+              setGateBlock({ required: createData.required, balance: createData.balance, affordable: createData.affordable })
+              setStage('review')
+              setUploadPhase('idle')
+              setSubmitting(false)
+              throw new Error('Not enough credits for this batch. Review the credit options below.')
+            }
+            throw new Error(createData?.error || createData?.message || 'Could not create the submission')
+          }
+          const submissionId = createData.submission.id as string
+          submissionIdRef.current = submissionId
+          return submissionId
         },
-        body: JSON.stringify({
-          category: config.category,
-          sub_category: selectedType === 'Naruto' ? 'Naruto / Kayou' : (config.category === 'Other' ? subCategory : undefined),
-          binder_id: binderId,
-          card_notes: cardNotes.trim() || undefined,
-          source: 'bulk_upload',
-          items: itemsPayload,
-        }),
-      })
-      const createData = await createRes.json().catch(() => null)
-      if (!createRes.ok || !createData?.submission?.id) {
-        if (createData?.code === 'insufficient_credits') {
-          setGateBlock({ required: createData.required, balance: createData.balance, affordable: createData.affordable })
-          setStage('review')
-          setUploadPhase('idle')
-          setSubmitting(false)
-          return
-        }
-        throw new Error(createData?.error || createData?.message || 'Could not create the submission')
-      }
-      const submissionId = createData.submission.id as string
-      submissionIdRef.current = submissionId
+        upload: async () => {
+          let failedUploads = 0
 
-      // Upload every image, concurrency 4, per-pair progress + retry.
-      setUploadPhase('uploading')
-      const initialState = new Map<number, PairUploadState>()
-      withIds.forEach(({ position }) => initialState.set(position, { frontDone: false, backDone: false, error: null }))
-      setUploadState(initialState)
+          // Upload every image, concurrency 4, per-pair progress + retry.
+          setUploadPhase('uploading')
+          const initialState = new Map<number, PairUploadState>()
+          withIds.forEach(({ position }) => initialState.set(position, { frontDone: false, backDone: false, error: null }))
+          setUploadState(initialState)
 
-      await runWithConcurrency(withIds, UPLOAD_CONCURRENCY, async ({ position, cardId, pair }) => {
-        try {
-          if (pair.front) {
-            await uploadOneSide(authClient, userId, cardId, 'front', pair.front, rotations.get(pair.front.id) || 0)
-            setUploadState((prev) => new Map(prev).set(position, { ...(prev.get(position) as PairUploadState), frontDone: true }))
+          await runWithConcurrency(withIds, UPLOAD_CONCURRENCY, async ({ position, cardId, pair }) => {
+            try {
+              if (pair.front) {
+                await uploadOneSide(authClient, userId, cardId, 'front', pair.front, rotations.get(pair.front.id) || 0)
+                setUploadState((prev) => new Map(prev).set(position, { ...(prev.get(position) as PairUploadState), frontDone: true }))
+              }
+              if (pair.back) {
+                await uploadOneSide(authClient, userId, cardId, 'back', pair.back, rotations.get(pair.back.id) || 0)
+                setUploadState((prev) => new Map(prev).set(position, { ...(prev.get(position) as PairUploadState), backDone: true }))
+              }
+            } catch (e: any) {
+              failedUploads++
+              setUploadState((prev) =>
+                new Map(prev).set(position, {
+                  ...(prev.get(position) as PairUploadState),
+                  error: e?.message || 'Upload failed',
+                })
+              )
+            }
+          })
+
+          if (failedUploads) throw new Error(`${failedUploads} card photo pair(s) could not upload. Retry to finish this same batch; grading has not started.`)
+        },
+        commit: async (submissionId) => {
+          setUploadPhase('committing')
+          const commitRes = await fetch(`/api/submissions/${submissionId}/commit`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+          const commitData = await commitRes.json().catch(() => null)
+          if (!commitRes.ok || !commitData?.success) {
+            if (commitData?.code === 'insufficient_credits') {
+              setGateBlock({ required: commitData.required, balance: commitData.balance, affordable: commitData.affordable })
+              setUploadPhase('idle')
+              setStage('review')
+              setSubmitting(false)
+              throw Object.assign(new Error('Not enough credits to start this batch. Add credits and retry this same batch.'), { code: 'insufficient_credits' })
+            }
+            // A lost commit response may be retried after grading has already completed.
+            const statusResponse = await fetch(`/api/submissions/${submissionId}/status`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+            const status = statusResponse.ok ? await statusResponse.json() : null
+            if (['running', 'complete', 'failed', 'paused'].includes(status?.submission?.status)) return
+            throw new Error(commitData?.message || commitData?.error || 'Could not start grading')
           }
-          if (pair.back) {
-            await uploadOneSide(authClient, userId, cardId, 'back', pair.back, rotations.get(pair.back.id) || 0)
-            setUploadState((prev) => new Map(prev).set(position, { ...(prev.get(position) as PairUploadState), backDone: true }))
-          }
-        } catch (e: any) {
-          setUploadState((prev) =>
-            new Map(prev).set(position, {
-              ...(prev.get(position) as PairUploadState),
-              error: e?.message || 'Upload failed',
-            })
-          )
-        }
-      })
 
-      setUploadPhase('committing')
-      const commitRes = await fetch(`/api/submissions/${submissionId}/commit`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        },
       })
-      const commitData = await commitRes.json().catch(() => null)
-      if (!commitRes.ok || !commitData?.success) {
-        if (commitData?.code === 'insufficient_credits') {
-          setGateBlock({ required: commitData.required, balance: commitData.balance, affordable: commitData.affordable })
-          setUploadPhase('idle')
-          setStage('review')
-          setSubmitting(false)
-          return
-        }
-        throw new Error(commitData?.message || commitData?.error || 'Could not start grading')
-      }
 
       // Kick the drain once so the first tick doesn't wait for the cron.
       fetch(`/api/submissions/drain?submission_id=${submissionId}`, {
@@ -1045,20 +1081,18 @@ function SubmissionsNewInner() {
       console.error('[submissions/new] start grading failed:', e)
       setSubmitError(e?.message || 'Something went wrong starting this submission.')
       setUploadPhase('error')
-      setStage('review')
+      setStage(e?.code === 'insufficient_credits' ? 'review' : uploadAttempt.current.id ? 'uploading' : 'review')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const retryUploads = () => {
-    // Re-running startGrading would create a second draft. A real "resume"
-    // would re-POST only the failed sides against the existing submission —
-    // not exposed by the server core, so for now a failed upload asks the
-    // user to retry the whole submission.
-    setStage('review')
-    setUploadPhase('idle')
+  const startGrading = async () => {
+    if (submitGuard.current) return
+    submitGuard.current = true
+    try { await performStartGrading() } finally { submitGuard.current = false }
   }
+  const retryUploads = () => { void startGrading() }
 
   // ---------------------------------------------------------------------
   // Render
@@ -1066,6 +1100,8 @@ function SubmissionsNewInner() {
 
   // 🔒 Session not resolved yet — show nothing rather than a flash of the
   // intake form to someone who is about to be redirected.
+  if (sessionError) return <div role="alert" className="mx-auto max-w-lg p-6"><p>{sessionError}</p><button className="mt-4 rounded bg-purple-700 px-4 py-3 text-white" onClick={() => window.location.reload()}>Retry</button></div>
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -1593,6 +1629,8 @@ function SubmissionsNewInner() {
                   {uploadPhase === 'creating' && 'Creating your submission…'}
                   {uploadPhase === 'uploading' && `Uploading images (up to ${UPLOAD_CONCURRENCY} at once)…`}
                   {uploadPhase === 'committing' && 'Starting grading…'}
+                  {uploadPhase === 'error' && 'Your batch is saved. Retry below to continue the same upload.'}
+                  {uploadPhase === 'error' && submissionIdRef.current && <Link href={`/submissions/${submissionIdRef.current}`} className="ml-2 underline">View batch status</Link>}
                 </div>
               )}
 
@@ -1610,7 +1648,7 @@ function SubmissionsNewInner() {
                   </button>
                 )}
                 {stage === 'uploading' && uploadPhase === 'error' && (
-                  <button onClick={retryUploads} className="px-4 py-2 text-sm font-semibold bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Back to review</button>
+                  <button onClick={retryUploads} className="px-4 py-2 text-sm font-semibold bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Retry This Batch</button>
                 )}
               </div>
             </div>

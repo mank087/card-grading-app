@@ -21,6 +21,7 @@ export const CARD_TYPE_PATHS = new Set([
 /** Web paths that have a dedicated native screen under `app/pages/`. */
 const NATIVE_PAGE_ROUTES: Record<string, string> = {
   '/credits': '/pages/credits',
+  '/submissions/new': '/pages/bulk-grade',
   '/card-lovers': '/pages/card-lovers',
   '/vip': '/pages/vip',
   '/account': '/pages/my-account',
@@ -50,7 +51,7 @@ export function splitUrl(raw: string): { path: string; search: string } {
 
   // Strip a scheme + host: https://dcmgrading.com/x, dcmgrading://x
   const schemeMatch = rest.match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)(.*)$/i)
-  if (schemeMatch) rest = schemeMatch[2] || '/'
+  if (schemeMatch) rest = /^dcmgrading:/i.test(raw) ? `/${schemeMatch[1]}${schemeMatch[2]}` : (schemeMatch[2] || '/')
 
   const hashIndex = rest.indexOf('#')
   if (hashIndex >= 0) rest = rest.slice(0, hashIndex)
@@ -104,7 +105,7 @@ let pending: string | null = null
 
 /** Routes we must never bounce back to after signing in. */
 function isReturnable(href: string): boolean {
-  if (!href || !href.startsWith('/')) return false
+  if (!href || !href.startsWith('/') || href.startsWith('//') || href.includes('\\') || href.startsWith('/reset-password')) return false
   if (href === '/' || href.startsWith('/+not-found')) return false
   if (href.startsWith('/(auth)') || href.startsWith('/(tabs)')) return false
   return true

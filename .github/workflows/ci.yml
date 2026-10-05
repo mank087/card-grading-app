@@ -22,6 +22,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dcm-mobile/package-lock.json
 
       - name: Keep experimental grading out of releases
         run: node scripts/check-grading-isolation.cjs
@@ -29,10 +32,21 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Patch tests need pristine Expo native source, but no native binaries or
+      # mobile postinstall side effects. They patch isolated temporary copies.
+      - name: Install mobile sources for camera patch tests
+        run: npm ci --prefix dcm-mobile --ignore-scripts
+
       # Gate 1. The build already fails on type errors (ignoreBuildErrors is
       # false and must stay that way), so this catches them before a deploy.
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Mobile typecheck
+        run: npm run typecheck --prefix dcm-mobile
+
+      - name: Web and mobile consistency
+        run: npm run check:twin-drift
 
       # Gate 2. Unit tests only — node environment, no network. Grading calls
       # cost money and are nondeterministic, so live-model evaluation lives in

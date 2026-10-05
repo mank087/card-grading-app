@@ -1,4 +1,5 @@
 'use client';
+import { useNativeExportToken } from '@/lib/useNativeExportToken';
 
 /**
  * Batch Label Export — multi-card variant of /label-export/[cardId].
@@ -153,7 +154,7 @@ export default function BatchLabelExportPage() {
 
 function BatchLabelExportInner() {
   const sp = useSearchParams();
-  const token = sp.get('token') || '';
+  const token = useNativeExportToken(sp.get('token'));
   const cardIdsParam = sp.get('cardIds') || '';
   const cardIds = cardIdsParam.split(',').map(s => s.trim()).filter(Boolean);
   const rawType = sp.get('type') || 'slab-modern';
@@ -204,6 +205,7 @@ function BatchLabelExportInner() {
   const [doneFiles, setDoneFiles] = useState<DoneFile[]>([]);
 
   useEffect(() => {
+    if (!token) return; // Wait for the native handoff before accessing protected data.
     let cancelled = false;
     // Density + duplex flip / printer calibration saved in this browser by the
     // label modal; `&flip=` overrides the flip. Default = the bare density.

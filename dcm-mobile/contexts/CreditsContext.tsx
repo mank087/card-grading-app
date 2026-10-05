@@ -1,78 +1,55 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
-import { AppState, type AppStateStatus } from 'react-native'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { AppState } from 'react-native'
 import { useAuth } from './AuthContext'
 import { supabase } from '@/lib/supabase'
 
 interface CreditsContextType {
   balance: number
   isLoading: boolean
+  error: string | null
+  hasBalance: boolean
   refresh: () => Promise<void>
 }
-
-const CreditsContext = createContext<CreditsContextType>({
-  balance: 0,
-  isLoading: true,
-  refresh: async () => {},
-})
+const CreditsContext = createContext<CreditsContextType>({ balance: 0, isLoading: true, error: null, hasBalance: false, refresh: async () => {} })
 
 export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const [balance, setBalance] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-
+  const owner = user?.id ?? null
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const request = useRef(0)
+  const [state, setState] = useState({ owner, balance: 0, isLoading: true, error: null as string | null, hasBalance: false })
   const refresh = useCallback(async () => {
-    if (!user) {
-      setBalance(0)
-      setIsLoading(false)
+    const sequence = ++request.current
+    if (!owner) {
+      setState({ owner, balance: 0, isLoading: false, error: null, hasBalance: false })
       return
     }
+    setState(prev => prev.owner === owner ? { ...prev, isLoading: true } : { owner, balance: 0, isLoading: true, error: null, hasBalance: false })
     try {
-      // Query user_credits table directly via Supabase (authenticated session)
-      const { data, error } = await supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single()
-
-      if (error) {
-        console.error('[Credits] Supabase query error:', error.message)
-        setBalance(0)
-      } else {
-        console.log('[Credits] Balance:', data?.balance)
-        setBalance(data?.balance ?? 0)
-      }
-    } catch (err) {
-      console.error('[Credits] Error:', err)
-    } finally {
-      setIsLoading(false)
+      const { data, error } = await supabase.from('user_credits').select('balance').eq('user_id', owner).single()
+      if (error) throw error
+      if (typeof data?.balance !== 'number' || !Number.isFinite(data.balance)) throw Error('Invalid balance')
+      if (sequence !== request.current || ownerRef.current !== owner) return
+      setState({ owner, balance: data.balance, isLoading: false, error: null, hasBalance: true })
+    } catch {
+      if (sequence !== request.current || ownerRef.current !== owner) return
+      setState(prev => ({ ...prev, isLoading: false, error: 'Credit balance unavailable. Tap to retry.' }))
     }
-  }, [user])
-
+  }, [owner])
+  useEffect(() => { void refresh(); return () => { request.current++ } }, [refresh])
   useEffect(() => {
-    refresh()
-  }, [refresh])
-
-  // Android buys credits on the web /credits page inside a WebView and iOS
-  // can complete a purchase while the app is backgrounded; neither path
-  // tells this context anything. Re-read the balance whenever the app comes
-  // back to the foreground so the header badge and the grade flow catch up.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (next === 'active') refresh()
-    })
+    const sub = AppState.addEventListener('change', next => { if (next === 'active') void refresh() })
     return () => sub.remove()
   }, [refresh])
-
-  const value = useMemo(
-    () => ({ balance, isLoading, refresh }),
-    [balance, isLoading, refresh],
-  )
-
-  return (
-    <CreditsContext.Provider value={value}>
-      {children}
-    </CreditsContext.Provider>
-  )
+  // An account switch must never render the previous account's cached balance.
+  const value = useMemo(() => ({
+    balance: state.owner === owner ? state.balance : 0,
+    isLoading: state.owner !== owner || state.isLoading,
+    error: state.owner === owner ? state.error : null,
+    hasBalance: state.owner === owner && state.hasBalance,
+    refresh,
+  }), [state, owner, refresh])
+  return <CreditsContext.Provider value={value}>{children}</CreditsContext.Provider>
 }
-
 export const useCredits = () => useContext(CreditsContext)

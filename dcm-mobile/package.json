@@ -3,6 +3,9 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "typecheck": "tsc --noEmit --incremental false",
+    "postinstall": "node scripts/patch-camera.cjs",
+    "check:camera-patch": "node scripts/patch-camera.cjs --check",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -10,7 +13,7 @@
     "ota:ios": "eas update --branch production --platform ios --message",
     "ota:android": "eas update --branch production --platform android --message"
   },
-  "//ota": "Publish per platform only: npm run ota:ios -- \"msg\" then npm run ota:android -- \"msg\". --platform all crashes the web export (window is not defined). Runtime policy appVersion at 1.0.2; legacy lanes 1.0.1 iOS / 1.0.0 Android need app.json version set, publish, then git checkout -- app.json.",
+  "//ota": "Camera controls require the 1.0.3 native build. Publish per platform only: npm run ota:ios -- \"msg\" then npm run ota:android -- \"msg\". Runtime policy appVersion isolates 1.0.3 from older binaries. For legacy OTA updates use a separate reviewed release checkout; native controls are capability-gated.",
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -22,7 +25,7 @@
     "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.11",
     "expo-build-properties": "~1.0.10",
-    "expo-camera": "~17.0.10",
+    "expo-camera": "17.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.9",
@@ -63,5 +66,14 @@
     "sharp": "^0.34.5",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-camera"
+        ]
+      }
+    }
+  }
 }

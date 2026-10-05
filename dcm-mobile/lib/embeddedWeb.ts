@@ -36,7 +36,7 @@ export const APP_VERSION: string =
  * `applicationNameForUserAgent` prop (both iOS and Android append it to the
  * platform UA rather than replacing it, which is what the web sniff needs).
  */
-export const APP_USER_AGENT_SUFFIX = `DCMGradingApp/${APP_VERSION}`
+export const APP_USER_AGENT_SUFFIX = `DCMGradingApp/${APP_VERSION} DCMBridge/1`
 
 /**
  * Adds `app=1` (and the app version, for web-side debugging) to a DCM URL,

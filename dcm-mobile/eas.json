@@ -4,6 +4,15 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "camera-validation": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "camera-validation",
+      "android": {
+        "buildType": "apk",
+        "resourceClass": "large"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -48,6 +57,20 @@
       },
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "camera-validation-simulator": {
+      "extends": "camera-validation",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "release-validation": {
+      "extends": "production",
+      "distribution": "store",
+      "channel": "camera-validation",
+      "ios": {
+        "simulator": false
       }
     }
   },

@@ -1,5 +1,6 @@
 'use client'
 
+import NativeAppBridge from '@/components/NativeAppBridge'
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
@@ -129,6 +130,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <OrgProvider>
     <CreditsProvider>
       <GradingQueueProvider>
+        <NativeAppBridge />
         <ScrollToTop />
         <BackgroundGradingMonitor />
         <SessionRefreshMonitor />

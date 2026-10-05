@@ -1,4 +1,5 @@
 'use client';
+import { useNativeExportToken } from '@/lib/useNativeExportToken';
 
 /**
  * eBay Image Prep page — loaded in a hidden WebView from the mobile app.
@@ -133,7 +134,7 @@ async function imageToJpegBase64(imageUrl: string): Promise<string> {
 export default function EbayImagePrepPage() {
   const { cardId } = useParams<{ cardId: string }>();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const token = useNativeExportToken(searchParams.get('token'));
   const labelStyleParam = (searchParams.get('labelStyle') || 'modern') as
     | 'modern' | 'traditional' | 'heritage' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
   // Chunked bridge protocol requested by new app builds (see header comment).
@@ -148,6 +149,7 @@ export default function EbayImagePrepPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) return; // Wait for the native handoff before accessing protected data.
     let cancelled = false;
     (async () => {
       try {

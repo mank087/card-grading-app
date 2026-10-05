@@ -1,4 +1,5 @@
 'use client';
+import { useNativeExportToken } from '@/lib/useNativeExportToken';
 
 /**
  * Label Preview page — loaded in a hidden mobile WebView (LabelWebRenderer).
@@ -143,7 +144,7 @@ function borderedConfig(side: 'front' | 'back'): CustomLabelConfig {
 export default function LabelPreviewPage() {
   const { cardId } = useParams<{ cardId: string }>();
   const sp = useSearchParams();
-  const token = sp.get('token') || '';
+  const token = useNativeExportToken(sp.get('token'));
   const initialType = sp.get('type') || 'slab-modern';
   const initialSide = (sp.get('side') as 'front' | 'back') || 'front';
   const initialCustomConfigRaw = sp.get('customConfig');
@@ -184,6 +185,7 @@ export default function LabelPreviewPage() {
 
   // ---------- Card data load (once) ----------
   useEffect(() => {
+    if (!token) return; // Wait for the native handoff before accessing protected data.
     let cancelled = false;
     (async () => {
       try {

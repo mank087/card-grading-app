@@ -20,6 +20,8 @@
 
 import * as Crypto from 'expo-crypto'
 import { Platform } from 'react-native'
+import Constants from 'expo-constants'
+import * as Updates from 'expo-updates'
 
 export type UploadTelemetryEvent =
   | 'heic_convert_error'
@@ -88,6 +90,16 @@ export function reportUploadEvent(
         attempt_id: currentAttemptId ?? undefined,
         client_surface: Platform.OS === 'ios' ? 'native_ios' : 'native_android',
         ...payload,
+        metadata: {
+          app_version: Constants.expoConfig?.version ?? null,
+          native_build: Platform.OS === 'ios' ? Constants.platform?.ios?.buildNumber ?? null : Constants.platform?.android?.versionCode ?? null,
+          device_model: Constants.platform?.ios?.model ?? (Platform.OS === 'android' ? Platform.constants.Model : null),
+          runtime_version: Updates.runtimeVersion ?? null,
+          update_id: Updates.updateId ?? null,
+          embedded_update: Updates.isEmbeddedLaunch,
+          os_version: String(Platform.Version),
+          ...payload.metadata,
+        },
         page: 'native',
       }),
     }).catch(() => { /* never surface */ })
