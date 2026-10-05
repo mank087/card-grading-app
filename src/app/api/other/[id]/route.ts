@@ -28,6 +28,7 @@ import { getConditionFromGrade } from "@/lib/conditionAssessment";
 import { getUserCredits } from "@/lib/credits";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -465,8 +466,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           conversational_defects_back: parsedConversationalData.transformedDefects.back,
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         // ⭐ Card owner's founder/VIP/Card Lovers status (for emblems on public card labels)
         owner_is_founder: ownerIsFounder,
         owner_show_founder_badge: ownerShowFounderBadge,
@@ -1060,8 +1060,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
     return NextResponse.json({
       ...(updatedCard || card),
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
       sub_category: subCategory,
       // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,

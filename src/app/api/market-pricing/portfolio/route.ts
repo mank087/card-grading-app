@@ -7,6 +7,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { isMissingColumnError } from '@/lib/cards/ownership';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
+import { displayImagePath } from '@/lib/images/displayPath'
 
 // DB stores: Pokemon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, Other, or
 // sport names (Football, Baseball, etc.) — categoryToRouteSlug handles them all.
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
       .from('cards')
       .select(`
         id, card_name, featured, pokemon_featured, conversational_card_info,
-        category, card_set, card_number, front_path, is_foil,
+        category, card_set, card_number, front_path, display_crop:capture_quality->display, is_foil,
         conversational_decimal_grade, conversational_whole_grade, conversational_condition_label,
         ebay_price_lowest, ebay_price_median, ebay_price_average, ebay_price_highest,
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
     // thumbnails now (≤480px, ~35 KB) rather than the full ~800 KB original.
     let urlMap = new Map<string, SignedImagePair>();
     if (top10.length > 0) {
-      const frontPaths = top10.map(item => item.card.front_path as string).filter(Boolean);
+      const frontPaths = top10.map(item => displayImagePath(item.card as any, 'front') as string).filter(Boolean);
       if (frontPaths.length > 0) {
         try {
           urlMap = await createSignedImageMap(supabase.storage, 'cards', frontPaths);
@@ -206,8 +207,8 @@ export async function GET(request: NextRequest) {
         return g > 0 ? getConditionFromGrade(g) : ((item.card.conversational_condition_label as string) || '');
       })(),
       value: Math.round(item.value * 100) / 100,
-      imageUrl: pickDisplayUrls(urlMap, item.card.front_path as string).display,
-      imageFullUrl: pickDisplayUrls(urlMap, item.card.front_path as string).full,
+      imageUrl: pickDisplayUrls(urlMap, displayImagePath(item.card as any, 'front') as string).display,
+      imageFullUrl: pickDisplayUrls(urlMap, displayImagePath(item.card as any, 'front') as string).full,
       cardPath: getCardPath(item.card),
       cardSet: (item.card.card_set as string) || '',
       cardNumber: (item.card.card_number as string) || '',

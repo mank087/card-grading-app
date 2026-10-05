@@ -31,6 +31,7 @@ import { disambiguateMtgPrint } from "@/lib/mtgPrintDisambiguator";
 import { recordGradingFailure, acquireGradingLock } from "@/lib/gradingFailure";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -619,8 +620,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           conversational_defects_back: parsedConversationalData.transformedDefects.back,
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         processing_time: card.processing_time,  // Use stored value, not recalculated
         // ⭐ Card owner's founder/VIP/Card Lovers status (for emblems on public card labels)
         owner_is_founder: ownerIsFounder,
@@ -1405,8 +1405,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       ai_confidence_score: confidence,
       final_dcm_score: wholeGrade.toString(),
       ...cardFields,
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
       processing_time: Date.now() - startTime,
       // 🃏 Scryfall API verification results
       mtg_api_verification: null,

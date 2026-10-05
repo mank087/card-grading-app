@@ -191,8 +191,10 @@ export function GradeDetailsSection({
 
   const structuralNote = readStructuralUnconfirmedNote(card);
   const hasUserReport = !!card?.has_user_condition_report && !!card?.user_condition_report;
-  const frontUrl = vm.images.front.url;
-  const backUrl = vm.images.back.url;
+  // Evidence views place defect markers and corner zooms in the ORIGINAL photo's
+  // coordinates, so they never use the trimmed display copy.
+  const frontUrl = vm.images.front.originalUrl ?? vm.images.front.url;
+  const backUrl = vm.images.back.originalUrl ?? vm.images.back.url;
   const showCentering = hasCenteringData(card);
   const activeTab = EVIDENCE_TABS.find((tab) => tab.key === evidence) ?? EVIDENCE_TABS[0];
 

@@ -28,6 +28,7 @@ import { getUserCredits } from "@/lib/credits";
 import { lookupLorcanaCard, extractSetCodeFromCardNumber, searchByName as searchLorcanaByName, type LorcanaCard } from "@/lib/lorcanaCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -569,8 +570,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
           conversational_defects_back: parsedConversationalData.transformedDefects.back,
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         processing_time: card.processing_time,  // ✅ CRITICAL: Use stored value, NOT recalculated
         owner_is_founder: ownerIsFounder,
         owner_show_founder_badge: ownerShowFounderBadge,
@@ -1378,8 +1378,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       ai_confidence_score: confidence,
       final_dcm_score: wholeGrade.toString(),
       ...cardFields,
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
       processing_time: Date.now() - startTime,
       // 🎯 Database-matched card reference
       lorcana_card_id: matchedDatabaseCard?.id || null,

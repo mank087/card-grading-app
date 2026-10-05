@@ -25,6 +25,7 @@
  */
 
 import type { ZoomResult } from '../zoomInspection';
+import type { DisplayCropRecord } from '../images/displayPath';
 
 /** Bump when the measurement's meaning changes, so thresholds stay attributable. */
 export const CAPTURE_QUALITY_VERSION = 'cq-2';
@@ -47,6 +48,8 @@ export interface CaptureQualityRecord {
   zoom_error?: string;
   zoom_inspection_status: 'complete' | 'incomplete';
   zoom_coverage?: ZoomResult['coverage'];
+  /** Straightened, trimmed display copies of the photos (images/displayCrop.ts). */
+  display?: DisplayCropRecord;
 }
 
 /** Build the record from a zoom result. Returns null when nothing was measured. */

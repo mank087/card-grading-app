@@ -41,6 +41,7 @@ import { ensureThumbnailsFromSignedUrls } from './images/cardThumbnails';
 import { recordCvCentering } from './grading/cvCenteringLog';
 import { applyCvCenteringGate } from './grading/cvCenteringGate';
 import { buildCaptureQualityRecord, recordCaptureQuality } from './grading/captureQualityLog';
+import { makeDisplayCropsForGrade } from './images/displayCrop';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
 import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
@@ -2533,6 +2534,12 @@ Provide detailed analysis as markdown with all required sections.`
         try {
           const captureRecord = buildCaptureQualityRecord(zoom);
           if (captureRecord) {
+            // Display crop (Oct 2026): a straightened, trimmed copy of each photo
+            // for SHOWING the card, from the outline just measured and the bytes
+            // already in memory. Originals are untouched; nothing here feeds
+            // grading. Bounded and non-throwing, like the record itself.
+            const display = await makeDisplayCropsForGrade(loadOriginals, frontImageUrl, backImageUrl, captureRecord);
+            if (display) captureRecord.display = display;
             await recordCaptureQuality(options?.routingKey, captureRecord);
             if (captureRecord.zoom_outcome !== 'full') {
               console.log(`[CAPTURE] ${captureRecord.zoom_outcome} — front fill ${captureRecord.front.fill_percent}% / back ${captureRecord.back.fill_percent}%`);

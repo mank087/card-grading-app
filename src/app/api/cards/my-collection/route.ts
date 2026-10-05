@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from "@/lib/signedUrlBatch";
+import { displayImagePath } from "@/lib/images/displayPath";
 import { isMissingColumnError, isOwnershipStatus } from "@/lib/cards/ownership";
 
 export async function GET(request: NextRequest) {
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Dropping it silently empties four sections of a paid report. NEVER put a
     // comment inside the template string below: PostgREST parses it verbatim.
     const BASE_COLUMNS = `
-        id, serial, org_id, org_serial, org_serial_display, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
+        id, serial, org_id, org_serial, org_serial_display, front_path, back_path, display_crop:capture_quality->display, card_name, featured, pokemon_featured, category, card_set,
         manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
         dcm_grade_whole, dvg_image_quality, created_at, visibility,
         conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,
@@ -216,7 +217,7 @@ export async function GET(request: NextRequest) {
     // download, label preview — reads front_full_url / back_full_url. Cards
     // graded before the thumbnail backfill have no thumb, so *_url falls back to
     // the original and nothing breaks.
-    const allPaths = cards.flatMap(card => [card.front_path, card.back_path]);
+    const allPaths = cards.flatMap(card => [displayImagePath(card, 'front'), displayImagePath(card, 'back')]);
 
     let urlMap: Map<string, SignedImagePair>;
     try {
@@ -244,8 +245,8 @@ export async function GET(request: NextRequest) {
 
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
-      const front = pickDisplayUrls(urlMap, card.front_path);
-      const back = pickDisplayUrls(urlMap, card.back_path);
+      const front = pickDisplayUrls(urlMap, displayImagePath(card, 'front'));
+      const back = pickDisplayUrls(urlMap, displayImagePath(card, 'back'));
       const enrichedCard = {
         ...card,
         front_url: front.display,

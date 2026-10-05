@@ -42,6 +42,7 @@ import { searchLorcanaCardPrices, estimateLorcanaDcmValue, isLorcanaPricingEnabl
 import { searchOnePieceCardPrices, estimateOnePieceDcmValue, isOnePiecePricingEnabled } from "@/lib/onepiecePricing";
 import { searchOtherCardPrices, estimateOtherDcmValue, isOtherPricingEnabled } from "@/lib/otherPricing";
 import { internalServiceHeaders } from "@/lib/cronAuth";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Track cards currently being processed
 const processingCards = new Map<string, number>();
@@ -278,8 +279,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
 
       return NextResponse.json({
         ...card,
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         processing_time: 0,
         grading_system: 'dvg-v2',
         // Include professional grades if they exist in the cached data
@@ -2399,8 +2399,7 @@ EXTRACTION RULES:
       ai_vs_slab_comparison: aiVsSlabComparison,
 
       // Image URLs
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
 
       // Metadata
       processing_time: processingTime,

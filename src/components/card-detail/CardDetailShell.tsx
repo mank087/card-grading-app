@@ -722,11 +722,13 @@ export function CardDetailShell(props: CardDetailShellProps) {
                 onZoom={() => {
                   const img = pieceSide === 'front' ? vm.images.front : vm.images.back;
                   if (img.present && img.url) {
-                    // ALWAYS the original photo, never the composition.
+                    // ALWAYS the original photo, never the composition — and never
+                    // the trimmed display copy either: zoom is how an owner sees the
+                    // untouched upload at full resolution.
                     openZoom(
-                      img.url,
+                      img.originalUrl ?? img.url,
                       `${vm.identity.displayName} card ${pieceSide}`,
-                      `Card ${pieceSide === 'front' ? 'Front' : 'Back'} — full size`,
+                      `Card ${pieceSide === 'front' ? 'Front' : 'Back'} — original photo`,
                     );
                   }
                 }}

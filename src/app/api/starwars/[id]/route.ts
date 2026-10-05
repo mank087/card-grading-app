@@ -30,6 +30,7 @@ import { lookupStarWarsCard } from "@/lib/starwarsCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { guardedPriceUpdate, readPriceRevisions } from "@/lib/pricing/guardedPriceWrite";
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -536,8 +537,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           conversational_defects_back: parsedConversationalData.transformedDefects.back,
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         processing_time: card.processing_time,
         // ⭐ Card owner's founder/VIP/Card Lovers status (for emblems on public card labels)
         owner_is_founder: ownerIsFounder,
@@ -1253,8 +1253,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
       ai_confidence_score: confidence,
       final_dcm_score: wholeGrade.toString(),
       ...cardFields,
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
       processing_time: Date.now() - startTime,
       starwars_card_id: matchedDatabaseCard?.id || null,
       starwars_reference_image: matchedDatabaseCard?.image_url || null,

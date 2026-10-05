@@ -35,6 +35,7 @@ import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
 import { applyYearGuard } from "@/lib/yearGuard";
 import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
 import { resolveSportsChecklist } from "@/lib/identification/sportsChecklist";
+import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -548,8 +549,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           conversational_defects_back: parsedConversationalData.transformedDefects.back,
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
-        front_url: frontUrl,
-        back_url: backUrl,
+        ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
         processing_time: card.processing_time,  // Use stored value, not recalculated
         // ⭐ Card owner's founder/VIP/Card Lovers status (for emblems on public card labels)
         owner_is_founder: ownerIsFounder,
@@ -1448,8 +1448,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     return NextResponse.json({
       ...stripSensitiveCardFields(card),
       ...updateData,  // Include all the conversational grading fields
-      front_url: frontUrl,
-      back_url: backUrl,
+      ...(await displayPhotoUrls(supabase, card, frontUrl, backUrl)),
       // ⭐ Card owner's founder/VIP/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,
       owner_show_founder_badge: ownerShowFounderBadge,

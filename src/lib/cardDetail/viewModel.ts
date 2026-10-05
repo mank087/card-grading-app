@@ -48,6 +48,8 @@ export interface CardDetailSource extends CardForPricing {
   serial?: string | null;
   front_url?: string | null;
   back_url?: string | null;
+  front_original_url?: string | null;
+  back_original_url?: string | null;
   visibility?: 'public' | 'private' | null;
   org_id?: string | null;
   ownership_status?: 'owned' | 'sold' | 'archived' | null;
@@ -131,6 +133,8 @@ export interface CardDetailImage {
   url: string | null;
   /** False when the row has no URL for this side. */
   present: boolean;
+  /** The untouched upload when `url` is the trimmed display copy (displayCrop.ts); else null. */
+  originalUrl?: string | null;
 }
 
 export interface CardDetailIdentity {
@@ -416,14 +420,16 @@ export function buildCardDetailViewModel({
 
   const front = firstString(card.front_url);
   const back = firstString(card.back_url);
+  const frontOriginal = firstString(card.front_original_url);
+  const backOriginal = firstString(card.back_original_url);
 
   return {
     id: card.id,
     category,
     identity,
     images: {
-      front: { url: front, present: front !== null },
-      back: { url: back, present: back !== null },
+      front: { url: front, present: front !== null, originalUrl: frontOriginal && frontOriginal !== front ? frontOriginal : null },
+      back: { url: back, present: back !== null, originalUrl: backOriginal && backOriginal !== back ? backOriginal : null },
     },
     grade: buildGrade(card, labelData, isProcessing, incompleteInspectionMessage),
     detectedSlabGrade: buildDetectedSlabGrade(card),

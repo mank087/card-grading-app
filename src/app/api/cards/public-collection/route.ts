@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
+import { displayImagePath } from '@/lib/images/displayPath'
 import { stripSensitiveCardFields } from '@/lib/cards/publicCardShape'
 
 export async function GET(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     let listQuery = supabaseAdmin
       .from('cards')
       .select(`
-        id, serial, card_name, category, front_path, back_path, created_at,
+        id, serial, card_name, category, front_path, back_path, display_crop:capture_quality->display, created_at,
         featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
         conversational_decimal_grade, conversational_whole_grade,
         conversational_condition_label, conversational_card_info,
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
     // public collections >500 cards used to render with no images).
     // front_url/back_url are thumbnails where one exists; *_full_url keeps the
     // original for the lightbox and any download.
-    const allPaths = cards.flatMap(card => [card.front_path, card.back_path])
+    const allPaths = cards.flatMap(card => [displayImagePath(card, 'front'), displayImagePath(card, 'back')])
     let urlMap = new Map<string, SignedImagePair>()
     try {
       urlMap = await createSignedImageMap(supabaseAdmin.storage, 'cards', allPaths)
@@ -116,8 +117,8 @@ export async function GET(request: NextRequest) {
 
     // Enrich cards (same logic as featured API)
     const cardsWithUrls = cards.map(card => {
-      const front = pickDisplayUrls(urlMap, card.front_path)
-      const back = pickDisplayUrls(urlMap, card.back_path)
+      const front = pickDisplayUrls(urlMap, displayImagePath(card, 'front'))
+      const back = pickDisplayUrls(urlMap, displayImagePath(card, 'back'))
       const enrichedCard: any = {
         ...stripSensitiveCardFields(card),
         front_url: front.display,

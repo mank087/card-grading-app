@@ -2,6 +2,7 @@ import { unstable_cache } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { HOME_SHOWCASE_IDS, LEARNING_CARD_IDS } from '@/lib/cards/marketingShowcase'
 import { createSignedImageMap, pickDisplayUrls } from '@/lib/signedUrlBatch'
+import { displayImagePath } from '@/lib/images/displayPath'
 
 export async function loadFeaturedCards(limit: number, category: string | null, learningPage: string | null) {
     // Fetch featured cards (public, admin-curated, graded)
@@ -11,7 +12,7 @@ export async function loadFeaturedCards(limit: number, category: string | null, 
     let query = supabaseAdmin
       .from('cards')
       .select(`
-        id, serial, card_name, category, front_path, back_path, created_at,
+        id, serial, card_name, category, front_path, back_path, display_crop:capture_quality->display, created_at,
         featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
         conversational_decimal_grade, conversational_whole_grade,
         conversational_condition_label, conversational_card_info,
@@ -55,14 +56,14 @@ export async function loadFeaturedCards(limit: number, category: string | null, 
 
     // Batch-sign thumbnails and originals. Small marketing displays use the
     // thumbnail; explicitly cropped photos can retain the original when needed.
-    const allPaths = cards.flatMap(card => [card.front_path, card.back_path])
+    const allPaths = cards.flatMap(card => [displayImagePath(card, 'front'), displayImagePath(card, 'back')])
 
     const urlMap = await createSignedImageMap(supabaseAdmin.storage, 'cards', allPaths)
 
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
-      const front = pickDisplayUrls(urlMap, card.front_path)
-      const back = pickDisplayUrls(urlMap, card.back_path)
+      const front = pickDisplayUrls(urlMap, displayImagePath(card, 'front'))
+      const back = pickDisplayUrls(urlMap, displayImagePath(card, 'back'))
       const enrichedCard = {
         ...card,
         front_url: front.display,

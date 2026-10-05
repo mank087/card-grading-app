@@ -78,7 +78,7 @@ describe('a normal graded card', () => {
   });
 
   it('exposes both images as present', () => {
-    expect(vm.images.front).toEqual({ url: 'https://cdn.example/front.jpg', present: true });
+    expect(vm.images.front).toEqual({ url: 'https://cdn.example/front.jpg', present: true, originalUrl: null });
     expect(vm.images.back.present).toBe(true);
   });
 
@@ -238,9 +238,14 @@ describe('value', () => {
 });
 
 describe('images', () => {
+  it('keeps the original upload beside a trimmed display copy (display crop, Oct 2026)', () => {
+    const vm = build({ front_url: 'https://cdn.example/front_display.jpg', front_original_url: 'https://cdn.example/front.jpg' });
+    expect(vm.images.front).toEqual({ url: 'https://cdn.example/front_display.jpg', present: true, originalUrl: 'https://cdn.example/front.jpg' });
+  });
+
   it('marks a missing back image explicitly rather than emitting an empty string', () => {
     const vm = build({ back_url: null });
-    expect(vm.images.back).toEqual({ url: null, present: false });
+    expect(vm.images.back).toEqual({ url: null, present: false, originalUrl: null });
     expect(vm.images.front.present).toBe(true);
   });
 
