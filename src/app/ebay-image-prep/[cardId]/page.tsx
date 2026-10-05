@@ -74,6 +74,7 @@ import { CardGradingReport, type ReportCardData } from '@/components/reports/Car
 // the three had already drifted.
 import { getConditionFromGrade as getConditionLabel } from '@/lib/conditionAssessment';
 import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 declare global {
   interface Window {
@@ -173,10 +174,10 @@ export default function EbayImagePrepPage() {
 
         // Sign URLs for front/back so the canvas can fetch them
         setStatus('Fetching images…');
-        const paths = [card.front_path, card.back_path].filter(Boolean) as string[];
+        const paths = [displayImagePath(card, 'front'), displayImagePath(card, 'back')].filter(Boolean) as string[];
         const { data: signed } = await supabase.storage.from('cards').createSignedUrls(paths, 3600);
-        const frontImageUrl = signed?.find(u => u.path === card.front_path)?.signedUrl;
-        const backImageUrl = signed?.find(u => u.path === card.back_path)?.signedUrl;
+        const frontImageUrl = signed?.find(u => u.path === displayImagePath(card, 'front'))?.signedUrl;
+        const backImageUrl = signed?.find(u => u.path === displayImagePath(card, 'back'))?.signedUrl;
         if (!frontImageUrl || !backImageUrl) throw new Error('Card images not signable');
 
         // Resolve a custom-N style id to its saved config (needed to detect

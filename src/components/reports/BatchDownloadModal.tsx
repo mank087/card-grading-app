@@ -16,6 +16,7 @@ import { getAuthenticatedClient } from '../../lib/directAuth';
 import { estimateProfessionalGrades, DcmGradingInput } from '../../lib/professionalGradeMapper';
 import QRCode from 'qrcode';
 import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 interface CardData {
   id: string;
@@ -215,11 +216,12 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     let backUrl = card.back_url;
 
     if (!frontUrl || !backUrl) {
-      if (card.front_path && card.back_path) {
+      const frontPath = displayImagePath(card, 'front'), backPath = displayImagePath(card, 'back');
+      if (frontPath && backPath) {
         const authClient = getAuthenticatedClient();
         const [frontData, backData] = await Promise.all([
-          authClient.storage.from('cards').createSignedUrl(card.front_path, 3600),
-          authClient.storage.from('cards').createSignedUrl(card.back_path, 3600)
+          authClient.storage.from('cards').createSignedUrl(frontPath, 3600),
+          authClient.storage.from('cards').createSignedUrl(backPath, 3600)
         ]);
         frontUrl = frontData.data?.signedUrl || '';
         backUrl = backData.data?.signedUrl || '';

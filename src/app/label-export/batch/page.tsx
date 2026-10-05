@@ -95,6 +95,7 @@ import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
 import { parseSheetDensity, parseDuplexFlip } from '@/lib/labels/sheetGeometry';
 import { readSheetCalibration, sheetLayoutFor } from '@/lib/labels/sheetCalibration';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 declare global {
   interface Window {
@@ -240,8 +241,9 @@ function BatchLabelExportInner() {
         // Signed URLs for all front/back images (for card-image + mini-report types).
         const allPaths: string[] = [];
         orderedCards.forEach(c => {
-          if (c.front_path) allPaths.push(c.front_path);
-          if (c.back_path) allPaths.push(c.back_path);
+          const fp = displayImagePath(c, 'front'), bp = displayImagePath(c, 'back');
+          if (fp) allPaths.push(fp);
+          if (bp) allPaths.push(bp);
         });
         // Chunked at 500 — Supabase rejects >1000 paths per request (a select-all
         // batch export on a large collection would otherwise get zero images)
@@ -758,8 +760,8 @@ function BatchLabelExportInner() {
           for (let i = 0; i < perCard.length; i++) {
             const { card, labelData, subScores, grade, cardUrl, qrCodeDataUrl } = perCard[i];
             setStatus(`Building report ${i + 1}/${perCard.length}…`);
-            const frontUrl = signedByPath.get(card.front_path) || '';
-            const backUrl = signedByPath.get(card.back_path) || '';
+            const frontUrl = signedByPath.get(displayImagePath(card, 'front') ?? '') || '';
+            const backUrl = signedByPath.get(displayImagePath(card, 'back') ?? '') || '';
             const [frontJpeg, backJpeg] = await Promise.all([
               frontUrl ? imageToJpegBase64(frontUrl).catch(() => '') : '',
               backUrl ? imageToJpegBase64(backUrl).catch(() => '') : '',
@@ -872,8 +874,8 @@ function BatchLabelExportInner() {
           const labelStyle: 'modern' | 'traditional' = type === 'card-image-traditional' ? 'traditional' : 'modern';
           for (let i = 0; i < perCard.length; i++) {
             const { card, labelData, subScores, grade, cardUrl } = perCard[i];
-            const frontUrl = signedByPath.get(card.front_path) || '';
-            const backUrl = signedByPath.get(card.back_path) || '';
+            const frontUrl = signedByPath.get(displayImagePath(card, 'front') ?? '') || '';
+            const backUrl = signedByPath.get(displayImagePath(card, 'back') ?? '') || '';
             const namePrefix = sanitize(labelData.primaryName || `card-${card.serial}`);
             const imageData: CardImageData = {
               cardName: labelData.primaryName,

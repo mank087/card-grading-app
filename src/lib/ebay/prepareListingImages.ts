@@ -26,6 +26,7 @@ import { resolveHeritageSelection } from '@/lib/labels/labelStyleResolution';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { getAuthenticatedClient } from '@/lib/directAuth';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 export type SystemImageKey = 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack';
 
@@ -103,14 +104,16 @@ export async function prepareListingImages(
   let backImageUrl = card.back_url;
 
   if (!frontImageUrl || !backImageUrl) {
-    if (!card.front_path || !card.back_path) {
+    const frontPath = displayImagePath(card, 'front');
+    const backPath = displayImagePath(card, 'back');
+    if (!frontPath || !backPath) {
       throw new Error('Card images not found');
     }
 
     const authClient = getAuthenticatedClient();
     const [frontUrl, backUrl] = await Promise.all([
-      authClient.storage.from('cards').createSignedUrl(card.front_path, 3600),
-      authClient.storage.from('cards').createSignedUrl(card.back_path, 3600),
+      authClient.storage.from('cards').createSignedUrl(frontPath, 3600),
+      authClient.storage.from('cards').createSignedUrl(backPath, 3600),
     ]);
 
     if (!frontUrl.data?.signedUrl || !backUrl.data?.signedUrl) {

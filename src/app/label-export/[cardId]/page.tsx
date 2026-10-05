@@ -39,6 +39,7 @@ import { CardGradingReport, type ReportCardData } from '@/components/reports/Car
 import { resolveEmblemVisibility } from '@/lib/labelEmblems';
 import { resolveHeritageBandColors } from '@/lib/labelLab/heritageLayout';
 import { resolveHeritageSelection, resolveCompactHeritage } from '@/lib/labels/labelStyleResolution';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 declare global {
   interface Window {
@@ -178,10 +179,10 @@ export default function LabelExportPage() {
           .single();
         if (cardErr || !card) throw new Error(cardErr?.message || 'Card not found');
 
-        const paths = [card.front_path, card.back_path].filter(Boolean) as string[];
+        const paths = [displayImagePath(card, 'front'), displayImagePath(card, 'back')].filter(Boolean) as string[];
         const { data: signed } = await supabase.storage.from('cards').createSignedUrls(paths, 3600);
-        const frontImageUrl = signed?.find(u => u.path === card.front_path)?.signedUrl || '';
-        const backImageUrl = signed?.find(u => u.path === card.back_path)?.signedUrl || '';
+        const frontImageUrl = signed?.find(u => u.path === displayImagePath(card, 'front'))?.signedUrl || '';
+        const backImageUrl = signed?.find(u => u.path === displayImagePath(card, 'back'))?.signedUrl || '';
 
         // Look up emblem entitlements + saved custom label styles in one query.
         let showFounderEmblem = false;

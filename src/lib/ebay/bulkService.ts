@@ -187,7 +187,7 @@ export async function refreshBatchCounts(supabase: ServerClient, batchId: string
  */
 export const DRAFT_CARD_COLUMNS = [
   'id', 'user_id', 'card_name', 'category', 'sub_category', 'serial',
-  'front_path', 'back_path', 'org_id', 'org_serial_display',
+  'front_path', 'back_path', 'display_crop:capture_quality->display', 'org_id', 'org_serial_display',
   'conversational_whole_grade', 'conversational_decimal_grade',
   'conversational_condition_label', 'conversational_card_info',
   'conversational_sub_scores', 'conversational_weighted_sub_scores',

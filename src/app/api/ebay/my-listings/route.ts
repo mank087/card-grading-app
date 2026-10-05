@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
           card_name,
           category,
           front_path,
+          display_crop:capture_quality->display,
           serial,
           conversational_whole_grade
         )
@@ -81,7 +83,7 @@ export async function GET(request: NextRequest) {
     // inside the 'cards' bucket; we sign for 1 hour so the UI can render
     // without making per-row fetches.
     const paths = (rows ?? [])
-      .map(r => (r as any).cards?.front_path)
+      .map(r => displayImagePath((r as any).cards, 'front'))
       .filter((p): p is string => !!p);
     // Up to 500 listings on one dashboard — at ~800 KB per original that was
     // ~390 MB of egress for a full marketplace load. thumbnailUrl now resolves
@@ -104,7 +106,7 @@ export async function GET(request: NextRequest) {
       const ebayThumb = Array.isArray(r.ebay_image_urls) && r.ebay_image_urls.length > 0
         ? r.ebay_image_urls[0]
         : null;
-      const cardImage = pickDisplayUrls(urlMap, r.cards?.front_path);
+      const cardImage = pickDisplayUrls(urlMap, displayImagePath(r.cards as any, 'front'));
       const thumbnailUrl = ebayThumb ?? cardImage.display;
       return {
       cardFullImageUrl: cardImage.full,

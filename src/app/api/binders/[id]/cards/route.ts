@@ -4,6 +4,7 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { isUuid } from '@/lib/uuid';
 import { createSignedUrlMap } from '@/lib/signedUrlBatch';
 import { addCardsToBinder, applySmartFilter, isSmart, type SmartFilter } from '@/lib/binders/service';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 /**
  * GET    /api/binders/[id]/cards   → the binder's cards, in order, keyset-paged
@@ -23,7 +24,7 @@ const PAGE_SIZE = 300;
 /** Columns the collection grid actually renders. The cards table carries
  *  multi-MB grading blobs this view never reads. */
 const CARD_COLUMNS = `
-  id, serial, front_path, back_path, card_name, featured, pokemon_featured,
+  id, serial, front_path, back_path, display_crop:capture_quality->display, card_name, featured, pokemon_featured,
   category, sub_category, card_set, card_number, release_date, manufacturer_name,
   visibility, created_at,
   conversational_whole_grade, conversational_decimal_grade,
@@ -162,14 +163,14 @@ export async function GET(
 }
 
 async function withImageUrls(supabase: any, cards: Record<string, any>[]) {
-  const paths = cards.flatMap(c => [c.front_path, c.back_path]).filter(Boolean);
+  const paths = cards.flatMap(c => [displayImagePath(c, 'front'), displayImagePath(c, 'back')]).filter(Boolean);
   if (!paths.length) return cards.map(c => ({ ...c, front_url: null, back_url: null }));
   try {
     const map = await createSignedUrlMap(supabase.storage, 'cards', paths, 60 * 60);
     return cards.map(c => ({
       ...c,
-      front_url: c.front_path ? map.get(c.front_path) ?? null : null,
-      back_url: c.back_path ? map.get(c.back_path) ?? null : null,
+      front_url: map.get(displayImagePath(c, 'front') ?? '') ?? null,
+      back_url: map.get(displayImagePath(c, 'back') ?? '') ?? null,
     }));
   } catch {
     return cards.map(c => ({ ...c, front_url: null, back_url: null }));

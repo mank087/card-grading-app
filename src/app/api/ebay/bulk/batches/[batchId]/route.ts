@@ -27,6 +27,7 @@ import {
 } from '@/lib/ebay/bulkService';
 import { normalizeBulkSettings, withSellerPolicyDefaults } from '@/lib/ebay/bulkSettings';
 import { readinessPatch } from '@/lib/ebay/bulkReadiness';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 export const runtime = 'nodejs';
 
@@ -92,8 +93,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const paths: string[] = [];
   for (const c of cards) {
-    if (c.front_path) paths.push(c.front_path);
-    if (c.back_path) paths.push(c.back_path);
+    const fp = displayImagePath(c, 'front'), bp = displayImagePath(c, 'back');
+    if (fp) paths.push(fp);
+    if (bp) paths.push(bp);
   }
   let urlMap = new Map<string, string>();
   if (paths.length > 0) {
@@ -127,8 +129,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     listings,
     cards: cards.map(c => ({
       ...c,
-      front_url: c.front_path ? urlMap.get(c.front_path) ?? null : null,
-      back_url: c.back_path ? urlMap.get(c.back_path) ?? null : null,
+      front_url: urlMap.get(displayImagePath(c, 'front') ?? '') ?? null,
+      back_url: urlMap.get(displayImagePath(c, 'back') ?? '') ?? null,
     })),
     hasMore: items.length === ITEM_PAGE,
   });

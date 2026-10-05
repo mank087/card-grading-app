@@ -31,6 +31,7 @@ import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { useOrgContext } from '@/contexts/OrgContext';
 import { getUncertaintyFromConfidence } from '@/lib/gradeDisplayUtils';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 /**
  * Download Report Button Component
@@ -482,12 +483,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         const { data: frontUrlData } = await authClient
           .storage
           .from('cards')
-          .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
+          .createSignedUrl(displayImagePath(card, 'front') ?? card.front_path, 60 * 60); // 1 hour expiry
 
         const { data: backUrlData } = await authClient
           .storage
           .from('cards')
-          .createSignedUrl(card.back_path, 60 * 60); // 1 hour expiry
+          .createSignedUrl(displayImagePath(card, 'back') ?? card.back_path, 60 * 60); // 1 hour expiry
 
         if (!frontUrlData?.signedUrl || !backUrlData?.signedUrl) {
           throw new Error('Failed to generate signed URLs for card images');
@@ -987,12 +988,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         const { data: frontUrlData } = await authClient
           .storage
           .from('cards')
-          .createSignedUrl(card.front_path, 60 * 60);
+          .createSignedUrl(displayImagePath(card, 'front') ?? card.front_path, 60 * 60);
 
         const { data: backUrlData } = await authClient
           .storage
           .from('cards')
-          .createSignedUrl(card.back_path, 60 * 60);
+          .createSignedUrl(displayImagePath(card, 'back') ?? card.back_path, 60 * 60);
 
         if (!frontUrlData?.signedUrl || !backUrlData?.signedUrl) {
           throw new Error('Failed to generate signed URLs for card images');

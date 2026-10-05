@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 import { isMissingColumnError } from '@/lib/cards/ownership';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 /**
  * Explicit column list — the cards table carries several very large JSON /
@@ -34,7 +35,7 @@ import { isMissingColumnError } from '@/lib/cards/ownership';
 const CARD_COLUMNS = [
   // Identity + picker display
   'id', 'card_name', 'category', 'sub_category', 'serial',
-  'front_path', 'back_path', 'created_at',
+  'front_path', 'back_path', 'display_crop:capture_quality->display', 'created_at',
   // Enterprise: the modal reads card.org_id for branding + the cross-org
   // template guard, and org_serial_display is the cert number on the listing.
   // Both were missing here, so a store-graded card listed from the picker
@@ -185,8 +186,9 @@ export async function GET(request: NextRequest) {
     // for its image generation pipeline without making per-card storage calls.
     const allPaths: string[] = [];
     for (const c of eligibleRows) {
-      if (c.front_path) allPaths.push(c.front_path);
-      if (c.back_path) allPaths.push(c.back_path);
+      const fp = displayImagePath(c, 'front'), bp = displayImagePath(c, 'back');
+      if (fp) allPaths.push(fp);
+      if (bp) allPaths.push(bp);
     }
     // Chunked — Supabase rejects >1000 paths per request, and the 2000-card cap
     // here means up to 4000 paths (collections >500 cards used to get no images)
@@ -210,8 +212,8 @@ export async function GET(request: NextRequest) {
     // one-line change in src/app/instalist-marketplace/components/CardPicker.tsx
     // that this worker does not own.
     const enriched = eligibleRows.map(c => {
-      const front = pickDisplayUrls(urlMap, c.front_path);
-      const back = pickDisplayUrls(urlMap, c.back_path);
+      const front = pickDisplayUrls(urlMap, displayImagePath(c, 'front'));
+      const back = pickDisplayUrls(urlMap, displayImagePath(c, 'back'));
       return {
         ...c,
         front_url: front.full,
