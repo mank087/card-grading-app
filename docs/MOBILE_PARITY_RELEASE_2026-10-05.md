@@ -20,11 +20,29 @@ Prepared October 5, 2026 on `codex/camera-native-focus`, following the October 3
 
 ## Verification
 
-The complete regression suite passed: **169 test files, 2,122 tests passed, 6 skipped**. Mobile TypeScript passed. Both final iOS and Android JavaScript bundles compiled with Expo Metro/Hermes. Web TypeScript, consistency checks, and new EAS build references are recorded below as they complete.
+The final complete regression suite passed: **170 test files, 2,128 tests passed, 6 skipped**. Web and mobile TypeScript passed. All 19 web/mobile consistency pairs passed. Both final iOS and Android JavaScript bundles compiled with Expo Metro/Hermes. Git whitespace checks passed. Vercel successfully built the companion web preview at application commit `d3101c78`.
 
-Automated tests cover payment/navigation boundaries, native credit failure/account-switch races, authentic session expiry, recovery-link parsing, export receiver compatibility, mounted native export generation/preview, public-card filtering, grade-review API schema compatibility, and upload-attempt recovery. The final export regression verifies that authentication reaches the hidden generator while the iOS PDF preview stays local.
+Automated tests cover payment/navigation boundaries, native credit failure/account-switch races, authentic session expiry, recovery-link parsing, export receiver compatibility, mounted native export generation/preview, public-card filtering, grade-review API schema compatibility, and upload-attempt recovery. Mounted grade-review tests exercise the request form, details-only correction, accept/keep decisions, and non-owner access. The final export regression verifies that authentication reaches the hidden generator while the iOS PDF preview stays local. A final web fix keeps credit options reachable if the balance changes during upload; retry retains completed uploads.
 
 Compilation and automated tests do not validate camera optics, physical-device UI, real purchases, or email universal-link delivery.
+
+## Build artifacts
+
+Both EAS builds finished successfully from native source `1a6438e570b98959b8aff69dcf4c57999b065dbc`. Commit `d3101c78` changes only web credit-recovery handling and tests; the native sources match these artifacts exactly. Both are version/runtime 1.0.3 on `camera-validation`.
+
+| Platform | Build and artifact | Verification |
+| --- | --- | --- |
+| Android | [Build 7](https://expo.dev/accounts/dcm_grading/projects/dcm-mobile/builds/5ef268cb-3616-4ee0-91be-2a633bc7929b); [installable APK](https://expo.dev/artifacts/eas/GpwqQLncOSnRXEnjZ0SXvi0WFVQUYilG92aFakCagAc.apk) | Gradle compiled Expo Camera from source. Downloaded APK contains all three DCM native camera controls in `classes4.dex`. |
+| iOS | [Build 15](https://expo.dev/accounts/dcm_grading/projects/dcm-mobile/builds/1dee2165-26d3-48e8-898d-99490c74bc1b); [signed IPA](https://expo.dev/artifacts/eas/BVmpYYr-eEa7KTR1YIu16-EBDPo93aAP1DaUUiYYQlk.ipa) | Physical-device App Store archive succeeded. Downloaded Mach-O contains the capability property and both method registrations, with the short Swift strings encoded as ARM64 immediate words. This is not a simulator build. TestFlight submission remains separate. |
+
+Artifact SHA-256:
+
+- Android, 143,679,956 bytes: `2601b593d6fa38038d6accb78d7a1e52b55ea3e367fb06d891dcc1a30ca8a962`.
+- iOS, 26,259,296 bytes: `87827d0821607448bc58009f768268cb04c720a38ddb07b4fa17a53d822d2a66`.
+
+Expo Doctor reports seven available SDK 54 patch updates (Expo, constants, file system, font, localization, router, updates). These are version-alignment notices, not native compilation failures. This release retains the tested dependency lock and pinned camera patch; dependency upgrades should receive a separate patch review and device check.
+
+The Vercel preview is access-protected. Browser inspection reached Vercel sign-in in both available browser sessions, so no authenticated or visual acceptance result is claimed. Production web, production OTA channels, and app stores were not updated by this release preparation.
 
 ## Coordinated rollout
 
