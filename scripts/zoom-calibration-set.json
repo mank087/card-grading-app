@@ -236,6 +236,61 @@
         "face": "any", "categories": ["surface"], "types": ["stain", "discoloration", "toning"], "min_severity": "moderate",
         "any_source": true
       }
+    },
+    {
+      "key": "griffey-90-ud-checklist",
+      "review_id": null,
+      "card_id": "5f061f67-6a37-4965-a79c-858913f7b673",
+      "grade_run_id": "cba1b2eb-e8ef-467c-8883-bd55756bbe02",
+      "label": "1990 Upper Deck #24 Ken Griffey Jr. (Mariners checklist)",
+      "cardType": "sports",
+      "front_path": "fd324f2e-1616-44c8-aa68-27d87fc2fd3a/5f061f67-6a37-4965-a79c-858913f7b673/front.jpg",
+      "back_path": "fd324f2e-1616-44c8-aa68-27d87fc2fd3a/5f061f67-6a37-4965-a79c-858913f7b673/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 8,
+      "expected_subgrades": { "centering": [10, 9], "corners": [10, 10], "edges": [10, 10], "surface": [8, 9] },
+      "expected_limiting": ["surface"],
+      "false_positive": {
+        "note": "Oct 5 2026 customer dispute: the printed tan wood-grain back panel was read as four moderate stains (zoom pass). Corrected 7 -> 8 by hand.",
+        "face": "back", "categories": ["surface"], "types": ["stain", "discoloration", "toning"], "min_severity": "minor"
+      }
+    },
+    {
+      "key": "gonzalez-90-donruss",
+      "review_id": null,
+      "card_id": "40550ee2-9dad-4656-8e06-acbb39a24cc0",
+      "grade_run_id": "793f14b9-8ea2-4eb1-84e4-f03c58d2ece1",
+      "label": "1990 Donruss Rated Rookie Juan Gonzalez (expected_grade NOT hand-verified; judge the false positive only)",
+      "cardType": "sports",
+      "front_path": "3cef1091-ab8b-499d-8e89-b8cd8366253c/40550ee2-9dad-4656-8e06-acbb39a24cc0/front.jpg",
+      "back_path": "3cef1091-ab8b-499d-8e89-b8cd8366253c/40550ee2-9dad-4656-8e06-acbb39a24cc0/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": ["edges"],
+      "false_positive": {
+        "note": "The printed black splatter on the 1990 Donruss red border was read as reddish-brown blotches (stain).",
+        "face": "front", "categories": ["surface"], "types": ["stain", "discoloration", "toning", "spot"], "min_severity": "moderate"
+      }
+    },
+    {
+      "key": "jordan-84-star-real-stain",
+      "review_id": null,
+      "card_id": "6469a057-33d1-4d1b-8fdc-692722f268bd",
+      "grade_run_id": "9f078ccf-26ef-4d51-9673-3602583281e0",
+      "label": "1984 Star Michael Jordan 2 of 10 (real stain control; expected_grade NOT hand-verified)",
+      "cardType": "sports",
+      "front_path": "4f18a0fd-1d06-4e81-af87-a289104499c6/6469a057-33d1-4d1b-8fdc-692722f268bd/front.jpg",
+      "back_path": "4f18a0fd-1d06-4e81-af87-a289104499c6/6469a057-33d1-4d1b-8fdc-692722f268bd/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": ["surface", "edges"],
+      "false_positive": null,
+      "must_detect": {
+        "face": "back", "categories": ["surface"], "types": ["stain", "discoloration", "spot"], "min_severity": "minor",
+        "note": "real small pink ring-shaped marks on the plain white back stock"
+      }
     }
   ]
 }

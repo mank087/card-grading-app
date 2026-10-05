@@ -8,9 +8,10 @@ vi.mock('./images/originalImages', () => ({ fetchCardOriginals: mocks.fetch }));
 import { runZoomInspection, zoomSystemPrompt, computeZoomFaceCaps, type ZoomDefect } from './zoomInspection';
 import { ZOOM_DESIGN_ARTIFACT_EXCLUSIONS } from './grading/zoomCorroboration';
 
-// sha256 of ZOOM_SYSTEM_PROMPT as shipped before ZOOM_CORROBORATION_V1 existed
-// (git HEAD 3c535e58). The default path must keep sending exactly this text.
-const SHIPPED_PROMPT_SHA256 = '0c6f32c5028b64c16954ed43e617857ff05ffb457c1c94e54284b85ed9e535d4';
+// sha256 of the shipped ZOOM_SYSTEM_PROMPT. The default path must keep sending exactly this
+// text; change it only with a zoom calibration run (scripts/run-zoom-calibration.ts).
+// Oct 5 2026: + PRINTED TEXTURE IS NOT A STAIN (was 0c6f32c5... from 3c535e58).
+const SHIPPED_PROMPT_SHA256 = '786e1bb4d6192d196ec0a2fb26eee2dab99cc6a8e1b65b8c85e2c2ea79de1504';
 
 let images: { front: Buffer; back: Buffer };
 const choice = (value: unknown) => ({ finish_reason: 'stop', message: { content: JSON.stringify(value) } });
