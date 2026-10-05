@@ -28,4 +28,14 @@ describe('bulk upload retries', () => {
     await first
     expect(ops.commit).toHaveBeenCalledTimes(1)
   })
+  it('retains completed uploads while the user adds credits and retries the commit', async () => {
+    const attempt = createUploadAttempt()
+    const ops = { create: vi.fn().mockResolvedValue('draft-1'), upload: vi.fn().mockResolvedValue(undefined), commit: vi.fn().mockRejectedValueOnce(Object.assign(Error('Add credits'), { code: 'insufficient_credits' })).mockResolvedValue(undefined) }
+    await expect(runUploadAttempt(attempt, ops)).rejects.toMatchObject({ code: 'insufficient_credits' })
+    expect(attempt).toMatchObject({ id: 'draft-1', uploaded: true, pending: null })
+    await runUploadAttempt(attempt, ops)
+    expect(ops.create).toHaveBeenCalledTimes(1)
+    expect(ops.upload).toHaveBeenCalledTimes(1)
+    expect(ops.commit).toHaveBeenCalledTimes(2)
+  })
 })

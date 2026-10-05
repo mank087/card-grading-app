@@ -1056,7 +1056,7 @@ function SubmissionsNewInner() {
               setUploadPhase('idle')
               setStage('review')
               setSubmitting(false)
-              throw new Error('Not enough credits to start this batch. Add credits and retry this same batch.')
+              throw Object.assign(new Error('Not enough credits to start this batch. Add credits and retry this same batch.'), { code: 'insufficient_credits' })
             }
             // A lost commit response may be retried after grading has already completed.
             const statusResponse = await fetch(`/api/submissions/${submissionId}/status`, { headers: { Authorization: `Bearer ${session.access_token}` } })
@@ -1081,7 +1081,7 @@ function SubmissionsNewInner() {
       console.error('[submissions/new] start grading failed:', e)
       setSubmitError(e?.message || 'Something went wrong starting this submission.')
       setUploadPhase('error')
-      setStage(uploadAttempt.current.id ? 'uploading' : 'review')
+      setStage(e?.code === 'insufficient_credits' ? 'review' : uploadAttempt.current.id ? 'uploading' : 'review')
     } finally {
       setSubmitting(false)
     }
