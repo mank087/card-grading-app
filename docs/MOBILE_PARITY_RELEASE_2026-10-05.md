@@ -2,6 +2,8 @@
 
 Prepared October 5, 2026 on `codex/camera-native-focus`, following the October 3 mobile/web parity review. Production web base: `f2d41e23`. Prior native camera source: `e5922054`. Current production OTA source: `2295abd1` on its separate release branch.
 
+Review: [draft PR #1](https://github.com/mank087/card-grading-app/pull/1). The branch is pushed and mergeable. The GitHub CLI account has read-only access, so the draft was created through the already authenticated repository-owner browser session; no account permission changes were needed.
+
 ## Included changes
 
 - Native grade-review requests, details disputes, status/results, and proposed-grade decisions use the existing server APIs and eligibility rules.
@@ -50,7 +52,7 @@ The Vercel preview is access-protected. Browser inspection reached Vercel sign-i
 2. Deploy the companion web receivers and session/navigation bridge **before distributing the new app binaries**. New export flows depend on that receiver. Installed apps remain compatible through the legacy receiver path.
 3. Validate the combined release on physical Android/iPhone devices. Focus acceptance: tap fine print, hold still for at least ten seconds, capture, and inspect saved detail; then change distance and tap again. Repeat front/back, torch, camera reopen, and background/foreground, comparing the phone's system camera under the same conditions.
 4. Verify iOS StoreKit sandbox purchase/restore/cancel and Android Stripe success/cancel. Confirm credit refresh and retained batch photos on return. Exercise grade review, public/private sharing, recovery links, batch retry, labels/reports, external links, and large text.
-5. Promote the accepted native binaries through their store release process. OTA cannot install the native camera methods into older runtimes. Keep older runtime lanes separate.
+5. After acceptance, generate production-profile store artifacts (Android AAB and signed iOS build) using the production update channel and submit them through the store release process. The isolated validation APK is for testing. OTA cannot install the native camera methods into older runtimes. Keep older runtime lanes separate.
 
 The Android `camera-validation` profile produces an installable APK. The iOS `release-validation` profile produces a signed physical-device/store build on the isolated `camera-validation` update channel; TestFlight distribution is a separate submission step.
 
