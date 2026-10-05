@@ -49,6 +49,7 @@ import { useLabelStyle, MAX_SAVED_LABEL_STYLES } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import * as WebBrowser from 'expo-web-browser'
 import { productsForHolder, productUrl } from '@/lib/shopProducts'
+import { displayImagePath } from '@/lib/displayPath'
 
 // SCREEN_W is now read per-render via useWindowDimensions() inside the
 // component so the FlatList snap interval tracks iPad rotation +
@@ -503,7 +504,7 @@ export default function LabelStudioScreen() {
     if (!session?.user) return
     const { data, error } = await supabase
       .from('cards')
-      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, release_date, card_number, manufacturer_name, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
+      .select('id, serial, front_path, back_path, display_crop:capture_quality->display, card_name, featured, category, card_set, release_date, card_number, manufacturer_name, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
       .eq('user_id', session.user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
@@ -614,10 +615,10 @@ export default function LabelStudioScreen() {
   // side toggle can flip the card photo too.
   useEffect(() => {
     if (!selectedCard?.front_path) { setFrontUrl(null); setBackUrl(null); return }
-    supabase.storage.from('cards').createSignedUrl(selectedCard.front_path, 3600)
+    supabase.storage.from('cards').createSignedUrl(displayImagePath(selectedCard, 'front') ?? selectedCard.front_path, 3600)
       .then(({ data }) => { if (data?.signedUrl) setFrontUrl(data.signedUrl) })
     if (selectedCard?.back_path) {
-      supabase.storage.from('cards').createSignedUrl(selectedCard.back_path, 3600)
+      supabase.storage.from('cards').createSignedUrl(displayImagePath(selectedCard, 'back') ?? selectedCard.back_path, 3600)
         .then(({ data }) => { if (data?.signedUrl) setBackUrl(data.signedUrl) })
     } else {
       setBackUrl(null)
@@ -1561,7 +1562,7 @@ export default function LabelStudioScreen() {
                     </View>
                   )}
                   {item.front_path ? (
-                    <CardThumbnail frontPath={item.front_path} />
+                    <CardThumbnail frontPath={displayImagePath(item, 'front') ?? item.front_path} />
                   ) : (
                     <View style={s.cardTilePlaceholder}>
                       <Text style={{ color: Colors.gray[400], fontSize: 10 }}>No image</Text>

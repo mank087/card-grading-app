@@ -112,6 +112,8 @@ const MOBILE_CONSTANTS = 'dcm-mobile/lib/constants.ts'
 const WEB_CONDITION = 'src/lib/conditionAssessment.ts'
 const MOBILE_RESOLVE = 'dcm-mobile/lib/resolveCardValue.ts'
 const WEB_RESOLVE = 'src/lib/pricing/resolveCardValue.ts'
+const MOBILE_DISPLAY_PATH = 'dcm-mobile/lib/displayPath.ts'
+const WEB_DISPLAY_PATH = 'src/lib/images/displayPath.ts'
 const MOBILE_FIELDS = 'dcm-mobile/lib/ebayListingFields.ts'
 const WEB_FIELDS = 'src/lib/ebay/listingFields.ts'
 const MOBILE_BLOCKLIST = 'dcm-mobile/lib/ebayGradingCompanyBlocklist.ts'
@@ -307,6 +309,11 @@ const PAIRS: Pair[] = [
     name: 'resolveCardValue (verbatim copy)',
     a: { label: MOBILE_RESOLVE, get: () => normalizedResolveCore(MOBILE_RESOLVE) },
     b: { label: WEB_RESOLVE, get: () => normalizedResolveCore(WEB_RESOLVE) },
+  },
+  {
+    name: 'displayImagePath (verbatim copy)',
+    a: { label: MOBILE_DISPLAY_PATH, get: () => normalizedResolveCore(MOBILE_DISPLAY_PATH) },
+    b: { label: WEB_DISPLAY_PATH, get: () => normalizedResolveCore(WEB_DISPLAY_PATH) },
   },
 ]
 

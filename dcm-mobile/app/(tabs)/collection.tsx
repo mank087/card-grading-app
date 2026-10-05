@@ -33,6 +33,7 @@ import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsShe
 import { identityConfirmationPending } from '@/lib/reviewClient'
 import { isNonStandardItemType } from '@/lib/itemType'
 import { identityConfirmEnabled, loadIdentityReview, type IdentityReviewState } from '@/lib/identityReviewApi'
+import { displayImagePath } from '@/lib/displayPath'
 
 // Star Wars was retired as a top-level category and is now an "Other" sub-category.
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
@@ -266,7 +267,7 @@ export default function CollectionScreen() {
     card_number, release_date, manufacturer_name, visibility,
     rookie_card, autographed, serial_numbering,
     conversational_whole_grade, conversational_condition_label, grade_status,
-    conversational_card_info, front_path, card_colors,
+    conversational_card_info, front_path, display_crop:capture_quality->display, card_colors,
     ebay_price_median, dcm_price_estimate,
     dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
     dcm_selected_product_id, identity_confirmed_revision,
@@ -331,7 +332,10 @@ export default function CollectionScreen() {
     if (withPath.length === 0) return rows
 
     const thumbFor = (p: string) => thumbPath(p)
-    const thumbPaths = withPath.map(r => thumbFor(r.front_path))
+    // Newly graded cards have a trimmed display copy (lib/displayPath); older
+    // cards resolve to their original, so the grid is unchanged for them.
+    const shown = (r: any) => displayImagePath(r, 'front') || r.front_path
+    const thumbPaths = withPath.map(r => thumbFor(shown(r)))
 
     const signed = new Map<string, string>()
     const sign = async (paths: string[]) => {
@@ -347,12 +351,12 @@ export default function CollectionScreen() {
     await sign(thumbPaths)
     // Only pay for a second signing round for the rows whose thumb is missing.
     const missing = withPath
-      .filter(r => !signed.has(thumbFor(r.front_path)))
-      .map(r => r.front_path)
+      .filter(r => !signed.has(thumbFor(shown(r))))
+      .map(r => shown(r))
     await sign(missing)
 
     for (const r of withPath) {
-      r.front_url = signed.get(thumbFor(r.front_path)) || signed.get(r.front_path) || null
+      r.front_url = signed.get(thumbFor(shown(r))) || signed.get(shown(r)) || null
     }
     return rows
   }, [])

@@ -64,6 +64,7 @@ import { hidesMarketValue, isNonStandardItemType, nonStandardExplanation, NOT_ST
 import { useIsFocused } from '@react-navigation/native'
 import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsSheet'
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
+import { displayImagePath } from '@/lib/displayPath'
 import GradeReview from '@/components/gradeReview/GradeReview'
 import InAppPage from '@/components/ui/InAppPage'
 
@@ -134,6 +135,11 @@ function CardDetailScreen() {
   const [sellBusy, setSellBusy] = useState(false)
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [backUrl, setBackUrl] = useState<string | null>(null)
+  // Display crop (Oct 2026): the trimmed copy shown in the slab hero. frontUrl/
+  // backUrl stay the ORIGINAL photo: zoom, centering and evidence views place
+  // their markers in the original's coordinates.
+  const [displayFrontUrl, setDisplayFrontUrl] = useState<string | null>(null)
+  const [displayBackUrl, setDisplayBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
   const [zoomImage, setZoomImage] = useState<string | null>(null)
 
@@ -405,14 +411,17 @@ function CardDetailScreen() {
     if (!isMountedRef.current) return
     if (error || !data) { setIsLoading(false); setRefreshing(false); return }
     setCard(data as Card)
-    const paths = [data.front_path, data.back_path].filter(Boolean)
+    const displayFront = displayImagePath(data, 'front')
+    const displayBack = displayImagePath(data, 'back')
+    const paths = [...new Set([data.front_path, data.back_path, displayFront, displayBack].filter(Boolean))] as string[]
     if (paths.length > 0) {
       const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
       if (!isMountedRef.current) return
-      urls?.forEach(u => {
-        if (u.path === data.front_path) setFrontUrl(u.signedUrl)
-        if (u.path === data.back_path) setBackUrl(u.signedUrl)
-      })
+      const byPath = new Map((urls ?? []).filter(u => u.signedUrl).map(u => [u.path, u.signedUrl]))
+      setFrontUrl(byPath.get(data.front_path) ?? null)
+      setBackUrl(byPath.get(data.back_path) ?? null)
+      setDisplayFrontUrl((displayFront && byPath.get(displayFront)) || byPath.get(data.front_path) || null)
+      setDisplayBackUrl((displayBack && byPath.get(displayBack)) || byPath.get(data.back_path) || null)
     }
     if (!isMountedRef.current) return
     setIsLoading(false); setRefreshing(false)
@@ -1684,7 +1693,7 @@ function CardDetailScreen() {
         <View style={s.slabContainer} {...slabPanResponder.panHandlers}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
           <SlabCard
-            imageUrl={activeImage === 'front' ? frontUrl : backUrl}
+            imageUrl={activeImage === 'front' ? (displayFrontUrl ?? frontUrl) : (displayBackUrl ?? backUrl)}
             displayName={getDisplayName(card as any)}
             contextLine={getContextLine(card as any)}
             features={getFeatures(card as any)}
