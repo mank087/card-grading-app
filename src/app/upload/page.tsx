@@ -50,6 +50,7 @@ interface CompressionInfo {
 // table without importing a page module (Next's typed-routes check rejects
 // non-standard named exports from page.tsx).
 import { CARD_TYPES, OTHER_SUB_CATEGORIES, type CardType } from '@/lib/cardTypeConfig';
+import { pinFile } from '@/lib/images/pinFile'
 
 // Module scope, NOT component state: the nav-reset effect flips isUploading
 // back to false when the user clicks "grade another card" mid-upload, but the
@@ -1238,13 +1239,13 @@ function UniversalUploadPageContent() {
         type="file"
         accept="image/*"
         disabled={isCompressing}
+        // Cleared when the picker OPENS (so the same photo can be picked again),
+        // never right after a pick: on Android, clearing revokes access to a
+        // photo-picker file before it is read. pinFile copies the bytes first.
+        onClick={(e) => { e.currentTarget.value = '' }}
         onChange={(e) => {
           const file = e.target.files?.[0]
-          if (file) {
-            handleFileSelect(file, 'front')
-            // Clear the input so same file can be selected again
-            e.target.value = ''
-          }
+          if (file) void pinFile(file).then(pinned => handleFileSelect(pinned, 'front'))
         }}
         className="hidden"
       />
@@ -1253,13 +1254,10 @@ function UniversalUploadPageContent() {
         type="file"
         accept="image/*"
         disabled={isCompressing}
+        onClick={(e) => { e.currentTarget.value = '' }}
         onChange={(e) => {
           const file = e.target.files?.[0]
-          if (file) {
-            handleFileSelect(file, 'back')
-            // Clear the input so same file can be selected again
-            e.target.value = ''
-          }
+          if (file) void pinFile(file).then(pinned => handleFileSelect(pinned, 'back'))
         }}
         className="hidden"
       />

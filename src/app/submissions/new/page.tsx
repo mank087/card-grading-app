@@ -414,9 +414,11 @@ function SubmissionsNewInner() {
     }
   }, [addFiles, toast])
 
+  // The input is cleared when the picker OPENS (onClick on the input), not
+  // here: on Android, clearing right after a pick can revoke access to
+  // photo-picker files before they are read (see lib/images/pinFile.ts).
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) handleIncomingFiles(e.target.files)
-    e.target.value = ''
+    if (e.target.files?.length) handleIncomingFiles(Array.from(e.target.files))
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -1220,7 +1222,7 @@ function SubmissionsNewInner() {
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <label className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-indigo-700">
                     Choose Photos
-                    <input type="file" multiple accept="image/*,.zip,application/zip" className="hidden" onChange={handleFileInput} />
+                    <input type="file" multiple accept="image/*,.zip,application/zip" className="hidden" onClick={(e) => { e.currentTarget.value = '' }} onChange={handleFileInput} />
                   </label>
                   <label className="px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg text-sm font-semibold cursor-pointer hover:bg-gray-50">
                     Choose a Folder
@@ -1228,6 +1230,7 @@ function SubmissionsNewInner() {
                       type="file"
                       multiple
                       className="hidden"
+                      onClick={(e) => { e.currentTarget.value = '' }}
                       onChange={handleFileInput}
                       ref={(el) => { if (el) el.setAttribute('webkitdirectory', '') }}
                     />

@@ -16,6 +16,7 @@ import { useCaptureFeedback } from '@/hooks/useCaptureFeedback';
 import { MIN_CAPTURE_EDGE } from '@/utils/captureSelection';
 import { prepareSystemCameraPhoto } from '@/utils/systemCameraPhoto';
 import { reportUploadEvent } from '@/lib/uploadTelemetry';
+import { pinFile } from '@/lib/images/pinFile';
 
 /**
  * How the browser actually produced the frame.
@@ -524,7 +525,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           {isProcessing ? 'Saving photo — hold steady…' : feedback.ready ? feedback.message : 'Waiting for camera…'}
         </p>
         <input ref={systemCameraInput} type="file" accept="image/*" capture="environment" className="hidden"
-          onChange={e => { void handleSystemPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+          onClick={e => { e.currentTarget.value = ''; }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) void pinFile(f).then(handleSystemPhoto); }} />
         {/* Capture button - slightly smaller */}
         <div className="flex justify-center">
           <button
