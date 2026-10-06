@@ -66,6 +66,7 @@ import ConfirmCardDetailsSheet from '@/components/identity/ConfirmCardDetailsShe
 import { useIdentityReview, IdentityReviewBanner } from '@/components/identity/useIdentityReview'
 import { displayImagePath } from '@/lib/displayPath'
 import GradeReview from '@/components/gradeReview/GradeReview'
+import PendingGradeChangeBanner from '@/components/gradeReview/PendingGradeChangeBanner'
 import InAppPage from '@/components/ui/InAppPage'
 
 /**
@@ -905,8 +906,10 @@ function CardDetailScreen() {
     >
 
       {/* A manual review proposed a new grade: the owner accepts or keeps it
-          here (mirrors the web card page; Sept 2026). */}
-      <GradeReview cardId={card.id} ownerId={card.user_id} onChanged={fetchCard} />
+          here at the top (mirrors the web card page). Renders nothing unless a
+          decision is waiting; the review request/status box itself lives at
+          the bottom of the page, above Mark as sold / Remove (Oct 2026). */}
+      <PendingGradeChangeBanner cardId={card.id} isOwner={isOwner} onDecided={fetchCard} />
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
           on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
@@ -3332,6 +3335,14 @@ function CardDetailScreen() {
             )}
           </View>
         )}
+        {/* ══════ GRADE REVIEW ══════
+            Request a review / view its status. Owner-only. Moved from the top of the page (Oct 2026). */}
+        {isOwner && (
+          <View style={{ marginTop: 24, borderRadius: 12, overflow: 'hidden' }}>
+            <GradeReview cardId={card.id} ownerId={card.user_id} onChanged={fetchCard} />
+          </View>
+        )}
+
         {/* ══════ OWNERSHIP ══════ */}
         {isOwner && card.ownership_status !== 'sold' && (
           <TouchableOpacity style={s.soldBtn} onPress={handleMarkSold}>
