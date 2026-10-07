@@ -506,6 +506,8 @@ export default function LabelStudioScreen() {
       .from('cards')
       .select('id, serial, front_path, back_path, display_crop:capture_quality->display, card_name, featured, category, card_set, release_date, card_number, manufacturer_name, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
       .eq('user_id', session.user.id)
+      // A card the owner deleted must not stay pickable here (customer report, Oct 7 2026).
+      .is('deleted_at', null)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1000)
