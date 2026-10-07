@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
         custom_label_data
       `);
 
+    // A deleted card is gone for everyone, its owner included.
+    query = query.is('deleted_at', null);
+
     // Search by serial number (case-insensitive, partial match)
     query = query.ilike('serial', `%${serial}%`);
 

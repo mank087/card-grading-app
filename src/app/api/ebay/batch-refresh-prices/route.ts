@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         ${PRICE_REVISION_SELECT}
       `)
       .eq('user_id', auth.userId)
+      .is('deleted_at', null)
       .in('id', card_ids.slice(0, MAX_CARDS_PER_BATCH * 2)); // Fetch more to filter stale ones
 
     if (fetchError) {

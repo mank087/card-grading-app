@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       .from('cards')
       .select(REFRESH_CARD_SELECT)
       .eq('user_id', auth.userId)
+      .is('deleted_at', null)
       .not('category', 'is', null);
 
     if (fetchError) {

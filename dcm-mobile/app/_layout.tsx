@@ -170,6 +170,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         .from('cards')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .not('conversational_whole_grade', 'is', null)
       if (cancelled) return
       const hasGraded = !error && (count ?? 0) > 0

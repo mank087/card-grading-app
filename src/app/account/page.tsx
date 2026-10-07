@@ -113,6 +113,8 @@ export default function AccountPage() {
           .from('cards')
           .select('*')
           .eq('user_id', user.id)
+          // Deleted cards are out of the collection, so out of its stats too.
+          .is('deleted_at', null)
 
         if (cardsError) {
           throw cardsError
