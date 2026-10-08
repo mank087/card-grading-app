@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
 import { escapeIlike } from '@/lib/orgSlugs'
@@ -43,6 +43,10 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to add member' }, { status: 500 })
   }
 
+  await logAdminActivity(admin.id, admin.email, 'add_organization_member', 'organization', params.id, {
+    user_id: user.id, email: user.email, role: 'member',
+  }, clientIp(request))
+
   return NextResponse.json({ member: { user_id: user.id, email: user.email, role: 'member' } })
 }
 
@@ -79,6 +83,10 @@ export async function DELETE(
     console.error('[admin/organizations/members] remove error:', error)
     return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 })
   }
+
+  await logAdminActivity(admin.id, admin.email, 'remove_organization_member', 'organization', params.id, {
+    user_id: userId,
+  }, clientIp(request))
 
   return NextResponse.json({ removed: true })
 }

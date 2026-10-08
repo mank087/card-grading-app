@@ -18,18 +18,30 @@ declare global {
   }
 }
 
+// One shared load: a second caller while the tag is still loading waits for
+// the same load/error instead of resolving before window.scanic exists.
+let scanicLoad: Promise<void> | null = null
+
 function loadScanicScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.scanic) { resolve(); return }
-    const existing = document.getElementById('scanic-script')
-    if (existing) { resolve(); return }
-    const script = document.createElement('script')
-    script.id = 'scanic-script'
-    script.src = '/lib/scanic.umd.js'
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load Scanic'))
-    document.head.appendChild(script)
+  if (window.scanic) return Promise.resolve()
+  if (scanicLoad) return scanicLoad
+  scanicLoad = new Promise<void>((resolve, reject) => {
+    let script = document.getElementById('scanic-script') as HTMLScriptElement | null
+    if (!script) {
+      script = document.createElement('script')
+      script.id = 'scanic-script'
+      script.src = '/lib/scanic.umd.js'
+      document.head.appendChild(script)
+    }
+    script.addEventListener('load', () => resolve(), { once: true })
+    script.addEventListener('error', () => {
+      // Allow a retry on the next call.
+      scanicLoad = null
+      script?.remove()
+      reject(new Error('Failed to load Scanic'))
+    }, { once: true })
   })
+  return scanicLoad
 }
 
 // ============================================================================

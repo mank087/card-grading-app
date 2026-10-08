@@ -23,9 +23,17 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate') || null
     const endDate = searchParams.get('endDate') || null
 
+    // Include the whole end day, like the other analytics routes.
+    let pEnd: string | null = null
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setUTCHours(23, 59, 59, 999)
+      pEnd = end.toISOString()
+    }
+
     const { data, error } = await supabaseAdmin.rpc('get_conversion_analytics', {
       p_start: startDate ? new Date(startDate).toISOString() : null,
-      p_end: endDate ? new Date(endDate).toISOString() : null,
+      p_end: pEnd,
     })
     if (error) {
       console.error('[admin/analytics/conversion] RPC error:', error)

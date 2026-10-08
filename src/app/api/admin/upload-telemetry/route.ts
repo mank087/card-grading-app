@@ -21,34 +21,57 @@ export async function GET(request: NextRequest) {
     const days = Math.min(90, Math.max(1, Number(request.nextUrl.searchParams.get('days')) || 7))
     const since = new Date(Date.now() - days * 86400 * 1000).toISOString()
 
-    const { data: rows, error } = await supabaseAdmin
-      .from('upload_telemetry')
-      .select('created_at, user_id, event, side, reason, image_width, image_height, file_type, file_size_bytes, page')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(2000)
+    // Exact total + the 100 most recent rows for display
+    const [totalResult, recentResult] = await Promise.all([
+      supabaseAdmin
+        .from('upload_telemetry')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', since),
+      supabaseAdmin
+        .from('upload_telemetry')
+        .select('created_at, user_id, event, side, reason, image_width, image_height, file_type, file_size_bytes, page')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(100),
+    ])
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const firstError = totalResult.error || recentResult.error
+    if (firstError) {
+      return NextResponse.json({ error: firstError.message }, { status: 500 })
     }
 
+    // Group counts by paging narrow rows (PostgREST caps a select at 1000)
     const byEvent: Record<string, number> = {}
     const byReason: Record<string, number> = {}
     const affectedUsers = new Set<string>()
-    for (const r of rows || []) {
-      byEvent[r.event] = (byEvent[r.event] || 0) + 1
-      const reasonKey = `${r.event}: ${(r.reason || '-').slice(0, 120)}`
-      byReason[reasonKey] = (byReason[reasonKey] || 0) + 1
-      if (r.user_id) affectedUsers.add(r.user_id)
+    const BATCH = 1000
+    const MAX_BATCHES = 100
+    for (let i = 0; i < MAX_BATCHES; i++) {
+      const { data: batch, error: batchError } = await supabaseAdmin
+        .from('upload_telemetry')
+        .select('event, reason, user_id')
+        .gte('created_at', since)
+        .order('id', { ascending: true })
+        .range(i * BATCH, i * BATCH + BATCH - 1)
+      if (batchError) {
+        return NextResponse.json({ error: batchError.message }, { status: 500 })
+      }
+      for (const r of batch || []) {
+        byEvent[r.event] = (byEvent[r.event] || 0) + 1
+        const reasonKey = `${r.event}: ${(r.reason || '-').slice(0, 120)}`
+        byReason[reasonKey] = (byReason[reasonKey] || 0) + 1
+        if (r.user_id) affectedUsers.add(r.user_id)
+      }
+      if (!batch || batch.length < BATCH) break
     }
 
     return NextResponse.json({
       days,
-      total: rows?.length || 0,
+      total: totalResult.count || 0,
       affected_users: affectedUsers.size,
       by_event: Object.fromEntries(Object.entries(byEvent).sort((a, b) => b[1] - a[1])),
       by_reason: Object.fromEntries(Object.entries(byReason).sort((a, b) => b[1] - a[1]).slice(0, 40)),
-      recent: (rows || []).slice(0, 100),
+      recent: recentResult.data || [],
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 })

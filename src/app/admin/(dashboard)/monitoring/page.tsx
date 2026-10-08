@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
 
 interface ErrorLog {
   id: string
@@ -36,16 +35,14 @@ interface PaginationData {
   total_pages: number
 }
 
+// The admin (dashboard) layout already wraps every page in AdminAuthGuard.
 export default function AdminMonitoringPage() {
-  return (
-    <AdminAuthGuard>
-      {(admin) => <MonitoringContent />}
-    </AdminAuthGuard>
-  )
+  return <MonitoringContent />
 }
 
 function MonitoringContent() {
-  const [activeTab, setActiveTab] = useState<'errors' | 'api-usage'>('errors')
+  // API Usage is the default: nothing writes to error_log yet.
+  const [activeTab, setActiveTab] = useState<'errors' | 'api-usage'>('api-usage')
   const [errors, setErrors] = useState<ErrorLog[]>([])
   const [apiLogs, setApiLogs] = useState<ApiLog[]>([])
   const [errorPagination, setErrorPagination] = useState<PaginationData>({
@@ -231,7 +228,12 @@ function MonitoringContent() {
             {loading ? (
               <div className="p-8 text-center text-gray-500">Loading error logs...</div>
             ) : errors.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No errors found</div>
+              <div className="p-8 text-center text-gray-500">
+                <p className="mb-4">No errors found</p>
+                <p className="text-xs text-gray-400">
+                  Error logging isn&apos;t wired up yet: no code currently writes to the error_log table, so this tab stays empty. Check Vercel logs for server errors.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -345,7 +347,7 @@ function MonitoringContent() {
           {/* Usage by Service */}
           {apiStats && apiStats.by_service.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Usage by Service</h3>
+              <h3 className="text-lg font-semibold mb-4">Usage by Service (Last 24h)</h3>
               <div className="space-y-3">
                 {apiStats.by_service.map((service: any) => (
                   <div key={service.service} className="flex justify-between items-center">
@@ -377,7 +379,6 @@ function MonitoringContent() {
                 >
                   <option value="all">All Services</option>
                   <option value="openai">OpenAI</option>
-                  <option value="supabase">Supabase</option>
                 </select>
               </div>
             </div>

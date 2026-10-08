@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
 
@@ -43,6 +43,12 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
+  const { data: prior } = await supabaseAdmin
+    .from('enterprise_leads')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle()
+
   const { error } = await supabaseAdmin
     .from('enterprise_leads')
     .update({ status })
@@ -51,5 +57,9 @@ export async function PATCH(request: NextRequest) {
     console.error('[admin/enterprise-leads] update error:', error)
     return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
   }
+  await logAdminActivity(admin.id, admin.email, 'update_enterprise_lead', 'enterprise_lead', id, {
+    before: { status: prior?.status ?? null },
+    after: { status },
+  }, clientIp(request))
   return NextResponse.json({ success: true })
 }

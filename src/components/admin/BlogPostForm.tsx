@@ -2,11 +2,32 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { BlogPost, BlogCategory, BlogPostFormData } from '@/types/blog';
 import BlogImageUploader from './BlogImageUploader';
 import BlogCollageUploader from './BlogCollageUploader';
 import MarkdownToolbar from './MarkdownToolbar';
-import WysiwygEditor from './WysiwygEditor';
+
+// TipTap is client-only and heavy; keep it out of the server render and the
+// initial chunk.
+const WysiwygEditor = dynamic(() => import('./WysiwygEditor'), {
+  ssr: false,
+  loading: () => <div className="p-5 text-sm text-gray-400">Loading editor…</div>,
+});
+
+/** ISO instant → `YYYY-MM-DDTHH:mm` in the browser's local time, for datetime-local inputs. */
+function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+/** A published post with a future published_at is shown as "Scheduled". */
+function isFuture(iso?: string | null): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return !isNaN(t) && t > Date.now();
+}
 
 interface BlogPostFormProps {
   post?: BlogPost;
@@ -34,7 +55,9 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
     meta_description: post?.meta_description || '',
     quick_answer: post?.quick_answer || '',
     faq: Array.isArray(post?.faq) ? post!.faq! : [],
-    status: post?.status || 'draft',
+    status: post?.status === 'published' && isFuture(post?.published_at)
+      ? 'scheduled'
+      : post?.status || 'draft',
     published_at: post?.published_at || '',
     author_name: post?.author_name || 'Douglas Mankiewicz',
   });
@@ -174,7 +197,7 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
       const submitData = {
         ...formData,
         status: publishNow ? 'published' : formData.status,
-        published_at: publishNow && !formData.published_at
+        published_at: publishNow && (!formData.published_at || isFuture(formData.published_at))
           ? new Date().toISOString()
           : formData.published_at,
       };
@@ -412,7 +435,7 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
                 </label>
                 <input
                   type="datetime-local"
-                  value={formData.published_at ? formData.published_at.slice(0, 16) : ''}
+                  value={formData.published_at ? isoToLocalInput(formData.published_at) : ''}
                   onChange={(e) => setFormData(prev => ({
                     ...prev,
                     published_at: e.target.value ? new Date(e.target.value).toISOString() : '',
@@ -428,7 +451,7 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
                 disabled={loading}
                 className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 font-medium"
               >
-                {loading ? 'Saving...' : 'Save Draft'}
+                {loading ? 'Saving...' : 'Save'}
               </button>
               <button
                 type="button"

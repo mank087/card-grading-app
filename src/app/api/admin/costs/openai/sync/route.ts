@@ -58,6 +58,9 @@ async function runSync(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (!process.env.OPENAI_ADMIN_API_KEY) {
+    // Logged loudly so a silently-stopped nightly sync shows up in Vercel logs
+    // (openai_daily_costs stopped receiving rows after 2026-05-19 with no trace).
+    console.error('[costs/openai/sync] FAILED: OPENAI_ADMIN_API_KEY is not set — no OpenAI billing rows will be written; /admin/costs falls back to the api_usage_log token estimate.')
     return NextResponse.json({
       error: 'OPENAI_ADMIN_API_KEY is not set',
       hint: 'Create an admin key in OpenAI Dashboard → Settings → Admin keys, then add to Vercel env.',
@@ -80,6 +83,7 @@ async function runSync(request: NextRequest) {
     const buckets = await fetchOpenAICostRange(start, end)
 
     if (!buckets.length) {
+      console.error(`[costs/openai/sync] FAILED: OpenAI Admin Costs API returned 0 buckets for ${from}..${to} — nothing written to openai_daily_costs. Check the admin key's org/project scope and that the date range has billing data.`)
       return NextResponse.json({ synced: 0, dates: [], skipped: 0, note: 'No buckets returned' })
     }
 
@@ -98,6 +102,7 @@ async function runSync(request: NextRequest) {
       .upsert(rows, { onConflict: 'date' })
 
     if (error) {
+      console.error(`[costs/openai/sync] FAILED: openai_daily_costs upsert error for ${from}..${to}:`, error.message)
       return NextResponse.json({ error: 'Upsert failed', details: error.message }, { status: 500 })
     }
 
@@ -107,6 +112,7 @@ async function runSync(request: NextRequest) {
       total_usd: Math.round(rows.reduce((s, r) => s + r.cost_usd, 0) * 100) / 100,
     })
   } catch (err: any) {
+    console.error(`[costs/openai/sync] FAILED for ${from}..${to}:`, err?.message || err)
     return NextResponse.json({ error: err?.message || 'Sync failed' }, { status: 500 })
   }
 }

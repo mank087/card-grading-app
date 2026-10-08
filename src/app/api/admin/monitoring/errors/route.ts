@@ -64,19 +64,33 @@ export async function GET(request: NextRequest) {
       user_email: error.user_id ? userMap[error.user_id] : null
     }))
 
-    // Calculate error statistics
-    const last24Hours = new Date()
-    last24Hours.setHours(last24Hours.getHours() - 24)
+    // Calculate error statistics for the last 24h across ALL rows (not just
+    // the current page)
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const errorsLast24h = errors?.filter(e =>
-      new Date(e.created_at) >= last24Hours
-    ).length || 0
+    const { count: errorsCount } = await supabaseAdmin
+      .from('error_log')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', since24h)
+    const errorsLast24h = errorsCount || 0
 
     const errorsByType: Record<string, number> = {}
-    errors?.forEach(error => {
-      const type = error.error_type || 'unknown'
-      errorsByType[type] = (errorsByType[type] || 0) + 1
-    })
+    const BATCH = 1000
+    const MAX_BATCHES = 100
+    for (let i = 0; i < MAX_BATCHES; i++) {
+      const { data: batch, error: batchError } = await supabaseAdmin
+        .from('error_log')
+        .select('error_type')
+        .gte('created_at', since24h)
+        .order('id', { ascending: true })
+        .range(i * BATCH, i * BATCH + BATCH - 1)
+      if (batchError) throw batchError
+      for (const row of batch || []) {
+        const type = row.error_type || 'unknown'
+        errorsByType[type] = (errorsByType[type] || 0) + 1
+      }
+      if (!batch || batch.length < BATCH) break
+    }
 
     return NextResponse.json({
       errors: enrichedErrors,

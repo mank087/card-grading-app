@@ -3,6 +3,17 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+// Only same-origin admin paths: must start with /admin, no protocol-relative
+// '//' and no scheme/backslash tricks.
+function safeAdminRedirect(raw: string | null): string {
+  const fallback = '/admin/dashboard'
+  if (!raw) return fallback
+  if (!raw.startsWith('/admin')) return fallback
+  if (raw.includes('//') || raw.includes('\\') || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return fallback
+  if (raw.startsWith('/admin/login')) return fallback
+  return raw
+}
+
 export default function AdminLoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -30,8 +41,9 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Redirect to admin dashboard
-      router.push('/admin/dashboard')
+      // Return to the page that sent us here (AdminAuthGuard passes ?redirect=)
+      const redirect = new URLSearchParams(window.location.search).get('redirect')
+      router.push(safeAdminRedirect(redirect))
     } catch (err) {
       setError('An error occurred. Please try again.')
       setLoading(false)

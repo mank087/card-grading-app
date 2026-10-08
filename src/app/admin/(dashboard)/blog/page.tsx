@@ -1,8 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { BlogPost } from '@/types/blog';
+import { BlogPost, BlogCategory } from '@/types/blog';
+
+/** The narrow row shape the list API returns. */
+type BlogPostRow = Pick<BlogPost, 'id' | 'title' | 'slug' | 'status' | 'published_at' | 'view_count' | 'updated_at'> & {
+  category?: Pick<BlogCategory, 'name' | 'color'> | null;
+};
+
+/** "Scheduled" posts are stored as published with a future published_at. */
+const displayStatus = (post: BlogPostRow): BlogPost['status'] =>
+  post.status === 'published' && post.published_at && new Date(post.published_at).getTime() > Date.now()
+    ? 'scheduled'
+    : post.status;
 
 type SortKey = 'title' | 'category' | 'status' | 'published_at' | 'view_count';
 
@@ -14,7 +25,7 @@ interface PaginationData {
 }
 
 export default function AdminBlogPage() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [posts, setPosts] = useState<BlogPostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState<PaginationData>({
     page: 1,
@@ -23,6 +34,11 @@ export default function AdminBlogPage() {
     total_pages: 0,
   });
   const [search, setSearch] = useState('');
+  // The input updates `search` immediately; fetches use the debounced copy.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  // Incremented per request so a slow, stale response can't overwrite a newer one.
+  const requestIdRef = useRef(0);
   const [statusFilter, setStatusFilter] = useState('all');
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -31,8 +47,13 @@ export default function AdminBlogPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
     fetchPosts();
-  }, [pagination.page, search, statusFilter, sortBy, sortDir]);
+  }, [pagination.page, debouncedSearch, statusFilter, sortBy, sortDir]);
 
   // Click a header to sort by it; click again to flip the direction.
   // Text columns start A to Z, dates and views start newest/highest.
@@ -68,13 +89,14 @@ export default function AdminBlogPage() {
   };
 
   const fetchPosts = async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         status: statusFilter,
-        search,
+        search: debouncedSearch,
       });
       if (sortBy) {
         params.set('sort', sortBy);
@@ -82,15 +104,23 @@ export default function AdminBlogPage() {
       }
 
       const response = await fetch(`/api/admin/blog/posts?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPosts(data.posts);
-        setPagination(data.pagination);
+      if (requestId !== requestIdRef.current) return;
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setFetchError(data?.error || `Failed to load posts (HTTP ${response.status})`);
+        return;
       }
+      const data = await response.json();
+      if (requestId !== requestIdRef.current) return;
+      setFetchError(null);
+      setPosts(data.posts);
+      setPagination(data.pagination);
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Error fetching posts:', error);
+      setFetchError('Failed to load posts');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
@@ -101,8 +131,15 @@ export default function AdminBlogPage() {
         method: 'DELETE',
       });
       if (response.ok) {
-        setPosts(posts.filter(p => p.id !== id));
         setDeletePostId(null);
+        // Refetch so pagination totals and the page contents stay right. If
+        // this was the last row on a later page, step back a page (the page
+        // change triggers the refetch).
+        if (posts.length === 1 && pagination.page > 1) {
+          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+        } else {
+          fetchPosts();
+        }
       } else {
         alert('Failed to delete post');
       }
@@ -184,6 +221,12 @@ export default function AdminBlogPage() {
         </div>
       </div>
 
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {fetchError}
+        </div>
+      )}
+
       {/* Posts Table */}
       {loading ? (
         <div className="bg-white rounded-lg shadow p-8 text-center">
@@ -225,7 +268,8 @@ export default function AdminBlogPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {posts.map((post) => {
-                  const statusBadge = getStatusBadge(post.status);
+                  const status = displayStatus(post);
+                  const statusBadge = getStatusBadge(status);
                   return (
                     <tr key={post.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
@@ -255,7 +299,7 @@ export default function AdminBlogPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}>
-                          {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
@@ -266,7 +310,7 @@ export default function AdminBlogPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {post.status === 'published' && (
+                          {status === 'published' && (
                             <Link
                               href={`/blog/${post.slug}`}
                               target="_blank"

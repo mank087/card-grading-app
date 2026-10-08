@@ -3,6 +3,14 @@ import { verifyAdminSession } from '@/lib/admin/adminAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+// Extension comes from the validated MIME type, never the client filename.
+const EXTENSION_BY_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/avif': 'avif',
+};
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: NextRequest) {
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
-    const extension = file.name.split('.').pop() || 'jpg';
+    const extension = EXTENSION_BY_TYPE[file.type] || 'jpg';
     const fileName = `blog/${timestamp}-${randomString}.${extension}`;
 
     // Convert file to buffer
@@ -55,7 +63,7 @@ export async function POST(request: NextRequest) {
       .from('blog-images')
       .upload(fileName, buffer, {
         contentType: file.type,
-        cacheControl: '3600',
+        cacheControl: '31536000', // timestamped filenames are immutable
         upsert: false,
       });
 
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
           .from('blog-images')
           .upload(fileName, buffer, {
             contentType: file.type,
-            cacheControl: '3600',
+            cacheControl: '31536000', // timestamped filenames are immutable
             upsert: false,
           });
 

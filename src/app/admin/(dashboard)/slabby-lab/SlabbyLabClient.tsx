@@ -391,6 +391,9 @@ export default function SlabbyLabClient() {
   useEffect(() => { void refreshDrafts() }, [refreshDrafts])
 
   const saveDraft = useCallback(async () => {
+    // Same slug rule as the drafts API, so we can spot an overwrite.
+    const draftName = String(scene.name || 'draft').replace(/[^a-z0-9-_]/gi, '-').toLowerCase().slice(0, 80)
+    if (drafts.some((d) => d.name === draftName) && !confirm(`Overwrite the existing draft "${draftName}"?`)) return
     setDraftBusy('save')
     setDraftError(null)
     try {
@@ -413,7 +416,7 @@ export default function SlabbyLabClient() {
     } finally {
       setDraftBusy(null)
     }
-  }, [scene, refreshDrafts])
+  }, [scene, drafts, refreshDrafts])
 
   const loadDraft = useCallback(async (name: string) => {
     setDraftBusy(`load-${name}`)

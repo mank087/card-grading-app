@@ -38,6 +38,29 @@ async function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+/**
+ * Downscale to at most `maxEdge` px on the long edge and re-encode as JPEG.
+ * Four full-size phone photos as base64 JSON blow past Vercel's 4.5MB request
+ * body limit; ~2000px keeps detail for grading at a fraction of the size.
+ */
+async function fileToDownscaledDataUrl(file: File, maxEdge = 2000, quality = 0.88): Promise<string> {
+  const src = await fileToDataUrl(file)
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = () => reject(new Error('could not decode image'))
+    i.src = src
+  })
+  const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas unavailable')
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
 function CollectionTab() {
   const [comics, setComics] = useState<any[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -94,8 +117,12 @@ export default function ComicLabPage() {
     if (!file) return
     if (file.size > 12 * 1024 * 1024) { setError(`${slot}: file over 12MB`); return }
     setError(null)
-    const dataUrl = await fileToDataUrl(file)
-    setImages(prev => ({ ...prev, [slot]: dataUrl }))
+    try {
+      const dataUrl = await fileToDownscaledDataUrl(file)
+      setImages(prev => ({ ...prev, [slot]: dataUrl }))
+    } catch (e: any) {
+      setError(`${slot}: ${e.message}`)
+    }
   }
 
   const grade = async () => {
@@ -107,6 +134,14 @@ export default function ComicLabPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ era, front: images.front, back: images.back, spine: images.spine, pageEdge: images.pageEdge }),
       })
+      // Platform errors (413 body too large, 504 timeout) come back as
+      // text/HTML, not JSON — don't let res.json() mask them.
+      const isJson = (res.headers.get('content-type') || '').includes('application/json')
+      if (!isJson) {
+        if (res.status === 413) throw new Error('Upload too large — try fewer or smaller photos.')
+        if (res.status === 504) throw new Error('Grading timed out — try again.')
+        throw new Error(`Grading failed (HTTP ${res.status})`)
+      }
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
       setResult(data)

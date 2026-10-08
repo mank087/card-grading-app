@@ -17,10 +17,16 @@ export async function GET(request: NextRequest) {
     .limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Signed thumbnail URLs (1h)
-  const comics = await Promise.all((data ?? []).map(async (c) => {
-    const { data: signed } = await supabaseAdmin.storage.from('cards').createSignedUrl(c.front_path, 3600);
-    return { ...c, front_url: signed?.signedUrl ?? null };
-  }));
+  // Signed thumbnail URLs (1h), all in one storage call.
+  const rows = data ?? [];
+  const paths = rows.map((c) => c.front_path).filter((p): p is string => !!p);
+  const urlByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: signed } = await supabaseAdmin.storage.from('cards').createSignedUrls(paths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl);
+    }
+  }
+  const comics = rows.map((c) => ({ ...c, front_url: (c.front_path && urlByPath.get(c.front_path)) || null }));
   return NextResponse.json({ comics });
 }

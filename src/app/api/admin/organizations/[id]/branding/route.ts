@@ -4,7 +4,7 @@
  * application wizard.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
 import { processAndStoreOrgLogo } from '@/lib/orgLogo'
@@ -43,5 +43,8 @@ export async function POST(
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: result.status })
   }
+  await logAdminActivity(admin.id, admin.email, 'upload_organization_logo', 'organization', params.id, {
+    file_name: file.name, file_size: file.size, file_type: file.type,
+  }, clientIp(request))
   return NextResponse.json({ success: true, previews: result.previews })
 }

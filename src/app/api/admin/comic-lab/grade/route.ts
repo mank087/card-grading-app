@@ -1,7 +1,9 @@
 /**
  * COMIC LAB grading endpoint — ADMIN ONLY, testing sandbox.
- * Not referenced by any user-facing surface; results are returned to the
- * caller and not persisted (the lab UI keeps its own local history).
+ * Not referenced by any user-facing surface. Successful grades are returned
+ * to the caller AND persisted to the lab collection (comics_lab table +
+ * images under comic-lab/ in the cards bucket); the lab UI also keeps a
+ * local history.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/admin/adminAuth';
@@ -22,6 +24,16 @@ function decodeImage(dataUrl: unknown, name: string): Buffer | null {
   const buf = Buffer.from(m[1], 'base64');
   if (buf.length > MAX_IMAGE_BYTES) throw new Error(`${name} exceeds ${MAX_IMAGE_BYTES / 1024 / 1024}MB`);
   return buf;
+}
+
+/** Storage content type + extension from the image's magic bytes. The lab UI
+ *  downscales to JPEG, but the API also accepts PNG/WebP data URLs. */
+function imageTypeOf(buf: Buffer): { contentType: string; ext: string } {
+  if (buf.length >= 8 && buf.readUInt32BE(0) === 0x89504e47) return { contentType: 'image/png', ext: 'png' };
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+    return { contentType: 'image/webp', ext: 'webp' };
+  }
+  return { contentType: 'image/jpeg', ext: 'jpg' };
 }
 
 export async function POST(request: NextRequest) {
@@ -63,8 +75,9 @@ export async function POST(request: NextRequest) {
         const id = randomUUID();
         const upload = async (buf: Buffer | null | undefined, name: string): Promise<string | null> => {
           if (!buf) return null;
-          const p = `comic-lab/${id}/${name}.jpg`;
-          const { error } = await supabaseAdmin.storage.from('cards').upload(p, buf, { contentType: 'image/jpeg', upsert: true });
+          const { contentType, ext } = imageTypeOf(buf);
+          const p = `comic-lab/${id}/${name}.${ext}`;
+          const { error } = await supabaseAdmin.storage.from('cards').upload(p, buf, { contentType, upsert: true });
           if (error) throw new Error(`upload ${name}: ${error.message}`);
           return p;
         };

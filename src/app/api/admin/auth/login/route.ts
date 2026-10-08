@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, isAdminLoginRateLimited, recordFailedAdminLogin } from '@/lib/admin/adminAuth'
+import { authenticateAdmin, cleanupExpiredSessions, isAdminLoginRateLimited, recordFailedAdminLogin } from '@/lib/admin/adminAuth'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    // Opportunistically purge expired admin_sessions rows (they otherwise
+    // accumulate forever). Runs only after a successful login, never per
+    // request; cleanupExpiredSessions swallows its own errors.
+    await cleanupExpiredSessions()
 
     // Set session token in HTTP-only cookie
     const response = NextResponse.json(

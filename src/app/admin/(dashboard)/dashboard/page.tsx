@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates'
 
 interface DashboardStats {
   totalUsers: number
@@ -18,7 +19,7 @@ interface DashboardStats {
     conversational_decimal_grade: number | null
     conversational_condition_label: string | null
     conversational_card_info: any
-    ai_grading: any
+    ai_grading?: any
     featured: string | null
     card_set: string | null
     release_date: string | null
@@ -291,21 +292,9 @@ export default function AdminDashboardPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stats.recentActivity.map((card) => {
-                  // Get category route for link
-                  const categoryRoutes: Record<string, string> = {
-                    'Football': '/sports',
-                    'Baseball': '/sports',
-                    'Basketball': '/sports',
-                    'Hockey': '/sports',
-                    'Soccer': '/sports',
-                    'Wrestling': '/sports',
-                    'Sports': '/sports',
-                    'Pokemon': '/pokemon',
-                    'MTG': '/mtg',
-                    'Lorcana': '/lorcana',
-                    'Other': '/other'
-                  }
-                  const route = categoryRoutes[card.category || ''] || '/other'
+                  // Get category route for link (same mapping as sitemap; Star Wars cards live under /other)
+                  const slug = categoryToRouteSlug(card.category)
+                  const route = `/${slug === 'starwars' ? 'other' : slug}`
 
                   return (
                     <tr key={card.id} className="hover:bg-gray-50 transition-colors">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   pickContrastTextHex,
   sampleGradientContrast,
@@ -27,7 +27,7 @@ import {
   resolveGradeChip,
   type CardColorInput,
 } from '@/lib/labelPresets'
-import { BAND_PATTERNS, LOGO_TREATMENTS, LOGO_COLORS, type BandPattern, type LogoTreatment, type LogoColor } from '@/lib/labelLab/heritageSlabPdfDoc'
+import { BAND_PATTERNS, LOGO_TREATMENTS, LOGO_COLORS, type BandPattern, type LogoTreatment, type LogoColor } from '@/lib/labelLab/heritageSlabOptions'
 
 // ============================================================================
 // Types
@@ -133,6 +133,9 @@ export default function LabelLabClient() {
   const [vectorPdfError, setVectorPdfError] = useState<string | null>(null)
   const [vectorBuilding, setVectorBuilding] = useState(false)
 
+  // Recent cards from the mount load, restored when the search is cleared.
+  const recentCardsRef = useRef<LabCard[]>([])
+
   // --- Load recent cards on mount ---
   useEffect(() => {
     let cancelled = false
@@ -142,6 +145,7 @@ export default function LabelLabClient() {
       .then(d => {
         if (cancelled) return
         const list = (d.cards || []) as LabCard[]
+        recentCardsRef.current = list
         setCards(list)
         if (list[0]) setSelectedCard(list[0])
       })
@@ -168,7 +172,12 @@ export default function LabelLabClient() {
 
   // --- Search debounce ---
   useEffect(() => {
-    if (search.trim().length === 0) return
+    if (search.trim().length === 0) {
+      // Cleared: drop any pending search and show the recent cards again.
+      setSearching(false)
+      setCards(recentCardsRef.current)
+      return
+    }
     let cancelled = false
     setSearching(true)
     const t = setTimeout(() => {
@@ -293,12 +302,15 @@ export default function LabelLabClient() {
     if (!liveFormat) {
       // Stub format selected — clear the PDF panel
       setVectorPdfBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+      setVectorBuilding(false)
       return
     }
     let cancelled = false
     setVectorBuilding(true)
     setVectorPdfError(null)
-    ;(async () => {
+    // Debounced: colour pickers / sliders fire many changes per second and
+    // each rebuild is a full react-pdf render.
+    const debounce = setTimeout(() => void (async () => {
       try {
         const { pdf } = await import('@react-pdf/renderer')
         let doc: any
@@ -409,8 +421,8 @@ export default function LabelLabClient() {
       } finally {
         if (!cancelled) setVectorBuilding(false)
       }
-    })()
-    return () => { cancelled = true }
+    })(), 250)
+    return () => { cancelled = true; clearTimeout(debounce) }
   }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode, heritagePattern, heritageBandColors, heritagePaletteSource, heritageLogo, heritageHardened, heritageLogoColor, blackLogoDataUrl, heritageFounder, heritageCardLover, heritageVip])
 
   // --- Download vector PDF ---

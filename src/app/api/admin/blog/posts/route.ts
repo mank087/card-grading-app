@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sanitizeFaq } from '@/lib/seo/blogSchema';
 import { verifyAdminSession, logAdminActivity } from '@/lib/admin/adminAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { BlogPost, BlogPostFormData } from '@/types/blog';
+import { BlogPostFormData } from '@/types/blog';
 
 // GET - List all blog posts (including drafts)
 export async function GET(request: NextRequest) {
@@ -38,19 +38,31 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('blog_posts')
-      .select(`
-        *,
-        category:blog_categories(*)
-      `, { count: 'exact' })
+      // Only the columns the admin table renders.
+      .select(
+        'id,title,slug,status,published_at,view_count,updated_at,category:blog_categories(name,color)',
+        { count: 'exact' }
+      )
       .order(sortColumn, { ascending, nullsFirst: false });
     if (sortColumn !== 'updated_at') query = query.order('updated_at', { ascending: false });
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      const nowIso = new Date().toISOString();
+      if (status === 'scheduled') {
+        // Scheduled posts are stored as status 'published' with a future
+        // published_at (legacy rows may still carry status 'scheduled').
+        query = query.or(`status.eq.scheduled,and(status.eq.published,published_at.gt.${nowIso})`);
+      } else if (status === 'published') {
+        query = query.eq('status', 'published').or(`published_at.is.null,published_at.lte.${nowIso}`);
+      } else {
+        query = query.eq('status', status);
+      }
     }
 
-    if (search) {
-      query = query.or(`title.ilike.%${search}%,excerpt.ilike.%${search}%`);
+    // Strip characters that would break PostgREST's or() filter syntax.
+    const q = (search || '').trim().replace(/[%,()]/g, '');
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,excerpt.ilike.%${q}%`);
     }
 
     query = query.range(offset, offset + limit - 1);
@@ -63,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      posts: posts as BlogPost[],
+      posts,
       pagination: {
         page,
         limit,
@@ -100,6 +112,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // "Scheduled" is stored as published with a future published_at: the
+    // public queries (status='published' AND published_at<=now) then pick the
+    // post up on its date with no job needed to flip the status.
+    let status = body.status || 'draft';
+    if (status === 'scheduled') {
+      const at = body.published_at ? new Date(body.published_at).getTime() : NaN;
+      if (isNaN(at) || at <= Date.now()) {
+        return NextResponse.json(
+          { error: 'Scheduled posts need a publish date in the future' },
+          { status: 400 }
+        );
+      }
+      status = 'published';
+    }
+
     // Check for duplicate slug
     const { data: existingPost } = await supabaseAdmin
       .from('blog_posts')
@@ -129,8 +156,8 @@ export async function POST(request: NextRequest) {
       meta_description: body.meta_description || null,
       quick_answer: typeof body.quick_answer === 'string' && body.quick_answer.trim() ? body.quick_answer.trim().slice(0, 600) : null,
       faq: sanitizeFaq(body.faq),
-      status: body.status || 'draft',
-      published_at: body.status === 'published' ? (body.published_at || new Date().toISOString()) : body.published_at || null,
+      status,
+      published_at: status === 'published' ? (body.published_at || new Date().toISOString()) : body.published_at || null,
       author_name: body.author_name || 'Douglas Mankiewicz',
       created_by: admin.id,
       updated_by: admin.id,

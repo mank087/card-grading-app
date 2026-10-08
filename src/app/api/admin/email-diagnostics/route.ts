@@ -25,21 +25,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get email schedule stats
-    const { data: scheduleStats, error: scheduleError } = await supabase
+    // Get email schedule stats with exact head counts (a plain select is
+    // capped at 1000 rows, which under-reported the totals).
+    const KNOWN_STATUSES = ['pending', 'sent', 'cancelled', 'failed', 'skipped'];
+    const scheduleHead = () => supabase
       .from('email_schedule')
-      .select('status, email_type')
+      .select('id', { count: 'exact', head: true })
       .eq('email_type', 'follow_up_24h');
+    const [totalResult, ...statusResults] = await Promise.all([
+      scheduleHead(),
+      ...KNOWN_STATUSES.map(status => scheduleHead().eq('status', status)),
+    ]);
 
+    const scheduleError = totalResult.error || statusResults.find(r => r.error)?.error;
     if (scheduleError) {
       return NextResponse.json({ error: 'Failed to fetch email schedule', details: scheduleError }, { status: 500 });
     }
 
     // Count by status
+    const scheduleTotal = totalResult.count || 0;
     const statusCounts: Record<string, number> = {};
-    scheduleStats?.forEach(email => {
-      statusCounts[email.status] = (statusCounts[email.status] || 0) + 1;
+    KNOWN_STATUSES.forEach((status, i) => {
+      const c = statusResults[i].count || 0;
+      if (c > 0) statusCounts[status] = c;
     });
+    const otherCount = scheduleTotal - Object.values(statusCounts).reduce((a, b) => a + b, 0);
+    if (otherCount > 0) statusCounts.other = otherCount;
 
     // Get sample of sent emails with their resend IDs
     const { data: sentEmails, error: sentError } = await supabase
@@ -77,8 +88,8 @@ export async function GET(request: NextRequest) {
 
     // Check environment
     const envCheck = {
+      // Never return any part of the key itself.
       hasResendKey: !!process.env.RESEND_API_KEY,
-      resendKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 10) + '...',
       hasCronSecret: !!process.env.CRON_SECRET,
       baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
       nodeEnv: process.env.NODE_ENV,
@@ -88,7 +99,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       environment: envCheck,
       emailSchedule: {
-        total: scheduleStats?.length || 0,
+        total: scheduleTotal,
         byStatus: statusCounts,
       },
       recentSentEmails: sentEmails?.map(e => ({

@@ -243,13 +243,16 @@ async function generateSinglePreview(): Promise<string> {
 export default function PromoLabelsPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handlePreview = async () => {
     setIsGenerating(true)
+    setError(null)
     try {
       setPreviewUrl(await generateSinglePreview())
     } catch (err) {
       console.error('Preview failed:', err)
+      setError(`Preview failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsGenerating(false)
     }
@@ -257,6 +260,7 @@ export default function PromoLabelsPage() {
 
   const handleDownload = async () => {
     setIsGenerating(true)
+    setError(null)
     try {
       const blob = await generatePromoSheet()
       const url = URL.createObjectURL(blob)
@@ -269,6 +273,7 @@ export default function PromoLabelsPage() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Download failed:', err)
+      setError(`Download failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsGenerating(false)
     }
@@ -299,6 +304,11 @@ export default function PromoLabelsPage() {
             {isGenerating ? 'Generating...' : 'Download Full Sheet (80 labels)'}
           </button>
         </div>
+        {error && (
+          <div className="mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+            {error}
+          </div>
+        )}
       </div>
 
       {previewUrl && (

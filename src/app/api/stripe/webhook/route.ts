@@ -91,6 +91,102 @@ async function checkSessionProcessed(sessionId: string): Promise<{ hasBeenProces
   return { hasBeenProcessed: data && data.length > 0 };
 }
 
+/**
+ * What the customer actually paid, for revenue reporting. The admin revenue
+ * RPCs (get_revenue_analytics / get_costs_summary / get_conversion_analytics)
+ * read credit_transactions.metadata->>'amount_paid_usd' when present and only
+ * fall back to the list price parsed from the description when it is missing,
+ * so promo codes and discounts stop being reported at full list price.
+ */
+interface PaidAmounts {
+  amount_paid_usd: number;
+  amount_subtotal_usd?: number | null;
+  discount_usd?: number | null;
+  paid_currency?: string | null;
+  stripe_invoice_id?: string | null;
+}
+
+function sessionPaidAmounts(session: Stripe.Checkout.Session): PaidAmounts {
+  return {
+    amount_paid_usd: (session.amount_total ?? 0) / 100,
+    amount_subtotal_usd: typeof session.amount_subtotal === 'number' ? session.amount_subtotal / 100 : null,
+    discount_usd: typeof session.total_details?.amount_discount === 'number'
+      ? session.total_details.amount_discount / 100
+      : null,
+    paid_currency: session.currency ?? null,
+  };
+}
+
+function invoicePaidAmounts(invoice: Stripe.Invoice): PaidAmounts {
+  return {
+    amount_paid_usd: (invoice.amount_paid ?? 0) / 100,
+    amount_subtotal_usd: typeof invoice.subtotal === 'number' ? invoice.subtotal / 100 : null,
+    paid_currency: invoice.currency ?? null,
+    stripe_invoice_id: invoice.id ?? null,
+  };
+}
+
+type PaidRowMatch =
+  | { sessionId: string }
+  | { orgId: string; orgDedupeKey: string }
+  | { cardLoversRenewalUserId: string };
+
+/**
+ * Merge the paid amount into the purchase row(s) the grant just wrote.
+ * Purely additive and best-effort: it runs AFTER the credit grant succeeded,
+ * only adds keys to metadata (existing keys such as org_dedupe_key /
+ * org_grant_completed are preserved), skips rows already stamped, and never
+ * throws — a failure here can never affect credit granting or the webhook
+ * response.
+ */
+async function stampAmountPaid(match: PaidRowMatch, amounts: PaidAmounts): Promise<void> {
+  try {
+    const supabase = getServiceClient();
+    let query = supabase
+      .from('credit_transactions')
+      .select('id, metadata')
+      .eq('type', 'purchase');
+    if ('sessionId' in match) {
+      query = query.eq('stripe_session_id', match.sessionId).limit(5);
+    } else if ('orgId' in match) {
+      query = query.eq('org_id', match.orgId).eq('metadata->>org_dedupe_key', match.orgDedupeKey).limit(5);
+    } else {
+      // Card Lovers renewal rows carry no session/invoice id: take the newest
+      // unstamped card_lovers row this user got in the last 15 minutes.
+      query = query
+        .eq('user_id', match.cardLoversRenewalUserId)
+        .eq('metadata->>subscription', 'card_lovers')
+        .is('stripe_session_id', null)
+        .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Webhook] stampAmountPaid lookup failed (non-fatal):', error.message);
+      return;
+    }
+    for (const row of data || []) {
+      const meta = (row.metadata && typeof row.metadata === 'object' ? row.metadata : {}) as Record<string, unknown>;
+      if (meta.amount_paid_usd !== undefined && meta.amount_paid_usd !== null) continue;
+      const extra: Record<string, unknown> = { amount_paid_usd: amounts.amount_paid_usd };
+      if (amounts.amount_subtotal_usd != null) extra.amount_subtotal_usd = amounts.amount_subtotal_usd;
+      if (amounts.discount_usd != null) extra.discount_usd = amounts.discount_usd;
+      if (amounts.paid_currency) extra.paid_currency = amounts.paid_currency;
+      if (amounts.stripe_invoice_id) extra.stripe_invoice_id = amounts.stripe_invoice_id;
+      const { error: updError } = await supabase
+        .from('credit_transactions')
+        .update({ metadata: { ...meta, ...extra } })
+        .eq('id', row.id);
+      if (updError) {
+        console.warn('[Webhook] stampAmountPaid update failed (non-fatal):', updError.message);
+      }
+    }
+  } catch (err) {
+    console.warn('[Webhook] stampAmountPaid error (non-fatal):', err instanceof Error ? err.message : err);
+  }
+}
+
 // Disable body parsing - we need raw body for signature verification
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -279,6 +375,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
     if (founderResult.success) {
       console.log('Founder status set successfully:', { userId });
+      await stampAmountPaid({ sessionId: session.id }, sessionPaidAmounts(session));
     } else {
       console.error('Failed to set founder status:', { userId, error: founderResult.error });
     }
@@ -314,6 +411,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
     if (vipResult.success) {
       console.log('VIP status set successfully:', { userId });
+      await stampAmountPaid({ sessionId: session.id }, sessionPaidAmounts(session));
     } else {
       console.error('Failed to set VIP status:', { userId, error: vipResult.error });
     }
@@ -371,6 +469,8 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     console.error('Failed to add credits:', { userId, result });
     throw new Error('Credit grant failed for session ' + session.id);
   }
+
+  await stampAmountPaid({ sessionId: session.id }, sessionPaidAmounts(session));
 
   // Affiliate attribution for one-time purchases
   await processAffiliateAttribution(session, userId);
@@ -474,6 +574,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
       userId,
       creditsAdded: result.creditsAdded,
     });
+    await stampAmountPaid({ sessionId: session.id }, sessionPaidAmounts(session));
   } else {
     console.error('Failed to activate Card Lovers subscription:', result.error);
     throw new Error('Card Lovers activation failed for session ' + session.id + ': ' + (result.error ?? 'unknown'));
@@ -626,6 +727,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         creditsAdded: result.creditsAdded,
         bonusCredits: result.bonusCredits,
       });
+      await stampAmountPaid({ cardLoversRenewalUserId: userId }, invoicePaidAmounts(invoice));
       // Clear past-due flag set by handleInvoicePaymentFailed (if any).
       // Non-fatal if the column doesn't exist yet.
       try {
@@ -1177,6 +1279,7 @@ async function handleOrgSubscriptionCheckout(session: Stripe.Checkout.Session) {
     // 500 so Stripe redelivers — the paid first cycle must not be dropped.
     throw new Error(`[handleOrgSubscriptionCheckout] Initial fill failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
   }
+  await stampAmountPaid({ orgId, orgDedupeKey: session.id }, sessionPaidAmounts(session));
 
   // Activation email to the owner: what they have, how billing recurs, and
   // where to manage it. Fire-and-forget; skipped on webhook replays (the
@@ -1356,6 +1459,7 @@ async function handleOrgInvoicePaid(invoice: Stripe.Invoice, subscription: Strip
     // paid cycle must not be silently dropped.
     throw new Error(`[handleOrgInvoicePaid] Monthly reset failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
   }
+  await stampAmountPaid({ orgId, orgDedupeKey: invoice.id }, invoicePaidAmounts(invoice));
 }
 
 /**
@@ -1391,6 +1495,7 @@ async function handleOrgTopup(session: Stripe.Checkout.Session) {
     // 500 so Stripe redelivers — the paid pack must not be dropped.
     throw new Error(`[handleOrgTopup] Top-up deposit failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
   }
+  await stampAmountPaid({ orgId, orgDedupeKey: session.id }, sessionPaidAmounts(session));
   if (!deposit.alreadyProcessed) {
     await reportGa4Purchase(session, [
       { item_id: 'org_topup', item_name: `Enterprise overage pack (${grades} grades)`, price: (session.amount_total || 0) / 100, quantity: 1 },

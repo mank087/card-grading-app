@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator'
+import { CARD_FOR_LABEL_COLUMNS, generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator'
 
 /**
  * Backfill label_data for existing cards
@@ -35,36 +35,7 @@ export async function POST(request: NextRequest) {
     // Build query to fetch cards
     let query = supabaseAdmin
       .from('cards')
-      .select(`
-        id,
-        category,
-        serial,
-        conversational_decimal_grade,
-        conversational_whole_grade,
-        conversational_condition_label,
-        conversational_card_info,
-        dvg_decimal_grade,
-        card_name,
-        card_set,
-        card_number,
-        featured,
-        pokemon_featured,
-        release_date,
-        serial_numbering,
-        rarity_tier,
-        rarity_description,
-        autographed,
-        autograph_type,
-        memorabilia_type,
-        rookie_card,
-        first_print_rookie,
-        holofoil,
-        is_foil,
-        foil_type,
-        is_double_faced,
-        mtg_rarity,
-        label_data
-      `)
+      .select(`${CARD_FOR_LABEL_COLUMNS}, label_data`)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -81,7 +52,8 @@ export async function POST(request: NextRequest) {
     // Only process graded cards
     query = query.not('conversational_decimal_grade', 'is', null)
 
-    const { data: cards, error: fetchError } = await query
+    const { data, error: fetchError } = await query
+    const cards = data as unknown as CardForLabel[] | null
 
     if (fetchError) {
       throw fetchError

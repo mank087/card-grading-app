@@ -337,6 +337,23 @@ export interface CardForLabel {
   conversational_card_info?: ConversationalCardInfo | null;
 }
 
+/**
+ * Every `cards` column CardForLabel declares, as a PostgREST select list. Routes
+ * that rebuild label_data from a narrow select must use this — a missing column
+ * reads as null and silently changes the label (org serial, sub-category,
+ * Pokemon printed total, DVG whole grade, autograph designation).
+ */
+export const CARD_FOR_LABEL_COLUMNS = [
+  'id', 'category', 'sub_category', 'serial', 'org_serial_display',
+  'conversational_decimal_grade', 'conversational_whole_grade', 'conversational_condition_label',
+  'conversational_final_grade_summary', 'dvg_decimal_grade', 'dvg_whole_grade',
+  'card_name', 'card_set', 'card_number', 'featured', 'pokemon_featured', 'release_date',
+  'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed', 'autograph_type',
+  'memorabilia_type', 'rookie_card', 'first_print_rookie', 'holofoil',
+  'is_foil', 'foil_type', 'is_double_faced', 'mtg_rarity',
+  'pokemon_api_data', 'conversational_card_info',
+].join(', ')
+
 // ============================================================================
 // HELPERS
 // ============================================================================

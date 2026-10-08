@@ -25,10 +25,21 @@ export async function GET(request: NextRequest) {
       return response
     }
 
-    return NextResponse.json(
+    // verifyAdminSession slides the DB session forward; re-issue the cookie
+    // with a fresh maxAge so it doesn't expire 1h after login while the
+    // session is still active. Options match the login route.
+    const response = NextResponse.json(
       { authenticated: true, user },
       { status: 200 }
     )
+    response.cookies.set('admin_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 60 * 60, // 1 hour, matches SESSION_DURATION_MS
+      path: '/'
+    })
+    return response
   } catch (error) {
     console.error('Admin verify error:', error)
     return NextResponse.json(

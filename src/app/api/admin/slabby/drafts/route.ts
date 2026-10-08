@@ -72,9 +72,11 @@ export async function POST(request: NextRequest) {
     const name = slug(body?.name)
     if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 })
 
-    // Remove any existing file first so the signed upload never conflicts.
-    await supabaseAdmin.storage.from(BUCKET).remove([`${name}.json`])
-    const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(`${name}.json`)
+    // Upsert-signed URL overwrites in place, so the existing draft survives
+    // until the new upload actually lands (no pre-delete data-loss window).
+    const { data, error } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .createSignedUploadUrl(`${name}.json`, { upsert: true })
     if (error || !data) return NextResponse.json({ error: error?.message || 'Could not sign upload' }, { status: 500 })
     return NextResponse.json({ url: data.signedUrl, name })
   } catch (error: any) {

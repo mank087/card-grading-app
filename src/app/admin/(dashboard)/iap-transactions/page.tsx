@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface Txn {
   id: string
@@ -35,7 +35,8 @@ interface Facets {
 interface ListResponse {
   transactions: Txn[]
   pagination: Pagination
-  facets: Facets
+  facets?: Facets
+  email_match_truncated?: boolean
 }
 
 interface DetailResponse {
@@ -80,6 +81,12 @@ export default function IapTransactionsPage() {
   const [status, setStatus] = useState<string>('all')
   const [productId, setProductId] = useState<string>('')
   const [email, setEmail] = useState<string>('')
+  // Debounced copy of `email` that actually drives the fetch
+  const [emailQuery, setEmailQuery] = useState<string>('')
+  // Facets are loaded once (first fetch), not on every page/filter change
+  const [facets, setFacets] = useState<Facets | null>(null)
+  const facetsRequested = useRef(false)
+  const listSeq = useRef(0)
   const [from, setFrom] = useState<string>('')
   const [to, setTo] = useState<string>('')
   // Default to production so TestFlight + Apple reviewer sandbox rows don't
@@ -91,6 +98,7 @@ export default function IapTransactionsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
+    const seq = ++listSeq.current
     setLoading(true)
     setError(null)
     try {
@@ -101,26 +109,52 @@ export default function IapTransactionsPage() {
       if (platform !== 'all') sp.set('platform', platform)
       if (status !== 'all') sp.set('status', status)
       if (productId) sp.set('product_id', productId)
-      if (email.trim()) sp.set('email', email.trim())
+      if (emailQuery) sp.set('email', emailQuery)
       if (from) sp.set('from', from)
       if (to) sp.set('to', to)
       sp.set('environment', environment)
+      const askFacets = !facetsRequested.current
+      if (askFacets) {
+        sp.set('facets', '1')
+        facetsRequested.current = true
+      }
       const res = await fetch(`/api/admin/iap/transactions?${sp}`)
-      if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`)
-      setData(await res.json())
+      if (!res.ok) {
+        if (askFacets) facetsRequested.current = false
+        throw new Error((await res.json()).error || `HTTP ${res.status}`)
+      }
+      const json: ListResponse = await res.json()
+      if (json.facets) setFacets(json.facets)
+      if (seq !== listSeq.current) return // a newer request superseded this one
+      setData(json)
     } catch (err: any) {
+      if (seq !== listSeq.current) return
       setError(err.message || 'Failed to load')
     } finally {
-      setLoading(false)
+      if (seq === listSeq.current) setLoading(false)
     }
-  }, [page, platform, status, productId, email, from, to, environment])
+  }, [page, platform, status, productId, emailQuery, from, to, environment])
 
   useEffect(() => { fetchList() }, [fetchList])
 
-  // Reset to page 1 whenever filters change
+  // Debounce the email search ~300ms; reset to page 1 in the same batch so
+  // only one fetch fires.
   useEffect(() => {
+    const next = email.trim()
+    if (next === emailQuery) return
+    const t = setTimeout(() => {
+      setEmailQuery(next)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [email, emailQuery])
+
+  // Filter changes reset to page 1 in the same render as the filter update
+  // (instead of a separate effect, which caused a second fetch).
+  const withPageReset = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v)
     setPage(1)
-  }, [platform, status, productId, email, from, to, environment])
+  }
 
   const openDetail = async (id: string) => {
     setDetailLoading(true)
@@ -153,7 +187,7 @@ export default function IapTransactionsPage() {
         <Field label="Environment">
           <select
             value={environment}
-            onChange={(e) => setEnvironment(e.target.value)}
+            onChange={(e) => withPageReset(setEnvironment)(e.target.value)}
             className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
           >
             <option value="production">Production</option>
@@ -164,31 +198,31 @@ export default function IapTransactionsPage() {
         <Field label="Platform">
           <select
             value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
+            onChange={(e) => withPageReset(setPlatform)(e.target.value)}
             className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
           >
             <option value="all">All</option>
-            {data?.facets.platforms.map((p) => <option key={p} value={p}>{p}</option>)}
+            {facets?.platforms.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </Field>
         <Field label="Status">
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => withPageReset(setStatus)(e.target.value)}
             className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
           >
             <option value="all">All</option>
-            {data?.facets.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+            {facets?.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </Field>
         <Field label="Product">
           <select
             value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+            onChange={(e) => withPageReset(setProductId)(e.target.value)}
             className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
           >
             <option value="">All</option>
-            {data?.facets.products.map((p) => (
+            {facets?.products.map((p) => (
               <option key={p.product_id} value={p.product_id}>{p.product_id} ({p.count})</option>
             ))}
           </select>
@@ -202,12 +236,18 @@ export default function IapTransactionsPage() {
           />
         </Field>
         <Field label="From">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+          <input type="date" value={from} onChange={(e) => withPageReset(setFrom)(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
         </Field>
         <Field label="To">
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
+          <input type="date" value={to} onChange={(e) => withPageReset(setTo)(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" />
         </Field>
       </div>
+
+      {data?.email_match_truncated && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          Email search matched more than 100 users; only the first 100 are included. Type more of the address to narrow it.
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

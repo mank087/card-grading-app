@@ -16,12 +16,14 @@
  *   ?from / ?to   ISO date range on created_at
  *   ?id           if provided, returns the single full row including raw_receipt
  *                 (otherwise list response omits raw_receipt to keep payloads small)
+ *   ?facets=1     include filter facets (the page asks once, not on every fetch)
  *
  * Response shape:
  *   {
  *     transactions: Array<{...row, email}>,
  *     pagination: { page, limit, total, total_pages },
- *     facets: { platforms, statuses, products }   // for filter dropdowns
+ *     facets?: { platforms, statuses, products }  // only when ?facets=1
+ *     email_match_truncated?: true                 // email matched > EMAIL_MATCH_CAP users
  *   }
  */
 
@@ -31,6 +33,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 const VALID_PLATFORMS = new Set(['apple', 'google'])
 const VALID_STATUSES = new Set(['active', 'expired', 'refunded', 'revoked', 'pending', 'cancelled'])
+// Cap the user ids pushed into .in() for an email search; a broader match
+// should be narrowed by typing more of the address.
+const EMAIL_MATCH_CAP = 100
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,6 +94,7 @@ export async function GET(request: NextRequest) {
     // Pass ?environment=all to see everything, or ?environment=sandbox to
     // isolate test transactions.
     const environment = sp.get('environment') || 'production'
+    const wantFacets = sp.get('facets') === '1'
 
     // Build base query
     let query = supabaseAdmin
@@ -123,18 +129,22 @@ export async function GET(request: NextRequest) {
     // Email filter: resolve to user_id(s) first, then filter the IAP query.
     // Doing it this way (rather than a join) keeps us within Supabase's
     // PostgREST capabilities without introducing a view.
+    let emailMatchTruncated = false
     if (emailQuery) {
+      // Escape LIKE wildcards so '_' / '%' in the search are literal
+      const escaped = emailQuery.replace(/[\\%_]/g, (ch) => `\\${ch}`)
       const { data: matchingUsers } = await supabaseAdmin
         .from('users')
         .select('id')
-        .ilike('email', `%${emailQuery}%`)
-        .limit(1000)
-      const ids = matchingUsers?.map((u) => u.id) || []
+        .ilike('email', `%${escaped}%`)
+        .limit(EMAIL_MATCH_CAP + 1)
+      const ids = (matchingUsers?.map((u) => u.id) || []).slice(0, EMAIL_MATCH_CAP)
+      emailMatchTruncated = (matchingUsers?.length || 0) > EMAIL_MATCH_CAP
       if (ids.length === 0) {
         return NextResponse.json({
           transactions: [],
           pagination: { page, limit, total: 0, total_pages: 0 },
-          facets: await loadFacets(),
+          ...(wantFacets ? { facets: await loadFacets() } : {}),
         })
       }
       query = query.in('user_id', ids)
@@ -170,7 +180,8 @@ export async function GET(request: NextRequest) {
         total: count || 0,
         total_pages: Math.ceil((count || 0) / limit),
       },
-      facets: await loadFacets(),
+      ...(wantFacets ? { facets: await loadFacets() } : {}),
+      ...(emailMatchTruncated ? { email_match_truncated: true } : {}),
     })
   } catch (err: any) {
     console.error('[admin/iap/transactions] error:', err)
@@ -184,20 +195,29 @@ async function loadFacets(): Promise<{
   products: Array<{ product_id: string; count: number }>
 }> {
   // Distinct values for filter dropdowns. PostgREST doesn't support a real
-  // DISTINCT, but pulling a wide projection and de-duping in JS is fine at
-  // current row counts.
-  const { data } = await supabaseAdmin
-    .from('iap_transactions')
-    .select('platform, status, product_id')
-    .limit(10000)
+  // DISTINCT and caps a select at 1000 rows (the old .limit(10000) was
+  // silently truncated), so page the narrow projection in batches of 1000.
   const platforms = new Set<string>()
   const statuses = new Set<string>()
   const productCounts: Record<string, number> = {}
-  ;(data || []).forEach((r: any) => {
-    if (r.platform) platforms.add(r.platform)
-    if (r.status) statuses.add(r.status)
-    if (r.product_id) productCounts[r.product_id] = (productCounts[r.product_id] || 0) + 1
-  })
+  const BATCH = 1000
+  for (let i = 0; i < 100; i++) {
+    const { data, error } = await supabaseAdmin
+      .from('iap_transactions')
+      .select('platform, status, product_id')
+      .order('id', { ascending: true })
+      .range(i * BATCH, i * BATCH + BATCH - 1)
+    if (error) {
+      console.error('[admin/iap/transactions] facets query error:', error)
+      break
+    }
+    ;(data || []).forEach((r: any) => {
+      if (r.platform) platforms.add(r.platform)
+      if (r.status) statuses.add(r.status)
+      if (r.product_id) productCounts[r.product_id] = (productCounts[r.product_id] || 0) + 1
+    })
+    if (!data || data.length < BATCH) break
+  }
   return {
     platforms: Array.from(platforms).sort(),
     statuses: Array.from(statuses).sort(),

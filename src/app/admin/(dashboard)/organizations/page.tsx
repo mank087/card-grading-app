@@ -510,7 +510,12 @@ export default function OrganizationsAdminPage() {
             <div className="flex items-center gap-2">
               {(['active', 'suspended', 'cancelled'] as const).map(s => (
                 <button key={s}
-                  onClick={() => s !== selected.status && patchOrg({ status: s }, `Status → ${s}`)}
+                  onClick={() => {
+                    if (s === selected.status) return
+                    if ((s === 'suspended' || s === 'cancelled') &&
+                      !window.confirm(`${s === 'suspended' ? 'Suspend' : 'Cancel'} ${selected.name}? This changes the organization's status to "${s}".`)) return
+                    patchOrg({ status: s }, `Status → ${s}`)
+                  }}
                   disabled={busy}
                   className={`px-3 py-1 rounded-full text-xs font-medium border ${selected.status === s
                     ? 'bg-purple-600 text-white border-purple-600'

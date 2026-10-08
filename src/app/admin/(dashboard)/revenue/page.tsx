@@ -197,7 +197,6 @@ export default function AdminRevenuePage() {
               revenue: s.revenue,
               count: s.count,
             }))}
-            total={data.headline.total_revenue}
           />
         </Card>
 
@@ -209,7 +208,6 @@ export default function AdminRevenuePage() {
               revenue: p.revenue,
               count: p.count,
             }))}
-            total={data.headline.total_revenue}
           />
         </Card>
       </div>
@@ -345,11 +343,12 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function BreakdownTable({
   rows,
-  total,
 }: {
   rows: Array<{ label: string; color: string; revenue: number; count: number }>
-  total: number
 }) {
+  // Shares are computed from the displayed rows so they always sum to 100%,
+  // independent of the headline total.
+  const total = rows.reduce((sum, r) => sum + (Number(r.revenue) || 0), 0)
   return (
     <table className="min-w-full text-sm">
       <thead>

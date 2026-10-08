@@ -146,7 +146,7 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/admin/cards/[id]?reason=... — admin SOFT delete.
+ * DELETE /api/admin/cards/[id] (JSON body { reason }) — admin SOFT delete.
  *
  * Same write as the owner path (DELETE /api/cards/[id]): deleted_at + forced
  * private visibility, images kept, restorable. The DB trigger
@@ -173,7 +173,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
-    const reason = request.nextUrl.searchParams.get('reason') || 'No reason provided'
+    // Reason comes in the JSON body; the query param is read for older clients.
+    const body = await request.json().catch(() => null)
+    const bodyReason = typeof body?.reason === 'string' ? body.reason.trim() : ''
+    const reason = bodyReason || request.nextUrl.searchParams.get('reason') || 'No reason provided'
 
     const { data: card, error: fetchError } = await supabase
       .from('cards')

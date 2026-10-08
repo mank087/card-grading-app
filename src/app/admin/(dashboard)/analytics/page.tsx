@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
@@ -137,47 +137,70 @@ export default function AdminAnalyticsPage() {
   const [conversionLoading, setConversionLoading] = useState(false)
 
   // Shared date range — applies to every tab. Default last 30 days.
-  const initial = defaultDateRange()
+  // `from`/`to` drive the inputs; `range` is the debounced value the
+  // fetches use, so editing a date doesn't fire a request per change.
+  const [initial] = useState(defaultDateRange)
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
+  const [range, setRange] = useState(initial)
+
+  useEffect(() => {
+    if (from === range.from && to === range.to) return
+    const t = setTimeout(() => setRange({ from, to }), 400)
+    return () => clearTimeout(t)
+  }, [from, to, range.from, range.to])
+
+  // Request sequence numbers: responses from superseded requests are ignored.
+  const allSeq = useRef(0)
+  const conversionSeq = useRef(0)
 
   const fetchAll = useCallback(async () => {
+    const seq = ++allSeq.current
     setLoading(true)
     try {
-      const qs = new URLSearchParams({ from, to }).toString()
+      const qs = new URLSearchParams({ from: range.from, to: range.to }).toString()
       const [usersRes, gradingRes, cardsRes] = await Promise.all([
         fetch(`/api/admin/analytics/users?${qs}`),
         fetch(`/api/admin/analytics/grading?${qs}`),
         fetch(`/api/admin/analytics/cards?${qs}`),
       ])
-      if (usersRes.ok) setUserAnalytics(await usersRes.json())
-      if (gradingRes.ok) setGradingAnalytics(await gradingRes.json())
-      if (cardsRes.ok) setCardAnalytics(await cardsRes.json())
+      const [usersData, gradingData, cardsData] = await Promise.all([
+        usersRes.ok ? usersRes.json() : null,
+        gradingRes.ok ? gradingRes.json() : null,
+        cardsRes.ok ? cardsRes.json() : null,
+      ])
+      if (seq !== allSeq.current) return
+      if (usersData) setUserAnalytics(usersData)
+      if (gradingData) setGradingAnalytics(gradingData)
+      if (cardsData) setCardAnalytics(cardsData)
     } catch (error) {
       console.error('Error fetching analytics:', error)
     } finally {
-      setLoading(false)
+      if (seq === allSeq.current) setLoading(false)
     }
-  }, [from, to])
+  }, [range])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
   // Conversion is fetched lazily when the tab is opened (or when the date
   // range changes while it's the active tab).
   const fetchConversionAnalytics = useCallback(async () => {
+    const seq = ++conversionSeq.current
     setConversionLoading(true)
     try {
       const params = new URLSearchParams()
-      params.append('startDate', from)
-      params.append('endDate', to)
+      params.append('startDate', range.from)
+      params.append('endDate', range.to)
       const res = await fetch(`/api/admin/analytics/conversion?${params.toString()}`)
-      if (res.ok) setConversionAnalytics(await res.json())
+      const data = res.ok ? await res.json() : null
+      if (seq !== conversionSeq.current) return
+      if (data) setConversionAnalytics(data)
     } catch (error) {
       console.error('Error fetching conversion analytics:', error)
     } finally {
-      setConversionLoading(false)
+      if (seq === conversionSeq.current) setConversionLoading(false)
     }
-  }, [from, to])
+  }, [range])
 
   useEffect(() => {
     if (activeTab === 'conversion') {
@@ -185,13 +208,8 @@ export default function AdminAnalyticsPage() {
     }
   }, [activeTab, fetchConversionAnalytics])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  // Header + date inputs stay mounted; loading is shown locally.
+  const hasData = !!(userAnalytics || gradingAnalytics || cardAnalytics)
 
   return (
     <div className="space-y-6">
@@ -204,6 +222,12 @@ export default function AdminAnalyticsPage() {
           </p>
         </div>
         <div className="flex items-end gap-2">
+          {(loading || conversionLoading) && (
+            <div className="flex items-center gap-2 pb-2 text-xs text-gray-500" aria-live="polite">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              Updating
+            </div>
+          )}
           <div>
             <label className="block text-xs text-gray-500 mb-1">From</label>
             <input
@@ -251,6 +275,13 @@ export default function AdminAnalyticsPage() {
         </nav>
       </div>
 
+      {loading && !hasData && activeTab !== 'conversion' && (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+
+      <div className={loading && hasData ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
       {/* User Analytics Tab */}
       {activeTab === 'users' && userAnalytics && (
         <div className="space-y-6">
@@ -402,20 +433,20 @@ export default function AdminAnalyticsPage() {
           {/* Overview Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Total Graded</p>
+              <p className="text-sm text-gray-600">Total Graded <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{gradingAnalytics.overview.total_graded.toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Average Grade</p>
+              <p className="text-sm text-gray-600">Average Grade <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-blue-600 mt-2">{gradingAnalytics.overview.average_grade}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Perfect 10s</p>
+              <p className="text-sm text-gray-600">Perfect 10s <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-yellow-600 mt-2">{gradingAnalytics.overview.perfect_tens}</p>
               <p className="text-sm text-gray-500 mt-1">{gradingAnalytics.overview.perfect_ten_rate}%</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">High Grades (9+)</p>
+              <p className="text-sm text-gray-600">High Grades (9+) <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-green-600 mt-2">{gradingAnalytics.overview.high_grades_9_plus}</p>
               <p className="text-sm text-gray-500 mt-1">{gradingAnalytics.overview.high_grade_rate}%</p>
             </div>
@@ -528,19 +559,19 @@ export default function AdminAnalyticsPage() {
           {/* Overview Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Total Cards</p>
+              <p className="text-sm text-gray-600">Total Cards <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{cardAnalytics.overview.total_cards.toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Public Cards</p>
+              <p className="text-sm text-gray-600">Public Cards <span className="text-xs text-gray-400">(All-time)</span></p>
               <p className="text-3xl font-bold text-blue-600 mt-2">{cardAnalytics.overview.public_cards.toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Last 7 Days</p>
+              <p className="text-sm text-gray-600">Last 7 Days <span className="text-xs text-gray-400">(fixed window)</span></p>
               <p className="text-3xl font-bold text-green-600 mt-2">{cardAnalytics.overview.cards_last_7_days}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Last 30 Days</p>
+              <p className="text-sm text-gray-600">Last 30 Days <span className="text-xs text-gray-400">(fixed window)</span></p>
               <p className="text-3xl font-bold text-purple-600 mt-2">{cardAnalytics.overview.cards_last_30_days}</p>
             </div>
           </div>
@@ -638,10 +669,12 @@ export default function AdminAnalyticsPage() {
         </div>
       )}
 
+      </div>
+
       {/* Conversion Analytics Tab */}
       {activeTab === 'conversion' && (
         <div className="space-y-6">
-          {conversionLoading ? (
+          {conversionLoading && !conversionAnalytics ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
             </div>
@@ -826,7 +859,7 @@ export default function AdminAnalyticsPage() {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Conversion Trends (Last 12 Weeks)</h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={conversionAnalytics.weekly_trends}>
+                  <ComposedChart data={conversionAnalytics.weekly_trends}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                     <YAxis yAxisId="left" />
@@ -836,7 +869,7 @@ export default function AdminAnalyticsPage() {
                     <Bar yAxisId="left" dataKey="signups" fill="#3b82f6" name="Signups" />
                     <Bar yAxisId="left" dataKey="conversions" fill="#10b981" name="Conversions" />
                     <Line yAxisId="right" type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} name="Conversion Rate %" />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
 

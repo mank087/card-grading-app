@@ -36,6 +36,11 @@ import { heritageTheme, heritageGeometry, fitHeritageFront, heritageMarkBox, her
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
 export type { BandPattern }
+// Logo options live in a react-pdf-free module so client UIs can import them
+// without pulling @react-pdf/renderer into their bundle.
+import { LOGO_COLORS, LOGO_TREATMENTS, type LogoColor, type LogoTreatment } from './heritageSlabOptions'
+export { LOGO_COLORS, LOGO_TREATMENTS }
+export type { LogoColor, LogoTreatment }
 
 /**
  * CJK support. The base-14 PDF fonts carry no CJK glyphs at all — a Japanese
@@ -139,30 +144,6 @@ export interface HeritageInputs {
 export function heritageChip(i: HeritageInputs): GradeChip {
   return resolveGradeChip(i.grade, !!i.printHardened, i.design?.chip.theme ?? 'black')
 }
-
-/**
- * How the DCM mark is presented at the bottom edge.
- *
- * On the ivory field a bare navy mark at 200x78 mockup-px is honest but quiet —
- * at 2.8" it reads as a smudge from arm's length, which defeats the point of
- * moving it to the bottom centre in the first place. Each treatment below buys
- * presence a different way, and they cost different amounts of ink.
- */
-export type LogoColor = 'black' | 'color' | 'white'
-
-export const LOGO_COLORS: { id: LogoColor; name: string }[] = [
-  { id: 'black', name: 'Black' },
-  { id: 'color', name: 'Colour' },
-  { id: 'white', name: 'White' },
-]
-
-export type LogoTreatment = 'plate' | 'rules' | 'plain'
-
-export const LOGO_TREATMENTS: { id: LogoTreatment; name: string; note: string }[] = [
-  { id: 'plate', name: 'Purple plate', note: 'White mark knocked out of a brand-purple rounded plate.' },
-  { id: 'rules', name: 'Colour mark + rules', note: 'The navy mark with a short horizontal rule either side. Almost no extra ink, and it anchors the mark without committing the design to a shape.' },
-  { id: 'plain', name: 'Plain (reference)', note: 'Bare navy mark on ivory, kept only for comparison.' },
-]
 
 // ---------------------------------------------------------------------------
 // Band patterns. Geometry mirrors the approved Round 3 mockups, which in turn

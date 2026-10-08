@@ -64,26 +64,41 @@ export async function GET(request: NextRequest) {
       user_email: log.user_id ? userMap[log.user_id] : null
     }))
 
-    // Calculate API usage statistics
-    const last24Hours = new Date()
-    last24Hours.setHours(last24Hours.getHours() - 24)
+    // Calculate API usage statistics for the last 24h across ALL rows (not just
+    // the current page): exact head count for calls, and cost/service totals
+    // summed by paging narrow rows in batches of 1000.
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const logsLast24h = apiLogs?.filter(log =>
-      new Date(log.created_at) >= last24Hours
-    ) || []
-
-    const callsLast24h = logsLast24h.length
-    const costLast24h = logsLast24h.reduce((sum, log) => sum + (log.cost_usd || 0), 0)
+    const { count: callsCount } = await supabaseAdmin
+      .from('api_usage_log')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', since24h)
 
     const usageByService: Record<string, { calls: number; cost: number }> = {}
-    apiLogs?.forEach(log => {
-      const svc = log.service || 'unknown'
-      if (!usageByService[svc]) {
-        usageByService[svc] = { calls: 0, cost: 0 }
+    let costLast24h = 0
+    const BATCH = 1000
+    const MAX_BATCHES = 100
+    for (let i = 0; i < MAX_BATCHES; i++) {
+      const { data: batch, error: batchError } = await supabaseAdmin
+        .from('api_usage_log')
+        .select('service, cost_usd')
+        .gte('created_at', since24h)
+        .order('id', { ascending: true })
+        .range(i * BATCH, i * BATCH + BATCH - 1)
+      if (batchError) throw batchError
+      for (const log of batch || []) {
+        const svc = log.service || 'unknown'
+        if (!usageByService[svc]) {
+          usageByService[svc] = { calls: 0, cost: 0 }
+        }
+        const cost = Number(log.cost_usd) || 0
+        usageByService[svc].calls++
+        usageByService[svc].cost += cost
+        costLast24h += cost
       }
-      usageByService[svc].calls++
-      usageByService[svc].cost += log.cost_usd || 0
-    })
+      if (!batch || batch.length < BATCH) break
+    }
+    const callsLast24h = callsCount || 0
 
     return NextResponse.json({
       logs: enrichedLogs,

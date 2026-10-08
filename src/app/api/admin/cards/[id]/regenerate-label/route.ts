@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator'
+import { CARD_FOR_LABEL_COLUMNS, generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator'
 
 export async function POST(
   request: NextRequest,
@@ -24,45 +24,17 @@ export async function POST(
     // Fetch the card with all required fields for label generation
     const { data: card, error: fetchError } = await supabaseAdmin
       .from('cards')
-      .select(`
-        id,
-        category,
-        serial,
-        conversational_decimal_grade,
-        conversational_whole_grade,
-        conversational_condition_label,
-        conversational_card_info,
-        dvg_decimal_grade,
-        card_name,
-        card_set,
-        card_number,
-        featured,
-        pokemon_featured,
-        release_date,
-        serial_numbering,
-        rarity_tier,
-        rarity_description,
-        autographed,
-        autograph_type,
-        memorabilia_type,
-        rookie_card,
-        first_print_rookie,
-        holofoil,
-        is_foil,
-        foil_type,
-        is_double_faced,
-        mtg_rarity
-      `)
+      .select(CARD_FOR_LABEL_COLUMNS)
       .eq('id', cardId)
       .single()
 
-    if (fetchError) {
+    if (fetchError || !card) {
       console.error('Error fetching card:', fetchError)
       return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
     // Generate new label data
-    const labelData = generateLabelData(card as CardForLabel)
+    const labelData = generateLabelData(card as unknown as CardForLabel)
 
     // Update the card with new label_data
     const { error: updateError } = await supabaseAdmin
@@ -74,6 +46,8 @@ export async function POST(
       console.error('Error updating label data:', updateError)
       return NextResponse.json({ error: 'Failed to update label' }, { status: 500 })
     }
+
+    await logAdminActivity(admin.id, admin.email, 'regenerate_card_label', 'card', cardId, {}, clientIp(request))
 
     return NextResponse.json({
       success: true,

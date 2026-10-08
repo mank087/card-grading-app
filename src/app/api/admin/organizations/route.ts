@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { SLUG_RE, RESERVED_SLUGS, escapeIlike } from '@/lib/orgSlugs'
 
@@ -22,24 +22,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load organizations' }, { status: 500 })
   }
 
-  // Member counts + graded-card counts in two grouped queries
+  // Member counts + card counts as exact head counts per org. Fetching the
+  // rows and counting in JS silently capped at PostgREST's 1,000-row default,
+  // so busy stores stopped counting up. Soft-deleted cards are excluded.
   const ids = (orgs || []).map(o => o.id)
   const memberCounts: Record<string, number> = {}
   const cardCounts: Record<string, number> = {}
-  if (ids.length > 0) {
-    const { data: members } = await supabaseAdmin
-      .from('organization_members')
-      .select('org_id')
-      .in('org_id', ids)
-    for (const m of members || []) memberCounts[m.org_id] = (memberCounts[m.org_id] || 0) + 1
-    const { data: cards } = await supabaseAdmin
-      .from('cards')
-      .select('org_id')
-      .in('org_id', ids)
-    for (const c of cards || []) {
-      if (c.org_id) cardCounts[c.org_id] = (cardCounts[c.org_id] || 0) + 1
-    }
-  }
+  await Promise.all(ids.map(async (orgId) => {
+    const [members, cards] = await Promise.all([
+      supabaseAdmin
+        .from('organization_members')
+        .select('org_id', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      supabaseAdmin
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId)
+        .is('deleted_at', null),
+    ])
+    memberCounts[orgId] = members.count || 0
+    cardCounts[orgId] = cards.count || 0
+  }))
 
   return NextResponse.json({
     organizations: (orgs || []).map(o => ({
@@ -116,6 +119,10 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from('organizations').delete().eq('id', org.id)
     return NextResponse.json({ error: 'Failed to link owner to organization' }, { status: 500 })
   }
+
+  await logAdminActivity(admin.id, admin.email, 'create_organization', 'organization', org.id, {
+    name, slug, owner_user_id: owner.id, owner_email: owner.email, brand_color: brandColor,
+  }, clientIp(request))
 
   return NextResponse.json({ organization: org, owner: { id: owner.id, email: owner.email } })
 }

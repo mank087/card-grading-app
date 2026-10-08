@@ -15,6 +15,11 @@ interface Affiliate {
   commission_type: string
   reward_credits?: number | null
   discount_percent?: number | null
+  user_id?: string | null
+  /** Sum of reward_credits on 'paid' referral rows (credits already granted). */
+  reward_credits_granted?: number
+  /** Sum of reward_credits on 'pending' referral rows (credits owed). */
+  reward_credits_pending?: number
   total_referrals: number
   total_commission_earned: number
   total_commission_paid: number
@@ -34,6 +39,8 @@ interface AffiliateDetail {
   paidAmount: number
   conversionRate: number
   commissions: Commission[]
+  rewardCreditsGranted?: number
+  rewardCreditsPending?: number
 }
 
 interface Commission {
@@ -51,6 +58,7 @@ interface Commission {
   paid_at: string | null
   payout_reference: string | null
   reversal_reason: string | null
+  reward_credits?: number | null
   created_at: string
 }
 
@@ -96,6 +104,7 @@ export default function AdminAffiliatesPage() {
 
 function AffiliatesContent({ adminRole }: { adminRole: string }) {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([])
+  const [rewardTotals, setRewardTotals] = useState<{ reward_credits_granted: number; reward_credits_pending: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [addPrefill, setAddPrefill] = useState<AffiliatePrefill | null>(null)
@@ -108,8 +117,10 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Payout modal state
+  // Payout covers ALL approved commissions for the affiliate; the ids are
+  // resolved server-side because only the latest 50 commissions are loaded.
   const [showPayoutModal, setShowPayoutModal] = useState(false)
-  const [selectedCommissions, setSelectedCommissions] = useState<string[]>([])
+  const [payoutTarget, setPayoutTarget] = useState<{ affiliateId: string; count: number } | null>(null)
   const [payoutReference, setPayoutReference] = useState('')
 
   useEffect(() => {
@@ -150,7 +161,12 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
       setLoading(true)
       const res = await fetch('/api/admin/affiliates')
       const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to load affiliates')
+        return
+      }
       setAffiliates(data.affiliates || [])
+      setRewardTotals(data.totals || null)
     } catch (err) {
       setError('Failed to load affiliates')
     } finally {
@@ -222,7 +238,11 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
     try {
       setActionLoading('approve')
       const res = await fetch('/api/admin/affiliates/approve-commissions', { method: 'POST' })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Failed to approve commissions')
+        return
+      }
       setSuccessMessage(data.message || `${data.approvedCount} commissions approved`)
       loadAffiliates()
       if (selectedAffiliate) {
@@ -236,21 +256,26 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
   }
 
   const handlePayout = async () => {
-    if (!payoutReference.trim() || selectedCommissions.length === 0) return
+    if (!payoutReference.trim() || !payoutTarget) return
     try {
       setActionLoading('payout')
       const res = await fetch('/api/admin/affiliates/commissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          commission_ids: selectedCommissions,
+          affiliate_id: payoutTarget.affiliateId,
+          all_approved: true,
           payout_reference: payoutReference.trim(),
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Failed to process payout')
+        return
+      }
       setSuccessMessage(data.message || `${data.paidCount} commissions paid`)
       setShowPayoutModal(false)
-      setSelectedCommissions([])
+      setPayoutTarget(null)
       setPayoutReference('')
       loadAffiliates()
       if (selectedAffiliate) {
@@ -267,11 +292,23 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
     const newStatus = currentStatus === 'active' ? 'paused' : 'active'
     try {
       setActionLoading(id)
-      await fetch(`/api/admin/affiliates/${id}`, {
+      setError(null)
+      const res = await fetch(`/api/admin/affiliates/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Failed to update status')
+        return
+      }
+      // The status change is saved even when Stripe fails to toggle the promo code
+      if (data.stripe_error) {
+        setError(data.stripe_error)
+      } else {
+        setSuccessMessage(newStatus === 'active' ? 'Affiliate resumed; promo code reactivated' : 'Affiliate paused; promo code deactivated')
+      }
       loadAffiliates()
       if (selectedAffiliate?.affiliate.id === id) {
         loadAffiliateDetail(id)
@@ -424,6 +461,21 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
         )}
       </div>
 
+      {/* Reward credit totals (credits model) */}
+      {rewardTotals && (
+        <div className="grid grid-cols-2 gap-4 mb-4 max-w-md">
+          <div className="bg-green-50 rounded-lg p-3">
+            <div className="text-xs text-green-700 uppercase">Credits granted</div>
+            <div className="text-lg font-bold text-green-800">{rewardTotals.reward_credits_granted.toLocaleString()}</div>
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-3">
+            <div className="text-xs text-yellow-700 uppercase">Credits pending</div>
+            <div className="text-lg font-bold text-yellow-800">{rewardTotals.reward_credits_pending.toLocaleString()}</div>
+            <div className="text-[11px] text-yellow-700">Owed; usually no linked account</div>
+          </div>
+        </div>
+      )}
+
       {/* Affiliates Table */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading affiliates...</div>
@@ -442,6 +494,8 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Reward credits</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Referrals</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Credits granted</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Credits pending</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy earned</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy paid</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Legacy pending</th>
@@ -481,6 +535,13 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                   </td>
                   <td className="px-4 py-3 text-right text-sm">{aff.discount_percent ?? 15}%</td>
                   <td className="px-4 py-3 text-right text-sm">{aff.total_referrals}</td>
+                  <td className="px-4 py-3 text-right text-sm text-green-700">{aff.reward_credits_granted ?? 0}</td>
+                  <td className="px-4 py-3 text-right text-sm text-yellow-700">
+                    {aff.reward_credits_pending ?? 0}
+                    {(aff.reward_credits_pending ?? 0) > 0 && !aff.user_id && (
+                      <div className="text-[11px] text-red-700">No linked account</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-sm font-medium">{formatCurrency(aff.total_commission_earned)}</td>
                   <td className="px-4 py-3 text-right text-sm text-green-600">{formatCurrency(aff.total_commission_paid)}</td>
                   <td className="px-4 py-3 text-right text-sm text-yellow-600">
@@ -501,6 +562,10 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
           </table>
         </div>
       )}
+
+      <p className="mt-2 text-xs text-gray-500">
+        The buyer discount is fixed on the Stripe coupon when the code is created. Changing the percent requires a new Stripe code.
+      </p>
 
       {/* Legacy cash commissions (pre-credit program) */}
       <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-6">
@@ -544,7 +609,22 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                 </button>
               </div>
 
-              {/* Stats Grid */}
+              {/* Reward credits (current program) */}
+              <div className="grid grid-cols-2 gap-4 mb-4 max-w-md">
+                <div className="bg-green-50 rounded-lg p-3">
+                  <div className="text-xs text-green-600 uppercase">Credits granted</div>
+                  <div className="text-lg font-bold text-green-700">{selectedAffiliate.rewardCreditsGranted ?? 0}</div>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3">
+                  <div className="text-xs text-yellow-600 uppercase">Credits pending</div>
+                  <div className="text-lg font-bold text-yellow-700">{selectedAffiliate.rewardCreditsPending ?? 0}</div>
+                  {(selectedAffiliate.rewardCreditsPending ?? 0) > 0 && !selectedAffiliate.affiliate.user_id && (
+                    <div className="text-xs text-red-600">No linked account</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Legacy cash stats */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-xs text-gray-500 uppercase">Clicks</div>
@@ -556,17 +636,17 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                   <div className="text-xs text-gray-400">{selectedAffiliate.conversionRate}% rate</div>
                 </div>
                 <div className="bg-yellow-50 rounded-lg p-3">
-                  <div className="text-xs text-yellow-600 uppercase">Pending</div>
+                  <div className="text-xs text-yellow-600 uppercase">Pending (legacy $)</div>
                   <div className="text-lg font-bold text-yellow-700">{formatCurrency(selectedAffiliate.pendingAmount)}</div>
                   <div className="text-xs text-yellow-500">{selectedAffiliate.pendingCommissions} commissions</div>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-xs text-blue-600 uppercase">Approved</div>
+                  <div className="text-xs text-blue-600 uppercase">Approved (legacy $)</div>
                   <div className="text-lg font-bold text-blue-700">{formatCurrency(selectedAffiliate.approvedAmount)}</div>
                   <div className="text-xs text-blue-500">{selectedAffiliate.approvedCommissions} commissions</div>
                 </div>
                 <div className="bg-green-50 rounded-lg p-3">
-                  <div className="text-xs text-green-600 uppercase">Paid</div>
+                  <div className="text-xs text-green-600 uppercase">Paid (legacy $)</div>
                   <div className="text-lg font-bold text-green-700">{formatCurrency(selectedAffiliate.paidAmount)}</div>
                   <div className="text-xs text-green-500">{selectedAffiliate.paidCommissions} commissions</div>
                 </div>
@@ -577,11 +657,11 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                 <div className="mb-4">
                   <button
                     onClick={() => {
-                      // Pre-select all approved commissions for this affiliate
-                      const approvedIds = selectedAffiliate.commissions
-                        .filter(c => c.status === 'approved')
-                        .map(c => c.id)
-                      setSelectedCommissions(approvedIds)
+                      // All approved commissions for this affiliate (resolved server-side)
+                      setPayoutTarget({
+                        affiliateId: selectedAffiliate.affiliate.id,
+                        count: selectedAffiliate.approvedCommissions,
+                      })
                       setShowPayoutModal(true)
                     }}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
@@ -603,6 +683,7 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Date</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Order</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Net</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Credits</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Commission</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Hold Until</th>
@@ -614,6 +695,7 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
                           <td className="px-3 py-2 text-gray-600">{formatDate(c.created_at)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(c.order_amount)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(c.net_amount)}</td>
+                          <td className="px-3 py-2 text-right">{c.reward_credits ? c.reward_credits : '-'}</td>
                           <td className="px-3 py-2 text-right font-medium">{formatCurrency(c.commission_amount)}</td>
                           <td className="px-3 py-2">{statusBadge(c.status)}</td>
                           <td className="px-3 py-2 text-gray-500 text-xs">
@@ -651,7 +733,7 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold mb-4">Mark Commissions as Paid</h3>
             <p className="text-sm text-gray-600 mb-4">
-              {selectedCommissions.length} commission(s) selected
+              All {payoutTarget?.count ?? 0} approved commission(s) for this affiliate
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -667,7 +749,7 @@ function AffiliatesContent({ adminRole }: { adminRole: string }) {
             </div>
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setShowPayoutModal(false); setPayoutReference(''); setSelectedCommissions([]); }}
+                onClick={() => { setShowPayoutModal(false); setPayoutReference(''); setPayoutTarget(null); }}
                 className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50 text-sm"
               >
                 Cancel
@@ -728,8 +810,9 @@ function AddAffiliateModal({
           name: form.name,
           email: form.email,
           code: form.code,
-          reward_credits: parseInt(form.reward_credits, 10) || 20,
-          discount_percent: parseInt(form.discount_percent, 10) || 15,
+          // 0 is a valid value; fall back to the defaults only when blank/invalid
+          reward_credits: Number.isFinite(parseInt(form.reward_credits, 10)) ? parseInt(form.reward_credits, 10) : 20,
+          discount_percent: Number.isFinite(parseInt(form.discount_percent, 10)) ? parseInt(form.discount_percent, 10) : 15,
           ...(prefill?.applicationId ? { application_id: prefill.applicationId } : {}),
           commission_rate: parseFloat(form.commission_rate) / 100,
           commission_type: form.commission_type,

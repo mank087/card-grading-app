@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/admin/adminAuth';
-import { listCommissions, markCommissionsPaid } from '@/lib/affiliates';
+import { getPayableCommissions, listCommissions, markCommissionsPaid } from '@/lib/affiliates';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,11 +53,25 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { commission_ids, payout_reference } = body;
+    const { payout_reference, affiliate_id, all_approved } = body;
+    let commission_ids: unknown = body.commission_ids;
+
+    // Pay out every approved commission for an affiliate, resolved server-side
+    // (the page only loads the latest 50 commissions).
+    if (all_approved === true && typeof affiliate_id === 'string' && affiliate_id) {
+      const payable = await getPayableCommissions(affiliate_id);
+      commission_ids = payable.map((c) => c.id);
+      if ((commission_ids as string[]).length === 0) {
+        return NextResponse.json(
+          { error: 'No approved commissions to pay for this affiliate' },
+          { status: 400 }
+        );
+      }
+    }
 
     if (!commission_ids || !Array.isArray(commission_ids) || commission_ids.length === 0) {
       return NextResponse.json(
-        { error: 'commission_ids array is required' },
+        { error: 'commission_ids array (or affiliate_id with all_approved) is required' },
         { status: 400 }
       );
     }
@@ -69,7 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await markCommissionsPaid(commission_ids, payout_reference);
+    const result = await markCommissionsPaid(commission_ids as string[], payout_reference);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });

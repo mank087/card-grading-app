@@ -186,7 +186,9 @@ export default function AdminCostsPage() {
             </tbody>
           </table>
           <p className="text-xs text-gray-500 mt-3">
-            {s.openai_source === 'estimate' && '⚠️ OpenAI cost is estimated from token counts. Add an OPENAI_ADMIN_API_KEY to pull actuals. '}
+            {s.openai_source === 'actual'
+              ? 'OpenAI cost is synced from OpenAI billing (openai_daily_costs). '
+              : '⚠️ No synced OpenAI billing for this month, so OpenAI cost is our own token-count estimate (api_usage_log) and may differ from the invoice. Check the nightly cost sync / OPENAI_ADMIN_API_KEY. '}
             {s.stripe_fees_source === 'estimate' && '⚠️ Stripe fees use 2.9% + $0.30 per charge formula. Nightly sync will replace with actuals.'}
           </p>
         </Panel>
@@ -479,17 +481,27 @@ function FixedCostEditor({ onChanged }: { onChanged: () => void }) {
 
   const remove = async (id: string) => {
     if (!confirm('Delete this cost row?')) return
-    await fetch(`/api/admin/costs/fixed?id=${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/admin/costs/fixed?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || `Delete failed (HTTP ${res.status})`)
+      return
+    }
     await fetchRows()
     onChanged()
   }
 
   const archive = async (id: string, effective_to: string) => {
-    await fetch('/api/admin/costs/fixed', {
+    const res = await fetch('/api/admin/costs/fixed', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, effective_to }),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || `Archive failed (HTTP ${res.status})`)
+      return
+    }
     await fetchRows()
     onChanged()
   }

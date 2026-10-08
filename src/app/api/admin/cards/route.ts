@@ -3,10 +3,55 @@ import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createClient } from '@supabase/supabase-js'
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
+import { NON_SPORT_DB_CATEGORIES, SPORT_DB_CATEGORIES } from '@/lib/admin/cardCategories'
 
 // Initialize storage client for signed URLs
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+type CardStats = { total: number; graded: number; byCategory: Record<string, number> }
+
+// The stat tiles are global (they ignore the list's filters) and cost a
+// couple dozen exact counts, so they're cached per server instance for 60s
+// instead of being recounted on every page/filter/search keystroke.
+const STATS_TTL_MS = 60_000
+let statsCache: { at: number; stats: CardStats } | null = null
+
+async function getCardStats(): Promise<CardStats> {
+  if (statsCache && Date.now() - statsCache.at < STATS_TTL_MS) return statsCache.stats
+
+  // Count queries, not row fetches (avoids the default 1000-row limit).
+  // Soft-deleted cards are excluded, matching the list.
+  const allCategories = [...SPORT_DB_CATEGORIES, ...NON_SPORT_DB_CATEGORIES]
+  const count = () => supabaseAdmin.from('cards').select('id', { count: 'exact', head: true }).is('deleted_at', null)
+  const [totalResult, gradedResult, ...categoryResults] = await Promise.all([
+    count(),
+    count().not('conversational_decimal_grade', 'is', null),
+    ...allCategories.map(cat => count().eq('category', cat)),
+  ])
+
+  // Build category counts and consolidate sports
+  const byCategory: Record<string, number> = {}
+  let sportsTotal = 0
+  allCategories.forEach((cat, i) => {
+    const catCount = categoryResults[i].count || 0
+    if (SPORT_DB_CATEGORIES.includes(cat)) {
+      sportsTotal += catCount
+    } else {
+      byCategory[cat] = catCount
+    }
+  })
+  byCategory['Sports'] = sportsTotal
+
+  const stats = {
+    total: totalResult.count || 0,
+    graded: gradedResult.count || 0,
+    byCategory,
+  }
+  // Don't cache a failed round (all zeros from errors) for the full TTL.
+  if (!totalResult.error) statsCache = { at: Date.now(), stats }
+  return stats
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,8 +93,6 @@ export async function GET(request: NextRequest) {
         conversational_whole_grade,
         conversational_condition_label,
         conversational_card_info,
-        conversational_grading,
-        ai_grading,
         featured,
         pokemon_featured,
         card_set,
@@ -82,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     // Apply category filter (consolidate sports subcategories)
     if (category === 'Sports') {
-      query = query.in('category', ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'])
+      query = query.in('category', SPORT_DB_CATEGORIES)
     } else if (category !== 'all') {
       query = query.eq('category', category)
     }
@@ -102,20 +145,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply search filter (search across multiple fields including user email)
-    if (search) {
-      // Check if search looks like an email - look up matching user IDs
-      let emailUserIds: string[] = []
-      if (search.includes('@') || search.includes('.')) {
-        const { data: matchedUsers } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .ilike('email', `%${search}%`)
-          .limit(50)
-        emailUserIds = matchedUsers?.map(u => u.id) || []
-      }
+    // Strip PostgREST filter syntax (`,` `(` `)`) and ilike wildcards so the
+    // term can't break out of the .or() expression; same as label-lab/cards.
+    const term = search.replace(/[,()%]/g, ' ').trim()
+    if (term) {
+      // Email partial match → user ids (always: "smith" should find
+      // smith@example.com's cards too, not only terms containing @ or .)
+      const { data: matchedUsers } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .ilike('email', `%${term}%`)
+        .limit(50)
+      const emailUserIds = matchedUsers?.map(u => u.id) || []
 
-      // Build OR filter with card fields + optional user_id match
-      const cardFieldFilters = `card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%,manufacturer_name.ilike.%${search}%,card_number.ilike.%${search}%,pokemon_featured.ilike.%${search}%`
+      // Build OR filter with card fields (incl. the identified name/player in
+      // conversational_card_info) + optional user_id match
+      const cardFieldFilters = [
+        'card_name', 'serial', 'featured', 'card_set', 'manufacturer_name', 'card_number', 'pokemon_featured',
+        'conversational_card_info->>card_name', 'conversational_card_info->>player_or_character',
+      ].map(field => `${field}.ilike.%${term}%`).join(',')
       if (emailUserIds.length > 0) {
         query = query.or(`${cardFieldFilters},user_id.in.(${emailUserIds.join(',')})`)
       } else {
@@ -173,8 +221,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // The conversational_grading / ai_grading blobs are only display fallbacks
+    // for rows with no stored grade or no conversational_card_info (legacy and
+    // in-progress cards), so they're fetched for just those ids, and only the
+    // parts the page reads are kept.
+    const legacyMap = new Map<string, { conversational_grading: any; ai_grading: any }>()
+    const legacyIds = (cards || [])
+      .filter(c => c.conversational_decimal_grade === null || c.conversational_decimal_grade === undefined || !c.conversational_card_info)
+      .map(c => c.id)
+    if (legacyIds.length > 0) {
+      const { data: legacyRows } = await supabaseAdmin
+        .from('cards')
+        .select('id, conversational_grading, ai_grading')
+        .in('id', legacyIds)
+      for (const row of legacyRows || []) {
+        const ai = row.ai_grading as Record<string, any> | null
+        legacyMap.set(row.id, {
+          conversational_grading: row.conversational_grading,
+          ai_grading: ai ? {
+            'Card Information': ai['Card Information'],
+            card_info: ai.card_info,
+            recommended_grade: ai.recommended_grade,
+          } : null,
+        })
+      }
+    }
+
     // Enrich card data with user email, signed URL, and extract grade from JSON if needed
     const enrichedCards = cards?.map(card => {
+      const legacy = legacyMap.get(card.id)
       const enrichedCard: any = {
         ...card,
         user_email: userMap[card.user_id] || 'Unknown',
@@ -182,13 +257,15 @@ export async function GET(request: NextRequest) {
         front_full_url: pickDisplayUrls(signedUrlMap, card.front_path).full,
       }
 
+      enrichedCard.ai_grading = legacy?.ai_grading ?? null
+
       // If conversational_grading exists, parse it and extract grade if missing
       // This matches the My Collection API enrichment logic
-      if (card.conversational_grading && !card.conversational_decimal_grade) {
+      if (legacy?.conversational_grading && !card.conversational_decimal_grade) {
         try {
-          const parsed = typeof card.conversational_grading === 'string'
-            ? JSON.parse(card.conversational_grading)
-            : card.conversational_grading
+          const parsed = typeof legacy.conversational_grading === 'string'
+            ? JSON.parse(legacy.conversational_grading)
+            : legacy.conversational_grading
 
           // Extract grade from JSON structure
           const grade = parsed.grading_passes?.averaged_rounded?.final ?? parsed.final_grade?.decimal_grade
@@ -209,38 +286,7 @@ export async function GET(request: NextRequest) {
       return enrichedCard
     })
 
-    // Get category stats using count queries (avoids Supabase default 1000 row limit)
-    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
-    const allCategories = [...sportCategories, 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other']
-
-    const [totalResult, gradedResult, ...categoryResults] = await Promise.all([
-      supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).not('conversational_decimal_grade', 'is', null),
-      ...allCategories.map(cat =>
-        supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('category', cat)
-      )
-    ])
-
-    // Build category counts and consolidate sports
-    const consolidatedByCategory: Record<string, number> = {}
-    let sportsTotal = 0
-    allCategories.forEach((cat, i) => {
-      const catCount = categoryResults[i].count || 0
-      if (sportCategories.includes(cat)) {
-        sportsTotal += catCount
-      } else {
-        consolidatedByCategory[cat] = catCount
-      }
-    })
-    if (sportsTotal > 0) {
-      consolidatedByCategory['Sports'] = sportsTotal
-    }
-
-    const stats = {
-      total: totalResult.count || 0,
-      graded: gradedResult.count || 0,
-      byCategory: consolidatedByCategory
-    }
+    const stats = await getCardStats()
 
     return NextResponse.json({
       cards: enrichedCards,

@@ -31,25 +31,26 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const results = await Promise.all(
-      (data || []).map(async (c) => {
-        let thumb: string | null = null
-        if (c.front_path) {
-          const { data: signed } = await supabaseAdmin.storage.from('cards').createSignedUrl(c.front_path, 600)
-          thumb = signed?.signedUrl || null
-        }
-        return {
-          id: c.id,
-          name: c.card_name || '(unnamed)',
-          serial: c.serial,
-          category: c.category,
-          grade: c.conversational_whole_grade,
-          condition: c.conversational_condition_label,
-          thumb,
-          gradedAt: c.created_at,
-        }
-      })
-    )
+    // Sign every thumbnail in one storage call.
+    const paths = (data || []).map((c) => c.front_path).filter((p): p is string => !!p)
+    const thumbByPath = new Map<string, string>()
+    if (paths.length > 0) {
+      const { data: signed } = await supabaseAdmin.storage.from('cards').createSignedUrls(paths, 600)
+      for (const s of signed || []) {
+        if (s.path && s.signedUrl && !s.error) thumbByPath.set(s.path, s.signedUrl)
+      }
+    }
+
+    const results = (data || []).map((c) => ({
+      id: c.id,
+      name: c.card_name || '(unnamed)',
+      serial: c.serial,
+      category: c.category,
+      grade: c.conversational_whole_grade,
+      condition: c.conversational_condition_label,
+      thumb: (c.front_path && thumbByPath.get(c.front_path)) || null,
+      gradedAt: c.created_at,
+    }))
 
     return NextResponse.json({ results })
   } catch (error: any) {

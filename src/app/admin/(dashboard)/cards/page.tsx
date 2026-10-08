@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
 import Link from 'next/link'
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue'
+import { ADMIN_CATEGORY_GROUPS, adminCardHref, isSportCategory } from '@/lib/admin/cardCategories'
 
 interface Card {
   id: string
@@ -88,7 +89,7 @@ const getPlayerName = (card: Card) => {
   const cardInfo = getCardInfo(card)
   // For sports cards AND Other cards: show player/character name first
   // For TCG cards (MTG, Pokemon, Lorcana): show card name first
-  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+  const isSportsCard = isSportCategory(card.category)
   const isOtherCard = card.category === 'Other'
   return (isSportsCard || isOtherCard)
     ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown')
@@ -195,11 +196,17 @@ const getCategoryBadge = (category: string | null) => {
     'Hockey': { bg: 'bg-sky-100', text: 'text-sky-800', label: '🏒 Hockey' },
     'Soccer': { bg: 'bg-green-100', text: 'text-green-800', label: '⚽ Soccer' },
     'Wrestling': { bg: 'bg-purple-100', text: 'text-purple-800', label: '🤼 Wrestling' },
+    'Racing': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🏎️ Racing' },
+    'Golf': { bg: 'bg-blue-100', text: 'text-blue-800', label: '⛳ Golf' },
+    'Boxing': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🥊 Boxing' },
+    'MMA': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🥊 MMA' },
+    'Tennis': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🎾 Tennis' },
     'Sports': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🏆 Sports' },
     'Pokemon': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '⚡ Pokemon' },
     'MTG': { bg: 'bg-indigo-100', text: 'text-indigo-800', label: '🎴 MTG' },
     'Lorcana': { bg: 'bg-pink-100', text: 'text-pink-800', label: '✨ Lorcana' },
     'One Piece': { bg: 'bg-rose-100', text: 'text-rose-800', label: '🏴‍☠️ One Piece' },
+    'Yu-Gi-Oh': { bg: 'bg-violet-100', text: 'text-violet-800', label: '🔮 Yu-Gi-Oh' },
     'Other': { bg: 'bg-gray-100', text: 'text-gray-800', label: '📦 Other' },
   }
   return categoryConfig[category || ''] || { bg: 'bg-gray-100', text: 'text-gray-600', label: category || 'Unknown' }
@@ -223,7 +230,14 @@ function CardsContent() {
     total_pages: 0
   })
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  // searchInput is the text box; search is its 300ms-debounced value that
+  // drives the fetch. ?search= seeds both so other admin pages can deep-link.
+  // (This component mounts only client-side, behind AdminAuthGuard.)
+  const [searchInput, setSearchInput] = useState(() =>
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('search') || ''
+  )
+  const [search, setSearch] = useState(searchInput)
   const [category, setCategory] = useState<string>('all')
   const [graded, setGraded] = useState<'all' | 'graded' | 'ungraded'>('all')
   const [featured, setFeatured] = useState<'all' | 'featured' | 'not_featured'>('all')
@@ -254,11 +268,21 @@ function CardsContent() {
   }
 
   useEffect(() => {
+    if (searchInput === search) return
+    const timer = setTimeout(() => {
+      setSearch(searchInput)
+      setPagination(prev => ({ ...prev, page: 1 }))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, search])
+
+  useEffect(() => {
     fetchCards()
   }, [pagination.page, search, category, graded, featured, sortColumn, sortDirection])
 
   const fetchCards = async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -272,7 +296,7 @@ function CardsContent() {
       })
 
       const response = await fetch(`/api/admin/cards?${params}`)
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
       if (response.ok) {
         setCards(data.cards)
@@ -280,9 +304,12 @@ function CardsContent() {
         if (data.stats) {
           setStats(data.stats)
         }
+      } else {
+        setError(data.error || `Failed to load cards (HTTP ${response.status})`)
       }
     } catch (error) {
       console.error('Error fetching cards:', error)
+      setError('Network error: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setLoading(false)
     }
@@ -297,10 +324,11 @@ function CardsContent() {
     setDeletingCardId(deleteCardId)
 
     try {
-      const response = await fetch(
-        `/api/admin/cards/${deleteCardId}?reason=${encodeURIComponent(deleteReason)}`,
-        { method: 'DELETE' }
-      )
+      const response = await fetch(`/api/admin/cards/${deleteCardId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: deleteReason }),
+      })
 
       if (response.ok) {
         alert('Card deleted successfully')
@@ -417,7 +445,7 @@ function CardsContent() {
 
         {/* Quick Stats Bar */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-3">
             <div className="bg-white rounded-lg shadow p-3 border-l-4 border-purple-500">
               <div className="text-2xl font-bold text-gray-900">{stats.total.toLocaleString()}</div>
               <div className="text-xs text-gray-500 uppercase">Total Cards</div>
@@ -426,7 +454,7 @@ function CardsContent() {
               <div className="text-2xl font-bold text-gray-900">{stats.graded.toLocaleString()}</div>
               <div className="text-xs text-gray-500 uppercase">Graded</div>
             </div>
-            {['Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other'].map((cat) => {
+            {ADMIN_CATEGORY_GROUPS.map((cat) => {
               const count = stats.byCategory[cat] || 0
               const badge = getCategoryBadge(cat)
               return (
@@ -448,11 +476,8 @@ function CardsContent() {
             <input
               type="text"
               placeholder="Search by name, set, manufacturer, card number, or user email..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPagination(prev => ({ ...prev, page: 1 }))
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
@@ -468,12 +493,9 @@ function CardsContent() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="all">All Categories</option>
-              <option value="Sports">🏆 Sports</option>
-              <option value="Pokemon">⚡ Pokemon</option>
-              <option value="MTG">🎴 MTG</option>
-              <option value="Lorcana">✨ Lorcana</option>
-              <option value="One Piece">🏴‍☠️ One Piece</option>
-              <option value="Other">📦 Other</option>
+              {ADMIN_CATEGORY_GROUPS.map((cat) => (
+                <option key={cat} value={cat}>{getCategoryBadge(cat).label}</option>
+              ))}
             </select>
           </div>
 
@@ -510,6 +532,13 @@ function CardsContent() {
           </div>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-800">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
 
       {/* Bulk Actions Bar */}
       {selectedCards.size > 0 && (
@@ -594,13 +623,7 @@ function CardsContent() {
             {/* Mobile Cards */}
             <div className="divide-y divide-gray-200">
               {cards.map((card) => {
-                const categoryRoutes: Record<string, string> = {
-                  'Football': '/sports', 'Baseball': '/sports', 'Basketball': '/sports',
-                  'Hockey': '/sports', 'Soccer': '/sports', 'Wrestling': '/sports',
-                  'Sports': '/sports', 'Pokemon': '/pokemon', 'MTG': '/mtg',
-                  'Lorcana': '/lorcana', 'One Piece': '/onepiece', 'Other': '/other'
-                }
-                const route = categoryRoutes[card.category || ''] || '/other'
+                const cardHref = adminCardHref(card.category, card.id)
                 const badge = getCategoryBadge(card.category)
                 const grade = getCardGrade(card)
                 const marketValue = getMarketValue(card)
@@ -655,7 +678,7 @@ function CardsContent() {
                       {/* Actions */}
                       <div className="flex flex-col items-end gap-2">
                         <Link
-                          href={`${route}/${card.id}`}
+                          href={cardHref}
                           className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 bg-purple-50 rounded"
                         >
                           View
@@ -793,22 +816,8 @@ function CardsContent() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {cards.map((card) => {
-                  // Get category route for link
-                  const categoryRoutes: Record<string, string> = {
-                    'Football': '/sports',
-                    'Baseball': '/sports',
-                    'Basketball': '/sports',
-                    'Hockey': '/sports',
-                    'Soccer': '/sports',
-                    'Wrestling': '/sports',
-                    'Sports': '/sports',
-                    'Pokemon': '/pokemon',
-                    'MTG': '/mtg',
-                    'Lorcana': '/lorcana',
-                    'One Piece': '/onepiece',
-                    'Other': '/other'
-                  }
-                  const route = categoryRoutes[card.category || ''] || '/other'
+                  // Public card page (same slug mapping as the sitemap)
+                  const cardHref = adminCardHref(card.category, card.id)
                   const badge = getCategoryBadge(card.category)
                   const grade = getCardGrade(card)
                   const marketValue = getMarketValue(card)
@@ -918,7 +927,7 @@ function CardsContent() {
                       <td className="px-2 py-3">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`${route}/${card.id}`}
+                            href={cardHref}
                             className="text-xs text-purple-600 hover:text-purple-800 font-medium"
                             title="View card details"
                           >

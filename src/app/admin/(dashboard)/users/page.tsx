@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
+import { adminCardHref, isSportCategory } from '@/lib/admin/cardCategories'
 
 interface User {
   id: string
   email: string
   created_at: string
   updated_at: string
+  /** auth.users.last_sign_in_at (null if never signed in / lookup failed) */
+  last_active: string | null
   card_count: number
   credits_balance: number
   is_suspended: boolean
@@ -77,18 +80,11 @@ const getCardInfo = (card: UserDetails['recent_cards'][0]) => {
 
 const getPlayerName = (card: UserDetails['recent_cards'][0]) => {
   const cardInfo = getCardInfo(card)
-  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+  const isSportsCard = isSportCategory(card.category)
   const isOtherCard = card.category === 'Other'
   return (isSportsCard || isOtherCard)
     ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown')
     : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card')
-}
-
-const categoryRoutes: Record<string, string> = {
-  'Football': '/sports', 'Baseball': '/sports', 'Basketball': '/sports',
-  'Hockey': '/sports', 'Soccer': '/sports', 'Wrestling': '/sports',
-  'Sports': '/sports', 'Pokemon': '/pokemon', 'MTG': '/mtg',
-  'Lorcana': '/lorcana', 'One Piece': '/onepiece', 'Other': '/other'
 }
 
 const getCategoryBadge = (category: string | null) => {
@@ -99,6 +95,12 @@ const getCategoryBadge = (category: string | null) => {
     'Hockey': { bg: 'bg-sky-100', text: 'text-sky-800', label: '🏒 Hockey' },
     'Soccer': { bg: 'bg-green-100', text: 'text-green-800', label: '⚽ Soccer' },
     'Wrestling': { bg: 'bg-purple-100', text: 'text-purple-800', label: '🤼 Wrestling' },
+    'Racing': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🏎️ Racing' },
+    'Golf': { bg: 'bg-blue-100', text: 'text-blue-800', label: '⛳ Golf' },
+    'Boxing': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🥊 Boxing' },
+    'MMA': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🥊 MMA' },
+    'Tennis': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🎾 Tennis' },
+    'Yu-Gi-Oh': { bg: 'bg-violet-100', text: 'text-violet-800', label: '🔮 Yu-Gi-Oh' },
     'Sports': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🏆 Sports' },
     'Pokemon': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '⚡ Pokemon' },
     'MTG': { bg: 'bg-indigo-100', text: 'text-indigo-800', label: '🎴 MTG' },
@@ -119,13 +121,28 @@ function UsersContent({ adminRole }: { adminRole: string }) {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  // searchInput is the text box; search is its 300ms-debounced value that
+  // drives the fetch. ?search= seeds both (email or user id) so other admin
+  // pages can deep-link. (Mounts only client-side, behind AdminAuthGuard.)
+  const [searchInput, setSearchInput] = useState(() =>
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('search') || ''
+  )
+  const [search, setSearch] = useState(searchInput)
   const [status, setStatus] = useState<'all' | 'active' | 'suspended'>('all')
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
+
+  useEffect(() => {
+    if (searchInput === search) return
+    const timer = setTimeout(() => {
+      setSearch(searchInput)
+      setPagination(prev => ({ ...prev, page: 1 }))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, search])
 
   useEffect(() => {
     fetchUsers()
@@ -143,15 +160,13 @@ function UsersContent({ adminRole }: { adminRole: string }) {
       })
 
       const response = await fetch(`/api/admin/users?${params}`)
-      const data = await response.json()
-
-      console.log('Users API Response:', { status: response.status, ok: response.ok, data })
+      const data = await response.json().catch(() => ({}))
 
       if (response.ok) {
         setUsers(data.users || [])
         setPagination(data.pagination)
       } else {
-        setError(data.error || 'Failed to fetch users')
+        setError(data.error || `Failed to fetch users (HTTP ${response.status})`)
         console.error('API Error:', data)
       }
     } catch (error) {
@@ -222,10 +237,11 @@ function UsersContent({ adminRole }: { adminRole: string }) {
     }
 
     try {
-      const response = await fetch(
-        `/api/admin/users/${deleteUserId}?reason=${encodeURIComponent(deleteReason)}`,
-        { method: 'DELETE' }
-      )
+      const response = await fetch(`/api/admin/users/${deleteUserId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: deleteReason }),
+      })
 
       if (response.ok) {
         alert('User deleted successfully')
@@ -263,11 +279,8 @@ function UsersContent({ adminRole }: { adminRole: string }) {
             <input
               type="text"
               placeholder="Search by email..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPagination(prev => ({ ...prev, page: 1 }))
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -331,7 +344,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                       Joined
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Active
+                      Last sign-in
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -363,7 +376,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">
-                          {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
+                          {user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Never'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -471,6 +484,10 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                       {new Date(selectedUser.user.created_at).toLocaleString()}
                     </div>
                     <div>
+                      <strong>Last sign-in:</strong>{' '}
+                      {selectedUser.user.last_active ? new Date(selectedUser.user.last_active).toLocaleString() : 'Never'}
+                    </div>
+                    <div>
                       <strong>Status:</strong>{' '}
                       {selectedUser.user.is_suspended ? (
                         <span className="text-red-600 font-semibold">Suspended</span>
@@ -514,7 +531,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                       <p className="text-gray-500">No cards uploaded yet</p>
                     ) : (
                       selectedUser.recent_cards.map((card) => {
-                        const route = categoryRoutes[card.category || ''] || '/other'
+                        const cardHref = adminCardHref(card.category, card.id)
                         const badge = getCategoryBadge(card.category)
                         const cardInfo = getCardInfo(card)
                         const name = getPlayerName(card)
@@ -524,7 +541,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                         return (
                           <Link
                             key={card.id}
-                            href={`${route}/${card.id}`}
+                            href={cardHref}
                             className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors group"
                           >
                             {/* Grade circle */}

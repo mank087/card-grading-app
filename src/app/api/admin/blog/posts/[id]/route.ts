@@ -88,10 +88,26 @@ export async function PUT(
       }
     }
 
-    // Handle publishing logic
-    let publishedAt = body.published_at || null;
-    if (body.status === 'published' && !existingPost.published_at && !publishedAt) {
-      publishedAt = new Date().toISOString();
+    // Handle publishing logic. "Scheduled" is stored as published with a
+    // future published_at so the public queries (status='published' AND
+    // published_at<=now) pick it up on its date with no job to flip status.
+    let status = body.status;
+    let publishedAt: string | null | undefined =
+      body.published_at === undefined ? undefined : body.published_at || null;
+    if (status === 'scheduled') {
+      const at = publishedAt ? new Date(publishedAt).getTime() : NaN;
+      if (isNaN(at) || at <= Date.now()) {
+        return NextResponse.json(
+          { error: 'Scheduled posts need a publish date in the future' },
+          { status: 400 }
+        );
+      }
+      status = 'published';
+    }
+    // Never null the date of a published post: keep the existing one, or
+    // stamp now when there is none.
+    if ((status ?? existingPost.status) === 'published' && !publishedAt) {
+      publishedAt = existingPost.published_at || new Date().toISOString();
     }
 
     // Update post
@@ -114,7 +130,7 @@ export async function PUT(
     if (body.meta_description !== undefined) updateData.meta_description = body.meta_description || null;
     if (body.quick_answer !== undefined) updateData.quick_answer = typeof body.quick_answer === 'string' && body.quick_answer.trim() ? body.quick_answer.trim().slice(0, 600) : null;
     if (body.faq !== undefined) updateData.faq = sanitizeFaq(body.faq);
-    if (body.status !== undefined) updateData.status = body.status;
+    if (status !== undefined) updateData.status = status;
     if (publishedAt !== undefined) updateData.published_at = publishedAt;
     if (body.author_name !== undefined) updateData.author_name = body.author_name || 'Douglas Mankiewicz';
 

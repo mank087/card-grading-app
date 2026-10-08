@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { returnOrgCredits, getOrgBranding } from '@/lib/organizations'
 import { stripe } from '@/lib/stripe'
@@ -106,11 +106,14 @@ export async function GET(
 
   // Signed URLs for storefront photos so the admin panel can show the grid
   // (org.storefront only holds storage paths in the private org-assets bucket).
+  // One batched signing call instead of one round trip per photo.
   const storefrontPhotoPreviews: { path: string; url: string }[] = []
   const storefrontPhotos: string[] = (org.storefront?.photos || []).slice(0, 8)
-  for (const path of storefrontPhotos) {
-    const { data } = await supabaseAdmin.storage.from('org-assets').createSignedUrl(path, 3600)
-    if (data?.signedUrl) storefrontPhotoPreviews.push({ path, url: data.signedUrl })
+  if (storefrontPhotos.length > 0) {
+    const { data: signed } = await supabaseAdmin.storage.from('org-assets').createSignedUrls(storefrontPhotos, 3600)
+    for (const item of signed || []) {
+      if (item.path && item.signedUrl) storefrontPhotoPreviews.push({ path: item.path, url: item.signedUrl })
+    }
   }
 
   return NextResponse.json({
@@ -199,22 +202,29 @@ export async function PATCH(
       description: String(body.adjustReason || `Admin adjustment by ${admin.email}`).slice(0, 250),
       metadata: { org_credit: true, org_bucket: 'overage', admin_email: admin.email },
     })
+    await logAdminActivity(admin.id, admin.email, 'adjust_organization_credits', 'organization', params.id, {
+      amount: body.adjustCredits,
+      before: { overage_credits: org.overage_credits },
+      balance_after: newBalance,
+      reason: body.adjustReason ? String(body.adjustReason).slice(0, 250) : null,
+    }, clientIp(request))
   }
 
   if (Object.keys(updates).length > 0) {
+    // Prior row: feeds the audit log's before/after and approval detection.
+    const { data: prior } = await supabaseAdmin
+      .from('organizations')
+      .select('*')
+      .eq('id', params.id)
+      .maybeSingle()
+
     // Approval detection: transition pending → active triggers the owner email.
     let approving: { name: string; owner_user_id: string } | null = null
-    if (updates.status === 'active') {
-      const { data: prior } = await supabaseAdmin
-        .from('organizations')
-        .select('status, name, owner_user_id')
-        .eq('id', params.id)
-        .maybeSingle()
-      if (prior?.status === 'pending') {
-        approving = { name: prior.name, owner_user_id: prior.owner_user_id }
-      }
+    if (updates.status === 'active' && prior?.status === 'pending') {
+      approving = { name: prior.name, owner_user_id: prior.owner_user_id }
     }
 
+    const changedFields = Object.keys(updates)
     updates.updated_at = new Date().toISOString()
     const { error } = await supabaseAdmin
       .from('organizations')
@@ -224,6 +234,16 @@ export async function PATCH(
       console.error('[admin/organizations] update error:', error)
       return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 })
     }
+
+    const before: Record<string, unknown> = {}
+    const after: Record<string, unknown> = {}
+    for (const field of changedFields) {
+      before[field] = prior ? (prior as Record<string, unknown>)[field] ?? null : null
+      after[field] = updates[field]
+    }
+    await logAdminActivity(admin.id, admin.email, 'update_organization', 'organization', params.id, {
+      before, after,
+    }, clientIp(request))
 
     if (approving) {
       await sendApprovalEmail(params.id, approving.name, approving.owner_user_id)

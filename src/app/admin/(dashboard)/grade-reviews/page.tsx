@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { concernLabels, reviewStatusLabels, type ReviewSummary } from '@/lib/gradeReview/types';
+import { adminCardHref } from '@/lib/admin/cardCategories';
 
 type Entry = ReviewSummary & {
   card_id: string;
@@ -47,7 +48,7 @@ export default function GradeReviewsPage() {
       {entries.map(entry => <article key={entry.id} className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap justify-between gap-2">
           <h2 className="font-semibold text-gray-900">{entry.cards?.card_name || entry.cards?.serial || entry.card_id}</h2>
-          <span className="text-sm font-medium text-purple-800">{entry.cards?.deleted_at && ['queued', 'processing'].includes(entry.status) ? <span className="mr-2 rounded bg-amber-100 px-2 py-0.5 text-amber-900">Card deleted by owner</span> : null}{reviewStatusLabels[entry.status]}</span>
+          <span className="text-sm font-medium text-purple-800">{entry.cards?.deleted_at && ['queued', 'processing'].includes(entry.status) ? <span className="mr-2 rounded bg-amber-100 px-2 py-0.5 text-amber-900">Card deleted</span> : null}{reviewStatusLabels[entry.status]}</span>
         </div>
         <p className="mt-2 text-sm text-gray-600">Requested {new Date(entry.requested_at).toLocaleString()} · Serial {entry.cards?.serial || 'Unavailable'}</p>
         <p className="mt-2 break-all text-xs text-gray-500">Customer: {entry.requester_id} · Card: {entry.card_id}</p>
@@ -57,7 +58,7 @@ export default function GradeReviewsPage() {
         {entry.last_error_code && <p className="mt-2 text-sm text-amber-800">Processing delayed after {entry.attempt_count} attempt(s). Code: {entry.last_error_code}</p>}
         <p className="mt-3 break-all text-xs text-gray-500">Review {entry.id} · Grade run {entry.grade_run_id}</p>
         {entry.proposed_grade != null && <p className="mt-2 text-sm">Original grade: {entry.original_grade}. Proposed grade: {entry.proposed_grade}. {entry.owner_decision ? `Owner decision: ${entry.owner_decision === 'accept' ? 'Accepted' : 'Kept original'}.` : 'Awaiting owner decision.'}</p>}
-        <div className="mt-3 flex gap-4 text-sm text-purple-700"><Link href={`/admin/grade-reviews/${entry.id}`}>Open Review</Link><Link href="/admin/cards">Cards</Link><Link href="/admin/users">Customers</Link></div>
+        <div className="mt-3 flex gap-4 text-sm text-purple-700"><Link href={`/admin/grade-reviews/${entry.id}`}>Open Review</Link>{/* Admin card list hides soft-deleted cards, so deleted ones link to the card page instead. */}<Link href={entry.cards?.serial && !entry.cards.deleted_at ? `/admin/cards?search=${encodeURIComponent(entry.cards.serial)}` : adminCardHref(entry.cards?.category, entry.card_id)}>Card</Link><Link href={`/admin/users?search=${encodeURIComponent(entry.requester_id)}`}>Customer</Link></div>
       </article>)}
     </div>}
     <div className="flex items-center gap-4">

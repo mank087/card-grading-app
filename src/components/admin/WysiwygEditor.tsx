@@ -19,6 +19,21 @@ interface WysiwygEditorProps {
 }
 
 /**
+ * True when the markdown contains a GFM pipe table (a `| … |` row followed by a
+ * `|---|` separator row). The rich pane has no Table extension installed, so
+ * letting it re-serialize such content would flatten the tables into text.
+ */
+function hasMarkdownTable(markdown: string): boolean {
+  const lines = markdown.split(/\r?\n/);
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^\s*\|.*\|\s*$/.test(lines[i]) && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(lines[i + 1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Side-by-side bidirectional markdown editor.
  *
  *   - Left pane: live WYSIWYG (TipTap). Type formatted text directly here.
@@ -49,6 +64,13 @@ export default function WysiwygEditor({
   // keystroke in the rich pane would cause a setContent → cursor reset.
   const lastWrittenToEditor = useRef<string>(value);
 
+  // Tables can't round-trip through the rich pane (no Table extension), so
+  // when present the rich pane becomes a read-only preview and never writes
+  // back to the markdown.
+  const hasTable = hasMarkdownTable(value);
+  const hasTableRef = useRef(hasTable);
+  hasTableRef.current = hasTable;
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -63,10 +85,12 @@ export default function WysiwygEditor({
       }),
     ],
     content: value,
+    editable: !hasTable,
     // Required by Next.js App Router — defer initial render to client so
     // SSR/hydration doesn't mismatch on the editor's content.
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
+      if (hasTableRef.current) return;
       const md = (editor.storage as any).markdown.getMarkdown();
       lastWrittenToEditor.current = md;
       if (md !== value) onChange(md);
@@ -83,6 +107,12 @@ export default function WysiwygEditor({
     editor.commands.setContent(value, { emitUpdate: false });
   }, [value, editor]);
 
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.isEditable === !hasTable) return;
+    editor.setEditable(!hasTable, false);
+  }, [hasTable, editor]);
+
   return (
     <div
       className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-200"
@@ -91,8 +121,13 @@ export default function WysiwygEditor({
       {/* WYSIWYG pane */}
       <div className="flex flex-col">
         <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          Preview · click to edit
+          {hasTable ? 'Preview · read-only' : 'Preview · click to edit'}
         </div>
+        {hasTable && (
+          <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+            This post has tables; edit in the Markdown pane to keep them.
+          </div>
+        )}
         <div className="flex-1 overflow-auto">
           <EditorContent
             editor={editor}

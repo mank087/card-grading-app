@@ -32,31 +32,77 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get user's cards
-    const { data: cards, error: cardsError } = await supabaseAdmin
+    // Get user's recent cards (displayed columns only; soft-deleted excluded).
+    // ai_grading is a large blob, so it is not selected here — legacy rows
+    // with no conversational_card_info get just its card-info part below.
+    const { data: cards } = await supabaseAdmin
       .from('cards')
-      .select('id, serial, card_name, category, created_at, conversational_decimal_grade, conversational_whole_grade, conversational_condition_label, conversational_card_info, ai_grading, featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number')
+      .select('id, serial, card_name, category, created_at, conversational_decimal_grade, conversational_whole_grade, conversational_condition_label, conversational_card_info, featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number')
       .eq('user_id', id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(10)
 
-    // Get user statistics
-    const { data: allCards } = await supabaseAdmin
-      .from('cards')
-      .select('id, conversational_decimal_grade')
-      .eq('user_id', id)
+    const recentCards: Array<Record<string, any>> = (cards || []).map(c => ({ ...c, ai_grading: null }))
+    const legacyIds = recentCards.filter(c => !c.conversational_card_info).map(c => c.id)
+    if (legacyIds.length > 0) {
+      const { data: legacyRows } = await supabaseAdmin
+        .from('cards')
+        .select('id, ai_grading')
+        .in('id', legacyIds)
+      for (const row of legacyRows || []) {
+        const target = recentCards.find(c => c.id === row.id)
+        const ai = row.ai_grading as Record<string, any> | null
+        if (target && ai) {
+          target.ai_grading = { 'Card Information': ai['Card Information'], card_info: ai.card_info }
+        }
+      }
+    }
 
-    const totalCards = allCards?.length || 0
-    const gradedCards = allCards?.filter(c => c.conversational_decimal_grade).length || 0
-    const avgGrade = gradedCards > 0
-      ? allCards!
-          .filter(c => c.conversational_decimal_grade)
-          .reduce((sum, c) => sum + c.conversational_decimal_grade, 0) / gradedCards
-      : 0
+    // Get user statistics: exact head counts (no 1,000-row cap) and an average
+    // paged over the narrow grade column in batches of 1,000.
+    const [totalResult, gradedResult, authResult] = await Promise.all([
+      supabaseAdmin
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', id)
+        .is('deleted_at', null),
+      supabaseAdmin
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', id)
+        .is('deleted_at', null)
+        .not('conversational_decimal_grade', 'is', null),
+      supabaseAdmin.auth.admin.getUserById(id).catch(() => null),
+    ])
+
+    const totalCards = totalResult.count || 0
+    const gradedCards = gradedResult.count || 0
+    let gradeSum = 0
+    let gradeRows = 0
+    const PAGE = 1000
+    for (let from = 0; from < gradedCards; from += PAGE) {
+      const { data: gradePage, error: gradeError } = await supabaseAdmin
+        .from('cards')
+        .select('conversational_decimal_grade')
+        .eq('user_id', id)
+        .is('deleted_at', null)
+        .not('conversational_decimal_grade', 'is', null)
+        .order('id')
+        .range(from, from + PAGE - 1)
+      if (gradeError || !gradePage || gradePage.length === 0) break
+      for (const row of gradePage) {
+        const g = Number(row.conversational_decimal_grade)
+        if (g) { gradeSum += g; gradeRows++ }
+      }
+      if (gradePage.length < PAGE) break
+    }
+    const avgGrade = gradeRows > 0 ? gradeSum / gradeRows : 0
 
     return NextResponse.json({
       user: {
         ...user,
+        last_active: authResult?.data?.user?.last_sign_in_at ?? null,
         is_suspended: false // Will update when we add suspended_at field
       },
       statistics: {
@@ -64,7 +110,7 @@ export async function GET(
         graded_cards: gradedCards,
         average_grade: Math.round(avgGrade * 10) / 10
       },
-      recent_cards: cards || []
+      recent_cards: recentCards
     }, { status: 200 })
   } catch (error) {
     console.error('Error fetching user:', error)
@@ -151,9 +197,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Only super admins can delete users' }, { status: 403 })
     }
 
-    // Get reason from query params
-    const searchParams = request.nextUrl.searchParams
-    const reason = searchParams.get('reason') || 'No reason provided'
+    // Reason comes in the JSON body (kept out of URLs/access logs); the query
+    // param is still read for older clients.
+    const body = await request.json().catch(() => null)
+    const bodyReason = typeof body?.reason === 'string' ? body.reason.trim() : ''
+    const reason = bodyReason || request.nextUrl.searchParams.get('reason') || 'No reason provided'
 
     // Delete user's cards first
     const { error: cardsError } = await supabaseAdmin

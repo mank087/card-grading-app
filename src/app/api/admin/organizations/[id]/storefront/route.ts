@@ -4,7 +4,7 @@
  * public Enterprise Page at /enterprise/[slug] reads the same jsonb blob.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { isUuid } from '@/lib/uuid'
 import { BAND_PATTERNS } from '@/lib/labelLab/bandGeometry'
@@ -257,6 +257,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to save storefront' }, { status: 500 })
   }
 
+  await logAdminActivity(admin.id, admin.email, 'update_organization_storefront', 'organization', params.id, {
+    before: {
+      ...(updates.storefront_enabled !== undefined ? { storefront_enabled: current.enabled } : {}),
+      ...(updates.storefront !== undefined ? { storefront: current.content } : {}),
+    },
+    after: updates,
+  }, clientIp(request))
+
   return NextResponse.json({
     success: true,
     storefront_enabled: updates.storefront_enabled ?? current.enabled,
@@ -319,6 +327,10 @@ export async function POST(
     return NextResponse.json({ error: 'Photo stored but organization update failed' }, { status: 500 })
   }
 
+  await logAdminActivity(admin.id, admin.email, 'add_organization_storefront_photo', 'organization', params.id, {
+    path,
+  }, clientIp(request))
+
   const { data: signed } = await supabaseAdmin.storage.from('org-assets').createSignedUrl(path, SIGN_TTL)
   return NextResponse.json({ success: true, path, signedUrl: signed?.signedUrl ?? null })
 }
@@ -353,6 +365,10 @@ export async function DELETE(
     console.error('[org storefront] photo delete save failed:', error)
     return NextResponse.json({ error: 'Photo removed but organization update failed' }, { status: 500 })
   }
+
+  await logAdminActivity(admin.id, admin.email, 'remove_organization_storefront_photo', 'organization', params.id, {
+    path,
+  }, clientIp(request))
 
   return NextResponse.json({ success: true })
 }

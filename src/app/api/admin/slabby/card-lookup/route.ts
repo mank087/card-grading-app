@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { getLabelData, CardForLabel } from '@/lib/labelDataGenerator'
+import sharp from 'sharp'
+import { getLabelData, CardForLabel, CARD_FOR_LABEL_COLUMNS } from '@/lib/labelDataGenerator'
 
 /**
  * Slabby Lab: resolve any card reference into slab-mockup data.
@@ -14,6 +15,12 @@ import { getLabelData, CardForLabel } from '@/lib/labelDataGenerator'
  */
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+
+// Label fields + what this route reads itself (image path, grading JSON).
+const LOOKUP_COLUMNS = `${CARD_FOR_LABEL_COLUMNS}, front_path, user_id, conversational_grading`
+
+// Scenes only need a mockup-sized image; full-res originals bloat the JSON.
+const MAX_IMAGE_EDGE = 1200
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,13 +40,13 @@ export async function GET(request: NextRequest) {
 
     if (uuids && uuids.length > 0) {
       for (const candidate of [...uuids].reverse()) {
-        const { data } = await supabaseAdmin.from('cards').select('*').eq('id', candidate).maybeSingle()
-        if (data) { card = data; break }
+        const { data } = await supabaseAdmin.from('cards').select(LOOKUP_COLUMNS).eq('id', candidate).maybeSingle()
+        if (data) { card = data as any; break }
       }
     }
     if (!card && /^\d{6,10}$/.test(decoded)) {
-      const { data } = await supabaseAdmin.from('cards').select('*').eq('serial', decoded).maybeSingle()
-      if (data) card = data
+      const { data } = await supabaseAdmin.from('cards').select(LOOKUP_COLUMNS).eq('serial', decoded).maybeSingle()
+      if (data) card = data as any
     }
     if (!card) {
       return NextResponse.json({ error: 'Card not found — paste a card details URL, image URL, card id, or serial.' }, { status: 404 })
@@ -55,8 +62,18 @@ export async function GET(request: NextRequest) {
         const res = await fetch(signed.signedUrl)
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer())
-          const mime = res.headers.get('content-type') || 'image/jpeg'
-          image = `data:${mime};base64,${buf.toString('base64')}`
+          try {
+            const small = await sharp(buf)
+              .rotate()
+              .resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 88 })
+              .toBuffer()
+            image = `data:image/jpeg;base64,${small.toString('base64')}`
+          } catch {
+            // Undecodable by sharp: fall back to the original bytes.
+            const mime = res.headers.get('content-type') || 'image/jpeg'
+            image = `data:${mime};base64,${buf.toString('base64')}`
+          }
         }
       }
     }

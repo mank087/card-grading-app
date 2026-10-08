@@ -12,32 +12,66 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { ensureAffiliateStripeCode, describeStripeError } from '@/lib/affiliateStripe';
 
 /**
- * Find the auth user id for an email so referral credits have somewhere to
- * land. Uses the same supabaseAdmin.auth.admin.listUsers() pattern as
- * src/app/api/auth/facebook-deletion/route.ts. Returns null when the person
- * has not signed up yet (an admin can link the account later).
+ * Find the user id for an email so referral credits have somewhere to land.
+ * Looks the email up in public.users (case-insensitive exact match, with
+ * LIKE wildcards escaped) instead of paging auth.admin.listUsers. Returns
+ * null when the person has not signed up yet (an admin can link the account
+ * later).
  */
 async function findUserIdByEmail(email: string): Promise<string | null> {
   const target = email.trim().toLowerCase();
+  if (!target) return null;
   try {
-    let page = 1;
-    // Cap the sweep so a large user table cannot stall affiliate creation.
-    while (page <= 20) {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-      if (error) {
-        console.error('Error listing users for affiliate link:', error);
-        return null;
-      }
-      const users = data?.users || [];
-      const match = users.find((u) => (u.email || '').toLowerCase() === target);
-      if (match) return match.id;
-      if (users.length < 1000) return null;
-      page += 1;
+    const escaped = target.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email')
+      .ilike('email', escaped)
+      .limit(5);
+    if (error) {
+      console.error('Error looking up user for affiliate link:', error);
+      return null;
     }
+    const match = (data || []).find((u) => (u.email || '').toLowerCase() === target);
+    return match?.id ?? null;
   } catch (err) {
     console.error('Error resolving affiliate user by email:', err);
   }
   return null;
+}
+
+type RewardTotals = { granted: number; pending: number; reversed: number };
+
+/**
+ * Sum reward_credits by status per affiliate (credits model). 'paid' rows are
+ * credits already granted; 'pending' rows are credits owed (usually because
+ * the affiliate has no linked account yet). Pages narrow rows in batches of
+ * 1000 so the totals are not capped.
+ */
+async function rewardTotalsByAffiliate(): Promise<Record<string, RewardTotals>> {
+  const totals: Record<string, RewardTotals> = {};
+  const BATCH = 1000;
+  for (let i = 0; i < 100; i++) {
+    const { data, error } = await supabaseAdmin
+      .from('affiliate_commissions')
+      .select('affiliate_id, status, reward_credits')
+      .gt('reward_credits', 0)
+      .order('id', { ascending: true })
+      .range(i * BATCH, i * BATCH + BATCH - 1);
+    if (error) {
+      console.error('Error summing affiliate reward credits:', error);
+      break;
+    }
+    for (const row of data || []) {
+      const t = (totals[row.affiliate_id] ||= { granted: 0, pending: 0, reversed: 0 });
+      const credits = Number(row.reward_credits) || 0;
+      if (row.status === 'paid') t.granted += credits;
+      else if (row.status === 'pending' || row.status === 'approved') t.pending += credits;
+      else if (row.status === 'reversed') t.reversed += credits;
+    }
+    if (!data || data.length < BATCH) break;
+  }
+  return totals;
 }
 
 export async function GET(request: NextRequest) {
@@ -55,9 +89,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || undefined;
 
-    const affiliates = await listAffiliates(status);
+    const [affiliates, rewardTotals] = await Promise.all([
+      listAffiliates(status),
+      rewardTotalsByAffiliate(),
+    ]);
 
-    return NextResponse.json({ affiliates });
+    const withRewards = affiliates.map((a) => ({
+      ...a,
+      reward_credits_granted: rewardTotals[a.id]?.granted ?? 0,
+      reward_credits_pending: rewardTotals[a.id]?.pending ?? 0,
+    }));
+    const totals = withRewards.reduce(
+      (acc, a) => ({
+        reward_credits_granted: acc.reward_credits_granted + a.reward_credits_granted,
+        reward_credits_pending: acc.reward_credits_pending + a.reward_credits_pending,
+      }),
+      { reward_credits_granted: 0, reward_credits_pending: 0 }
+    );
+
+    return NextResponse.json({ affiliates: withRewards, totals });
   } catch (error) {
     console.error('Error listing affiliates:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

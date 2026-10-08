@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { clientIp, logAdminActivity, verifyAdminSession } from '@/lib/admin/adminAuth'
+import { isUuid } from '@/lib/uuid'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function PATCH(
@@ -18,8 +19,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { is_featured } = await request.json()
     const { id: cardId } = await params
+    if (!isUuid(cardId)) {
+      return NextResponse.json({ error: 'Invalid card id' }, { status: 400 })
+    }
+
+    const body = await request.json().catch(() => ({}))
+    const raw = body?.is_featured
+    // Coerce to a real boolean: the column takes whatever JSON arrives otherwise.
+    const is_featured = raw === true || raw === 'true' ? true
+      : raw === false || raw === 'false' ? false
+      : null
+    if (is_featured === null) {
+      return NextResponse.json({ error: 'is_featured must be a boolean' }, { status: 400 })
+    }
 
     // Update the card's featured status
     const { error } = await supabaseAdmin
@@ -31,6 +44,10 @@ export async function PATCH(
       console.error('Error updating featured status:', error)
       throw error
     }
+
+    await logAdminActivity(admin.id, admin.email, is_featured ? 'feature_card' : 'unfeature_card', 'card', cardId, {
+      is_featured,
+    }, clientIp(request))
 
     return NextResponse.json(
       { message: 'Featured status updated successfully', is_featured },

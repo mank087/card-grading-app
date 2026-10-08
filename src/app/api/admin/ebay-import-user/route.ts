@@ -47,7 +47,8 @@ function ebayCategoryFor(cardCategory: string | null | undefined): string {
 }
 
 export async function POST(request: NextRequest) {
-  if (CRON_SECRET && request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
+  // Fail closed: with no CRON_SECRET configured, nobody is authorized.
+  if (!CRON_SECRET || request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
