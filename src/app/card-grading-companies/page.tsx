@@ -88,11 +88,11 @@ const faqs = [
   },
   {
     q: 'What is the cheapest card grading service?',
-    a: 'Among mail-in graders, the lowest listed base price is CGC Bulk at about $15 per card, but it requires a 25-card minimum and was last checked August 24, 2026. For a single card, as of October 8, 2026 SGC lists Standard at $50 and PSA lists Standard at $59.99, with PSA Value services temporarily paused. When last checked in August 2026, Beckett’s cheapest open tier was Express at $79.95 after it paused Base and Standard. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, with no shipping or insurance to add.',
+    a: 'As of October 8, 2026, the cheapest single-card tier among the mail-in graders is CGC Economy at $20 (about 90 working days), followed by SGC Standard at $50, PSA Standard at $59.99 and Beckett Express at $79.95. CGC Bulk is lower at $17 per card, but only on a 25-card submission. PSA lists its Value services as temporarily paused, and Beckett has paused its Base and Standard tiers. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, with no shipping or insurance to add.',
   },
   {
     q: 'Which card grading company is fastest?',
-    a: 'Among mail-in graders, Beckett Express published the shortest turnaround on a cheapest open tier at 15 business days when last checked in August 2026. As of October 8, 2026, SGC lists 40 or more business days on Standard and PSA lists 90 to 100 business days on Standard. CGC Bulk was 100 or more business days when last checked in August 2026. DCM returns a grade in about 60 seconds because nothing ships. Published mail-in turnarounds are estimates, not guarantees, and shipping adds time on top.',
+    a: 'Among mail-in graders, as of October 8, 2026, Beckett Express publishes the shortest turnaround on a cheapest open tier at 15 business days, followed by SGC Standard at 40 or more, CGC Economy at 90 and PSA Standard at 90 to 100. CGC Bulk is about 150 working days. DCM returns a grade in about 60 seconds because nothing ships. Published mail-in turnarounds are estimates, not guarantees, and shipping adds time on top.',
   },
   {
     q: 'Which card grading company should I use?',
@@ -143,14 +143,14 @@ export default function CardGradingCompaniesPage() {
             The major trading card grading companies are <strong>PSA</strong>, <strong>Beckett (BGS)</strong>,{' '}
             <strong>SGC</strong>, <strong>CGC</strong>, <strong>TAG</strong> and <strong>DCM Grading</strong>. The
             first five are mail-in services: you ship the card, it is graded, and it comes back sealed in a slab.
-            Their published base prices run from about $15 (CGC Bulk, 25-card minimum) to about $80 per card, with
-            published turnarounds from 15 to 100-plus business days. PSA and SGC figures were checked October 8,
-            2026; Beckett and CGC figures were last checked in August 2026. DCM is photo-based, grades in about 60 seconds for $2.99 a single card
+            On their cheapest open single-card tiers, published prices run from $20 (CGC Economy) to about $80 per
+            card, with published turnarounds from 15 to 100 business days. CGC Bulk is $17 a card, but only on a
+            25-card submission. All figures were checked October 8, 2026. DCM is photo-based, grades in about 60 seconds for $2.99 a single card
             or as low as $0.66 a card with the VIP package, and the card never leaves your hands.
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
-            row shows its own check date. Business days throughout, shipping excluded. Sources are linked under the
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}; each row shows its own check
+            date. Business days throughout, shipping excluded. Sources are linked under the
             table.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -258,15 +258,15 @@ export default function CardGradingCompaniesPage() {
                 <strong className="text-gray-900">Backlogs.</strong> PSA&apos;s own updates page reported a backlog
                 above 12 million cards in late July 2026, and as of October 8, 2026 PSA&apos;s services page lists
                 Value services as temporarily paused. Beckett paused its Base and Standard tiers on August 5, 2026
-                after a reported 102 percent year-over-year rise in submissions; it targeted a mid-September
-                reopening, and reports since conflict on whether it held. Published turnarounds are estimates, not
+                after a reported 102 percent year-over-year rise in submissions, and as of October 8, 2026 they remain
+                temporarily paused with a waitlist open. Published turnarounds are estimates, not
                 guarantees.
               </p>
               <p>
                 <strong className="text-gray-900">Faster tiers.</strong> Every mail-in service sells faster tiers at
-                higher prices. As of October 8, 2026, SGC Expedited (2 to 3 business days) starts at $150, PSA Express
-                is $199 for 20 to 30 business days and PSA Super Express is $349 for 10 to 15, and walk-through service
-                at Beckett runs $250 or more. Those tiers make sense for cards worth several hundred dollars and up.
+                higher prices. As of October 8, 2026, CGC Standard is $55 for 10 days and CGC Express $100 for 5, SGC
+                Expedited (2 to 3 business days) starts at $150, PSA Express is $199 for 20 to 30 business days and
+                PSA Super Express is $349 for 10 to 15. Those tiers make sense for cards worth several hundred dollars and up.
               </p>
               <p>
                 <strong className="text-gray-900">Subgrades.</strong> Beckett prints subgrades on the label at every
@@ -297,7 +297,7 @@ export default function CardGradingCompaniesPage() {
                 <li>• You are building a registry set, which needs a slab from a company that runs one.</li>
                 <li>• The buyer you have in mind specifically wants a slab in hand from that company.</li>
                 <li>• The card is a vintage or high-dollar piece where a third-party authenticity opinion matters.</li>
-                <li>• You can absorb the published turnaround, which on the cheapest open tiers runs from 15 to 100-plus business days.</li>
+                <li>• You can absorb the published turnaround, which on the cheapest open single-card tiers runs from 15 to 100 business days.</li>
               </ul>
             </div>
             <div className="bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">

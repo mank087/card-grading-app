@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = completeMetadata({
   title: "Fastest Card Grading: Turnarounds Compared",
   description:
-    "Published turnarounds for PSA, Beckett, SGC and CGC run 15 to 100+ business days on their cheapest open tiers. DCM grades from two photos in about 60 seconds.",
+    "Published turnarounds for PSA, Beckett, SGC and CGC run 15 to 100 business days on their cheapest open tiers. DCM grades from two photos in about 60 seconds.",
   keywords:
     'fastest card grading, card grading turnaround times, how long does card grading take, fast card grading service, instant card grading, same day card grading',
   alternates: { canonical: 'https://dcmgrading.com/fastest-card-grading' },
@@ -83,11 +83,11 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the fastest card grading service?',
-    a: 'DCM returns a grade in about 60 seconds because nothing ships: you photograph the front and back and the grade comes back with four subgrades and a written reason for every deduction. Among the mail-in graders, Beckett Express published the shortest turnaround on a cheapest open tier at 15 business days when last checked in August 2026. As of October 8, 2026, SGC lists 40 or more business days on Standard and PSA lists 90 to 100 business days on Standard; CGC Bulk was 100 or more when last checked in August 2026. Every mail-in service also sells faster tiers at higher prices.',
+    a: 'DCM returns a grade in about 60 seconds because nothing ships: you photograph the front and back and the grade comes back with four subgrades and a written reason for every deduction. Among the mail-in graders, as of October 8, 2026, Beckett Express publishes the shortest turnaround on a cheapest open tier at 15 business days, followed by SGC Standard at 40 or more, CGC Economy at 90 and PSA Standard at 90 to 100. Every mail-in service also sells faster tiers at higher prices.',
   },
   {
     q: 'How long does card grading take in 2026?',
-    a: 'On the cheapest open tiers, published turnarounds run from 15 business days to more than 100: SGC Standard 40 or more and PSA Standard 90 to 100 as of October 8, 2026, with Beckett Express at 15 and CGC Bulk at 100 or more when last checked in August 2026. Those figures exclude shipping in both directions, and they are estimates, not guarantees. PSA reported a backlog above 12 million cards in late July 2026 and still lists its Value services as temporarily paused, and Beckett paused its two cheapest tiers on August 5 after a reported 102 percent year-over-year rise in submissions.',
+    a: 'On the cheapest open single-card tiers, published turnarounds run from 15 to 100 business days as of October 8, 2026: Beckett Express 15, SGC Standard 40 or more, CGC Economy 90 and PSA Standard 90 to 100. CGC Bulk is about 150 working days. Those figures exclude shipping in both directions, and they are estimates, not guarantees. PSA reported a backlog above 12 million cards in late July 2026 and still lists its Value services as temporarily paused, and Beckett paused its two cheapest tiers on August 5 after a reported 102 percent year-over-year rise in submissions; they remain paused.',
   },
   {
     q: 'Can you get a card graded the same day?',
@@ -133,14 +133,13 @@ export default function FastestCardGradingPage() {
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
             The fastest way to get a card graded is not to ship it. DCM grades from two photos in{' '}
             <strong>about 60 seconds</strong>, with no packing, no insurance and no return queue. Among the mail-in
-            graders, Beckett published <strong>15 business days</strong> on Express when last checked in August
-            2026. As of October 8, 2026, SGC lists <strong>40 or more</strong> on Standard and PSA lists{' '}
-            <strong>90 to 100</strong> on Standard, and CGC Bulk was <strong>100 or more</strong> when last checked
-            in August — all before shipping in either direction.
+            graders as of October 8, 2026, Beckett publishes <strong>15 business days</strong> on Express, SGC{' '}
+            <strong>40 or more</strong> on Standard, CGC <strong>90</strong> on Economy and PSA{' '}
+            <strong>90 to 100</strong> on Standard, all before shipping in either direction.
           </p>
           <p className="text-sm text-gray-500">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
-            row shows its own check date. Business days, shipping excluded. Sources below.
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}; each row shows its own check
+            date. Business days, shipping excluded. Sources below.
           </p>
         </section>
 
@@ -181,9 +180,9 @@ export default function FastestCardGradingPage() {
           </div>
           <p className="text-sm text-gray-600 mt-4">
             Turnaround is quoted for the cheapest open tier at each company as of the row&apos;s check date. Faster
-            tiers exist everywhere at higher prices. As of October 8, 2026, SGC Expedited (2 to 3 business days)
-            starts at $150, PSA Express is $199 for 20 to 30 business days and PSA Super Express is $349 for 10 to 15,
-            and walk-through service at Beckett runs $250 or more.
+            tiers exist everywhere at higher prices. As of October 8, 2026, CGC Standard is $55 for 10 days and CGC
+            Express $100 for 5, SGC Expedited (2 to 3 business days) starts at $150, PSA Express is $199 for 20 to 30
+            business days and PSA Super Express is $349 for 10 to 15.
           </p>
         </section>
 
@@ -194,9 +193,8 @@ export default function FastestCardGradingPage() {
             <p className="text-gray-700 mb-3">
               PSA&apos;s submission updates page reported a backlog above 12 million cards in late July 2026, and as
               of October 8, 2026 its services page lists Value services as temporarily paused. Beckett paused its Base
-              and Standard tiers on August 5, 2026 after a reported 102 percent year-over-year rise in submissions; it
-              targeted a mid-September reopening, and reports since conflict on whether it held. Check Beckett directly
-              for current status.
+              and Standard tiers on August 5, 2026 after a reported 102 percent year-over-year rise in submissions,
+              and as of October 8, 2026 they remain temporarily paused with a waitlist open.
             </p>
             <p className="text-gray-700">
               Published turnarounds are estimates, not guarantees. Add insured shipping in both directions on

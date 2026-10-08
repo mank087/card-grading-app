@@ -85,11 +85,11 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the cheapest card grading service?',
-    a: 'The lowest listed base price among the mail-in graders is CGC Bulk at about $15 per card, but it requires a 25-card minimum and was last checked August 24, 2026. For a single card, as of October 8, 2026 SGC lists Standard at $50 and PSA lists Standard at $59.99, with PSA Value services temporarily paused. When last checked in August 2026, Beckett had paused Base and Standard, leaving Express at $79.95 as its cheapest open level. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, and nothing ships.',
+    a: 'As of October 8, 2026, the cheapest single-card tier among the mail-in graders is CGC Economy at $20 (about 90 working days), followed by SGC Standard at $50, PSA Standard at $59.99 and Beckett Express at $79.95. CGC Bulk is lower at $17 per card, but only on a 25-card submission. PSA lists its Value services as temporarily paused, and Beckett has paused its Base and Standard tiers. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, and nothing ships.',
   },
   {
     q: 'How much does it cost to get a card graded?',
-    a: 'Budget about $15 to $80 per card for a mail-in grade on the cheapest open tiers (about $15 only on a 25-card CGC Bulk submission; $50 to $80 for a single card), plus $15 to $40 of insured shipping in each direction depending on declared value. The advertised tier price is only part of the total: shipping, insurance, and in some cases subgrades or minimum submission sizes are extra. Grading at home costs $2.99 for a single card at DCM with nothing to add.',
+    a: 'Budget $20 to about $80 per card for a single mail-in grade on the cheapest open tiers as of October 8, 2026 ($17 a card on a 25-card CGC Bulk submission), plus $15 to $40 of insured shipping in each direction depending on declared value. The advertised tier price is only part of the total: shipping, insurance, and in some cases subgrades or minimum submission sizes are extra. Grading at home costs $2.99 for a single card at DCM with nothing to add.',
   },
   {
     q: 'What does a card grading price include?',
@@ -97,7 +97,7 @@ const faqs = [
   },
   {
     q: 'Is cheap card grading worth it?',
-    a: 'It depends on whether the card needs a slab or just a documented grade. On a $30 card, a $15 to $80 fee plus shipping plus a queue of 15 to 100-plus business days rarely pays for itself, and that describes most of a normal collection. Where a card is valuable enough that a sealed, recognized slab changes what a buyer will pay, the fee is doing real work.',
+    a: 'It depends on whether the card needs a slab or just a documented grade. On a $30 card, a $20 to $80 fee plus shipping plus a queue of 15 to 100 business days rarely pays for itself, and that describes most of a normal collection. Where a card is valuable enough that a sealed, recognized slab changes what a buyer will pay, the fee is doing real work.',
   },
 ];
 
@@ -133,16 +133,16 @@ export default function CheapestCardGradingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-5">Cheapest Card Grading</h1>
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
-            The lowest listed mail-in price is <strong>CGC Bulk at about $15</strong> per card on a 25-card minimum
-            (last checked August 24, 2026). For a single card, as of October 8, 2026 <strong>SGC Standard is $50</strong>{' '}
-            and <strong>PSA Standard is $59.99</strong>, with PSA Value services temporarily paused. Beckett&apos;s
-            cheapest open tier when last checked in August 2026 was Express at <strong>$79.95</strong>. None of those
-            figures includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, and{' '}
+            As of October 8, 2026, the cheapest single-card mail-in price is <strong>CGC Economy at $20</strong>,
+            then <strong>SGC Standard at $50</strong>, <strong>PSA Standard at $59.99</strong> and{' '}
+            <strong>Beckett Express at $79.95</strong>. CGC Bulk is lower at $17 a card, but only on a 25-card
+            submission. PSA lists its Value services as temporarily paused, and Beckett has paused Base and
+            Standard. None of those figures includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, and{' '}
             <strong>as low as $0.66 a card with the 150-credit VIP package</strong>.
           </p>
           <p className="text-sm text-gray-500">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
-            row shows its own check date. Per card, shipping excluded. Sources below.
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}; each row shows its own check
+            date. Per card, shipping excluded. Sources below.
           </p>
         </section>
 
@@ -194,7 +194,7 @@ export default function CheapestCardGradingPage() {
             <ul className="space-y-3 text-gray-700">
               <li>
                 <strong className="text-gray-900">Shipping and insurance are extra everywhere it applies.</strong>{' '}
-                Insured shipping both ways typically runs $15 to $40 depending on declared value. On a $15 grading
+                Insured shipping both ways typically runs $15 to $40 depending on declared value. On a $20 grading
                 fee, that is the majority of the real cost.
               </li>
               <li>
@@ -209,7 +209,8 @@ export default function CheapestCardGradingPage() {
               <li>
                 <strong className="text-gray-900">Budget tiers get paused.</strong> The affordable tiers are the first
                 to close when submissions spike, which is exactly what happened at PSA and Beckett in the summer of
-                2026. As of October 8, 2026, PSA still lists its Value services as temporarily paused.
+                2026. As of October 8, 2026, PSA still lists its Value services as temporarily paused, and Beckett&apos;s Base
+                and Standard tiers remain paused with a waitlist open.
               </li>
               <li>
                 <strong className="text-gray-900">A mail-in fee buys a sealed slab.</strong> That is a real thing the
