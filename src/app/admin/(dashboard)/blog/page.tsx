@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { BlogPost } from '@/types/blog';
 
+type SortKey = 'title' | 'category' | 'status' | 'published_at' | 'view_count';
+
 interface PaginationData {
   page: number;
   limit: number;
@@ -24,10 +26,46 @@ export default function AdminBlogPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // null = default order (most recently updated first)
+  const [sortBy, setSortBy] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchPosts();
-  }, [pagination.page, search, statusFilter]);
+  }, [pagination.page, search, statusFilter, sortBy, sortDir]);
+
+  // Click a header to sort by it; click again to flip the direction.
+  // Text columns start A to Z, dates and views start newest/highest.
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDir(dir => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir(key === 'published_at' || key === 'view_count' ? 'desc' : 'asc');
+    }
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const SortHeader = ({ label, sortKey }: { label: string; sortKey: SortKey }) => {
+    const active = sortBy === sortKey;
+    return (
+      <th
+        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <button
+          type="button"
+          onClick={() => handleSort(sortKey)}
+          className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-900 ${active ? 'text-gray-900' : ''}`}
+        >
+          {label}
+          <span aria-hidden="true" className={active ? '' : 'opacity-30'}>
+            {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲▼'}
+          </span>
+        </button>
+      </th>
+    );
+  };
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -38,6 +76,10 @@ export default function AdminBlogPage() {
         status: statusFilter,
         search,
       });
+      if (sortBy) {
+        params.set('sort', sortBy);
+        params.set('dir', sortDir);
+      }
 
       const response = await fetch(`/api/admin/blog/posts?${params}`);
       if (response.ok) {
@@ -171,21 +213,11 @@ export default function AdminBlogPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Published
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Views
-                  </th>
+                  <SortHeader label="Title" sortKey="title" />
+                  <SortHeader label="Category" sortKey="category" />
+                  <SortHeader label="Status" sortKey="status" />
+                  <SortHeader label="Published" sortKey="published_at" />
+                  <SortHeader label="Views" sortKey="view_count" />
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>

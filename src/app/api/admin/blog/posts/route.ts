@@ -23,6 +23,18 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status'); // draft, published, scheduled, archived
     const search = searchParams.get('search');
     const offset = (page - 1) * limit;
+    // Sortable columns in the admin table. Category sorts by the related
+    // category's name; ties fall back to most recently updated.
+    const SORT_COLUMNS: Record<string, string> = {
+      title: 'title',
+      category: 'category(name)',
+      status: 'status',
+      published_at: 'published_at',
+      view_count: 'view_count',
+      updated_at: 'updated_at',
+    };
+    const sortColumn = SORT_COLUMNS[searchParams.get('sort') || ''] || 'updated_at';
+    const ascending = searchParams.get('dir') === 'asc';
 
     let query = supabaseAdmin
       .from('blog_posts')
@@ -30,7 +42,8 @@ export async function GET(request: NextRequest) {
         *,
         category:blog_categories(*)
       `, { count: 'exact' })
-      .order('updated_at', { ascending: false });
+      .order(sortColumn, { ascending, nullsFirst: false });
+    if (sortColumn !== 'updated_at') query = query.order('updated_at', { ascending: false });
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
