@@ -16,6 +16,7 @@ import { getOrgForUser } from '@/lib/organizations'
 import { stripe } from '@/lib/stripe'
 import { ORG_PLANS, ORG_OVERAGE_PACK, OrgPlanKey } from '@/lib/orgPlans'
 import { orgTaxParams, priceDataTaxBehavior } from '@/lib/stripeTax'
+import { gaClientIdMetadata } from '@/lib/ga4MeasurementProtocol'
 
 export const runtime = 'nodejs'
 
@@ -124,7 +125,9 @@ export async function POST(request: NextRequest) {
             ...priceDataTaxBehavior(),
           },
         }],
-        metadata,
+        // ga_client_id (session only): the webhook's server-side GA4 purchase
+        // uses the owner's own GA client id when they had analytics on.
+        metadata: { ...metadata, ...gaClientIdMetadata(request) },
         subscription_data: { metadata },
       })
       return NextResponse.json({ url: session.url })
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
           dcm_type: 'org_topup',
           orgId: org.id,
           grades: String(grades),
+          ...gaClientIdMetadata(request),
         },
       })
       return NextResponse.json({ url: session.url })

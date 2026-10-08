@@ -11,6 +11,7 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 import { getAffiliateByCode } from '@/lib/affiliates';
 import { taxParams, priceDataTaxBehavior } from '@/lib/stripeTax';
+import { gaClientIdMetadata } from '@/lib/ga4MeasurementProtocol';
 
 export async function POST(request: NextRequest) {
   try {
@@ -170,7 +171,9 @@ export async function POST(request: NextRequest) {
       // 36% off, so the field is only offered at list price.
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: sessionMetadata,
+      // ga_client_id (session only) tells the webhook the browser had GA and
+      // sends GA4 `purchase` itself, so no server-side duplicate is sent.
+      metadata: { ...sessionMetadata, ...gaClientIdMetadata(request) },
       payment_intent_data: {
         metadata: sessionMetadata,
       },

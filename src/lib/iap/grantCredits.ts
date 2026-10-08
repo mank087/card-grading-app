@@ -10,6 +10,7 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getProduct } from '@/lib/iap/products'
 import { enqueueAdConversion } from '@/lib/adConversions'
+import { sendGa4Purchase } from '@/lib/ga4MeasurementProtocol'
 
 export interface RecordIAPInput {
   userId: string
@@ -167,6 +168,18 @@ export async function recordIAPTransaction(input: RecordIAPInput): Promise<Recor
       currency: 'USD',
       occurredAt: input.periodStart ?? undefined,
     })
+    // Server-side GA4 purchase (never throws; no-op without
+    // GA4_MP_API_SECRET). The apps run no GA, so this is the only report.
+    // Sandbox (TestFlight / license tester) purchases are not sent.
+    if ((input.environment ?? 'production') === 'production') {
+      await sendGa4Purchase({
+        transactionId: `iap_${input.platform}_${input.transactionId}`.slice(0, 64),
+        value: product.priceUsd,
+        currency: 'USD',
+        items: [{ item_id: product.productId, item_name: product.label, price: product.priceUsd, quantity: 1 }],
+        source: input.platform === 'apple' ? 'apple' : 'google_play',
+      })
+    }
   }
 
   return {

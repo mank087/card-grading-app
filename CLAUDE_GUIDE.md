@@ -2546,6 +2546,11 @@ PRICECHARTING_API_TOKEN=
 ```env
 USE_V5_ARCHITECTURE=true    # Enable v5 grading
 NEXT_PUBLIC_BASE_URL=https://www.dcmgrading.com
+# GA4 Measurement Protocol secret (GA4 Admin > Data streams > web stream >
+# Measurement Protocol API secrets). Enables server-side GA4 purchase events
+# for IAP, no-consent web and org purchases (src/lib/ga4MeasurementProtocol.ts).
+# Unset = no-op.
+GA4_MP_API_SECRET=
 ```
 
 ---

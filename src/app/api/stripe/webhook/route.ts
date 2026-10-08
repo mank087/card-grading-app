@@ -26,6 +26,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { enqueueAdConversion } from '@/lib/adConversions';
 import { analyticsTransactionId } from '@/lib/analyticsTransactionId';
+import { sendGa4Purchase, Ga4Item } from '@/lib/ga4MeasurementProtocol';
 import Stripe from 'stripe';
 import { Resend } from 'resend';
 
@@ -187,6 +188,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Server-side GA4 purchase for a completed Checkout Session (never throws).
+ * Consumer purchases whose session carries ga_client_id are skipped: the
+ * buyer's browser had GA running and its success page already sent
+ * `purchase`. Org purchases have no browser purchase event, so they are
+ * always sent (under the buyer's own client id when known). Test-mode
+ * sessions are never sent. transaction_id matches the browser's GA4 id.
+ */
+async function reportGa4Purchase(
+  session: Stripe.Checkout.Session,
+  items: Ga4Item[],
+  opts: { org?: boolean } = {}
+) {
+  if (!session.livemode) return;
+  const gaClientId = session.metadata?.ga_client_id;
+  if (gaClientId && !opts.org) return;
+  await sendGa4Purchase({
+    clientId: gaClientId,
+    transactionId: analyticsTransactionId(session.id),
+    value: (session.amount_total || 0) / 100,
+    currency: session.currency || 'usd',
+    items,
+    source: opts.org ? 'stripe_org' : 'stripe',
+  });
+}
+
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   console.log('Processing checkout.session.completed:', session.id);
 
@@ -265,6 +292,9 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       value: (session.amount_total || 0) / 100,
       currency: session.currency || 'usd',
     });
+    await reportGa4Purchase(session, [
+      { item_id: 'founders', item_name: 'Founders Package', price: (session.amount_total || 0) / 100, quantity: 1 },
+    ]);
     return;
   }
 
@@ -297,6 +327,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       value: (session.amount_total || 0) / 100,
       currency: session.currency || 'usd',
     });
+    // Items mirror the /credits/success GA4 purchase (item_id = tier).
+    await reportGa4Purchase(session, [
+      { item_id: tier || 'vip', item_name: `${credits} Credits`, price: (session.amount_total || 0) / 100, quantity: 1 },
+    ]);
     return;
   }
 
@@ -352,6 +386,10 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     value: (session.amount_total || 0) / 100,
     currency: session.currency || 'usd',
   });
+  // Items mirror the /credits/success GA4 purchase.
+  await reportGa4Purchase(session, [
+    { item_id: tier || 'credits', item_name: `${credits} Credits`, price: (session.amount_total || 0) / 100, quantity: 1 },
+  ]);
 }
 
 /**
@@ -454,6 +492,10 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     value: (session.amount_total || 0) / 100,
     currency: session.currency || 'usd',
   });
+  // Items mirror the /card-lovers/success GA4 purchase.
+  await reportGa4Purchase(session, [
+    { item_id: `card_lovers_${plan}`, item_name: `Card Lovers ${plan}`, price: (session.amount_total || 0) / 100, quantity: 1 },
+  ]);
 }
 
 /**
@@ -1141,6 +1183,9 @@ async function handleOrgSubscriptionCheckout(session: Stripe.Checkout.Session) {
   // deposit dedupe already fired the first time).
   if (!deposit.alreadyProcessed) {
     await sendOrgActivationEmail(org, session, subscriptionId, plan || org.plan, grades);
+    await reportGa4Purchase(session, [
+      { item_id: `org_plan_${plan || org.plan}`, item_name: `Enterprise ${plan || org.plan} plan`, price: (session.amount_total || 0) / 100, quantity: 1 },
+    ], { org: true });
   }
 }
 
@@ -1345,5 +1390,10 @@ async function handleOrgTopup(session: Stripe.Checkout.Session) {
   if (!deposit.success) {
     // 500 so Stripe redelivers — the paid pack must not be dropped.
     throw new Error(`[handleOrgTopup] Top-up deposit failed for org ${orgId}: ${deposit.error || 'unknown error'}`);
+  }
+  if (!deposit.alreadyProcessed) {
+    await reportGa4Purchase(session, [
+      { item_id: 'org_topup', item_name: `Enterprise overage pack (${grades} grades)`, price: (session.amount_total || 0) / 100, quantity: 1 },
+    ], { org: true });
   }
 }

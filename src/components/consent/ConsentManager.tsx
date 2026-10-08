@@ -66,6 +66,11 @@ const COOKIE_NAME = 'dcm_consent'
 // so the banner must never overlay them. No trackers load there either.
 const FULLSCREEN_ROUTES = ['/label-export', '/label-preview']
 
+// DCM's own admin console is staff traffic: no trackers load there (2026-10-08).
+function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
 const VENDOR_LIST = 'Google Analytics, Google Ads, Meta, Reddit, Microsoft Advertising'
 
 type ConsentState = 'granted' | 'essential' | null
@@ -215,7 +220,7 @@ export default function ConsentManager() {
   // no trackers, so the host is checked alongside the path.
   const [tenantHost, setTenantHost] = useState(false)
   useEffect(() => { setTenantHost(isStorefrontHost(window.location.hostname)) }, [])
-  const suppressed = tenantHost || (!!pathname && (FULLSCREEN_ROUTES.some(p => pathname.startsWith(p)) || isOrgPublicPath(pathname)))
+  const suppressed = tenantHost || (!!pathname && (FULLSCREEN_ROUTES.some(p => pathname.startsWith(p)) || isOrgPublicPath(pathname) || isAdminPath(pathname)))
   const [consent, setConsent] = useState<ConsentState>(null)
   const [bannerOpen, setBannerOpen] = useState(false)
   const [gpcActive, setGpcActive] = useState(false)
@@ -225,6 +230,13 @@ export default function ConsentManager() {
   // for a clean page and a later "accept" can upgrade instead of re-adding.
   const googleLoaded = useRef<'none' | 'denied' | 'granted'>('none')
   const vendorsLoaded = useRef(false)
+
+  // Client-side navigation into /admin after trackers loaded on another page:
+  // GA4 enhanced measurement would still send history page_views. Google's
+  // documented opt-out flag silences GA4 while on admin pages and lifts on exit.
+  useEffect(() => {
+    ;(window as any)['ga-disable-G-YLC2FKKBGC'] = !!pathname && isAdminPath(pathname)
+  }, [pathname])
 
   useEffect(() => {
     if (suppressed) { installStubs(); return }
@@ -260,14 +272,17 @@ export default function ConsentManager() {
       } catch { logConsent('shown', 'banner', r, m) }
     }
 
+    // Leaving a suppressed page (e.g. /admin) re-runs this effect; tags that
+    // already loaded on this page are not loaded a second time.
     if (stored === 'granted') {
-      loadGoogle(true); googleLoaded.current = 'granted'
-      loadOtherVendors(); vendorsLoaded.current = true
+      if (googleLoaded.current === 'none') { loadGoogle(true); googleLoaded.current = 'granted' }
+      else if (googleLoaded.current === 'denied') { grantGoogle(); googleLoaded.current = 'granted' }
+      if (!vendorsLoaded.current) { loadOtherVendors(); vendorsLoaded.current = true }
       captureClickIdsFromUrl()
     } else if (stored === null && m === 'us-optout') {
       // US notice-and-opt-out: Google in Consent Mode denied only. Nothing
       // else, and never for GPC (m is forced to strict above).
-      loadGoogle(false); googleLoaded.current = 'denied'
+      if (googleLoaded.current === 'none') { loadGoogle(false); googleLoaded.current = 'denied' }
       captureClickIdsFromUrl()
     }
 

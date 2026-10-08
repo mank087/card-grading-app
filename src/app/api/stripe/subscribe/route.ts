@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { stripe, CARD_LOVERS_SUBSCRIPTION, CardLoversPlan } from '@/lib/stripe';
 import { getAffiliateByCode } from '@/lib/affiliates';
 import { taxParams } from '@/lib/stripeTax';
+import { gaClientIdMetadata } from '@/lib/ga4MeasurementProtocol';
 import Stripe from 'stripe';
 
 // Create Supabase client for auth
@@ -157,7 +158,9 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${origin}/card-lovers/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/card-lovers`,
-      metadata: sessionMetadata,
+      // ga_client_id (session only) tells the webhook the browser had GA and
+      // sends GA4 `purchase` itself, so no server-side duplicate is sent.
+      metadata: { ...sessionMetadata, ...gaClientIdMetadata(request) },
       subscription_data: {
         metadata: sessionMetadata,
       },
