@@ -352,6 +352,21 @@ function CreditsPageContent() {
         throw new Error('Not authenticated')
       }
 
+      // Track begin_checkout event (item ids match the purchase event on
+      // /card-lovers/success)
+      if (typeof window !== 'undefined' && window.gtag) {
+        window.gtag('event', 'begin_checkout', {
+          currency: 'USD',
+          value: CARD_LOVERS_PLANS[cardLoversSelectedPlan].price,
+          items: [{
+            item_id: `card_lovers_${cardLoversSelectedPlan}`,
+            item_name: `Card Lovers ${cardLoversSelectedPlan}`,
+            price: CARD_LOVERS_PLANS[cardLoversSelectedPlan].price,
+            quantity: 1
+          }]
+        })
+      }
+
       // Track subscription attempt
       if (typeof window !== 'undefined' && window.fbq) {
         window.fbq('track', 'InitiateCheckout', {

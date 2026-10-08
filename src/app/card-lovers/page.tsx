@@ -131,7 +131,7 @@ export default function CardLoversPage() {
           window.gtag('event', 'begin_checkout', {
             value,
             currency: 'USD',
-            items: [{ item_id: `card_lovers_${plan}`, item_name: `Card Lovers ${plan}`, price: value }]
+            items: [{ item_id: `card_lovers_${plan}`, item_name: `Card Lovers ${plan}`, price: value, quantity: 1 }]
           })
         }
       }

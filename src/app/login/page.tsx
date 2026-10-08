@@ -110,7 +110,8 @@ function LoginPageContent() {
         } else {
           // Track SignUp conversions
           if (typeof window !== 'undefined') {
-            const signupId = `signup_${Date.now()}_${email.split('@')[0]}`
+            // Random id: never derive pixel ids from the email address (PII).
+            const signupId = `signup_${typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`}`
 
             // Reddit SignUp conversion
             if (window.rdt) {
@@ -120,12 +121,13 @@ function LoginPageContent() {
               console.log('[Reddit Pixel] SignUp event tracked with conversionId:', signupId)
             }
 
-            // Google Analytics sign_up event
+            // Form submitted, account not yet confirmed. The real GA4 sign_up
+            // fires once in /auth/callback when the email link is clicked.
             if (window.gtag) {
-              window.gtag('event', 'sign_up', {
+              window.gtag('event', 'sign_up_submitted', {
                 method: 'email'
               })
-              console.log('[GA4] sign_up event tracked')
+              console.log('[GA4] sign_up_submitted event tracked')
             }
 
             // Meta/Facebook CompleteRegistration event
@@ -157,6 +159,10 @@ function LoginPageContent() {
           const createdAt = new Date(result.user.created_at || 0).getTime()
           const now = Date.now()
           const isNewUser = (now - createdAt) < 60000
+
+          if (!isNewUser && typeof window.gtag === 'function') {
+            window.gtag('event', 'login', { method: 'email' })
+          }
 
           // A new user who came in from a pricing CTA goes back to the plan
           // they picked, so the purchase they started is not lost by the

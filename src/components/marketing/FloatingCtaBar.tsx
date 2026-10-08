@@ -126,11 +126,6 @@ export default function FloatingCtaBar({
         event_label: location,
         page: source,
       })
-      window.gtag('event', 'conversion', {
-        send_to: 'G-YLC2FKKBGC',
-        event_category: 'signup',
-        event_label: `${source}_${location}`,
-      })
     }
     if (window.rdt) {
       window.rdt('track', 'Lead', { conversionId: `lead_${source}_${Date.now()}_${location}` })
@@ -168,7 +163,7 @@ export default function FloatingCtaBar({
       } else {
         if (typeof window !== 'undefined') {
           if (window.rdt) window.rdt('track', 'SignUp', { conversionId: `signup_${source}_${Date.now()}` })
-          if (window.gtag) window.gtag('event', 'sign_up', { method: 'email' })
+          if (window.gtag) window.gtag('event', 'sign_up_submitted', { method: 'email' })
           if (window.fbq) window.fbq('track', 'CompleteRegistration', { content_name: `${source} Floating Signup` })
           if ((window as any).uetq) (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: `${source}_floating_email` })
         }

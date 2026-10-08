@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
-import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
+import { analyticsTransactionId, claimPurchaseTracking } from '@/lib/analyticsTransactionId'
 
 // Declare rdt, gtag, and fbq for TypeScript
 declare global {
@@ -27,8 +27,9 @@ function PurchaseSuccessContent() {
   const credits = parseInt(searchParams.get('credits') || '0')
 
   useEffect(() => {
-    // Track purchase conversions (only once)
-    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && sessionId) {
+    // Track purchase conversions (only once). The ref covers re-renders of this
+    // mount; claimPurchaseTracking persists across reloads and revisits.
+    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && sessionId && claimPurchaseTracking(sessionId)) {
       // Track Reddit Purchase conversion
       if (window.rdt) {
         window.rdt('track', 'Purchase', {

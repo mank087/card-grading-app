@@ -25,6 +25,9 @@ export default function LeadForm() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
       setDone(true)
+      if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
+        (window as any).gtag('event', 'generate_lead', { lead_type: 'enterprise_inquiry' })
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {

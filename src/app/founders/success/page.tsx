@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
 import Image from 'next/image'
-import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
+import { analyticsTransactionId, claimPurchaseTracking } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -25,8 +25,9 @@ function FounderSuccessContent() {
   const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
-    // Track purchase conversions (only once)
-    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && sessionId) {
+    // Track purchase conversions (only once). The ref covers re-renders of this
+    // mount; claimPurchaseTracking persists across reloads and revisits.
+    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && sessionId && claimPurchaseTracking(sessionId)) {
       // Track Reddit Purchase conversion
       if (window.rdt) {
         window.rdt('track', 'Purchase', {

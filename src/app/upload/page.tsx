@@ -889,11 +889,6 @@ function UniversalUploadPageContent() {
                     is_free_credit: isFreeUser,
                     card_type: config.category,
                   });
-                  (window as any).gtag('event', 'conversion', {
-                    send_to: 'G-YLC2FKKBGC',
-                    event_category: 'first_grade',
-                    event_label: isFreeUser ? 'free_credit' : 'purchased_credit',
-                  });
                 }
                 if ((window as any).fbq) {
                   (window as any).fbq('track', 'StartTrial', {

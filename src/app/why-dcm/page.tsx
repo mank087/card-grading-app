@@ -27,11 +27,6 @@ const trackSignupClick = (location: string) => {
       event_label: location,
       page: 'why-dcm-landing',
     })
-    window.gtag('event', 'conversion', {
-      send_to: 'G-YLC2FKKBGC',
-      event_category: 'signup',
-      event_label: `why_dcm_${location}`,
-    })
   }
   if (window.rdt) {
     window.rdt('track', 'Lead', { conversionId: `lead_whydcm_${Date.now()}_${location}` })
@@ -66,10 +61,10 @@ export default function WhyDcmPage() {
     // Analytics
     if (typeof window !== 'undefined') {
       if (window.gtag) {
-        window.gtag('event', 'page_view', {
-          page_title: 'Why DCM Landing',
-          page_location: window.location.href,
-          page_path: '/why-dcm',
+        // Page views are recorded by GA4 enhanced measurement; this only
+        // tags the landing and its traffic source.
+        window.gtag('event', 'landing_view', {
+          landing: 'why-dcm',
           traffic_source: 'paid',
         })
       }
@@ -136,7 +131,7 @@ export default function WhyDcmPage() {
       } else {
         if (typeof window !== 'undefined') {
           if (window.rdt) window.rdt('track', 'SignUp', { conversionId: `signup_whydcm_hero_${Date.now()}` })
-          if (window.gtag) window.gtag('event', 'sign_up', { method: 'email' })
+          if (window.gtag) window.gtag('event', 'sign_up_submitted', { method: 'email' })
           if (window.fbq) window.fbq('track', 'CompleteRegistration', { content_name: 'Why DCM Hero Signup' })
           if ((window as any).uetq) (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'why_dcm_hero_email' })
         }

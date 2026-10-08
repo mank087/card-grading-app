@@ -113,7 +113,7 @@ export default function VipPage() {
           window.gtag('event', 'begin_checkout', {
             value: 99,
             currency: 'USD',
-            items: [{ item_id: 'vip', item_name: 'VIP Package', price: 99 }]
+            items: [{ item_id: 'vip', item_name: 'VIP Package', price: 99, quantity: 1 }]
           })
         }
       }

@@ -25,6 +25,7 @@ import {
 } from '@/lib/affiliates';
 import { createClient } from '@supabase/supabase-js';
 import { enqueueAdConversion } from '@/lib/adConversions';
+import { analyticsTransactionId } from '@/lib/analyticsTransactionId';
 import Stripe from 'stripe';
 import { Resend } from 'resend';
 
@@ -255,6 +256,15 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       console.error('Failed to set founder status:', { userId, error: founderResult.error });
     }
     await processAffiliateAttribution(session, userId);
+    // Server-side ad conversion (consent-gated inside; never throws). Order id
+    // matches the browser's Google Ads transaction_id on /founders/success.
+    await enqueueAdConversion({
+      userId,
+      source: 'stripe',
+      eventId: analyticsTransactionId(session.id, 'founders_'),
+      value: (session.amount_total || 0) / 100,
+      currency: session.currency || 'usd',
+    });
     return;
   }
 
@@ -278,6 +288,15 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       console.error('Failed to set VIP status:', { userId, error: vipResult.error });
     }
     await processAffiliateAttribution(session, userId);
+    // Server-side ad conversion (consent-gated inside; never throws). VIP lands
+    // on /credits/success, so the order id carries no prefix, like credits.
+    await enqueueAdConversion({
+      userId,
+      source: 'stripe',
+      eventId: analyticsTransactionId(session.id),
+      value: (session.amount_total || 0) / 100,
+      currency: session.currency || 'usd',
+    });
     return;
   }
 
@@ -322,11 +341,14 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   // Affiliate attribution for one-time purchases
   await processAffiliateAttribution(session, userId);
 
-  // Server-side ad conversion (consent-gated inside; never throws).
+  // Server-side ad conversion (consent-gated inside; never throws). The order
+  // id is the same capped id the browser sends as the Google Ads
+  // transaction_id on /credits/success (raw session ids exceed Google's
+  // 64-char order_id limit and would not dedupe against the browser tag).
   await enqueueAdConversion({
     userId,
     source: 'stripe',
-    eventId: session.id,
+    eventId: analyticsTransactionId(session.id),
     value: (session.amount_total || 0) / 100,
     currency: session.currency || 'usd',
   });
@@ -423,11 +445,12 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   await processAffiliateAttribution(session, userId);
 
   // Server-side ad conversion for the first subscription payment
-  // (consent-gated inside; never throws).
+  // (consent-gated inside; never throws). Order id matches the browser's
+  // Google Ads transaction_id on /card-lovers/success.
   await enqueueAdConversion({
     userId,
     source: 'stripe',
-    eventId: session.id,
+    eventId: analyticsTransactionId(session.id, 'card_lovers_'),
     value: (session.amount_total || 0) / 100,
     currency: session.currency || 'usd',
   });

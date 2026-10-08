@@ -156,6 +156,12 @@ export default function AuthCallbackPage() {
             localStorage.removeItem('auth_redirect')
             localStorage.removeItem('signup_source')
 
+            // GA4 recommended 'login' event for returning users (new users get
+            // sign_up below instead).
+            if (!isNewUser && typeof (window as any).gtag === 'function') {
+              (window as any).gtag('event', 'login', { method: storedSession.user.app_metadata?.provider || 'oauth' })
+            }
+
             // Use replace to prevent back-button issues
             // New users go to grade-your-first-card page for onboarding, existing users go to collection (or custom redirect)
             if (isNewUser) {
@@ -173,11 +179,6 @@ export default function AuthCallbackPage() {
                   (window as any).gtag('event', 'sign_up', {
                     method: provider,
                     signup_source: signupSource || 'direct',
-                  });
-                  (window as any).gtag('event', 'conversion', {
-                    send_to: 'G-YLC2FKKBGC',
-                    event_category: 'signup',
-                    event_label: `oauth_${provider}_${signupSource || 'direct'}`,
                   });
                 }
                 if ((window as any).fbq) {
@@ -253,6 +254,10 @@ export default function AuthCallbackPage() {
               localStorage.removeItem('auth_redirect')
               localStorage.removeItem('signup_source')
 
+              if (!isNewUser && typeof (window as any).gtag === 'function') {
+                (window as any).gtag('event', 'login', { method: retrySession.user.app_metadata?.provider || 'oauth' })
+              }
+
               if (isNewUser) {
                 // Track OAuth signup conversion events (retry path)
                 if (typeof window !== 'undefined') {
@@ -260,7 +265,6 @@ export default function AuthCallbackPage() {
                   const signupId = `signup_${Date.now()}_${retrySession.user.id.slice(0, 8)}`
                   if ((window as any).gtag) {
                     (window as any).gtag('event', 'sign_up', { method: provider });
-                    (window as any).gtag('event', 'conversion', { send_to: 'G-YLC2FKKBGC', event_category: 'signup', event_label: `oauth_${provider}` });
                   }
                   if ((window as any).fbq) {
                     (window as any).fbq('track', 'CompleteRegistration', { content_name: `OAuth Signup - ${provider}`, status: true });

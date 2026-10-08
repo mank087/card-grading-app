@@ -1815,14 +1815,25 @@ export function PokemonCardDetails() {
     }
   }, [card, loading, balance, postResultOfferEligible]);
 
-  // 📊 Track grade_card_complete when a graded card is viewed
+  // 📊 Track grade_card_complete once per card, for its owner only. Any
+  // visitor can open a public card page, so without the owner check every
+  // view of a shared card counted as a completed grade.
   useEffect(() => {
     if (card && card.grade && !hasTrackedGradeComplete.current && typeof window !== 'undefined' && window.gtag) {
+      const viewerId = getStoredSession()?.user?.id;
+      if (!viewerId || !card.user_id || viewerId !== card.user_id) return;
+      hasTrackedGradeComplete.current = true;
+      const storageKey = `dcm_grade_complete_${card.id}`;
+      try {
+        if (localStorage.getItem(storageKey)) return;
+        localStorage.setItem(storageKey, '1');
+      } catch {
+        // storage unavailable: fall back to once per mount
+      }
       window.gtag('event', 'grade_card_complete', {
         card_category: card.category || 'Pokemon',
         grade: card.grade
       });
-      hasTrackedGradeComplete.current = true;
       console.log('[GA4] grade_card_complete event tracked:', card.category, card.grade);
     }
   }, [card]);

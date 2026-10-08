@@ -120,7 +120,9 @@ export default function EnterpriseApplyPage() {
         (window as any).gtag('event', 'enterprise_apply', {
           event_category: 'conversion',
           event_label: 'enterprise_application_submitted',
-        })
+        });
+        // GA4 recommended event, alongside the Ads conversion above.
+        (window as any).gtag('event', 'generate_lead', { lead_type: 'enterprise_application' })
       }
     } catch {
       setError('Network error. Please try again.')

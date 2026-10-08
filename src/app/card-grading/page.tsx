@@ -25,13 +25,6 @@ const trackSignupClick = (location: string) => {
         event_label: location,
         page: 'card-grading-landing'
       })
-
-      // Also send as a conversion event (for Google Ads if connected)
-      window.gtag('event', 'conversion', {
-        send_to: 'G-YLC2FKKBGC',
-        event_category: 'signup',
-        event_label: `card_landing_${location}`
-      })
     }
 
     // Track Reddit Lead conversion
@@ -87,11 +80,11 @@ export default function CardGradingLanding() {
     // Track landing page view - Google Analytics
     if (typeof window !== 'undefined') {
       if (window.gtag) {
-        window.gtag('event', 'page_view', {
-          page_title: 'Card Grading Landing',
-          page_location: window.location.href,
-          page_path: '/card-grading',
-          traffic_source: 'retargeting'
+        // Page views are recorded by GA4 enhanced measurement; this only
+        // tags the landing and its traffic source.
+        window.gtag('event', 'landing_view', {
+          landing: 'card-grading',
+          traffic_source: 'retargeting',
         })
       }
 
@@ -153,7 +146,7 @@ export default function CardGradingLanding() {
             window.rdt('track', 'SignUp', { conversionId: `signup_card_${Date.now()}` })
           }
           if (window.gtag) {
-            window.gtag('event', 'sign_up', { method: 'email' })
+            window.gtag('event', 'sign_up_submitted', { method: 'email' })
           }
           if (window.fbq) {
             window.fbq('track', 'CompleteRegistration', { content_name: 'Card Landing Email Signup' })

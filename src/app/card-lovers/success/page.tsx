@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
-import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
+import { analyticsTransactionId, claimPurchaseTracking } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -63,9 +63,14 @@ function CardLoversSuccessContent() {
     fetchSubscriptionStatus()
   }, [refreshCredits])
 
-  // Track purchase event once
+  // Track purchase event once. Requires the Stripe session_id that checkout
+  // appends to the success URL: an active member who just revisits this page
+  // must not count as a new purchase. claimPurchaseTracking keeps the guard
+  // across reloads and revisits of the same session URL.
   useEffect(() => {
-    if (tracked || !subscriptionStatus?.isActive) return
+    if (tracked || !subscriptionStatus?.isActive || !sessionId) return
+    setTracked(true)
+    if (!claimPurchaseTracking(sessionId)) return
 
     const value = subscriptionStatus.plan === 'monthly' ? 49.99 : 449
     const credits = subscriptionStatus.plan === 'monthly' ? 70 : 900
@@ -130,8 +135,6 @@ function CardLoversSuccessContent() {
         console.log('[Microsoft UET] Card Lovers Purchase event tracked')
       }
     }
-
-    setTracked(true)
   }, [subscriptionStatus, sessionId, tracked])
 
   const creditsReceived = subscriptionStatus?.plan === 'monthly' ? 70 : 900

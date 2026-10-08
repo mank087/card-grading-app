@@ -28,13 +28,6 @@ const trackSignupClick = (location: string) => {
         event_label: location,
         page: 'pokemon-grading-landing'
       })
-
-      // Also send as a conversion event (for Google Ads if connected)
-      window.gtag('event', 'conversion', {
-        send_to: 'G-YLC2FKKBGC',
-        event_category: 'signup',
-        event_label: `pokemon_landing_${location}`
-      })
     }
 
     // Track Reddit Lead conversion
@@ -112,11 +105,11 @@ export default function PokemonGradingLanding() {
 
     // Track landing page view
     if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_title: 'Pokemon Grading Landing',
-        page_location: window.location.href,
-        page_path: '/pokemon-grading',
-        traffic_source: 'paid_ad'
+      // Page views are recorded by GA4 enhanced measurement; this only
+      // tags the landing and its traffic source.
+      window.gtag('event', 'landing_view', {
+        landing: 'pokemon-grading',
+        traffic_source: 'paid_ad',
       })
     }
   }, [])
@@ -177,7 +170,7 @@ export default function PokemonGradingLanding() {
             window.rdt('track', 'SignUp', { conversionId: `signup_pokemon_${Date.now()}` })
           }
           if (window.gtag) {
-            window.gtag('event', 'sign_up', { method: 'email' })
+            window.gtag('event', 'sign_up_submitted', { method: 'email' })
           }
           if (window.fbq) {
             window.fbq('track', 'CompleteRegistration', { content_name: 'Pokemon Landing Email Signup' })
