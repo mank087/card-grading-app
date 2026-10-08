@@ -11,7 +11,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 
 # Block utility pages
@@ -41,7 +41,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -61,7 +61,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -81,7 +81,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -101,7 +101,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -121,7 +121,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -141,7 +141,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -161,7 +161,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -181,7 +181,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167
@@ -201,7 +201,7 @@ Disallow: /collection$
 Disallow: /collection?
 Disallow: /upload
 Disallow: /admin
-Disallow: /auth
+Disallow: /auth/
 Disallow: /login
 Disallow: /data-deletion-status
 Disallow: /test-8167

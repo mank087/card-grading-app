@@ -30,7 +30,7 @@ export default function CreditPacksShowcase() {
       price: money(VIP_PACKAGE.price),
       credits: String(VIP_PACKAGE.credits),
       perGrade: `$${VIP_PACKAGE.perGradeCost.toFixed(2)}`,
-      bonus: 'Lowest cost per grade',
+      bonus: 'Lowest one-time pack rate',
       popular: true,
     },
     ...pricingTiers.map(t => ({

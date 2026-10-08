@@ -211,7 +211,10 @@ export default function CreditsLayout({
             {' · '}
             {CARD_LOVERS.map((m) => `${m.name} ${money(m.price)} a ${m.billingLabel} for ${m.credits} grades (${m.per} a grade)`).join(' · ')}
             . Two free credits when you sign up. One credit grades one card, with four subgrades and a written reason
-            for every deduction.
+            for every deduction. VIP is the lowest one-time pack rate; Card Lovers Annual is the lowest per-grade
+            price overall. Consumer credits, from packs and membership alike, never expire. Enterprise plans work
+            differently: their monthly allowance resets each billing cycle (see{' '}
+            <a href="/enterprise" className="underline">Enterprise</a>).
           </p>
         </div>
       </section>

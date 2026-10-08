@@ -24,8 +24,8 @@ export const metadata: Metadata = completeMetadata({
 
 const ORG_ID = 'https://dcmgrading.com/#organization';
 const ABOUT_URL = 'https://dcmgrading.com/about';
-const FACTS_UPDATED_ISO = '2026-08-31';
-const FACTS_UPDATED_LABEL = 'August 31, 2026';
+const FACTS_UPDATED_ISO = '2026-10-08';
+const FACTS_UPDATED_LABEL = 'October 8, 2026';
 
 /**
  * The facts, stated once.
@@ -49,15 +49,16 @@ const facts: { claim: string; detail: React.ReactNode; plain: string }[] = [
       'A card is graded from photographs of its front and back, and the collector prints a serialized label and applies it to a slab they own, so cards are never shipped to DCM and never leave the collector’s hands.',
   },
   {
-    claim: 'DCM sells labels and slab supplies, not an encapsulation service.',
+    claim: 'DCM sells digital grades and printable label files, not physical supplies or encapsulation.',
     detail: (
       <>
-        The physical products DCM sells are the label and the supplies for slabbing your own card;
-        DCM does not encapsulate cards on a collector&apos;s behalf.
+        Every grade comes with a condition report and label files you print yourself. Holders and label
+        stock are linked from the DCM Shop as Amazon affiliate products, sold and shipped by Amazon
+        sellers, and DCM does not encapsulate cards on a collector&apos;s behalf.
       </>
     ),
     plain:
-      'The physical products DCM sells are the label and the supplies for slabbing your own card; DCM does not encapsulate cards on a collector’s behalf.',
+      'Every grade comes with a condition report and label files you print yourself. Holders and label stock are linked from the DCM Shop as Amazon affiliate products, sold and shipped by Amazon sellers, and DCM does not encapsulate cards on a collector’s behalf.',
   },
   {
     claim: 'The company is Dynamic Collectibles Management LLC, a team of collectors.',

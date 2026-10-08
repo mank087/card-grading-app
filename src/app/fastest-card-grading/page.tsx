@@ -13,14 +13,14 @@ import {
 export const metadata: Metadata = completeMetadata({
   title: "Fastest Card Grading: Turnarounds Compared",
   description:
-    "Published turnarounds for PSA, Beckett, SGC and CGC ran 15 to 100+ business days in August 2026. DCM grades from two photos in about 60 seconds.",
+    "Published turnarounds for PSA, Beckett, SGC and CGC run 15 to 100+ business days on their cheapest open tiers. DCM grades from two photos in about 60 seconds.",
   keywords:
     'fastest card grading, card grading turnaround times, how long does card grading take, fast card grading service, instant card grading, same day card grading',
   alternates: { canonical: 'https://dcmgrading.com/fastest-card-grading' },
   openGraph: {
     title: 'Fastest Card Grading (2026) | DCM Grading',
     description:
-      'Published turnarounds for the mail-in majors, side by side with a grade that takes about 60 seconds. Sourced, August 2026.',
+      'Published turnarounds for the mail-in majors, side by side with a grade that takes about 60 seconds. Sourced and dated, October 2026.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/fastest-card-grading',
@@ -29,7 +29,7 @@ export const metadata: Metadata = completeMetadata({
         url: '/why-dcm/Price-graded-cards.png',
         width: 1200,
         height: 630,
-        alt: 'Card grading turnaround times compared, August 2026',
+        alt: 'Card grading turnaround times compared, October 2026',
       },
     ],
   },
@@ -66,7 +66,7 @@ const articleJsonLd = {
   '@type': 'Article',
   headline: 'Fastest Card Grading (2026): Published Turnaround Times Compared',
   description:
-    'Published turnaround times for PSA, Beckett, SGC, CGC and DCM, with sources, as of August 2026.',
+    'Published turnaround times for PSA, Beckett, SGC, CGC and DCM, with sources and a check date on every row (October 2026).',
   datePublished: UPDATED_ISO,
   dateModified: UPDATED_ISO,
   mainEntityOfPage: 'https://dcmgrading.com/fastest-card-grading',
@@ -83,11 +83,11 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the fastest card grading service?',
-    a: 'DCM returns a grade in about 60 seconds because nothing ships: you photograph the front and back and the grade comes back with four subgrades and a written reason for every deduction. Among the mail-in graders in August 2026, Beckett published the shortest turnaround on its cheapest open tier at 15 business days, with PSA and SGC at 40 to 50 business days and CGC Bulk at 100 or more. Every mail-in service also sells faster tiers at higher prices.',
+    a: 'DCM returns a grade in about 60 seconds because nothing ships: you photograph the front and back and the grade comes back with four subgrades and a written reason for every deduction. Among the mail-in graders, Beckett Express published the shortest turnaround on a cheapest open tier at 15 business days when last checked in August 2026. As of October 8, 2026, SGC lists 40 or more business days on Standard and PSA lists 90 to 100 business days on Standard; CGC Bulk was 100 or more when last checked in August 2026. Every mail-in service also sells faster tiers at higher prices.',
   },
   {
     q: 'How long does card grading take in 2026?',
-    a: 'On the cheapest tiers that were open in August 2026, published turnarounds ran from 15 business days to more than 100. Those figures exclude shipping in both directions and were set before the current queues formed, so treat them as a floor. PSA reported a backlog above 12 million cards in late July 2026, and Beckett paused its two cheapest tiers on August 5 after a reported 102 percent year-over-year rise in submissions.',
+    a: 'On the cheapest open tiers, published turnarounds run from 15 business days to more than 100: SGC Standard 40 or more and PSA Standard 90 to 100 as of October 8, 2026, with Beckett Express at 15 and CGC Bulk at 100 or more when last checked in August 2026. Those figures exclude shipping in both directions, and they are estimates, not guarantees. PSA reported a backlog above 12 million cards in late July 2026 and still lists its Value services as temporarily paused, and Beckett paused its two cheapest tiers on August 5 after a reported 102 percent year-over-year rise in submissions.',
   },
   {
     q: 'Can you get a card graded the same day?',
@@ -133,12 +133,14 @@ export default function FastestCardGradingPage() {
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
             The fastest way to get a card graded is not to ship it. DCM grades from two photos in{' '}
             <strong>about 60 seconds</strong>, with no packing, no insurance and no return queue. Among the mail-in
-            graders in August 2026, Beckett published <strong>15 business days</strong> on its cheapest open tier,
-            PSA and SGC published <strong>40 to 50</strong>, and CGC Bulk published <strong>100 or more</strong> —
-            before shipping in either direction.
+            graders, Beckett published <strong>15 business days</strong> on Express when last checked in August
+            2026. As of October 8, 2026, SGC lists <strong>40 or more</strong> on Standard and PSA lists{' '}
+            <strong>90 to 100</strong> on Standard, and CGC Bulk was <strong>100 or more</strong> when last checked
+            in August — all before shipping in either direction.
           </p>
           <p className="text-sm text-gray-500">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}. Business days, shipping excluded. Sources below.
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
+            row shows its own check date. Business days, shipping excluded. Sources below.
           </p>
         </section>
 
@@ -162,7 +164,10 @@ export default function FastestCardGradingPage() {
                       key={c.name}
                       className={`border-b border-gray-200 last:border-0 align-top ${c.isDcm ? 'bg-purple-50' : ''}`}
                     >
-                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">{c.name}</td>
+                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">
+                        {c.name}
+                        <div className="text-xs font-normal text-gray-500 mt-1">Checked {c.checked}</div>
+                      </td>
                       <td className="py-4 px-4 text-gray-700">{c.cheapestTier}</td>
                       <td className="py-4 px-4 text-gray-900 font-semibold">{c.turnaround}</td>
                       <td className="py-4 px-4 text-gray-700">
@@ -175,9 +180,10 @@ export default function FastestCardGradingPage() {
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-4">
-            Turnaround is quoted for the cheapest tier that was open at each company in August 2026. Faster tiers
-            exist everywhere at higher prices, from roughly $150 for a five-to-seven-day PSA Super Express to $250 or
-            more for walk-through service at Beckett.
+            Turnaround is quoted for the cheapest open tier at each company as of the row&apos;s check date. Faster
+            tiers exist everywhere at higher prices. As of October 8, 2026, SGC Expedited (2 to 3 business days)
+            starts at $150, PSA Express is $199 for 20 to 30 business days and PSA Super Express is $349 for 10 to 15,
+            and walk-through service at Beckett runs $250 or more.
           </p>
         </section>
 
@@ -186,12 +192,14 @@ export default function FastestCardGradingPage() {
           <div className="bg-white rounded-2xl p-8 shadow-md">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Read published turnarounds as a floor</h2>
             <p className="text-gray-700 mb-3">
-              PSA&apos;s submission updates page reported a backlog above 12 million cards in late July 2026, with its
-              Value services listed as paused. Beckett paused its Base and Standard tiers on August 5, 2026 after a
-              reported 102 percent year-over-year rise in submissions, with reopening estimated for mid September.
+              PSA&apos;s submission updates page reported a backlog above 12 million cards in late July 2026, and as
+              of October 8, 2026 its services page lists Value services as temporarily paused. Beckett paused its Base
+              and Standard tiers on August 5, 2026 after a reported 102 percent year-over-year rise in submissions; it
+              targeted a mid-September reopening, and reports since conflict on whether it held. Check Beckett directly
+              for current status.
             </p>
             <p className="text-gray-700">
-              Published turnarounds were set before those queues formed. Add insured shipping in both directions on
+              Published turnarounds are estimates, not guarantees. Add insured shipping in both directions on
               top, and the elapsed time from your kitchen table back to your kitchen table is longer than any number in
               the table above.
             </p>

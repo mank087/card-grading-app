@@ -178,22 +178,22 @@ export default function GradingRubricPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Phase 0: Pre-Grading Verification */}
+            {/* Phase 0: Intake Checks */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 0: Pre-Grading Verification</h3>
-              <p className="text-sm text-gray-600 mb-4">Mandatory verification before condition evaluation begins</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 0: Intake Checks</h3>
+              <p className="text-sm text-gray-600 mb-4">Visual checks that run before condition scoring. They are part of the DCM grade, not a separate service, and they are not authentication.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="font-semibold text-red-600">Autograph Verification</p>
-                  <p className="text-sm text-gray-600">Distinguishes manufacturer-authenticated signatures from unverified additions</p>
+                  <p className="font-semibold text-red-600">Autograph Notes</p>
+                  <p className="text-sm text-gray-600">Records whether a signature is present and whether the card is a manufacturer-issued autograph card. DCM does not authenticate signatures.</p>
                 </div>
                 <div>
                   <p className="font-semibold text-red-600">Handwritten Markings Detection</p>
                   <p className="text-sm text-gray-600">Scans for post-production alterations, stamps, adhesive residue, and markings</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-red-600">Trimming Detection Protocol</p>
-                  <p className="text-sm text-gray-600">Analyzes border proportions and edge patterns to detect trimmed cards</p>
+                  <p className="font-semibold text-red-600">Border and Edge Review</p>
+                  <p className="text-sm text-gray-600">Looks at border proportions and edge patterns for visible signs of trimming. A photo cannot confirm or rule out trimming.</p>
                 </div>
                 <div>
                   <p className="font-semibold text-red-600">Image Completeness Check</p>

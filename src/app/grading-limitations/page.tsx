@@ -381,30 +381,31 @@ export default function GradingLimitationsPage() {
             Understanding DCM Optic™ Confidence Ratings
           </h2>
           <p className="mb-6 text-indigo-100">
-            Every grade includes a confidence rating that reflects our assessment certainty
-            based on image quality and visibility of card features.
+            Every grade includes a confidence rating that reflects image quality and how much of the
+            card the photos let us see. It measures photo visibility, not certainty about the physical
+            card: even an A cannot detect what a photograph does not show.
           </p>
 
           <div className="grid md:grid-cols-4 gap-4">
             <div className="bg-white/10 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold mb-1">A</div>
               <div className="text-sm text-indigo-200">Excellent</div>
-              <div className="text-xs text-indigo-300 mt-2">±0 grade uncertainty</div>
+              <div className="text-xs text-indigo-300 mt-2">±0 photo uncertainty</div>
             </div>
             <div className="bg-white/10 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold mb-1">B</div>
               <div className="text-sm text-indigo-200">Good</div>
-              <div className="text-xs text-indigo-300 mt-2">±1 grade uncertainty</div>
+              <div className="text-xs text-indigo-300 mt-2">±1 photo uncertainty</div>
             </div>
             <div className="bg-white/10 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold mb-1">C</div>
               <div className="text-sm text-indigo-200">Fair</div>
-              <div className="text-xs text-indigo-300 mt-2">±2 grade uncertainty</div>
+              <div className="text-xs text-indigo-300 mt-2">±2 photo uncertainty</div>
             </div>
             <div className="bg-white/10 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold mb-1">D</div>
               <div className="text-sm text-indigo-200">Limited</div>
-              <div className="text-xs text-indigo-300 mt-2">±3 grade uncertainty</div>
+              <div className="text-xs text-indigo-300 mt-2">±3 photo uncertainty</div>
             </div>
           </div>
 

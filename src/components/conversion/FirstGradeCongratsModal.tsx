@@ -118,13 +118,13 @@ export function FirstGradeCongratsModal({
           (window as any).gtag('event', 'promo_code_applied', {
             event_category: 'conversion',
             promo_code: PROMO_CODE,
-            source: `congrats_modal_${variant}`,
+            promo_source: `congrats_modal_${variant}`,
           })
         }
         if ((window as any).fbq) {
           (window as any).fbq('trackCustom', 'PromoCodeApplied', {
             promo_code: PROMO_CODE,
-            source: `congrats_modal_${variant}`,
+            promo_source: `congrats_modal_${variant}`,
           })
         }
         console.log('[FirstGradeCongratsModal] promo_code_applied event tracked:', PROMO_CODE)

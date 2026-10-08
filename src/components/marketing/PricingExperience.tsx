@@ -125,7 +125,7 @@ export default function PricingExperience({ authenticated = null, balance = 0, b
         </article>}
 
         <article className={`dcm-plan ${highlightPack === 'vip' ? 'dcm-plan--popular' : ''}`} id="plan-vip">
-          <p className="dcm-plan-badge">Lowest cost per grade</p>
+          <p className="dcm-plan-badge">Lowest one-time pack rate</p>
           <div className="dcm-plan-montage"><PackageMontage pack="vip" /></div>
           <h3>{VIP_PACKAGE.name}</h3><p className="dcm-price">${VIP_PACKAGE.price}</p><p className="dcm-price-per">${VIP_PACKAGE.perGradeCost.toFixed(2)} per grade</p><p className="dcm-plan-meta">{VIP_PACKAGE.credits} credits · one-time</p>
           <div className="dcm-plan-benefits"><p>{VIP_PACKAGE.description}. More room for a whole collection.</p><p><strong>VIP diamond emblem</strong><br />Included on your card labels.</p><Link className="underline underline-offset-4" href="/vip">Explore VIP benefits</Link></div>

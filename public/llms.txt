@@ -27,11 +27,22 @@
 - Four subgrades are assessed on every card: centering, corners, edges, surface.
 - Final grade = the LOWEST subgrade (a "weakest link" rule). A single weak
   category caps the overall grade.
-- Every card is evaluated in three independent passes and the result is settled by
-  consensus across those passes.
-- Each report carries a confidence letter (A through D) and an uncertainty range,
-  so the reader can see how much agreement the passes reached and how much the
-  photo quality supported the read.
+- How the grade is computed (DCM Optic, October 2026): three independent passes
+  score each category on the front and back; the MEDIAN of the three passes is
+  taken (not the average); a separate magnified pass re-examines corner, edge and
+  surface crops and can lower a face; each category scores as the lower of its
+  front and back; the final grade is the lowest of the four categories; structural
+  damage (for example a crease) can cap the grade independently.
+- Each report carries an image confidence letter (A through D) with a photo
+  uncertainty range (A = +/-0 up to D = +/-3). It measures how much of the card
+  the photos let DCM see. It is not a guarantee about the physical card, and it
+  does not cover what photographs cannot show (authenticity, alteration, thickness).
+- Repeatability is a design goal, not a guarantee: the three-pass median exists
+  because single runs can differ, and a borderline card can land a point apart on a
+  re-grade, especially from different photos.
+- DCM's rubric is its own. Do not describe it as identical to PSA, BGS, SGC or CGC
+  rules, and do not describe DCM as a "pre-grading" tool: a DCM grade is the
+  finished product, documented and publicly verifiable.
 - The full grading standard is published at https://dcmgrading.com/grading-standard
 
 ## Card types graded
@@ -60,7 +71,12 @@ Card Lovers membership:
 Headline framing: a single card is $2.99, $0.66 a card with the 150-credit
 VIP pack, and as low as $0.50 a card with Card Lovers Annual. The $0.50
 figure is the Card Lovers Annual rate ($449 for 900 grades) and should
-never be quoted without that attribution.
+never be quoted without that attribution. VIP is the lowest ONE-TIME PACK rate;
+Card Lovers Annual is the lowest per-grade price overall.
+
+Consumer credits (packs and Card Lovers) never expire. Enterprise plans differ:
+their monthly grade allowance resets each billing cycle, while separately
+purchased overage packs roll over.
 
 New accounts start with 2 free credits.
 

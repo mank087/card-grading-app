@@ -20,8 +20,16 @@ import {
 // Pack pricing lives in @/lib/creditPackages so marketing surfaces (blog
 // embeds, landing pages) render the same numbers checkout charges.
 
+// useSearchParams makes this page bail out to client rendering, so the
+// fallback is the only body markup crawlers receive. It repeats the
+// PricingExperience intro so the server HTML carries the page's H1.
 function CreditsLoadingShell() {
-  return <div className="dcm-brand dcm-container dcm-section" role="status" aria-live="polite">Loading card grading pricing…</div>
+  return <div className="dcm-brand dcm-pricing-page">
+    <section className="dcm-price-intro"><div className="dcm-container dcm-price-intro-row">
+      <div><p className="dcm-eyebrow">Grading that fits your collection</p><h1>Card grading pricing.</h1><p className="dcm-lead">One credit grades one card. Every grade includes the condition report and printable labels.</p></div>
+    </div></section>
+    <div className="dcm-container dcm-section" role="status" aria-live="polite">Loading card grading pricing…</div>
+  </div>
 }
 
 function CreditsPageContent() {

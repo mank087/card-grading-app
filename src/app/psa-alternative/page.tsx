@@ -7,7 +7,9 @@ import { PsaCostComparison, PsaReportExample } from '@/components/marketing/PsaC
 import { CARD_LOVERS_PLANS } from '@/lib/creditPackages';
 import styles from '@/components/marketing/PsaExperience.module.css';
 const PSA_SOURCE = 'https://www.psacard.com/articles/articleview/15763';
-const UPDATED_ISO = '2026-09-10';
+const PSA_SERVICES = 'https://www.psacard.com/services/tradingcardgrading';
+const PSA_CHECKED = 'October 8, 2026';
+const UPDATED_ISO = '2026-10-08';
 
 export const metadata: Metadata = completeMetadata({
   title: "PSA Alternative: Photo-Based Card Grading",
@@ -97,7 +99,7 @@ const articleJsonLd = {
     url: 'https://dcmgrading.com',
     logo: { '@type': 'ImageObject', url: 'https://dcmgrading.com/DCM-logo.png' },
   },
-  citation: [PSA_SOURCE, 'https://www.psacard.com/services/tradingcardgrading'],
+  citation: [PSA_SERVICES, PSA_SOURCE],
 };
 
 /**
@@ -115,11 +117,11 @@ const faqs = [
   },
   {
     q: 'How does DCM pricing compare to PSA?',
-    a: 'DCM costs $2.99 for a single grading credit, $19.99 for 20, or $99 for 150. Card Lovers Annual is $449 for 900 credits upfront. PSA announced Standard at $59.99 per card, opening September 14, 2026, with a $1,000 maximum insured value. Its Value tiers remain paused. These are different services: DCM provides a digital assessment and printable labels; PSA provides physical authentication, grading and encapsulation. Shipping and applicable taxes are additional to PSA grading fees.',
+    a: 'DCM costs $2.99 for a single grading credit, $19.99 for 20, or $99 for 150. Card Lovers Annual is $449 for 900 credits upfront. As of October 8, 2026, PSA lists Standard at $59.99 per card with a $1,000 maximum insured value, and lists its Value services as temporarily paused. These are different services: DCM provides a digital assessment and printable labels; PSA provides physical authentication, grading and encapsulation. Shipping and applicable taxes are additional to PSA grading fees.',
   },
   {
     q: 'How long does PSA take compared to DCM?',
-    a: 'DCM typically returns a digital assessment in about a minute, although processing time varies. PSA’s September 9 announcement gives Standard an estimated 90–100 business-day turnaround, opening September 14, 2026. Priority, formerly Regular, is estimated at 70–80 business days. PSA estimates are not guarantees, and shipping adds time to the physical submission journey.',
+    a: 'DCM typically returns a digital assessment in about a minute, although processing time varies. As of October 8, 2026, PSA lists Standard at an estimated 90–100 business days and Priority at an estimated 70–80 business days. PSA estimates are not guarantees, and shipping adds time to the physical submission journey.',
   },
   {
     q: 'Does DCM have a card-value minimum?',
@@ -168,9 +170,9 @@ export default function PsaAlternativePage() {
           <div className={styles.heroCard}><ReferenceCardShowcase page="reports-and-labels" category="Pokemon" /></div>
         </section>
         <aside className={styles.update} aria-label="PSA service update">
-          <strong>PSA update · Checked September 10, 2026</strong>
-          <p>Standard opens September 14: <strong>$59.99 per card</strong>, estimated <strong>90–100 business days</strong>, maximum insured value <strong>$1,000</strong>. Value tiers remain paused. Existing Value and Bulk orders will be processed before Standard orders.</p>
-          <p>Regular is being renamed Priority: $79.99 per card, estimated 70–80 business days. <a href={PSA_SOURCE} target="_blank" rel="noopener noreferrer">Read PSA’s September 9 announcement ↗</a></p>
+          <strong>PSA services · Checked {PSA_CHECKED}</strong>
+          <p>As of {PSA_CHECKED}, PSA lists Standard at <strong>$59.99 per card</strong>, estimated <strong>90–100 business days</strong>, maximum insured value <strong>$1,000</strong>. Value services are listed as temporarily paused.</p>
+          <p>Priority is $79.99 per card, estimated 70–80 business days, up to $1,500 insured value. Faster levels run from Express at $199 to Premier at $599. Estimates are not guarantees. <a href={PSA_SERVICES} target="_blank" rel="noopener noreferrer">See PSA’s current services and pricing ↗</a></p>
         </aside>
         <section id="real-report" className={styles.section}><PsaReportExample /></section>
         <section className={styles.section}><PsaCostComparison /></section>
@@ -178,7 +180,7 @@ export default function PsaAlternativePage() {
           <p className="dcm-eyebrow">Two different journeys</p><h2>From your card to your next decision.</h2>
           <div className={styles.two}>
             <article className={styles.tile}><h3>DCM · Photo-based analysis</h3><p>Your card stays on your desk. Receive a digital grade and condition report, then choose how to use it.</p><ol className={styles.steps}><li>Photograph the front and back</li><li>Upload for DCM Optic analysis</li><li>Explore your grade and four subgrades</li><li>Create labels, organize or prepare a listing</li></ol><p className={styles.note}>Usually about a minute per analysis. Photo quality and processing conditions can affect timing.</p></article>
-            <article className={styles.tile}><h3>PSA · Physical grading</h3><p>Choose this path when you want physical authentication, a sealed PSA holder or PSA-specific certification.</p><ol className={styles.steps}><li>Select an eligible service level</li><li>Prepare and send your cards</li><li>Physical authentication, grading and encapsulation</li><li>Receive your graded cards</li></ol><p className={styles.note}>Standard: estimated 90–100 business days, announced opening September 14. Shipping adds time. Estimates are not guaranteed.</p></article>
+            <article className={styles.tile}><h3>PSA · Physical grading</h3><p>Choose this path when you want physical authentication, a sealed PSA holder or PSA-specific certification.</p><ol className={styles.steps}><li>Select an eligible service level</li><li>Prepare and send your cards</li><li>Physical authentication, grading and encapsulation</li><li>Receive your graded cards</li></ol><p className={styles.note}>Standard: estimated 90–100 business days as of {PSA_CHECKED}. Shipping adds time. Estimates are not guaranteed.</p></article>
           </div>
         </section>
         <section className={styles.section}>
@@ -191,10 +193,10 @@ export default function PsaAlternativePage() {
         </section>
         <section className={styles.section}>
           <p className="dcm-eyebrow">Choose the outcome you need</p><h2>DCM vs PSA at a glance.</h2>
-          <div className={styles.tableWrap}><table><caption className="sr-only">DCM digital assessments compared with PSA physical grading; PSA Standard announced for September 14, 2026</caption><thead><tr><th scope="col">What matters to you</th><th scope="col">DCM</th><th scope="col">PSA Standard · announced</th></tr></thead><tbody>
+          <div className={styles.tableWrap}><table><caption className="sr-only">DCM digital assessments compared with PSA Standard physical grading, PSA figures checked {PSA_CHECKED}</caption><thead><tr><th scope="col">What matters to you</th><th scope="col">DCM</th><th scope="col">PSA Standard</th></tr></thead><tbody>
             {[
               ['Your card', 'Stays with you; front-and-back photos required', 'Physical submission required'],
-              ['Price', '$2.99 for one credit; one-time packs and optional membership available', '$59.99 per card; opens September 14'],
+              ['Price', '$2.99 for one credit; one-time packs and optional membership available', '$59.99 per card'],
               ['Timing', 'Usually about a minute for a digital analysis', 'Estimated 90–100 business days, plus shipping'],
               ['Condition evidence', 'Centering, corners, edges and surface subgrades with written analysis', 'PSA grade and certification; four subgrades are not printed on the standard label'],
               ['Value thresholds', 'No card-value-based pricing bands', '$1,000 maximum insured value per card on Standard'],
@@ -202,7 +204,7 @@ export default function PsaAlternativePage() {
               ['Shipping', 'No shipping for the assessment', 'Shipping and applicable charges are additional'],
             ].map(([feature,dcm,psa]) => <tr key={feature}><th scope="row">{feature}</th><td>{dcm}</td><td>{psa}</td></tr>)}
           </tbody></table></div>
-          <p className={styles.note}>DCM uses its own published standard. A DCM assessment is not PSA certification or a substitute for physical authentication. <Link href="/grading-limitations">Understand photo-based grading limitations</Link>. <a href={PSA_SOURCE} target="_blank" rel="noopener noreferrer">PSA source, September 9, 2026 ↗</a></p>
+          <p className={styles.note}>DCM uses its own published standard. A DCM assessment is not PSA certification or a substitute for physical authentication. <Link href="/grading-limitations">Understand photo-based grading limitations</Link>. <a href={PSA_SERVICES} target="_blank" rel="noopener noreferrer">PSA services and pricing, checked {PSA_CHECKED} ↗</a></p>
         </section>
         <section className={styles.section}>
           <p className="dcm-eyebrow">Start with two cards</p><h2>Choose a plan when you’re ready for more.</h2>

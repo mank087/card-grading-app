@@ -73,7 +73,7 @@ export const VIP_PACKAGE = {
   price: 99,
   credits: 150,
   perGradeCost: 0.66,
-  description: 'Lowest cost per grade',
+  description: 'Lowest one-time pack rate',
   icon: '◆',
 } as const
 

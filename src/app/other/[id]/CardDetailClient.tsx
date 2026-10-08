@@ -4932,7 +4932,7 @@ export function OtherCardDetails() {
                     const gradeDefinitions = {
                       'A': {
                         name: 'Grade A - Excellent',
-                        description: 'Clear, well-lit images with no obstructions. Optimal for accurate grading with no uncertainty.',
+                        description: 'Clear, well-lit images with no obstructions. Every grading feature is visible in the photos.',
                         icon: '✨',
                         recommendNewPhotos: false
                       },

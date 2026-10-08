@@ -193,21 +193,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Page through narrow public rows: Supabase's default row limit must not
-  // silently leave most graded cards out of the sitemap. Errors fail the
-  // regeneration rather than publishing a successful partial sitemap.
+  // Page through narrow public rows, newest first. Every public card is read
+  // so each public collection owner is still discovered, but only the newest
+  // MAX_SITEMAP_CARDS card reports are listed: advertising all ~40k (Oct 2026)
+  // left core pages like /about and /fastest-card-grading "discovered, not
+  // indexed" because crawl budget went to per-card templates. Older cards stay
+  // public and linked from collections. Errors fail the regeneration rather
+  // than publishing a successful partial sitemap.
+  const MAX_SITEMAP_CARDS = 2000;
   const cards: { id: string; category: string | null; user_id?: string; org_id?: string }[] = [];
   const batchSize = 1000;
   for (let offset = 0; ; offset += batchSize) {
+    const end = offset + batchSize - 1;
     const { data, error } = await withColumnFallback(
       () => supabase.from('cards').select('id, category, user_id, org_id')
         .eq('visibility', 'public').is('deleted_at', null)
         .or('conversational_decimal_grade.not.is.null,conversational_grading.not.is.null')
-        .order('id').range(offset, offset + batchSize - 1),
+        .order('created_at', { ascending: false }).order('id').range(offset, end),
       () => supabase.from('cards').select('id, category, user_id, org_id')
         .eq('visibility', 'public')
         .or('conversational_decimal_grade.not.is.null,conversational_grading.not.is.null')
-        .order('id').range(offset, offset + batchSize - 1),
+        .order('created_at', { ascending: false }).order('id').range(offset, end),
       'sitemap public cards'
     );
     if (error) throw new Error('Unable to generate the public card sitemap');
@@ -215,7 +221,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!data || data.length < batchSize) break;
   }
   // Omit lastModified: this schema has no reliable card-content update date.
-  const cardPages: MetadataRoute.Sitemap = cards.map(card => ({
+  const listedCards = cards.slice(0, MAX_SITEMAP_CARDS);
+  const cardPages: MetadataRoute.Sitemap = listedCards.map(card => ({
     url: `${baseUrl}/${categoryToRouteSlug(card.category) === 'starwars' ? 'other' : categoryToRouteSlug(card.category)}/${card.id}`,
     changeFrequency: 'weekly', priority: 0.6,
   }));
@@ -295,7 +302,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const discoveryPages: MetadataRoute.Sitemap = orgs.map(org => ({
     url: `${baseUrl}/enterprise/${encodeURIComponent(org.slug)}`, changeFrequency: 'weekly', priority: 0.6,
   }));
-  for (const card of cards) {
+  for (const card of listedCards) {
     const slug = card.org_id && orgSlugs.get(card.org_id);
     if (slug) discoveryPages.push({ url: `${baseUrl}/enterprise/${encodeURIComponent(slug)}/card/${card.id}`, changeFrequency: 'weekly', priority: 0.5 });
   }

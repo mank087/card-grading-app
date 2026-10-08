@@ -185,7 +185,7 @@ const faqs: FAQItem[] = [
           <li><strong>Surface:</strong> Scratches, print defects, stains, structural damage</li>
         </ul>
         <p className="mb-3">Each category&apos;s score is the <strong>lower of its two faces</strong> — a category is only as good as its worse side, so a chipped back edge sets the edges score even if the front edges are clean.</p>
-        <p><strong>Weakest Link Rule:</strong> Your final grade is the lowest of those four category scores, matching how PSA, BGS, and SGC assign final grades.</p>
+        <p><strong>Weakest Link Rule:</strong> Your final grade is the lowest of those four category scores. One weak area decides the card, so a strong surface cannot average away a soft corner.</p>
       </>
     ),
     category: 'Grading Process',
@@ -232,11 +232,12 @@ const faqs: FAQItem[] = [
       <>
         <p className="mb-3">The confidence rating (A-D) indicates how well we can assess your card based on image quality:</p>
         <ul className="list-disc list-inside space-y-2">
-          <li><strong>Grade A:</strong> Crystal clear images, the whole card readable, highest confidence — uncertainty ±0</li>
-          <li><strong>Grade B:</strong> Clear images with minor issues, high confidence — uncertainty ±1</li>
-          <li><strong>Grade C:</strong> Acceptable images with moderate glare, softness, or obstruction — uncertainty ±2</li>
-          <li><strong>Grade D:</strong> Significant issues, consider resubmitting — uncertainty ±3</li>
+          <li><strong>Grade A:</strong> Crystal clear images, the whole card readable — photo uncertainty ±0</li>
+          <li><strong>Grade B:</strong> Clear images with minor issues — photo uncertainty ±1</li>
+          <li><strong>Grade C:</strong> Acceptable images with moderate glare, softness, or obstruction — photo uncertainty ±2</li>
+          <li><strong>Grade D:</strong> Significant issues, consider resubmitting — photo uncertainty ±3</li>
         </ul>
+        <p className="mt-3">The letter measures how much of the card the photos let us see, not how certain the grade is. Even an A cannot reveal what a photo cannot show, such as a fine surface scratch that only shows at a particular light angle, card thickness or warping, or whether a card has been altered or is genuine. See <Link href="/grading-limitations" className="text-purple-600 hover:text-purple-800 underline">grading limitations</Link>.</p>
       </>
     ),
     category: 'Image Quality',
@@ -301,7 +302,7 @@ const faqs: FAQItem[] = [
     question: 'How does DCM compare to PSA, BGS, and CGC?',
     answer: (
       <>
-        <p className="mb-3">DCM uses grading criteria aligned with professional services like PSA, BGS, and CGC. Our three-pass consensus system mimics how these companies use multiple human evaluators.</p>
+        <p className="mb-3">DCM grades on its own <Link href="/grading-standard" className="text-purple-600 hover:text-purple-800 underline">published standard</Link>, using the same four categories collectors know (centering, corners, edges and surface) on a 1–10 scale. Each card gets three independent evaluation passes and the median becomes the grade. DCM is not affiliated with PSA, BGS or CGC and makes no claim about the grade they would assign.</p>
         <p className="mb-3"><strong>Key differences:</strong></p>
         <ul className="list-disc list-inside space-y-1 mb-3">
           <li>DCM grades are based on photo analysis, not physical inspection</li>
@@ -362,7 +363,7 @@ const faqs: FAQItem[] = [
           <li><strong>Different standards:</strong> PSA, BGS, and CGC have slightly different criteria</li>
           <li><strong>Timing:</strong> Grading standards can shift over time</li>
         </ul>
-        <p>Use our uncertainty range as a guide. It reports how much of the card the photos let us assess, in whole points: ±0 when visibility is excellent, up to ±3 when it is poor. A card graded 9 with ±1 could reasonably come back an 8 or a 10 from another service.</p>
+        <p>Use our uncertainty range as a guide. It reports how much of the card the photos let us assess, in whole points: ±0 when visibility is excellent, up to ±3 when it is poor. It reflects photo visibility, not a guarantee about the physical card. A card graded 9 with ±1 could reasonably come back an 8 or a 10 from another service.</p>
       </>
     ),
     category: 'Accuracy & Comparison',

@@ -23,7 +23,7 @@ export const DEFAULT_ABOUT_TITLE = 'Professional grading, in-store'
 export const DEFAULT_ABOUT_BULLETS: string[] = [
   'Graded on-site, so your card never gets mailed away',
   'Four sub-grades with a full condition report',
-  'Serialized label with scan-to-verify authenticity',
+  'Serialized label with a scannable grading record',
 ]
 
 export const DEFAULT_HOW_IT_WORKS: HowItWorksStep[] = [

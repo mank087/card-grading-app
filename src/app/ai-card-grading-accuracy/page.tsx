@@ -213,13 +213,19 @@ export default function AiCardGradingAccuracyPage() {
           <div className="rounded-2xl p-8 border border-blue-200 dcm-editorial-soft">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">The consistency argument</h2>
             <p className="text-lg text-gray-700 mb-4">
-              DCM Optic grades card #1 and card #4,000 identically. It does not have a bad day, it does not know your
-              card is valuable, it has no submission tier and no name on the flip to react to, and it has no reason to
-              nudge a 10 down to a 9. There is no fatigue at the end of a long session and no order effect from
-              whatever it graded a minute earlier.
+              DCM Optic applies the same rubric and the same process to card #1 and card #4,000. It does not have a bad
+              day, it does not know your card is valuable, it has no submission tier and no name on the flip to react
+              to. There is no fatigue at the end of a long session and no order effect from whatever it graded a minute
+              earlier.
             </p>
             <p className="text-lg text-gray-700 mb-4">
-              That is a claim about <em>consistency</em>, which is measurable, rather than a claim about being right
+              That is a design goal, not a guarantee. The model underneath is not perfectly repeatable from one run to
+              the next, which is why every card gets three independent passes and the median becomes the grade: one
+              outlying pass cannot move the result on its own. A borderline card can still land a point apart on a
+              re-grade, especially from different photos.
+            </p>
+            <p className="text-lg text-gray-700 mb-4">
+              It is a claim about <em>consistency</em>, which is measurable, rather than a claim about being right
               more often than someone else, which we do not make.
             </p>
             <p className="text-lg text-gray-700">

@@ -22,7 +22,7 @@ export const metadata: Metadata = completeMetadata({
   openGraph: {
     title: 'Cheapest Card Grading (2026) | DCM Grading',
     description:
-      'Published base prices for PSA, Beckett, SGC and CGC next to grading at home, as low as $0.50 a card with Card Lovers Annual. Sourced, August 2026.',
+      'Published base prices for PSA, Beckett, SGC and CGC next to grading at home, as low as $0.50 a card with Card Lovers Annual. Sourced and dated, October 2026.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/cheapest-card-grading',
@@ -31,7 +31,7 @@ export const metadata: Metadata = completeMetadata({
         url: '/why-dcm/Price-graded-cards.png',
         width: 1200,
         height: 630,
-        alt: 'Card grading prices compared, August 2026',
+        alt: 'Card grading prices compared, October 2026',
       },
     ],
   },
@@ -68,7 +68,7 @@ const articleJsonLd = {
   '@type': 'Article',
   headline: 'Cheapest Card Grading (2026): Published Prices Compared',
   description:
-    'Published per-card prices for PSA, Beckett, SGC, CGC and DCM, with what each price does and does not include, as of August 2026.',
+    'Published per-card prices for PSA, Beckett, SGC, CGC and DCM, with what each price does and does not include, with a check date on every row (October 2026).',
   datePublished: UPDATED_ISO,
   dateModified: UPDATED_ISO,
   mainEntityOfPage: 'https://dcmgrading.com/cheapest-card-grading',
@@ -85,11 +85,11 @@ const articleJsonLd = {
 const faqs = [
   {
     q: 'What is the cheapest card grading service?',
-    a: 'The cheapest published base price among the mail-in graders in August 2026 was SGC Standard at $15 per card, with CGC Bulk at about $15 but requiring a 25-card minimum. PSA and Beckett had both paused their budget tiers, leaving $79.99 and $79.95 as their cheapest open service levels. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, and nothing ships.',
+    a: 'The lowest listed base price among the mail-in graders is CGC Bulk at about $15 per card, but it requires a 25-card minimum and was last checked August 24, 2026. For a single card, as of October 8, 2026 SGC lists Standard at $50 and PSA lists Standard at $59.99, with PSA Value services temporarily paused. When last checked in August 2026, Beckett had paused Base and Standard, leaving Express at $79.95 as its cheapest open level. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, and nothing ships.',
   },
   {
     q: 'How much does it cost to get a card graded?',
-    a: 'Budget $15 to $80 per card for a mail-in grade in August 2026, plus $15 to $40 of insured shipping in each direction depending on declared value. The advertised tier price is only part of the total: shipping, insurance, and in some cases subgrades or minimum submission sizes are extra. Grading at home costs $2.99 for a single card at DCM with nothing to add.',
+    a: 'Budget about $15 to $80 per card for a mail-in grade on the cheapest open tiers (about $15 only on a 25-card CGC Bulk submission; $50 to $80 for a single card), plus $15 to $40 of insured shipping in each direction depending on declared value. The advertised tier price is only part of the total: shipping, insurance, and in some cases subgrades or minimum submission sizes are extra. Grading at home costs $2.99 for a single card at DCM with nothing to add.',
   },
   {
     q: 'What does a card grading price include?',
@@ -133,14 +133,16 @@ export default function CheapestCardGradingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-5">Cheapest Card Grading</h1>
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
-            The cheapest published mail-in price in August 2026 was <strong>SGC Standard at $15</strong> per card, with
-            CGC Bulk at about $15 on a 25-card minimum. PSA and Beckett had paused their budget tiers, leaving{' '}
-            <strong>$79.99</strong> and <strong>$79.95</strong> as their cheapest open levels. None of those figures
-            includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, and{' '}
+            The lowest listed mail-in price is <strong>CGC Bulk at about $15</strong> per card on a 25-card minimum
+            (last checked August 24, 2026). For a single card, as of October 8, 2026 <strong>SGC Standard is $50</strong>{' '}
+            and <strong>PSA Standard is $59.99</strong>, with PSA Value services temporarily paused. Beckett&apos;s
+            cheapest open tier when last checked in August 2026 was Express at <strong>$79.95</strong>. None of those
+            figures includes shipping. Grading at home with DCM costs <strong>$2.99</strong> for one card, and{' '}
             <strong>as low as $0.66 a card with the 150-credit VIP package</strong>.
           </p>
           <p className="text-sm text-gray-500">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}. Per card, shipping excluded. Sources below.
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
+            row shows its own check date. Per card, shipping excluded. Sources below.
           </p>
         </section>
 
@@ -165,7 +167,10 @@ export default function CheapestCardGradingPage() {
                       key={c.name}
                       className={`border-b border-gray-200 last:border-0 align-top ${c.isDcm ? 'bg-purple-50' : ''}`}
                     >
-                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">{c.name}</td>
+                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">
+                        {c.name}
+                        <div className="text-xs font-normal text-gray-500 mt-1">Checked {c.checked}</div>
+                      </td>
                       <td className="py-4 px-4 text-gray-700">{c.cheapestTier}</td>
                       <td className="py-4 px-4 text-gray-900 font-semibold">{c.price}</td>
                       <td className="py-4 px-4 text-gray-700">{c.minimum}</td>
@@ -204,7 +209,7 @@ export default function CheapestCardGradingPage() {
               <li>
                 <strong className="text-gray-900">Budget tiers get paused.</strong> The affordable tiers are the first
                 to close when submissions spike, which is exactly what happened at PSA and Beckett in the summer of
-                2026.
+                2026. As of October 8, 2026, PSA still lists its Value services as temporarily paused.
               </li>
               <li>
                 <strong className="text-gray-900">A mail-in fee buys a sealed slab.</strong> That is a real thing the

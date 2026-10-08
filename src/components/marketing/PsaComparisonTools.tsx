@@ -49,13 +49,13 @@ export function PsaCostComparison() {
   const psa = count * 59.99
   const money = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
   return <div className={styles.calculator}>
-    <div><p className="dcm-eyebrow">Compare your grading budget</p><h2>How many cards are you considering?</h2><p>Compare a DCM digital assessment pack with PSA’s announced Standard service. Choose the outcome that suits your collection.</p></div>
+    <div><p className="dcm-eyebrow">Compare your grading budget</p><h2>How many cards are you considering?</h2><p>Compare a DCM digital assessment pack with PSA’s Standard service. Choose the outcome that suits your collection.</p></div>
     <div className={styles.choices} role="group" aria-label="Number of cards">{packs.map(item => <button type="button" key={item.id} aria-pressed={count === item.credits} onClick={() => setCount(item.credits)}>{item.credits} {item.credits === 1 ? 'card' : 'cards'}</button>)}</div>
     <div aria-live="polite" aria-atomic="true">
       <div className={styles.costRow}><div><strong>DCM · {pack.name} pack</strong><span>{money(pack.price)}<small>one-time purchase</small></span></div><div className={styles.track}><div className={styles.dcmBar} style={{ width: `${pack.price / psa * 100}%` }} /></div><p>{count} digital assessments. Reports and printable labels included.</p></div>
-      <div className={styles.costRow}><div><strong>PSA · Standard</strong><span>{money(psa)}<small>{count} × $59.99</small></span></div><div className={styles.track}><div className={styles.psaBar} /></div><p>Physical authentication, grading and encapsulation. Announced opening: September 14, 2026.</p></div>
+      <div className={styles.costRow}><div><strong>PSA · Standard</strong><span>{money(psa)}<small>{count} × $59.99</small></span></div><div className={styles.track}><div className={styles.psaBar} /></div><p>Physical authentication, grading and encapsulation. Estimated 90–100 business days as of October 8, 2026.</p></div>
     </div>
-    <p className={styles.note}>USD grading fees only. Shipping, taxes, promotions and first-purchase bonuses excluded. Bar lengths use the same zero-based scale. Different services and outputs; DCM grades do not predict PSA grades. Standard’s maximum insured value is $1,000 per card. <a href="https://www.psacard.com/articles/articleview/15763" target="_blank" rel="noopener noreferrer">PSA announcement ↗</a></p>
+    <p className={styles.note}>USD grading fees only. Shipping, taxes, promotions and first-purchase bonuses excluded. Bar lengths use the same zero-based scale. Different services and outputs; DCM grades do not predict PSA grades. Standard’s maximum insured value is $1,000 per card. <a href="https://www.psacard.com/services/tradingcardgrading" target="_blank" rel="noopener noreferrer">PSA services and pricing ↗</a></p>
     <Link className={styles.primary} href="/login?mode=signup&redirect=%2Fupload">Try DCM with 2 Free Credits →</Link>
   </div>
 }

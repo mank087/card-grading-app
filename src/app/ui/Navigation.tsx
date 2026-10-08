@@ -30,7 +30,7 @@ const GUEST_PRIMARY = [
 const GUEST_PRICING = [
   { href: '/credits', label: 'Grading Credits', description: 'Pay per card, from 2 free grades' },
   { href: '/card-lovers', label: 'Card Lovers Membership', description: 'Monthly or annual bundles for collectors' },
-  { href: '/vip', label: 'VIP Package', description: '150 grades at the lowest per-card price' },
+  { href: '/vip', label: 'VIP Package', description: '150 grades at our lowest one-time pack rate' },
 ] as const;
 const GUEST_RESOURCES = [
   { href: '/grading-rubric', label: 'Grading Standards' },
@@ -58,7 +58,7 @@ const MEMBER_PRIMARY = [
 const MEMBER_CREDITS = [
   { href: '/credits', label: 'Buy credits', description: 'Single grades and packs' },
   { href: '/card-lovers', label: 'Card Lovers Membership', description: 'Monthly or annual bundles' },
-  { href: '/vip', label: 'VIP Package', description: '150 grades at the lowest per-card price' },
+  { href: '/vip', label: 'VIP Package', description: '150 grades at our lowest one-time pack rate' },
 ] as const;
 const MEMBER_RESOURCES = [
   { href: '/get-started', label: 'How It Works' },

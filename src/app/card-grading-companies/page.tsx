@@ -14,7 +14,7 @@ import {
 export const metadata: Metadata = completeMetadata({
   title: "Card Grading Companies: PSA, BGS, CGC & DCM",
   description:
-    "Compare PSA, BGS, SGC, CGC, TAG and DCM: published prices, turnaround times, grading methods and report formats, with sources dated August 2026.",
+    "Compare PSA, BGS, SGC, CGC, TAG and DCM: published prices, turnaround times, grading methods and report formats, sourced, with a check date on every row (October 2026).",
   keywords:
     'card grading companies, best card grading service, card grading comparison, PSA vs BGS vs SGC vs CGC, grading company prices, grading turnaround times, cheapest card grading, fastest card grading',
   alternates: {
@@ -23,7 +23,7 @@ export const metadata: Metadata = completeMetadata({
   openGraph: {
     title: 'Card Grading Companies Compared (2026) | DCM Grading',
     description:
-      'Published prices, published turnarounds, method and format for PSA, Beckett, SGC, CGC, TAG and DCM. Sourced and dated, August 2026.',
+      'Published prices, published turnarounds, method and format for PSA, Beckett, SGC, CGC, TAG and DCM. Sourced, with a check date on every row, October 2026.',
     type: 'website',
     siteName: 'DCM Grading',
     url: 'https://dcmgrading.com/card-grading-companies',
@@ -32,14 +32,14 @@ export const metadata: Metadata = completeMetadata({
         url: '/why-dcm/Price-graded-cards.png',
         width: 1200,
         height: 630,
-        alt: 'Comparison of card grading companies by price, turnaround and method, August 2026',
+        alt: 'Comparison of card grading companies by price, turnaround and method, October 2026',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Card Grading Companies Compared (2026)',
-    description: 'Published prices and turnarounds for PSA, Beckett, SGC, CGC, TAG and DCM. Sourced, August 2026.',
+    description: 'Published prices and turnarounds for PSA, Beckett, SGC, CGC, TAG and DCM. Sourced and dated, October 2026.',
     images: ['/why-dcm/Price-graded-cards.png'],
   },
 });
@@ -88,15 +88,15 @@ const faqs = [
   },
   {
     q: 'What is the cheapest card grading service?',
-    a: 'Among mail-in graders, SGC published the lowest base price in August 2026 at $15 per card on its Standard tier, with CGC at about $15 on a Bulk tier that requires a 25-card minimum. PSA and Beckett were both at roughly $80 on their cheapest open tiers after pausing their budget services. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, with no shipping or insurance to add.',
+    a: 'Among mail-in graders, the lowest listed base price is CGC Bulk at about $15 per card, but it requires a 25-card minimum and was last checked August 24, 2026. For a single card, as of October 8, 2026 SGC lists Standard at $50 and PSA lists Standard at $59.99, with PSA Value services temporarily paused. When last checked in August 2026, Beckett’s cheapest open tier was Express at $79.95 after it paused Base and Standard. DCM grades a single card for $2.99, as low as $0.66 a card with the 150-credit VIP package, with no shipping or insurance to add.',
   },
   {
     q: 'Which card grading company is fastest?',
-    a: 'Among mail-in graders in August 2026, Beckett published the shortest turnaround on its cheapest open tier at 15 business days, with PSA and SGC at 40 to 50 business days and CGC Bulk at 100 or more. DCM returns a grade in about 60 seconds because nothing ships. Published mail-in turnarounds are estimates made before the current queues formed, so read them as a floor rather than a promise.',
+    a: 'Among mail-in graders, Beckett Express published the shortest turnaround on a cheapest open tier at 15 business days when last checked in August 2026. As of October 8, 2026, SGC lists 40 or more business days on Standard and PSA lists 90 to 100 business days on Standard. CGC Bulk was 100 or more business days when last checked in August 2026. DCM returns a grade in about 60 seconds because nothing ships. Published mail-in turnarounds are estimates, not guarantees, and shipping adds time on top.',
   },
   {
     q: 'Which card grading company should I use?',
-    a: 'It depends on what the card needs to do. If the card is valuable enough that a sealed, serialized slab from a recognized third-party grader changes what a buyer will pay, or you want it in a registry, send it to one of the mail-in companies. If you want a documented grade today on cards that were never going to justify a submission fee and a two-month wait, grade at home. Most collectors end up doing both.',
+    a: 'It depends on what the card needs to do. If the card is valuable enough that a sealed, serialized slab from a recognized third-party grader changes what a buyer will pay, or you want it in a registry, send it to one of the mail-in companies. If you want a documented grade today on cards that were never going to justify a submission fee and a wait of months, grade at home. Most collectors end up doing both.',
   },
   {
     q: 'Do any card grading companies use AI?',
@@ -142,14 +142,16 @@ export default function CardGradingCompaniesPage() {
           <p className="text-xl text-gray-700 leading-relaxed mb-4">
             The major trading card grading companies are <strong>PSA</strong>, <strong>Beckett (BGS)</strong>,{' '}
             <strong>SGC</strong>, <strong>CGC</strong>, <strong>TAG</strong> and <strong>DCM Grading</strong>. The
-            first five are mail-in services: you ship the card, it is graded, and it comes back sealed in a slab. In
-            August 2026 their published base prices ran from $15 to about $80 per card, with published turnarounds
-            from 15 to 100-plus business days. DCM is photo-based, grades in about 60 seconds for $2.99 a single card
+            first five are mail-in services: you ship the card, it is graded, and it comes back sealed in a slab.
+            Their published base prices run from about $15 (CGC Bulk, 25-card minimum) to about $80 per card, with
+            published turnarounds from 15 to 100-plus business days. PSA and SGC figures were checked October 8,
+            2026; Beckett and CGC figures were last checked in August 2026. DCM is photo-based, grades in about 60 seconds for $2.99 a single card
             or as low as $0.66 a card with the VIP package, and the card never leaves your hands.
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED}. Business days throughout, shipping excluded. Sources
-            are linked under the table.
+            {UPDATED_LABEL}. Figures last checked {LAST_CHECKED} where the company&apos;s site could be reached; each
+            row shows its own check date. Business days throughout, shipping excluded. Sources are linked under the
+            table.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
@@ -170,11 +172,11 @@ export default function CardGradingCompaniesPage() {
         {/* The comparison table */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-3">
-            The comparison table (August 2026)
+            The comparison table (October 2026)
           </h2>
           <p className="text-gray-600 mb-6">
             Every figure below is a published number from the grading company or a dated third-party roundup. Prices
-            are per card on the cheapest tier that was open in August 2026 and exclude shipping and insurance.
+            are per card on the cheapest tier open as of each row&apos;s check date and exclude shipping and insurance.
           </p>
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -196,7 +198,10 @@ export default function CardGradingCompaniesPage() {
                       key={c.name}
                       className={`border-b border-gray-200 last:border-0 align-top ${c.isDcm ? 'bg-purple-50' : ''}`}
                     >
-                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">{c.name}</td>
+                      <td className="py-4 px-4 font-semibold text-gray-900 whitespace-nowrap">
+                        {c.name}
+                        <div className="text-xs font-normal text-gray-500 mt-1">Checked {c.checked}</div>
+                      </td>
                       <td className="py-4 px-4 text-gray-700">{c.cheapestTier}</td>
                       <td className="py-4 px-4 text-gray-900 font-semibold">{c.price}</td>
                       <td className="py-4 px-4 text-gray-700">{c.turnaround}</td>
@@ -214,7 +219,8 @@ export default function CardGradingCompaniesPage() {
             <ul className="space-y-3 text-sm text-gray-700">
               {COMPANIES.map((c) => (
                 <li key={c.name}>
-                  <strong className="text-gray-900">{c.name}:</strong> {c.notes} Minimum: {c.minimum}.
+                  <strong className="text-gray-900">{c.name}:</strong> {c.notes} Minimum: {c.minimum}.{' '}
+                  <span className="text-gray-500">Checked {c.checked}.</span>
                 </li>
               ))}
             </ul>
@@ -250,14 +256,17 @@ export default function CardGradingCompaniesPage() {
             <div className="space-y-4 text-gray-700">
               <p>
                 <strong className="text-gray-900">Backlogs.</strong> PSA&apos;s own updates page reported a backlog
-                above 12 million cards in late July 2026 and listed Value services as paused. Beckett paused its Base
-                and Standard tiers on August 5, 2026 after a reported 102 percent year-over-year rise in submissions.
-                Published turnarounds were set before those queues formed.
+                above 12 million cards in late July 2026, and as of October 8, 2026 PSA&apos;s services page lists
+                Value services as temporarily paused. Beckett paused its Base and Standard tiers on August 5, 2026
+                after a reported 102 percent year-over-year rise in submissions; it targeted a mid-September
+                reopening, and reports since conflict on whether it held. Published turnarounds are estimates, not
+                guarantees.
               </p>
               <p>
                 <strong className="text-gray-900">Faster tiers.</strong> Every mail-in service sells faster tiers at
-                higher prices, from roughly $150 for a five-to-seven-day PSA Super Express to $250 or more for
-                walk-through service at Beckett. Those tiers make sense for cards worth several hundred dollars and up.
+                higher prices. As of October 8, 2026, SGC Expedited (2 to 3 business days) starts at $150, PSA Express
+                is $199 for 20 to 30 business days and PSA Super Express is $349 for 10 to 15, and walk-through service
+                at Beckett runs $250 or more. Those tiers make sense for cards worth several hundred dollars and up.
               </p>
               <p>
                 <strong className="text-gray-900">Subgrades.</strong> Beckett prints subgrades on the label at every
@@ -288,7 +297,7 @@ export default function CardGradingCompaniesPage() {
                 <li>• You are building a registry set, which needs a slab from a company that runs one.</li>
                 <li>• The buyer you have in mind specifically wants a slab in hand from that company.</li>
                 <li>• The card is a vintage or high-dollar piece where a third-party authenticity opinion matters.</li>
-                <li>• You can absorb the published turnaround, which in August 2026 ran from 15 to 100-plus business days.</li>
+                <li>• You can absorb the published turnaround, which on the cheapest open tiers runs from 15 to 100-plus business days.</li>
               </ul>
             </div>
             <div className="bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">

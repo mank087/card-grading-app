@@ -11,13 +11,14 @@
  * RULES FOR EDITING THIS FILE
  *  - Never add a number without a source in SOURCES and a `sourceId` on the row.
  *  - Never add a claim about how a third party would grade a card.
- *  - Re-date LAST_CHECKED when any figure moves.
+ *  - Re-date LAST_CHECKED when any figure moves, and set `checked` on every row
+ *    you re-verify. Rows that could not be re-verified keep their old date.
  */
 
-export const LAST_CHECKED = 'August 24, 2026';
-export const UPDATED_LABEL = 'Updated August 2026';
+export const LAST_CHECKED = 'October 8, 2026';
+export const UPDATED_LABEL = 'Updated October 2026';
 /** ISO date used for `dateModified` in JSON-LD. */
-export const UPDATED_ISO = '2026-09-09';
+export const UPDATED_ISO = '2026-10-08';
 
 export interface Source {
   id: string;
@@ -36,11 +37,6 @@ export const SOURCES: Record<string, Source> = {
     label: 'PreGradeCards, "Beckett pauses grading", August 2026',
     url: 'https://pregradecards.com/blog/beckett-pauses-grading-august-2026-budget-tiers-closed',
   },
-  dkPsaTurnaround: {
-    id: 'dkPsaTurnaround',
-    label: 'DraftKings Network, PSA turnaround breakdown, May 14, 2026',
-    url: 'https://dknetwork.draftkings.com/2026/05/14/psa-turnaround-times-2026/',
-  },
   psaUpdates: {
     id: 'psaUpdates',
     label: 'PSA submission updates',
@@ -55,6 +51,11 @@ export const SOURCES: Record<string, Source> = {
     id: 'psaPricing',
     label: 'PSA trading card grading services and pricing',
     url: 'https://www.psacard.com/services/tradingcardgrading',
+  },
+  sgcPricing: {
+    id: 'sgcPricing',
+    label: 'SGC card grading services and pricing',
+    url: 'https://gosgc.com/card-grading/services-pricing',
   },
   tagSite: {
     id: 'tagSite',
@@ -72,7 +73,7 @@ export interface CompanyRow {
   methodShort: 'Human graders' | 'Human graders, machine-assisted' | 'Computer-vision AI';
   /** What you get back. */
   format: string;
-  /** Cheapest tier that was open in August 2026, or a note. */
+  /** Cheapest open tier as of the row's `checked` date, or a note. */
   cheapestTier: string;
   /** Published price per card for that tier. */
   price: string;
@@ -85,6 +86,8 @@ export interface CompanyRow {
   minimum: string;
   notes: string;
   sourceIds: string[];
+  /** Date this row's figures were last verified against its sources. */
+  checked: string;
   isDcm?: boolean;
 }
 
@@ -99,30 +102,32 @@ export const COMPANIES: CompanyRow[] = [
     method: 'Human graders. Multiple graders on higher service levels.',
     methodShort: 'Human graders',
     format: 'Mail-in. Sealed physical slab with a serialized cert.',
-    cheapestTier: 'Regular (Value tiers paused)',
-    price: '$79.99',
-    priceSort: 79.99,
-    turnaround: '40 to 50 business days',
-    turnaroundSort: 40,
-    minimum: 'None on Regular',
+    cheapestTier: 'Standard (Value services paused)',
+    price: '$59.99',
+    priceSort: 59.99,
+    turnaround: '90 to 100 business days',
+    turnaroundSort: 90,
+    minimum: 'None listed',
     notes:
-      'Value services from $24.99 to $64.99 were listed as paused in August 2026, with a reported backlog above 12 million cards in late July.',
-    sourceIds: ['pregradeRoundup', 'dkPsaTurnaround', 'psaUpdates', 'psaPricing'],
+      'PSA lists Value services as temporarily paused. Standard covers cards up to $1,000 insured value. Priority is $79.99 (up to $1,500, 70 to 80 business days), Express $199 (up to $2,500, 20 to 30 business days), Super Express $349 (up to $5,000, 10 to 15 business days) and Premier $599 (up to $10,000, 7 to 10 business days). PSA reported a backlog above 12 million cards in late July 2026.',
+    sourceIds: ['psaPricing', 'psaUpdates'],
+    checked: 'October 8, 2026',
   },
   {
     name: 'Beckett (BGS)',
     method: 'Human graders. Subgrades printed on the label at every tier.',
     methodShort: 'Human graders',
     format: 'Mail-in. Sealed physical slab with a serialized cert.',
-    cheapestTier: 'Express (Base and Standard paused)',
+    cheapestTier: 'Express (Base and Standard paused in August)',
     price: '$79.95',
     priceSort: 79.95,
     turnaround: '15 business days',
     turnaroundSort: 15,
     minimum: 'None on Express',
     notes:
-      'Base ($14.95 to $17.95) and Standard ($34.95) were paused on August 5, 2026 after a reported 102 percent year-over-year rise in submissions, with reopening estimated for mid September.',
+      'Base ($14.95 to $17.95) and Standard ($34.95) were paused on August 5, 2026 after a reported 102 percent year-over-year rise in submissions. Beckett targeted a mid-September reopening, and reports since conflict on whether it held. Check Beckett directly for current status.',
     sourceIds: ['pregradeBeckett', 'cardgradeBgs', 'pregradeRoundup'],
+    checked: 'August 24, 2026',
   },
   {
     name: 'SGC',
@@ -130,13 +135,15 @@ export const COMPANIES: CompanyRow[] = [
     methodShort: 'Human graders',
     format: 'Mail-in. Sealed physical slab with a serialized cert.',
     cheapestTier: 'Standard',
-    price: '$15',
-    priceSort: 15,
-    turnaround: '40 to 50 business days',
+    price: '$50',
+    priceSort: 50,
+    turnaround: '40 or more business days',
     turnaroundSort: 40,
-    minimum: 'None',
-    notes: 'No tier pauses reported in August 2026. The cheapest published base price among the mail-in majors.',
-    sourceIds: ['pregradeRoundup'],
+    minimum: 'None listed',
+    notes:
+      'Standard covers cards up to $1,500 declared value. Expedited (2 to 3 business days) runs from $150 (up to $3,500 value) to $3,750 for cards valued at $100,000 or more.',
+    sourceIds: ['sgcPricing'],
+    checked: 'October 8, 2026',
   },
   {
     name: 'CGC',
@@ -149,8 +156,10 @@ export const COMPANIES: CompanyRow[] = [
     turnaround: '100 or more business days',
     turnaroundSort: 100,
     minimum: '25 cards',
-    notes: 'The bulk rate requires a 25-card submission, so the entry cost is the bulk minimum rather than one card.',
+    notes:
+      'The bulk rate requires a 25-card submission, so the entry cost is the bulk minimum rather than one card. Last checked August 24, 2026; check CGC directly for current fees.',
     sourceIds: ['pregradeRoundup'],
+    checked: 'August 24, 2026',
   },
   {
     name: 'TAG',
@@ -166,6 +175,7 @@ export const COMPANIES: CompanyRow[] = [
     notes:
       'We do not restate TAG pricing or turnaround here because we do not have a dated published figure we can source. Check TAG directly for current numbers.',
     sourceIds: ['tagSite', 'pregradeRoundup'],
+    checked: 'August 24, 2026',
   },
   {
     name: 'DCM Grading',
@@ -182,6 +192,7 @@ export const COMPANIES: CompanyRow[] = [
     notes:
       'Packs bring the per-grade cost down: 5 for $9.99, 20 for $19.99, 150 for $99. A DCM grade is not a slab from one of the companies above and is not registry-eligible.',
     sourceIds: [],
+    checked: 'October 8, 2026',
     isDcm: true,
   },
 ];

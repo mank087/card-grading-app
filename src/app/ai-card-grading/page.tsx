@@ -270,7 +270,7 @@ export default function AiCardGradingPage() {
 
           <div className="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-200">
             <p className="text-sm text-blue-900">
-              <strong>Pre-grading checks run first.</strong> Before the AI scores condition, it verifies authentication (autograph, trimming detection, alterations), identifies finish type (refractor, chrome, holographic, matte), and detects whether the card is already in a slab or holder. <Link href="/grading-rubric" className="underline font-semibold">Read the full grading rubric</Link>.
+              <strong>Intake checks run first.</strong> Before DCM Optic scores condition, it confirms both photos are usable, identifies the finish type (refractor, chrome, holographic, matte), detects whether the card is already in a slab or holder, and looks for visible signs of alteration such as markings or uneven borders. These are visual checks, not authentication: a photo cannot prove a card or signature is genuine. <Link href="/grading-rubric" className="underline font-semibold">Read the full grading rubric</Link>.
             </p>
           </div>
         </section>
