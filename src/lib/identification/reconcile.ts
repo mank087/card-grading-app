@@ -11,6 +11,10 @@
  * taken and confidence drops to 'low' so downstream lookups and the human
  * reviewer both know this card was contested.
  *
+ * Since Oct 2026 a quoted name is not enough on its own: the 480px read also
+ * quotes captions and, now and then, names that are not on the card at all.
+ * The override needs a second witness (see the name override gate below).
+ *
  * What this file must NEVER do:
  *   - touch `year`. The independent pass's year was measured WRONG in most
  *     runs (a 1958-1961 spread on a 1960 Mantle). Its `year_hint` is recorded
@@ -146,7 +150,161 @@ export function numbersAgree(a: unknown, b: unknown): boolean {
   return !!fa && fa === fb;
 }
 
+// ── name override gate (Oct 2026) ─────────────────────────────────────────
+//
+// 45 days of production (10,166 grades) had 279 independent-read overrides,
+// and a large share of them were wrong in two ways the 480px read cannot see:
+//   - CAPTIONS taken as the name: "MAGIC ON JORDAN", "1963 ROOKIE STARS",
+//     "ALL-STAR CHECKLIST", "Mickey Bio", "BIRDMAN", "BO BREAKER".
+//   - HALLUCINATED printed names: "MIKE WILSON" on a Luis Castillo, "RICK
+//     DEMPSEY" on a David Justice, "Mimikyu" on a Spewpa — each with
+//     printed_name_seen filled in, so the old rule took them on sight.
+// A disagreement is now settled by a third witness, not by whichever read
+// claims to have seen print. Without one, the grading name stays, the card is
+// marked low confidence, and the owner is prompted — the same outcome the old
+// rule gave a correct override, minus the risk of writing a wrong name.
+
+/** Trading-card games print the card's own name, which can be long, carry a
+ *  possessive ("Team Rocket's Mewtwo ex") or a number; caption rules would
+ *  misfire there. */
+const TCG_CATEGORIES = /^(pokemon|mtg|magic|yu-?gi-?oh|lorcana|one ?piece|digimon|dragon ?ball|naruto)/i;
+
+const CAPTION_WORDS = /\b(rookies?|stars|leaders|checklist|champions?|championship|edition|series|breaker|all star|vs|versus|throws|bio|highlights?|record|league|world|playoffs?|legends?|prospects?|magic on|no hitter|draft|team|card|insert|begins|socks|homers?)\b/;
+
+/**
+ * Does this "printed name" read like a caption, title or nickname rather than
+ * a person or character's name? Deliberately conservative outside sports:
+ * "THOR" and "CYCLOPS" are real names on non-sport cards.
+ */
+export function looksLikeCaption(printed: unknown, category?: string | null): boolean {
+  const raw = String(printed ?? '').trim();
+  const n = normalizeName(raw);
+  if (!n) return false;
+  if (category && TCG_CATEGORIES.test(String(category).trim())) return false;
+  if (/\d/.test(n)) return true;
+  if (CAPTION_WORDS.test(n)) return true;
+  if (/^the\s/.test(n)) return true;
+  if (/[a-z]['’]s\b/i.test(raw)) return true;
+  // Multi-subject cards ("JORDAN / PIPPEN") are names, just several of them.
+  if (!/[\/&;]/.test(raw) && n.split(' ').length > 4) return true;
+  // A lone word on a sports card is a nickname ("BIRDMAN", "SHUFFLER"); a
+  // lone surname would already have AGREED with the grading name.
+  if (/^sports?$/i.test(String(category ?? '').trim()) && !/[\/&;]/.test(raw) && n.split(' ').length === 1) return true;
+  return false;
+}
+
+/** Position tags printed after names on multi-player cards ("TOM SEAVER · P"). */
+const POSITIONS = new Set(['p', 'c', '1b', '2b', '3b', 'ss', 'of', 'lf', 'cf', 'rf', 'dh', 'qb', 'rb', 'wr', 'te', 'k', 'g', 'f', 'lw', 'rw', 'd']);
+
+/** Surnames of every subject on the card: "Howe, Gordon" -> [howe];
+ *  "BILL DENEHY · P / TOM SEAVER · P" -> [denehy, seaver]. */
+function subjectSurnames(input: unknown): string[] {
+  const raw = String(input ?? '');
+  const parts = raw.split(/\s*(?:\/|&|;|\band\b|\bvs\.?\b|,(?!\s*(?:jr|sr|ii|iii|iv)\b))\s*/i).filter(Boolean);
+  // A single "Last, First" is one person, not two.
+  const single = /^[^,\/&;]+,\s*[^,\/&;]+$/.test(raw.trim()) && !/\b(jr|sr)\b/i.test(raw) && parts.length === 2 && !parts[1].includes(' ');
+  const subjects = single ? [`${parts[1]} ${parts[0]}`] : parts;
+  const out: string[] = [];
+  for (const s of subjects) {
+    const t = nameTokens(s);
+    while (t.length > 1 && POSITIONS.has(t[t.length - 1])) t.pop();
+    const last = t[t.length - 1];
+    if (last && last.length >= 3) out.push(last);
+  }
+  return out;
+}
+
+/**
+ * Does the first look back the independent read? Same person by the usual
+ * rule, or — outside the TCGs, where "Dragon" is not a surname — any shared
+ * subject surname, which absorbs spelling drift ("Jeremiah"/"Jeremiyah"),
+ * name order and multi-player cards.
+ */
+function firstLookBacks(firstLookSubject: string, names: Array<string | null>, category?: string | null): boolean {
+  const named = names.filter((n): n is string => !!n);
+  if (named.some((n) => namesAgree(firstLookSubject, n))) return true;
+  if (category && TCG_CATEGORIES.test(String(category).trim())) return false;
+  const fl = new Set(subjectSurnames(firstLookSubject));
+  return named.some((n) => subjectSurnames(n).some((s) => fl.has(s)));
+}
+
+/** Whole-word presence of the name's surname in a block of text. */
+function surnameIn(name: unknown, text: string): boolean {
+  const last = lastName(name);
+  if (!last || last.length < 3 || !text) return false;
+  return new RegExp(`\\b${last}\\b`).test(text);
+}
+
+export type NameDecisionReason =
+  | 'caption'
+  | 'first_look_agrees'
+  | 'first_look_disagrees'
+  | 'grader_transcription'
+  | 'uncorroborated';
+
+export interface NameDecision {
+  action: 'override' | 'kept_grading';
+  reason: NameDecisionReason;
+  /** The grading call's name before any change — lost otherwise. */
+  grading_name: string | null;
+  first_look_subject: string | null;
+}
+
+/**
+ * Should the independent read's name replace the grading name? Only on
+ * corroboration:
+ *   1. the first look (full-resolution photos, its own call) names the same
+ *      subject as the independent read; or, with no first look,
+ *   2. the grading call's OWN transcription of the card's text contains the
+ *      independent name and not its own (the Pilarcik shape: the grader read
+ *      "AL PILARCIK" off the card and still answered "Cal Ripken Jr.").
+ */
+function decideName(
+  gradingCardInfo: Record<string, unknown>,
+  gradingName: string | null,
+  independent: IdentificationResult,
+  category: string | null | undefined,
+  firstLookSubject: string | null
+): Omit<NameDecision, 'grading_name' | 'first_look_subject'> {
+  const printed = independent.printed_name_seen;
+  if (looksLikeCaption(printed, category)) return { action: 'kept_grading', reason: 'caption' };
+
+  const independentName = independent.player_or_character || printed;
+  if (firstLookSubject) {
+    return firstLookBacks(firstLookSubject, [independentName, printed], category)
+      ? { action: 'override', reason: 'first_look_agrees' }
+      : { action: 'kept_grading', reason: 'first_look_disagrees' };
+  }
+
+  const transcribed = normalizeName(`${str(gradingCardInfo.card_front_text) ?? ''} ${str(gradingCardInfo.card_back_text) ?? ''}`);
+  if (surnameIn(independentName, transcribed) && !surnameIn(gradingName, transcribed)) {
+    return { action: 'override', reason: 'grader_transcription' };
+  }
+  return { action: 'kept_grading', reason: 'uncorroborated' };
+}
+
+/** Cheap pre-check so the caller only waits for the first look when it matters. */
+export function hasNameConflict(
+  gradingCardInfo: Record<string, unknown> | null | undefined,
+  independent: IdentificationResult | null
+): boolean {
+  if (!independent || independent.confidence === 'low' || !independent.printed_name_seen) return false;
+  const gradingName = str(gradingCardInfo?.card_name);
+  const gradingPlayer = str(gradingCardInfo?.player_or_character);
+  if (!gradingName && !gradingPlayer) return false;
+  const independentName = independent.printed_name_seen || independent.player_or_character || independent.card_name;
+  return !(
+    namesAgree(gradingName ?? gradingPlayer, independentName) ||
+    namesAgree(gradingPlayer ?? gradingName, independentName)
+  );
+}
+
 // ── reconciliation ─────────────────────────────────────────────────────────
+
+export interface ReconcileOptions {
+  /** The first look's identity.subject, when it finished in time. */
+  firstLookSubject?: string | null;
+}
 
 /** The independent result minus token accounting — what we persist. */
 function auditShape(independent: IdentificationResult): Record<string, unknown> {
@@ -157,7 +315,8 @@ function auditShape(independent: IdentificationResult): Record<string, unknown> 
 export function reconcileIdentity(
   gradingCardInfo: Record<string, unknown>,
   independent: IdentificationResult | null,
-  category?: string | null
+  category?: string | null,
+  options: ReconcileOptions = {}
 ): ReconcileOutcome {
   const cardInfo: Record<string, unknown> = { ...(gradingCardInfo || {}) };
   const conflicts: string[] = [];
@@ -198,11 +357,21 @@ export function reconcileIdentity(
 
   let changed = false;
 
-  // NAME: the independent read wins only when it can quote the characters it
-  // saw. Without printed_name_seen it is an inference, and an inference does
-  // not get to overwrite another inference.
+  // NAME: the independent read can only win when it quotes the characters it
+  // saw (without printed_name_seen it is an inference, and an inference does
+  // not get to overwrite another inference) AND something else backs it — see
+  // decideName. Either way the disagreement makes the card low confidence.
+  let nameDecision: NameDecision | null = null;
   if (!nameAgrees && independent.printed_name_seen) {
     conflicts.push('name');
+    const firstLookSubject = str(options.firstLookSubject);
+    nameDecision = {
+      ...decideName(gradingCardInfo || {}, gradingName ?? gradingPlayer, independent, category, firstLookSubject),
+      grading_name: gradingName ?? gradingPlayer,
+      first_look_subject: firstLookSubject,
+    };
+  }
+  if (nameDecision?.action === 'override' && independent.printed_name_seen) {
     const newName = independent.card_name || independent.printed_name_seen;
     cardInfo.card_name = newName;
     applied.push('card_name');
@@ -243,6 +412,7 @@ export function reconcileIdentity(
     agreement: { name: nameAgrees, number: numberAgrees },
     applied,
     category: category ?? null,
+    ...(nameDecision ? { name_decision: nameDecision } : {}),
   };
 
   return { cardInfo, changed, conflicts, confidence };

@@ -53,7 +53,7 @@ import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingM
 import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
-import { reconcileIdentity } from './identification/reconcile';
+import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
 import { fillBlankNumberFromFirstLook, numberFillEnabled } from './identification/firstLookNumberFill';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
@@ -2263,7 +2263,17 @@ Provide detailed analysis as markdown with all required sections.`
       if (identifyPending && jsonData?.card_info && typeof jsonData.card_info === 'object') {
         try {
           const independent = await identifyPending;
-          const rec = reconcileIdentity(jsonData.card_info, independent, categoryHint || cardType);
+          // A name disagreement is settled by the first look (full-resolution,
+          // its own call), so on a conflict — ~3% of grades — give its pass-1
+          // read a short, capped grace period. Agreement never waits.
+          if (hasNameConflict(jsonData.card_info, independent)) {
+            const firstLookPending = pendingFirstLook();
+            if (firstLookPending) await Promise.race([firstLookPending, new Promise(resolve => setTimeout(resolve, 8000))]);
+          }
+          const firstLookSubject = completedFirstLook()?.result?.identity?.subject?.value ?? null;
+          const rec = reconcileIdentity(jsonData.card_info, independent, categoryHint || cardType, { firstLookSubject });
+          const nameDecision = (rec.cardInfo.identification_check as any)?.name_decision;
+          if (nameDecision) console.log(`[identify] name conflict: ${nameDecision.action} (${nameDecision.reason}) grading="${nameDecision.grading_name}" independent="${independent?.printed_name_seen}" first_look="${nameDecision.first_look_subject ?? '-'}"`);
           jsonData.card_info = rec.cardInfo;
           console.log(
             `[identify] name=${rec.conflicts.includes('name') ? 'conflict' : 'agree'} ` +

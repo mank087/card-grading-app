@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reconcileIdentity, namesAgree, numbersAgree, normalizeName, normalizeNumber } from './reconcile';
+import { reconcileIdentity, namesAgree, numbersAgree, normalizeName, normalizeNumber, looksLikeCaption, hasNameConflict } from './reconcile';
 import type { IdentificationResult } from './identifyCard';
 
 function ident(over: Partial<IdentificationResult> = {}): IdentificationResult {
@@ -67,6 +67,8 @@ describe('reconcileIdentity', () => {
       card_number: '7',
       year: '1959',
       identification_confidence: 'high',
+      // The grading call's own transcription has the printed name in it.
+      card_front_text: 'AL PILARCIK  ORIOLES  OUTFIELD',
     };
     const out = reconcileIdentity(
       grading,
@@ -94,12 +96,15 @@ describe('reconcileIdentity', () => {
     expect(check.independent.tokens).toBeUndefined();
     expect(check.agreement).toEqual({ name: false, number: true });
     expect(check.applied).toContain('card_name');
+    expect(check.name_decision).toEqual({ action: 'override', reason: 'grader_transcription', grading_name: 'Cal Ripken Jr.', first_look_subject: null });
   });
 
   it('does not overwrite a distinct player_or_character', () => {
     const out = reconcileIdentity(
       { card_name: 'Cal Ripken Jr. — Iron Man', player_or_character: 'Some Other Guy', card_number: '7' },
-      ident({ printed_name_seen: 'AL PILARCIK', card_name: 'Al Pilarcik', player_or_character: 'Al Pilarcik' })
+      ident({ printed_name_seen: 'AL PILARCIK', card_name: 'Al Pilarcik', player_or_character: 'Al Pilarcik' }),
+      'sports',
+      { firstLookSubject: 'Al Pilarcik' }
     );
     expect(out.cardInfo.card_name).toBe('Al Pilarcik');
     expect(out.cardInfo.player_or_character).toBe('Some Other Guy');
@@ -191,5 +196,124 @@ describe('reconcileIdentity', () => {
     reconcileIdentity(grading, ident({ printed_name_seen: 'AL PILARCIK', card_name: 'Al Pilarcik' }));
     expect(grading.card_name).toBe('Cal Ripken Jr.');
     expect(grading.identification_check).toBeUndefined();
+  });
+});
+
+describe('name override gate (Oct 2026 production misses)', () => {
+  it('Luis Castillo read as "MIKE WILSON": no first look, not in the transcription -> grading name kept, low confidence', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Luis Castillo', player_or_character: 'Luis Castillo', card_number: '69', identification_confidence: 'high', card_front_text: 'TOPPS CHROME  MARINERS' },
+      ident({ printed_name_seen: 'MIKE WILSON', card_name: 'Mike Wilson', player_or_character: 'Mike Wilson', card_number: '69', card_number_text_seen: '69' }),
+      'Sports'
+    );
+    expect(out.cardInfo.card_name).toBe('Luis Castillo');
+    expect(out.cardInfo.player_or_character).toBe('Luis Castillo');
+    expect(out.cardInfo.identification_name_source).toBeUndefined();
+    expect(out.cardInfo.printed_name_seen).toBeUndefined();
+    expect(out.conflicts).toEqual(['name']);
+    expect(out.confidence).toBe('low');
+    expect(out.changed).toBe(false);
+    expect((out.cardInfo.identification_check as any).name_decision).toEqual({
+      action: 'kept_grading', reason: 'uncorroborated', grading_name: 'Luis Castillo', first_look_subject: null,
+    });
+  });
+
+  it('David Justice read as "RICK DEMPSEY" while the first look says Justice -> kept', () => {
+    const out = reconcileIdentity(
+      { card_name: 'David Justice', player_or_character: 'David Justice' },
+      ident({ printed_name_seen: 'RICK DEMPSEY', card_name: 'Rick Dempsey Autograph Card', player_or_character: 'Rick Dempsey' }),
+      'Sports',
+      { firstLookSubject: 'David Justice' }
+    );
+    expect(out.cardInfo.card_name).toBe('David Justice');
+    expect((out.cardInfo.identification_check as any).name_decision.reason).toBe('first_look_disagrees');
+    expect(out.confidence).toBe('low');
+  });
+
+  it('Spewpa read as "Mimikyu" with the first look saying Spewpa -> kept', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Spewpa', player_or_character: 'Spewpa', card_number: '089/088' },
+      ident({ printed_name_seen: 'Mimikyu', card_name: 'Mimikyu', player_or_character: 'Mimikyu' }),
+      'Pokemon',
+      { firstLookSubject: 'Spewpa' }
+    );
+    expect(out.cardInfo.card_name).toBe('Spewpa');
+    expect(out.confidence).toBe('low');
+  });
+
+  it('a caption is never taken as the name, even when the first look echoes it', () => {
+    for (const printed of ['BO BREAKER', 'MAGIC ON JORDAN', '1963 ROOKIE STARS', 'ALL-STAR CHECKLIST', 'Mickey Bio', 'BIRDMAN', "MICHAEL'S MAGIC"]) {
+      const out = reconcileIdentity(
+        { card_name: 'Bo Jackson', player_or_character: 'Bo Jackson' },
+        ident({ printed_name_seen: printed, card_name: printed, player_or_character: printed }),
+        'Sports',
+        { firstLookSubject: printed }
+      );
+      expect(out.cardInfo.card_name).toBe('Bo Jackson');
+      expect((out.cardInfo.identification_check as any).name_decision.reason).toBe('caption');
+    }
+  });
+
+  it('the first look agreeing with the independent read lets the override through', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Cal Ripken Jr.', player_or_character: 'Cal Ripken Jr.' },
+      ident({ printed_name_seen: 'AL PILARCIK', card_name: 'Al Pilarcik', player_or_character: 'Al Pilarcik' }),
+      'Sports',
+      { firstLookSubject: 'Al Pilarcik' }
+    );
+    expect(out.cardInfo.card_name).toBe('Al Pilarcik');
+    expect(out.cardInfo.identification_name_source).toBe('independent_read');
+    expect((out.cardInfo.identification_check as any).name_decision.reason).toBe('first_look_agrees');
+  });
+
+  it('the transcription rule needs the grading name to be ABSENT from its own text', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Luis Castillo', player_or_character: 'Luis Castillo', card_back_text: 'Castillo struck out 10 in a win over Mike Wilson and Oakland.' },
+      ident({ printed_name_seen: 'MIKE WILSON', card_name: 'Mike Wilson', player_or_character: 'Mike Wilson' }),
+      'Sports'
+    );
+    expect(out.cardInfo.card_name).toBe('Luis Castillo');
+  });
+
+  it('the first look backs the read through name order, spelling drift and position tags', () => {
+    const cases: Array<[string, string]> = [
+      ['Howe, Gordon', 'Gordon Howe'],
+      ['JEREMIAH LOVE', 'Jeremiyah Love'],
+      ['BILL DENEHY · P / TOM SEAVER · P', 'Bill Denehy / Tom Seaver'],
+      ['M. MALONE / D. WILKINS / M. JORDAN', 'Michael Jordan, Dominique Wilkins, Karl Malone'],
+    ];
+    for (const [printed, fl] of cases) {
+      const out = reconcileIdentity(
+        { card_name: 'Someone Else', player_or_character: 'Someone Else' },
+        ident({ printed_name_seen: printed, card_name: printed, player_or_character: printed }),
+        'Sports',
+        { firstLookSubject: fl }
+      );
+      expect((out.cardInfo.identification_check as any).name_decision.reason, printed).toBe('first_look_agrees');
+    }
+  });
+
+  it('a shared word is not agreement on a TCG card', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Red-Eyes Black Dragon', player_or_character: 'Red-Eyes Black Dragon' },
+      ident({ printed_name_seen: 'Red-Eyes Darkness Metal Dragon', card_name: 'Red-Eyes Darkness Metal Dragon' }),
+      'Yu-Gi-Oh',
+      { firstLookSubject: 'Red-Eyes B. Dragon' }
+    );
+    expect(out.cardInfo.card_name).toBe('Red-Eyes Black Dragon');
+  });
+
+  it('looksLikeCaption leaves real names alone', () => {
+    expect(looksLikeCaption('KEN GRIFFEY, JR.', 'Sports')).toBe(false);
+    expect(looksLikeCaption('JORDAN / BLAYLOCK / STOCKTON', 'Sports')).toBe(false);
+    expect(looksLikeCaption('THOR', 'Other')).toBe(false);
+    expect(looksLikeCaption("Team Rocket's Mewtwo ex", 'Pokemon')).toBe(false);
+    expect(looksLikeCaption('Red-Eyes Darkness Metal Dragon', 'Yu-Gi-Oh')).toBe(false);
+  });
+
+  it('hasNameConflict only fires on a quoted disagreement', () => {
+    expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: 'MANTLE' }))).toBe(false);
+    expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: null, card_name: 'Roger Maris' }))).toBe(false);
+    expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: 'ROGER MARIS' }))).toBe(true);
   });
 });

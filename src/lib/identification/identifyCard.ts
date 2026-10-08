@@ -88,6 +88,8 @@ function buildPrompt(category?: string | null): string {
     '"language": "en|ja|...|null", "variant": "parallel/foil/insert text as printed or null", ',
     '"confidence": "high|medium|low"}. ',
     'The printed name is authoritative; never infer a player from the team, uniform number or card number. ',
+    'player_or_character is the person or character pictured; printed_name_seen is the printed text of THAT name only, ',
+    'never a caption, headline, subset or checklist title, nickname or artist credit, and null if the name appears only as a signature. ',
     'If the card is not readable, use nulls and confidence "low". ',
     `Category hint: ${hint}.`,
   ].join('');
