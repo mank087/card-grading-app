@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
 import Image from 'next/image'
+import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -37,7 +38,7 @@ function FounderSuccessContent() {
       // Track Google Ads Purchase conversion
       if (window.gtag) {
         window.gtag('event', 'ads_conversion_PURCHASE_1', {
-          transaction_id: `founders_${sessionId}`,
+          transaction_id: analyticsTransactionId(sessionId, 'founders_'),
           value: 99,
           currency: 'USD'
         })
@@ -47,7 +48,7 @@ function FounderSuccessContent() {
       // Track GA4 purchase event with ecommerce data
       if (window.gtag) {
         window.gtag('event', 'purchase', {
-          transaction_id: sessionId,
+          transaction_id: analyticsTransactionId(sessionId),
           value: 99,
           currency: 'USD',
           items: [{

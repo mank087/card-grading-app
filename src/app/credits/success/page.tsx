@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
+import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
 
 // Declare rdt, gtag, and fbq for TypeScript
 declare global {
@@ -39,7 +40,7 @@ function PurchaseSuccessContent() {
       // Track Google Ads Purchase conversion
       if (window.gtag) {
         window.gtag('event', 'ads_conversion_PURCHASE_1', {
-          transaction_id: sessionId, // Stripe session ID for deduplication
+          transaction_id: analyticsTransactionId(sessionId), // Stripe session ID, capped at GA's 64 chars
           value: value,
           currency: 'USD'
         })
@@ -49,7 +50,7 @@ function PurchaseSuccessContent() {
       // Track GA4 purchase event with ecommerce data
       if (window.gtag && value > 0) {
         window.gtag('event', 'purchase', {
-          transaction_id: sessionId,
+          transaction_id: analyticsTransactionId(sessionId),
           value: value,
           currency: 'USD',
           items: [{

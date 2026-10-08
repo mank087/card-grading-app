@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
+import { analyticsTransactionId } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -85,7 +86,7 @@ function CardLoversSuccessContent() {
       // Google Ads Purchase conversion
       if (window.gtag) {
         window.gtag('event', 'ads_conversion_PURCHASE_1', {
-          transaction_id: `card_lovers_${sessionId}`,
+          transaction_id: analyticsTransactionId(sessionId, 'card_lovers_'),
           value,
           currency: 'USD'
         })
@@ -95,7 +96,7 @@ function CardLoversSuccessContent() {
       // GA4 purchase event
       if (window.gtag) {
         window.gtag('event', 'purchase', {
-          transaction_id: sessionId,
+          transaction_id: analyticsTransactionId(sessionId),
           value,
           currency: 'USD',
           items: [{
