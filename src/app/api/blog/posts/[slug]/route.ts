@@ -31,12 +31,8 @@ export async function GET(
       );
     }
 
-    // Increment view count (fire and forget)
-    supabase
-      .from('blog_posts')
-      .update({ view_count: (post.view_count || 0) + 1 })
-      .eq('id', post.id)
-      .then(() => {});
+    // Views are counted by POST /api/blog/view from the post page, not here
+    // (this response is ISR-cached, so it never counted readers).
 
     return NextResponse.json({ post: post as BlogPost });
   } catch (error) {

@@ -125,7 +125,7 @@ export default function AdminCostsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Costs &amp; P&amp;L</h1>
           <p className="text-gray-600 mt-1">
-            Revenue, variable costs, fixed costs, and margins. IAP fee rate currently {data.iap_fee_rate_pct}% (Small Business Program pending).
+            Revenue, variable costs, fixed costs, and margins. IAP fee rate currently {data.iap_fee_rate_pct}% (App Store Small Business Program).
           </p>
         </div>
         <div className="flex items-end gap-2">

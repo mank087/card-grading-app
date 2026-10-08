@@ -299,7 +299,8 @@ export function hasRole(user: AdminUser, requiredRole: AdminRole | AdminRole[]):
 }
 
 /**
- * Log admin activity for audit trail
+ * Log admin activity for audit trail. Never throws; resolves false when the
+ * row was not written, so callers that must not act unaudited can stop.
  */
 export async function logAdminActivity(
   adminUserId: string,
@@ -309,7 +310,7 @@ export async function logAdminActivity(
   targetId: string | null,
   details: Record<string, any>,
   ipAddress?: string | null
-): Promise<void> {
+): Promise<boolean> {
   try {
     // Supabase returns insert errors instead of throwing; check it, or a bad
     // column silently drops the audit row (Sept 2026: eight admin actions,
@@ -323,9 +324,14 @@ export async function logAdminActivity(
       details,
       ip_address: ipAddress
     })
-    if (error) console.error(`Error logging admin activity (${action}):`, error.message)
+    if (error) {
+      console.error(`Error logging admin activity (${action}):`, error.message)
+      return false
+    }
+    return true
   } catch (error) {
     console.error('Error logging admin activity:', error)
+    return false
   }
 }
 

@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
     const requestedSort = searchParams.get('sortBy') || 'created_at'
     const sortBy = SORTABLE_COLUMNS.has(requestedSort) ? requestedSort : 'created_at'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
-    const status = searchParams.get('status') || 'all' // all, active, suspended
 
     const offset = (page - 1) * limit
 
@@ -45,15 +44,6 @@ export async function GET(request: NextRequest) {
         ? query.eq('id', search.trim())
         : query.ilike('email', `%${search}%`)
     }
-
-    // Apply status filter
-    // Note: suspended_at column doesn't exist yet in users table
-    // Uncomment when suspension feature is added
-    // if (status === 'active') {
-    //   query = query.is('suspended_at', null)
-    // } else if (status === 'suspended') {
-    //   query = query.not('suspended_at', 'is', null)
-    // }
 
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' })
@@ -104,7 +94,6 @@ export async function GET(request: NextRequest) {
       card_count: cardCountMap[user.id] || 0,
       last_active: lastActiveMap[user.id] ?? null,
       credits_balance: creditsMap[user.id] ?? 0,
-      is_suspended: false // Will be determined by suspended_at field when we add it
     }))
 
     return NextResponse.json({

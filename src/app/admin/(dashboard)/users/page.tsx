@@ -14,7 +14,6 @@ interface User {
   last_active: string | null
   card_count: number
   credits_balance: number
-  is_suspended: boolean
 }
 
 interface UserDetails {
@@ -128,7 +127,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
     typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('search') || ''
   )
   const [search, setSearch] = useState(searchInput)
-  const [status, setStatus] = useState<'all' | 'active' | 'suspended'>('all')
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -146,7 +144,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
 
   useEffect(() => {
     fetchUsers()
-  }, [pagination.page, search, status])
+  }, [pagination.page, search])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -155,8 +153,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
-        search,
-        status
+        search
       })
 
       const response = await fetch(`/api/admin/users?${params}`)
@@ -191,45 +188,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
     }
   }
 
-  const handleSuspendUser = async (userId: string) => {
-    const reason = prompt('Enter reason for suspension:')
-    if (!reason) return
-
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'suspend', reason })
-      })
-
-      if (response.ok) {
-        alert('User suspended successfully')
-        fetchUsers()
-      }
-    } catch (error) {
-      console.error('Error suspending user:', error)
-      alert('Failed to suspend user')
-    }
-  }
-
-  const handleActivateUser = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'activate' })
-      })
-
-      if (response.ok) {
-        alert('User activated successfully')
-        fetchUsers()
-      }
-    } catch (error) {
-      console.error('Error activating user:', error)
-      alert('Failed to activate user')
-    }
-  }
-
   const handleDeleteUser = async () => {
     if (!deleteUserId || !deleteReason.trim()) {
       alert('Please provide a reason for deletion')
@@ -244,7 +202,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
       })
 
       if (response.ok) {
-        alert('User deleted successfully')
+        alert('User deleted: cards hidden, purchase history kept, account disabled')
         setShowDeleteModal(false)
         setDeleteUserId(null)
         setDeleteReason('')
@@ -285,21 +243,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
             />
           </div>
 
-          {/* Status Filter */}
-          <div>
-            <select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value as 'all' | 'active' | 'suspended')
-                setPagination(prev => ({ ...prev, page: 1 }))
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Users</option>
-              <option value="active">Active Only</option>
-              <option value="suspended">Suspended Only</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -346,9 +289,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Last sign-in
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -379,17 +319,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                           {user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Never'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {user.is_suspended ? (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                            Suspended
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            Active
-                          </span>
-                        )}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => fetchUserDetails(user.id)}
@@ -397,21 +326,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                         >
                           View
                         </button>
-                        {!user.is_suspended ? (
-                          <button
-                            onClick={() => handleSuspendUser(user.id)}
-                            className="text-orange-600 hover:text-orange-900 mr-3"
-                          >
-                            Suspend
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleActivateUser(user.id)}
-                            className="text-green-600 hover:text-green-900 mr-3"
-                          >
-                            Activate
-                          </button>
-                        )}
                         {adminRole === 'super_admin' && (
                           <button
                             onClick={() => openDeleteModal(user.id)}
@@ -486,14 +400,6 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                     <div>
                       <strong>Last sign-in:</strong>{' '}
                       {selectedUser.user.last_active ? new Date(selectedUser.user.last_active).toLocaleString() : 'Never'}
-                    </div>
-                    <div>
-                      <strong>Status:</strong>{' '}
-                      {selectedUser.user.is_suspended ? (
-                        <span className="text-red-600 font-semibold">Suspended</span>
-                      ) : (
-                        <span className="text-green-600 font-semibold">Active</span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -609,9 +515,15 @@ function UsersContent({ adminRole }: { adminRole: string }) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Delete User</h2>
-            <p className="text-gray-600 mb-4">
-              This will permanently delete the user and all their cards. This action cannot be undone.
-            </p>
+            <div className="text-gray-600 mb-4 space-y-2 text-sm">
+              <p>Deleting this user will:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Hide all their cards (soft delete; card rows and images are kept and restorable)</li>
+                <li>Keep their purchase and credit history for financial records</li>
+                <li>Disable the account and replace their email and profile details</li>
+              </ul>
+              <p>Users who own an organization cannot be deleted until it is transferred or closed.</p>
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Reason for deletion (required):

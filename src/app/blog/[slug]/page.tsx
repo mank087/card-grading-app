@@ -16,6 +16,7 @@ import {
   RelatedPosts,
   FurtherReading,
 } from '@/components/blog';
+import BlogViewBeacon from '@/components/blog/BlogViewBeacon';
 
 export const revalidate = 60;
 
@@ -37,15 +38,8 @@ async function getBlogPost(slug: string): Promise<BlogPost | null> {
     .lte('published_at', new Date().toISOString())
     .single();
 
-  if (post) {
-    // Increment view count (fire and forget)
-    supabase
-      .from('blog_posts')
-      .update({ view_count: (post.view_count || 0) + 1 })
-      .eq('id', post.id)
-      .then(() => {});
-  }
-
+  // Views are counted client-side by <BlogViewBeacon> (one per browser
+  // session), not here: this runs per ISR regeneration, not per reader.
   return post as BlogPost | null;
 }
 
@@ -168,6 +162,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   return (
     <>
       <ReadingProgress />
+      <BlogViewBeacon slug={post.slug} />
 
       <script
         type="application/ld+json"
