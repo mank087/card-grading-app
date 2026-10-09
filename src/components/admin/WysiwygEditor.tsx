@@ -1,11 +1,13 @@
 'use client';
 
-import { RefObject, useEffect, useRef } from 'react';
+import { RefObject, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import { Markdown } from 'tiptap-markdown';
+import { hasMarkdownTable, tablesSurviveRoundTrip } from './markdownTables';
 
 interface WysiwygEditorProps {
   /** Markdown source — source of truth lives in the parent form. */
@@ -16,21 +18,6 @@ interface WysiwygEditorProps {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
   minHeight?: number;
-}
-
-/**
- * True when the markdown contains a GFM pipe table (a `| … |` row followed by a
- * `|---|` separator row). The rich pane has no Table extension installed, so
- * letting it re-serialize such content would flatten the tables into text.
- */
-function hasMarkdownTable(markdown: string): boolean {
-  const lines = markdown.split(/\r?\n/);
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (/^\s*\|.*\|\s*$/.test(lines[i]) && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(lines[i + 1])) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -64,18 +51,23 @@ export default function WysiwygEditor({
   // keystroke in the rich pane would cause a setContent → cursor reset.
   const lastWrittenToEditor = useRef<string>(value);
 
-  // Tables can't round-trip through the rich pane (no Table extension), so
-  // when present the rich pane becomes a read-only preview and never writes
-  // back to the markdown.
-  const hasTable = hasMarkdownTable(value);
-  const hasTableRef = useRef(hasTable);
-  hasTableRef.current = hasTable;
+  // The rich pane renders and edits GFM tables, but writes them back in its
+  // own shape (see markdownTables.ts). Until we've confirmed the current
+  // tables survive that round trip unchanged, the rich pane is a read-only
+  // preview and never writes back to the markdown.
+  const [tableLocked, setTableLocked] = useState(() => hasMarkdownTable(value));
+  const tableLockedRef = useRef(tableLocked);
+  tableLockedRef.current = tableLocked;
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Image.configure({ inline: false, allowBase64: false }),
       Link.configure({ openOnClick: false, autolink: true }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Markdown.configure({
         html: true,
         breaks: false,
@@ -85,12 +77,12 @@ export default function WysiwygEditor({
       }),
     ],
     content: value,
-    editable: !hasTable,
+    editable: !tableLocked,
     // Required by Next.js App Router — defer initial render to client so
     // SSR/hydration doesn't mismatch on the editor's content.
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      if (hasTableRef.current) return;
+      if (tableLockedRef.current) return;
       const md = (editor.storage as any).markdown.getMarkdown();
       lastWrittenToEditor.current = md;
       if (md !== value) onChange(md);
@@ -107,11 +99,19 @@ export default function WysiwygEditor({
     editor.commands.setContent(value, { emitUpdate: false });
   }, [value, editor]);
 
+  // After the editor holds `value`, check what it would write back. Runs after
+  // the setContent effect above, so it always tests the current content.
   useEffect(() => {
     if (!editor) return;
-    if (editor.isEditable === !hasTable) return;
-    editor.setEditable(!hasTable, false);
-  }, [hasTable, editor]);
+    const roundTripped = (editor.storage as any).markdown.getMarkdown();
+    setTableLocked(!tablesSurviveRoundTrip(value, roundTripped));
+  }, [value, editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.isEditable === !tableLocked) return;
+    editor.setEditable(!tableLocked, false);
+  }, [tableLocked, editor]);
 
   return (
     <div
@@ -121,11 +121,11 @@ export default function WysiwygEditor({
       {/* WYSIWYG pane */}
       <div className="flex flex-col">
         <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {hasTable ? 'Preview · read-only' : 'Preview · click to edit'}
+          {tableLocked ? 'Preview · read-only' : 'Preview · click to edit'}
         </div>
-        {hasTable && (
+        {tableLocked && (
           <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
-            This post has tables; edit in the Markdown pane to keep them.
+            This post has a table the preview can't edit without changing it (alignment, merged cells or special characters); edit in the Markdown pane.
           </div>
         )}
         <div className="flex-1 overflow-auto">
