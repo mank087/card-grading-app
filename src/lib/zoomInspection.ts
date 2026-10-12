@@ -27,6 +27,7 @@ import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 import { structuralV2Enabled, STRUCTURAL_V2_ZOOM_RULE } from './grading/structuralV2';
 import { imageDetail } from './grading/imageDetail';
 import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
+import { geometryGateSystemPrompt, pixelCornersToNorm, prepareGateImage, quadIsCardShaped } from './grading/geometryGate';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -116,6 +117,9 @@ export interface ZoomResult {
     backFill: number | null;
     frontQuad: Pt[] | null;
     backQuad: Pt[] | null;
+    /** Card-shape check per quad (geometryGate.quadIsCardShaped); null = no quad / not checked. */
+    frontCardShaped?: boolean | null;
+    backCardShaped?: boolean | null;
     outcome: 'full' | 'card_relative' | 'abandoned';
     gateModel: string | null;
   };
@@ -768,6 +772,18 @@ export interface CardGeometry {
   backFill: number | null;
   front?: Pt[];
   back?: Pt[];
+  /**
+   * Card-shape check on each quad (geometryGate.quadIsCardShaped). false = the
+   * outline locates the card but is not trustworthy to measure from, so CV
+   * centering skips that face. Absent (older callers) = not checked.
+   */
+  frontCardShaped?: boolean;
+  backCardShaped?: boolean;
+}
+
+/** CV centering only measures from quads that passed (or predate) the card-shape check. */
+function measurable(quad: Pt[] | undefined, cardShaped: boolean | undefined): quad is Pt[] {
+  return !!quad && cardShaped !== false;
 }
 
 export async function detectCardGeometry(
@@ -778,24 +794,28 @@ export async function detectCardGeometry(
   const out: CardGeometry = { frontFill: null, backFill: null };
   const openaiGate = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const gateStart = Date.now();
+  // Oct 2026 card-outline fix (see geometryGate.ts): the model gets a copy we
+  // sized ourselves and answers in that copy's PIXELS; we convert to 0-1000.
+  // detail is pinned to 'high' (not IMAGE_DETAIL): the copy already fits the
+  // high-detail box, so the pixel frame the model reasons in is exactly the
+  // one we stated.
+  const [frontGate, backGate, frontMeta, backMeta] = await Promise.all([
+    prepareGateImage(frontBuf), prepareGateImage(backBuf),
+    sharp(frontBuf, { failOn: 'none' }).metadata(), sharp(backBuf, { failOn: 'none' }).metadata(),
+  ]);
   const { config: gateConfig } = applyModelCompat({
     model: model || BASELINE_MODEL,
     temperature: 0,
     max_completion_tokens: 2000,
     response_format: { type: 'json_object' },
     messages: [
-      {
-        role: 'system', content: 'You locate a trading card in each photo. Reply ONLY with JSON:\n' +
-          '{"front_fill_percent": <0-100>, "front_corners": [{"x":<0-1000>,"y":<0-1000>} x4], "back_fill_percent": <0-100>, "back_corners": [{"x":<0-1000>,"y":<0-1000>} x4]}\n' +
-          'fill_percent = share of the image area covered by the card itself (not sleeve/holder/background).\n' +
-          'corners = the card\'s four outer corners in NORMALIZED coordinates (x: 0=left edge of image, 1000=right; y: 0=top, 1000=bottom), ordered [top-left, top-right, bottom-right, bottom-left]. Locate them precisely at the card\'s printed corner tips.'
-      },
+      { role: 'system', content: geometryGateSystemPrompt(frontGate, backGate) },
       {
         role: 'user', content: [
           { type: 'text', text: 'Photo 1 (front):' },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: IMAGE_DETAIL } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontGate.b64}`, detail: 'high' } },
           { type: 'text', text: 'Photo 2 (back):' },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: IMAGE_DETAIL } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backGate.b64}`, detail: 'high' } },
         ] as any,
       },
     ],
@@ -811,8 +831,16 @@ export async function detectCardGeometry(
   const fill = JSON.parse(fillRes.choices[0].message.content!);
   out.frontFill = validFill(fill.front_fill_percent);
   out.backFill = validFill(fill.back_fill_percent);
-  if (quadPlausible(fill.front_corners)) out.front = fill.front_corners;
-  if (quadPlausible(fill.back_corners)) out.back = fill.back_corners;
+  const frontQuad = pixelCornersToNorm(fill.front_corners, frontGate.width, frontGate.height);
+  const backQuad = pixelCornersToNorm(fill.back_corners, backGate.width, backGate.height);
+  if (quadPlausible(frontQuad)) {
+    out.front = frontQuad;
+    out.frontCardShaped = quadIsCardShaped(frontQuad, frontMeta.width ?? 0, frontMeta.height ?? 0);
+  }
+  if (quadPlausible(backQuad)) {
+    out.back = backQuad;
+    out.backCardShaped = quadIsCardShaped(backQuad, backMeta.width ?? 0, backMeta.height ?? 0);
+  }
   return out;
 }
 
@@ -927,12 +955,16 @@ export async function runZoomInspection(
       capture.backFill = gate.backFill;
       capture.frontQuad = gate.front ?? null;
       capture.backQuad = gate.back ?? null;
+      capture.frontCardShaped = gate.front ? gate.frontCardShaped ?? null : null;
+      capture.backCardShaped = gate.back ? gate.backCardShaped ?? null : null;
       // v9.5: quads are captured for CENTERING MEASUREMENT whenever plausible,
       // independent of the fill decision (measureGeometry). Card-relative CROPS
       // still engage only for margin photos (fill < threshold) — for full-frame
       // photos blind edge-hugging crops remain better (they hug the cut edges).
-      if (gate.front) measureGeometry.front = gate.front;
-      if (gate.back) measureGeometry.back = gate.back;
+      // Oct 2026: a quad that fails the card-shape check still locates the card for
+      // crops, but is not measured from (a wrong outline gives a wrong centering).
+      if (measurable(gate.front, gate.frontCardShaped)) measureGeometry.front = gate.front;
+      if (measurable(gate.back, gate.backCardShaped)) measureGeometry.back = gate.back;
       if (Number.isFinite(worst) && worst < MIN_FILL_PERCENT) {
         if (quadPlausible(gate.front) && quadPlausible(gate.back)) {
           geometry.front = gate.front;

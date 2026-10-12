@@ -51,7 +51,7 @@ describe('actual zoom pipeline with injected API failures', () => {
     expect(result.regionsInspected).toBeGreaterThan(0);
     expect(result.regionsInspected).toBeLessThan(result.coverage!.expected);
     expect(result.faceCaps).toEqual({});
-    expect(buildCaptureQualityRecord(result)).toMatchObject({ gate_version: 'cq-2', zoom_inspection_status: 'incomplete',
+    expect(buildCaptureQualityRecord(result)).toMatchObject({ gate_version: 'cq-3', zoom_inspection_status: 'incomplete',
       zoom_coverage: { inspected: result.regionsInspected } });
   });
   it('abandons unknown geometry instead of assuming full frame fill', async () => {
@@ -70,6 +70,28 @@ describe('actual zoom pipeline with injected API failures', () => {
     await expect(detectCardGeometry(images.front, images.back)).rejects.toThrow('incomplete');
     mocks.create.mockResolvedValueOnce({ choices: [choice({ front_fill_percent: null, back_fill_percent: '90' })] });
     expect(await detectCardGeometry(images.front, images.back)).toMatchObject({ frontFill: null, backFill: null });
+  });
+  it('asks for pixel corners in a sized copy and returns 0-1000 quads with the card-shape check', async () => {
+    // 600x840 test photo: the gate copy is the same size (never enlarged).
+    const card = [{ x: 150, y: 140 }, { x: 450, y: 140 }, { x: 450, y: 560 }, { x: 150, y: 560 }]; // 300x420 px = 0.714
+    const squashed = [{ x: 150, y: 125 }, { x: 450, y: 125 }, { x: 450, y: 500 }, { x: 150, y: 500 }]; // y x0.89
+    mocks.create.mockResolvedValueOnce({ choices: [choice({ front_fill_percent: 25, back_fill_percent: 22, front_corners: card, back_corners: squashed })] });
+    const geometry = await detectCardGeometry(images.front, images.back);
+    const config = mocks.create.mock.calls[0][0];
+    expect(config.messages[0].content).toContain('Photo 1 is 600 px wide and 840 px tall');
+    expect(config.messages[1].content.filter((c: any) => c.type === 'image_url').every((c: any) => c.image_url.detail === 'high')).toBe(true);
+    expect(geometry.front).toEqual([{ x: 250, y: 167 }, { x: 750, y: 167 }, { x: 750, y: 667 }, { x: 250, y: 667 }]);
+    expect(geometry.frontCardShaped).toBe(true);
+    expect(geometry.backCardShaped).toBe(false);
+  });
+  it('locates crops from an off-shape quad but does not measure centering from it', async () => {
+    mocks.create.mockImplementation(async config => cleanResponse(config));
+    const corners = [{ x: 200, y: 150 }, { x: 800, y: 150 }, { x: 800, y: 850 }, { x: 200, y: 850 }];
+    const result = await runZoomInspection('unused', 'unused', { images, cardType: 'sports',
+      precomputedGeometry: { frontFill: 40, backFill: 40, front: corners, back: corners, frontCardShaped: false, backCardShaped: true } });
+    expect(result.capture).toMatchObject({ outcome: 'card_relative', frontCardShaped: false, backCardShaped: true });
+    expect(result.centering?.front ?? null).toBeNull();
+    expect(buildCaptureQualityRecord(result)).toMatchObject({ front: { card_shaped: false }, back: { card_shaped: true } });
   });
   it('rejects crossed or concave corner geometry before creating card-relative crops', async () => {
     const corners = [{ x: 50, y: 50 }, { x: 950, y: 50 }, { x: 300, y: 300 }, { x: 50, y: 950 }];

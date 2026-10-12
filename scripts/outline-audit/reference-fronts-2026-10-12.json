@@ -1,0 +1,371 @@
+{
+ "ed0ea559-3c6b-4bb0-90cd-9c6cb9f6f0a6": {
+  "edges": [
+   356,
+   701,
+   312,
+   661
+  ],
+  "src": "cv-verified"
+ },
+ "877b9b10-9e38-4ef0-a3cf-ed398db408eb": {
+  "edges": [
+   156,
+   800,
+   175,
+   790
+  ],
+  "src": "manual"
+ },
+ "0c87bc6d-c6e2-402e-8586-0dc9bff66013": {
+  "edges": [
+   83,
+   872,
+   70,
+   855
+  ],
+  "src": "manual"
+ },
+ "91ace57d-3c95-465f-8f06-56f5890c2e8d": {
+  "edges": [
+   80,
+   907,
+   102,
+   891
+  ],
+  "src": "cv-verified"
+ },
+ "21a152e5-2bd6-4fdf-a1bd-fe5981d842ed": {
+  "edges": [
+   50,
+   941,
+   82,
+   935
+  ],
+  "src": "cv-verified"
+ },
+ "3c9223d2-11a0-41c1-add5-19c6feecb2d9": {
+  "edges": [
+   287,
+   887,
+   100,
+   848
+  ],
+  "src": "manual"
+ },
+ "9590e647-d9a2-421f-8889-1bca0ca09ae6": {
+  "edges": [
+   189,
+   822,
+   190,
+   837
+  ],
+  "src": "manual"
+ },
+ "64ae083f-43b8-444f-bdc6-0b05cd170143": {
+  "edges": [
+   92,
+   864,
+   111,
+   852
+  ],
+  "src": "cv-verified"
+ },
+ "36d2d668-8921-494b-a418-cb650405bb2f": {
+  "edges": [
+   101,
+   910,
+   77,
+   855
+  ],
+  "src": "cv-verified"
+ },
+ "649a02c8-f2f0-4d13-91d2-8d1ef0a051f6": {
+  "edges": [
+   13,
+   935,
+   84,
+   960
+  ],
+  "src": "cv-verified"
+ },
+ "b685468d-eb88-4c4b-b0c6-ef33ab564ce1": {
+  "edges": [
+   27,
+   894,
+   78,
+   902
+  ],
+  "src": "cv-verified"
+ },
+ "03795482-f487-4438-962c-892bd05d8fcc": {
+  "edges": [
+   138,
+   857,
+   144,
+   856
+  ],
+  "src": "cv-verified"
+ },
+ "2676b97e-d91e-4b00-9b22-c943a723ca4a": {
+  "edges": [
+   61,
+   925,
+   101,
+   929
+  ],
+  "src": "manual"
+ },
+ "72c395a5-2bcc-44d6-8b6b-9a57b4f94a9c": {
+  "edges": [
+   76,
+   947,
+   65,
+   895
+  ],
+  "src": "cv-verified"
+ },
+ "7951f030-6149-4622-a946-06cb7b59e413": {
+  "edges": [
+   61,
+   939,
+   134,
+   965
+  ],
+  "src": "manual"
+ },
+ "9a23eb35-9bc7-48a9-95b3-4db444416a88": {
+  "edges": [
+   119,
+   884,
+   104,
+   864
+  ],
+  "src": "cv-verified"
+ },
+ "eae43e11-f008-43b6-b9c6-06aaf5281d6b": {
+  "edges": [
+   139,
+   832,
+   144,
+   827
+  ],
+  "src": "cv-verified"
+ },
+ "baa2cc28-1f07-4457-a1aa-b1197b06aa0b": {
+  "edges": [
+   80,
+   906,
+   102,
+   892
+  ],
+  "src": "cv-verified"
+ },
+ "52b3d616-1f37-4f3a-9ecf-40b1a566556d": {
+  "edges": [
+   150,
+   894,
+   152,
+   878
+  ],
+  "src": "manual"
+ },
+ "d2f63d86-f9b1-4cae-83e2-21febbd68273": {
+  "edges": [
+   50,
+   905,
+   92,
+   896
+  ],
+  "src": "manual"
+ },
+ "7c7e317a-b618-4326-a0ce-ef2d94a140d5": {
+  "edges": [
+   151,
+   846,
+   151,
+   860
+  ],
+  "src": "cv-verified"
+ },
+ "661a701d-5e7b-44aa-ab39-83160924694c": {
+  "edges": [
+   222,
+   858,
+   307,
+   754
+  ],
+  "src": "manual"
+ },
+ "fb5062d6-43a8-4a5c-acc7-5d7ac20ade8d": {
+  "edges": [
+   50,
+   928,
+   100,
+   925
+  ],
+  "src": "manual"
+ },
+ "3698e96a-7780-4d4a-bb45-81939edad640": {
+  "edges": [
+   164,
+   756,
+   287,
+   720
+  ],
+  "src": "manual"
+ },
+ "32b4d097-c305-491d-bce5-0a17f1079b87": {
+  "edges": [
+   62,
+   925,
+   61,
+   894
+  ],
+  "src": "cv-verified"
+ },
+ "15c52a47-7f37-4f5d-9bbd-5c3eb77cb7de": {
+  "edges": [
+   74,
+   878,
+   76,
+   846
+  ],
+  "src": "cv-verified"
+ },
+ "33d18cfb-8178-4c3e-8af4-e1cdf3689a1d": {
+  "edges": [
+   98,
+   973,
+   70,
+   911
+  ],
+  "src": "cv-verified"
+ },
+ "980d123d-2385-4d70-92dc-2a70f033ab9c": {
+  "edges": [
+   60,
+   892,
+   92,
+   886
+  ],
+  "src": "cv-verified"
+ },
+ "21fcd7b9-5438-47a8-a03e-7a1b8c5d162a": {
+  "edges": [
+   183,
+   854,
+   149,
+   823
+  ],
+  "src": "cv-verified"
+ },
+ "1f402288-61a2-4b47-988e-ca5d19491177": {
+  "edges": [
+   41,
+   893,
+   120,
+   929
+  ],
+  "src": "cv-verified"
+ },
+ "31c223e3-c0b0-4938-a873-ffdb42e52047": {
+  "edges": [
+   48,
+   923,
+   101,
+   946
+  ],
+  "src": "cv-verified"
+ },
+ "a13603b9-5d48-499c-b350-f7384886f3da": {
+  "edges": [
+   45,
+   921,
+   81,
+   914
+  ],
+  "src": "cv-verified"
+ },
+ "bfa18a98-53ad-4fad-9d93-41000ddeb300": {
+  "edges": [
+   79,
+   925,
+   74,
+   895
+  ],
+  "src": "manual"
+ },
+ "76baccf6-5e26-4985-bfb0-b3ccc00b3ff7": {
+  "edges": [
+   107,
+   934,
+   103,
+   890
+  ],
+  "src": "cv-verified"
+ },
+ "22b47198-99ae-490e-ae9b-85276b3724b5": {
+  "edges": [
+   143,
+   890,
+   149,
+   887
+  ],
+  "src": "cv-verified"
+ },
+ "4bd7ecb9-905a-4607-ba94-fd979b69b9c7": {
+  "edges": [
+   67,
+   958,
+   32,
+   875
+  ],
+  "src": "cv-verified"
+ },
+ "bceccc94-b7dc-4788-9588-705e0d9d9c95": {
+  "edges": [
+   91,
+   898,
+   96,
+   875
+  ],
+  "src": "cv-verified"
+ },
+ "5749d4d3-859b-4eef-8b43-f88449736a6c": {
+  "edges": [
+   94,
+   922,
+   71,
+   856
+  ],
+  "src": "manual"
+ },
+ "6cfd2bfc-ba1d-41ea-9770-942642a940bb": {
+  "edges": [
+   87,
+   872,
+   92,
+   896
+  ],
+  "src": "manual"
+ },
+ "851b2d23-2b83-4077-8fa3-100af33a1b29": {
+  "edges": [
+   56,
+   934,
+   104,
+   933
+  ],
+  "src": "cv-verified"
+ },
+ "7e34ae91-e4e6-4c43-b71b-1a84db33a547": {
+  "edges": [
+   164,
+   858,
+   171,
+   855
+  ],
+  "src": "manual"
+ }
+}
