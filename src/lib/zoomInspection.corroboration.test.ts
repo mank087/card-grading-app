@@ -7,10 +7,13 @@ vi.mock('./apiUsageLogger', () => ({ logOpenAIUsage: vi.fn() }));
 vi.mock('./images/originalImages', () => ({ fetchCardOriginals: mocks.fetch }));
 import { runZoomInspection, zoomSystemPrompt, computeZoomFaceCaps, type ZoomDefect } from './zoomInspection';
 import { ZOOM_DESIGN_ARTIFACT_EXCLUSIONS } from './grading/zoomCorroboration';
+import { STRUCTURAL_V2_ZOOM_RULE } from './grading/structuralV2';
 
 // sha256 of the shipped ZOOM_SYSTEM_PROMPT. The default path must keep sending exactly this
 // text; change it only with a zoom calibration run (scripts/run-zoom-calibration.ts).
 // Oct 5 2026: + PRINTED TEXTURE IS NOT A STAIN (was 0c6f32c5... from 3c535e58).
+// v9.32: structural v2 (on by default, STRUCTURAL_V2=0 kill switch) appends
+// STRUCTURAL_V2_ZOOM_RULE after this text; the hash pins the text before it.
 const SHIPPED_PROMPT_SHA256 = '786e1bb4d6192d196ec0a2fb26eee2dab99cc6a8e1b65b8c85e2c2ea79de1504';
 
 let images: { front: Buffer; back: Buffer };
@@ -58,12 +61,13 @@ const FINDINGS = {
 
 describe('ZOOM_CORROBORATION_V1 off: default path unchanged', () => {
   it('sends exactly the shipped zoom prompt', async () => {
-    expect(createHash('sha256').update(zoomSystemPrompt(false)).digest('hex')).toBe(SHIPPED_PROMPT_SHA256);
+    expect(createHash('sha256').update(zoomSystemPrompt(false, false)).digest('hex')).toBe(SHIPPED_PROMPT_SHA256);
+    expect(zoomSystemPrompt(false)).toBe(zoomSystemPrompt(false, false) + STRUCTURAL_V2_ZOOM_RULE);
     mocks.create.mockImplementation(respond({}));
     await runZoomInspection('u', 'u', options());
     const sent = mocks.create.mock.calls.map(([config]: any) => config.messages[0].content);
     expect(sent.length).toBeGreaterThan(0);
-    for (const s of sent) expect(createHash('sha256').update(s).digest('hex')).toBe(SHIPPED_PROMPT_SHA256);
+    for (const s of sent) expect(s).toBe(zoomSystemPrompt(false, false) + STRUCTURAL_V2_ZOOM_RULE);
   });
 
   it.each([undefined, '', 'off', '0', 'false'])('flag=%s: no votes, no attribution, caps as before', async (flag) => {
@@ -87,7 +91,7 @@ describe('ZOOM_CORROBORATION_V1 off: default path unchanged', () => {
 describe('ZOOM_CORROBORATION_V1 on', () => {
   it('appends the design/photo artifact exclusions to the prompt', async () => {
     vi.stubEnv('ZOOM_CORROBORATION_V1', 'on');
-    expect(zoomSystemPrompt(true)).toBe(zoomSystemPrompt(false) + ZOOM_DESIGN_ARTIFACT_EXCLUSIONS);
+    expect(zoomSystemPrompt(true, false)).toBe(zoomSystemPrompt(false, false) + ZOOM_DESIGN_ARTIFACT_EXCLUSIONS);
     mocks.create.mockImplementation(respond({}));
     await runZoomInspection('u', 'u', options());
     for (const [config] of mocks.create.mock.calls as any[]) expect(config.messages[0].content).toBe(zoomSystemPrompt(true));

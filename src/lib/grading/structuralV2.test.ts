@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   structuralV2Enabled, structuralUnsureCap, isStickerProduct, cardContextOf, neutralStructuralClaims, structuralV2Prompt,
-  parseStructuralV2Sample, parseOtherCrease, tallyStructuralV2, sampleVote, structuralRecheckNote, structuralV2Note, liftRefutedStructural,
+  parseStructuralV2Sample, parseOtherCrease, parseCardYear, evaluationsYear, hasFiberEvidence, isStructuralVintage, STRUCTURAL_V2_GRADING_RULE, tallyStructuralV2, sampleVote, structuralRecheckNote, structuralV2Note, liftRefutedStructural,
   type V2Line,
 } from './structuralV2';
 
@@ -12,9 +12,9 @@ const parsed = (...classes: string[]): V2Line[] =>
   parseStructuralV2Sample(sample(...classes.map((c, i) => line(`C${i + 1}`, c, c === 'real_crease_or_bend' ? { evidence: ['surface_break'] } : {}))), classes.length)!;
 
 describe('flag + settings', () => {
-  it('is off unless STRUCTURAL_V2 is on/1/true', () => {
-    expect(structuralV2Enabled({})).toBe(false);
-    expect(structuralV2Enabled({ STRUCTURAL_V2: '0' })).toBe(false);
+  it('is on by default; STRUCTURAL_V2=0/off/false is the kill switch', () => {
+    expect(structuralV2Enabled({})).toBe(true);
+    for (const v of ['0', 'off', 'FALSE']) expect(structuralV2Enabled({ STRUCTURAL_V2: v })).toBe(false);
     for (const v of ['1', 'on', 'TRUE']) expect(structuralV2Enabled({ STRUCTURAL_V2: v })).toBe(true);
   });
   it('unsure cap defaults to 6 and only accepts whole 4-9', () => {
@@ -22,6 +22,36 @@ describe('flag + settings', () => {
     expect(structuralUnsureCap({ STRUCTURAL_V2_UNSURE_CAP: '7' })).toBe(7);
     expect(structuralUnsureCap({ STRUCTURAL_V2_UNSURE_CAP: '10' })).toBe(6);
     expect(structuralUnsureCap({ STRUCTURAL_V2_UNSURE_CAP: 'x' })).toBe(6);
+  });
+});
+
+describe('lone-vote evidence bar', () => {
+  it('needs paper fibre / cracked ink on a real line or the other crease', () => {
+    const line = (evidence: string[]) => ({ claim: 'c', cls: 'real_crease_or_bend' as const, justification: 'j', evidence });
+    expect(hasFiberEvidence({ lines: [line(['surface_break', 'opposite_face_line'])] })).toBe(false);
+    expect(hasFiberEvidence({ lines: [line(['surface_break', 'fiber_or_ink_crack'])] })).toBe(true);
+    expect(hasFiberEvidence({ lines: [], otherCrease: { location: 'x', justification: 'y', evidence: ['fiber_or_ink_crack'] } })).toBe(true);
+  });
+});
+
+describe('vintage split', () => {
+  it('parses the first plausible year', () => {
+    expect(parseCardYear('1986-87')).toBe(1986);
+    expect(parseCardYear(1958)).toBe(1958);
+    expect(parseCardYear('Topps')).toBeNull();
+    expect(parseCardYear('#1234')).toBeNull();
+  });
+  it('takes the median of the evaluations, falling back to the set name', () => {
+    expect(evaluationsYear([{ year: '1970' }, { year: '1971' }, { year: null, set_name: '1970 Topps' }])).toBe(1970);
+    expect(evaluationsYear([{}, null])).toBeNull();
+  });
+  it('pre-1980 is vintage; 1980+ and unknown are not', () => {
+    expect(isStructuralVintage([{ year: '1958' }, { year: '1958' }, {}])).toBe(true);
+    expect(isStructuralVintage([{ year: '1986' }])).toBe(false);
+    expect(isStructuralVintage([{}, {}])).toBe(false);
+  });
+  it('the grading rule tells pre-1980 cards to skip it', () => {
+    expect(STRUCTURAL_V2_GRADING_RULE).toContain('for a card printed before 1980, skip this whole paragraph');
   });
 });
 

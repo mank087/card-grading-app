@@ -2,7 +2,7 @@
   "_readme": [
     "STRUCTURAL-CAP CALIBRATION SET (Oct 12 2026). Labels from a by-eye audit of 21 random structural-capped cards + 3 known false caps + 2 calibration-set anchors.",
     "label: false = the cap was not damage (should release), real = real crease (must stay at the crease level), unclear = could not tell by eye.",
-    "Run: npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set scripts/structural-calibration-set.json --tag <tag> --n 2 (STRUCTURAL_V2=1 for the new detector).",
+    "Run: npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set scripts/structural-calibration-set.json --tag <tag> --n 2 (v2 is the default since v9.32; STRUCTURAL_V2=0 runs the legacy baseline).",
     "2026-10-12 (round 2): added Yastrzemski 252209 + Mays 393528 (real creases v2 missed), four clearly creased cards and two old-frame red MTG false anchors from the 44 recent capped cards."
   ],
   "cases": [

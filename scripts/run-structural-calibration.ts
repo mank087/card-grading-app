@@ -5,8 +5,8 @@
  * records what the crease/bend pipeline did: whether a structural cap applied,
  * the final grade, the verifier's verdict, the pass votes, and measured spend.
  *
- *   npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set <file> --tag baseline --n 2
- *   STRUCTURAL_V2=1 npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set <file> --tag v2 --n 2
+ *   STRUCTURAL_V2=0 npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set <file> --tag baseline --n 2
+ *   npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set <file> --tag v2 --n 2
  *   npx tsx scripts/run-structural-calibration.ts --set <file> --report baseline [--compare v2]
  *   options: --only <key>  --concurrency <c> (default 3)  --out-dir <dir>
  *
@@ -119,7 +119,7 @@ function installMeter() {
 
 (async () => {
   if (reportTag) { report(reportTag, compareTag); return; }
-  const v2 = process.env.STRUCTURAL_V2 || 'off';
+  const v2 = process.env.STRUCTURAL_V2 || 'default (on)';
   const done = new Set(readRows(tag).map(r => `${r.key}|${r.run}`));
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(), process.env.SUPABASE_SERVICE_ROLE_KEY!.trim());
   const signed = new Map<string, { f: string; b: string }>();

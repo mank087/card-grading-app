@@ -1,5 +1,5 @@
 /**
- * Structural detector v2 (Oct 2026, behind STRUCTURAL_V2, default OFF).
+ * Structural detector v2 (Oct 2026, v9.32; on by default, STRUCTURAL_V2=0 is the kill switch).
  *
  * A confirmed crease/bend caps a grade at 4. A by-eye audit of 21 random capped
  * cards (Oct 12) found 11 false, 7 real, 3 unclear, and the v9.1 verifier had
@@ -39,9 +39,47 @@ import { applyModelCompat, BASELINE_MODEL } from './modelRouter';
 import { completedChoice } from './inspectionCompleteness';
 import { fetchCardOriginals, type CardOriginals } from '../images/originalImages';
 
+/** On by default (v9.32). STRUCTURAL_V2=0 / off / false is the kill switch back to the legacy pipeline. */
 export function structuralV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
-  const v = String(env.STRUCTURAL_V2 || '').trim().toLowerCase();
-  return v === 'on' || v === '1' || v === 'true';
+  const v = String(env.STRUCTURAL_V2 ?? '').trim().toLowerCase();
+  return !(v === '0' || v === 'off' || v === 'false');
+}
+
+/**
+ * Vintage split (Oct 12 round 3). Cards printed before this year keep the legacy
+ * structural pipeline end to end: the v2 rule is skipped by the evaluations (the
+ * rule text says so) and the legacy verifier decides. The real creases v2 missed
+ * were all on pre-1980 cardboard (1958 Mays, 1970 Yastrzemski, 1970s Griese
+ * 3-D) - worn stock with printed jersey folds next to real creases, where the
+ * "follows the artwork" rule suppressed the claim itself. Every labeled false
+ * cap was 1985 or later (1980s stickers, Garbage Pail Kids, 1986 Topps Traded,
+ * 1990s Flair/Studio, modern TCG), so 1990 would have handed the 1980s sticker
+ * false caps back to the legacy pipeline.
+ */
+export const STRUCTURAL_V2_VINTAGE_BEFORE = 1980;
+
+/** First plausible 4-digit year in a card_info.year value ("1986", "1986-87", 1958). */
+export function parseCardYear(value: unknown): number | null {
+  const m = /(18[6-9]\d|19\d\d|20\d\d)/.exec(String(value ?? ''));
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The card's year as the evaluations read it: the median of the years they
+ * report (card_info.year, else set_name), or null when none reports one. Pure.
+ */
+export function evaluationsYear(cardInfos: unknown[]): number | null {
+  const years = cardInfos.map(ci => {
+    const info = ci && typeof ci === 'object' ? ci as Record<string, unknown> : {};
+    return parseCardYear(info.year) ?? parseCardYear(info.set_name);
+  }).filter((y): y is number => y !== null).sort((a, b) => a - b);
+  return years.length ? years[Math.floor((years.length - 1) / 2)] : null;
+}
+
+/** True when the evaluations date the card before STRUCTURAL_V2_VINTAGE_BEFORE. Unknown year -> false (v2). Pure. */
+export function isStructuralVintage(cardInfos: unknown[]): boolean {
+  const year = evaluationsYear(cardInfos);
+  return year !== null && year < STRUCTURAL_V2_VINTAGE_BEFORE;
 }
 
 /** The grade an unresolved ("cannot_tell") structural claim is held at. */
@@ -91,7 +129,7 @@ export function cardContextOf(cardInfo: any, category?: string | null, allCardIn
 // ── prompt text (only sent with STRUCTURAL_V2 on) ────────────────────────────
 
 /** Added to the grading ensemble's request. */
-export const STRUCTURAL_V2_GRADING_RULE = `- STRUCTURAL DAMAGE IS A BREAK IN THE CARD STOCK, NOT A LINE IN THE PRINT. These are NEVER structural damage (do not report them in structural_damage, do not lower corners, edges or surface for them): factory features - the split or slit line(s) across the backing paper of a sticker, the die-cut / kiss-cut outline around a peel-off sticker image (Garbage Pail Kids, Wacky Packages, Fleer/Topps/Panini stickers), "bend and peel" corner scores, perforations, the ridged texture of a lenticular (3-D) card, factory-rounded corners on TCG cards; and printed lines that FOLLOW the artwork - wrinkles and folds in a player's jersey, web strands, uniform or waistband stripes, lightning, rain, light streaks, speed lines, swirls, crumpled-paper or stone textures (including the cracked-stone frame of old Magic: The Gathering cards), panel dividers and borders; a line that starts and stops at a printed panel's border is printed. A real crease breaks the print: it crosses design elements at an angle unrelated to them, and shows a surface break (a ridge, a change in gloss along the line), whitening, paper fibres or cracked ink along the line, a kink where it meets the card's edge, or the same line at the same physical spot on the other face. If a line follows the artwork or is a factory feature, it is not a crease. This rule removes printed and factory lines only - it never excuses a DIFFERENT line: ruling out one printed line does not end the search. Check both faces for any other line that cuts across the artwork independently of it (old cards often have a printed jersey fold AND a real crease near it), and report every such line in structural_damage with its own location; every reported crease or bend is re-inspected up close before it affects the grade.`;
+export const STRUCTURAL_V2_GRADING_RULE = `- CARDS PRINTED IN ${STRUCTURAL_V2_VINTAGE_BEFORE} OR LATER ONLY (read the copyright or print year on the card; for a card printed before ${STRUCTURAL_V2_VINTAGE_BEFORE}, skip this whole paragraph and report creases exactly as the rest of these instructions say): STRUCTURAL DAMAGE IS A BREAK IN THE CARD STOCK, NOT A LINE IN THE PRINT. These are NEVER structural damage (do not report them in structural_damage, do not lower corners, edges or surface for them): factory features - the split or slit line(s) across the backing paper of a sticker, the die-cut / kiss-cut outline around a peel-off sticker image (Garbage Pail Kids, Wacky Packages, Fleer/Topps/Panini stickers), "bend and peel" corner scores, perforations, the ridged texture of a lenticular (3-D) card, factory-rounded corners on TCG cards; and printed lines that FOLLOW the artwork - wrinkles and folds in a player's jersey, web strands, uniform or waistband stripes, lightning, rain, light streaks, speed lines, swirls, crumpled-paper or stone textures (including the cracked-stone frame of old Magic: The Gathering cards), panel dividers and borders; a line that starts and stops at a printed panel's border is printed. A real crease breaks the print: it crosses design elements at an angle unrelated to them, and shows a surface break (a ridge, a change in gloss along the line), whitening, paper fibres or cracked ink along the line, a kink where it meets the card's edge, or the same line at the same physical spot on the other face. If a line follows the artwork or is a factory feature, it is not a crease. This rule removes printed and factory lines only - it never excuses a DIFFERENT line: ruling out one printed line does not end the search. Check both faces for any other line that cuts across the artwork independently of it (old cards often have a printed jersey fold AND a real crease near it), and report every such line in structural_damage with its own location; every reported crease or bend is re-inspected up close before it affects the grade.`;
 
 /** Appended to the zoom system prompt. */
 export const STRUCTURAL_V2_ZOOM_RULE = `
@@ -222,6 +260,12 @@ export interface StructuralV2Verdict {
   otherCrease?: V2OtherCrease;
   /** Samples that reported a real crease on a line nobody claimed (diagnostic). */
   otherVotes?: number;
+}
+
+/** The confirmation cites paper fibre or cracked ink along a real line (the sign printing cannot fake). Pure. */
+export function hasFiberEvidence(verdict: Pick<StructuralV2Verdict, 'lines' | 'otherCrease'>): boolean {
+  return verdict.lines.some(l => l.cls === 'real_crease_or_bend' && l.evidence.includes('fiber_or_ink_crack'))
+    || !!verdict.otherCrease?.evidence.includes('fiber_or_ink_crack');
 }
 
 /** A sample's overall reading: any real line -> real; every line non-damage -> not_damage. Pure. */

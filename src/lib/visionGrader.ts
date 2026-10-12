@@ -50,7 +50,7 @@ import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { repairReportConsistency, reportConsistencyEnabled } from './grading/reportConsistency';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
-import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
+import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, isStructuralVintage, evaluationsYear, hasFiberEvidence, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
@@ -73,7 +73,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.31'; // v9.31: Pokemon card_info.printed_badge ("30" / "25" / "pumpkin" / null): a printed anniversary badge puts the card in the 30th Celebration / Celebrations sets, whose Classic Collection reprints keep the original number and copyright (pokemonAnniversary.ts); the pumpkin stamp marks a Trick or Trade promo (pokemonTrickOrTrade.ts). v9.30: one field schema for Other/non-sport cards (other_delta: card_name = printed title, player_or_character = who is pictured, set_name = product, subset = insert line, card_number = printed code, serial_number = stamped print run); master rubric points Other at it. v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.32'; // v9.32: structural detector v2 (grading/structuralV2.ts; STRUCTURAL_V2=0 kill switch): the grading request and zoom are told factory features and lines that follow the artwork are not creases (cards printed 1980+ only; earlier cards keep the legacy pipeline), and a crease claim is classified (real / printed / factory / photo / cannot tell) before the scores are used - not damage re-runs the ensemble once, cannot tell holds the grade at 6. v9.31: Pokemon card_info.printed_badge ("30" / "25" / "pumpkin" / null): a printed anniversary badge puts the card in the 30th Celebration / Celebrations sets, whose Classic Collection reprints keep the original number and copyright (pokemonAnniversary.ts); the pumpkin stamp marks a Trick or Trade promo (pokemonTrickOrTrade.ts). v9.30: one field schema for Other/non-sport cards (other_delta: card_name = printed title, player_or_character = who is pictured, set_name = product, subset = insert line, card_number = printed code, serial_number = stamped print run); master rubric points Other at it. v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -2047,7 +2047,7 @@ export async function gradeCardConversational(
 ${categoryHintSection}${cvAdvisorySection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}${markingRecheckNote?.startsWith('PRINTED') ? `
 - VERIFIED BEFORE THIS EVALUATION: lines or marks on this card that an earlier evaluation took for added writing were re-inspected up close and are PRINTED DESIGN, not an alteration (${markingRecheckNote.slice(9)}). Do not report them as a marking or as surface damage; grade the card normally on its actual condition.` : ''}${markingRecheckNote?.startsWith('SIGNATURE') ? `
-- VERIFIED BEFORE THIS EVALUATION: the ink an earlier evaluation took for added writing is a hand-signed AUTOGRAPH (${markingRecheckNote.slice(11)}). Apply [STEP 0A]: report it in alteration_detection.autograph, never as a marking, never as N/A; score all four categories normally with surface judged as if the ink were absent.` : ''}${structuralV2On && process.env.STRUCTURAL_V2_PROMPT !== 'off' ? `
+- VERIFIED BEFORE THIS EVALUATION: the ink an earlier evaluation took for added writing is a hand-signed AUTOGRAPH (${markingRecheckNote.slice(11)}). Apply [STEP 0A]: report it in alteration_detection.autograph, never as a marking, never as N/A; score all four categories normally with surface judged as if the ink were absent.` : ''}${structuralV2On ? `
 ${STRUCTURAL_V2_GRADING_RULE}` : ''}${structuralV2RecheckNote ? `
 ${structuralV2RecheckNote}` : ''}
 Return ONLY the JSON object with all required fields filled.`
@@ -2231,7 +2231,9 @@ Provide detailed analysis as markdown with all required sections.`
       // and surface around it (a creased card comes back 4/4/4), so lifting the cap
       // afterwards would leave the grade where it was. When the line is not damage, or
       // cannot be confirmed, the ensemble runs once more, told what was found.
-      if (structuralV2On && !structuralV2Early) {
+      // Vintage split: cards the evaluations date before STRUCTURAL_V2_VINTAGE_BEFORE keep
+      // the legacy structural pipeline (their evaluations were told to skip the v2 rule).
+      if (structuralV2On && !structuralV2Early && !isStructuralVintage(scored.map(x => x.j?.card_info))) {
         const detecting = scored.filter(x => x.j?.structural_damage?.detected === true);
         if (detecting.length > 0) {
           const zoomEarly = zoomPromise ? await zoomPromise : null;
@@ -2243,7 +2245,11 @@ Provide detailed analysis as markdown with all required sections.`
           // vote is classified too, but it can only ADD a cap, and only unanimously:
           // anything short of 3/3 "real" leaves it uncorroborated exactly as before.
           // (Measured Oct 12: allowing 2/3 here added one false cap - Shaq Stadium
-          // Club corner - and caught no real crease that 3/3 missed.)
+          // Club corner - and caught no real crease that 3/3 missed.) It must also cite
+          // the one sign printing cannot fake, paper fibre or cracked ink along the line:
+          // over 4 calibration rounds the 7 false lone-vote confirmations (McGwire x4,
+          // Shaq x2, Thunderstrike) all rested on gloss change / opposite-face line /
+          // outline alone, while 5 of the 6 real ones (Nidoqueen, Darkrai) cited it.
           const singleVote = !corroboratedEarly;
           {
             const findings = [
@@ -2269,7 +2275,7 @@ Provide detailed analysis as markdown with all required sections.`
             }
             console.log(`[STRUCTURAL V2] first ensemble: ${detecting.length}/${scored.length} evaluations + zoom=${zoomStructuralEarly} flagged structural → ${verdict.ok ? `[other-line votes ${verdict.otherVotes ?? 0}/3] ${verdict.reason}` : 'verification unavailable (Step 3.9 decides)'}`);
             if (singleVote) {
-              if (verdict.ok && verdict.outcome === 'confirmed') { structuralV2Early = verdict; structuralV2SingleConfirmed = true; }
+              if (verdict.ok && verdict.outcome === 'confirmed' && hasFiberEvidence(verdict)) { structuralV2Early = verdict; structuralV2SingleConfirmed = true; }
             } else if (verdict.ok) {
               structuralV2Early = verdict;
               const note = structuralRecheckNote(verdict);
@@ -3239,6 +3245,10 @@ Provide detailed analysis as markdown with all required sections.`
         let structuralVerified = true;
         let structuralVerifyReason = '';
         let structuralV2Final: StructuralV2Verdict | null = null;
+        // STRUCTURAL_V2 vintage split (see grading/structuralV2.ts STRUCTURAL_V2_VINTAGE_BEFORE).
+        const structuralVintage = structuralV2On && isStructuralVintage(scored.map(x => x.j?.card_info));
+        const structuralV2Active = structuralV2On && !structuralVintage;
+        if (structuralVintage) console.log(`[STRUCTURAL V2] vintage card (evaluations read ${evaluationsYear(scored.map(x => x.j?.card_info))}) - legacy structural pipeline`);
         if (structuralFlagged && structuralCorroborated) {
           const findings = Array.isArray(jsonData.structural_damage?.findings) && jsonData.structural_damage.findings.length > 0
             ? jsonData.structural_damage.findings
@@ -3254,7 +3264,7 @@ Provide detailed analysis as markdown with all required sections.`
           // A failed load falls back to undefined, and the verifier then fetches
           // for itself — identical behavior to before the egress fix.
           const verifierImages = await loadOriginals().catch(() => undefined);
-          if (structuralV2On) {
+          if (structuralV2Active) {
             // STRUCTURAL_V2: the first ensemble's verdict stands when this IS that
             // ensemble (no re-grade ran). After a re-grade the claim belongs to the
             // re-graded evaluations, so it is classified afresh.
@@ -3339,7 +3349,7 @@ Provide detailed analysis as markdown with all required sections.`
 
         // STRUCTURAL_V2 outcome for this card: the latest verdict (Step 3.9's, or the
         // first ensemble's when the re-grade no longer reported the line).
-        const structuralV2Decision = structuralV2On ? (structuralV2Final ?? structuralV2Early) : null;
+        const structuralV2Decision = structuralV2Active ? (structuralV2Final ?? structuralV2Early) : null;
         // "cannot_tell": no 4-cap, but the grade is held at STRUCTURAL_V2_UNSURE_CAP.
         const structuralUnsureHold = !structuralDetected && structuralV2Decision?.outcome === 'uncertain';
         const STRUCT_UNSURE_CAP = structuralUnsureCap();
