@@ -14,6 +14,8 @@ vi.mock('openai', () => ({
     constructor(_opts: any) {}
   },
 }));
+const logUsage = vi.fn();
+vi.mock('@/lib/apiUsageLogger', () => ({ logOpenAIUsage: (e: unknown) => logUsage(e) }));
 vi.mock('@/lib/images/cardThumbnails', () => ({
   makeThumbnail: vi.fn(async (b: Buffer) => b),
 }));
@@ -33,6 +35,7 @@ function completion(body: unknown) {
 
 beforeEach(() => {
   create.mockReset();
+  logUsage.mockReset();
   process.env.OPENAI_API_KEY = 'test-key';
   process.env.IDENTIFICATION_MODEL = 'gpt-5.6-luna';
 });
@@ -101,6 +104,22 @@ describe('identifyCardFromImages', () => {
     expect(out!.card_number).toBeNull();
     expect(out!.set_name).toBeNull();
     expect(out!.confidence).toBe('low');
+  });
+
+  it('logs its usage to api_usage_log as identify_card', async () => {
+    create.mockResolvedValue(completion({ confidence: 'low' }));
+    await identifyCardFromImages({ front: FRONT });
+    expect(logUsage).toHaveBeenCalledTimes(1);
+    const [entry] = logUsage.mock.calls[0];
+    expect(entry).toMatchObject({ operation: 'identify_card', model: 'gpt-5.6-luna', usage: { prompt_tokens: 312, completion_tokens: 74 } });
+    expect(typeof entry.durationMs).toBe('number');
+  });
+
+  it('a throwing usage logger never costs the read', async () => {
+    create.mockResolvedValue(completion({ confidence: 'high', card_number: '7' }));
+    logUsage.mockImplementation(() => { throw new Error('logger down'); });
+    const out = await identifyCardFromImages({ front: FRONT });
+    expect(out!.card_number).toBe('7');
   });
 
   it('returns null (never throws) when the API call fails', async () => {

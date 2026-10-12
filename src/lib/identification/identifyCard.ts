@@ -30,6 +30,7 @@
 import OpenAI from 'openai';
 import { makeThumbnail } from '@/lib/images/cardThumbnails';
 import { applyModelCompat } from '@/lib/grading/modelRouter';
+import { logOpenAIUsage } from '@/lib/apiUsageLogger';
 
 /** Hard ceiling on the whole pass. It runs parallel to the ensemble, but a
  *  hung request must not outlive the grade it is annotating. */
@@ -207,6 +208,11 @@ export async function identifyCardFromImages(
     delete (config as Record<string, any>).prompt_cache_retention;
 
     const response: any = await openai.chat.completions.create(config as any, { signal: controller.signal });
+    // One call per grade that api_usage_log never saw (Oct 2026). Fire-and-forget;
+    // the guard keeps a logger fault from turning into a skipped read.
+    try {
+      logOpenAIUsage({ operation: 'identify_card', model, usage: response?.usage, durationMs: Date.now() - started });
+    } catch { /* never let logging cost the read */ }
     const text = response?.choices?.[0]?.message?.content;
     if (!text) {
       console.warn(`[identify] empty completion (finish_reason=${response?.choices?.[0]?.finish_reason ?? '?'}) — skipped`);
