@@ -123,7 +123,7 @@ export interface FirstLookYearEvidence {
   source: string | null;
 }
 
-const FILL_SOURCES = new Set(['printed', 'inferred']);
+const FILL_SOURCES = new Set(['printed', 'inferred', 'recognized']);
 const BLANK_YEAR = /^(unknown|n\/?a|none|null|undefined|not visible|unreadable)?$/i;
 
 /** First year of "1992-93" / "1992", or null when it is not a plausible year. */

@@ -101,8 +101,8 @@ describe('fillBlankSportsYearFromFirstLook', () => {
     expect(a.year).toBe('1992');
   });
 
-  it('never fills from a recognized or unknown year, and never overwrites a year', () => {
-    expect(fillBlankSportsYearFromFirstLook(info(null, '1989', 'recognized')).filled).toBe(false);
+  it('fills from a recognized year, never from an unknown one, and never overwrites a year', () => {
+    expect(fillBlankSportsYearFromFirstLook(info(null, '1989', 'recognized')).filled).toBe(true);
     expect(fillBlankSportsYearFromFirstLook(info(null, null, 'unknown')).filled).toBe(false);
     const kept = info('1971', '1972', 'printed');
     expect(fillBlankSportsYearFromFirstLook(kept).filled).toBe(false);
