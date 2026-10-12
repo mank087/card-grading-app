@@ -1,0 +1,191 @@
+{
+  "_readme": [
+    "STRUCTURAL-CAP CALIBRATION SET (Oct 12 2026). Labels from a by-eye audit of 21 random structural-capped cards + 3 known false caps + 2 calibration-set anchors.",
+    "label: false = the cap was not damage (should release), real = real crease (must stay at the crease level), unclear = could not tell by eye.",
+    "Run: npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set scripts/structural-calibration-set.json --tag <tag> --n 2 (STRUCTURAL_V2=1 for the new detector)."
+  ],
+  "cases": [
+    {
+      "key": "149058",
+      "label": "false",
+      "note": "Bob 1994-95 Flair Jordan: printed white waistband stripes on back read as creases; true ~8",
+      "card_id": "f19a096f-514a-4c3d-8a7f-822c9370cb6e",
+      "cardType": "sports"
+    },
+    {
+      "key": "162392",
+      "label": "false",
+      "note": "Marvel Masterpieces Thunderstrike: painted lightning/rain read as vertical crease",
+      "card_id": "d1eb2826-1d0f-42b7-afc7-60eac89233a7",
+      "cardType": "other"
+    },
+    {
+      "key": "168075",
+      "label": "unclear",
+      "note": "Mega Dragalge ex: unclear",
+      "card_id": "4e7cc032-f46b-47ed-b91e-5d8eb32368f8",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "171473",
+      "label": "real",
+      "note": "Nidoqueen Legendary Collection: real crease",
+      "card_id": "06bd70cf-45f6-4e33-828d-cab9d99875e6",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "220019",
+      "label": "real",
+      "note": "Jigglypuff CoroCoro promo: real crease",
+      "card_id": "c0d100c3-d17f-4f56-bcad-214874426756",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "300149",
+      "label": "unclear",
+      "note": "Tom Brady SPA: unclear",
+      "card_id": "32bf5764-0e67-4790-b8c0-b087cb54374e",
+      "cardType": "sports"
+    },
+    {
+      "key": "342292",
+      "label": "real",
+      "note": "Darkrai EX: real crease",
+      "card_id": "b0bb1a05-5464-425a-968a-807a5b450706",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "366257",
+      "label": "false",
+      "note": "Garbage Pail Kids Pat Splat: sticker die-cut/peel line read as curved crease",
+      "card_id": "9534704c-9b0d-47ec-ba2e-4777cbcef48c",
+      "cardType": "other"
+    },
+    {
+      "key": "644534",
+      "label": "real",
+      "note": "Howard Johnson Topps: real crease",
+      "card_id": "9d38a5bb-1f6b-4204-92da-12804795d653",
+      "cardType": "sports"
+    },
+    {
+      "key": "654422",
+      "label": "false",
+      "note": "Fleer Super Star Sticker Magic Johnson: factory bend-and-peel corner score read as crease",
+      "card_id": "fbf5269e-f4c9-4f55-a8d4-0c1cc09f45e7",
+      "cardType": "sports"
+    },
+    {
+      "key": "682403",
+      "label": "real",
+      "note": "Enos Slaughter Bowman: real crease",
+      "card_id": "cbcca957-e00c-4561-8076-7b984c030ce8",
+      "cardType": "sports"
+    },
+    {
+      "key": "682559",
+      "label": "false",
+      "note": "Shaq Stadium Club: printed light streak read as corner bend",
+      "card_id": "089dddfe-cd6e-4156-9ceb-24b064616bc4",
+      "cardType": "sports"
+    },
+    {
+      "key": "775138",
+      "label": "real",
+      "note": "Ralph Kiner Topps: real crease",
+      "card_id": "39dc330e-803d-4d4d-922a-a9609854e6b8",
+      "cardType": "sports"
+    },
+    {
+      "key": "795121",
+      "label": "false",
+      "note": "1994 Flair Spider-Man: printed white web strands read as creases",
+      "card_id": "bef10ce2-ac56-460e-9fb2-3a70e7317497",
+      "cardType": "other"
+    },
+    {
+      "key": "797398",
+      "label": "real",
+      "note": "Bob Griese 3-D Super Stars lenticular: real crease",
+      "card_id": "9e1974c9-3b5f-48d6-a42b-70291f006bb3",
+      "cardType": "sports"
+    },
+    {
+      "key": "851339",
+      "label": "false",
+      "note": "Garbage Pail Kids Bullseye Barry: sticker die-cut/peel lines read as diagonal crease",
+      "card_id": "38ec2464-6827-4dde-822c-06e473832b54",
+      "cardType": "other"
+    },
+    {
+      "key": "856910",
+      "label": "false",
+      "note": "1994 Flair Spider-Man: printed white web strands read as creases",
+      "card_id": "27e2a0b4-ce58-41f1-95a5-ea71ff500885",
+      "cardType": "other"
+    },
+    {
+      "key": "930192",
+      "label": "false",
+      "note": "McGwire 1993 Studio: nothing visible (likely false)",
+      "card_id": "bf3a746c-75ed-491f-88d8-1c740a7d2d90",
+      "cardType": "sports"
+    },
+    {
+      "key": "930413",
+      "label": "false",
+      "note": "Bob 1994-95 Flair Jordan: printed white waistband stripes on back read as two creases; true ~8",
+      "card_id": "9387e60f-16b3-4a34-8415-c85f2a648fbb",
+      "cardType": "sports"
+    },
+    {
+      "key": "964660",
+      "label": "false",
+      "note": "Bo Jackson 1986 Topps Traded: printed jersey wrinkles read as branching crease + bend; true ~8",
+      "card_id": "67535a24-182a-4bac-83da-20a680a1be45",
+      "cardType": "sports"
+    },
+    {
+      "key": "047271",
+      "label": "false",
+      "note": "1986 Fleer MJ sticker: sticker backing factory split lines read as full-width creases",
+      "card_id": "c12d26d4-3b73-4e1c-a028-1665abdd040e",
+      "cardType": "sports"
+    },
+    {
+      "key": "009527",
+      "label": "false",
+      "note": "1986 Fleer MJ sticker: sticker backing split / peel corner read as bend",
+      "card_id": "53923b90-2e79-46db-bf7b-646a4860f1c5",
+      "cardType": "sports"
+    },
+    {
+      "key": "090425",
+      "label": "false",
+      "note": "Pikachu VMAX: factory-rounded TCG corner read as bend (likely false)",
+      "card_id": "41f603dd-314f-4fa0-b4b3-eb1124f5f2ed",
+      "cardType": "sports"
+    },
+    {
+      "key": "034068",
+      "label": "unclear",
+      "note": "Mega Gengar ex: unclear",
+      "card_id": "1aa2e687-6d19-4e13-9fd4-37f1a43cabab",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "pineiro",
+      "label": "real",
+      "note": "calibration-set anchor: Eddy Pineiro Donruss, obvious horizontal crease + warp both faces (expected 3)",
+      "card_id": "8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932",
+      "cardType": "sports"
+    },
+    {
+      "key": "gengar",
+      "label": "false",
+      "note": "calibration-set anchor: Gengar false crease in printed back swirl (expected 9)",
+      "card_id": "ff322597-2764-4782-a10e-6ddf1d5841c4",
+      "cardType": "pokemon"
+    }
+  ]
+}

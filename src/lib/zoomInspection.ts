@@ -24,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { attributeZoomDefects, zoomCorroborationEnabled, ZOOM_DESIGN_ARTIFACT_EXCLUSIONS, type DroppedFinding, type RefiledFinding } from './grading/zoomCorroboration';
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
+import { structuralV2Enabled, STRUCTURAL_V2_ZOOM_RULE } from './grading/structuralV2';
 import { imageDetail } from './grading/imageDetail';
 import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
@@ -748,10 +749,12 @@ When card_area is "some" or "none", the crop is dominated by the surface the car
 /**
  * The zoom system prompt. With ZOOM_CORROBORATION_V1 off this is exactly
  * ZOOM_SYSTEM_PROMPT (the default path's text is unchanged); on, the printed-design
- * and photo-artifact exclusions are appended.
+ * and photo-artifact exclusions are appended. STRUCTURAL_V2 (Oct 2026) appends the
+ * factory-feature / printed-line crease exclusions.
  */
-export function zoomSystemPrompt(corroborationOn: boolean = zoomCorroborationEnabled()): string {
-  return corroborationOn ? ZOOM_SYSTEM_PROMPT + ZOOM_DESIGN_ARTIFACT_EXCLUSIONS : ZOOM_SYSTEM_PROMPT;
+export function zoomSystemPrompt(corroborationOn: boolean = zoomCorroborationEnabled(), structuralV2On: boolean = structuralV2Enabled()): string {
+  return (corroborationOn ? ZOOM_SYSTEM_PROMPT + ZOOM_DESIGN_ARTIFACT_EXCLUSIONS : ZOOM_SYSTEM_PROMPT)
+    + (structuralV2On ? STRUCTURAL_V2_ZOOM_RULE : '');
 }
 
 /**

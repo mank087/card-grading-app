@@ -48,6 +48,7 @@ import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
+import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
@@ -1973,6 +1974,14 @@ export async function gradeCardConversational(
   // Sept 2026: set when evaluations declined over a claimed added marking and the
   // verifier found printed design instead. The one re-grade states that finding.
   let markingRecheckNote: string | null = null;
+  // Oct 2026 STRUCTURAL_V2 (default off, see grading/structuralV2.ts): the verdict on
+  // the first ensemble's crease/bend claim, and the note the one re-grade carries
+  // when that verdict was "not damage" or "cannot tell".
+  const structuralV2On = outputFormat === 'json' && structuralV2Enabled();
+  let structuralV2Early: StructuralV2Verdict | null = null;
+  let structuralV2RecheckNote: string | null = null;
+  // A lone evaluation's crease that the v2 verifier confirmed unanimously.
+  let structuralV2SingleConfirmed = false;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -2036,7 +2045,9 @@ export async function gradeCardConversational(
 ${categoryHintSection}${cvAdvisorySection}${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}${markingRecheckNote?.startsWith('PRINTED') ? `
 - VERIFIED BEFORE THIS EVALUATION: lines or marks on this card that an earlier evaluation took for added writing were re-inspected up close and are PRINTED DESIGN, not an alteration (${markingRecheckNote.slice(9)}). Do not report them as a marking or as surface damage; grade the card normally on its actual condition.` : ''}${markingRecheckNote?.startsWith('SIGNATURE') ? `
-- VERIFIED BEFORE THIS EVALUATION: the ink an earlier evaluation took for added writing is a hand-signed AUTOGRAPH (${markingRecheckNote.slice(11)}). Apply [STEP 0A]: report it in alteration_detection.autograph, never as a marking, never as N/A; score all four categories normally with surface judged as if the ink were absent.` : ''}
+- VERIFIED BEFORE THIS EVALUATION: the ink an earlier evaluation took for added writing is a hand-signed AUTOGRAPH (${markingRecheckNote.slice(11)}). Apply [STEP 0A]: report it in alteration_detection.autograph, never as a marking, never as N/A; score all four categories normally with surface judged as if the ink were absent.` : ''}${structuralV2On && process.env.STRUCTURAL_V2_PROMPT !== 'off' ? `
+${STRUCTURAL_V2_GRADING_RULE}` : ''}${structuralV2RecheckNote ? `
+${structuralV2RecheckNote}` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
 
@@ -2212,6 +2223,55 @@ Provide detailed analysis as markdown with all required sections.`
       }
       requireCompleteEnsemble(scored);
 
+      // Oct 2026 STRUCTURAL_V2: a crease/bend claim that would reach the cap (a majority
+      // of evaluations, or one evaluation plus the zoom) is classified HERE, before the
+      // scores are used: the evaluations that saw a "crease" also scored corners, edges
+      // and surface around it (a creased card comes back 4/4/4), so lifting the cap
+      // afterwards would leave the grade where it was. When the line is not damage, or
+      // cannot be confirmed, the ensemble runs once more, told what was found.
+      if (structuralV2On && !structuralV2Early) {
+        const detecting = scored.filter(x => x.j?.structural_damage?.detected === true);
+        if (detecting.length > 0) {
+          const zoomEarly = zoomPromise ? await zoomPromise : null;
+          const zoomStructuralEarly = !!(zoomEarly?.ok && zoomEarly.structuralFindings.length > 0);
+          const corroboratedEarly = detecting.length >= Math.ceil(scored.length / 2) || zoomStructuralEarly;
+          // One evaluation alone has never capped (v9.1). Under v2 the evaluations are
+          // told what is NOT a crease, so a real crease now sometimes keeps only one
+          // vote (Nidoqueen anchor: 3/3 votes without the rule, 1/3 with it). A lone
+          // vote is classified too, but it can only ADD a cap, and only unanimously:
+          // anything short of 3/3 "real" leaves it uncorroborated exactly as before.
+          const singleVote = !corroboratedEarly;
+          {
+            const findings = [
+              ...detecting.flatMap(x => Array.isArray(x.j.structural_damage.findings) && x.j.structural_damage.findings.length
+                ? x.j.structural_damage.findings
+                : [{ type: 'crease', location: String(x.j.structural_damage.description || '') }]),
+              ...(zoomEarly?.ok ? zoomEarly.structuralFindings : []),
+            ];
+            const verifyOpts = {
+              model,
+              images: await loadOriginals().catch(() => undefined),
+              context: cardContextOf(detecting[0].j?.card_info, cardType, scored.map(x => x.j?.card_info)),
+              // Same rule as Step 3.9: a clean regioned zoom is counter-evidence.
+              requireUnanimous: singleVote || !!(zoomEarly?.ok && zoomEarly.structuralFindings.length === 0),
+            };
+            let verdict = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, verifyOpts);
+            if (!verdict.ok) verdict = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, verifyOpts);
+            console.log(`[STRUCTURAL V2] first ensemble: ${detecting.length}/${scored.length} evaluations + zoom=${zoomStructuralEarly} flagged structural → ${verdict.ok ? verdict.reason : 'verification unavailable (Step 3.9 decides)'}`);
+            if (singleVote) {
+              if (verdict.ok && verdict.outcome === 'confirmed') { structuralV2Early = verdict; structuralV2SingleConfirmed = true; }
+            } else if (verdict.ok) {
+              structuralV2Early = verdict;
+              const note = structuralRecheckNote(verdict);
+              if (note && attempt < MAX_RETRIES) {
+                structuralV2RecheckNote = note;
+                continue; // one re-grade, told what the verification found
+              }
+            }
+          }
+        }
+      }
+
       // MEDIAN-PICK: the completion whose final grade is the median becomes the displayed
       // result (identity, narratives, per-face detail). The other completions feed only
       // the consensus math and the uncertainty band.
@@ -2230,7 +2290,7 @@ Provide detailed analysis as markdown with all required sections.`
       // line as a crease should not hijack the narrative (and the cap requires the same
       // corroboration downstream). Zoom-confirmed structural still applies via the merge.
       const structuralMajority = structuralDetectors.length >= Math.ceil(scored.length / 2);
-      if (structuralMajority && base.j?.structural_damage?.detected !== true) {
+      if ((structuralMajority || structuralV2SingleConfirmed) && base.j?.structural_damage?.detected !== true) {
         base = structuralDetectors[0]; // lowest final among detectors (byFinal is sorted)
         console.log(`[CONVERSATIONAL JSON] 🚨 Structural damage reported by ${structuralDetectors.length}/${scored.length} completions (majority) — overriding median-pick with the detecting completion (final=${base.final})`);
       } else if (structuralDetectors.length > 0) {
@@ -3156,7 +3216,9 @@ Provide detailed analysis as markdown with all required sections.`
         // confirmed all 29 with "strong" evidence, so it cannot be the safeguard here.
         // A zoom finding now needs at least one whole-card evaluation to agree; alone it
         // is recorded as unconfirmed (the v9.8 Pokemon-back guard, generalised).
-        const structuralCorroborated = structuralVotes >= Math.ceil(scored.length / 2) || (zoomStructural && structuralVotes >= 1);
+        const structuralCorroborated = structuralVotes >= Math.ceil(scored.length / 2) || (zoomStructural && structuralVotes >= 1)
+          // STRUCTURAL_V2: a lone vote the classifier confirmed 3/3 (see the first-ensemble check).
+          || (structuralV2SingleConfirmed && structuralVotes >= 1);
 
         // v9.1 STRUCTURAL VERIFICATION: even unanimous crease/bend claims can be a
         // lighting/reflection band on glossy or metallic cards (a broad tonal step,
@@ -3166,6 +3228,7 @@ Provide detailed analysis as markdown with all required sections.`
         // ridge, or broad lighting band? Unavailable verification blocks publication.
         let structuralVerified = true;
         let structuralVerifyReason = '';
+        let structuralV2Final: StructuralV2Verdict | null = null;
         if (structuralFlagged && structuralCorroborated) {
           const findings = Array.isArray(jsonData.structural_damage?.findings) && jsonData.structural_damage.findings.length > 0
             ? jsonData.structural_damage.findings
@@ -3181,6 +3244,30 @@ Provide detailed analysis as markdown with all required sections.`
           // A failed load falls back to undefined, and the verifier then fetches
           // for itself — identical behavior to before the egress fix.
           const verifierImages = await loadOriginals().catch(() => undefined);
+          if (structuralV2On) {
+            // STRUCTURAL_V2: the first ensemble's verdict stands when this IS that
+            // ensemble (no re-grade ran). After a re-grade the claim belongs to the
+            // re-graded evaluations, so it is classified afresh.
+            let v2 = structuralV2Early && !structuralV2RecheckNote ? structuralV2Early : null;
+            if (!v2) {
+              const v2Opts = { model, images: verifierImages, context: cardContextOf(jsonData.card_info, cardType), requireUnanimous: zoomFoundNoStructural };
+              v2 = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, v2Opts);
+              if (!v2.ok) v2 = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, v2Opts);
+              if (!v2.ok) throw new IncompleteInspectionError('structural', v2.reason);
+            }
+            structuralV2Final = v2;
+            structuralVerified = v2.outcome === 'confirmed';
+            structuralVerifyReason = `classified ${v2.reason}`;
+            if (jsonData.structural_damage) {
+              jsonData.structural_damage.verification = structuralVerifyReason;
+              if (!structuralVerified) {
+                console.log(`[GRADE RECALC] ⚠️ structural claim NOT CONFIRMED (v2): ${v2.reason}`);
+                jsonData.structural_damage.detected = false;
+                jsonData.structural_damage.unconfirmed = true;
+                jsonData.structural_damage.unconfirmed_note = structuralV2Note(v2.outcome as 'refuted' | 'uncertain', structuralUnsureCap());
+              }
+            }
+          } else {
           let verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
           if (!verdict.ok || verdict.confirmed === null) {
             verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural, model, images: verifierImages });
@@ -3232,16 +3319,80 @@ Provide detailed analysis as markdown with all required sections.`
             jsonData.structural_damage.unconfirmed = true;
             jsonData.structural_damage.unconfirmed_note = `A line was flagged as possible structural damage, but magnified verification could not confirm physical damage — such lines are usually a lighting/reflection band or part of the card's printed artwork (e.g. the wave lines on a Pokemon card back). Grade not capped. (${structuralVerifyReason})`;
           }
+          }
         }
 
         const structuralDetected = structuralFlagged && structuralCorroborated && structuralVerified;
+
+        // STRUCTURAL_V2 outcome for this card: the latest verdict (Step 3.9's, or the
+        // first ensemble's when the re-grade no longer reported the line).
+        const structuralV2Decision = structuralV2On ? (structuralV2Final ?? structuralV2Early) : null;
+        // "cannot_tell": no 4-cap, but the grade is held at STRUCTURAL_V2_UNSURE_CAP.
+        const structuralUnsureHold = !structuralDetected && structuralV2Decision?.outcome === 'uncertain';
+        const STRUCT_UNSURE_CAP = structuralUnsureCap();
+        if (structuralV2Decision) {
+          const sd = jsonData.structural_damage && typeof jsonData.structural_damage === 'object' ? jsonData.structural_damage : (jsonData.structural_damage = { detected: false });
+          sd.v2 = {
+            outcome: structuralV2Decision.outcome,
+            reason: structuralV2Decision.reason,
+            votes: structuralV2Decision.votes,
+            lines: structuralV2Decision.lines,
+            regraded: !!structuralV2RecheckNote,
+            first_verdict: structuralV2Early && structuralV2Early !== structuralV2Decision ? structuralV2Early.reason : null,
+            unsure_cap: structuralUnsureHold ? STRUCT_UNSURE_CAP : null,
+          };
+          if (!structuralDetected && !sd.unconfirmed_note && structuralV2Decision.outcome !== 'confirmed') {
+            sd.unconfirmed = true;
+            sd.unconfirmed_note = structuralV2Note(structuralV2Decision.outcome as 'refuted' | 'uncertain', STRUCT_UNSURE_CAP);
+          }
+        }
+        // The current evaluations still scored around a line that was not confirmed
+        // (no re-grade was possible, or the re-grade reported it again): their corners,
+        // edges and surface sit at the crease level. Take the clean reading instead.
+        if (structuralV2Decision && !structuralDetected && structuralVotes > 0) {
+          const lifted = liftRefutedStructural({
+            scores: { corners: serverRounded.corners, edges: serverRounded.edges, surface: serverRounded.surface },
+            faces: jsonData.raw_sub_scores || {},
+            cleanPassScores: {
+              corners: scored.filter(x => x.j?.structural_damage?.detected !== true).map(x => x.cats.corners),
+              edges: scored.filter(x => x.j?.structural_damage?.detected !== true).map(x => x.cats.edges),
+              surface: scored.filter(x => x.j?.structural_damage?.detected !== true).map(x => x.cats.surface),
+            },
+            zoomOk: !!zoom?.ok,
+            zoomCaps: appliedFaceCaps,
+            structCap: STRUCT_CAP,
+          });
+          if (lifted.changed.length) {
+            for (const cat of ['corners', 'edges', 'surface'] as const) serverRounded[cat] = lifted.scores[cat];
+            if (jsonData.raw_sub_scores) Object.assign(jsonData.raw_sub_scores, lifted.faces);
+            serverRounded.final = Math.max(serverRounded.final,
+              Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface));
+            console.log(`[GRADE RECALC] 🔧 structural v2 lift: ${lifted.changed.join(', ')} (evaluations scored around an unconfirmed line)`);
+            if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(`Structural check: the evaluations scored ${lifted.changed.map(c => c.split(' ')[0]).join(', ')} around a line that a close inspection did not confirm as a crease or bend, so those categories use the clean reading.`);
+            }
+          }
+        }
+        if (structuralUnsureHold) {
+          if (serverRounded.surface > STRUCT_UNSURE_CAP) serverRounded.surface = STRUCT_UNSURE_CAP;
+          if (jsonData.raw_sub_scores) {
+            for (const key of ['surface_front', 'surface_back']) {
+              if (typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > STRUCT_UNSURE_CAP) jsonData.raw_sub_scores[key] = STRUCT_UNSURE_CAP;
+            }
+          }
+          console.log(`[GRADE RECALC] ⚖️ structural v2: unresolved line - surface held at ${STRUCT_UNSURE_CAP} instead of the structural cap`);
+          if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            jsonData.grading_passes.consensus_notes.push(`Structural check: a line flagged as a possible crease or bend could not be confirmed or ruled out from the photos, so the grade is held at no more than ${STRUCT_UNSURE_CAP} instead of the structural cap of ${STRUCT_CAP}.`);
+          }
+        }
 
         if (structuralFlagged && !structuralCorroborated) {
           console.log(`[GRADE RECALC] ⚠️ structural UNCORROBORATED (${structuralVotes}/${scored.length} completions, zoom=${zoomStructural}) — NOT capping to 4 (likely reflection/embossed line on a foil/metallic card)`);
           if (jsonData.structural_damage) {
             jsonData.structural_damage.detected = false;
             jsonData.structural_damage.unconfirmed = true;
-            jsonData.structural_damage.unconfirmed_note = structuralVotes === 0 && zoomStructural
+            // STRUCTURAL_V2: the classification note above already describes the decision.
+            if (!jsonData.structural_damage.v2) jsonData.structural_damage.unconfirmed_note = structuralVotes === 0 && zoomStructural
               ? 'The magnified inspection flagged a possible crease, but none of the whole-card evaluations saw one. Lines found only at magnification are usually printed design (dividers, textures, panel lines), a holder edge or the background — treated as unconfirmed. Grade not capped.'
               : 'A possible surface line was flagged by a single evaluation but not corroborated by the other evaluations or the magnified inspection — treated as unconfirmed (common on reflective/foil/embossed cards). Grade not capped.';
           }
@@ -3389,6 +3540,10 @@ Provide detailed analysis as markdown with all required sections.`
           console.log(`[GRADE RECALC] 🚨 STRUCTURAL CAP backstop: capping final ${finalGrade} → ${STRUCT_CAP}`);
           finalGrade = STRUCT_CAP;
         }
+        if (structuralUnsureHold && finalGrade > STRUCT_UNSURE_CAP) {
+          console.log(`[GRADE RECALC] ⚖️ structural v2 hold: capping final ${finalGrade} → ${STRUCT_UNSURE_CAP}`);
+          finalGrade = STRUCT_UNSURE_CAP;
+        }
 
         // Step 5: Grade 10 validation — standard rounding handles the math naturally
         // Grade 10 only requires: all subgrades round to 10 AND final rounds to 10
@@ -3425,6 +3580,7 @@ Provide detailed analysis as markdown with all required sections.`
           if (typeof cf === 'number') caps.push(cf);
           if (typeof cb === 'number') caps.push(cb);
           if (structuralDetected && cat === 'surface') caps.push(STRUCT_CAP);
+          if (structuralUnsureHold && cat === 'surface') caps.push(STRUCT_UNSURE_CAP);
           return caps.length ? Math.min(...caps) : null;
         };
         for (const p of [threePassData.pass_1, threePassData.pass_2, threePassData.pass_3] as any[]) {
@@ -3435,6 +3591,7 @@ Provide detailed analysis as markdown with all required sections.`
           }
           let pf = Math.min(p.centering, p.corners, p.edges, p.surface);
           if (structuralDetected) pf = Math.min(pf, STRUCT_CAP);
+          if (structuralUnsureHold) pf = Math.min(pf, STRUCT_UNSURE_CAP);
           p.final = pf;
         }
         // Keep the displayed variance/consistency consistent with the folded passes
@@ -3898,7 +4055,7 @@ Provide detailed analysis as markdown with all required sections.`
               consensus: consensus as number,
               clampFaceScore: clamp ? clamp.faceScore : null,
               zoomCaps: [appliedFaceCaps[`${cat}_front`], appliedFaceCaps[`${cat}_back`]],
-              structuralCap: structuralDetected && cat === 'surface' ? STRUCT_CAP : null,
+              structuralCap: structuralDetected && cat === 'surface' ? STRUCT_CAP : structuralUnsureHold && cat === 'surface' ? STRUCT_UNSURE_CAP : null,
               dissentValue: dissentReflectedCats.get(cat) ?? null,
               dragValue: tileDraggedCats.get(cat) ?? null,
             });
@@ -3913,6 +4070,7 @@ Provide detailed analysis as markdown with all required sections.`
               if (pass[cat] > foldTo) pass[cat] = foldTo;
               let pf = Math.min(pass.centering, pass.corners, pass.edges, pass.surface);
               if (structuralDetected) pf = Math.min(pf, STRUCT_CAP);
+              if (structuralUnsureHold) pf = Math.min(pf, STRUCT_UNSURE_CAP);
               pass.final = pf;
             }
 
