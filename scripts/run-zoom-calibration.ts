@@ -62,6 +62,8 @@ interface CalCase {
   false_positive: DefectSpec | null;
   must_detect?: DefectSpec;
   hold_must_name_reason?: boolean;
+  /** No trusted grade: shown in the table, left out of exact/off-by-one/MAE. */
+  report_only?: boolean;
 }
 interface FoundDefect { source: string; category: string; face: string; type: string; severity: string; location: string; description: string }
 interface Row {
@@ -85,7 +87,8 @@ const concurrency = Math.max(1, Number(argVal('--concurrency') || 2));
 const OUTDIR = process.env.SCRATCH || __dirname;
 const outFile = (t: string) => path.join(OUTDIR, `zoom-cal-${t}.jsonl`);
 
-const set = JSON.parse(fs.readFileSync(path.join(__dirname, 'zoom-calibration-set.json'), 'utf8'));
+// --set <file in scripts/>: run another set in the same format (e.g. texture-calibration-set.json).
+const set = JSON.parse(fs.readFileSync(path.join(__dirname, argVal('--set') || 'zoom-calibration-set.json'), 'utf8'));
 const cases: CalCase[] = set.cards.filter((c: CalCase) => !only || c.key === only);
 
 function readRows(t: string): Row[] {
@@ -138,9 +141,11 @@ function summarize(t: string) {
     const rs = rows.filter(r => r.key === c.key);
     const pc = perCase[c.key] = { grades: rs.map(r => r.grade!), fp: 0, fpDen: 0, md: 0, mdDen: 0, lim: 0, limDen: 0 };
     for (const r of rs) {
-      n++;
-      const e = Math.abs(r.grade! - c.expected_grade);
-      absErr += e; if (e === 0) hit++; if (e === 1) off1++;
+      if (!c.report_only) {
+        n++;
+        const e = Math.abs(r.grade! - c.expected_grade);
+        absErr += e; if (e === 0) hit++; if (e === 1) off1++;
+      }
       if (c.false_positive) {
         const spec = c.false_positive as DefectSpec;
         const recurs = r.defects.some(d => matchesSpec(d, spec));

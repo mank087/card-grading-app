@@ -757,7 +757,8 @@ caused by physical contact with harder objects and disturb the card's coating.
 • Near edges (from sliding in/out of sleeves)
 
 **CRITICAL:** A faint line you're unsure about? If it catches light differently
-than surrounding area → IT IS A SCRATCH. Do not talk yourself out of it.
+than surrounding area → IT IS A SCRATCH. Do not talk yourself out of it. (Exception: holo
+sparkle and printed or die-cut lines — see PRINTED DESIGN IS NOT DAMAGE, Section 1.10.5.)
 
 ---
 EDGE WHITENING - VISUAL IDENTIFICATION
@@ -1020,6 +1021,21 @@ See Photo-Based Tolerance rules in Section 1 header for full policy. Quick refer
 • Real defect: on card surface, has depth/texture, follows card contours, on one side only
 • Image artifact: uniform across photo, pixelated at zoom, random distribution, on both sides
 • If you cannot confirm the mark is physically ON THE CARD, it is NOT a defect.
+
+🚨 **PRINTED DESIGN IS NOT DAMAGE (v9.33 — surface, edges and corners):**
+Many cards are PRINTED to look aged or textured. These are part of the card, never defects:
+• Printed aged/parchment, distressed or "worn paperback" art and frames (including fake wear
+  printed along the border), marble, stone, wood grain, speckle, mottled or crumpled-paper backgrounds
+• Natural tone and print speckle of vintage cardstock; tiny ink specks that sit IN the print layer
+• Foil, refractor, holo, prizm and chrome patterns and their sparkle; glare and reflections
+• Sticker die-cut / peel lines around sticker art
+A PHYSICAL defect breaks the print or sits on top of it: a gloss break or scuff haze that ignores
+the design, a scratch that cuts ACROSS design elements, a stain with its own outline (ring, tide
+line, blot) or on an area printed plain. Uneven tone or speckle spread across a whole panel or face
+is printing or stock, not a stain. Edge/corner whitening is exposed stock AT the physical cut edge or
+corner tip that makes the cut line itself ragged — not a printed light colour or printed wear that
+ends at a clean, smooth cut line, a speck inside the border, or a bright reflection. A mark that
+follows, repeats with or stays inside the printed design is printing: do not report it.
 
 **STEP 1: Back Surface Scan**
 The back surface is where MOST defects hide. Scan the ENTIRE back:
