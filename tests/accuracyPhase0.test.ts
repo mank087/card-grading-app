@@ -20,9 +20,16 @@ describe('offline Phase 0 baseline', () => {
     // else still matches it, and the guide now fits. A blanket "differs from the baseline"
     // would let any future regression through.
     const frozen = JSON.parse(readFileSync('docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json', 'utf8'));
-    const { mobileGuide: frozenGuide, webPortraitCrop: frozenWebCrop, ...frozenRest } = frozen;
-    const { mobileGuide, webPortraitCrop, ...observedRest } = manifest.probes.observed;
+    const { mobileGuide: frozenGuide, webPortraitCrop: frozenWebCrop, promptSizes: frozenPromptSizes, ...frozenRest } = frozen;
+    const { mobileGuide, webPortraitCrop, promptSizes, ...observedRest } = manifest.probes.observed;
     expect(observedRest).toEqual(frozenRest);
+    // Third deliberate change (Oct 2026, v9.30): the Other delta gained its non-sport field
+    // schema and the master rubric a one-line pointer to it. Every other prompt is unchanged.
+    const v930 = new Map<string, any>([
+      ['master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 287562, lines: 5616, approximateTokensCharsDiv4: 71891 }],
+      ['other_delta_v5.txt', { file: 'other_delta_v5.txt', characters: 15751, lines: 328, approximateTokensCharsDiv4: 3938 }],
+    ]);
+    expect(promptSizes).toEqual(frozenPromptSizes.map((p: any) => v930.get(p.file) ?? p));
     // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
     // screen so cards stop being clipped at the shutter. The crop is the same shape,
     // scaled by 0.78/0.98.
