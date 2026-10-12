@@ -35,6 +35,7 @@ import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
 import { applyYearGuard } from "@/lib/yearGuard";
 import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
 import { resolveSportsChecklist } from "@/lib/identification/sportsChecklist";
+import { fillBlankSportsYearFromFirstLook, normalizeSportsSetName, sportsYearFillEnabled } from "@/lib/identification/sportsIdentityNormalize";
 import { displayPhotoUrls } from '@/lib/images/displayUrls';
 
 // Vercel serverless function configuration
@@ -1238,6 +1239,34 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         }
       } catch (validationError) {
         console.error(`[SportsValidation] ⚠️ Validation failed (non-fatal), continuing with AI values:`, validationError);
+      }
+    }
+
+    // 🗂️ Oct 2026 SET/YEAR SAVE FORM (src/lib/identification/sportsIdentityNormalize.ts).
+    // Runs after the year guard, the checklist and DB validation so it sees the
+    // final values. 1) a blank year takes first look's printed/inferred read;
+    // 2) the set name loses a leading year the year field already carries and a
+    // trailing sport word ("2025 Panini Phoenix Football" → "Panini Phoenix").
+    if (conversationalGradingData?.card_info) {
+      const ci = conversationalGradingData.card_info;
+      const yearFill = sportsYearFillEnabled() ? fillBlankSportsYearFromFirstLook(ci) : { filled: false };
+      if (yearFill.filled) console.log(`[SportsYear] ${cardId}: blank year filled from first look → ${yearFill.value}`);
+      const setForm = normalizeSportsSetName(ci.set_name, ci.year);
+      if (setForm.changed) {
+        console.log(`[SportsSet] ${cardId}: "${ci.set_name}" → "${setForm.value}" (removed ${setForm.removed.join(', ')})`);
+        ci.set_name_as_graded = ci.set_name;
+        ci.set_name = setForm.value;
+      }
+      // Keep the full-report tab (rendered off the raw string) in step.
+      if ((yearFill.filled || setForm.changed) && conversationalGradingResult) {
+        try {
+          const raw = JSON.parse(conversationalGradingResult);
+          if (raw?.card_info) {
+            raw.card_info.year = ci.year;
+            raw.card_info.set_name = ci.set_name;
+            conversationalGradingResult = JSON.stringify(raw);
+          }
+        } catch { /* markdown-format report: nothing to patch */ }
       }
     }
 

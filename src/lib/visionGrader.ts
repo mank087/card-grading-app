@@ -3649,6 +3649,11 @@ Provide detailed analysis as markdown with all required sections.`
         if (firstLookBadge && jsonData?.card_info && typeof jsonData.card_info === 'object') {
           jsonData.card_info.first_look_printed_badge = firstLookBadge;
         }
+        // Evidence only: first look's year + its source; the sports route may fill a blank year from it (identification/sportsIdentityNormalize.ts).
+        const firstLookResult = completedFirstLook()?.result;
+        if (firstLookResult?.identity?.year?.value && firstLookResult.photos?.same_item_both_photos !== 'no_different_items' && jsonData?.card_info && typeof jsonData.card_info === 'object') {
+          jsonData.card_info.first_look_year = { value: firstLookResult.identity.year.value, source: firstLookResult.identity.year.source };
+        }
 
         // Out-of-frame corners: a located corner ON the photo border means part of
         // the card is outside the picture. The model's own confidence letter does
