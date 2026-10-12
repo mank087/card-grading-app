@@ -36,6 +36,9 @@ const TRUSTED_NUMBER_SOURCES = new Set([
   // number (identification/firstLookNumberFill.ts). An independent read, quoted in
   // card_number_text_seen like the others, so it faces the same whole-token check.
   'first_look',
+  // Set by applyOtherPrintRunSwap (below) when the independent read's code
+  // replaced a stamped print run; quoted in card_number_text_seen the same way.
+  'independent_read',
 ]);
 
 /** Explicit "I could not read it" marker. */
@@ -401,4 +404,85 @@ export function applyCardNumberGuard(
   };
 
   return result;
+}
+
+// ── Other: a stamped print run taken as the card number ────────────────────
+//
+// For category Other the print-run heuristic above is off (Other also holds
+// TCGs whose "125/198" is set numbering). So on a non-sport insert stamped
+// "09/25" that also prints a code ("A-70", "IWR-2"), the stamp stayed as the
+// card number. The stamp only loses when another read saw a CODE-style number:
+// first look's printed number, or the independent read's.
+
+const PRINT_RUN_SHAPE = /^\d+\s*\/\s*\d+$/;
+const BLANK_VALUE = /^(unknown|n\/?a|none|null|undefined|not visible|unreadable)?$/i;
+
+/** "A-70", "IWR-2", "CC-GN", "No. A-70" -> the code; anything else (plain digits,
+ *  fractions, prose) -> null. A letter is required so a TCG's bare "125" never
+ *  replaces its "125/198". */
+export function codeStyleNumber(value: unknown): string | null {
+  const raw = String(value ?? '').trim().replace(/^(?:#\s*|no\.\s*|no\s+|number\s+)/i, '').trim();
+  if (!raw || raw.length > 20 || PRINT_RUN_SHAPE.test(raw)) return null;
+  if (!/^[A-Za-z0-9]+(?:[-.][A-Za-z0-9]+)*$/.test(raw)) return null;
+  if (!/[A-Za-z]/.test(raw)) return null;
+  // Needs a code shape: letters with digits ("A70"), or a hyphenated code ("CC-GN").
+  if (!/\d/.test(raw) && !raw.includes('-')) return null;
+  return raw;
+}
+
+export interface PrintRunSwap {
+  swapped: boolean;
+  /** The card number to keep (the code on a swap, else unchanged). */
+  cardNumber: string | null;
+  /** The print run to store as serial numbering, or null to leave it alone. */
+  serialNumber: string | null;
+  /** Which read supplied the code. */
+  evidenceSource: 'first_look' | 'independent_read' | null;
+}
+
+/**
+ * Pure decision. `cardInfo` is the grading card_info after reconcile, which
+ * carries `first_look_card_number` (visionGrader), `card_number_independent_read`
+ * and `identification_check.independent` (reconcile.ts).
+ */
+export function decideOtherPrintRunSwap(cardInfo: any): PrintRunSwap {
+  const current = cardInfo?.card_number == null ? null : String(cardInfo.card_number).trim();
+  const none: PrintRunSwap = { swapped: false, cardNumber: current || null, serialNumber: null, evidenceSource: null };
+  if (!current || !PRINT_RUN_SHAPE.test(current)) return none;
+
+  const independent = cardInfo?.identification_check?.independent;
+  const candidates: Array<[unknown, PrintRunSwap['evidenceSource']]> = [
+    [cardInfo?.first_look_card_number, 'first_look'],
+    [independent?.card_number_text_seen, 'independent_read'],
+    [independent?.card_number, 'independent_read'],
+    [cardInfo?.card_number_independent_read, 'independent_read'],
+  ];
+  for (const [value, source] of candidates) {
+    const code = codeStyleNumber(value);
+    if (!code) continue;
+    const serialEmpty = BLANK_VALUE.test(String(cardInfo?.serial_number ?? '').trim());
+    return { swapped: true, cardNumber: code, serialNumber: serialEmpty ? current.replace(/\s+/g, '') : null, evidenceSource: source };
+  }
+  return none;
+}
+
+/** Apply decideOtherPrintRunSwap in place, with an audit record. */
+export function applyOtherPrintRunSwap(cardInfo: any, label = 'card'): PrintRunSwap {
+  if (!cardInfo || typeof cardInfo !== 'object') return { swapped: false, cardNumber: null, serialNumber: null, evidenceSource: null };
+  const decision = decideOtherPrintRunSwap(cardInfo);
+  if (!decision.swapped) return decision;
+  const printRun = String(cardInfo.card_number).trim();
+  console.log(`[CardNumberGuard] ${label}: "${printRun}" is a print run; card number -> "${decision.cardNumber}" (${decision.evidenceSource})`);
+  cardInfo._print_run_swap = {
+    print_run: printRun,
+    previous_text_seen: cardInfo.card_number_text_seen ?? null,
+    previous_source: cardInfo.card_number_source ?? null,
+    evidence_source: decision.evidenceSource,
+    serial_written: !!decision.serialNumber,
+  };
+  cardInfo.card_number = decision.cardNumber;
+  cardInfo.card_number_text_seen = decision.cardNumber;
+  cardInfo.card_number_source = decision.evidenceSource;
+  if (decision.serialNumber) cardInfo.serial_number = decision.serialNumber;
+  return decision;
 }

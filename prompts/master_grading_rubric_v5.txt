@@ -1887,6 +1887,8 @@ Exactly as with the year, you must show where you read the number:
   set_name/subset: "Gold Standard".
 • **player_or_character** = the person/character only. Same prohibition: NEVER the set,
   subset, or product line.
+• For Other/non-sport cards, see the delta's NON-SPORT FIELD SCHEMA (a scene card's
+  card_name is its printed scene title; player_or_character is null when no one is named).
 
 🚨 **SUBJECT ATTRIBUTION — the card's subject is who it is TITLED for, NEVER a name that
 merely appears somewhere in its text (v9.20):**

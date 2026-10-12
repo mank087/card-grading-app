@@ -22,7 +22,7 @@ import { resolveAutographVerdict } from "@/lib/grading/autographPolicy";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
 import { applyYearGuard } from "@/lib/yearGuard";
-import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
+import { applyCardNumberGuard, applyOtherPrintRunSwap } from "@/lib/cardNumberGuard";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
 import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
@@ -94,6 +94,12 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
       // was writing only `manufacturer`, leaving 94% of rows blank in the UI
       manufacturer_name: cardInfo.manufacturer || null,
       card_date: cardInfo.card_date || null,
+      // Every other category route writes these two from card_info; Other
+      // never did, so labels/search/eBay titles read blanks for non-sport cards.
+      // Same raw-year convention as the sports and pokemon routes; the year
+      // guard has already run, so a dropped year writes null here.
+      release_date: cardInfo.year || null,
+      featured: cardInfo.player_or_character || null,
       special_features: cardInfo.special_features || null,
       front_text: cardInfo.front_text || null,
       back_text: cardInfo.back_text || null,
@@ -107,6 +113,8 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
       manufacturer: null,
       manufacturer_name: null,
       card_date: null,
+      release_date: null,
+      featured: null,
       special_features: null,
       front_text: null,
       back_text: null,
@@ -673,13 +681,23 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           // Re-serialize when EITHER guard changed something. Previously only a
           // dropped YEAR triggered this, so a rejected card number stayed in the
           // stored report string and resurfaced from there into labels/reports.
-          if (guard.outcome.startsWith('dropped_') || numberGuard.outcome.startsWith('dropped_')) {
+          // With the print-run heuristic off, a stamped "09/25" stays as the card
+          // number even when a code ("A-70") is printed. Another read's code-style
+          // number wins and the stamp moves to serial_number (see cardNumberGuard.ts).
+          const printRunSwap = numberGuard.outcome.startsWith('kept')
+            ? applyOtherPrintRunSwap(jsonData.card_info, `other/${cardId}`)
+            : null;
+          if (guard.outcome.startsWith('dropped_') || numberGuard.outcome.startsWith('dropped_') || printRunSwap?.swapped) {
             conversationalGradingResult = JSON.stringify(jsonData);
           }
         }
 
         // Extract card-specific fields
         otherFields = extractOtherFieldsFromConversational(jsonData);
+        // A print run moved off the card number lands in its own column too.
+        if (jsonData.card_info?._print_run_swap?.serial_written && jsonData.card_info.serial_number) {
+          otherFields.serial_numbering = jsonData.card_info.serial_number;
+        }
 
         // Extract grading scores. v9.2: prefer the engine's server-CAPPED final_grade
         // (decimal_grade/whole_grade) over jsonData.scoring.* — scoring.final_grade is the

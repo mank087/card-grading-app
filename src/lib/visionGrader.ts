@@ -54,7 +54,7 @@ import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
-import { fillBlankNumberFromFirstLook, numberFillEnabled } from './identification/firstLookNumberFill';
+import { fillBlankNumberFromFirstLook, numberFillEnabled, printedNumberFromFirstLook } from './identification/firstLookNumberFill';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -69,7 +69,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.29'; // v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.30'; // v9.30: one field schema for Other/non-sport cards (other_delta: card_name = printed title, player_or_character = who is pictured, set_name = product, subset = insert line, card_number = printed code, serial_number = stamped print run); master rubric points Other at it. v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -3454,6 +3454,13 @@ Provide detailed analysis as markdown with all required sections.`
         if (numberFillEnabled()) {
           const fill = fillBlankNumberFromFirstLook(jsonData?.card_info, completedFirstLook()?.result);
           if (fill.filled) console.log(`[first-look] filled a blank card number from the printed read: ${JSON.stringify(fill.value)}`);
+        }
+        // Evidence only, never applied here: the number first look read off the card,
+        // so the Other route can tell a stamped print run ("09/25") from the printed
+        // code ("A-70"). See applyOtherPrintRunSwap in cardNumberGuard.ts.
+        const firstLookNumber = printedNumberFromFirstLook(completedFirstLook()?.result);
+        if (firstLookNumber && jsonData?.card_info && typeof jsonData.card_info === 'object') {
+          jsonData.card_info.first_look_card_number = firstLookNumber;
         }
 
         // Out-of-frame corners: a located corner ON the photo border means part of
