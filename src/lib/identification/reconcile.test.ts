@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reconcileIdentity, namesAgree, numbersAgree, normalizeName, normalizeNumber, looksLikeCaption, hasNameConflict } from './reconcile';
+import { reconcileIdentity, namesAgree, numbersAgree, normalizeName, normalizeNumber, looksLikeCaption, hasNameConflict, titleCaseName } from './reconcile';
 import type { IdentificationResult } from './identifyCard';
 
 function ident(over: Partial<IdentificationResult> = {}): IdentificationResult {
@@ -315,5 +315,73 @@ describe('name override gate (Oct 2026 production misses)', () => {
     expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: 'MANTLE' }))).toBe(false);
     expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: null, card_name: 'Roger Maris' }))).toBe(false);
     expect(hasNameConflict({ card_name: 'Mickey Mantle' }, ident({ printed_name_seen: 'ROGER MARIS' }))).toBe(true);
+  });
+});
+
+describe('non-TCG override names the card from the witnessed print, not a subset title', () => {
+  // Production: Mars Attacks "Caught in the Crossfire" autographs were named
+  // after the subset because the read's card_name was the subset line.
+  const spinerRead = () => ident({
+    printed_name_seen: 'BRENT SPINER',
+    player_or_character: 'Brent Spiner',
+    card_name: 'CAUGHT IN THE CROSSFIRE',
+    card_number: 'CC-BS',
+    card_number_text_seen: 'CC-BS',
+  });
+
+  it('Brent Spiner: card_name is the printed name, the subset title is kept as evidence', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Martian Invasion', player_or_character: 'Martian Invasion', card_number: 'CC-BS' },
+      spinerRead(),
+      'Other',
+      { firstLookSubject: 'Brent Spiner' }
+    );
+    expect(out.cardInfo.card_name).toBe('Brent Spiner');
+    expect(out.cardInfo.player_or_character).toBe('Brent Spiner');
+    expect(out.cardInfo.subset_title_seen).toBe('CAUGHT IN THE CROSSFIRE');
+    expect(out.cardInfo.subset).toBeUndefined();
+    expect(out.cardInfo.identification_name_source).toBe('independent_read');
+  });
+
+  it('never overwrites an existing subset or subset_title_seen', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Martian Invasion', subset: 'Caught in the Crossfire Autographs', subset_title_seen: 'EARLIER' },
+      spinerRead(),
+      'Other',
+      { firstLookSubject: 'Brent Spiner' }
+    );
+    expect(out.cardInfo.card_name).toBe('Brent Spiner');
+    expect(out.cardInfo.subset).toBe('Caught in the Crossfire Autographs');
+    expect(out.cardInfo.subset_title_seen).toBe('EARLIER');
+  });
+
+  it('title-cases an all-caps print when the read gives no agreeing player', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Martian Invasion' },
+      ident({ printed_name_seen: 'BRENT SPINER', card_name: 'CAUGHT IN THE CROSSFIRE' }),
+      'Other',
+      { firstLookSubject: 'Brent Spiner' }
+    );
+    expect(out.cardInfo.card_name).toBe('Brent Spiner');
+    expect(out.cardInfo.player_or_character).toBe('Brent Spiner');
+  });
+
+  it('TCG behaviour is unchanged: the read card_name is taken', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Spewpa', player_or_character: 'Spewpa' },
+      ident({ printed_name_seen: 'Mimikyu', card_name: 'Mimikyu ex', player_or_character: 'Mimikyu' }),
+      'Pokemon',
+      { firstLookSubject: 'Mimikyu' }
+    );
+    expect(out.cardInfo.card_name).toBe('Mimikyu ex');
+    expect(out.cardInfo.subset_title_seen).toBeUndefined();
+  });
+
+  it('titleCaseName', () => {
+    expect(titleCaseName('BRENT SPINER')).toBe('Brent Spiner');
+    expect(titleCaseName("SHAQUILLE O'NEAL")).toBe("Shaquille O'Neal");
+    expect(titleCaseName('KEN GRIFFEY JR.')).toBe('Ken Griffey Jr.');
+    expect(titleCaseName('JOHN SMITH III')).toBe('John Smith III');
+    expect(titleCaseName('Jean-Luc Picard')).toBe('Jean-Luc Picard');
   });
 });

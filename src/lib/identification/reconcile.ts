@@ -283,6 +283,28 @@ function decideName(
   return { action: 'kept_grading', reason: 'uncorroborated' };
 }
 
+const ROMAN = /^(ii|iii|iv|vi|vii|viii|ix)$/i;
+
+/** "BRENT SPINER" -> "Brent Spiner"; "o'neal" -> "O'Neal"; mixed case is
+ *  left as printed. */
+export function titleCaseName(input: string): string {
+  const raw = input.trim();
+  if (/[a-z]/.test(raw) && /[A-Z]/.test(raw)) return raw;
+  return raw
+    .toLowerCase()
+    .split(/(\s+)/)
+    .map((w) => (ROMAN.test(w) ? w.toUpperCase() : w.replace(/(^|[-'’.])([a-z])/g, (_m, p: string, c: string) => p + c.toUpperCase())))
+    .join('');
+}
+
+/** The witnessed printed name, in the read's own casing when its
+ *  player_or_character names the same subject, else title-cased. */
+function nameFromPrinted(printed: string, player: string | null | undefined): string {
+  const p = str(player);
+  if (p && namesAgree(p, printed)) return p;
+  return titleCaseName(printed);
+}
+
 /** Cheap pre-check so the caller only waits for the first look when it matters. */
 export function hasNameConflict(
   gradingCardInfo: Record<string, unknown> | null | undefined,
@@ -372,14 +394,26 @@ export function reconcileIdentity(
     };
   }
   if (nameDecision?.action === 'override' && independent.printed_name_seen) {
-    const newName = independent.card_name || independent.printed_name_seen;
-    cardInfo.card_name = newName;
+    const isTcg = !!category && TCG_CATEGORIES.test(String(category).trim());
+    if (isTcg) {
+      cardInfo.card_name = independent.card_name || independent.printed_name_seen;
+    } else {
+      // Outside the TCGs the read's card_name is often a subset or insert
+      // title ("CAUGHT IN THE CROSSFIRE" on a Brent Spiner autograph), so the
+      // name comes from the witnessed print; the differing title is kept only
+      // as evidence.
+      cardInfo.card_name = nameFromPrinted(independent.printed_name_seen, independent.player_or_character);
+      const readTitle = str(independent.card_name);
+      if (readTitle && !namesAgree(readTitle, independent.printed_name_seen) && !str(cardInfo.subset_title_seen)) {
+        cardInfo.subset_title_seen = readTitle;
+      }
+    }
     applied.push('card_name');
     // player_or_character is only replaced when it was empty or was merely a
     // copy of the old card_name — a genuinely separate value (a character on a
     // named subset card) is left for a human to look at.
     if (!gradingPlayer || (gradingName && normalizeName(gradingPlayer) === normalizeName(gradingName))) {
-      cardInfo.player_or_character = independent.player_or_character || independent.printed_name_seen;
+      cardInfo.player_or_character = independent.player_or_character || (isTcg ? independent.printed_name_seen : cardInfo.card_name);
       applied.push('player_or_character');
     }
     cardInfo.identification_name_source = 'independent_read';
