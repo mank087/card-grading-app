@@ -93,6 +93,12 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
       // was writing only `manufacturer`, leaving 94% of rows blank in the UI
       manufacturer_name: cardInfo.manufacturer || null,
       card_date: cardInfo.card_date || null,
+      // Every other category route writes these two from card_info; Other
+      // never did, so labels/search/eBay titles read blanks for non-sport cards.
+      // Same raw-year convention as the sports and pokemon routes; the year
+      // guard has already run, so a dropped year writes null here.
+      release_date: cardInfo.year || null,
+      featured: cardInfo.player_or_character || null,
       special_features: cardInfo.special_features || null,
       front_text: cardInfo.front_text || null,
       back_text: cardInfo.back_text || null,
@@ -106,6 +112,8 @@ function extractOtherFieldsFromConversational(conversationalJSON: any) {
       manufacturer: null,
       manufacturer_name: null,
       card_date: null,
+      release_date: null,
+      featured: null,
       special_features: null,
       front_text: null,
       back_text: null,
