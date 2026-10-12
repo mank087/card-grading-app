@@ -23,7 +23,10 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { incompleteInspectionMessage } from './inspectionMessageText';
 import {
   isPrechargePhotoCheckEnabled,
+  minShortSidePx,
+  readImageSize,
   runPhotoPrecheck,
+  tooSmallSide,
   PRECHARGE_TIMEOUT_MS,
   type PhotoSide,
   type PrechargeReason,
@@ -33,7 +36,7 @@ import {
 /** Stage tag in cards.error_message; the grading routes key off it. */
 export const PRECHARGE_ERROR_TAG = 'Inspection incomplete (precharge).';
 
-const REASONS: readonly PrechargeReason[] = ['no_card', 'different_cards', 'multiple_cards', 'not_a_card', 'framing', 'blurry', 'screenshot'];
+const REASONS: readonly PrechargeReason[] = ['no_card', 'different_cards', 'multiple_cards', 'not_a_card', 'framing', 'blurry', 'screenshot', 'too_small'];
 
 /** Reasons the owner cannot fix by photographing again. */
 const SUPPORT_REASONS = new Set<PrechargeReason>(['not_a_card']);
@@ -106,6 +109,25 @@ async function download(path: string): Promise<Buffer> {
 }
 
 /**
+ * Record the block so the grading routes refuse it too. Compare-and-set on a
+ * never-graded row: if anything else has touched grade_status since we read
+ * it, do not block. false = not recorded (the caller fails open).
+ */
+async function recordBlock(cardId: string, reason: PrechargeReason, side: PhotoSide): Promise<boolean> {
+  const { data: updated, error } = await supabaseAdmin
+    .from('cards')
+    .update({ grade_status: 'failed', error_message: prechargeErrorMessage(reason, side) })
+    .eq('id', cardId)
+    .is('grade_status', null)
+    .select('id');
+  if (error || !updated?.length) {
+    console.warn(`[PrechargeGate] card ${cardId}: block not recorded (${error?.message ?? 'row changed'}) — failing open`);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Run the check for a first-grade charge. Called by the deduct route with the
  * card row it already loaded. Never throws.
  */
@@ -143,25 +165,30 @@ export async function prechargePhotoGate(card: {
       Promise.all([download(card.front_path), download(card.back_path)]),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('image download timed out')), PRECHARGE_TIMEOUT_MS / 2); }),
     ]).finally(() => clearTimeout(timer));
+
+    // Minimum resolution (Oct 2026): deterministic, from the image headers, no
+    // model call. PRECHARGE_MIN_SHORT_SIDE sets the threshold or turns it off.
+    const minShort = minShortSidePx();
+    if (minShort > 0) {
+      const [frontSize, backSize] = await Promise.all([readImageSize(images[0]), readImageSize(images[1])]);
+      const smallSide = tooSmallSide(frontSize, backSize, minShort);
+      if (smallSide) {
+        const dims = [frontSize, backSize].map(d => (d ? `${d.width}x${d.height}` : '?')).join(' / ');
+        console.log(`[PrechargeGate] card ${card.id}: too_small/${smallSide} (${dims}, min short side ${minShort}px)`);
+        if (await recordBlock(card.id, 'too_small', smallSide)) {
+          return { blocked: true, body: prechargeBlockBody('too_small', smallSide) };
+        }
+        return { blocked: false, skipped: 'too_small block not recorded' };
+      }
+    }
+
     const remaining = PRECHARGE_TIMEOUT_MS - (Date.now() - started);
     const result = await runPhotoPrecheck(images[0], images[1], { timeoutMs: Math.max(2000, remaining), cardId: card.id, userId: card.user_id });
     console.log(`[PrechargeGate] card ${card.id}: ${result.verdict}${result.reason ? ` ${result.reason}/${result.side}` : ''}`
       + ` in ${result.latency_ms}ms${result.failed_open ? ` (failed open: ${result.error})` : ''}${result.signals.length ? ` signals=${result.signals.join(',')}` : ''}`);
     if (result.verdict !== 'block' || !result.reason || !result.side) return { blocked: false, result };
 
-    // Record the block so the grading routes refuse it too. Compare-and-set on
-    // a never-graded row: if anything else has touched grade_status since we
-    // read it, do not block.
-    const { data: updated, error } = await supabaseAdmin
-      .from('cards')
-      .update({ grade_status: 'failed', error_message: prechargeErrorMessage(result.reason, result.side) })
-      .eq('id', card.id)
-      .is('grade_status', null)
-      .select('id');
-    if (error || !updated?.length) {
-      console.warn(`[PrechargeGate] card ${card.id}: block not recorded (${error?.message ?? 'row changed'}) — failing open`);
-      return { blocked: false, result };
-    }
+    if (!(await recordBlock(card.id, result.reason, result.side))) return { blocked: false, result };
     return { blocked: true, body: prechargeBlockBody(result.reason, result.side), result };
   } catch (e: any) {
     console.warn(`[PrechargeGate] card ${card?.id}: check unavailable, failing open:`, e?.message || e);

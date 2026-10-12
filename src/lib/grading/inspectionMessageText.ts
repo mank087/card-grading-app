@@ -47,6 +47,11 @@ const REASONS: Record<string, { title: string; advice: string }> = {
     title: 'A photo is too blurry to read the card.',
     advice: 'Hold the phone steady, tap the card to focus, use good light, and retake the photo, then try again.',
   },
+  // Oct 2026: the stored photo is below the minimum resolution (prechargeGate.ts).
+  too_small: {
+    title: 'This photo is too small to grade accurately.',
+    advice: "Please retake it with the card filling the frame. If the in-browser camera keeps producing a small photo, take the picture with your phone's camera app and upload the original instead.",
+  },
   screenshot: {
     title: 'This looks like a screenshot or a photo of a screen, not a photo of the card itself.',
     advice: 'Photograph the physical card with your camera, front and back, with all four edges in the frame, then try again.',

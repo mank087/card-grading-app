@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   downloads: [] as string[],
   precheck: null as any,
   precheckCalls: 0,
+  sizes: [null, null] as Array<{ width: number; height: number } | null>,
 }));
 
 vi.mock('@/lib/supabaseAdmin', () => {
@@ -43,6 +44,8 @@ vi.mock('./photoPrecheck', async (orig) => {
   return {
     ...actual,
     runPhotoPrecheck: async () => { state.precheckCalls++; return state.precheck; },
+    // The download mock returns 8 bytes; sizes come from state instead.
+    readImageSize: async () => state.sizes.shift() ?? null,
   };
 });
 
@@ -63,6 +66,8 @@ beforeEach(() => {
   state.precheck = passResult;
   state.precheckCalls = 0;
   delete process.env.PRECHARGE_PHOTO_CHECK;
+  delete process.env.PRECHARGE_MIN_SHORT_SIDE;
+  state.sizes = [null, null];
 });
 
 describe('block body and stored message', () => {
@@ -176,5 +181,91 @@ describe('prechargePhotoGate', () => {
 
   it('fails open when an image path is missing', async () => {
     expect((await prechargePhotoGate({ ...freshCard, back_path: null })).blocked).toBe(false);
+  });
+});
+
+describe('minimum-resolution gate (too_small)', () => {
+  const big = { width: 2250, height: 3000 };
+  const tiny = { width: 755, height: 1057 };
+
+  it('blocks a 755x1057 front before the model call and before any charge', async () => {
+    state.sizes = [tiny, big];
+    const out = await prechargePhotoGate(freshCard);
+    expect(out).toMatchObject({ blocked: true, body: { inspection_reason: 'too_small', photo_side: 'front', credit_refund_status: 'not_charged', next_action: 'retake_photos' } });
+    expect(state.precheckCalls).toBe(0);
+    expect(state.updates).toHaveLength(1);
+    expect(state.updates[0].cas).toEqual(['grade_status', null]);
+    expect(state.updates[0].patch.error_message).toContain('[too_small] (front photo)');
+    if (out.blocked) {
+      expect(out.body.error).toContain('This photo is too small to grade accurately.');
+      expect(out.body.error).toContain('Please retake it with the card filling the frame.');
+      expect(out.body.error).toContain('No grading credit was charged');
+    }
+  });
+
+  it('names both photos when both are small, and the row round-trips for older apps', async () => {
+    state.sizes = [tiny, { width: 1057, height: 755 }];
+    const out = await prechargePhotoGate(freshCard);
+    expect(out).toMatchObject({ blocked: true, body: { inspection_reason: 'too_small', photo_side: 'both' } });
+    const row = { grade_status: 'failed', error_message: state.updates[0].patch.error_message };
+    expect(prechargeBlockFromRow(row)).toMatchObject({ inspection_reason: 'too_small', photo_side: 'both' });
+    expect(incompleteInspectionFromErrorMessage(row.error_message)).toContain('too small to grade accurately');
+  });
+
+  it('passes normal photos on to the model check', async () => {
+    state.sizes = [big, big];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    expect(state.precheckCalls).toBe(1);
+  });
+
+  it('uses the short side: 1000x1400 passes, 999x3000 blocks', async () => {
+    state.sizes = [{ width: 1000, height: 1400 }, big];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    state.sizes = [big, { width: 3000, height: 999 }];
+    expect(await prechargePhotoGate(freshCard)).toMatchObject({ blocked: true, body: { photo_side: 'back' } });
+  });
+
+  it('reads the threshold from PRECHARGE_MIN_SHORT_SIDE and can be turned off', async () => {
+    process.env.PRECHARGE_MIN_SHORT_SIDE = '700';
+    state.sizes = [tiny, tiny];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    process.env.PRECHARGE_MIN_SHORT_SIDE = 'off';
+    state.sizes = [{ width: 300, height: 400 }, tiny];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    expect(state.updates).toEqual([]);
+  });
+
+  it('fails open when the size cannot be read or the block cannot be recorded', async () => {
+    state.sizes = [null, null];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    state.sizes = [tiny, big];
+    state.updateResult = { data: [], error: null };
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+  });
+
+  it('is covered by the master kill switch and skipped for an already-charged card', async () => {
+    process.env.PRECHARGE_PHOTO_CHECK = 'off';
+    state.sizes = [tiny, tiny];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    delete process.env.PRECHARGE_PHOTO_CHECK;
+    state.priorCharge = { id: 'tx' };
+    state.sizes = [tiny, tiny];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+  });
+});
+
+describe('minShortSidePx / tooSmallSide', () => {
+  it('defaults to 1000 and ignores out-of-range values', async () => {
+    const { minShortSidePx, tooSmallSide } = await vi.importActual<typeof import('./photoPrecheck')>('./photoPrecheck');
+    expect(minShortSidePx()).toBe(1000);
+    process.env.PRECHARGE_MIN_SHORT_SIDE = '50';
+    expect(minShortSidePx()).toBe(1000);
+    process.env.PRECHARGE_MIN_SHORT_SIDE = '1200';
+    expect(minShortSidePx()).toBe(1200);
+    process.env.PRECHARGE_MIN_SHORT_SIDE = 'false';
+    expect(minShortSidePx()).toBe(0);
+    expect(tooSmallSide({ width: 755, height: 1057 }, null, 1000)).toBe('front');
+    expect(tooSmallSide(null, null, 1000)).toBeNull();
+    expect(tooSmallSide({ width: 10, height: 10 }, { width: 10, height: 10 }, 0)).toBeNull();
   });
 });

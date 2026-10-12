@@ -74,7 +74,8 @@ export type PrechargeReason =
   | 'not_a_card'
   | 'framing'
   | 'blurry'
-  | 'screenshot';
+  | 'screenshot'
+  | 'too_small';
 
 export type PhotoSide = 'front' | 'back' | 'both';
 
@@ -82,6 +83,54 @@ export type PhotoSide = 'front' | 'back' | 'both';
 export function isPrechargePhotoCheckEnabled(): boolean {
   const v = (process.env.PRECHARGE_PHOTO_CHECK || '').trim().toLowerCase();
   return !(v === 'off' || v === '0' || v === 'false');
+}
+
+// ── Minimum resolution (Oct 2026) ───────────────────────────────────────────
+//
+// WHY. Normal uploads store ~2250×3000. From Oct 4 the web camera stored many
+// at 755×1057 (one customer: 227 cards), too small to judge a corner or confirm
+// a 10, and two false crease caps came from small photos. The client gates
+// check the LONG edge against 1000px, which a 755×1057 crop passes. This gate
+// checks the SHORT side of the stored original, on the server, before a credit
+// moves. Deterministic, no model call.
+
+export const DEFAULT_MIN_SHORT_SIDE = 1000;
+
+/**
+ * Env PRECHARGE_MIN_SHORT_SIDE: the minimum short side in pixels, default
+ * 1000. 'off' / '0' / 'false' disables the gate. Values outside 200-4000 are
+ * ignored (default used) so a typo cannot block every photo.
+ */
+export function minShortSidePx(): number {
+  const raw = (process.env.PRECHARGE_MIN_SHORT_SIDE || '').trim().toLowerCase();
+  if (raw === 'off' || raw === '0' || raw === 'false') return 0;
+  const n = Number(raw);
+  return raw && Number.isFinite(n) && n >= 200 && n <= 4000 ? Math.round(n) : DEFAULT_MIN_SHORT_SIDE;
+}
+
+/** Width/height from the image header only (no decode). null when unreadable. */
+export async function readImageSize(buf: Buffer): Promise<{ width: number; height: number } | null> {
+  try {
+    const meta = await sharp(buf, { failOn: 'none' }).metadata();
+    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pure: which photo(s) fall below the minimum short side. An unreadable size
+ * never blocks (fail open); min <= 0 disables.
+ */
+export function tooSmallSide(
+  front: { width: number; height: number } | null,
+  back: { width: number; height: number } | null,
+  min: number,
+): PhotoSide | null {
+  if (!(min > 0)) return null;
+  const small = (d: { width: number; height: number } | null) => !!d && Math.min(d.width, d.height) < min;
+  const f = small(front), b = small(back);
+  return f && b ? 'both' : f ? 'front' : b ? 'back' : null;
 }
 
 // ── Model contract ──────────────────────────────────────────────────────────

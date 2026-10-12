@@ -27,7 +27,6 @@ const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(naviga
  * Get camera constraints optimized for card photography
  */
 const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints => {
-  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
   return {
     video: {
       facingMode: isIOS ? facingMode : { ideal: facingMode },
@@ -36,20 +35,28 @@ const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamCo
       // portrait card crop from the landscape stream came out ~1037px on the long edge
       // (borderline for the 1000px minimum-resolution grading gate) and the 720p
       // fallback produced ~690px captures that the gate rightly rejects.
-      width: { ideal: portrait ? 2160 : 3840 },
-      height: { ideal: portrait ? 3840 : 2160 },
+      //
+      // Oct 2026: ALWAYS landscape-ordered (3840×2160), even on a portrait
+      // phone. Camera modes are listed in sensor (landscape) terms, so the
+      // portrait-ordered ideal added Oct 3 (2160×3840) scored 1920×1080 as the
+      // closest mode by constraint fitness distance (0.83 vs 1.22 for 4K):
+      // streams fell to 1080p and stored photos to 755×1057. Web-camera photos
+      // under 1000px on the short side went from ~3% (Sept 24 - Oct 3) to ~25%
+      // (Oct 4-12; iOS Chrome 95%). The browser still delivers portrait frames
+      // on a portrait phone with this ideal, as it did before Oct 3.
+      width: { ideal: 3840 },
+      height: { ideal: 2160 },
       frameRate: { ideal: 30 },
     }
   };
 };
 
 /**
- * Fallback constraints if optimal fails
+ * Fallback constraints if optimal fails. Landscape-ordered for the same reason.
  */
 const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints[] => {
-  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
   return [
-    { video: { facingMode, width: { ideal: portrait ? 1080 : 1920 }, height: { ideal: portrait ? 1920 : 1080 } } },
+    { video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } } },
     { video: { facingMode } },
   ];
 };
