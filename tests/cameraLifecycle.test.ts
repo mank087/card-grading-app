@@ -57,7 +57,7 @@ describe('browser camera session lifecycle', () => {
       expect(current().error).toContain('Camera permission denied');
     } finally { log.mockRestore(); }
   });
-  it('requests portrait resolution and refuses an unready video capture', async () => {
+  it('requests landscape-ordered 4K (sensor terms) and refuses an unready video capture', async () => {
     const stream = fakeStream(), getUserMedia = vi.fn().mockResolvedValue(stream);
     const current = await mount(getUserMedia);
     await act(async () => {
@@ -65,7 +65,7 @@ describe('browser camera session lifecycle', () => {
       await vi.advanceTimersByTimeAsync(100);
       await starting;
     });
-    expect(getUserMedia.mock.calls[0][0].video).toMatchObject({ width: { ideal: 2160 }, height: { ideal: 3840 } });
+    expect(getUserMedia.mock.calls[0][0].video).toMatchObject({ width: { ideal: 3840 }, height: { ideal: 2160 } });
     expect(await current().captureImage()).toBeNull();
     await act(() => current().stopCamera());
     expect(stream.track.stop).toHaveBeenCalledOnce();

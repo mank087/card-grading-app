@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
     // cannot be graded — no card, two different cards, several cards, a comic,
     // edges cut off, heavy blur, a screenshot — are stopped here, before any
     // credit moves. 422 with the INSPECTION_INCOMPLETE body both clients
-    // already render. Anything uncertain, and any error, passes.
+    // already render. Anything uncertain, and any error, passes. Oct 2026: a
+    // stored photo whose short side is under PRECHARGE_MIN_SHORT_SIDE (1000px)
+    // is stopped here too ('too_small'), deterministically, before the model.
     if (!isRegrade) {
       const gate = await prechargePhotoGate(card);
       if (gate.blocked) {
