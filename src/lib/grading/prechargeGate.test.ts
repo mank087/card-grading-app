@@ -66,7 +66,7 @@ beforeEach(() => {
   state.precheck = passResult;
   state.precheckCalls = 0;
   delete process.env.PRECHARGE_PHOTO_CHECK;
-  delete process.env.PRECHARGE_MIN_SHORT_SIDE;
+  process.env.PRECHARGE_MIN_SHORT_SIDE = 'on';
   state.sizes = [null, null];
 });
 
@@ -231,6 +231,9 @@ describe('minimum-resolution gate (too_small)', () => {
     expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
     process.env.PRECHARGE_MIN_SHORT_SIDE = 'off';
     state.sizes = [{ width: 300, height: 400 }, tiny];
+    expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
+    // Unset is off until live photo sizes confirm the camera fix (Oct 12 2026).
+    delete process.env.PRECHARGE_MIN_SHORT_SIDE;
     expect((await prechargePhotoGate(freshCard)).blocked).toBe(false);
     expect(state.updates).toEqual([]);
   });

@@ -97,13 +97,18 @@ export function isPrechargePhotoCheckEnabled(): boolean {
 export const DEFAULT_MIN_SHORT_SIDE = 1000;
 
 /**
- * Env PRECHARGE_MIN_SHORT_SIDE: the minimum short side in pixels, default
- * 1000. 'off' / '0' / 'false' disables the gate. Values outside 200-4000 are
- * ignored (default used) so a typo cannot block every photo.
+ * Env PRECHARGE_MIN_SHORT_SIDE: the minimum short side in pixels. UNSET MEANS
+ * OFF (Oct 12 2026): the web-camera 1080p regression that produced most small
+ * photos is fixed in the same release, and the gate is switched on (e.g. 1000)
+ * only once live photo sizes confirm the fix, so customers are not turned away
+ * by a camera that still cannot do better. 'on' uses DEFAULT_MIN_SHORT_SIDE;
+ * 'off' / '0' / 'false' disables. Values outside 200-4000 fall back to the
+ * default so a typo cannot block every photo.
  */
 export function minShortSidePx(): number {
   const raw = (process.env.PRECHARGE_MIN_SHORT_SIDE || '').trim().toLowerCase();
-  if (raw === 'off' || raw === '0' || raw === 'false') return 0;
+  if (!raw || raw === 'off' || raw === '0' || raw === 'false') return 0;
+  if (raw === 'on') return DEFAULT_MIN_SHORT_SIDE;
   const n = Number(raw);
   return raw && Number.isFinite(n) && n >= 200 && n <= 4000 ? Math.round(n) : DEFAULT_MIN_SHORT_SIDE;
 }
