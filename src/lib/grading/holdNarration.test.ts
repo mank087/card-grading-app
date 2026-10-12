@@ -76,3 +76,19 @@ describe('reflective finish wording', () => {
     expect(finishHoldReason('chrome')).toMatch(/^a 10 on a chrome finish can't be confirmed from photos/);
   });
 });
+
+describe('friendlyCitation keeps the corner/edge position from the path (Oct 12 2026)', () => {
+  it('production shape: no location field, position in the path', () => {
+    expect(friendlyCitation('corners front bottom left fiber exposure (minor): Bottom-left front corner tip', 'corners'))
+      .toBe('light fiber exposure (front bottom-left corner)');
+    expect(friendlyCitation('corners back bottom right rounding (minor): tip softening', 'corners'))
+      .toBe('light rounding (back bottom-right corner)');
+    expect(friendlyCitation('edges front left whitening (moderate): pale run', 'edges'))
+      .toBe('noticeable whitening (front left edge)');
+  });
+  it('an explicit location still wins, and a face-only path stays face-only', () => {
+    expect(friendlyCitation('surface back white dot (minor, central blue diamond): pale mark', 'surface'))
+      .toBe('light white dot (back central blue diamond)');
+    expect(friendlyCitation('corners front rounding (minor): soft', 'corners')).toBe('light rounding (front)');
+  });
+});
