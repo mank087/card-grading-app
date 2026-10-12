@@ -91,7 +91,15 @@ export function friendlyCitation(line: string, cat: HoldCategory): string {
     const face = words.find(w => w === 'front' || w === 'back');
     const type = words.filter(w => !POSITION_WORDS.has(w)).join(' ').replace(/_/g, ' ').trim();
     const sev = SEV_WORDS[m[2].trim().toLowerCase()] ?? '';
-    const where = [face, (m[3] || '').trim()].filter(Boolean).join(' ');
+    // Oct 12 2026: corner and edge defects usually carry no `location` field — the
+    // position lives in the path ("corners front bottom left ..."). Dropping it made a
+    // located corner read "light rounding (front)", and customers disputed holds that
+    // "named no corner" (Hutchinson, serial 125106). Keep the path's position words.
+    const pathPos = words.filter(w => POSITION_WORDS.has(w) && w !== 'front' && w !== 'back');
+    const pathWhere = pathPos.length
+      ? `${pathPos.join('-')}${cat === 'corners' ? ' corner' : cat === 'edges' ? ' edge' : ''}`
+      : '';
+    const where = [face, (m[3] || '').trim() || pathWhere].filter(Boolean).join(' ');
     const what = [sev, type || 'a flaw'].filter(Boolean).join(' ');
     return where ? `${what} (${where})` : what;
   }
