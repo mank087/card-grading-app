@@ -23,29 +23,49 @@ Extract the following fields from generic trading cards:
 REQUIRED FIELDS (All Generic Cards)
 ────────────────────────────────────────────────────────────────────────
 
-**player_or_character**: PRIMARY CARD SUBJECT (MOST IMPORTANT FIELD)
-• This is the MAIN identifier for the card - the person, character, or subject featured
-• For celebrity/entertainment cards: The person's full name (e.g., "Gisele Bundchen", "Tom Brady")
+🚨 **NON-SPORT FIELD SCHEMA (category Other — one meaning per field, no overlap):**
+Non-sport cards print several kinds of text: a title, a person/character name, a product
+name, an insert/subset line, a card code and sometimes a stamped print run. Each goes in
+exactly ONE field:
+  card_name           = the card's PRINTED TITLE. Scene/story cards keep the scene title
+                        ("Cabin Ablaze"); person/character cards use the name ("Brent Spiner").
+                        Never the product, never the subset/insert line.
+  player_or_character = the person or character PICTURED. Never a title, caption or subset.
+                        null for a scene card with no named subject.
+  set_name            = the PRODUCT ("2026 Topps Mars Attacks Christmas"). Never a headline,
+                        caption or scene title printed on the card.
+  subset              = the insert/subset line ("Caught in the Crossfire Autographs").
+  card_number         = the printed code EXACTLY, including any letter prefix
+                        ("IWR-2", "A-70", "CC-GN").
+  serial_number       = a stamped print run ("144/199", "09/25") — never the card_number.
+❌ WRONG: card_name "Caught in the Crossfire" on a Brent Spiner autograph →
+✅ card_name "Brent Spiner", player_or_character "Brent Spiner", subset "Caught in the Crossfire Autographs".
+❌ WRONG: card_number "09/25" on a card that also prints "A-70" → ✅ card_number "A-70", serial_number "09/25".
+This schema is how the master rubric's canonical field definitions apply to Other cards.
+
+**player_or_character**: The person or character pictured
+• For celebrity/entertainment cards: The person's full name (e.g., "Gisele Bundchen", "Brent Spiner")
 • For character cards: The character name (e.g., "Blue-Eyes White Dragon", "Goku")
 • For team/group cards: The group name or primary figure
-• This field should ALWAYS identify WHO or WHAT the card features
-• NEVER use the set name, subset, or product line here
+• NEVER a title, caption, set name, subset, or product line
+• null for a scene card with no named person or character
 
-**card_name**: Card name/title
-• The full card title as printed on the card
-• May include player name + subset (e.g., "Gisele Bundchen Pop Century Autograph")
+**card_name**: The card's printed title
+• Person/character cards: the name (e.g., "Gisele Bundchen", not "Gisele Bundchen Pop Century Autograph")
+• Scene/story cards: the scene title as printed (e.g., "Cabin Ablaze")
 • For TCGs: Card name as printed (e.g., "Blue-Eyes White Dragon")
+• NEVER the product, set, subset or insert line
 
-**set_name**: Set/expansion/product line name
-• The product line or set the card belongs to
-• Examples: "Pop Century", "Donruss", "Legend of Blue Eyes White Dragon"
-• This is the COLLECTION, not the subject
+**set_name**: The product
+• The product line or set the card belongs to, with its year when printed
+• Examples: "2026 Topps Mars Attacks Christmas", "Pop Century", "Legend of Blue Eyes White Dragon"
+• This is the COLLECTION, not the subject — never a headline or caption printed on the card
 • If unclear: null
 
-**card_number**: Card number
-• Format varies by game/product
-• Example: "LOB-001", "#45/100", "123", "GQ-GB"
-• Extract as shown on card
+**card_number**: The printed card code
+• Copy it EXACTLY as printed, including any letter prefix
+• Examples: "LOB-001", "IWR-2", "A-70", "CC-GN", "123"
+• A stamped print run ("45/100", "09/25") is serial_number, NOT card_number
 
 **year**: Release year
 • 4-digit year from copyright text or another printed date/marking on the card (NEVER inferred from the card's design or art style)
@@ -98,12 +118,13 @@ ENHANCED FIELDS (Game-Specific, Extract If Visible)
 • Rarity symbols vary by game
 • Extract based on visible indicators
 
-**subset**: Subset/variant
-• Options: Holographic, Foil, Parallel, Limited Edition, Promo, etc.
+**subset**: Insert/subset line
+• The insert or subset the card belongs to, as printed (e.g., "Caught in the Crossfire Autographs")
+• Parallels/finishes (Holographic, Foil, Parallel, Limited Edition, Promo) if no insert line is printed
 • Extract if visible
 
-**serial_number**: Serial number (if present)
-• Format: "/99", "1/1", etc.
+**serial_number**: Stamped print run (if present)
+• Format: "144/199", "09/25", "1/1"
 • null if not present
 
 **card_type**: Card type classification
