@@ -402,7 +402,12 @@ export function reconcileIdentity(
       // title ("CAUGHT IN THE CROSSFIRE" on a Brent Spiner autograph), so the
       // name comes from the witnessed print; the differing title is kept only
       // as evidence.
-      cardInfo.card_name = nameFromPrinted(independent.printed_name_seen, independent.player_or_character);
+      // Spelling comes from the best reader available: the first look (full
+      // resolution, catalog form) when it is the witness that agreed, then the
+      // read's own player name; raw 480px print is the last resort ("HEN
+      // GRIFFEY, JR." was a misread of KEN).
+      const witnessed = nameDecision.reason === 'first_look_agrees' ? str(nameDecision.first_look_subject) : null;
+      cardInfo.card_name = witnessed ?? str(independent.player_or_character) ?? nameFromPrinted(independent.printed_name_seen, null);
       const readTitle = str(independent.card_name);
       if (readTitle && !namesAgree(readTitle, independent.printed_name_seen) && !str(cardInfo.subset_title_seen)) {
         cardInfo.subset_title_seen = readTitle;
@@ -413,7 +418,9 @@ export function reconcileIdentity(
     // copy of the old card_name — a genuinely separate value (a character on a
     // named subset card) is left for a human to look at.
     if (!gradingPlayer || (gradingName && normalizeName(gradingPlayer) === normalizeName(gradingName))) {
-      cardInfo.player_or_character = independent.player_or_character || (isTcg ? independent.printed_name_seen : cardInfo.card_name);
+      cardInfo.player_or_character = isTcg
+        ? independent.player_or_character || independent.printed_name_seen
+        : cardInfo.card_name;
       applied.push('player_or_character');
     }
     cardInfo.identification_name_source = 'independent_read';

@@ -200,6 +200,17 @@ describe('reconcileIdentity', () => {
 });
 
 describe('name override gate (Oct 2026 production misses)', () => {
+  it('a corroborated override takes the first look spelling, not the 480px misread', () => {
+    const out = reconcileIdentity(
+      { card_name: 'Barry Bonds', player_or_character: 'Barry Bonds' },
+      ident({ printed_name_seen: 'HEN GRIFFEY, JR.', card_name: 'Hen Griffey Jr.', player_or_character: 'Hen Griffey Jr.' }),
+      'Sports',
+      { firstLookSubject: 'Ken Griffey Jr.' }
+    );
+    expect(out.cardInfo.card_name).toBe('Ken Griffey Jr.');
+    expect(out.cardInfo.player_or_character).toBe('Ken Griffey Jr.');
+  });
+
   it('Luis Castillo read as "MIKE WILSON": no first look, not in the transcription -> grading name kept, low confidence', () => {
     const out = reconcileIdentity(
       { card_name: 'Luis Castillo', player_or_character: 'Luis Castillo', card_number: '69', identification_confidence: 'high', card_front_text: 'TOPPS CHROME  MARINERS' },
