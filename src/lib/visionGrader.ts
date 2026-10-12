@@ -45,8 +45,6 @@ import { makeDisplayCropsForGrade } from './images/displayCrop';
 import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapNote, centeringUnmeasurableNote, R0_QUALITY_TIER, foldR0IntoPass } from './grading/centeringPolicy';
 import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
-import { buildStructuralCheck, structuralEvidence, withStructuralCheckSentence } from './gradeReview/structuralCheck';
-import { reportStructuralCheck } from './gradeReview/structuralCheckServer';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
@@ -3249,9 +3247,6 @@ Provide detailed analysis as markdown with all required sections.`
           }
         }
 
-        // Oct 2026 structural-cap check: the surface faces before the clamp below,
-        // so a person can lift a false cap back to exactly this reading.
-        const preStructuralSurface = { front: jsonData.raw_sub_scores?.surface_front, back: jsonData.raw_sub_scores?.surface_back };
         if (structuralDetected) {
           if (serverRounded.surface > STRUCT_CAP) {
             console.log(`[GRADE RECALC] 🚨 structural coherence: surface subgrade ${serverRounded.surface} → ${STRUCT_CAP} (corroborated structural damage: ${structuralVotes}/${scored.length} completions${zoomStructural ? ' + zoom' : ''})`);
@@ -4172,33 +4167,6 @@ Provide detailed analysis as markdown with all required sections.`
           whole_grade: finalGrade,
           uncertainty: uncertaintyStr // v8.8: measured (letter + pass spread + clamp), not AI self-report
         };
-
-        // Oct 2026 STRUCTURAL-CAP CHECK: about half of audited structural caps were
-        // not damage. A cap that costs 3+ points keeps the engine's grade but is
-        // flagged for a person (report.structural_check + capture_quality mirror +
-        // admin email) and the customer summary says the team will double-check it.
-        try {
-          const structuralCheck = buildStructuralCheck({
-            structuralDetected,
-            finalGrade,
-            finalScores: jsonData.raw_sub_scores,
-            preCapSurface: preStructuralSurface,
-            evidence: structuralEvidence({ structuralDamage: jsonData.structural_damage, votes: structuralVotes, passes: scored.length, zoom: zoomStructural }),
-          });
-          if (structuralCheck) {
-            jsonData.structural_check = structuralCheck;
-            if (jsonData.final_grade) jsonData.final_grade.summary = withStructuralCheckSentence(jsonData.final_grade.summary);
-            console.log(`[GRADE RECALC] 🧑‍🔧 structural check: cap took ${structuralCheck.uncapped_grade} → ${structuralCheck.capped_grade}; flagged for admin review`);
-            await reportStructuralCheck({
-              cardId: options?.routingKey,
-              cardName: String(jsonData.card_info?.card_name || jsonData.card_info?.player_or_character || 'Unnamed card'),
-              category: String(cardType),
-              check: structuralCheck,
-            });
-          }
-        } catch (e: any) {
-          console.warn('[GRADE RECALC] structural check skipped:', e?.message || e);
-        }
 
         // Log comparison: AI vs Server
         const aiRounded = threePassData.averaged_rounded;

@@ -11,7 +11,7 @@ const escapeHtml=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':
 const paragraphs=(value:string)=>value.split(/\n{2,}/).map(part=>`<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px 0;">${escapeHtml(part).replace(/\n/g,'<br>')}</p>`).join('');
 
 /** Shared DCM shell: dark header with the white logo, white body, legal footer. Table layout for email clients. */
-export function brandedEmail(opts:{preheader:string;eyebrow:string;heading:string;bodyHtml:string;cta:{label:string;url:string};footnote?:string}){
+function brandedEmail(opts:{preheader:string;eyebrow:string;heading:string;bodyHtml:string;cta:{label:string;url:string};footnote?:string}){
   return `<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><title>${escapeHtml(opts.heading)} &middot; DCM Grading</title>
 <style type="text/css">body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;}body{margin:0!important;padding:0!important;width:100%!important;}@media only screen and (max-width:620px){.email-container{width:100%!important;max-width:100%!important;}.pad-mobile{padding-left:20px!important;padding-right:20px!important;}.cta a{display:block!important;width:100%!important;box-sizing:border-box!important;}}</style></head>
