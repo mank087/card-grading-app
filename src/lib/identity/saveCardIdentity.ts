@@ -17,9 +17,20 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   applyCardNumberToInfo, applySetNameToInfo, applyYearToInfo, foilFollowOn, normalizePokemonNumberForSet, sameNumberStem,
 } from './identityFieldSync';
+import { isNoOpIdentityChange } from './reviewClient';
 
-/** Request keys that steer the save. They are never card data. */
-export const IDENTITY_CONTROL_KEYS = ['confirm', 'dismiss', 'expected_identity_revision'] as const;
+/**
+ * Request keys that steer the save. They are never card data.
+ * `prefill_accepted_fields` lists the fields the confirm dialog submitted
+ * exactly as first look prefilled them; it only annotates the history row.
+ */
+export const IDENTITY_CONTROL_KEYS = ['confirm', 'dismiss', 'expected_identity_revision', 'prefill_accepted_fields'] as const;
+
+/**
+ * Reserved key inside a history row's `after` jsonb for facts about the save
+ * itself rather than a field value (no editable field is named `_meta`).
+ */
+export const IDENTITY_HISTORY_META_KEY = '_meta';
 
 /**
  * Columns whose value the owner may never reach through this service, even if
@@ -285,6 +296,16 @@ export class IdentityFieldError extends Error {
  * Omitted means untouched. An empty string means the owner cleared the field
  * and is stored as null. A value equal to the current one is written but does
  * not count as a change, so it cannot bump the revision.
+ *
+ * "Equal" is the shared no-op rule (isNoOpIdentityChange): besides trim/case it
+ * treats blank and false as the same flag, blank and "Base" as the same
+ * parallel, and ignores a card number's leading "#". The edit form writes every
+ * flag as false and the confirm dialog wrote "Base" on every "Looks correct";
+ * those made ~2/3 of card_identity_history noise and a blank-to-Base parallel
+ * even counted as material (new revision, pricing wiped). Such values are still
+ * WRITTEN, only not logged or counted: dropping them could lose a value the
+ * owner did submit if the rule were ever wrong, while writing a false over a
+ * blank, or "Base" over a blank parallel, changes nothing anyone reads.
  */
 export function buildIdentityPatch(
   body: Record<string, any>,
@@ -317,7 +338,7 @@ export function buildIdentityPatch(
       value = normalizePokemonNumberForSet(value, card, 'card_set' in body ? (body.card_set === '' ? null : body.card_set) : undefined);
     }
     const currentValue = currentIdentityValue(card, key);
-    const changed = normalizeIdentityValue(currentValue) !== normalizeIdentityValue(value);
+    const changed = !isNoOpIdentityChange(key, currentValue, value);
     if (changed) {
       changedFields.push(key);
       before[key] = currentValue ?? null;
@@ -387,6 +408,18 @@ export function buildIdentityPatch(
     && normalizeIdentityValue(after.featured) !== null
     && normalizeIdentityValue(after.featured) === normalizeIdentityValue(cardNameAfter);
   const materialFields = changedFields.filter(f => MATERIAL_IDENTITY_FIELDS.includes(f) && !(f === 'featured' && featuredIsNameFill));
+
+  // Which logged changes were first look's prefill accepted as-is, so the history
+  // can separate "owner corrected it" from "owner accepted DCM's fill". Kept in
+  // `after` under a reserved key: no schema change, and only for fields that
+  // really changed (a client cannot annotate a field it did not change).
+  const prefillAccepted = Array.isArray(body.prefill_accepted_fields)
+    ? Array.from(new Set(body.prefill_accepted_fields.filter(
+      (f: unknown): f is string => typeof f === 'string' && changedFields.includes(f))))
+    : [];
+  if (prefillAccepted.length > 0) {
+    after[IDENTITY_HISTORY_META_KEY] = { prefill_accepted_fields: prefillAccepted };
+  }
   return {
     columnPatch,
     cardInfo: touchedJson ? info : null,

@@ -10,10 +10,12 @@ import type { FieldSource } from '../identification/firstLook';
 import {
   changedFieldPayload,
   identityConfirmationPending,
+  isNoOpIdentityChange,
   mergeReviewFields,
   mergeReviewValues,
   NO_CANDIDATE,
   parallelFromListingName,
+  prefillAcceptedFields,
   reviewOwnerEdited,
   versionPickNeedsSaving,
   type ReviewField,
@@ -111,3 +113,56 @@ describe('identityConfirmationPending', () => {
     expect(identityConfirmationPending({ ownership_status: 'sold', conversational_whole_grade: 9 })).toBe(false);
   });
 });
+
+describe('isNoOpIdentityChange', () => {
+  it('treats blank and false as the same flag, but not true', () => {
+    for (const blank of [null, undefined, '', false, 'false']) expect(isNoOpIdentityChange('is_refractor', blank, false)).toBe(true);
+    expect(isNoOpIdentityChange('rookie_card', null, false)).toBe(true);
+    expect(isNoOpIdentityChange('first_print_rookie', '', false)).toBe(true);
+    expect(isNoOpIdentityChange('is_refractor', false, true)).toBe(false);
+    expect(isNoOpIdentityChange('autographed', null, true)).toBe(false);
+    expect(isNoOpIdentityChange('autographed', true, false)).toBe(false);
+  });
+
+  it('treats a blank parallel and Base as the same, but not a named parallel', () => {
+    expect(isNoOpIdentityChange('parallel_type', null, 'Base')).toBe(true);
+    expect(isNoOpIdentityChange('parallel_type', '', 'base ')).toBe(true);
+    expect(isNoOpIdentityChange('parallel_type', null, '')).toBe(true);
+    expect(isNoOpIdentityChange('parallel_type', 'Base', 'Refractor')).toBe(false);
+    expect(isNoOpIdentityChange('parallel_type', null, 'Refractor')).toBe(false);
+  });
+
+  it('ignores whitespace, case and a card number\'s leading #, not punctuation', () => {
+    expect(isNoOpIdentityChange('card_set', ' Topps  Chrome ', 'topps chrome')).toBe(true);
+    expect(isNoOpIdentityChange('card_number', '#12', '12')).toBe(true);
+    expect(isNoOpIdentityChange('card_number', '116086', '116/086')).toBe(false);
+    // "Base" is only special for the parallel.
+    expect(isNoOpIdentityChange('subset_variant', null, 'Base')).toBe(false);
+  });
+
+  it('keeps a Base parallel prefilled from the version pick out of the payload', () => {
+    expect(changedFieldPayload([field('parallel_type', 'Base', '')], {})).toEqual({});
+    expect(changedFieldPayload([field('parallel_type', 'Base', '')], { parallel_type: 'Refractor' })).toEqual({ parallel_type: 'Refractor' });
+  });
+});
+
+describe('prefillAcceptedFields', () => {
+  const prefilled = (key: string, value: string, storedValue: string, origin: ReviewField['origin']): ReviewField =>
+    ({ ...field(key, value, storedValue), origin, differsFromStored: true });
+
+  it('lists the changes the owner accepted exactly as first look filled them', () => {
+    const fields = [
+      prefilled('card_set', 'Topps Chrome', '', 'suggested'),
+      prefilled('release_date', '1995', '', 'read_from_card'),
+      prefilled('card_number', '12', '', 'suggested'),
+      field('team', 'Yankees', ''),
+    ];
+    const payload = changedFieldPayload(fields, { card_number: '13' });
+    expect(prefillAcceptedFields(fields, payload)).toEqual(['card_set', 'release_date']);
+  });
+
+  it('never lists a field that was not sent', () => {
+    expect(prefillAcceptedFields([prefilled('parallel_type', 'Base', '', 'suggested')], {})).toEqual([]);
+  });
+});
+
