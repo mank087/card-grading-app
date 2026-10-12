@@ -46,6 +46,7 @@ import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapN
 import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
+import { repairReportConsistency, reportConsistencyEnabled } from './grading/reportConsistency';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
@@ -3947,6 +3948,21 @@ Provide detailed analysis as markdown with all required sections.`
           }
         } catch (e: any) {
           console.warn('[GRADE RECALC] face-clamp explanation failed (non-blocking):', e?.message || e);
+        }
+
+        // Oct 2026 REPORT CONSISTENCY: text/placement repairs only, never a score
+        // (src/lib/grading/reportConsistency.ts). Before the narrator, so the summary
+        // quotes the corrected finding locations.
+        if (reportConsistencyEnabled()) {
+          try {
+            const rc = repairReportConsistency(jsonData, { zoomAdjustments });
+            if (rc.repairs.length || rc.would_change_grade.length) {
+              console.log(`[REPORT CONSISTENCY] ${rc.repairs.length} repair(s): ${rc.repairs.map(r => `${r.rule}@${r.path}`).join(', ')}`
+                + (rc.would_change_grade.length ? ` | NOT refiled (would change a grade): ${rc.would_change_grade.map(w => `${w.severity} ${w.type} ${w.filed_under}->${w.belongs_to} (${w.reason})`).join('; ')}` : ''));
+            }
+          } catch (e: any) {
+            console.warn('[REPORT CONSISTENCY] skipped (non-blocking):', e?.message || e);
+          }
         }
 
         // v8.8: the condition label is DERIVED from the final grade — never the AI's prose.
