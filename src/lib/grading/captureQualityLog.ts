@@ -28,7 +28,9 @@ import type { ZoomResult } from '../zoomInspection';
 import type { DisplayCropRecord } from '../images/displayPath';
 
 /** Bump when the measurement's meaning changes, so thresholds stay attributable. */
-export const CAPTURE_QUALITY_VERSION = 'cq-2';
+// cq-3 (Oct 2026): quads come from the pixel-coordinate gate (geometryGate.ts);
+// cq-2 quads were often squashed toward the top of the photo. Compare within a version.
+export const CAPTURE_QUALITY_VERSION = 'cq-3';
 
 export interface CaptureQualityRecord {
   measured_at: string;
@@ -40,8 +42,8 @@ export interface CaptureQualityRecord {
    * independently rather than inheriting whatever is grading.
    */
   gate_model: string | null;
-  front: { fill_percent: number | null; quad: Array<{ x: number; y: number }> | null };
-  back: { fill_percent: number | null; quad: Array<{ x: number; y: number }> | null };
+  front: { fill_percent: number | null; quad: Array<{ x: number; y: number }> | null; card_shaped?: boolean | null };
+  back: { fill_percent: number | null; quad: Array<{ x: number; y: number }> | null; card_shaped?: boolean | null };
   /** full | card_relative | abandoned — the headline metric for the gate. */
   zoom_outcome: 'full' | 'card_relative' | 'abandoned';
   /** Present when the zoom pass was skipped or failed, verbatim. */
@@ -60,8 +62,8 @@ export function buildCaptureQualityRecord(zoom: ZoomResult | null): CaptureQuali
     measured_at: new Date().toISOString(),
     gate_version: CAPTURE_QUALITY_VERSION,
     gate_model: c.gateModel,
-    front: { fill_percent: c.frontFill, quad: c.frontQuad },
-    back: { fill_percent: c.backFill, quad: c.backQuad },
+    front: { fill_percent: c.frontFill, quad: c.frontQuad, card_shaped: c.frontCardShaped ?? null },
+    back: { fill_percent: c.backFill, quad: c.backQuad, card_shaped: c.backCardShaped ?? null },
     zoom_outcome: c.outcome,
     zoom_inspection_status: zoom.ok ? 'complete' : 'incomplete',
     ...(zoom.coverage ? { zoom_coverage: zoom.coverage } : {}),

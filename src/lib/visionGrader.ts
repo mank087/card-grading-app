@@ -1913,8 +1913,9 @@ export async function gradeCardConversational(
         const backBuf = originals.back;
         advisoryGeometry = await detectCardGeometry(frontBuf, backBuf, model);
         advisoryMeasurement = {
-          front: advisoryGeometry.front ? await measureCentering(frontBuf, advisoryGeometry.front) : null,
-          back: advisoryGeometry.back ? await measureCentering(backBuf, advisoryGeometry.back) : null,
+          // Oct 2026: off-shape outlines are not measured from (see geometryGate.quadIsCardShaped).
+          front: advisoryGeometry.front && advisoryGeometry.frontCardShaped !== false ? await measureCentering(frontBuf, advisoryGeometry.front) : null,
+          back: advisoryGeometry.back && advisoryGeometry.backCardShaped !== false ? await measureCentering(backBuf, advisoryGeometry.back) : null,
         };
         const faceLine = (label: string, m: CenteringMeasurement | null): string | null => {
           if (!m) return null;
