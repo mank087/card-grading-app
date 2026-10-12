@@ -16,9 +16,8 @@
  * NO PRODUCTION WRITES (same scheme as run-zoom-calibration.ts): the photos are
  * signed with the service key up front, then the key is deleted from this
  * process before any grading call, so every grading-path write (api_usage_log,
- * zoom evidence uploads, card-row diagnostics, the structural-check mirror) is
- * skipped. The routing key is a non-UUID ("structcal:<card>") as well, and
- * STRUCTURAL_CHECK_ALERTS is forced off. Spend is metered from the usage block
+ * zoom evidence uploads, card-row diagnostics) is skipped. The routing key is a
+ * non-UUID ("structcal:<card>") as well. Spend is metered from the usage block
  * of each OpenAI response.
  */
 import { createClient } from '@supabase/supabase-js';
@@ -26,12 +25,10 @@ import { AsyncLocalStorage } from 'async_hooks';
 import * as fs from 'fs';
 import * as path from 'path';
 
-process.env.STRUCTURAL_CHECK_ALERTS = 'off';
-
 interface Case { key: string; label: string; note?: string; card_id: string; cardType: string }
 interface Row {
   key: string; label: string; run: number; tag: string; v2: string;
-  grade: number | null; capped: boolean; structuralCheck: boolean;
+  grade: number | null; capped: boolean;
   subs: Record<string, number>; faces: Record<string, number>;
   structural: any; v2Record: any; severe: any; passFinals: Array<number | null>;
   cardInfo: { name?: string; set?: string; subset?: string; year?: string };
@@ -160,7 +157,6 @@ function installMeter() {
           key: c.key, label: c.label, run, tag, v2,
           grade: r.extracted_grade?.decimal_grade ?? null,
           capped: sd.detected === true,
-          structuralCheck: !!j.structural_check,
           subs: { centering: ws.centering_weighted, corners: ws.corners_weighted, edges: ws.edges_weighted, surface: ws.surface_weighted },
           faces: j.raw_sub_scores || {},
           structural: { detected: sd.detected, unconfirmed: sd.unconfirmed, findings: sd.findings, verification: sd.verification, unconfirmed_note: sd.unconfirmed_note },
@@ -172,7 +168,7 @@ function installMeter() {
           costUsd: store.cost, tokens: { p: store.p, c: store.c, calls: store.calls }, secs: Math.round((Date.now() - t0) / 1000),
         };
       } catch (e: any) {
-        row = { key: c.key, label: c.label, run, tag, v2, grade: null, capped: false, structuralCheck: false, subs: {}, faces: {},
+        row = { key: c.key, label: c.label, run, tag, v2, grade: null, capped: false, subs: {}, faces: {},
           structural: null, v2Record: null, severe: null, passFinals: [], cardInfo: {}, log: store.log, summary: '',
           costUsd: store.cost, tokens: { p: store.p, c: store.c, calls: store.calls }, secs: Math.round((Date.now() - t0) / 1000), err: String(e?.message || e) };
       }

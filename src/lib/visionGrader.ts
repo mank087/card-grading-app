@@ -2240,6 +2240,8 @@ Provide detailed analysis as markdown with all required sections.`
           // vote (Nidoqueen anchor: 3/3 votes without the rule, 1/3 with it). A lone
           // vote is classified too, but it can only ADD a cap, and only unanimously:
           // anything short of 3/3 "real" leaves it uncorroborated exactly as before.
+          // (Measured Oct 12: allowing 2/3 here added one false cap - Shaq Stadium
+          // Club corner - and caught no real crease that 3/3 missed.)
           const singleVote = !corroboratedEarly;
           {
             const findings = [
@@ -2257,7 +2259,13 @@ Provide detailed analysis as markdown with all required sections.`
             };
             let verdict = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, verifyOpts);
             if (!verdict.ok) verdict = await verifyStructuralClaimV2(frontImageUrl, backImageUrl, findings, verifyOpts);
-            console.log(`[STRUCTURAL V2] first ensemble: ${detecting.length}/${scored.length} evaluations + zoom=${zoomStructuralEarly} flagged structural → ${verdict.ok ? verdict.reason : 'verification unavailable (Step 3.9 decides)'}`);
+            // The claimed line was ruled out but the classifier found a DIFFERENT real
+            // crease (Yastrzemski anchor): that line is the finding the cap and report name.
+            if (verdict.ok && verdict.otherCrease) {
+              const other = { type: 'crease', location: verdict.otherCrease.location, description: verdict.otherCrease.justification };
+              for (const x of detecting) x.j.structural_damage = { ...x.j.structural_damage, detected: true, findings: [other] };
+            }
+            console.log(`[STRUCTURAL V2] first ensemble: ${detecting.length}/${scored.length} evaluations + zoom=${zoomStructuralEarly} flagged structural → ${verdict.ok ? `[other-line votes ${verdict.otherVotes ?? 0}/3] ${verdict.reason}` : 'verification unavailable (Step 3.9 decides)'}`);
             if (singleVote) {
               if (verdict.ok && verdict.outcome === 'confirmed') { structuralV2Early = verdict; structuralV2SingleConfirmed = true; }
             } else if (verdict.ok) {
@@ -3256,6 +3264,9 @@ Provide detailed analysis as markdown with all required sections.`
               if (!v2.ok) throw new IncompleteInspectionError('structural', v2.reason);
             }
             structuralV2Final = v2;
+            if (v2.otherCrease && jsonData.structural_damage) {
+              jsonData.structural_damage.findings = [{ type: 'crease', location: v2.otherCrease.location, description: v2.otherCrease.justification }];
+            }
             structuralVerified = v2.outcome === 'confirmed';
             structuralVerifyReason = `classified ${v2.reason}`;
             if (jsonData.structural_damage) {
@@ -3336,6 +3347,7 @@ Provide detailed analysis as markdown with all required sections.`
             outcome: structuralV2Decision.outcome,
             reason: structuralV2Decision.reason,
             votes: structuralV2Decision.votes,
+            other_votes: structuralV2Decision.otherVotes ?? null,
             lines: structuralV2Decision.lines,
             regraded: !!structuralV2RecheckNote,
             first_verdict: structuralV2Early && structuralV2Early !== structuralV2Decision ? structuralV2Early.reason : null,

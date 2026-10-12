@@ -91,7 +91,7 @@ export function cardContextOf(cardInfo: any, category?: string | null, allCardIn
 // ── prompt text (only sent with STRUCTURAL_V2 on) ────────────────────────────
 
 /** Added to the grading ensemble's request. */
-export const STRUCTURAL_V2_GRADING_RULE = `- STRUCTURAL DAMAGE IS A BREAK IN THE CARD STOCK, NOT A LINE IN THE PRINT. These are NEVER structural damage (do not report them in structural_damage, do not lower corners, edges or surface for them): factory features - the split or slit line(s) across the backing paper of a sticker, the die-cut / kiss-cut outline around a peel-off sticker image (Garbage Pail Kids, Wacky Packages, Fleer/Topps/Panini stickers), "bend and peel" corner scores, perforations, the ridged texture of a lenticular (3-D) card, factory-rounded corners on TCG cards; and printed lines that FOLLOW the artwork - wrinkles and folds in a player's jersey, web strands, uniform or waistband stripes, lightning, rain, light streaks, speed lines, swirls, crumpled-paper or stone textures, panel dividers and borders. A real crease breaks the print: it crosses design elements at an angle unrelated to them, and shows a surface break (a ridge, a change in gloss along the line), whitening, paper fibres or cracked ink along the line, a kink where it meets the card's edge, or the same line at the same physical spot on the other face. If a line follows the artwork or is a factory feature, it is not a crease. This rule removes printed and factory lines only: a line that cuts across the artwork independently of it MUST still be reported in structural_damage (every reported crease or bend is re-inspected up close before it affects the grade).`;
+export const STRUCTURAL_V2_GRADING_RULE = `- STRUCTURAL DAMAGE IS A BREAK IN THE CARD STOCK, NOT A LINE IN THE PRINT. These are NEVER structural damage (do not report them in structural_damage, do not lower corners, edges or surface for them): factory features - the split or slit line(s) across the backing paper of a sticker, the die-cut / kiss-cut outline around a peel-off sticker image (Garbage Pail Kids, Wacky Packages, Fleer/Topps/Panini stickers), "bend and peel" corner scores, perforations, the ridged texture of a lenticular (3-D) card, factory-rounded corners on TCG cards; and printed lines that FOLLOW the artwork - wrinkles and folds in a player's jersey, web strands, uniform or waistband stripes, lightning, rain, light streaks, speed lines, swirls, crumpled-paper or stone textures (including the cracked-stone frame of old Magic: The Gathering cards), panel dividers and borders; a line that starts and stops at a printed panel's border is printed. A real crease breaks the print: it crosses design elements at an angle unrelated to them, and shows a surface break (a ridge, a change in gloss along the line), whitening, paper fibres or cracked ink along the line, a kink where it meets the card's edge, or the same line at the same physical spot on the other face. If a line follows the artwork or is a factory feature, it is not a crease. This rule removes printed and factory lines only - it never excuses a DIFFERENT line: ruling out one printed line does not end the search. Check both faces for any other line that cuts across the artwork independently of it (old cards often have a printed jersey fold AND a real crease near it), and report every such line in structural_damage with its own location; every reported crease or bend is re-inspected up close before it affects the grade.`;
 
 /** Appended to the zoom system prompt. */
 export const STRUCTURAL_V2_ZOOM_RULE = `
@@ -144,13 +144,17 @@ For each line also report what you OBSERVE:
 
 RULES:
 - A line that follows the artwork is printed_design_element, however long, bright or continuous it is.
+- A line CONFINED to one printed panel or frame - it starts and stops at that panel's printed border instead of continuing into the next panel, the art box or the card edge - is printed texture. Known case: pre-2003 Magic: The Gathering cards print a cracked-stone texture in the frame (the RED frame especially): dark branching crack lines with light edges that look like cracked ink. They are ink on every copy. A line in such a frame is printed_design_element unless it continues out of the frame into the art or text box along the same path, or kinks the card's outline.
+- Other known printed lines: the faint wavy arcs in the swirl of the standard Pokemon card back, and the curved divider in the header of Pokemon Trainer cards.
 - A perfectly straight line running edge to edge, parallel to the card's sides, on a plain or blank back (no printing), with no kink in the outline and nothing at the mirrored spot on the front, is the slit in a sticker's backing paper: factory_cut_or_score.
 - Printed words such as "BEND AND PEEL", "PEEL HERE" or "STICKER" anywhere on the card mark a sticker product: the corner or line they point to is a factory score (factory_cut_or_score), even if it looks lifted.
 - A "warp" (the whole card bowed) is real_crease_or_bend only when the card's outline visibly curves against the background (outline_deformation); otherwise cannot_tell.
 - Left and right are mirrored between the faces: a line at the front's left edge sits behind the back's right edge.
 - Decide from the enlarged quarters, not only the whole-card views. Do not treat the flag itself as evidence.
 
-Reply ONLY JSON: {"lines":[{"id":"C1","follows_artwork":true|false,"evidence":[],"class":"real_crease_or_bend|printed_design_element|factory_cut_or_score|photo_artifact_or_sleeve|cannot_tell","justification":"<one sentence>"}]} with exactly one entry per flagged line.`;
+THEN LOOK FOR A DIFFERENT LINE. The automated reading sometimes describes a printed line (a jersey fold, a web strand) while a real crease sits elsewhere on the card, often on worn vintage cards. Scan BOTH faces, every quarter, for any OTHER line - not one of the flagged lines - that cuts across the artwork independently of it and shows a physical sign (cracked ink or white paper along it, a ridge, a kink where it meets the edge, or the same line on the other face). Report it in "other_crease" only if you can see such a sign; printed lines, texture, glare and the card's normal edges do not count.
+
+Reply ONLY JSON: {"lines":[{"id":"C1","follows_artwork":true|false,"evidence":[],"class":"real_crease_or_bend|printed_design_element|factory_cut_or_score|photo_artifact_or_sleeve|cannot_tell","justification":"<one sentence>"}],"other_crease":{"present":true|false,"location":"<face and where, or empty>","follows_artwork":true|false,"evidence":[],"justification":"<one sentence, or empty>"}} with exactly one "lines" entry per flagged line.`;
 }
 
 export interface V2Line { id: number; cls: V2Class; evidence: string[]; followsArtwork: boolean; justification: string; coerced?: boolean }
@@ -183,6 +187,27 @@ export function parseStructuralV2Sample(content: string, claimCount: number, cla
   return out.sort((a, b) => a.id - b.id);
 }
 
+/** A real crease the sample found somewhere OTHER than the flagged line(s). */
+export interface V2OtherCrease { location: string; evidence: string[]; justification: string }
+
+/**
+ * The sample's answer to "is there a DIFFERENT line on the card that is a real
+ * crease?" (Yastrzemski anchor: the evaluation described the printed jersey fold
+ * and the real crease beside it was never claimed). Counts only with a location,
+ * a justification and at least one physical sign. Pure.
+ */
+export function parseOtherCrease(content: string): V2OtherCrease | null {
+  let v: any;
+  try { v = JSON.parse(content); } catch { return null; }
+  const o = v?.other_crease;
+  if (!o || o.present !== true) return null;
+  const evidence = Array.isArray(o.evidence) ? o.evidence.filter((e: unknown) => (V2_EVIDENCE as readonly string[]).includes(String(e))) : [];
+  const location = typeof o.location === 'string' ? o.location.trim() : '';
+  const justification = typeof o.justification === 'string' ? o.justification.trim() : '';
+  if (!evidence.length || !location || !justification || o.follows_artwork === true) return null;
+  return { location: location.slice(0, 160), evidence, justification: justification.slice(0, 300) };
+}
+
 export type V2Outcome = 'confirmed' | 'refuted' | 'uncertain';
 export interface StructuralV2Verdict {
   ok: boolean;
@@ -193,6 +218,10 @@ export interface StructuralV2Verdict {
   /** Majority class per flagged line (ties -> cannot_tell). */
   lines: Array<{ claim: string; cls: V2Class; justification: string; evidence: string[] }>;
   claims: string[];
+  /** Set when the cap rests on a line nobody claimed (the claimed ones were ruled out). */
+  otherCrease?: V2OtherCrease;
+  /** Samples that reported a real crease on a line nobody claimed (diagnostic). */
+  otherVotes?: number;
 }
 
 /** A sample's overall reading: any real line -> real; every line non-damage -> not_damage. Pure. */
@@ -210,8 +239,9 @@ export function sampleVote(lines: V2Line[], claimTypes: string[] = []): 'real' |
  * requireUnanimous) read a real crease or bend; refuted: a majority read every
  * line as not damage and none read a real one; anything else is uncertain. Pure.
  */
-export function tallyStructuralV2(samples: Array<V2Line[] | null>, claims: string[], opts?: { requireUnanimous?: boolean }): StructuralV2Verdict {
-  const parsed = samples.filter((s): s is V2Line[] => s !== null);
+export function tallyStructuralV2(samples: Array<V2Line[] | null>, claims: string[], opts?: { requireUnanimous?: boolean; others?: Array<V2OtherCrease | null> }): StructuralV2Verdict {
+  const complete = samples.map((s, i) => ({ s, other: opts?.others?.[i] ?? null })).filter((x): x is { s: V2Line[]; other: V2OtherCrease | null } => x.s !== null);
+  const parsed = complete.map(x => x.s);
   if (parsed.length !== 3) return { ok: false, outcome: null, reason: 'verification incomplete - three complete answers required', votes: [], lines: [], claims };
   const types = claims.map(c => c.split(' - ')[0]);
   const votes = parsed.map(s => sampleVote(s, types));
@@ -219,6 +249,20 @@ export function tallyStructuralV2(samples: Array<V2Line[] | null>, claims: strin
   const notDamage = votes.filter(v => v === 'not_damage').length;
   const outcome: V2Outcome = real >= (opts?.requireUnanimous ? 3 : 2) ? 'confirmed'
     : notDamage >= 2 && real === 0 ? 'refuted' : 'uncertain';
+  // A crease nobody claimed, found while ruling the claimed line out. It has no
+  // evaluation's vote behind it, so all three samples must find it.
+  const others = complete.map(x => x.other).filter((o): o is V2OtherCrease => o !== null);
+  if (outcome !== 'confirmed' && others.length === 3) {
+    const o = others[0];
+    return {
+      ok: true, outcome: 'confirmed', votes,
+      reason: `confirmed (claimed line ${outcome}; a different line is a real crease 3/3): ${o.location} - ${o.justification}`,
+      lines: [...claims.map(claim => ({ claim, cls: 'cannot_tell' as V2Class, justification: 'see the other line', evidence: [] as string[] })),
+        { claim: `crease - ${o.location}`, cls: 'real_crease_or_bend', justification: o.justification, evidence: [...new Set(others.flatMap(x => x.evidence))] }],
+      claims,
+      otherCrease: o,
+    };
+  }
   const lines = claims.map((claim, i) => {
     const calls = parsed.map(s => s[i]);
     const counts = new Map<V2Class, number>();
@@ -232,7 +276,7 @@ export function tallyStructuralV2(samples: Array<V2Line[] | null>, claims: strin
   const sampleIdx = won ? votes.indexOf(won) : -1;
   const decisive = sampleIdx >= 0 ? parsed[sampleIdx].find(l => won === 'real' ? l.cls === 'real_crease_or_bend' : NOT_DAMAGE.has(l.cls)) : null;
   const reason = `${outcome} (${votes.join(', ')}${opts?.requireUnanimous ? '; unanimity required' : ''})${decisive ? `: ${decisive.cls.replace(/_/g, ' ')} - ${decisive.justification}` : ''}`;
-  return { ok: true, outcome, reason, votes, lines, claims };
+  return { ok: true, outcome, reason, votes, lines, claims, otherVotes: others.length };
 }
 
 const VERIFY_EDGE = 1600;
@@ -299,7 +343,8 @@ export async function verifyStructuralClaimV2(
       metadata: { n: 3, claims: claims.length, sticker: isStickerProduct(opts?.context) },
     });
     const samples = response.choices.map(choice => completedChoice(choice) ? parseStructuralV2Sample(choice.message?.content || '', claims.length, claims.map(c => c.split(' - ')[0])) : null);
-    const verdict = tallyStructuralV2(samples, claims, { requireUnanimous: opts?.requireUnanimous });
+    const others = response.choices.map(choice => completedChoice(choice) ? parseOtherCrease(choice.message?.content || '') : null);
+    const verdict = tallyStructuralV2(samples, claims, { requireUnanimous: opts?.requireUnanimous, others });
     console.log(`[STRUCTURAL V2] ${verdict.reason}`);
     return verdict;
   } catch (e: any) {

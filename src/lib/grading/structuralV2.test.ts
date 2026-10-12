@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   structuralV2Enabled, structuralUnsureCap, isStickerProduct, cardContextOf, neutralStructuralClaims, structuralV2Prompt,
-  parseStructuralV2Sample, tallyStructuralV2, sampleVote, structuralRecheckNote, structuralV2Note, liftRefutedStructural,
+  parseStructuralV2Sample, parseOtherCrease, tallyStructuralV2, sampleVote, structuralRecheckNote, structuralV2Note, liftRefutedStructural,
   type V2Line,
 } from './structuralV2';
 
@@ -129,6 +129,27 @@ describe('tally', () => {
   });
   it('fewer than three complete samples is not a verdict', () => {
     expect(tallyStructuralV2([parsed('real_crease_or_bend'), null, parsed('real_crease_or_bend')], claims)).toMatchObject({ ok: false, outcome: null });
+  });
+});
+
+describe('a different crease (Yastrzemski anchor)', () => {
+  const other = (o: any) => JSON.stringify({ lines: [], other_crease: o });
+  const yaz = { present: true, location: 'front left, horizontal across the jersey to the border', follows_artwork: false, evidence: ['fiber_or_ink_crack'], justification: 'cracked ink at the left border' };
+  it('needs a location, a justification and a physical sign', () => {
+    expect(parseOtherCrease(other(yaz))).toMatchObject({ evidence: ['fiber_or_ink_crack'] });
+    expect(parseOtherCrease(other({ ...yaz, evidence: [] }))).toBeNull();
+    expect(parseOtherCrease(other({ ...yaz, location: '' }))).toBeNull();
+    expect(parseOtherCrease(other({ ...yaz, follows_artwork: true }))).toBeNull();
+    expect(parseOtherCrease(other({ present: false }))).toBeNull();
+    expect(parseOtherCrease(JSON.stringify({ lines: [] }))).toBeNull();
+  });
+  const printed = () => parsed('printed_design_element');
+  it('confirms only when all three samples find it', () => {
+    const o = parseOtherCrease(other(yaz));
+    const v = tallyStructuralV2([printed(), printed(), printed()], ['crease - jersey'], { others: [o, o, o] });
+    expect(v).toMatchObject({ outcome: 'confirmed', otherCrease: { location: yaz.location } });
+    expect(v.lines.at(-1)).toMatchObject({ cls: 'real_crease_or_bend' });
+    expect(tallyStructuralV2([printed(), printed(), printed()], ['crease - jersey'], { others: [o, o, null] }).outcome).toBe('refuted');
   });
 });
 

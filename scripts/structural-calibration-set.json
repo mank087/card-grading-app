@@ -2,7 +2,8 @@
   "_readme": [
     "STRUCTURAL-CAP CALIBRATION SET (Oct 12 2026). Labels from a by-eye audit of 21 random structural-capped cards + 3 known false caps + 2 calibration-set anchors.",
     "label: false = the cap was not damage (should release), real = real crease (must stay at the crease level), unclear = could not tell by eye.",
-    "Run: npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set scripts/structural-calibration-set.json --tag <tag> --n 2 (STRUCTURAL_V2=1 for the new detector)."
+    "Run: npx tsx --env-file=.env.local scripts/run-structural-calibration.ts --set scripts/structural-calibration-set.json --tag <tag> --n 2 (STRUCTURAL_V2=1 for the new detector).",
+    "2026-10-12 (round 2): added Yastrzemski 252209 + Mays 393528 (real creases v2 missed), four clearly creased cards and two old-frame red MTG false anchors from the 44 recent capped cards."
   ],
   "cases": [
     {
@@ -186,6 +187,62 @@
       "note": "calibration-set anchor: Gengar false crease in printed back swirl (expected 9)",
       "card_id": "ff322597-2764-4782-a10e-6ddf1d5841c4",
       "cardType": "pokemon"
+    },
+    {
+      "key": "252209",
+      "label": "real",
+      "note": "1970 Topps Yastrzemski: horizontal crease with cracked ink reaching the left border (v2 released it at 7 - the claim described the printed jersey fold)",
+      "card_id": "1fa91b47-bb58-46aa-87b8-738b5cf547b8",
+      "cardType": "sports"
+    },
+    {
+      "key": "289901",
+      "label": "real",
+      "note": "Pokemon Mismagius ex: card visibly bent/warped",
+      "card_id": "99de26a6-3cc0-4cca-be5c-48c0c7f07dfb",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "344689",
+      "label": "real",
+      "note": "Pokemon Base Set 2 Charizard: multiple creases, front and back",
+      "card_id": "6df127ab-994c-4c1f-99b3-2803b04be574",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "393528",
+      "label": "real",
+      "note": "1958 Topps Willie Mays Sport Magazine All-Star: crease from the top border down through STAR (v2 released it at 5 - single vote, verifier real 2/3)",
+      "card_id": "8a5910d0-dd97-4c3d-9e9a-26e008d9827c",
+      "cardType": "sports"
+    },
+    {
+      "key": "443183",
+      "label": "false",
+      "note": "MTG Mercadian Masques Tectonic Break: old red frame cracked-stone texture read as creases",
+      "card_id": "576c4001-8e0a-4f02-842a-38221b960d7c",
+      "cardType": "mtg"
+    },
+    {
+      "key": "702244",
+      "label": "real",
+      "note": "Pokemon Rayquaza (Platinum era): vertical crease on the back through the logo/Poke Ball, clearly visible",
+      "card_id": "15347bc8-547b-46d8-b69c-cb61c579a757",
+      "cardType": "pokemon"
+    },
+    {
+      "key": "817672",
+      "label": "real",
+      "note": "Yu-Gi-Oh Black Luster Soldier 1st Ed: several creases across the back, clearly visible",
+      "card_id": "286839c0-a9c6-4a36-8bd3-6beb5488f124",
+      "cardType": "yugioh"
+    },
+    {
+      "key": "069146",
+      "label": "false",
+      "note": "MTG Tempest Jackal Pup: old red frame prints a cracked-stone texture; the crack lines are ink",
+      "card_id": "e784495d-1da0-4966-a561-9aaeaf496f4c",
+      "cardType": "mtg"
     }
   ]
 }
