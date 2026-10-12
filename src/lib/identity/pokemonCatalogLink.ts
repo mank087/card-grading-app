@@ -24,6 +24,7 @@ import {
   getPokemonApiUpdateFields,
   extractPokemonMetadata,
   splitPrintedPokemonNumber,
+  toCatalogCandidate,
   type CardInfoForVerification,
   type PokemonApiVerificationResult,
 } from '@/lib/pokemonApiVerification';
@@ -32,6 +33,9 @@ import { generateLabelData, type CardForLabel } from '@/lib/labelDataGenerator';
 import { firstLookCandidate, firstLookResultOf } from './reviewPrefill';
 import { relinkCatalog, RELINK_CATEGORIES } from './catalogRelink';
 import { isPokemonPromoSetId } from '@/lib/pokemonPromoNumber';
+import { pokemonPrintedNumber, printedBadgeOf } from '@/lib/pokemonAnniversary';
+import { hasTrickOrTradeEvidence, trickOrTradeIdentity } from '@/lib/pokemonTrickOrTrade';
+import { runBadgeNet, type StoredBadgeCheck } from './anniversaryBadgeNet';
 
 export interface VerifyPokemonOptions {
   /** Re-verify a card that is already verified. */
@@ -130,7 +134,7 @@ export async function verifyAndSavePokemonCard(
 
   const confirmed = isOwnerConfirmed(card);
   const linkOnly = opts.linkOnly === true || confirmed;
-  const convInfo = (card.conversational_card_info && typeof card.conversational_card_info === 'object')
+  let convInfo = (card.conversational_card_info && typeof card.conversational_card_info === 'object')
     ? card.conversational_card_info as Record<string, any>
     : {};
   const override = linkOnly ? null : (opts.overrideCardInfo || null);
@@ -155,6 +159,10 @@ export async function verifyAndSavePokemonCard(
       card_number_raw: override?.card_number_raw || convInfo.card_number_raw || null,
       card_number_format: override?.card_number_format || convInfo.card_number_format || null,
       set_total: override?.set_total || convInfo.set_total || null,
+      // Oct 2026: printed badges ("30"/"25" scope the search; "pumpkin" = Trick or Trade).
+      printed_badge: printedBadgeOf(override?.printed_badge ?? convInfo.printed_badge),
+      first_look_printed_badge: printedBadgeOf(override?.first_look_printed_badge ?? convInfo.first_look_printed_badge)
+        ?? printedBadgeOf((firstLookResultOf(card.first_look) as any)?.printed_text?.printed_badge),
     } as CardInfoForVerification;
 
   console.log(`${tag} card ${cardId}${linkOnly ? ' (link only)' : ''}:`, cardInfo);
@@ -174,6 +182,44 @@ export async function verifyAndSavePokemonCard(
         verification = second;
       } else if (second.candidates?.length && !verification.candidates?.length) {
         verification.candidates = second.candidates;
+      }
+    }
+  }
+
+  // Oct 2026: a match on a card with a Classic Collection twin (Base Pikachu
+  // 58/102 ↔ 30th Celebration me55c-58) and no badge read asks the photo once
+  // (identity/anniversaryBadgeNet.ts). The owner's confirmed identity is never asked about.
+  const matched = verification.success ? verification.pokemon_api_data : null;
+  const net = await runBadgeNet(supabase, cardId, {
+    info: cardInfo,
+    name: matched?.name || cardInfo.player_or_character || cardInfo.card_name,
+    printed: matched
+      ? (matched.printedNumber || pokemonPrintedNumber(matched.id, matched.number, matched.set.printedTotal))
+      : (cardInfo.card_number_raw || cardInfo.card_number),
+    matchedSetId: matched?.set?.id ?? null,
+    ownerConfirmed: confirmed,
+    stored: convInfo.anniversary_badge_check,
+  });
+  if (net) {
+    console.log(`${tag} badge net: ${net.outcome.action}${net.stored ? ` (${net.stored.answer}${net.stored.badge ? ` "${net.stored.badge}"` : ''}${net.fresh ? '' : ', stored'})` : ' (no answer)'}`);
+    if (net.fresh && net.stored) convInfo = { ...convInfo, anniversary_badge_check: net.stored as StoredBadgeCheck };
+    if (net.outcome.action === 'keep_low' && verification.success) {
+      verification.confidence = 'low';
+    } else if (net.outcome.action === 'rescope') {
+      const rescoped = await verifyPokemonCard({ ...cardInfo, printed_badge: net.outcome.badge });
+      if (rescoped.success && rescoped.pokemon_api_data && !linkOnly) {
+        verification = rescoped;
+        // Digits read but not settled by the border: apply it, and keep the owner's notice on.
+        if (!net.outcome.certain && verification.confidence === 'high') verification.confidence = 'medium';
+      } else if (rescoped.success && rescoped.pokemon_api_data) {
+        // Link-only: the owner's words stand. Offer both printings instead of linking either.
+        verification = {
+          ...verification, success: false, verified: false, pokemon_api_id: null, pokemon_api_data: null, confidence: 'low',
+          candidates: [rescoped.pokemon_api_data, ...(matched ? [matched] : [])].map(toCatalogCandidate),
+          error: 'Anniversary badge on the photo: the owner chooses the printing',
+        };
+      } else if (verification.success) {
+        verification.confidence = 'low';
       }
     }
   }
@@ -223,6 +269,17 @@ export async function verifyAndSavePokemonCard(
           ...(verification.rejected_candidate ? { _rejected_candidate: verification.rejected_candidate } : {}),
         };
         if (firstLookCorrection) updatedCardInfo._number_from_first_look = firstLookCorrection;
+
+        // Oct 2026: a Trick or Trade stamp keeps the ORIGINAL catalog link but
+        // its own set name and year (pokemonTrickOrTrade.ts), for label and price.
+        if (hasTrickOrTradeEvidence({ ...convInfo, ...cardInfo })) {
+          const stamp = trickOrTradeIdentity(cardInfo, metadata.set_release_date);
+          (updateFields as Record<string, any>).card_set = stamp.set_name;
+          if (stamp.year) (updateFields as Record<string, any>).release_date = stamp.year;
+          updatedCardInfo.set_name = stamp.set_name;
+          if (stamp.year) updatedCardInfo.year = stamp.year;
+          updatedCardInfo.printed_badge = 'pumpkin';
+        }
 
         const identityKeys = ['card_name', 'card_set', 'card_number', 'release_date'] as const;
         const overridesIdentity = identityKeys.some(k => (updateFields as any)[k] != null && (updateFields as any)[k] !== card[k]);

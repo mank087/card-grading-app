@@ -85,7 +85,7 @@ export const FIRST_LOOK_SCHEMA = {
       printed_text: {
         type: 'object',
         additionalProperties: false,
-        required: ['front_title_or_name', 'front_other', 'back_header', 'card_number_as_printed', 'copyright_line', 'serial_stamp', 'back_parallel_or_product_text'],
+        required: ['front_title_or_name', 'front_other', 'back_header', 'card_number_as_printed', 'copyright_line', 'serial_stamp', 'back_parallel_or_product_text', 'printed_badge'],
         properties: {
           front_title_or_name: { ...nullableString, description: 'The name/title/caption exactly as printed on the front.' },
           front_other: { ...nullableString, description: 'Other front text: team, position, logos as words, insert name, set logo text. Verbatim, separated by " | ".' },
@@ -94,6 +94,8 @@ export const FIRST_LOOK_SCHEMA = {
           copyright_line: { ...nullableString, description: 'The copyright / legal line verbatim, e.g. "© 1977 20TH CENTURY-FOX FILM CORP."' },
           serial_stamp: { ...nullableString, description: 'Stamped or foil print-run numbering exactly as it appears, e.g. "23/99", "1/1". null when there is none.' },
           back_parallel_or_product_text: { ...nullableString, description: 'Any back text naming the product line or parallel, e.g. "PRIZM", "REFRACTOR", "1st Edition". Verbatim.' },
+          // Oct 2026: Classic Collection reprints keep the original number and copyright; the badge is the only tell.
+          printed_badge: { type: ['string', 'null'], enum: ['30', '25', 'pumpkin', null], description: 'Pokémon only: a small printed badge/stamp on the front — a yellow Pikachu-head emblem (black-tipped ears) with two small red digits in its lower corners, "3" "0" ("30", 2026 30th Celebration; on reprints of older cards it overlaps a corner of the art box and the whole card has sparkle foil, border included) or "2" "5" ("25", 2021 Celebrations), or a small orange jack-o-lantern pumpkin with Pikachu ears ("pumpkin", Trick or Trade Halloween promos). null when no such badge is visible, and for every other card.' },
         },
       },
       // 3 — the design, in plain words, BEFORE any product is named. Look-alike
@@ -185,8 +187,8 @@ export const FIRST_LOOK_SCHEMA = {
 export const FIRST_LOOK_PROMPT = `You are identifying one trading card from photos of its front and back, for a catalog lookup and for the owner to confirm. Fill every field of the required JSON, in order.
 
 HOW TO WORK
-1. photos — FIRST decide what the item physically is (item_type) and say what you see that decides it. Not everything submitted is a trading card: deck-box dividers (an index tab cut into the top edge), stickers, tokens and code cards, jumbo box toppers, custom or fan-made cards, items marked REPRINT or REPLICA, a photo of a screen or of a printed picture of a card (moire, pixels, bezel, page edge, glare from a monitor), and cards already sealed in a grading slab all occur. A modern full-art, borderless, showcase, crossover or serial-numbered treatment of a licensed game is still a trading_card, however unusual the artwork; custom_or_fan_made needs positive evidence such as no official copyright line, a hand-drawn original, or home-print quality. Also check the two photos are the two faces of the same item. Then say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
-2. printed_text — transcribe exactly what is printed. Character for character. Do not normalise, translate, complete a partly hidden word, or add anything you merely know. If you cannot read it, use null.
+1. photos — FIRST decide what the item physically is (item_type) and say what you see that decides it. Not everything submitted is a trading card: deck-box dividers (an index tab cut into the top edge), stickers, tokens and code cards, jumbo box toppers, custom or fan-made cards, items marked REPRINT or REPLICA, a photo of a screen or of a printed picture of a card (moire, pixels, bezel, page edge, glare from a monitor), and cards already sealed in a grading slab all occur. A modern full-art, borderless, showcase, crossover or serial-numbered treatment of a licensed game is still a trading_card, however unusual the artwork; custom_or_fan_made needs positive evidence such as no official copyright line, a hand-drawn original, or home-print quality; an official copyright line plus an official card back means an official card, even when the finish or border looks unusual (official reprints, anniversary sets and stamped promos exist). Also check the two photos are the two faces of the same item. Then say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
+2. printed_text — transcribe exactly what is printed. Character for character. Look for small printed STAMPS or BADGES on the front and report them: an anniversary Pikachu-head badge with digits 3 0 or 2 5 (or the Trick or Trade pumpkin) goes in printed_badge; any other stamp (prerelease, staff, league, set-symbol or event stamp) goes in front_other. Do not normalise, translate, complete a partly hidden word, or add anything you merely know. If you cannot read it, use null.
 3. layout — describe the design in plain words: border, logo placement, name panel, back layout, how the number is written. Describe only; do not name a product yet.
 4. identity — now use everything you know about the hobby. The product you name must be one whose cards have THIS layout; a famous set with a different border, back or numbering style is the wrong answer. For each field give the catalog-standard value and its source:
    - "printed": the value's characters are in your printed_text transcription.
@@ -205,7 +207,8 @@ export type FirstLookField = { value: string | null; source: FieldSource };
 export interface FirstLook {
   photos: { item_type: string; item_type_evidence: string; same_item_both_photos: string; front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
   layout: { border: string; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
-  printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>;
+  printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>
+    & { printed_badge?: '30' | '25' | 'pumpkin' | null }; // optional: records before Oct 2026 lack it
   identity: {
     category: string;
     subject: FirstLookField; card_title: FirstLookField; year: FirstLookField; manufacturer: FirstLookField;
@@ -231,7 +234,9 @@ const squash = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 export function normalizeFirstLook(raw: FirstLook): { value: FirstLook; repairs: string[] } {
   const v: FirstLook = JSON.parse(JSON.stringify(raw));
   const repairs: string[] = [];
-  const transcript = squash(Object.values(v.printed_text).filter(Boolean).join(' '));
+  const { printed_badge: badge, ...transcribed } = v.printed_text;
+  const transcript = squash(Object.values(transcribed).filter(Boolean).join(' '));
+  if (badge !== undefined && badge !== null && badge !== '30' && badge !== '25' && badge !== 'pumpkin') { repairs.push(`printed_badge "${badge}" → null`); v.printed_text.printed_badge = null; }
 
   for (const key of IDENTITY_FIELDS) {
     const f = v.identity[key];

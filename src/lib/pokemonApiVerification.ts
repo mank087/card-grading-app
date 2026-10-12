@@ -16,7 +16,7 @@ import {
 import { namesAgree, speciesKey, type NameAgreement } from './identity/nameAgreement';
 import { findUniqueDigitVariant, positionsOff } from './cardNumberUtils';
 import type { CatalogCandidate } from './identity/catalogCandidates';
-import { anniversaryNumber, anniversarySetIds, pokemonPrintedNumber, printedDenominatorMatches } from './pokemonAnniversary';
+import { anniversaryEvidenceKind, anniversaryNumber, anniversarySetIds, pokemonPrintedNumber, printedDenominatorMatches } from './pokemonAnniversary';
 import { pokemonNumberForSet } from './pokemonPromoNumber';
 
 export interface PokemonApiVerificationResult {
@@ -81,6 +81,9 @@ export interface CardInfoForVerification {
   card_number_raw?: string; // Full printed number exactly as shown (e.g., "240/193", "SWSH039")
   card_number_format?: string; // Detected format type
   set_total?: string; // Denominator from card number (e.g., "193" from "240/193")
+  // Oct 2026: printed anniversary badge ("30" / "25") read by the grading call / first look
+  printed_badge?: string | null;
+  first_look_printed_badge?: string | null;
 }
 
 /**
@@ -759,7 +762,11 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
 
   // Process results
   if (dbCard) {
-    return settleMatch(result, dbCard, { cardName, setName, year: cardInfo.year, setTotal, anniversary: !!anniversarySets });
+    return settleMatch(result, dbCard, {
+      cardName, setName, year: cardInfo.year, setTotal, anniversary: !!anniversarySets,
+      // A badge-only scope skips the year check: reprints keep the original copyright year.
+      badgeOnly: !!anniversarySets && anniversaryEvidenceKind(cardInfo) === 'badge',
+    });
   }
   result.error = 'No matching card found in local database';
   console.log(`[Pokemon Local Verification] FAILED: No match found for ${cardName} #${cardNumber}${result.candidates?.length ? ` (${result.candidates.length} candidates for the owner)` : ''}`);
@@ -774,7 +781,7 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
 function settleMatch(
   result: PokemonApiVerificationResult,
   dbCard: PokemonCard,
-  read: { cardName: string; setName: string; year?: string; setTotal: string; anniversary: boolean },
+  read: { cardName: string; setName: string; year?: string; setTotal: string; anniversary: boolean; badgeOnly?: boolean },
 ): PokemonApiVerificationResult {
   const { cardName, setName, setTotal } = read;
   const cardInfo = { year: read.year };
@@ -787,7 +794,7 @@ function settleMatch(
     const dbYear = dbCard.set.releaseDate?.match(/^\d{4}/)?.[0] || '';
 
     // VALIDATION: Reject matches where year is way off (more than 3 years different)
-    if (cardInfo.year && dbYear) {
+    if (cardInfo.year && dbYear && !read.badgeOnly) {
       const originalYear = parseInt(cardInfo.year);
       const matchedYear = parseInt(dbYear);
       if (!isNaN(originalYear) && !isNaN(matchedYear)) {

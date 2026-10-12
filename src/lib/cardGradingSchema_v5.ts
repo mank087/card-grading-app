@@ -384,6 +384,9 @@ const PokemonCardInfoSchema = z.object({
     'Copy verbatim from the card - do not normalize or clean up. Must match card_number_ocr_breakdown.'
   ),
   authentic: z.boolean().describe('Is card authentic?'),
+  printed_badge: z.enum(['30', '25', 'pumpkin']).nullable().optional().describe(
+    'Printed badge on the front: "30" (2026 30th Celebration), "25" (2021 Celebrations), "pumpkin" (Trick or Trade Halloween stamp), null when none is visible'
+  ),
 
   // Pokemon-specific required fields
   pokemon_stage: z.string().nullable().describe('Evolution stage: Basic, Stage 1, Stage 2, VMAX, ex, etc.'),

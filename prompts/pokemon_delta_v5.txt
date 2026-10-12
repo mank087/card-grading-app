@@ -78,6 +78,14 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Extract exactly as printed (e.g., "SVI", "PAF", "SVP")
 • null if not visible or not present (older cards pre-2020)
 
+**printed_badge**: "30", "25", "pumpkin" or null — a small printed BADGE / STAMP on the card front that marks a special release
+• The anniversary badge is a yellow PIKACHU-HEAD emblem (two black-tipped ears) with two small red digits in its lower corners, where the cheeks are. On reprints of older cards it overlaps the lower-left or lower-right corner of the art box
+• "30" = digits 3 and 0 (2026 30th Celebration sets). The 2026 Classic Collection reprints ALSO have glitter/sparkle foil over the WHOLE card, border included
+• "25" = digits 2 and 5 (2021 Celebrations sets, McDonald's 2021); the 2021 reprints keep a plain yellow border
+• "pumpkin" = a small orange jack-o'-lantern PUMPKIN with Pikachu's face/ears stamped on the art (Trick or Trade Halloween BOOster Bundle promos, 2022-2025). The card is otherwise the normal card with its normal number
+• Report it ONLY when you can see the badge itself; otherwise null. Never infer it from the Pokémon, the artwork or the holo pattern
+• A "30" or "25" badge means the card IS from that anniversary set, even when everything else matches an older card: the Classic Collection reprints keep the ORIGINAL card number (58/102, 4/102, 149/147...) and the ORIGINAL copyright line. Still transcribe the number exactly as printed; when the badge is present, year = the anniversary release year ("2026" for "30", "2021" for "25"), not the reprinted copyright year
+
 ════════════════════════════════════════════════════════════════════════
 🚨🚨🚨 CARD NUMBER EXTRACTION - SIMPLIFIED RULES 🚨🚨🚨
 ════════════════════════════════════════════════════════════════════════

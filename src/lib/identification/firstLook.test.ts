@@ -59,3 +59,14 @@ describe('when the search pass is worth its cost', () => {
     expect(needsSearchPass(make(v => { v.identity.set_name = f('Prizm', 'printed'); v.identity.card_number = f(null, 'unknown'); }))).toBe(true);
   });
 });
+
+describe('printed_badge (Oct 2026)', () => {
+  it('keeps a valid badge out of the transcription check and repairs an invalid one', () => {
+    const ok = normalizeFirstLook(make(v => { v.printed_text.printed_badge = '30'; }));
+    expect(ok.value.printed_text.printed_badge).toBe('30');
+    expect(ok.repairs).toEqual([]);
+    const bad = normalizeFirstLook(make(v => { (v.printed_text as any).printed_badge = '31'; }));
+    expect(bad.value.printed_text.printed_badge).toBeNull();
+    expect(bad.repairs.join(' ')).toMatch(/printed_badge/);
+  });
+});

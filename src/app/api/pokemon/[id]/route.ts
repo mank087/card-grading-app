@@ -16,6 +16,7 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 // SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 import { anniversarySetIds } from "@/lib/pokemonAnniversary";
+import { applyTrickOrTradeStamp } from "@/lib/pokemonTrickOrTrade";
 import { isPokemonPromoSetId, isPokemonPromoSetName, pokemonNumberForSet } from "@/lib/pokemonPromoNumber";
 import { verifyPokemonCard } from "@/lib/pokemonApiVerification";
 // Label data generation for consistent display across all contexts
@@ -1405,6 +1406,24 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
             console.log(`[GET /api/pokemon/${cardId}] ✅ Updated raw JSON with DB-corrected values${isJapaneseCard ? ' (Japanese)' : ''}`);
           } catch (jsonUpdateError) {
             console.error(`[GET /api/pokemon/${cardId}] ⚠️ Failed to update raw JSON:`, jsonUpdateError);
+          }
+        }
+
+        // Oct 2026: a Trick or Trade pumpkin stamp (pokemonTrickOrTrade.ts). The
+        // validation above read the ORIGINAL printing; the card keeps its number
+        // but shows and prices as "Trick or Trade <year>".
+        if (!isJapaneseCard && cardInfo && applyTrickOrTradeStamp(cardInfo)) {
+          console.log(`[GET /api/pokemon/${cardId}] 🎃 Trick or Trade stamp: set "${cardInfo.set_name}", year ${cardInfo.year}`);
+          if (conversationalGradingResult) {
+            try {
+              const stamped = JSON.parse(conversationalGradingResult);
+              if (stamped.card_info) {
+                stamped.card_info.set_name = cardInfo.set_name;
+                stamped.card_info.year = cardInfo.year;
+                stamped.card_info.printed_badge = 'pumpkin';
+                conversationalGradingResult = JSON.stringify(stamped);
+              }
+            } catch { /* the column values above still carry the stamp */ }
           }
         }
 

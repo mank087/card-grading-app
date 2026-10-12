@@ -37,6 +37,7 @@ WEB SEARCH: before filling "identity", search the web. The same subject and year
 - Your FIRST search must NOT name the set you suspect. Build it only from what is on the card: the printed name/title, the year, and the distinctive design traits you can see (border colour, where the logo sits, an actor or team line, how the card number is written — e.g. spelled out as a word, the back layout).
 - Then search to confirm the product whose cards look like THIS one, including its set name, year and card number. At most 3 searches.
 - Do not settle on the most famous set unless its design matches these photos; if a less famous product matches the border, layout and numbering style better, it wins, and the famous set goes in alternatives.
+- When the finish, border or a stamp/badge does not match the printing you suspect, the likeliest answers are an official reprint, an anniversary/celebration set or a stamped promo: search for those (e.g. "<name> <number> reprint", "<name> <number> 30th Celebration", "<name> stamped promo") BEFORE considering custom or fan-made.
 A value you confirmed by search but that is not printed on the card has source "recognized". Do NOT use search to decide the parallel: decide that only from the photos.`;
 
 export interface FirstLookRecord {

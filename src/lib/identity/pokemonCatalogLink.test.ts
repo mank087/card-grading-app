@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const v = vi.hoisted(() => ({ verify: vi.fn(), byPrinted: vi.fn() }));
+const v = vi.hoisted(() => ({ verify: vi.fn(), byPrinted: vi.fn(), net: vi.fn() }));
+vi.mock('./anniversaryBadgeNet', async importOriginal => {
+  const actual = await importOriginal<typeof import('./anniversaryBadgeNet')>();
+  return { ...actual, runBadgeNet: v.net };
+});
 vi.mock('@/lib/pokemonApiVerification', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/pokemonApiVerification')>();
   return { ...actual, verifyPokemonCard: v.verify, verifyPokemonCardByPrintedNumber: v.byPrinted };
@@ -51,7 +55,7 @@ const graded = (over: Record<string, any> = {}) => ({
   first_look: null, ...over,
 });
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); v.net.mockResolvedValue(null); });
 
 describe('verifyAndSavePokemonCard', () => {
   it('stores catalog candidates for the owner when the lookup is ambiguous, without touching identity', async () => {
@@ -135,5 +139,68 @@ describe('helpers', () => {
     expect(catalogRelinkNeeded('Pokemon', ['card_number'])).toBe(true);
     expect(catalogRelinkNeeded('Pokemon', ['holofoil'])).toBe(false);
     expect(catalogRelinkNeeded('MTG', ['card_number'])).toBe(false);
+  });
+});
+
+const catalogCard = (id: string, name: string, number: string, printed: string, set: { id: string; name: string; total: number; date: string }) => ({
+  id, name, number, printedNumber: printed, supertype: 'Pokémon', subtypes: [], rarity: 'Common', images: { small: '', large: '' },
+  set: { id: set.id, name: set.name, printedTotal: set.total, total: set.total, series: '', releaseDate: set.date, images: { logo: '', symbol: '' } },
+});
+const base58 = catalogCard('base1-58', 'Pikachu', '58', '58/102', { id: 'base1', name: 'Base', total: 102, date: '1999/01/09' });
+const classic58 = catalogCard('me55c-58', 'Pikachu', '58', '58/102', { id: 'me55c', name: '30th Celebration: Classic Collection', total: 0, date: '2026-09-16' });
+const pikachuRow = (over: Record<string, any> = {}) => graded({
+  card_name: 'Pikachu', featured: 'Pikachu', card_set: 'Base', card_number: '58/102', release_date: '1999',
+  conversational_card_info: { card_name: 'Pikachu', player_or_character: 'Pikachu', set_name: 'Base', card_number: '58', card_number_raw: '58/102', year: '1999' },
+  ...over,
+});
+const pikachuHit = (card: any, extra: Record<string, unknown> = {}) => hit({ pokemon_api_id: card.id, pokemon_api_data: card, corrections: [],
+  name_agreement: { agrees: true, similarity: 1, reason: 'species match', aiKey: 'pikachu', dbKey: 'pikachu' }, ...extra });
+const verdict = (answer: string, badge: string | null) => ({ answer, badge, where: null, for_number: '58/102', at: 't' });
+
+describe('anniversary badge safety net (Oct 2026)', () => {
+  it('a "yes" re-scopes to the Classic Collection and saves that identity with the verdict', async () => {
+    v.verify.mockResolvedValueOnce(pikachuHit(base58))
+      .mockResolvedValueOnce(pikachuHit(classic58, { corrections: [{ field: 'set_name', original: 'Base', corrected: classic58.set.name }, { field: 'year', original: '1999', corrected: '2026' }] }));
+    v.net.mockResolvedValue({ outcome: { action: 'rescope', badge: '30', certain: true }, twins: [], stored: verdict('yes', '30'), fresh: true });
+    const { client, updates } = fakeDb(pikachuRow());
+    const out = await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(v.net).toHaveBeenCalledWith(client, cardId, expect.objectContaining({ name: 'Pikachu', printed: '58/102', matchedSetId: 'base1', ownerConfirmed: false }));
+    expect(v.verify).toHaveBeenLastCalledWith(expect.objectContaining({ printed_badge: '30' }));
+    expect(out.body.pokemon_api_id).toBe('me55c-58');
+    expect(updates[0]).toMatchObject({ pokemon_api_id: 'me55c-58', card_set: '30th Celebration: Classic Collection', release_date: '2026' });
+    expect(updates[0].conversational_card_info.anniversary_badge_check).toMatchObject({ answer: 'yes', badge: '30' });
+  });
+
+  it('"unclear" keeps the original printing at low confidence, without rewriting the set', async () => {
+    v.verify.mockResolvedValue(pikachuHit(base58, { corrections: [{ field: 'set_name', original: 'Base Set', corrected: 'Base' }] }));
+    v.net.mockResolvedValue({ outcome: { action: 'keep_low' }, twins: [], stored: verdict('unclear', null), fresh: true });
+    const { client, updates } = fakeDb(pikachuRow());
+    await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(updates[0]).toMatchObject({ pokemon_api_id: 'base1-58', pokemon_api_confidence: 'low' });
+    expect(updates[0].card_set).toBeUndefined();
+  });
+
+  it('link-only (owner edit): a "yes" never rewrites the owner identity, it offers both printings', async () => {
+    v.verify.mockResolvedValueOnce(pikachuHit(base58)).mockResolvedValueOnce(pikachuHit(classic58));
+    v.net.mockResolvedValue({ outcome: { action: 'rescope', badge: '30', certain: true }, twins: [], stored: verdict('yes', '30'), fresh: true });
+    const { client, updates } = fakeDb(pikachuRow());
+    await verifyAndSavePokemonCard(client, cardId, { force: true, linkOnly: true });
+    expect(updates[0]).toMatchObject({ pokemon_api_id: null, pokemon_api_verified: false });
+    expect(updates[0].conversational_card_info.catalog_candidates.map((c: any) => c.id)).toEqual(['me55c-58', 'base1-58']);
+    expect(updates[0].card_set).toBeUndefined();
+  });
+});
+
+describe('Trick or Trade stamp (Oct 2026)', () => {
+  const gengar = catalogCard('swsh11-66', 'Gengar', '66', '066/196', { id: 'swsh11', name: 'Lost Origin', total: 196, date: '2022/09/09' });
+  it('keeps the original catalog link but saves the canonical Trick or Trade set and year', async () => {
+    v.verify.mockResolvedValue(hit({ pokemon_api_id: 'swsh11-66', pokemon_api_data: gengar,
+      corrections: [{ field: 'set_name', original: 'Trick or Trade', corrected: 'Lost Origin' }],
+      name_agreement: { agrees: true, similarity: 1, reason: 'species match', aiKey: 'gengar', dbKey: 'gengar' } }));
+    const { client, updates } = fakeDb(graded({ card_name: 'Gengar', featured: 'Gengar', card_set: 'Trick or Trade', card_number: '066/196', release_date: '2022',
+      conversational_card_info: { card_name: 'Gengar', player_or_character: 'Gengar', set_name: 'Lost Origin', card_number: '066/196', year: '2022', printed_badge: 'pumpkin' } }));
+    await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(updates[0]).toMatchObject({ pokemon_api_id: 'swsh11-66', card_set: 'Trick or Trade 2023', release_date: '2023' });
+    expect(updates[0].conversational_card_info).toMatchObject({ set_name: 'Trick or Trade 2023', year: '2023', printed_badge: 'pumpkin' });
   });
 });
