@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { checkCardNumberEvidence, applyCardNumberGuard } from './cardNumberGuard';
+import { checkCardNumberEvidence, applyCardNumberGuard, decideOtherPrintRunSwap, applyOtherPrintRunSwap, codeStyleNumber } from './cardNumberGuard';
 
 const info = (over: Record<string, any> = {}) => ({
   card_number: '8',
@@ -277,5 +277,62 @@ describe('storing a spelled-out number as digits', () => {
       applyCardNumberGuard(info, 'test', { category: 'Other' });
       expect(info.card_number).toBe(number);
     }
+  });
+});
+
+describe('Other: stamped print run vs printed code (decideOtherPrintRunSwap)', () => {
+  it('first look read "A-70": the code wins and 09/25 moves to serial_number', () => {
+    const d = decideOtherPrintRunSwap({ card_number: '09/25', first_look_card_number: 'A-70' });
+    expect(d).toEqual({ swapped: true, cardNumber: 'A-70', serialNumber: '09/25', evidenceSource: 'first_look' });
+  });
+
+  it('independent read text "IWR-2" also counts', () => {
+    const d = decideOtherPrintRunSwap({
+      card_number: '09 / 25',
+      identification_check: { independent: { card_number_text_seen: 'IWR-2', card_number: 'IWR-2' } },
+    });
+    expect(d.swapped).toBe(true);
+    expect(d.cardNumber).toBe('IWR-2');
+    expect(d.serialNumber).toBe('09/25');
+    expect(d.evidenceSource).toBe('independent_read');
+  });
+
+  it('card_number_independent_read from reconcile counts, letter-only codes too', () => {
+    expect(decideOtherPrintRunSwap({ card_number: '144/199', card_number_independent_read: 'CC-GN' }).cardNumber).toBe('CC-GN');
+  });
+
+  it('never overwrites an existing serial_number', () => {
+    const d = decideOtherPrintRunSwap({ card_number: '09/25', serial_number: '09/25', first_look_card_number: 'A-70' });
+    expect(d.swapped).toBe(true);
+    expect(d.serialNumber).toBeNull();
+  });
+
+  it('a plain or fraction read is not a code: TCG set numbers stay', () => {
+    expect(decideOtherPrintRunSwap({ card_number: '125/198', first_look_card_number: '125' }).swapped).toBe(false);
+    expect(decideOtherPrintRunSwap({ card_number: '125/198', card_number_independent_read: '125/198' }).swapped).toBe(false);
+    expect(decideOtherPrintRunSwap({ card_number: '09/25' }).swapped).toBe(false);
+  });
+
+  it('only fires when the grading number is N/M', () => {
+    expect(decideOtherPrintRunSwap({ card_number: 'A-70', first_look_card_number: 'B-12' }).swapped).toBe(false);
+    expect(decideOtherPrintRunSwap({ card_number: null, first_look_card_number: 'A-70' }).swapped).toBe(false);
+  });
+
+  it('codeStyleNumber', () => {
+    expect(codeStyleNumber('No. A-70')).toBe('A-70');
+    expect(codeStyleNumber('#IWR-2')).toBe('IWR-2');
+    expect(codeStyleNumber('NOVA-1')).toBe('NOVA-1');
+    expect(codeStyleNumber('70')).toBeNull();
+    expect(codeStyleNumber('Topps 2026')).toBeNull();
+    expect(codeStyleNumber('THOR')).toBeNull();
+  });
+
+  it('applyOtherPrintRunSwap rewrites the evidence fields and keeps an audit record', () => {
+    const ci: any = { card_number: '09/25', card_number_text_seen: '09/25', card_number_source: 'front_number', first_look_card_number: 'A-70' };
+    applyOtherPrintRunSwap(ci, 'test');
+    expect(ci.card_number).toBe('A-70');
+    expect(ci.serial_number).toBe('09/25');
+    expect(ci.card_number_source).toBe('first_look');
+    expect(ci._print_run_swap).toMatchObject({ print_run: '09/25', previous_source: 'front_number', serial_written: true });
   });
 });

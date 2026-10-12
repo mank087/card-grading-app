@@ -54,7 +54,7 @@ import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
-import { fillBlankNumberFromFirstLook, numberFillEnabled } from './identification/firstLookNumberFill';
+import { fillBlankNumberFromFirstLook, numberFillEnabled, printedNumberFromFirstLook } from './identification/firstLookNumberFill';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
 // API accepts on gpt-5.4+. Runtime value is validated in imageDetail().
 const IMAGE_DETAIL = imageDetail() as 'high';
@@ -3454,6 +3454,13 @@ Provide detailed analysis as markdown with all required sections.`
         if (numberFillEnabled()) {
           const fill = fillBlankNumberFromFirstLook(jsonData?.card_info, completedFirstLook()?.result);
           if (fill.filled) console.log(`[first-look] filled a blank card number from the printed read: ${JSON.stringify(fill.value)}`);
+        }
+        // Evidence only, never applied here: the number first look read off the card,
+        // so the Other route can tell a stamped print run ("09/25") from the printed
+        // code ("A-70"). See applyOtherPrintRunSwap in cardNumberGuard.ts.
+        const firstLookNumber = printedNumberFromFirstLook(completedFirstLook()?.result);
+        if (firstLookNumber && jsonData?.card_info && typeof jsonData.card_info === 'object') {
+          jsonData.card_info.first_look_card_number = firstLookNumber;
         }
 
         // Out-of-frame corners: a located corner ON the photo border means part of

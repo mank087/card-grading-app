@@ -21,7 +21,7 @@ import { resolveAutographVerdict } from "@/lib/grading/autographPolicy";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // v9.11: discard any year the model could not actually read off the card
 import { applyYearGuard } from "@/lib/yearGuard";
-import { applyCardNumberGuard } from "@/lib/cardNumberGuard";
+import { applyCardNumberGuard, applyOtherPrintRunSwap } from "@/lib/cardNumberGuard";
 // v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
 import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
@@ -679,13 +679,23 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           // Re-serialize when EITHER guard changed something. Previously only a
           // dropped YEAR triggered this, so a rejected card number stayed in the
           // stored report string and resurfaced from there into labels/reports.
-          if (guard.outcome.startsWith('dropped_') || numberGuard.outcome.startsWith('dropped_')) {
+          // With the print-run heuristic off, a stamped "09/25" stays as the card
+          // number even when a code ("A-70") is printed. Another read's code-style
+          // number wins and the stamp moves to serial_number (see cardNumberGuard.ts).
+          const printRunSwap = numberGuard.outcome.startsWith('kept')
+            ? applyOtherPrintRunSwap(jsonData.card_info, `other/${cardId}`)
+            : null;
+          if (guard.outcome.startsWith('dropped_') || numberGuard.outcome.startsWith('dropped_') || printRunSwap?.swapped) {
             conversationalGradingResult = JSON.stringify(jsonData);
           }
         }
 
         // Extract card-specific fields
         otherFields = extractOtherFieldsFromConversational(jsonData);
+        // A print run moved off the card number lands in its own column too.
+        if (jsonData.card_info?._print_run_swap?.serial_written && jsonData.card_info.serial_number) {
+          otherFields.serial_numbering = jsonData.card_info.serial_number;
+        }
 
         // Extract grading scores. v9.2: prefer the engine's server-CAPPED final_grade
         // (decimal_grade/whole_grade) over jsonData.scoring.* — scoring.final_grade is the
