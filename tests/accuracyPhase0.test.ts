@@ -28,6 +28,9 @@ describe('offline Phase 0 baseline', () => {
     const v930 = new Map<string, any>([
       ['master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 287562, lines: 5616, approximateTokensCharsDiv4: 71891 }],
       ['other_delta_v5.txt', { file: 'other_delta_v5.txt', characters: 15751, lines: 328, approximateTokensCharsDiv4: 3938 }],
+      // Fourth deliberate change (Oct 2026, v9.31): the Pokemon delta reports printed badges
+      // (30th / 25th anniversary, Trick or Trade pumpkin).
+      ['pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 33663, lines: 656, approximateTokensCharsDiv4: 8416 }],
     ]);
     expect(promptSizes).toEqual(frozenPromptSizes.map((p: any) => v930.get(p.file) ?? p));
     // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
