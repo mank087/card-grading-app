@@ -7,6 +7,7 @@ import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
+import { cachedCardInfo } from "@/lib/cards/cachedCardInfo";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { recordGradingFailure, acquireGradingLock } from "@/lib/gradingFailure";
 import { verifyAuth } from "@/lib/serverAuth";
@@ -563,7 +564,8 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
           conversational_condition_label: parsedConversationalData.condition_label,
           conversational_image_confidence: parsedConversationalData.image_confidence,
           conversational_centering_ratios: parsedConversationalData.centering_ratios,
-          conversational_card_info: parsedConversationalData.card_info,
+          // The stored column carries owner edits; the blob is the grader's original read.
+          conversational_card_info: cachedCardInfo(parsedConversationalData.card_info, card.conversational_card_info),
           conversational_corners_edges_surface: parsedConversationalData.corners_edges_surface,
           conversational_case_detection: parsedConversationalData.case_detection,
           conversational_defects_front: parsedConversationalData.transformedDefects.front,
