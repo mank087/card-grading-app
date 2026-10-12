@@ -194,6 +194,7 @@ C. GENERIC CARD DEFECT PATTERNS
 ═══════════════════════════════════════════════════════════════════════
 
 **Common Generic TCG Defects:**
+• Sticker cards (Garbage Pail Kids, Wacky Packages): the die-cut peel lines around the sticker art are factory cuts, not scratches (master PRINTED DESIGN IS NOT DAMAGE rule).
 
 ────────────────────────────────────────────────────────────────────────
 1. HOLOGRAPHIC/FOIL DEFECTS (UNIVERSAL)

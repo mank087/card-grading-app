@@ -1,0 +1,713 @@
+{
+  "_readme": [
+    "PRINTED-DESIGN vs PHYSICAL-DEFECT regression set (Oct 12 2026, v9.33 texture rule).",
+    "Part 1: main-pass texture disputes (printed art, foil, glare, sticker peel-cuts, ink specks read as defects). false_positive specs check ALL defect sources (any_source). Card ids looked up by serial; photo paths are the card rows (same paths as the grade-run snapshots).",
+    "Part 2: real-defect anchors copied from zoom-calibration-set.json (real stain, real chips, real rough cut).",
+    "Part 3: the golden calibration set (scripts/calibration-set.json) converted, keys cal-<id8>. Two of its cards were deleted from the DB and are skipped.",
+    "report_only cases are excluded from accuracy. Runner: npx tsx scripts/run-zoom-calibration.ts --set texture-calibration-set.json --n 3 --tag <tag>"
+  ],
+  "cards": [
+    {
+      "key": "smaug-403563",
+      "label": "MTG Smaug, Wicked Worm (aged parchment art read as wear)",
+      "cardType": "mtg",
+      "card_id": "9ac0fc9c-44cc-4142-9ac5-490ca97df8bf",
+      "front_path": "75f5edcb-6a56-4e70-9d14-a077696538e5/9ac0fc9c-44cc-4142-9ac5-490ca97df8bf/front.jpg",
+      "back_path": "75f5edcb-6a56-4e70-9d14-a077696538e5/9ac0fc9c-44cc-4142-9ac5-490ca97df8bf/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 10,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "Printed aged/parchment frame and art read as surface wear/staining.",
+        "face": "front",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "wear",
+          "stain",
+          "discolor",
+          "scuff",
+          "toning",
+          "aging",
+          "dirt",
+          "spot"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "berra-501307",
+      "review_id": null,
+      "card_id": "f3d8b035-9e1a-4c68-b808-4e2ac3aa733f",
+      "grade_run_id": "d4d7aaf4-9524-40e4-8331-eb681bac173c",
+      "label": "1995 Collector's Edge Yogi Berra (Bob's card)",
+      "cardType": "sports",
+      "front_path": "6cc6e18b-9a2f-48ce-8f9c-d6a82b447c40/f3d8b035-9e1a-4c68-b808-4e2ac3aa733f/front.jpg",
+      "back_path": "6cc6e18b-9a2f-48ce-8f9c-d6a82b447c40/f3d8b035-9e1a-4c68-b808-4e2ac3aa733f/back.jpg",
+      "engine_grade": 5,
+      "expected_grade": 7,
+      "expected_subgrades": {
+        "centering": [
+          10,
+          10
+        ],
+        "corners": [
+          7,
+          8
+        ],
+        "edges": [
+          7,
+          7
+        ],
+        "surface": [
+          8,
+          8
+        ]
+      },
+      "expected_limiting": [
+        "corners",
+        "edges"
+      ],
+      "false_positive": {
+        "note": "Printed marbled 'aged stone' border and sepia back read as staining. In production this came from the WHOLE-CARD passes, not zoom - the runner checks all defect sources for this card.",
+        "face": "any",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "discoloration",
+          "toning"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
+    },
+    {
+      "key": "mchale-114031",
+      "review_id": "f77fe7a9-f3ba-49ab-a00c-be21b7ca702d",
+      "card_id": "b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4",
+      "grade_run_id": "3924d95d-cb31-4f89-8d7d-a408e9862e44",
+      "label": "1981 Topps Kevin McHale",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/b6447b1d-e6a1-4eb8-a029-9d7643ba0dc4/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": {
+        "centering": [
+          10,
+          10
+        ],
+        "corners": [
+          8,
+          8
+        ],
+        "edges": [
+          7,
+          7
+        ],
+        "surface": [
+          8,
+          8
+        ]
+      },
+      "expected_limiting": [
+        "edges"
+      ],
+      "false_positive": {
+        "note": "Back 'stain' was normal cardstock mottling on a 1981 back.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "discoloration",
+          "toning"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "aaron-255033",
+      "review_id": "1700bc92-a681-4dba-b490-fc5731b0617a",
+      "card_id": "3af00703-d12a-44f2-8c0e-e7e8bb46a123",
+      "grade_run_id": "3616a82f-eca6-4a26-9722-10786b2cf886",
+      "label": "1976 Topps Hank Aaron",
+      "cardType": "sports",
+      "front_path": "7ee4f1b2-c52e-4a45-867e-92c3b91f0b0b/3af00703-d12a-44f2-8c0e-e7e8bb46a123/front.jpg",
+      "back_path": "7ee4f1b2-c52e-4a45-867e-92c3b91f0b0b/3af00703-d12a-44f2-8c0e-e7e8bb46a123/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": {
+        "centering": [
+          9,
+          10
+        ],
+        "corners": [
+          7,
+          7
+        ],
+        "edges": [
+          7,
+          7
+        ],
+        "surface": [
+          7,
+          7
+        ]
+      },
+      "expected_limiting": [
+        "corners",
+        "edges",
+        "surface"
+      ],
+      "false_positive": {
+        "note": "Dark specks on the tan border were 1976 print speckle, not stains.",
+        "face": "any",
+        "categories": [
+          "edges",
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "speck",
+          "spot"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "adams-score-007558",
+      "review_id": "98655c44-ed9e-4e7f-8226-dc58549d5f66",
+      "card_id": "bdef109e-cade-4725-ada3-e17290131b61",
+      "grade_run_id": "5df074cd-52bf-4a60-9ce7-1fde0423b140",
+      "label": "2014 Score Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/bdef109e-cade-4725-ada3-e17290131b61/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/bdef109e-cade-4725-ada3-e17290131b61/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 9,
+      "expected_subgrades": {
+        "centering": [
+          10,
+          10
+        ],
+        "corners": [
+          9,
+          9
+        ],
+        "edges": [
+          9,
+          9
+        ],
+        "surface": [
+          10,
+          10
+        ]
+      },
+      "expected_limiting": [
+        "corners",
+        "edges"
+      ],
+      "false_positive": {
+        "note": "Printed silver foil stripe along the bottom read as flecks/whitening/surface defect.",
+        "face": "front",
+        "categories": [
+          "corners",
+          "edges",
+          "surface"
+        ],
+        "types": [
+          "whitening",
+          "chip",
+          "nick",
+          "scratch",
+          "print",
+          "speck",
+          "white_dot",
+          "fleck"
+        ],
+        "min_severity": "minor",
+        "regions": [
+          "bottom"
+        ],
+        "any_source": true
+      }
+    },
+    {
+      "key": "adams-85-chrome-043575",
+      "review_id": "5fc230ba-3d3b-4988-b605-df03fbaa90c9",
+      "card_id": "36084907-6283-4674-a985-f846e75a2e5a",
+      "grade_run_id": "d4ba9a62-3794-4242-ade9-7c8b1c063696",
+      "label": "2014 Topps Chrome ('85 design) Davante Adams",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/36084907-6283-4674-a985-f846e75a2e5a/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/36084907-6283-4674-a985-f846e75a2e5a/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 9,
+      "expected_subgrades": {
+        "centering": [
+          10,
+          10
+        ],
+        "corners": [
+          9,
+          9
+        ],
+        "edges": [
+          9,
+          9
+        ],
+        "surface": [
+          10,
+          9
+        ]
+      },
+      "expected_limiting": [
+        "corners",
+        "edges",
+        "surface"
+      ],
+      "false_positive": {
+        "note": "Back corner 'softening' and back edge 'whitening' at moderate severity were glossy-edge reflections.",
+        "face": "back",
+        "categories": [
+          "corners",
+          "edges"
+        ],
+        "types": [
+          "softening",
+          "whitening"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
+    },
+    {
+      "key": "gpk-marcus-540068",
+      "label": "Garbage Pail Kids Mugged Marcus (sticker peel-cut lines read as scratches)",
+      "cardType": "other",
+      "card_id": "b66998ac-8b4f-4fcd-9300-5e4b956a2904",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/b66998ac-8b4f-4fcd-9300-5e4b956a2904/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/b66998ac-8b4f-4fcd-9300-5e4b956a2904/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 10,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "Sticker die-cut / peel lines read as scratches.",
+        "face": "front",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "line",
+          "print_line",
+          "indent"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "gpk-paula-058170",
+      "label": "Garbage Pail Kids Totem Paula (peel-cut lines read as scratches; true 9 from a corner)",
+      "cardType": "other",
+      "card_id": "fce048dd-e4a2-492f-b26d-3f34e74b6062",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/fce048dd-e4a2-492f-b26d-3f34e74b6062/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/fce048dd-e4a2-492f-b26d-3f34e74b6062/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": [
+        "corners"
+      ],
+      "false_positive": {
+        "note": "Sticker die-cut / peel lines read as scratches.",
+        "face": "front",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "line",
+          "print_line",
+          "indent"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "halfnelson-400554",
+      "label": "Half-Nelson (Other) - printed ink specks on border read as corner whitening",
+      "cardType": "other",
+      "card_id": "9a15a686-05d8-41fb-82ef-067ee3ef9e81",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/9a15a686-05d8-41fb-82ef-067ee3ef9e81/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/9a15a686-05d8-41fb-82ef-067ee3ef9e81/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "Tiny printed ink specks on the border read as corner whitening.",
+        "face": "any",
+        "categories": [
+          "corners"
+        ],
+        "types": [
+          "whitening",
+          "fiber",
+          "speck",
+          "white_dot"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
+    },
+    {
+      "key": "sanders-034414",
+      "label": "Barry Sanders (hologram sparkle read as specks/scratches) - UNRESOLVED, report only",
+      "cardType": "sports",
+      "report_only": true,
+      "card_id": "9a738488-c809-43da-b053-8e7c0c49a4b7",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/9a738488-c809-43da-b053-8e7c0c49a4b7/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/9a738488-c809-43da-b053-8e7c0c49a4b7/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": {
+        "note": "Hologram sparkle read as specks/scratches.",
+        "face": "any",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "speck",
+          "scratch",
+          "white_dot",
+          "holo"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "jordan-84-star-real-stain",
+      "review_id": null,
+      "card_id": "6469a057-33d1-4d1b-8fdc-692722f268bd",
+      "grade_run_id": "9f078ccf-26ef-4d51-9673-3602583281e0",
+      "label": "1984 Star Michael Jordan 2 of 10 (real stain control; expected_grade NOT hand-verified)",
+      "cardType": "sports",
+      "front_path": "4f18a0fd-1d06-4e81-af87-a289104499c6/6469a057-33d1-4d1b-8fdc-692722f268bd/front.jpg",
+      "back_path": "4f18a0fd-1d06-4e81-af87-a289104499c6/6469a057-33d1-4d1b-8fdc-692722f268bd/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": [
+        "surface",
+        "edges"
+      ],
+      "false_positive": null,
+      "must_detect": {
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "discoloration",
+          "spot"
+        ],
+        "min_severity": "minor",
+        "note": "real small pink ring-shaped marks on the plain white back stock"
+      }
+    },
+    {
+      "key": "adams-chrome-chips",
+      "review_id": "1c1ee4b5-c19c-4f06-8a5c-f9b2e79e42c5",
+      "card_id": "eafe4123-0797-45d7-8657-ee4d927cfa76",
+      "grade_run_id": "38770d9a-7eb6-49ae-8014-7850cdd56e73",
+      "label": "Topps Chrome Davante Adams (real edge chips)",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/eafe4123-0797-45d7-8657-ee4d927cfa76/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/eafe4123-0797-45d7-8657-ee4d927cfa76/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": [
+        "edges",
+        "corners"
+      ],
+      "false_positive": null,
+      "must_detect": {
+        "face": "front",
+        "categories": [
+          "edges",
+          "corners"
+        ],
+        "min_severity": "minor",
+        "note": "real chrome edge chips along the top of the front"
+      }
+    },
+    {
+      "key": "evans-strata",
+      "review_id": "b2e8b6cb-8649-42ff-b3c2-07c3f3df06fe",
+      "card_id": "a5da95b5-ee24-4c08-b430-fed6ad2ed74d",
+      "grade_run_id": "40002790-72de-4e99-96b1-ca4b35d55021",
+      "label": "2014 Topps Strata Mike Evans",
+      "cardType": "sports",
+      "front_path": "29978476-9579-444b-992e-0f48f54060d6/a5da95b5-ee24-4c08-b430-fed6ad2ed74d/front.jpg",
+      "back_path": "29978476-9579-444b-992e-0f48f54060d6/a5da95b5-ee24-4c08-b430-fed6ad2ed74d/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": {
+        "edges": [
+          8,
+          null
+        ]
+      },
+      "expected_limiting": [
+        "edges"
+      ],
+      "false_positive": {
+        "note": "The front-left EDGE rough cut was filed under the front top-left CORNER (the limiting factor is the edge).",
+        "face": "front",
+        "categories": [
+          "corners"
+        ],
+        "types": [
+          "whitening",
+          "chip",
+          "nick",
+          "fraying",
+          "fray"
+        ],
+        "min_severity": "moderate",
+        "description_contains": [
+          "edge"
+        ]
+      },
+      "must_detect": {
+        "face": "front",
+        "categories": [
+          "edges"
+        ],
+        "min_severity": "minor",
+        "note": "real rough cut on the front left edge"
+      }
+    },
+    {
+      "key": "cal-8bf5eb4c",
+      "label": "Eddy Pineiro Donruss (obvious horizontal crease + warp, both faces)",
+      "cardType": "sports",
+      "card_id": "8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932",
+      "front_path": "75f5edcb-6a56-4e70-9d14-a077696538e5/8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932/front.jpg",
+      "back_path": "75f5edcb-6a56-4e70-9d14-a077696538e5/8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 3,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-9d0596fe",
+      "label": "1992-93 UD Shaq (minor corner/surface whitening; owner 8, PSA-realistic 7)",
+      "cardType": "sports",
+      "card_id": "9d0596fe-e4e9-47be-be3b-377336f266f4",
+      "front_path": "7483d95f-62ac-42fa-a104-1f62bef961be/9d0596fe-e4e9-47be-be3b-377336f266f4/front.jpg",
+      "back_path": "7483d95f-62ac-42fa-a104-1f62bef961be/9d0596fe-e4e9-47be-be3b-377336f266f4/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 8,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null,
+      "must_detect": {
+        "face": "any",
+        "categories": [
+          "corners",
+          "edges",
+          "surface"
+        ],
+        "types": null,
+        "min_severity": "minor",
+        "note": "genuine minor wear"
+      }
+    },
+    {
+      "key": "cal-b98dc05b",
+      "label": "1991 Fleer Michael Jordan (in-app camera, clean, well-centered)",
+      "cardType": "sports",
+      "card_id": "b98dc05b-db1d-4432-9095-84964d07eb49",
+      "front_path": "7483d95f-62ac-42fa-a104-1f62bef961be/b98dc05b-db1d-4432-9095-84964d07eb49/front.jpg",
+      "back_path": "7483d95f-62ac-42fa-a104-1f62bef961be/b98dc05b-db1d-4432-9095-84964d07eb49/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 10,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-848ddbc1",
+      "label": "Andre/Hogan WrestleMania III (clean, glossy black bg)",
+      "cardType": "sports",
+      "card_id": "848ddbc1-7327-47c5-96b4-ef5e5385ef4d",
+      "front_path": "7483d95f-62ac-42fa-a104-1f62bef961be/848ddbc1-7327-47c5-96b4-ef5e5385ef4d/front.jpg",
+      "back_path": "7483d95f-62ac-42fa-a104-1f62bef961be/848ddbc1-7327-47c5-96b4-ef5e5385ef4d/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 10,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-9e090db9",
+      "label": "Giratina (Pokemon) — repeat-flap: same card graded 10,10,10 and 7,7,8 within an hour (Jul 8)",
+      "cardType": "pokemon",
+      "card_id": "9e090db9-9b8e-40e9-bb80-be33bd7be82c",
+      "front_path": "0b5d2efe-142d-4e34-a32e-6266871cd029/9e090db9-9b8e-40e9-bb80-be33bd7be82c/front.jpg",
+      "back_path": "0b5d2efe-142d-4e34-a32e-6266871cd029/9e090db9-9b8e-40e9-bb80-be33bd7be82c/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 8,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-8fcb030c",
+      "label": "Aaron Rodgers (Sports) — repeat-flap: graded 7 here, 10 on a re-shoot 30 min later (Jul 8)",
+      "cardType": "sports",
+      "card_id": "8fcb030c-b068-4947-8d3e-795022839729",
+      "front_path": "0b5d2efe-142d-4e34-a32e-6266871cd029/8fcb030c-b068-4947-8d3e-795022839729/front.jpg",
+      "back_path": "0b5d2efe-142d-4e34-a32e-6266871cd029/8fcb030c-b068-4947-8d3e-795022839729/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 8,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-4cd40690",
+      "label": "Roberto Clemente Topps Chrome /99 — graded 10 THROUGH a rigid plastic display case (Jul 10)",
+      "cardType": "sports",
+      "card_id": "4cd40690-4c0a-4322-a700-c4349c97a86d",
+      "front_path": "a5329036-9986-4e97-84ca-4ab92fd99467/4cd40690-4c0a-4322-a700-c4349c97a86d/front.jpg",
+      "back_path": "a5329036-9986-4e97-84ca-4ab92fd99467/4cd40690-4c0a-4322-a700-c4349c97a86d/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 9,
+      "tolerance": 0,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-7f7b17dd",
+      "label": "Xerosic (Pokemon) — customer-reported: graded 10 by v9.3 (Jul 10) despite clear back edge/corner whitening; owner says 6-7",
+      "cardType": "pokemon",
+      "card_id": "7f7b17dd-d022-4815-8835-6911e6f45a0f",
+      "front_path": "c3b81cda-19dc-4126-98ab-6239cbb6b3f1/7f7b17dd-d022-4815-8835-6911e6f45a0f/front.jpg",
+      "back_path": "c3b81cda-19dc-4126-98ab-6239cbb6b3f1/7f7b17dd-d022-4815-8835-6911e6f45a0f/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 7,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null,
+      "must_detect": {
+        "face": "back",
+        "categories": [
+          "edges",
+          "corners"
+        ],
+        "types": [
+          "whitening",
+          "fiber",
+          "chip"
+        ],
+        "min_severity": "minor",
+        "note": "real back edge/corner whitening"
+      }
+    },
+    {
+      "key": "cal-ff322597",
+      "label": "Gengar (Pokemon) — FALSE-CREASE anchor: graded 4 (crease 'detected' in the back swirl's printed streaks) then 9 on re-shoot 5 min later (Jul 16)",
+      "cardType": "pokemon",
+      "card_id": "ff322597-2764-4782-a10e-6ddf1d5841c4",
+      "front_path": "248d4397-c0e0-49f1-a552-208dbc76ced7/ff322597-2764-4782-a10e-6ddf1d5841c4/front.jpg",
+      "back_path": "248d4397-c0e0-49f1-a552-208dbc76ced7/ff322597-2764-4782-a10e-6ddf1d5841c4/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 9,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-25ccdb29",
+      "label": "Koby EB04-044 (One Piece manga foil) — non-unanimous 10 ([10,10,9] passes, kept 10 via escape hatch)",
+      "cardType": "onepiece",
+      "card_id": "25ccdb29-64be-4c27-aed3-570646f42e6d",
+      "front_path": "3fdc31b5-249d-422a-b92e-b0840431012a/25ccdb29-64be-4c27-aed3-570646f42e6d/front.jpg",
+      "back_path": "3fdc31b5-249d-422a-b92e-b0840431012a/25ccdb29-64be-4c27-aed3-570646f42e6d/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 9,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null
+    },
+    {
+      "key": "cal-a9eca6ef",
+      "label": "Espeon-GX 140/149 full art (Sun & Moon) - printed cyan outline read as marker, graded 1",
+      "cardType": "pokemon",
+      "card_id": "a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4",
+      "front_path": "70522c7f-268d-4678-aea8-0a85e35659c3/a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4/front.jpg",
+      "back_path": "70522c7f-268d-4678-aea8-0a85e35659c3/a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 9,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": {
+        "face": "any",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "print_line",
+          "handwrit",
+          "marker"
+        ],
+        "min_severity": "minor",
+        "note": "artwork read as marks",
+        "any_source": true
+      }
+    }
+  ]
+}

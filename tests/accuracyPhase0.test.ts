@@ -32,6 +32,11 @@ describe('offline Phase 0 baseline', () => {
       // (30th / 25th anniversary, Trick or Trade pumpkin).
       ['pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 33663, lines: 656, approximateTokensCharsDiv4: 8416 }],
     ]);
+    // Fifth deliberate change (Oct 2026, v9.33): the master rubric gained the PRINTED DESIGN IS
+    // NOT DAMAGE rule (+1,392 characters, +16 lines) and the Other delta one sticker peel-cut line
+    // (+175 characters, +1 line). These replace the v9.30 sizes above for those two files.
+    v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 288954, lines: 5632, approximateTokensCharsDiv4: 72239 });
+    v930.set('other_delta_v5.txt', { file: 'other_delta_v5.txt', characters: 15926, lines: 329, approximateTokensCharsDiv4: 3982 });
     expect(promptSizes).toEqual(frozenPromptSizes.map((p: any) => v930.get(p.file) ?? p));
     // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
     // screen so cards stop being clipped at the shutter. The crop is the same shape,
