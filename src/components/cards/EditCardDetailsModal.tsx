@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { getStoredSession } from '@/lib/directAuth';
+import {
+  EMPTY_EDIT_FORM,
+  SPORTS_EDIT_CATEGORIES,
+  STALE_EDIT_MESSAGE,
+  buildEditFormData,
+  changedEditPayload,
+  isIdentityConflict,
+  type EditCardFormData,
+} from './editCardDetailsForm';
 
 interface CardData {
   id: string;
@@ -26,6 +35,8 @@ interface CardData {
   rarity_tier?: string;
   rarity_description?: string;
   category?: string;
+  /** Sent back as expected_identity_revision so a stale form gets a 409. */
+  identity_revision?: number | null;
   conversational_card_info?: {
     card_name?: string;
     player_or_character?: string;
@@ -122,232 +133,29 @@ export default function EditCardDetailsModal({
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Form state - initialized from card data
-  const [formData, setFormData] = useState({
-    // Core fields
-    card_name: '',
-    featured: '',
-    card_set: '',
-    card_number_num: '',      // Numerator part (e.g., "018")
-    card_number_total: '',    // Denominator part (e.g., "091")
-    release_date: '',
-    manufacturer_name: '',
-    serial_numbering: '',
-    // Special features
-    autographed: false,
-    rookie_card: false,
-    memorabilia_type: '',
-    memorabilia_other: '',
-    rarity_tier: '',
-    rarity_description: '',
-    // Sports-specific
-    sport: '',
-    team: '',
-    parallel_type: '',
-    first_print_rookie: false,
-    is_refractor: false,
-    is_numbered: false,
-    is_patch: false,
-    is_jersey: false,
-    is_game_used: false,
-    is_on_card_auto: false,
-    is_sticker_auto: false,
-    is_variation: false,
-    is_short_print: false,
-    is_case_hit: false,
-    // Pokemon-specific
-    holofoil: '',
-    pokemon_type: '',
-    pokemon_stage: '',
-    hp: '',
-    subset_variant: '',
-    // Pokemon special features
-    is_first_edition: false,
-    is_shadowless: false,
-    is_reverse_holo: false,
-    is_full_art: false,
-    is_secret_rare: false,
-    is_promo: false,
-    is_error_card: false,
-    is_illustration_rare: false,
-    is_special_art_rare: false,
-    is_hyper_rare: false,
-    is_gold_rare: false,
-    // MTG-specific
-    is_foil: false,
-    foil_type: '',
-    mtg_rarity: '',
-    is_double_faced: false,
-    mtg_set_code: '',
-    // MTG extended fields
-    mana_cost: '',
-    mtg_card_type: '',
-    creature_type: '',
-    power_toughness: '',
-    color_identity: '',
-    artist_name: '',
-    border_color: '',
-    frame_version: '',
-    language: '',
-    is_extended_art: false,
-    is_showcase: false,
-    is_borderless: false,
-    is_retro_frame: false,
-    is_full_art_mtg: false,
-  });
-
-  // Helper to convert value to boolean (handles string "false", "true", etc.)
-  const toBoolean = (val: any): boolean => {
-    if (typeof val === 'boolean') return val;
-    if (typeof val === 'string') return val.toLowerCase() === 'true';
-    return Boolean(val);
-  };
-
-  // Helper to parse card number into numerator and total parts
-  const parseCardNumber = (cardNum: string | null | undefined, cardNumRaw: string | null | undefined, setTotal: string | null | undefined) => {
-    // Try card_number_raw first (e.g., "018/091")
-    const raw = cardNumRaw || cardNum || '';
-
-    if (raw.includes('/')) {
-      const parts = raw.split('/');
-      return {
-        num: parts[0]?.trim() || '',
-        total: parts[1]?.trim() || setTotal || ''
-      };
-    }
-
-    // If no slash, use card_number as num and set_total as total
-    return {
-      num: cardNum || raw || '',
-      total: setTotal || ''
-    };
-  };
+  // Form state - initialized from card data. `openedWith` is the form as it
+  // opened, so a save sends only what the owner changed (see editCardDetailsForm).
+  const [formData, setFormData] = useState<EditCardFormData>(EMPTY_EDIT_FORM);
+  const [openedWith, setOpenedWith] = useState<EditCardFormData>(EMPTY_EDIT_FORM);
+  const [isConflict, setIsConflict] = useState(false);
 
   // Initialize form data when card changes
   useEffect(() => {
     if (card) {
-      const info = card.conversational_card_info || {};
-      const rarityDesc = card.rarity_description || info.rarity_description || info.rarity_or_variant || '';
-
-      // Parse card number into parts
-      // The card_number column is the corrected value; the card-info keys can hold
-      // the pre-correction read. A stored set_total is only a fallback denominator
-      // when there is no column value: re-saving a corrected bare promo number
-      // ("173") must not turn it into "173/215" (Sept 29).
-      const cardNumParts = card.card_number
-        ? parseCardNumber(card.card_number, card.card_number, null)
-        : parseCardNumber(info.card_number, info.card_number_raw, info.set_total);
-
-      // Get holofoil value, checking multiple sources
-      const holofoilValue = card.holofoil || info.holofoil || '';
-
-      // Detect reverse holo from holofoil field (legitimate stored data)
-      const isReverseHolo =
-        holofoilValue.toLowerCase() === 'reverse' ||
-        holofoilValue.toLowerCase() === 'reverse holo';
-
-      setFormData({
-        // Card name: prefer AI-detected card_name, then column value
-        card_name: info.card_name || card.card_name || '',
-        // Featured/Player: from AI card_info or column
-        featured: info.player_or_character || card.featured || '',
-        // Set name: prefer AI-detected, then column
-        card_set: info.set_name || card.card_set || '',
-        // Card number split into parts
-        card_number_num: cardNumParts.num,
-        card_number_total: cardNumParts.total,
-        // Year: prefer AI-detected year
-        release_date: info.year || card.release_date || '',
-        manufacturer_name: info.manufacturer || card.manufacturer_name || '',
-        serial_numbering: info.serial_number || card.serial_numbering || '',
-        autographed: toBoolean(info.autographed) || toBoolean(card.autographed),
-        rookie_card: toBoolean(info.rookie_or_first) || toBoolean(card.rookie_card),
-        memorabilia_type: info.memorabilia || card.memorabilia_type || '',
-        memorabilia_other: info.memorabilia_other || '',
-        // Rarity: try AI rarity_tier first, then derive from rarity description
-        rarity_tier: info.rarity_tier || card.rarity_tier || deriveRarityTier(rarityDesc),
-        rarity_description: rarityDesc,
-        // Sports-specific fields
-        sport: info.sport || (card as any).sport || '',
-        team: info.team || (card as any).team || '',
-        parallel_type: info.parallel_type || info.rarity_or_variant || '',
-        first_print_rookie: toBoolean(info.first_print_rookie) || toBoolean(card.first_print_rookie),
-        is_refractor: toBoolean(info.is_refractor) || toBoolean((card as any).is_refractor),
-        is_numbered: toBoolean(info.is_numbered) || toBoolean((card as any).is_numbered),
-        is_patch: toBoolean(info.is_patch) || toBoolean((card as any).is_patch),
-        is_jersey: toBoolean(info.is_jersey) || toBoolean((card as any).is_jersey),
-        is_game_used: toBoolean(info.is_game_used) || toBoolean((card as any).is_game_used),
-        is_on_card_auto: toBoolean(info.is_on_card_auto) || toBoolean((card as any).is_on_card_auto),
-        is_sticker_auto: toBoolean(info.is_sticker_auto) || toBoolean((card as any).is_sticker_auto),
-        is_variation: toBoolean(info.is_variation) || toBoolean((card as any).is_variation),
-        is_short_print: toBoolean(info.is_short_print) || toBoolean((card as any).is_short_print),
-        is_case_hit: toBoolean(info.is_case_hit) || toBoolean((card as any).is_case_hit),
-        // Pokemon-specific fields
-        holofoil: holofoilValue,
-        pokemon_type: info.pokemon_type || (card as any).pokemon_type || '',
-        pokemon_stage: info.pokemon_stage || (card as any).pokemon_stage || '',
-        hp: String(info.hp || (card as any).hp || ''),
-        subset_variant: info.subset || info.rarity_or_variant || info.subset_insert_name || '',
-        // Pokemon special features (detected or stored)
-        is_first_edition: toBoolean(info.is_first_edition) || toBoolean((card as any).is_first_edition),
-        is_shadowless: toBoolean(info.is_shadowless) || toBoolean((card as any).is_shadowless),
-        is_reverse_holo: toBoolean(info.is_reverse_holo) || toBoolean((card as any).is_reverse_holo) || isReverseHolo,
-        is_full_art: toBoolean(info.is_full_art) || toBoolean((card as any).is_full_art),
-        is_secret_rare: toBoolean(info.is_secret_rare) || toBoolean((card as any).is_secret_rare),
-        is_promo: toBoolean(info.is_promo) || toBoolean((card as any).is_promo),
-        is_error_card: toBoolean(info.is_error_card) || toBoolean((card as any).is_error_card),
-        is_illustration_rare: toBoolean(info.is_illustration_rare) || toBoolean((card as any).is_illustration_rare),
-        is_special_art_rare: toBoolean(info.is_special_art_rare) || toBoolean((card as any).is_special_art_rare),
-        is_hyper_rare: toBoolean(info.is_hyper_rare) || toBoolean((card as any).is_hyper_rare),
-        is_gold_rare: toBoolean(info.is_gold_rare) || toBoolean((card as any).is_gold_rare),
-        // MTG-specific
-        is_foil: toBoolean(info.is_foil) || toBoolean(card.is_foil),
-        foil_type: info.foil_type || card.foil_type || '',
-        mtg_rarity: info.mtg_rarity || card.mtg_rarity || '',
-        is_double_faced: toBoolean(info.is_double_faced) || toBoolean(card.is_double_faced),
-        mtg_set_code: info.expansion_code || card.mtg_set_code || '',
-        // MTG extended fields
-        mana_cost: info.mana_cost || (card as any).mana_cost || '',
-        mtg_card_type: info.mtg_card_type || (card as any).mtg_card_type || '',
-        creature_type: info.creature_type || (card as any).creature_type || '',
-        power_toughness: info.power_toughness || (card as any).power_toughness || '',
-        color_identity: info.color_identity || (card as any).color_identity || '',
-        artist_name: info.artist_name || (card as any).artist_name || '',
-        border_color: info.border_color || (card as any).border_color || '',
-        frame_version: info.frame_version || (card as any).frame_version || '',
-        language: info.language || (card as any).card_language || 'English',
-        is_extended_art: toBoolean(info.is_extended_art) || toBoolean((card as any).is_extended_art),
-        is_showcase: toBoolean(info.is_showcase) || toBoolean((card as any).is_showcase),
-        is_borderless: toBoolean(info.is_borderless) || toBoolean((card as any).is_borderless),
-        is_retro_frame: toBoolean(info.is_retro_frame) || toBoolean((card as any).is_retro_frame),
-        is_full_art_mtg: toBoolean(info.is_full_art_mtg) || toBoolean((card as any).is_full_art_mtg),
-      });
+      const initial = buildEditFormData(card as Record<string, any>);
+      setFormData(initial);
+      setOpenedWith(initial);
       setHasChanges(false);
       setError(null);
+      setIsConflict(false);
     }
   }, [card, isOpen]);
-
-  // Helper to derive rarity tier from description
-  const deriveRarityTier = (desc: string): string => {
-    const lower = (desc || '').toLowerCase();
-    if (lower.includes('hyper rare') || lower.includes('rainbow')) return 'hyper_rare';
-    if (lower.includes('special art rare') || lower.includes('sar')) return 'special_art_rare';
-    if (lower.includes('illustration rare')) return 'illustration_rare';
-    if (lower.includes('secret rare')) return 'secret_rare';
-    if (lower.includes('ultra rare')) return 'ultra_rare';
-    if (lower.includes('holo rare')) return 'holo_rare';
-    if (lower.includes('rare')) return 'rare';
-    if (lower.includes('uncommon')) return 'uncommon';
-    if (lower.includes('common')) return 'common';
-    if (lower.includes('promo')) return 'promo';
-    return '';
-  };
 
   // Card category flags
   const isPokemon = card.category === 'Pokemon';
   const isMTG = card.category === 'MTG';
   const isLorcana = card.category === 'Lorcana';
-  const isSports = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+  const isSports = SPORTS_EDIT_CATEGORIES.includes(card.category || '');
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -365,96 +173,12 @@ export default function EditCardDetailsModal({
         throw new Error('You must be logged in to edit card details');
       }
 
-      // Handle card number based on category
-      const cardNumber = isSports
-        ? formData.card_number_num || ''
-        : (formData.card_number_num && formData.card_number_total
-          ? `${formData.card_number_num}/${formData.card_number_total}`
-          : formData.card_number_num || '');
-
-      // Build category-specific payload (only send relevant fields)
-      const commonFields = {
-        card_name: formData.card_name,
-        featured: formData.featured,
-        card_set: formData.card_set,
-        card_number: cardNumber,
-        release_date: formData.release_date,
-        manufacturer_name: formData.manufacturer_name,
-        serial_numbering: formData.serial_numbering,
-        autographed: formData.autographed,
-        rookie_card: formData.rookie_card,
-        rarity_tier: formData.rarity_tier,
-        rarity_description: formData.rarity_description,
-      };
-
-      let payload: Record<string, any>;
-
-      if (isPokemon) {
-        payload = {
-          ...commonFields,
-          holofoil: formData.holofoil,
-          pokemon_type: formData.pokemon_type,
-          pokemon_stage: formData.pokemon_stage,
-          hp: formData.hp,
-          subset_variant: formData.subset_variant,
-          is_first_edition: formData.is_first_edition,
-          is_shadowless: formData.is_shadowless,
-          is_reverse_holo: formData.is_reverse_holo,
-          is_full_art: formData.is_full_art,
-          is_secret_rare: formData.is_secret_rare,
-          is_promo: formData.is_promo,
-          is_error_card: formData.is_error_card,
-          is_illustration_rare: formData.is_illustration_rare,
-          is_special_art_rare: formData.is_special_art_rare,
-          is_hyper_rare: formData.is_hyper_rare,
-          is_gold_rare: formData.is_gold_rare,
-        };
-      } else if (isSports) {
-        payload = {
-          ...commonFields,
-          sport: formData.sport,
-          team: formData.team,
-          parallel_type: formData.parallel_type,
-          memorabilia_type: formData.memorabilia_type,
-          memorabilia_other: formData.memorabilia_other,
-          first_print_rookie: formData.first_print_rookie,
-          is_refractor: formData.is_refractor,
-          is_numbered: formData.is_numbered,
-          is_patch: formData.is_patch,
-          is_jersey: formData.is_jersey,
-          is_game_used: formData.is_game_used,
-          is_on_card_auto: formData.is_on_card_auto,
-          is_sticker_auto: formData.is_sticker_auto,
-          is_variation: formData.is_variation,
-          is_short_print: formData.is_short_print,
-          is_case_hit: formData.is_case_hit,
-        };
-      } else if (isMTG) {
-        payload = {
-          ...commonFields,
-          is_foil: formData.is_foil,
-          foil_type: formData.foil_type,
-          mtg_rarity: formData.mtg_rarity,
-          is_double_faced: formData.is_double_faced,
-          mtg_set_code: formData.mtg_set_code,
-          mana_cost: formData.mana_cost,
-          mtg_card_type: formData.mtg_card_type,
-          creature_type: formData.creature_type,
-          power_toughness: formData.power_toughness,
-          color_identity: formData.color_identity,
-          artist_name: formData.artist_name,
-          border_color: formData.border_color,
-          frame_version: formData.frame_version,
-          language: formData.language,
-          is_extended_art: formData.is_extended_art,
-          is_showcase: formData.is_showcase,
-          is_borderless: formData.is_borderless,
-          is_retro_frame: formData.is_retro_frame,
-          is_full_art_mtg: formData.is_full_art_mtg,
-          is_promo: formData.is_promo,
-        };
-      } else {
-        payload = { ...commonFields };
+      // Only the fields the owner changed, plus the revision the form opened at.
+      // Re-sending untouched prefilled values reverted earlier corrections.
+      const payload = changedEditPayload(formData, openedWith, card.category, card.identity_revision);
+      if (!payload) {
+        onClose();
+        return;
       }
 
       const response = await fetch(`/api/cards/${card.id}/details`, {
@@ -467,6 +191,13 @@ export default function EditCardDetailsModal({
       });
 
       const data = await response.json();
+
+      // Someone (another tab, the identity review, an admin) saved this card
+      // after the form opened. Overwriting would revert their change.
+      if (isIdentityConflict(response.status, data)) {
+        setIsConflict(true);
+        throw new Error(STALE_EDIT_MESSAGE);
+      }
 
       if (!response.ok) {
         const errorMsg = data.details
@@ -526,6 +257,15 @@ export default function EditCardDetailsModal({
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="text-red-600 text-sm">{error}</p>
+                {isConflict && (
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-2 text-sm font-semibold text-red-700 underline"
+                  >
+                    Reload
+                  </button>
+                )}
               </div>
             )}
 

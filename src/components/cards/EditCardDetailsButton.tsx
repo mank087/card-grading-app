@@ -27,6 +27,7 @@ interface CardData {
   rarity_tier?: string;
   rarity_description?: string;
   category?: string;
+  identity_revision?: number | null;
   conversational_card_info?: Record<string, any>;
 }
 
