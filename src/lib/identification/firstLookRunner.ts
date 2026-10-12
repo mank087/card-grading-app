@@ -35,10 +35,35 @@ const SEARCH_ADDENDUM = `
 
 WEB SEARCH: before filling "identity", search the web. The same subject and year usually exist in several products (flagship set, inserts, food/retail premiums, stickers, regional issues, reprints, same-art reprint sets), and the most famous one is the easiest to assume wrongly.
 - Your FIRST search must NOT name the set you suspect. Build it only from what is on the card: the printed name/title, the year, and the distinctive design traits you can see (border colour, where the logo sits, an actor or team line, how the card number is written — e.g. spelled out as a word, the back layout).
-- Then search to confirm the product whose cards look like THIS one, including its set name, year and card number. At most 3 searches.
+- Then search to confirm the product whose cards look like THIS one, including its set name, year and card number. At most 2 searches in total, so make the second one count.
 - Do not settle on the most famous set unless its design matches these photos; if a less famous product matches the border, layout and numbering style better, it wins, and the famous set goes in alternatives.
 - When the finish, border or a stamp/badge does not match the printing you suspect, the likeliest answers are an official reprint, an anniversary/celebration set or a stamped promo: search for those (e.g. "<name> <number> reprint", "<name> <number> 30th Celebration", "<name> stamped promo") BEFORE considering custom or fan-made.
 A value you confirmed by search but that is not printed on the card has source "recognized". Do NOT use search to decide the parallel: decide that only from the photos.`;
+
+/** Hard cap on web searches per search pass (Oct 2026). 30-day mix was
+ *  1:2078 2:1741 3:339 4:73 5:25 6:5 7:3 8:1 — 446 passes (~10%) went past
+ *  2, spending ~600 of 7,053 searches, and the prompt's "at most 3" was not
+ *  holding. Enforced server-side via max_tool_calls and in the prompt. */
+export const MAX_SEARCHES_PER_PASS = 2;
+
+/** Per-search tool fee, which api_usage_log never saw (token cost only).
+ *  Override with FIRST_LOOK_SEARCH_FEE_USD; invalid/negative = default. */
+export function searchFeeUsd(searches: number): number {
+  const env = process.env.FIRST_LOOK_SEARCH_FEE_USD;
+  const raw = env ? Number(env) : NaN;
+  const per = Number.isFinite(raw) && raw >= 0 ? raw : 0.01;
+  return Math.max(0, searches) * per;
+}
+
+/** Pass 2's request body. Pure, so the search cap is testable. */
+export function buildSearchPassRequest(model: string, urls: string[], opts: { capToolCalls?: boolean } = {}): Record<string, unknown> {
+  return {
+    model, tools: [{ type: 'web_search' }],
+    ...(opts.capToolCalls === false ? {} : { max_tool_calls: MAX_SEARCHES_PER_PASS }),
+    text: { format: { type: 'json_schema', name: FIRST_LOOK_SCHEMA.name, schema: FIRST_LOOK_SCHEMA.schema, strict: true } },
+    input: [{ role: 'user', content: [{ type: 'input_text', text: FIRST_LOOK_PROMPT + SEARCH_ADDENDUM }, ...urls.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
+  };
+}
 
 export interface FirstLookRecord {
   version: string;
@@ -154,13 +179,20 @@ export async function runFirstLook(
     // Pass 2 — same contract, with web search. Any failure keeps pass 1.
     try {
       const t2 = Date.now();
-      const r2: any = await (openai as any).responses.create({
-        model, tools: [{ type: 'web_search' }],
-        text: { format: { type: 'json_schema', name: FIRST_LOOK_SCHEMA.name, schema: FIRST_LOOK_SCHEMA.schema, strict: true } },
-        input: [{ role: 'user', content: [{ type: 'input_text', text: FIRST_LOOK_PROMPT + SEARCH_ADDENDUM }, ...urls.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
-      }, { timeout: PASS_TIMEOUT_MS, maxRetries: 0 }); // one attempt: a retry doubled the slowest searches
+      const reqOpts = { timeout: PASS_TIMEOUT_MS, maxRetries: 0 }; // one attempt: a retry doubled the slowest searches
+      let r2: any;
+      try {
+        r2 = await (openai as any).responses.create(buildSearchPassRequest(model, urls), reqOpts);
+      } catch (err: any) {
+        // A model/API that rejects max_tool_calls must not silently kill every
+        // search pass: fall back once to the prompt-only cap.
+        if (err?.status !== 400 || !/max_tool_calls/i.test(String(err?.message || ''))) throw err;
+        console.warn('[first-look] max_tool_calls rejected — retrying with the prompt-only search cap');
+        r2 = await (openai as any).responses.create(buildSearchPassRequest(model, urls, { capToolCalls: false }), reqOpts);
+      }
       const searches = (r2.output || []).filter((o: any) => o.type === 'web_search_call').length;
-      logOpenAIUsage({ operation: 'first_look_search', model, usage: { prompt_tokens: r2.usage?.input_tokens, completion_tokens: r2.usage?.output_tokens, total_tokens: r2.usage?.total_tokens } as any, durationMs: Date.now() - t2, metadata: { searches } });
+      const searchFee = searchFeeUsd(searches);
+      logOpenAIUsage({ operation: 'first_look_search', model, usage: { prompt_tokens: r2.usage?.input_tokens, completion_tokens: r2.usage?.output_tokens, total_tokens: r2.usage?.total_tokens } as any, durationMs: Date.now() - t2, extraCostUsd: searchFee, metadata: { searches, search_fee_usd: searchFee } });
       const second = normalizeFirstLook(JSON.parse(r2.output_text));
       // The parallel is decided from the photos only: keep pass 1's.
       second.value.parallel = first.value.parallel;

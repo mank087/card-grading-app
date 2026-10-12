@@ -132,6 +132,29 @@ describe('buildReviewPrefill precedence', () => {
     expect(set.suggestion).toMatchObject({ value: 'Bowman Chrome', source: 'recognized' });
   });
 
+  it('offers no set suggestion when the names differ only in spelling (Oct 2026)', () => {
+    for (const [stored, read, source] of [
+      ['Prizm', 'Panini Prizm Football', recognized],
+      ['2025 Topps Football', 'Topps', recognized],
+      ['Panini Prizm Football', 'Prizm', printed],
+    ] as const) {
+      const prefill = buildReviewPrefill({ category: 'Football', card_set: stored }, look({ identity: { set_name: source(read) } }));
+      const set = field(prefill, 'card_set');
+      expect(set).toMatchObject({ value: stored, origin: 'from_grading', needsCheck: false, differsFromStored: false });
+      expect(set.suggestion).toBeUndefined();
+    }
+  });
+
+  it('still suggests a set that names a different product', () => {
+    const prefill = buildReviewPrefill(
+      { category: 'Other', card_set: 'Mars Attacks' },
+      look({ identity: { set_name: printed('Mars Attacks Christmas') } }),
+    );
+    const set = field(prefill, 'card_set');
+    expect(set.needsCheck).toBe(true);
+    expect(set.suggestion).toMatchObject({ value: 'Mars Attacks Christmas', source: 'printed' });
+  });
+
   it('offers no suggestion when first look agrees with the card', () => {
     const prefill = buildReviewPrefill(
       { category: 'Sports', card_set: 'Flair' },

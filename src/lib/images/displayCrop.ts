@@ -17,11 +17,14 @@
 import sharp from 'sharp';
 import type { DisplayCropRecord, Face } from './displayPath';
 
-export const DISPLAY_CROP_VERSION = 'dc-1';
+export const DISPLAY_CROP_VERSION = 'dc-2';
 
 /** Margin around the card, as a share of its width/height. The detected outline is
  *  often a few percent INSIDE the real edge (Oct 2026 sample), so this is generous. */
 const MARGIN = 0.08;
+/** Less room than this between the card and the photo edge: the trim could cut the
+ *  real edge (a 4% margin visibly clipped borders), so keep the original. */
+const MIN_MARGIN = 0.05;
 /** Output long edge. Display only; the original keeps full resolution. */
 const MAX_EDGE = 2000;
 /** Card already fills this share of the photo: nothing worth trimming. */
@@ -31,9 +34,27 @@ const MIN_FILL = 0.08;
 /** Straighten only when tilted at least this much; refuse beyond the max. */
 const MIN_TILT_DEG = 0.8;
 const MAX_TILT_DEG = 12;
-/** Standard card short/long side ratio is 2.5/3.5 = 0.714. */
-const ASPECT_MIN = 0.6;
-const ASPECT_MAX = 0.84;
+/**
+ * Card shape, short side / long side (portrait 0.716 = 63x88 mm and 2.5x3.5 in;
+ * landscape is the same ratio inverted, 1.40). The outline comes from a vision
+ * model and is NOT precise: in the Oct 12 2026 audit it mostly stopped short of
+ * the card's bottom edge (outline 0.78-0.90 wide), and those crops cut off the
+ * bottom of the card. The tolerance has to stay within what MARGIN can absorb:
+ * an outline that is 8% short on one axis still lands inside the 8% margin.
+ * Covers Yu-Gi-Oh (0.686) and 1952-53 sizes (0.67-0.70); odd sizes (tobacco,
+ * Goudey, tall boys) are skipped and simply show the original.
+ */
+export const CARD_ASPECT = 2.5 / 3.5;
+export const CARD_ASPECT_TOLERANCE = 0.08;
+const ASPECT_MIN = CARD_ASPECT * (1 - CARD_ASPECT_TOLERANCE); // 0.657
+const ASPECT_MAX = CARD_ASPECT * (1 + CARD_ASPECT_TOLERANCE); // 0.771
+
+/** True when a w x h region (either orientation) has the shape of a card. */
+export function isCardShaped(width: number, height: number): boolean {
+  if (!(width > 0) || !(height > 0)) return false;
+  const a = Math.min(width, height) / Math.max(width, height);
+  return a >= ASPECT_MIN && a <= ASPECT_MAX;
+}
 
 export interface Pt { x: number; y: number }
 
@@ -73,8 +94,7 @@ export function planDisplayCrop(quadNorm: unknown, w: number, h: number): CropPl
   if (Math.min(top, bottom) / Math.max(top, bottom) < 0.85 || Math.min(left, right) / Math.max(left, right) < 0.85) {
     return { ok: false, reason: 'skewed_outline' };
   }
-  const aspect = Math.min(horiz, vert) / Math.max(horiz, vert);
-  if (aspect < ASPECT_MIN || aspect > ASPECT_MAX) return { ok: false, reason: 'not_card_shaped' };
+  if (!isCardShaped(horiz, vert)) return { ok: false, reason: 'not_card_shaped' };
 
   // Tilt of the horizontal edges (degrees, positive = clockwise on screen).
   const tiltTop = Math.atan2(tr.y - tl.y, tr.x - tl.x);
@@ -93,17 +113,32 @@ export function planDisplayCrop(quadNorm: unknown, w: number, h: number): CropPl
     return { x: x * cos - y * sin + outW / 2, y: x * sin + y * cos + outH / 2 };
   });
   const xs = rot.map(p => p.x), ys = rot.map(p => p.y);
-  const cardW = Math.max(...xs) - Math.min(...xs), cardH = Math.max(...ys) - Math.min(...ys);
-  const mx = cardW * MARGIN, my = cardH * MARGIN;
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const cardW = maxX - minX, cardH = maxY - minY;
+  // The straightened card, as it will be shown, must itself be card-shaped.
+  if (!isCardShaped(cardW, cardH)) return { ok: false, reason: 'not_card_shaped' };
   // Keep the crop inside what was originally photographed (the rotated canvas
   // corners are padding, not photo).
   const inset = Math.ceil(Math.abs(Math.sin(a)) * Math.max(w, h) * 0.02);
-  const x0 = Math.max(inset, Math.floor(Math.min(...xs) - mx));
-  const y0 = Math.max(inset, Math.floor(Math.min(...ys) - my));
-  const x1 = Math.min(outW - inset, Math.ceil(Math.max(...xs) + mx));
-  const y1 = Math.min(outH - inset, Math.ceil(Math.max(...ys) + my));
+  // ONE margin share on all four sides, so the crop keeps the card's shape and
+  // the card sits centred. (dc-1 clamped each side separately at the photo
+  // edge, which skewed the crop's shape further whenever the outline was wrong.)
+  const room = Math.min(
+    (minX - inset) / cardW, (outW - inset - maxX) / cardW,
+    (minY - inset) / cardH, (outH - inset - maxY) / cardH,
+  );
+  const m = Math.min(MARGIN, room);
+  if (!(m >= MIN_MARGIN)) return { ok: false, reason: 'no_margin' };
+  const x0 = Math.max(inset, Math.floor(minX - cardW * m));
+  const y0 = Math.max(inset, Math.floor(minY - cardH * m));
+  const x1 = Math.min(outW - inset, Math.ceil(maxX + cardW * m));
+  const y1 = Math.min(outH - inset, Math.ceil(maxY + cardH * m));
   const box = { left: x0, top: y0, width: x1 - x0, height: y1 - y0 };
   if (box.width < 200 || box.height < 200) return { ok: false, reason: 'too_small' };
+  // Safety net, whatever the arithmetic above: the crop must be card-shaped and
+  // hold the whole outline. Otherwise the original is shown.
+  if (!isCardShaped(box.width, box.height)) return { ok: false, reason: 'crop_not_card_shaped' };
+  if (minX < x0 - 1 || minY < y0 - 1 || maxX > x1 + 1 || maxY > y1 + 1) return { ok: false, reason: 'crop_clips_card' };
   // Not worth a second copy when the trim is negligible and nothing is straightened.
   if (angleDeg === 0 && (box.width * box.height) / (w * h) > MIN_USEFUL_TRIM) return { ok: false, reason: 'already_tight' };
   return { ok: true, angleDeg, box, outW, outH };
@@ -147,6 +182,9 @@ export async function renderDisplayCrop(buffer: Buffer, quadNorm: unknown): Prom
       .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 90, mozjpeg: true })
       .toBuffer({ resolveWithObject: true });
+    // Same shape rule the plan used, on what is actually stored (and what
+    // scripts/repair-display-crops.ts checks on older copies).
+    if (!isCardShaped(info.width, info.height)) return { ok: false, reason: 'crop_not_card_shaped' };
     return { ok: true, jpeg: data, width: info.width, height: info.height };
   } catch (e: any) {
     return { ok: false, reason: `error:${String(e?.message || e).slice(0, 80)}` };

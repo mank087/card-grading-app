@@ -45,6 +45,9 @@ export interface OpenAIUsageEntry {
   errorMessage?: string;
   cardId?: string | null;
   userId?: string | null;
+  /** Non-token charges billed per call (e.g. web-search tool fees), added to
+   *  cost_usd. Omitted = token cost only, as before. */
+  extraCostUsd?: number;
   /** anything else worth keeping (n, attempt, batch index, …) */
   metadata?: Record<string, unknown>;
 }
@@ -75,6 +78,8 @@ export function logOpenAIUsage(entry: OpenAIUsageEntry): void {
           (cacheWrites / 1e6) * (rates.cacheWrite ?? rates.inputUncached) +
           (completion / 1e6) * rates.output;
       }
+      const extra = typeof entry.extraCostUsd === 'number' && Number.isFinite(entry.extraCostUsd) && entry.extraCostUsd > 0 ? entry.extraCostUsd : 0;
+      if (extra > 0) costUsd = (costUsd ?? 0) + extra;
 
       await supabase.from('api_usage_log').insert({
         service: 'openai',

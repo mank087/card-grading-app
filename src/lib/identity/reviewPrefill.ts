@@ -24,6 +24,7 @@
 import { currentIdentityValue } from './saveCardIdentity';
 import { isBlankIdentityText } from '../pricing/valueGuard';
 import { isRecordLocked } from '../cards/ownership';
+import { setNamesEquivalent } from './setNameEquivalence';
 import type { FieldSource, FirstLook } from '../identification/firstLook';
 import {
   NO_CANDIDATE,
@@ -256,6 +257,9 @@ export function buildReviewPrefill(
 
       // 3. The card already says something else. Keep it; offer the alternative.
       if (sameValue(proposal.value, stored)) return base;
+      // A set name that differs only in spelling ("Prizm" vs "Panini Prizm
+      // Football") is not a disagreement. Owners rejected those ~15:1 (Oct 2026).
+      if (key === 'card_set' && setNamesEquivalent(proposal.value, stored)) return base;
       return {
         ...base,
         // Two independent reads of the printed text disagree: flag the field so

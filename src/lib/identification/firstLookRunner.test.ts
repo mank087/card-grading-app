@@ -53,7 +53,8 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-import { runAndRecordFirstLook, shouldReplaceFirstLook, type FirstLookRecord } from './firstLookRunner';
+import { buildSearchPassRequest, MAX_SEARCHES_PER_PASS, runAndRecordFirstLook, runFirstLook, searchFeeUsd, shouldReplaceFirstLook, type FirstLookRecord } from './firstLookRunner';
+import { logOpenAIUsage } from '../apiUsageLogger';
 
 const f = (value: string | null, source: any) => ({ value, source });
 const look = (setSource: 'printed' | 'recognized'): FirstLook => ({
@@ -127,5 +128,63 @@ describe('shouldReplaceFirstLook', () => {
   it("lets a run's final record replace its own pass 1, but not the reverse", () => {
     expect(shouldReplaceFirstLook(rec('contract', 'a'), rec('contract_with_search', 'a'))).toBe(true);
     expect(shouldReplaceFirstLook(rec('contract_with_search', 'a'), rec('contract', 'a'))).toBe(false);
+  });
+});
+
+describe('search pass cap (Oct 2026)', () => {
+  it('asks the API for at most 2 tool calls and says so in the prompt', () => {
+    const req: any = buildSearchPassRequest('gpt-5.6-luna', ['data:a', 'data:b']);
+    expect(MAX_SEARCHES_PER_PASS).toBe(2);
+    expect(req.max_tool_calls).toBe(2);
+    expect(req.tools).toEqual([{ type: 'web_search' }]);
+    const text = req.input[0].content[0].text as string;
+    expect(text).toContain('At most 2 searches');
+    expect(text).not.toContain('At most 3 searches');
+    expect(req.input[0].content.filter((c: any) => c.type === 'input_image')).toHaveLength(2);
+  });
+
+  it('can drop the server-side cap (fallback path) but keeps the prompt cap', () => {
+    const req: any = buildSearchPassRequest('m', ['data:a'], { capToolCalls: false });
+    expect('max_tool_calls' in req).toBe(false);
+    expect(req.input[0].content[0].text).toContain('At most 2 searches');
+  });
+
+  it('prices searches at $0.01 by default, overridable by env, never negative', () => {
+    expect(searchFeeUsd(2)).toBeCloseTo(0.02);
+    vi.stubEnv('FIRST_LOOK_SEARCH_FEE_USD', '0.025');
+    expect(searchFeeUsd(2)).toBeCloseTo(0.05);
+    vi.stubEnv('FIRST_LOOK_SEARCH_FEE_USD', 'abc');
+    expect(searchFeeUsd(1)).toBeCloseTo(0.01);
+    vi.stubEnv('FIRST_LOOK_SEARCH_FEE_USD', '-1');
+    expect(searchFeeUsd(1)).toBeCloseTo(0.01);
+    vi.stubEnv('FIRST_LOOK_SEARCH_FEE_USD', '0');
+    expect(searchFeeUsd(3)).toBe(0);
+  });
+
+  it('sends max_tool_calls and logs the search count + fee with the token cost', async () => {
+    h.pass2.mockResolvedValue({ output: [{ type: 'web_search_call' }, { type: 'web_search_call' }], output_text: JSON.stringify(look('recognized')), usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } });
+    const rec = await runFirstLook(images, { allowSearch: true });
+    expect(rec?.pass).toBe('contract_with_search');
+    expect(h.pass2.mock.calls[0][0].max_tool_calls).toBe(2);
+    const entry = (logOpenAIUsage as any).mock.calls.map((c: any[]) => c[0]).find((e: any) => e.operation === 'first_look_search');
+    expect(entry.metadata).toEqual({ searches: 2, search_fee_usd: 0.02 });
+    expect(entry.extraCostUsd).toBeCloseTo(0.02);
+  });
+
+  it('retries once without max_tool_calls if the API rejects that parameter', async () => {
+    h.pass2
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown parameter: 'max_tool_calls'."), { status: 400 }))
+      .mockResolvedValueOnce({ output: [{ type: 'web_search_call' }], output_text: JSON.stringify(look('recognized')), usage: {} });
+    const rec = await runFirstLook(images, { allowSearch: true });
+    expect(rec?.pass).toBe('contract_with_search');
+    expect(h.pass2).toHaveBeenCalledTimes(2);
+    expect('max_tool_calls' in h.pass2.mock.calls[1][0]).toBe(false);
+  });
+
+  it('does not retry on other failures (keeps pass 1)', async () => {
+    h.pass2.mockRejectedValue(Object.assign(new Error('timeout'), { status: 408 }));
+    const rec = await runFirstLook(images, { allowSearch: true });
+    expect(rec?.pass).toBe('contract');
+    expect(h.pass2).toHaveBeenCalledTimes(1);
   });
 });

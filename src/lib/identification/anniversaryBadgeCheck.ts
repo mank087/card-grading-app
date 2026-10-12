@@ -68,6 +68,10 @@ export function parseBadgeCheck(text: unknown): BadgeCheck | null {
     ? raw.where.trim().slice(0, 120) : null;
   const sparkle_border = raw.sparkle_border === true || raw.sparkle_border === 'true' ? true
     : raw.sparkle_border === false || raw.sparkle_border === 'false' ? false : null;
+  // A "yes" with no digits read is not evidence (Oct 12 by-eye audit of 117
+  // yeses on 1,319 cards: all 9 digit-less yeses were sparkle-foil cards with
+  // no badge at all, and 0 real badges came back without digits).
+  if (answer === 'yes' && !badge) return { answer: 'unclear', badge: null, where, sparkle_border };
   if (answer === 'yes') return { answer, badge, where, sparkle_border };
   return { answer, badge: null, where: answer === 'unclear' ? where : null, sparkle_border };
 }

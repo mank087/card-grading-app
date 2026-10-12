@@ -29,6 +29,7 @@ import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim, detectCardGeometry, measureCentering, computeZoomFaceCaps, type CardGeometry, type CenteringMeasurement } from './zoomInspection';
 import { corroborateZoomDefects, majorityShare, wholeCardEvidence, zoomCorroborationEnabled } from './grading/zoomCorroboration';
 import { describeDissent, describeFaceAdjustment, finishHoldReason, reflectiveFinish } from './grading/holdNarration';
+import { backToleranceReleaseNote, centeringDissentEvidence, dissentReleaseEnabled, worstBackRatio } from './grading/dissentRelease';
 import { clippedCorners, confidenceWithClipping } from './grading/frameClipping';
 import { verifyClippedCorners } from './grading/frameEdgeCheck';
 import { caseConsensus } from './grading/caseConsensus';
@@ -46,6 +47,7 @@ import { applyCenteringPolicy, layoutFromCardType, ratioDeviation, centeringCapN
 import { buildClampNote, buildGateDragNote, decideClampExplanation } from './grading/consensusExplain';
 import { captureCorrectionBasis } from './gradeReview/correction';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
+import { repairReportConsistency, reportConsistencyEnabled } from './grading/reportConsistency';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
 import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
@@ -3762,15 +3764,14 @@ Provide detailed analysis as markdown with all required sections.`
         // 10 holds at 9. Backtested on the Aug 1-12 held cards: 14 of the 131
         // majority-10s hold, projecting a 23.9% 10-rate against the 24.5% July
         // baseline (T=4 -> 23.4%, T=3 -> 22.9%). See the calibration doc.
-        const CENTERING_MEASURED_DEV_POINTS = 5;
+        // (FRONT_GEM_MAX_DEV = 5 in grading/dissentRelease.ts.)
         // DISAGREEMENT arm — the dissenting pass MEASURED materially worse
         // borders than the passes that said 10, i.e. it saw something they
         // did not. Historic records carry no per-pass ratios (this release is
         // what starts storing them), so this arm could NOT be backtested; it
         // is deliberately set wide so it only fires on blatant disagreement,
         // and it can only tighten the gate. Revisit once per-pass ratios have
-        // accumulated.
-        const CENTERING_DISAGREEMENT_POINTS = 4;
+        // accumulated. (CENTERING_DISAGREEMENT_POINTS = 4 in grading/dissentRelease.ts.)
 
         // v9.15: match a defect to its category by the PREFIX defectListOf
         // writes ("corners front top-left ..."), not by keyword. The old
@@ -3786,6 +3787,9 @@ Provide detailed analysis as markdown with all required sections.`
         let majorityTenAwarded = false;
         let majorityDissentCats = '';
         let majorityDissentScore = 0;
+        // DISSENT_RELEASE_V1: set (to the dissenter's back ratio, or '') when the
+        // face-aware centering check released a card the v9.15 check would hold.
+        let majorityBackToleranceRelease: string | null = null;
         if (finalGrade === 10 && !unanimous10) {
           const votes = [{ f: f1, p: pass1 }, { f: f2, p: pass2 }, { f: f3, p: pass3 }];
           if (votes.filter(v => v.f >= 10).length === 2) {
@@ -3808,22 +3812,23 @@ Provide detailed analysis as markdown with all required sections.`
             if (dissentCats.includes('centering')) {
               // Arm 1 (backtested): the card as measured is at or past the
               // rubric's own 55/45 line for a centering 10.
-              const cardDev = centeringOf(jsonData).dev;
-              if (typeof cardDev === 'number' && cardDev >= CENTERING_MEASURED_DEV_POINTS) {
-                centeringMeasuredEvidence = true;
-              }
               // Arm 2 (not backtested — see the constant): the dissent measured
               // materially worse borders than either 10-voter.
-              if (!centeringMeasuredEvidence) {
-                const dissenterDev = dissenter.p.centering_dev;
-                const majorityDevs = votes
-                  .filter(v => v !== dissenter)
-                  .map(v => v.p.centering_dev)
-                  .filter((n: any): n is number => typeof n === 'number');
-                if (typeof dissenterDev === 'number' && majorityDevs.length > 0) {
-                  centeringMeasuredEvidence =
-                    dissenterDev - Math.min(...majorityDevs) >= CENTERING_DISAGREEMENT_POINTS;
-                }
+              // Both arms live in grading/dissentRelease.ts. With DISSENT_RELEASE_V1
+              // off they are exactly the v9.15 arms above (worst of BOTH faces at the
+              // front's 55/45 line); on, a back reading counts only past the back's
+              // own 75/25 tolerance (rubric GRADE-10 EXCEPTION).
+              const centeringInput = {
+                cardRatios: centeringOf(jsonData).ratios,
+                dissenter: { ratios: dissenter.p.centering_ratios, dev: dissenter.p.centering_dev },
+                majority: votes.filter(v => v !== dissenter).map(v => ({ ratios: v.p.centering_ratios, dev: v.p.centering_dev })),
+              };
+              const faceAware = dissentReleaseEnabled();
+              const verdict = centeringDissentEvidence(centeringInput, faceAware);
+              centeringMeasuredEvidence = verdict.evidence;
+              if (faceAware && !verdict.evidence && centeringDissentEvidence(centeringInput, false).evidence) {
+                // v9.15 would have held this card on a back reading inside 75/25.
+                majorityBackToleranceRelease = worstBackRatio(dissenter.p.centering_ratios) ?? '';
               }
             }
             const zoomEvidence = dissentCats.some(
@@ -3940,14 +3945,24 @@ Provide detailed analysis as markdown with all required sections.`
           // a flaw" was unfalsifiable; centering additionally has no defect
           // list, so it is described by its measurement instead.
           const centeringOnly = majorityDissentCats === 'centering';
-          gradeCapNote = centeringOnly
+          // DISSENT_RELEASE_V1: name the back-tolerance reason when that is what released it.
+          const backRelease = majorityBackToleranceRelease !== null;
+          gradeCapNote = centeringOnly && backRelease
+            ? backToleranceReleaseNote(majorityDissentScore, majorityBackToleranceRelease || null)
+            : centeringOnly
             ? `Two of the three independent evaluations scored this card a perfect 10; the third scored the centering at ${majorityDissentScore}. The measured borders are inside the tolerance for a perfect centering score and the magnified inspection found nothing to support a deduction, so the majority result stands.`
             : `Two of the three independent evaluations scored this card a perfect 10; the third scored the ${majorityDissentCats} at ${majorityDissentScore} without recording a defect there, and the magnified inspection found nothing to support it - the majority result stands.`;
           if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             jsonData.grading_passes.consensus_notes.push(
               `Gem Mint majority (v9.15): pass finals ${f1}/${f2}/${f3} - the lone dissent (${majorityDissentCats}) recorded no defect, its centering measurement was inside tolerance, and zoom found no corroboration, so the 2-of-3 majority awards the 10.`
             );
+            if (backRelease) {
+              jsonData.grading_passes.consensus_notes.push(
+                `DISSENT_RELEASE_V1: the dissent's centering reading fell only on the back${majorityBackToleranceRelease ? ` (${majorityBackToleranceRelease})` : ''}, inside the 75/25 back tolerance for a 10; v9.15 (both faces at 55/45) would have held this card at 9.`
+              );
+            }
           }
+          if (backRelease) jsonData.dissent_release = { applied: true, rule: 'DISSENT_RELEASE_V1', reason: 'back_centering_within_75_25', back_reading: majorityBackToleranceRelease || null };
           console.log(`[GRADE RECALC] ⚖️ majority gem gate: 10 KEPT on 2-of-3 (pass finals ${f1}/${f2}/${f3}; evidence-free dissent in: ${majorityDissentCats})`);
         }
 
@@ -4117,6 +4132,21 @@ Provide detailed analysis as markdown with all required sections.`
           }
         } catch (e: any) {
           console.warn('[GRADE RECALC] face-clamp explanation failed (non-blocking):', e?.message || e);
+        }
+
+        // Oct 2026 REPORT CONSISTENCY: text/placement repairs only, never a score
+        // (src/lib/grading/reportConsistency.ts). Before the narrator, so the summary
+        // quotes the corrected finding locations.
+        if (reportConsistencyEnabled()) {
+          try {
+            const rc = repairReportConsistency(jsonData, { zoomAdjustments });
+            if (rc.repairs.length || rc.would_change_grade.length) {
+              console.log(`[REPORT CONSISTENCY] ${rc.repairs.length} repair(s): ${rc.repairs.map(r => `${r.rule}@${r.path}`).join(', ')}`
+                + (rc.would_change_grade.length ? ` | NOT refiled (would change a grade): ${rc.would_change_grade.map(w => `${w.severity} ${w.type} ${w.filed_under}->${w.belongs_to} (${w.reason})`).join('; ')}` : ''));
+            }
+          } catch (e: any) {
+            console.warn('[REPORT CONSISTENCY] skipped (non-blocking):', e?.message || e);
+          }
         }
 
         // v8.8: the condition label is DERIVED from the final grade — never the AI's prose.

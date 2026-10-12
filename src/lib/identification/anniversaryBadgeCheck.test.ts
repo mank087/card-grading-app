@@ -7,9 +7,10 @@ describe('parseBadgeCheck', () => {
     ['{"answer":"YES","badge":25,"where":"near the set symbol","sparkle_border":"false"}', { answer: 'yes', badge: '25', where: 'near the set symbol', sparkle_border: false }],
     ['{"answer":"no","badge":"30","where":"none"}', { answer: 'no', badge: null, where: null, sparkle_border: null }],
     ['{"answer":"unclear","badge":null,"where":"glare over the art"}', { answer: 'unclear', badge: null, where: 'glare over the art', sparkle_border: null }],
-    // a badge seen without legible digits is still a "yes": the kind is settled elsewhere
-    ['{"answer":"yes","badge":null,"where":"corner"}', { answer: 'yes', badge: null, where: 'corner', sparkle_border: null }],
-    ['{"answer":"yes","badge":"pumpkin","where":null}', { answer: 'yes', badge: null, where: null, sparkle_border: null }],
+    // a "yes" without legible digits is only "unclear": in the Oct 12 audit every such
+    // read was sparkle foil with no badge
+    ['{"answer":"yes","badge":null,"where":"corner"}', { answer: 'unclear', badge: null, where: 'corner', sparkle_border: null }],
+    ['{"answer":"yes","badge":"pumpkin","where":null}', { answer: 'unclear', badge: null, where: null, sparkle_border: null }],
     ['```json\n{"answer":"no","badge":null,"where":null}\n```', { answer: 'no', badge: null, where: null, sparkle_border: null }],
   ])('%s', (text, expected) => {
     expect(parseBadgeCheck(text)).toEqual(expected);
