@@ -137,6 +137,51 @@ export function sameIdentityValue(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+/**
+ * Yes/no identity flags. A blank flag and `false` say the same thing ("not
+ * known to be one"), so filling a blank with false is not a change. Every
+ * `is_*` field is a flag too (isIdentityFlagField).
+ */
+export const IDENTITY_FLAG_FIELDS: readonly string[] = [
+  'autographed', 'rookie_card', 'first_print_rookie', 'facsimile_autograph', 'official_reprint', 'inkwell',
+];
+
+export function isIdentityFlagField(key: string): boolean {
+  return key.startsWith('is_') || IDENTITY_FLAG_FIELDS.includes(key);
+}
+
+/**
+ * The comparable form of a value for the no-op check. Trimmed, case-folded,
+ * inner whitespace collapsed, blank = null; a blank flag is false; a blank
+ * parallel is "Base"; a card number's leading "#" is dropped.
+ */
+function noOpComparable(key: string, value: unknown): string | null {
+  if (isIdentityFlagField(key)) {
+    if (value === null || value === undefined || value === false) return 'false';
+    if (value === true) return 'true';
+    const text = String(value).trim().toLowerCase();
+    if (text === '' || text === 'false' || text === 'no') return 'false';
+    if (text === 'true' || text === 'yes') return 'true';
+    return text;
+  }
+  if (value === null || value === undefined) return null;
+  let text = String(value).trim().replace(/\s+/g, ' ').toLowerCase();
+  if (key === 'card_number') text = text.replace(/^#\s*/, '');
+  if (key === 'parallel_type' && text === 'base') text = '';
+  return text === '' ? null : text;
+}
+
+/**
+ * True when writing `next` over `stored` would not change what the card says:
+ * blank to false on a flag, blank to "Base" on the parallel, or the same text
+ * after trimming, case and a leading "#". Such fields are not sent and are not
+ * logged as owner corrections (they made 2/3 of the history rows noise).
+ * false to true, "Base" to "Refractor" and blank to "Refractor" are real.
+ */
+export function isNoOpIdentityChange(key: string, stored: unknown, next: unknown): boolean {
+  return noOpComparable(key, stored) === noOpComparable(key, next);
+}
+
 /** The changed fields a confirmation should PATCH: the value in the box vs the stored value. */
 export function changedFieldPayload(
   fields: ReviewField[],
@@ -145,9 +190,27 @@ export function changedFieldPayload(
   const payload: Record<string, string> = {};
   for (const field of fields) {
     const next = (values[field.key] ?? field.value ?? '').trim();
-    if (!sameIdentityValue(next, field.storedValue)) payload[field.key] = next;
+    if (!isNoOpIdentityChange(field.key, field.storedValue, next)) payload[field.key] = next;
   }
   return payload;
+}
+
+/**
+ * The fields in a confirmation payload whose value is exactly what the dialog
+ * prefilled from first look (or a version pick) over the stored value, i.e. the
+ * owner accepted a suggestion rather than typing a correction. Sent as the
+ * `prefill_accepted_fields` control key so the history row can tell the two apart.
+ */
+export function prefillAcceptedFields(
+  fields: ReviewField[],
+  payload: Record<string, unknown>,
+): string[] {
+  return fields
+    .filter(f => f.key in payload
+      && (f.origin === 'read_from_card' || f.origin === 'suggested')
+      && !isNoOpIdentityChange(f.key, f.storedValue, f.value)
+      && sameIdentityValue(String(payload[f.key] ?? ''), f.value ?? ''))
+    .map(f => f.key);
 }
 
 /**

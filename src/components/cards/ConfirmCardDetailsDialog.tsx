@@ -24,6 +24,7 @@ import {
   mergeReviewValues,
   NO_CANDIDATE,
   parallelFromListingName,
+  prefillAcceptedFields,
   REVIEW_ALTERNATIVE_FIELD as ALTERNATIVE_FIELD,
   REVIEW_ALTERNATIVE_LABEL as ALTERNATIVE_LABEL,
   REVIEW_MAX_LENGTH as MAX_LENGTH,
@@ -272,6 +273,9 @@ export default function ConfirmCardDetailsDialog({
 
       const body: Record<string, unknown> = { ...changed, confirm: true };
       if (typeof revision === 'number') body.expected_identity_revision = revision;
+      // History only: which changes are DCM's prefill accepted as-is, not typed corrections.
+      const accepted = prefillAcceptedFields(fields, changed);
+      if (accepted.length > 0) body.prefill_accepted_fields = accepted;
 
       const response = await fetch(`/api/cards/${cardId}/details`, {
         method: 'PATCH',

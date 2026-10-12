@@ -322,3 +322,82 @@ describe('fallback when the migration has not been applied', () => {
     expect(identityUpdate).not.toHaveProperty('dcm_price_estimate');
   });
 });
+
+describe('no-op changes are written but not logged', () => {
+  it('does not log a blank flag set to false, but logs false to true', () => {
+    const patch = buildIdentityPatch({ is_refractor: false, is_patch: false, rookie_card: false, autographed: true }, sportsCard());
+    expect(patch.changedFields).toEqual(['autographed']);
+    expect(patch.before).not.toHaveProperty('is_refractor');
+    // Still written: a false over a blank is harmless and nothing the owner sent is lost.
+    expect(patch.cardInfo?.is_refractor).toBe(false);
+    expect(patch.columnPatch.rookie_card).toBe(false);
+  });
+
+  it('does not log or count as material a blank parallel filled with Base', () => {
+    const patch = buildIdentityPatch({ parallel_type: 'Base' }, sportsCard());
+    expect(patch.changedFields).toEqual([]);
+    expect(patch.material).toBe(false);
+    expect(patch.cardInfo?.parallel_type).toBe('Base');
+  });
+
+  it('logs a real parallel, from blank or from Base', () => {
+    expect(buildIdentityPatch({ parallel_type: 'Refractor' }, sportsCard()).changedFields).toEqual(['parallel_type']);
+    const fromBase = buildIdentityPatch({ parallel_type: 'Refractor' },
+      sportsCard({ conversational_card_info: { ...sportsCard().conversational_card_info, parallel_type: 'Base' } }));
+    expect(fromBase.changedFields).toEqual(['parallel_type']);
+    expect(fromBase.material).toBe(true);
+  });
+
+  it('does not log a blank MTG foil flag set to false, so pricing survives', () => {
+    const patch = buildIdentityPatch({ is_foil: false }, sportsCard({ category: 'MTG' }));
+    expect(patch.changedFields).toEqual([]);
+    expect(patch.material).toBe(false);
+  });
+
+  it('ignores whitespace, case and a leading # on the card number', () => {
+    const patch = buildIdentityPatch({ card_set: '  topps ', card_number: '#091/086', featured: 'Mickey  Mantle' }, sportsCard());
+    expect(patch.changedFields).toEqual([]);
+  });
+
+  it('a save that is all no-ops still confirms, with no changed fields', async () => {
+    const calls: any[] = [];
+    const supabase = {
+      rpc: async (fn: string, args: any) => {
+        calls.push(args);
+        return { data: { status: 'saved', identity_revision: 1, confirmed: true, pricing_invalidated: false }, error: null };
+      },
+    } as any;
+    const result = await saveCardIdentity(supabase, {
+      cardId: 'card-1', card: sportsCard(), actorId: 'owner-1', confirm: true,
+      body: { parallel_type: 'Base', is_refractor: false },
+    });
+    expect(result.status).toBe('saved');
+    // The RPC's action is 'confirm' (not 'edit_and_confirm') when p_changed_fields is empty.
+    expect(calls[0].p_changed_fields).toEqual([]);
+    expect(calls[0].p_material_change).toBe(false);
+    expect(calls[0].p_after).toEqual({});
+  });
+});
+
+describe('prefill_accepted_fields', () => {
+  it('is a control key, never card data', () => {
+    expect(IDENTITY_CONTROL_KEYS).toContain('prefill_accepted_fields');
+    const patch = buildIdentityPatch({ card_set: 'Bowman', prefill_accepted_fields: ['card_set'] }, sportsCard());
+    expect(patch.columnPatch).not.toHaveProperty('prefill_accepted_fields');
+    expect(patch.cardInfo).not.toHaveProperty('prefill_accepted_fields');
+  });
+
+  it('is recorded under after._meta, only for fields that really changed', () => {
+    const patch = buildIdentityPatch({
+      card_set: 'Bowman', parallel_type: 'Base',
+      prefill_accepted_fields: ['card_set', 'parallel_type', 'release_date', 42, 'card_set'],
+    }, sportsCard());
+    expect(patch.after._meta).toEqual({ prefill_accepted_fields: ['card_set'] });
+    expect(patch.changedFields).toEqual(['card_set']);
+  });
+
+  it('adds nothing when absent or malformed', () => {
+    expect(buildIdentityPatch({ card_set: 'Bowman' }, sportsCard()).after).not.toHaveProperty('_meta');
+    expect(buildIdentityPatch({ card_set: 'Bowman', prefill_accepted_fields: 'card_set' }, sportsCard()).after).not.toHaveProperty('_meta');
+  });
+});

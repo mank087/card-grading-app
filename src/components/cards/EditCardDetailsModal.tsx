@@ -11,6 +11,7 @@ import {
   isIdentityConflict,
   type EditCardFormData,
 } from './editCardDetailsForm';
+import { dropNoOpIdentityFills } from '@/lib/identity/editPayload';
 
 interface CardData {
   id: string;
@@ -187,7 +188,8 @@ export default function EditCardDetailsModal({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(payload),
+        // Blank flags sent as false (and a blank parallel) are not edits.
+        body: JSON.stringify(dropNoOpIdentityFills(payload, card)),
       });
 
       const data = await response.json();
