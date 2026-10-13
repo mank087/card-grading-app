@@ -184,6 +184,17 @@ export function baseConfigForStyle(
 /** Step 6 (supplies) is OPTIONAL — reachable from step 5, never required. */
 export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6
 
+/** Stepper labels. Also read by the /labels guide copy, so step names there
+ *  always match the wizard. */
+export const STEPS: { n: WizardStep; name: string; optional?: boolean }[] = [
+  { n: 1, name: 'Cards' },
+  { n: 2, name: 'Holder' },
+  { n: 3, name: 'Style' },
+  { n: 4, name: 'Customize' },
+  { n: 5, name: 'Finish' },
+  { n: 6, name: 'Supplies', optional: true },
+]
+
 export interface WizardState {
   step: WizardStep
   /** Selected card objects, in pick order. Capped at MAX_WIZARD_CARDS. */

@@ -632,8 +632,9 @@
 .dcm-label-workspace h1,.dcm-upload-workspace h1 { font-size: clamp(28px,3vw,38px); font-weight: 750; letter-spacing: -.035em; }
 .dcm-label-workspace h2,.dcm-upload-workspace h2 { font-size: 20px; letter-spacing: -.02em; }
 .dcm-tool-heading { padding: 24px; border: 1px solid #dfe3eb; border-top: 4px solid #9810fa; border-radius: 14px; background: white; }
-.dcm-label-workspace nav[aria-label="Wizard steps"] { padding: 16px; background: white; border: 1px solid #dfe3eb; border-radius: 12px; overflow-x: auto; }
-.dcm-label-workspace nav[aria-label="Wizard steps"] ol { min-width: max-content; }
+.dcm-label-workspace [role="navigation"][aria-label="Wizard steps"] { padding: 16px; background: white; border: 1px solid #dfe3eb; border-radius: 12px; overflow-x: auto; }
+.dcm-label-workspace [role="navigation"][aria-label="Wizard steps"] ol { min-width: max-content; }
+@media(max-width:639px) { .dcm-label-workspace [role="navigation"][aria-label="Wizard steps"] { padding: 12px 8px; } }
 .dcm-step-context { color: var(--dcm-muted); font-size: 13px; font-weight: 650; margin: -8px 0 16px; }
 .dcm-upload-workspace { background: #f6f7fa; }
 .dcm-photo-guidance { padding: 16px; border-left: 3px solid #06b6d4; border-radius: 0 8px 8px 0; background: #f6f7fa; font-size: 13px; }

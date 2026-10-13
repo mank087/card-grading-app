@@ -112,6 +112,7 @@ grade, the subgrades, and the card's identifying details into the listing.
 - Grading rubric: https://dcmgrading.com/grading-rubric
 - Grading limitations: https://dcmgrading.com/grading-limitations
 - Reports and labels: https://dcmgrading.com/reports-and-labels
+- Label Studio (free label maker for DCM-graded cards: slab, one-touch Avery 6871, toploader Avery 8167): https://dcmgrading.com/labels
 - Population report: https://dcmgrading.com/pop
 - Pricing and credits: https://dcmgrading.com/credits
 - FAQ: https://dcmgrading.com/faq

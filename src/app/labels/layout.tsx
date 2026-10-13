@@ -3,21 +3,21 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = completeMetadata({
   alternates: { canonical: 'https://dcmgrading.com/labels' },
-  title: { absolute: 'Label Studio: Custom Grading Labels | DCM Grading' },
+  title: { absolute: 'Free Grading Label Maker: Label Studio | DCM Grading' },
   description:
-    "Create printable grading labels for slabs, one-touch holders and top loaders. Customize colors, patterns and dimensions with DCM Label Studio.",
+    'Design and print custom grading labels for DCM-graded cards, free. Slab labels, one-touch (Avery 6871) and toploader (Avery 8167) sheets in five steps.',
   openGraph: {
     images: [{ url: '/DCM-logo.png', alt: 'DCM Grading' }],
-    title: 'Label Studio — Custom Grading Labels',
+    title: 'DCM Label Studio: Free Custom Grading Label Maker',
     description:
-      'Design professional grading labels for slabs, one-touch holders, and toploaders. Custom colors, batch printing, and fold-over support.',
+      'Design and print grading labels for slabs, one-touch holders and toploaders. Heritage, Modern and Traditional styles, custom colors, fold-over support.',
     url: 'https://dcmgrading.com/labels',
     siteName: 'DCM Grading',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Label Studio — Custom Grading Labels | DCM Grading',
+    title: 'DCM Label Studio: Free Custom Grading Label Maker',
     description:
       'Design and print professional grading labels for card slabs, one-touch holders, and toploaders.',
   },
@@ -37,6 +37,11 @@ export const metadata: Metadata = completeMetadata({
     'grading label design',
     'card display labels',
     'fold-over labels',
+    'free grading label maker',
+    'how to make a grading label',
+    'Avery 6871 labels',
+    'Avery 8167 labels',
+    'Zion Mag Pro labels',
   ],
 })
 

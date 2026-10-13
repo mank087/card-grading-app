@@ -21,6 +21,7 @@ import {
   stepBlocker,
   MAX_WIZARD_CARDS,
   isPristineClassic,
+  STEPS,
   type WizardStep,
 } from './wizardTypes'
 import { useWizardData, type WizardTextEdits } from './useWizardData'
@@ -30,15 +31,6 @@ import StepStyle from './StepStyle'
 import StepCustomize from './StepCustomize'
 import StepConfirm from './StepConfirm'
 import StepSupplies from './StepSupplies'
-
-const STEPS: { n: WizardStep; name: string; optional?: boolean }[] = [
-  { n: 1, name: 'Cards' },
-  { n: 2, name: 'Holder' },
-  { n: 3, name: 'Style' },
-  { n: 4, name: 'Customize' },
-  { n: 5, name: 'Finish' },
-  { n: 6, name: 'Supplies', optional: true },
-]
 
 interface LabelWizardProps {
   cards: any[]
@@ -176,7 +168,7 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
                     onClick={() => s.n <= maxReachable && goTo(s.n)}
                     disabled={s.n > maxReachable}
                     aria-current={status === 'current' ? 'step' : undefined}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
+                    className={`flex items-center gap-1.5 px-1 sm:px-2 py-1 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
                       status === 'current'
                         ? 'text-purple-700'
                         : status === 'done'
@@ -195,7 +187,9 @@ export default function LabelWizard({ cards, isAuthenticated }: LabelWizardProps
                     >
                       {s.n}
                     </span>
-                    <span className="hidden sm:inline">
+                    {/* All six names only fit from lg; between sm and lg just the
+                        current step is named, so the row never outgrows the page. */}
+                    <span className={status === 'current' ? 'hidden sm:inline' : 'hidden lg:inline'}>
                       {s.name}
                       {s.optional && <span className="ml-1 font-normal text-[10px] text-gray-400">optional</span>}
                     </span>
