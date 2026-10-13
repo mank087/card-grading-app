@@ -64,15 +64,44 @@ export interface RollPageGeometry {
   labelH: number
 }
 
-export function rollPageGeometry(size: RollSize = DEFAULT_ROLL_SIZE): RollPageGeometry {
+/**
+ * Print position nudge in millimetres (Oct 2026). Desktop thermal drivers often
+ * offer no offset control and start printing a little off the label (an iDPRT
+ * SP320 printed ~2.5 mm too high), so the owner can move the label on the page:
+ * +y moves it DOWN, +x moves it RIGHT. Clamped to ±6 mm, 0.5 mm steps.
+ */
+export interface RollOffsetMm { x: number; y: number }
+export const ROLL_OFFSET_KEY = 'labelStudio_rollOffsetMm'
+export const ROLL_OFFSET_LIMIT_MM = 6
+const MM = 72 / 25.4
+
+export function clampRollOffset(v: unknown): number {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return 0
+  return Math.round(Math.max(-ROLL_OFFSET_LIMIT_MM, Math.min(ROLL_OFFSET_LIMIT_MM, n)) * 2) / 2
+}
+
+export function readStoredRollOffset(): RollOffsetMm {
+  try {
+    if (typeof window === 'undefined') return { x: 0, y: 0 }
+    const raw = JSON.parse(localStorage.getItem(ROLL_OFFSET_KEY) || '{}')
+    return { x: clampRollOffset(raw?.x), y: clampRollOffset(raw?.y) }
+  } catch { return { x: 0, y: 0 } }
+}
+
+export function storeRollOffset(o: RollOffsetMm): void {
+  try { localStorage.setItem(ROLL_OFFSET_KEY, JSON.stringify({ x: clampRollOffset(o.x), y: clampRollOffset(o.y) })) } catch { /* ignore */ }
+}
+
+export function rollPageGeometry(size: RollSize = DEFAULT_ROLL_SIZE, offsetMm: RollOffsetMm = { x: 0, y: 0 }): RollPageGeometry {
   const s = ROLL_SIZES[size]
   const pageW = s.widthIn * INCH
   const pageH = s.heightIn * INCH
   return {
     pageW,
     pageH,
-    labelX: (pageW - ROLL_LABEL_W_PT) / 2,
-    labelY: (pageH - ROLL_LABEL_H_PT) / 2,
+    labelX: (pageW - ROLL_LABEL_W_PT) / 2 + clampRollOffset(offsetMm.x) * MM,
+    labelY: (pageH - ROLL_LABEL_H_PT) / 2 + clampRollOffset(offsetMm.y) * MM,
     labelW: ROLL_LABEL_W_PT,
     labelH: ROLL_LABEL_H_PT,
   }

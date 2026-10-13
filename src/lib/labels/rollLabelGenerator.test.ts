@@ -196,3 +196,16 @@ describe('rendered PDF page boxes', () => {
     }, 30_000,
   )
 })
+
+describe('roll position nudge (Oct 2026)', () => {
+  it('moves the label down/right by whole half-millimetres and clamps to ±6 mm', async () => {
+    const { rollPageGeometry, clampRollOffset } = await import('./rollLabelPrefs')
+    const base = rollPageGeometry('3x1')
+    const moved = rollPageGeometry('3x1', { x: 1, y: 2.5 })
+    expect(moved.labelY - base.labelY).toBeCloseTo(2.5 * 72 / 25.4, 3)
+    expect(moved.labelX - base.labelX).toBeCloseTo(72 / 25.4, 3)
+    expect(clampRollOffset(9)).toBe(6)
+    expect(clampRollOffset(-0.7)).toBe(-0.5)
+    expect(clampRollOffset('x')).toBe(0)
+  })
+})

@@ -410,7 +410,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+      {/* Scrolls on short screens: on a laptop the Generate button sat below the
+          viewport with no way to reach it (Oct 2026 customer report). */}
+      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -755,7 +757,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         )}
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+        <div className="sticky bottom-0 px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={isGenerating}

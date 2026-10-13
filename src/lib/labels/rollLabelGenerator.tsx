@@ -42,7 +42,9 @@ import {
 import { buildBatchInputs, type HeritageBatchItem } from '@/lib/labels/heritageSlabGenerator'
 import {
   rollPageGeometry,
+  readStoredRollOffset,
   DEFAULT_ROLL_SIZE,
+  type RollOffsetMm,
   type RollSize,
   type RollOptions,
   type RollPageGeometry,
@@ -105,8 +107,9 @@ function RollPage({ g, children }: { g: RollPageGeometry; children: React.ReactN
 }
 
 /** One label per page: card 1 front, card 1 back, card 2 front, … */
-export function RollLabelDoc({ labels, size = DEFAULT_ROLL_SIZE }: { labels: RollLabel[]; size?: RollSize }) {
-  const g = rollPageGeometry(size)
+export function RollLabelDoc({ labels, size = DEFAULT_ROLL_SIZE, offsetMm }: { labels: RollLabel[]; size?: RollSize; offsetMm?: RollOffsetMm }) {
+  // The owner's saved position nudge (browser only; 0/0 on the server and in tests).
+  const g = rollPageGeometry(size, offsetMm ?? readStoredRollOffset())
   const pages: React.ReactElement[] = []
   for (const l of labels) {
     pages.push(<RollPage key={`${l.key}-f`} g={g}>{l.front}</RollPage>)
