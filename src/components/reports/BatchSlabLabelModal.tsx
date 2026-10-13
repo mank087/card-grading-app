@@ -23,6 +23,14 @@ import {
   MM_PER_IN,
   type SheetCalibration,
 } from '@/lib/labels/sheetCalibration';
+import { RollPrintOptions } from '@/components/labels/RollPrintOptions';
+import {
+  DEFAULT_ROLL_SIZE,
+  readStoredRollMono,
+  readStoredRollSize,
+  rollPrintGuidance,
+  type RollSize,
+} from '@/lib/labels/rollLabelPrefs';
 
 interface CardData {
   id: string;
@@ -116,7 +124,10 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover'>('duplex');
+  // 'roll' = label printer: one true-size label per 3" × 1" (or 2.8" × 0.8") page.
+  const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover' | 'roll'>('duplex');
+  const [rollSize, setRollSize] = useState<RollSize>(DEFAULT_ROLL_SIZE);
+  const [rollMono, setRollMono] = useState(true);
   // 10, 20, 26 or 30 (true-size, pre-perforated) labels per duplex sheet; fold-over owns its own layout.
   const [density, setDensity] = useState<SheetDensity>('standard');
   // Duplex flip edge + printer calibration (saved in this browser).
@@ -142,6 +153,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       setProgress(0);
       setLocalStyle((labelStyleProp as LabelStyleId) || hookLabelStyle || 'modern');
       setDensity(readStoredDensity());
+      setRollSize(readStoredRollSize());
+      setRollMono(readStoredRollMono());
       setCalibration(readSheetCalibration());
       setCalibrationSaved(false);
       setCalibrationNonce(n => n + 1);
@@ -270,6 +283,12 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       setProgress(85);
 
       let blob: Blob;
+      let filename = `DCM-Slab-Labels-${selectedCards.length}-cards.pdf`;
+      // Roll printer: page = one label, front then back per card.
+      const roll = printFormat === 'roll'
+        ? await import('@/lib/labels/rollLabelGenerator')
+        : null;
+      if (roll) filename = roll.rollFilename(`DCM-Slab-Labels-${selectedCards.length}-cards`, rollSize);
       // Density + the saved duplex flip / printer calibration. Default
       // calibration passes the bare density, so those sheets are unchanged.
       const sheetLayout = sheetLayoutFor(density, calibration);
@@ -301,7 +320,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         const heritageDims = localActiveConfig
           ? { widthIn: localActiveConfig.width, heightIn: localActiveConfig.height }
           : undefined;
-        blob = printFormat === 'foldover'
+        blob = roll
+          ? await roll.rollDocToBlob(await roll.buildRollHeritageLabelsDoc(items, heritageSel.pattern, heritageSel.gradeColors, { size: rollSize, mono: rollMono }))
+          : printFormat === 'foldover'
           ? await gen.generateBatchHeritageFoldOverLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims)
           : await gen.generateBatchHeritageSlabLabelsVector(items, heritageSel.pattern, heritageSel.gradeColors, heritageDims, sheetLayout);
       } else {
@@ -312,7 +333,15 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         const printArray = orgMark
           ? labelDataArray.map(d => ({ ...d, whiteLogoDataUrl: orgMark }))
           : labelDataArray;
-        if (printFormat === 'foldover') {
+        if (roll) {
+          // Thermal B&W swaps the front mark for a black one: the org's
+          // Brand Setup mark on org batches, else the black DCM mark.
+          const rollOpts = { size: rollSize, mono: rollMono, logoBlack: orgMark ?? undefined };
+          const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+          blob = await roll.rollDocToBlob(localActiveConfig
+            ? await roll.buildRollCustomSlabLabelsDoc(printArray, localActiveConfig, rollOpts)
+            : await roll.buildRollSlabLabelsDoc(printArray, builtInStyle, rollOpts));
+        } else if (printFormat === 'foldover') {
           // Fold-over batch: multiple fold-over labels per page in a single PDF
           if (localActiveConfig) {
             blob = await generateBatchFoldOverCustomLabels(printArray, localActiveConfig);
@@ -336,7 +365,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `DCM-Slab-Labels-${selectedCards.length}-cards.pdf`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -354,7 +383,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, density, calibration, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, configOverride, printFormat, density, calibration, rollSize, rollMono, buildSlabLabelData, onClose]);
 
   // Fold-over: ~10 labels per page (single-sided). Duplex: 10 per sheet at
   // standard density, 20 when the user picks the dense sheet — for a
@@ -370,7 +399,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       density: 'dense',
     }).labelsPerPage;
   }, [density, localActiveConfig]);
-  const totalPages = printFormat === 'foldover'
+  const totalPages = printFormat === 'roll'
+    ? selectedCards.length * 2 // front + back roll label per card
+    : printFormat === 'foldover'
     ? Math.ceil(selectedCards.length / FOLDOVER_ROWS_PER_PAGE)
     : Math.ceil(selectedCards.length / duplexPerSheet);
   const totalSheets = totalPages;
@@ -386,7 +417,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             <div>
               <h2 className="text-lg font-bold text-white">Graded Slab Labels</h2>
               <p className="text-purple-200 text-sm">
-                {printFormat === 'foldover'
+                {printFormat === 'roll'
+                  ? `2.8\u201d × 0.8\u201d true size — one label per ${rollSize === '3x1' ? '3\u201d × 1\u201d' : '2.8\u201d × 0.8\u201d'} roll label`
+                  : printFormat === 'foldover'
                   ? '5.6\u201d × 0.8\u201d — Single-sided fold-over with cut guides'
                   : isTrueSizeDensity(density)
                     ? `2.8\u201d × 0.8\u201d true size — ${density === 'up26' ? 26 : 30} per pre-perforated duplex sheet`
@@ -408,6 +441,20 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
         {/* Content */}
         <div className="px-6 py-5 space-y-4">
           {/* Summary */}
+          {printFormat === 'roll' ? (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-purple-600">{selectedCards.length}</div>
+                <div className="text-xs text-gray-500">Labels</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-indigo-600">{totalPages}</div>
+                <div className="text-xs text-gray-500">Roll labels (front + back)</div>
+              </div>
+            </div>
+          </div>
+          ) : (
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -432,6 +479,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Label Style Dropdown — hidden when the design arrives from the
               Label Wizard (configOverride), where style was already chosen. */}
@@ -447,6 +495,16 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           )}
 
           {/* Print Instructions */}
+          {printFormat === 'roll' ? (
+          <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+            <p className="font-medium mb-1">Print Instructions:</p>
+            <ul className="space-y-0.5 text-xs text-blue-700">
+              <li>1. {rollPrintGuidance(rollSize)}</li>
+              <li>2. Each card prints its front label, then its back label</li>
+              <li>3. Labels print at true slab size, 2.8&quot; × 0.8&quot;{rollSize === '3x1' ? ' — trim to the corner ticks' : ''}</li>
+            </ul>
+          </div>
+          ) : (
           <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
             <p className="font-medium mb-1">Print Instructions:</p>
             <ul className="space-y-0.5 text-xs text-blue-700">
@@ -465,6 +523,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               )}
             </ul>
           </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -514,7 +573,22 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             >
               Fold-Over (Single-Sided)
             </button>
+            <button
+              onClick={() => setPrintFormat('roll')}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                printFormat === 'roll'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                  : 'border-gray-200 text-gray-600 hover:border-purple-300'
+              }`}
+            >
+              Label printer ({rollSize === '3x1' ? '3×1' : '2.8×0.8'} roll)
+            </button>
           </div>
+          {printFormat === 'roll' && (
+            <div className="mt-2">
+              <RollPrintOptions size={rollSize} mono={rollMono} onSizeChange={setRollSize} onMonoChange={setRollMono} />
+            </div>
+          )}
         </div>
 
         {/* Labels per sheet — duplex only; fold-over owns its own layout */}

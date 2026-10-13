@@ -32,6 +32,8 @@ import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
 import { resolveCompactHeritage } from '@/lib/labels/labelStyleResolution'
 import { readCardReturnPath, readHolderParam } from '@/lib/cardDetail/labelStudioLink'
 import type { SavedCustomStyle } from '@/lib/labelPresets'
+import { RollPrintOptions } from '@/components/labels/RollPrintOptions'
+import { DEFAULT_ROLL_SIZE, readStoredRollMono, readStoredRollSize, type RollSize } from '@/lib/labels/rollLabelPrefs'
 
 interface Props {
   cards: any[]
@@ -43,7 +45,9 @@ interface Props {
 // button is one click; the chooser stays reachable via the ▾ split button.
 // ============================================================================
 
-type SlabPrintFormat = 'duplex' | 'foldover'
+// 'roll' = label printer: every PDF page IS one 3" × 1" (or 2.8" × 0.8")
+// roll label, the slab label drawn at true size (labels/rollLabelGenerator).
+type SlabPrintFormat = 'duplex' | 'foldover' | 'roll'
 const PRINT_FORMAT_KEY = 'labelStudio_slabPrintFormat'
 
 /**
@@ -65,7 +69,7 @@ function customConfigKey(): string {
 function getStoredPrintFormat(): SlabPrintFormat | null {
   if (typeof window === 'undefined') return null
   const v = localStorage.getItem(PRINT_FORMAT_KEY)
-  return v === 'duplex' || v === 'foldover' ? v : null
+  return v === 'duplex' || v === 'foldover' || v === 'roll' ? v : null
 }
 function storePrintFormat(f: SlabPrintFormat) {
   try { localStorage.setItem(PRINT_FORMAT_KEY, f) } catch { /* ignore */ }
@@ -73,6 +77,33 @@ function storePrintFormat(f: SlabPrintFormat) {
 const PRINT_FORMAT_LABEL: Record<SlabPrintFormat, string> = {
   duplex: 'Front + Back (Duplex)',
   foldover: 'Fold-Over (Single-Sided)',
+  roll: 'Label printer (roll)',
+}
+/** "Label printer (3×1 roll)" / "(2.8×0.8 roll)" for the remembered size. */
+function rollFormatLabel(size: RollSize): string {
+  return `Label printer (${size === '3x1' ? '3×1' : '2.8×0.8'} roll)`
+}
+
+/** Remembered roll size + black & white toggle, loaded after mount. */
+function useRollPrefs() {
+  const [rollSize, setRollSize] = useState<RollSize>(DEFAULT_ROLL_SIZE)
+  const [rollMono, setRollMono] = useState(true)
+  useEffect(() => {
+    setRollSize(readStoredRollSize())
+    setRollMono(readStoredRollMono())
+  }, [])
+  return { rollSize, setRollSize, rollMono, setRollMono }
+}
+
+/** Build + download a roll-printer PDF (dynamic import keeps @react-pdf out of the bundle). */
+async function downloadRoll(
+  build: (gen: typeof import('@/lib/labels/rollLabelGenerator')) => Promise<React.ReactElement>,
+  base: string,
+  size: RollSize,
+): Promise<void> {
+  const gen = await import('@/lib/labels/rollLabelGenerator')
+  const blob = await gen.rollDocToBlob(await build(gen))
+  gen.downloadRollBlob(blob, gen.rollFilename(base, size))
 }
 
 // ============================================================================
@@ -764,6 +795,7 @@ function LabelGallery({
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [galleryPrintChoice, setGalleryPrintChoice] = useState<string | null>(null) // labelType.id when showing choice
+  const { rollSize, setRollSize, rollMono, setRollMono } = useRollPrefs()
 
   const labelProps = useMemo(() => {
     if (!selectedCard) return null
@@ -915,7 +947,7 @@ function LabelGallery({
     }
   }
 
-  const handleGallerySlabDownload = async (labelTypeId: string, format: 'duplex' | 'foldover') => {
+  const handleGallerySlabDownload = async (labelTypeId: string, format: SlabPrintFormat) => {
     storePrintFormat(format) // remembered for one-click downloads everywhere
     if (!slabData) return
     setGalleryPrintChoice(null)
@@ -923,7 +955,16 @@ function LabelGallery({
     try {
       const labelType = LABEL_TYPES.find(l => l.id === labelTypeId)
       const style = labelType?.style || 'modern'
-      if (format === 'foldover') {
+      if (format === 'roll') {
+        // Org cards: the store mark stands in for the black mark, as on Heritage.
+        await downloadRoll(
+          (gen) => gen.buildRollSlabLabelsDoc([slabData], style, {
+            size: rollSize, mono: rollMono, logoBlack: orgLogoColor ?? undefined,
+          }),
+          `DCM-Slab-${style === 'traditional' ? 'Traditional' : 'Modern'}-${slabData.serial}`,
+          rollSize,
+        )
+      } else if (format === 'foldover') {
         await downloadFoldOverSlabLabelStandard(slabData, style)
       } else {
         await downloadSlabLabel(slabData, style)
@@ -1014,8 +1055,22 @@ function LabelGallery({
                       <button onClick={() => handleGallerySlabDownload(lt.id, 'foldover')} className="w-full text-left px-2 py-1.5 rounded hover:bg-purple-50 text-[11px]">
                         <span className="font-medium text-gray-900">Fold-Over (1-page)</span>
                       </button>
+                      <button onClick={() => handleGallerySlabDownload(lt.id, 'roll')} className="w-full text-left px-2 py-1.5 rounded hover:bg-purple-50 text-[11px]">
+                        <span className="font-medium text-gray-900">{rollFormatLabel(rollSize)}</span>
+                      </button>
+                      <div className="px-2 pb-1">
+                        <RollPrintOptions compact size={rollSize} mono={rollMono} onSizeChange={setRollSize} onMonoChange={setRollMono} />
+                      </div>
                       <button onClick={() => setGalleryPrintChoice(null)} className="w-full text-center text-[10px] text-gray-400 mt-1">Cancel</button>
                     </div>
+                  )}
+                  {lt.downloadType === 'slab' && galleryPrintChoice !== lt.id && (
+                    <button
+                      onClick={() => setGalleryPrintChoice(lt.id)}
+                      className="w-full text-center text-[10px] text-purple-600 hover:text-purple-800 mt-1"
+                    >
+                      Print format ▾
+                    </button>
                   )}
                 </div>
               )}
@@ -1543,13 +1598,36 @@ function CustomDesigner({
   const [showCustomPrintChoice, setShowCustomPrintChoice] = useState(false)
   const [printFormatPref, setPrintFormatPref] = useState<SlabPrintFormat | null>(null)
   useEffect(() => { setPrintFormatPref(getStoredPrintFormat()) }, [])
+  const { rollSize, setRollSize, rollMono, setRollMono } = useRollPrefs()
 
-  const handleDownload = async (format: 'duplex' | 'foldover' = 'duplex') => {
+  const handleDownload = async (format: SlabPrintFormat = 'duplex') => {
     if (!previewData) return
     setShowCustomPrintChoice(false)
     setIsDownloading(true)
     try {
-      if (config.style === 'heritage') {
+      if (format === 'roll') {
+        // Label printer: one true-size 2.8" × 0.8" label per roll page.
+        if (config.style === 'heritage') {
+          await downloadRoll(
+            (gen) => gen.buildRollHeritageLabelsDoc(
+              [{ data: previewData, bandColors: heritageBandColors, logoBlack: orgLogoColor ?? undefined }],
+              heritagePattern,
+              config.heritageGradeColors ?? null,
+              { size: rollSize, mono: rollMono },
+            ),
+            `DCM-Heritage-Label-${previewData.serial}`,
+            rollSize,
+          )
+        } else {
+          await downloadRoll(
+            (gen) => gen.buildRollCustomSlabLabelsDoc([previewData], config, {
+              size: rollSize, mono: rollMono, logoBlack: orgLogoColor ?? undefined,
+            }),
+            `DCM-Custom-Label-${previewData.serial}`,
+            rollSize,
+          )
+        }
+      } else if (config.style === 'heritage') {
         // Heritage has its own vector documents. Dynamic import keeps
         // @react-pdf out of the initial bundle.
         const gen = await import('@/lib/labels/heritageSlabGenerator')
@@ -2634,7 +2712,7 @@ function CustomDesigner({
                   {isDownloading
                     ? 'Generating PDF...'
                     : printFormatPref
-                      ? `Download — ${PRINT_FORMAT_LABEL[printFormatPref]}`
+                      ? `Download — ${printFormatPref === 'roll' ? rollFormatLabel(rollSize) : PRINT_FORMAT_LABEL[printFormatPref]}`
                       : 'Download Label (PDF)'}
                 </button>
                 <button
@@ -2660,8 +2738,23 @@ function CustomDesigner({
                     <span className="font-medium text-gray-900">Fold-Over (Single-Sided)</span>
                     <span className="block text-xs text-gray-500">1-page PDF — cut and fold, no duplex needed</span>
                   </button>
+                  <button
+                    onClick={() => { storePrintFormat('roll'); setPrintFormatPref('roll'); handleDownload('roll') }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm"
+                  >
+                    <span className="font-medium text-gray-900">{rollFormatLabel(rollSize)}</span>
+                    <span className="block text-xs text-gray-500">Thermal / roll printers — one true-size label per page, front then back</span>
+                  </button>
+                  <div className="px-3 pt-1">
+                    <RollPrintOptions size={rollSize} mono={rollMono} onSizeChange={setRollSize} onMonoChange={setRollMono} />
+                  </div>
                 </div>
               )}
+              {printFormatPref === 'roll' ? (
+                <div className="mt-1.5">
+                  <RollPrintOptions compact size={rollSize} mono={rollMono} onSizeChange={setRollSize} onMonoChange={setRollMono} />
+                </div>
+              ) : (
               <p className="text-[9px] text-gray-400 mt-1.5 text-center leading-snug">
                 Print at <span className="font-semibold text-gray-500">100% scale / Actual Size</span> (not &quot;fit to page&quot;).{' '}
                 First time?{' '}
@@ -2672,6 +2765,7 @@ function CustomDesigner({
                   Print the calibration sheet
                 </button>
               </p>
+              )}
             </div>
 
             {/* Mobile bottom preview */}
