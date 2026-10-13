@@ -50,13 +50,54 @@ describe('guardedPriceUpdate', () => {
     );
 
     expect(result.status).toBe('written');
-    expect(db.lastUpdateFilters()).toEqual({
+    expect(Object.fromEntries(db.updates[0].filters)).toEqual({
       id: CARD, identity_revision: 3, pricing_selection_revision: 1,
     });
-    // The guard is the WHERE clause, not a read-then-write: exactly one query.
-    expect(db.queries).toHaveLength(1);
+    // The guard is the WHERE clause, not a read-then-write: no select first.
+    expect(db.queries.every(q => q.kind === 'update')).toBe(true);
     expect(db.updates[0].selected).toBe('id');
     expect(db.rows.get(CARD)!.dcm_price_estimate).toBe(120);
+  });
+
+  it('stamps the grading baseline from the first estimate', async () => {
+    const db = createFakeSupabase({ rows: [pricedRow()] });
+    await guardedPriceUpdate(
+      db as any, CARD, { identity_revision: 3, pricing_selection_revision: 1 },
+      { dcm_price_estimate: 120, dcm_price_updated_at: '2026-10-13T00:00:00Z' },
+    );
+    const row = db.rows.get(CARD)!;
+    expect(row.dcm_price_at_grading).toBe(120);
+    expect(row.dcm_price_at_grading_date).toBe('2026-10-13T00:00:00Z');
+    expect(Object.fromEntries(db.updates[1].filters)).toEqual({ id: CARD, dcm_price_at_grading: null });
+  });
+
+  it('stamps the baseline on an unguarded write too', async () => {
+    const db = createFakeSupabase({ rows: [pricedRow()] });
+    const result = await guardedPriceUpdate(db as any, CARD, null, { dcm_price_estimate: 40 });
+    expect(result.status).toBe('unguarded_written');
+    expect(db.rows.get(CARD)!.dcm_price_at_grading).toBe(40);
+  });
+
+  it('never overwrites an existing baseline', async () => {
+    const db = createFakeSupabase({ rows: [pricedRow({ dcm_price_at_grading: 80 })] });
+    await guardedPriceUpdate(
+      db as any, CARD, { identity_revision: 3, pricing_selection_revision: 1 }, { dcm_price_estimate: 120 },
+    );
+    expect(db.rows.get(CARD)!.dcm_price_estimate).toBe(120);
+    expect(db.rows.get(CARD)!.dcm_price_at_grading).toBe(80);
+  });
+
+  it('sets no baseline from a missing, zero or stale estimate', async () => {
+    for (const payload of [{ dcm_price_estimate: null }, { dcm_price_estimate: 0 }, { ebay_price_median: 5 }]) {
+      const db = createFakeSupabase({ rows: [pricedRow()] });
+      await guardedPriceUpdate(db as any, CARD, { identity_revision: 3, pricing_selection_revision: 1 }, payload);
+      expect(db.updates).toHaveLength(1);
+      expect(db.rows.get(CARD)!.dcm_price_at_grading).toBeUndefined();
+    }
+    const stale = createFakeSupabase({ rows: [pricedRow({ identity_revision: 4 })] });
+    await guardedPriceUpdate(stale as any, CARD, { identity_revision: 3, pricing_selection_revision: 1 }, { dcm_price_estimate: 9 });
+    expect(stale.updates).toHaveLength(1);
+    expect(stale.rows.get(CARD)!.dcm_price_at_grading).toBeUndefined();
   });
 
   it('reports stale and writes nothing when the identity moved', async () => {

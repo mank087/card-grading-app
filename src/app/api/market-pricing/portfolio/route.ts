@@ -87,7 +87,21 @@ export async function GET(request: NextRequest) {
     // Fetch all user cards with pricing columns (lighter query than my-collection).
     // Sold/archived cards are excluded — portfolio value is what you still HOLD,
     // and counting cards the user sold silently inflated it.
-    const runQuery = (applyOwnership: boolean) => {
+    // PostgREST caps every response at 1,000 rows, so a single select silently
+    // truncated large collections (1,526 owned → portfolio showed 1,000). Page
+    // through with .range() until a short page comes back.
+    const PAGE_SIZE = 1000;
+    const runQuery = async (applyOwnership: boolean) => {
+      const rows: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await buildQuery(applyOwnership).range(from, from + PAGE_SIZE - 1);
+        if (error) return { data: null, error };
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return { data: rows, error: null };
+    };
+    const buildQuery = (applyOwnership: boolean) => {
       let q = supabase
       .from('cards')
       .select(`
@@ -102,7 +116,8 @@ export async function GET(request: NextRequest) {
         release_date, dcm_selected_product_id, identity_confirmed_revision, item_type
       `)
       .eq('user_id', auth.userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true }); // tiebreaker so pages never overlap or skip
       if (applyOwnership) q = q.eq('ownership_status', 'owned').is('deleted_at', null);
       return q;
     };

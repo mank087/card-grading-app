@@ -130,6 +130,7 @@ export async function guardedPriceUpdate(
         console.error(`${label} unguarded update failed for card ${cardId}:`, error);
         return { status: 'error', error: error.message };
       }
+      await recordGradingBaseline(supabase, cardId, payload, label);
       return { status: 'unguarded_written' };
     }
 
@@ -169,11 +170,51 @@ export async function guardedPriceUpdate(
       return { status: 'stale' };
     }
 
+    await recordGradingBaseline(supabase, cardId, payload, label);
     return { status: 'written' };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error(`${label} threw for card ${cardId}:`, message);
     return { status: 'error', error: message };
+  }
+}
+
+/**
+ * Stamp `dcm_price_at_grading` from the first DCM estimate a card ever gets.
+ *
+ * The Movers chart compares the current estimate to this baseline. It used to
+ * be set only by /api/vision-grade, which nothing calls any more: production
+ * grading runs through the per-category routes, and the first price lands
+ * later from the detail page lookup, the batch refresh or a product pick. So
+ * from the Feb 18 2026 backfill on, no card got a baseline. Every price writer
+ * funnels through guardedPriceUpdate, so setting it here covers them all.
+ *
+ * `IS NULL` in the WHERE clause makes it set-once without a read: an existing
+ * baseline is never overwritten, and two racing first writes cannot both win.
+ * Best-effort: a failure here never turns a written price into an error.
+ */
+async function recordGradingBaseline(
+  supabase: SupabaseClient<any, any, any>,
+  cardId: string,
+  payload: Record<string, unknown>,
+  label: string,
+): Promise<void> {
+  const estimate = payload.dcm_price_estimate;
+  if (typeof estimate !== 'number' || !(estimate > 0)) return;
+  if ('dcm_price_at_grading' in payload) return; // caller set it explicitly
+  try {
+    const { error } = await supabase
+      .from('cards')
+      .update({
+        dcm_price_at_grading: estimate,
+        dcm_price_at_grading_date:
+          (payload.dcm_price_updated_at as string | undefined) ?? new Date().toISOString(),
+      })
+      .eq('id', cardId)
+      .is('dcm_price_at_grading', null);
+    if (error) console.warn(`${label} baseline write failed for card ${cardId}:`, error.message);
+  } catch (e) {
+    console.warn(`${label} baseline write threw for card ${cardId}:`, e instanceof Error ? e.message : String(e));
   }
 }
 

@@ -36,6 +36,11 @@ export interface FakeSupabaseOptions {
   beforeUpdate?: (fake: FakeSupabase) => void;
 }
 
+export function isBaselineStamp(q: RecordedQuery): boolean {
+  const keys = Object.keys(q.payload || {});
+  return keys.length > 0 && keys.every(k => k.startsWith('dcm_price_at_grading'));
+}
+
 export function createFakeSupabase(options: FakeSupabaseOptions = {}): FakeSupabase {
   const rows = new Map<string, Record<string, any>>();
   for (const row of options.rows || []) rows.set(String(row.id), { ...row });
@@ -49,7 +54,9 @@ export function createFakeSupabase(options: FakeSupabaseOptions = {}): FakeSupab
       return queries.filter(q => q.kind === 'update');
     },
     lastUpdateFilters() {
-      const ups = queries.filter(q => q.kind === 'update');
+      // The price write itself — not the set-once grading-baseline stamp that
+      // guardedPriceUpdate issues after it.
+      const ups = queries.filter(q => q.kind === 'update' && !isBaselineStamp(q));
       const last = ups[ups.length - 1];
       return Object.fromEntries(last ? last.filters : []);
     },
@@ -63,6 +70,8 @@ export function createFakeSupabase(options: FakeSupabaseOptions = {}): FakeSupab
       const actual = row[column];
       // `.in(column, values)` is recorded as an array value.
       if (Array.isArray(value)) return value.map(String).includes(String(actual));
+      // `.is(column, null)` — an unset field is NULL, as in Postgres.
+      if (value === null) return actual == null;
       // Postgres compares numbers numerically; a revision stored as 0 must match 0.
       if (typeof value === 'number') return Number(actual ?? NaN) === value;
       return actual === value;
@@ -117,6 +126,10 @@ export function createFakeSupabase(options: FakeSupabaseOptions = {}): FakeSupab
         return builder;
       },
       eq(column: string, value: unknown) {
+        record.filters.push([column, value]);
+        return builder;
+      },
+      is(column: string, value: unknown) {
         record.filters.push([column, value]);
         return builder;
       },
