@@ -57,6 +57,7 @@ import { imageDetail } from './grading/imageDetail';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
+import { weakestCategory } from './grading/weakestCategory';
 import { fillBlankNumberFromFirstLook, numberFillEnabled, printedNumberFromFirstLook } from './identification/firstLookNumberFill';
 import { printedBadgeOf } from './pokemonAnniversary';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
@@ -4227,8 +4228,11 @@ Provide detailed analysis as markdown with all required sections.`
           // These AI-authored fields otherwise retain pre-clamp values (observed: preliminary_grade 8 on a stored 6)
           jsonData.weighted_scores.preliminary_grade = finalGrade;
           jsonData.weighted_scores.weakest_subgrade = subgradeCap;
-          jsonData.weighted_scores.limiting_factor = (['centering', 'corners', 'edges', 'surface'] as const)
-            .find(cat => serverRounded[cat] === subgradeCap) || jsonData.weighted_scores.limiting_factor;
+          // Oct 2026: name the weakest tile AS DISPLAYED. subgradeCap is taken before the
+          // holds drag tiles down (chrome, dissent, photo holds), so matching against it
+          // picked the first category still at the old minimum: a chrome-held 9 with
+          // centering 9 and corners 10 was stored as "limiting factor: corners".
+          jsonData.weighted_scores.limiting_factor = weakestCategory(serverRounded) || jsonData.weighted_scores.limiting_factor;
         }
         if (jsonData.image_quality) {
           jsonData.image_quality.grade_uncertainty = uncertaintyStr;
