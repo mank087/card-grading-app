@@ -80,5 +80,7 @@ export function rollPageGeometry(size: RollSize = DEFAULT_ROLL_SIZE): RollPageGe
 
 /** Print guidance shown next to every roll option. */
 export function rollPrintGuidance(size: RollSize = DEFAULT_ROLL_SIZE): string {
-  return `Print at Actual size / 100% (not Fit). In the printer's paper size, choose ${ROLL_SIZES[size].paperHint}.`
+  const base = `Print at Actual size / 100% (not Fit). In the printer's paper size, choose ${ROLL_SIZES[size].paperHint}.`
+  // Many desktop thermal printers (e.g. iDPRT SP320) cannot feed labels shorter than 25 mm.
+  return size === '2.8x0.8' ? `${base} If your printer needs labels at least 1 in (25 mm) long, use the 3 × 1 roll.` : base
 }
