@@ -87,14 +87,55 @@ export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
 }
 
 // ============================================================================
+// Monochrome (direct-thermal roll printers)
+// ============================================================================
+
+const MONO_INK = '#000000'
+
+/**
+ * Black-on-white version of any spec, for black-only direct-thermal printers
+ * (Oct 2026, roll labels). Colour fields, gradients, glows and patterns all
+ * come out as dither speckle on a 203 dpi thermal head, so the background is
+ * plain white with a thin black keyline and every ink is pure black. The
+ * typography (fontScale) and layout are untouched.
+ */
+export function monoSpec(spec: LabStyleSpec): LabStyleSpec {
+  return {
+    ...spec,
+    id: `${spec.id}-mono`,
+    background: { stops: [{ color: '#FFFFFF', offset: 0 }, { color: '#FFFFFF', offset: 1 }], angleDeg: 0 },
+    overlay: undefined,
+    pattern: undefined,
+    border: { color: MONO_INK, widthIn: 0.014 },
+    textColor: MONO_INK,
+    accentColor: MONO_INK,
+    gradeColor: MONO_INK,
+    contrastStops: ['#FFFFFF'],
+    contrastDiscrete: false,
+  }
+}
+
+/** Pure-black content-row palette; the logo slot reads colorLogoDataUrl (pass a black mark). */
+export const MONO_PALETTE: SlabTextPalette = {
+  name: MONO_INK,
+  muted: MONO_INK,
+  accent: MONO_INK,
+  grade: MONO_INK,
+  condition: MONO_INK,
+  gradeDivider: MONO_INK,
+  logo: 'color',
+}
+
+// ============================================================================
 // Block
 // ============================================================================
 
 export function CustomSlabLabelBlock({
   inputs,
-  spec,
+  spec: specIn,
   idSuffix,
   bleedPt = 0,
+  mono = false,
 }: {
   inputs: Omit<SlabLabelInputs, 'theme'>
   spec: LabStyleSpec
@@ -102,7 +143,10 @@ export function CustomSlabLabelBlock({
   /** When set, the background paints bleedPt past the label rect on every
       side (print docs). The parent must not clip. */
   bleedPt?: number
+  /** Black-on-white for direct-thermal printers (see monoSpec). */
+  mono?: boolean
 }) {
+  const spec = mono ? monoSpec(specIn) : specIn
   return (
     <>
       <SpecBackground
@@ -114,7 +158,7 @@ export function CustomSlabLabelBlock({
         offsetY={bleedPt}
       />
       <SpecBorder spec={spec} />
-      <SlabFrontContentRow inputs={inputs} palette={paletteFromSpec(spec)} fontScale={spec.fontScale || 1} />
+      <SlabFrontContentRow inputs={inputs} palette={mono ? MONO_PALETTE : paletteFromSpec(spec)} fontScale={spec.fontScale || 1} />
     </>
   )
 }
@@ -455,19 +499,25 @@ export interface SlabBackInputs {
  */
 export function CustomSlabBackBlock({
   inputs,
-  spec,
+  spec: specIn,
   idSuffix,
   bleedPt = 0,
+  mono = false,
 }: {
   inputs: SlabBackInputs
   spec: LabStyleSpec
   idSuffix: string
   bleedPt?: number
+  /** Black-on-white for direct-thermal printers (see monoSpec). */
+  mono?: boolean
 }) {
+  const spec = mono ? monoSpec(specIn) : specIn
   const lightText = specHasLightText(spec)
   const gradeColor = spec.gradeColor || (lightText ? '#FFFFFF' : '#7c3aed')
-  const condColor = lightText ? 'rgba(255,255,255,0.8)' : '#6b46c1'
-  const subColor = lightText ? 'rgba(255,255,255,0.95)' : '#4b5563'
+  const condColor = mono ? MONO_INK : lightText ? 'rgba(255,255,255,0.8)' : '#6b46c1'
+  const subColor = mono ? MONO_INK : lightText ? 'rgba(255,255,255,0.95)' : '#4b5563'
+  // Emblem colours: brand hues normally, pure black on a thermal print.
+  const badge = (light: string, dark: string) => (mono ? MONO_INK : lightText ? light : dark)
   const condPt = fitBackCondition(inputs.condition)
   const qrFrameFill = spec.background.stops[0]?.color || '#1a1625'
 
@@ -528,24 +578,24 @@ export function CustomSlabBackBlock({
           <BadgeColumn
             glyphD={STAR_D}
             label="FOUNDER"
-            symbolColor={lightText ? '#FFD700' : '#d97706'}
-            textColor={lightText ? '#FFFFFF' : '#7c3aed'}
+            symbolColor={badge('#FFD700', '#d97706')}
+            textColor={badge('#FFFFFF', '#7c3aed')}
           />
         ) : null}
         {inputs.showCardLoversEmblem ? (
           <BadgeColumn
             glyphD={HEART_D}
             label="Card Lover"
-            symbolColor="#f43f5e"
-            textColor={lightText ? '#FFFFFF' : '#f43f5e'}
+            symbolColor={badge('#f43f5e', '#f43f5e')}
+            textColor={badge('#FFFFFF', '#f43f5e')}
           />
         ) : null}
         {inputs.showVipEmblem ? (
           <BadgeColumn
             glyphD={DIAMOND_D}
             label="VIP"
-            symbolColor="#6366f1"
-            textColor={lightText ? '#FFFFFF' : '#6366f1'}
+            symbolColor={badge('#6366f1', '#6366f1')}
+            textColor={badge('#FFFFFF', '#6366f1')}
           />
         ) : null}
       </View>

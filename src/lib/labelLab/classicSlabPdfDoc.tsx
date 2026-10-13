@@ -103,16 +103,29 @@ export function classicInputLines(i: ClassicInputs): ClassicLines {
  * field, which is what keeps them off the frame and — on the back — out of the
  * QR's quiet zone.
  */
-function ClassicFrame({ id }: { id: string }) {
+/**
+ * Inks for one render. `mono` (Oct 2026, direct-thermal roll printers) turns
+ * every ink — frame, type, accents — pure black and drops the waves: tinted
+ * strokes at partial opacity only come out as dither speckle on a black-only
+ * 203 dpi head.
+ */
+export interface ClassicInks { frame: string; ink: string; inkSoft: string; accent: string; waves: boolean }
+export function classicInks(mono = false): ClassicInks {
+  return mono
+    ? { frame: '#000000', ink: '#000000', inkSoft: '#000000', accent: '#000000', waves: false }
+    : { frame: CLASSIC_PURPLE, ink: CLASSIC_INK, inkSoft: CLASSIC_INK_SOFT, accent: CLASSIC_PURPLE, waves: true }
+}
+
+function ClassicFrame({ id, inks = classicInks() }: { id: string; inks?: ClassicInks }) {
   const f = classicField()
   return (
     <>
-      <View style={{ position: 'absolute', left: 0, top: 0, width: LABEL_W, height: LABEL_H, backgroundColor: CLASSIC_PURPLE }} />
+      <View style={{ position: 'absolute', left: 0, top: 0, width: LABEL_W, height: LABEL_H, backgroundColor: inks.frame }} />
       <View style={{
         position: 'absolute', left: u(f.x), top: u(f.y), width: u(f.w), height: u(f.h),
         backgroundColor: CLASSIC_FIELD, borderRadius: u(f.r),
       }} />
-      <Svg
+      {inks.waves ? <Svg
         style={{ position: 'absolute', left: 0, top: 0, width: LABEL_W, height: LABEL_H }}
         viewBox={`0 0 ${CLASSIC_PX.W} ${CLASSIC_PX.H}`}
       >
@@ -134,7 +147,7 @@ function ClassicFrame({ id }: { id: string }) {
             />
           ))}
         </G>
-      </Svg>
+      </Svg> : null}
     </>
   )
 }
@@ -188,7 +201,7 @@ function BaselineText({
 }
 
 /** The DCM mark on its plate, bottom centre, straddling the frame. */
-function ClassicPlate({ src }: { src?: string | null }) {
+function ClassicPlate({ src, inks = classicInks() }: { src?: string | null; inks?: ClassicInks }) {
   const P = CLASSIC_PX
   return (
     <>
@@ -196,7 +209,7 @@ function ClassicPlate({ src }: { src?: string | null }) {
         position: 'absolute', left: u(P.PLATE_X), top: u(P.PLATE_Y),
         width: u(P.PLATE_W), height: u(P.PLATE_H),
         backgroundColor: CLASSIC_FIELD, borderRadius: u(P.PLATE_R),
-        borderWidth: u(P.PLATE_STROKE), borderColor: CLASSIC_PURPLE, borderStyle: 'solid',
+        borderWidth: u(P.PLATE_STROKE), borderColor: inks.frame, borderStyle: 'solid',
       }} />
       {src ? (
         <View style={{
@@ -211,24 +224,25 @@ function ClassicPlate({ src }: { src?: string | null }) {
   )
 }
 
-const panelStyle = (bare: boolean) =>
+const panelStyle = (bare: boolean, inks: ClassicInks) =>
   bare
     ? ({ width: LABEL_W, height: LABEL_H, position: 'relative' } as const)
-    : ({ width: LABEL_W, height: LABEL_H, position: 'relative', backgroundColor: CLASSIC_PURPLE } as const)
+    : ({ width: LABEL_W, height: LABEL_H, position: 'relative', backgroundColor: inks.frame } as const)
 
 // ---------------------------------------------------------------------------
 // Front
 // ---------------------------------------------------------------------------
 
-export function ClassicFront({ i, bare = false, idSuffix = 'f' }: { i: ClassicInputs; bare?: boolean; idSuffix?: string }) {
+export function ClassicFront({ i, bare = false, idSuffix = 'f', mono = false }: { i: ClassicInputs; bare?: boolean; idSuffix?: string; mono?: boolean }) {
   const P = CLASSIC_PX
+  const inks = classicInks(mono)
   const lines = classicInputLines(i)
   const maxWidths = classicLeftMaxWidths(lines.right)
   const fit = fitClassicFront(lines.left, { maxWidths })
 
   return (
-    <View style={panelStyle(bare)}>
-      <ClassicFrame id={idSuffix} />
+    <View style={panelStyle(bare, inks)}>
+      <ClassicFrame id={idSuffix} inks={inks} />
 
       {/* Left identification column — four fixed baselines, never wrapped,
           never allowed under the right column or the logo plate. */}
@@ -238,19 +252,19 @@ export function ClassicFront({ i, bare = false, idSuffix = 'f' }: { i: ClassicIn
           text={row}
           baseline={P.LEFT_BASELINES[idx]}
           size={fit.sizes[idx]}
-          color={CLASSIC_INK}
+          color={inks.ink}
           left={P.LEFT_X}
           tracking={P.LEFT_TRACK}
         />
       ))}
 
       {/* Right grade column — right-aligned at RIGHT_X, fixed sizes. */}
-      <BaselineText text={lines.right.number} baseline={P.NUM_BASELINE} size={P.NUM_SIZE} color={CLASSIC_INK} right={P.RIGHT_X} />
-      <BaselineText text={lines.right.descriptor} baseline={P.DESC_BASELINE} size={P.DESC_SIZE} color={CLASSIC_PURPLE} right={P.RIGHT_X} />
-      <BaselineText text={lines.right.grade} baseline={P.GRADE_BASELINE} size={P.GRADE_SIZE} color={CLASSIC_PURPLE} right={P.RIGHT_X} />
-      <BaselineText text={lines.right.serial} baseline={P.SERIAL_BASELINE} size={P.SERIAL_SIZE} color={CLASSIC_INK} right={P.RIGHT_X} />
+      <BaselineText text={lines.right.number} baseline={P.NUM_BASELINE} size={P.NUM_SIZE} color={inks.ink} right={P.RIGHT_X} />
+      <BaselineText text={lines.right.descriptor} baseline={P.DESC_BASELINE} size={P.DESC_SIZE} color={inks.accent} right={P.RIGHT_X} />
+      <BaselineText text={lines.right.grade} baseline={P.GRADE_BASELINE} size={P.GRADE_SIZE} color={inks.accent} right={P.RIGHT_X} />
+      <BaselineText text={lines.right.serial} baseline={P.SERIAL_BASELINE} size={P.SERIAL_SIZE} color={inks.ink} right={P.RIGHT_X} />
 
-      <ClassicPlate src={i.blackLogoDataUrl} />
+      <ClassicPlate src={i.blackLogoDataUrl} inks={inks} />
     </View>
   )
 }
@@ -259,8 +273,9 @@ export function ClassicFront({ i, bare = false, idSuffix = 'f' }: { i: ClassicIn
 // Back
 // ---------------------------------------------------------------------------
 
-export function ClassicBack({ i, bare = false, idSuffix = 'b' }: { i: ClassicInputs; bare?: boolean; idSuffix?: string }) {
+export function ClassicBack({ i, bare = false, idSuffix = 'b', mono = false }: { i: ClassicInputs; bare?: boolean; idSuffix?: string; mono?: boolean }) {
   const P = CLASSIC_PX
+  const inks = classicInks(mono)
   const serial = i.serial || ''
   const verify = (i.verifyUrl || `dcmgrading.com/verify/${serial}`).replace(/^https?:\/\//, '')
   const back = fitClassicBack(serial, verify)
@@ -287,8 +302,8 @@ export function ClassicBack({ i, bare = false, idSuffix = 'b' }: { i: ClassicInp
   }
 
   return (
-    <View style={panelStyle(bare)}>
-      <ClassicFrame id={idSuffix} />
+    <View style={panelStyle(bare, inks)}>
+      <ClassicFrame id={idSuffix} inks={inks} />
 
       {/* DCM mark, left, vertically centred. */}
       {i.blackLogoDataUrl ? (
@@ -297,9 +312,9 @@ export function ClassicBack({ i, bare = false, idSuffix = 'b' }: { i: ClassicInp
         </View>
       ) : null}
 
-      {centred('DCM CERT', P.CERT_BASELINE, P.CERT_SIZE, CLASSIC_PURPLE, P.CERT_TRACK, true)}
-      {centred(serial, P.BACK_SERIAL_BASELINE, back.serialSize, CLASSIC_INK, 0, true)}
-      {centred(verify, P.VERIFY_BASELINE, back.urlSize, CLASSIC_INK_SOFT, 0, false)}
+      {centred('DCM CERT', P.CERT_BASELINE, P.CERT_SIZE, inks.accent, P.CERT_TRACK, true)}
+      {centred(serial, P.BACK_SERIAL_BASELINE, back.serialSize, inks.ink, 0, true)}
+      {centred(verify, P.VERIFY_BASELINE, back.urlSize, inks.inkSoft, 0, false)}
 
       {/* QR on a white plate, so the waves never touch the code. */}
       <View style={{ position: 'absolute', left: u(plate.x), top: u(plate.y), width: u(plate.w), height: u(plate.h), backgroundColor: CLASSIC_FIELD }} />

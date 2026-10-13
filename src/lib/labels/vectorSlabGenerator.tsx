@@ -1180,6 +1180,8 @@ export async function buildClassicFoldOverDoc(
 // sheets, guides, and duplex behaviour.
 export { PageHeader, CornerMarks, FrontCutGuides, GuidesLayer, LabelAt, gridPos, SINGLE_X, SINGLE_Y }
 export { BackTurn, PerforatedDuplexDoc, TrueSizeSlot, slotBleed }
+// Data mappers shared with the roll-printer documents (labels/rollLabelGenerator).
+export { mapFrontInputs, mapBackInputs, specForStyle, buildClassicBatch }
 
 async function renderDocToBlob(doc: React.ReactElement): Promise<Blob> {
   const { pdf } = await import('@react-pdf/renderer')

@@ -489,7 +489,8 @@ export interface HeritageBatchItem {
   design?: OrgLabelDesign | null
 }
 
-async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern, gradeColors?: Record<string, string> | null): Promise<HeritageInputs[]> {
+/** Exported for the roll-printer documents (labels/rollLabelGenerator). */
+export async function buildBatchInputs(items: HeritageBatchItem[], pattern: BandPattern, gradeColors?: Record<string, string> | null): Promise<HeritageInputs[]> {
   const dcmBlack = await loadBlackLogoAsBase64().catch(() => null)
   return Promise.all(
     items.map(it => buildHeritageInputs(

@@ -31,7 +31,7 @@ import { resolveGradeChip, GRADE_10_FOIL_STOPS, GRADE_CHIP_WHITE_LABEL_INK, type
 import { orgTextCase, type OrgLabelDesign } from '@/lib/labels/orgLabelDesign'
 import { bandGeometry, BAND_STROKE_HEX, BAND_STROKE_OPACITY, BAND_PATTERNS, type BandPattern } from './bandGeometry'
 import { EMBLEMS } from './emblemShapes'
-import { heritageTheme, heritageGeometry, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE, HERITAGE_PX, type HeritageGeometry } from './heritageLayout'
+import { heritageTheme, heritageGeometry, fitHeritageFront, heritageMarkBox, heritageRulesFit, heritageCtxTracking, heritageBackLayout, HERITAGE_CJK_RE, HERITAGE_PX, type HeritageGeometry, type HeritageTheme } from './heritageLayout'
 
 // Re-exported so consumers keep one import site.
 export { BAND_PATTERNS }
@@ -138,11 +138,31 @@ export interface HeritageInputs {
    * opened the designer — geometry then equals the stock constants exactly.
    */
   design?: OrgLabelDesign | null
+  /**
+   * Black-on-white for direct-thermal roll printers (Oct 2026). Every ink is
+   * pure black, the band is a solid black strip, the grade chip is a black
+   * chip with a white numeral, emblems go black. Raster marks are used as
+   * supplied — callers pass the black DCM/org mark.
+   */
+  mono?: boolean
+}
+
+const MONO_INK = '#000000'
+const MONO_THEME: HeritageTheme = {
+  field: '#FFFFFF', ink: MONO_INK, inkSoft: MONO_INK,
+  rule: MONO_INK, edge: MONO_INK, edgeWidth: 1, divider: MONO_INK,
+}
+
+/** Theme for these inputs: print/screen as before, or pure black when mono. */
+export function heritageInputsTheme(i: Pick<HeritageInputs, 'printHardened' | 'mono'>): HeritageTheme {
+  return i.mono ? MONO_THEME : heritageTheme(!!i.printHardened)
 }
 
 /** The chip for these inputs — theme-aware; every caller resolves it here. */
 export function heritageChip(i: HeritageInputs): GradeChip {
-  return resolveGradeChip(i.grade, !!i.printHardened, i.design?.chip.theme ?? 'black')
+  const chip = resolveGradeChip(i.grade, !!i.printHardened, i.design?.chip.theme ?? 'black')
+  // Thermal: a black chip with a white knockout numeral, no keyline.
+  return i.mono ? { ...chip, fill: MONO_INK, ink: '#FFFFFF', keyline: undefined } : chip
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +223,7 @@ function BandArt({
  * stock layout draws the same views the label always had.
  */
 function Frame({ geom, i, id }: { geom: HeritageGeometry; i: HeritageInputs; id: string }) {
-  const T = heritageTheme(!!i.printHardened)
+  const T = heritageInputsTheme(i)
   const b = geom.band
   // Band off (designer 'none'): no art and no rule, only the optional border.
   const bandOff = b.position === 'none'
@@ -213,13 +233,15 @@ function Frame({ geom, i, id }: { geom: HeritageGeometry; i: HeritageInputs; id:
         <View style={{
           position: 'absolute', left: u(geom.border.x - geom.border.width / 2), top: u(geom.border.y - geom.border.width / 2),
           width: u(geom.border.w + geom.border.width), height: u(geom.border.h + geom.border.width),
-          borderWidth: u(geom.border.width), borderColor: geom.border.color, borderStyle: 'solid',
+          borderWidth: u(geom.border.width), borderColor: i.mono ? MONO_INK : geom.border.color, borderStyle: 'solid',
         }} />
       ) : null}
       {bandOff ? null : (
         <>
           <View style={{ position: 'absolute', top: u(b.y), left: u(b.x), width: u(b.w), height: u(b.h) }}>
-            <BandArt pattern={i.pattern} colors={i.bandColors} id={id} w={u(b.w)} h={u(b.h)} horizontal={b.horizontal} />
+            {i.mono
+              ? <View style={{ position: 'absolute', top: 0, left: 0, width: u(b.w), height: u(b.h), backgroundColor: MONO_INK }} />
+              : <BandArt pattern={i.pattern} colors={i.bandColors} id={id} w={u(b.w)} h={u(b.h)} horizontal={b.horizontal} />}
           </View>
           <View style={{ position: 'absolute', top: u(geom.rule.y), left: u(geom.rule.x), width: u(geom.rule.w), height: u(geom.rule.h), backgroundColor: T.rule }} />
         </>
@@ -257,7 +279,7 @@ const foilAt = (() => {
  */
 const FOIL_STRIPS = 24
 
-function FoilChipBlock({ chip, size, solid, cs = 1 }: { chip: GradeChip; size: number; solid?: string | null; cs?: number }) {
+function FoilChipBlock({ chip, size, solid, cs = 1, mono = false }: { chip: GradeChip; size: number; solid?: string | null; cs?: number; mono?: boolean }) {
   const w = size
   const h = size * (252 / 240)
   const bw = u(6 * cs)
@@ -267,7 +289,7 @@ function FoilChipBlock({ chip, size, solid, cs = 1 }: { chip: GradeChip; size: n
   // Matches GradeChipBlock's knockout floor: 28/32, ~4pt at true size.
   const labelSize = u((chip.label.length > 8 ? 28 : 32) * cs)
   // White theme: the word under a foil numeral goes dark instead of ivory.
-  const labelInk = chip.keyline ? GRADE_CHIP_WHITE_LABEL_INK : '#F4EFE4'
+  const labelInk = mono ? '#FFFFFF' : chip.keyline ? GRADE_CHIP_WHITE_LABEL_INK : '#F4EFE4'
   // Digit box for the sweep, in diagonal coordinates c = x + y.
   const numW = numSize * 1.3
   const c0 = (w - numW) / 2 + (baseline - numSize * 0.72)
@@ -331,8 +353,10 @@ function FoilChipBlock({ chip, size, solid, cs = 1 }: { chip: GradeChip; size: n
   )
 }
 
-function GradeChipBlock({ chip, size, inkOverride, cs = 1 }: { chip: GradeChip; size: number; inkOverride?: string | null; cs?: number }) {
-  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} solid={inkOverride} cs={cs} />
+function GradeChipBlock({ chip, size, inkOverride, cs = 1, mono = false }: { chip: GradeChip; size: number; inkOverride?: string | null; cs?: number; mono?: boolean }) {
+  // Thermal: white numeral; the 10 takes the solid (non-foil) path.
+  if (mono) inkOverride = '#FFFFFF'
+  if (chip.grade === 10) return <FoilChipBlock chip={chip} size={size} solid={inkOverride} cs={cs} mono={mono} />
   const ink = inkOverride || chip.ink
   const isBig = String(chip.grade).length > 1 || chip.grade === 0
   return (
@@ -390,7 +414,7 @@ function LogoBlock({ i, showRules = true, fit, geom }: { i: HeritageInputs; show
     // Accent lines in the same ink as the mark so the group reads as one
     // object. Short on purpose — a full-width rule becomes a second divider and
     // argues with the one above the serial.
-    const ink = c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
+    const ink = i.mono ? MONO_INK : c === 'white' ? '#FFFFFF' : c === 'black' ? '#101014' : BRAND_PURPLE
     return (
       <>
         {t === 'rules' && showRules ? (
@@ -426,7 +450,7 @@ function LogoBlock({ i, showRules = true, fit, geom }: { i: HeritageInputs; show
  * from heritageLayout so the Studio's SVG preview renders the same geometry.
  */
 export function HeritageFront({ i, chip, bare = false }: { i: HeritageInputs; chip: GradeChip; bare?: boolean }) {
-  const T = heritageTheme(!!i.printHardened)
+  const T = heritageInputsTheme(i)
   const geom = heritageGeometry(i.design)
   // House type case (enterprise design only) applied BEFORE fitting, so the
   // fitter measures the capitals that will actually print.
@@ -480,6 +504,7 @@ export function HeritageFront({ i, chip, bare = false }: { i: HeritageInputs; ch
           chip={chip}
           size={u(geom.chip.w)}
           cs={geom.chip.scale}
+          mono={!!i.mono}
           inkOverride={i.gradeColors?.[String(chip.grade)] ?? (chip.grade === 10 ? i.design?.chip.grade10Color ?? undefined : undefined)}
         />
       </View>
@@ -515,8 +540,8 @@ export function HeritageFront({ i, chip, bare = false }: { i: HeritageInputs; ch
 const EMBLEM_SLOT = u(56)
 const EMBLEM_TRACK = u(240)   // long enough for the longest word, "CARD LOVER"
 
-function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
-  const e = EMBLEMS[id]
+function Emblem({ id, left, mono = false }: { id: keyof typeof EMBLEMS; left: number; mono?: boolean }) {
+  const e = mono ? { ...EMBLEMS[id], color: MONO_INK } : EMBLEMS[id]
   const trackLeft = (EMBLEM_SLOT - EMBLEM_TRACK) / 2
   const glyph = u(46)
   return (
@@ -553,7 +578,7 @@ function Emblem({ id, left }: { id: keyof typeof EMBLEMS; left: number }) {
 }
 
 export function HeritageBack({ i, chip, bare = false }: { i: HeritageInputs; chip: GradeChip; bare?: boolean }) {
-  const T = heritageTheme(!!i.printHardened)
+  const T = heritageInputsTheme(i)
   const geom = heritageGeometry(i.design)
   const sg = i.subgrades
   const row = (label: string, v: number | null) =>
@@ -577,7 +602,7 @@ export function HeritageBack({ i, chip, bare = false }: { i: HeritageInputs; chi
           Composited here rather than baked into the raster so it stays sharp
           and works for any caller that passes a plain QR. */}
       {i.qrDataUrl ? (
-        <View style={{ position: 'absolute', left: u(132), top: u(52), width: u(296), height: u(296), backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#D9D2C4', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', left: u(132), top: u(52), width: u(296), height: u(296), backgroundColor: '#FFFFFF', borderWidth: i.mono ? 0 : 0.5, borderColor: '#D9D2C4', alignItems: 'center', justifyContent: 'center' }}>
           <Image src={i.qrDataUrl} style={{ width: u(280), height: u(280) }} />
           {i.colorLogoDataUrl ? (
             <>
@@ -632,7 +657,7 @@ export function HeritageBack({ i, chip, bare = false }: { i: HeritageInputs; chi
         return (
           <>
             {shownEmblems.map((id, idx) => (
-              <Emblem key={id} id={id} left={u(L.emblemXs[idx])} />
+              <Emblem key={id} id={id} left={u(L.emblemXs[idx])} mono={!!i.mono} />
             ))}
 
             {/* Grade + condition, centred in the free span. */}
