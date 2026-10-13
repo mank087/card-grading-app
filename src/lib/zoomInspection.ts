@@ -26,6 +26,7 @@ import { attributeZoomDefects, zoomCorroborationEnabled, ZOOM_DESIGN_ARTIFACT_EX
 import { applyModelCompat, BASELINE_MODEL } from './grading/modelRouter';
 import { structuralV2Enabled, STRUCTURAL_V2_ZOOM_RULE } from './grading/structuralV2';
 import { imageDetail } from './grading/imageDetail';
+import { verifyZoomFindings, zoomVerifierEnabled, type ZvDropped } from './grading/zoomVerifier';
 import { fetchCardOriginals, type CardOriginals } from './images/originalImages';
 import { geometryGateSystemPrompt, pixelCornersToNorm, prepareGateImage, quadIsCardShaped } from './grading/geometryGate';
 // Cast: the OpenAI SDK's type union predates detail:'original', which the
@@ -94,6 +95,8 @@ export interface ZoomResult {
   centering?: { front: CenteringMeasurement | null; back: CenteringMeasurement | null };
   /** ZOOM_CORROBORATION_V1 only: findings the attribution rules removed, with reasons. */
   corroboration?: { dropped: DroppedFinding[]; refiled: RefiledFinding[] };
+  /** ZOOM_VERIFIER_V1 only: findings the verifier classified as printing or photo artifacts and removed. */
+  verifier?: { checked: number; dropped: ZvDropped[]; failedCalls: number };
   /**
    * Capture-gate P0: what the geometry gate saw.
    *
@@ -1239,6 +1242,26 @@ export async function runZoomInspection(
     } else if (corroborationOn) {
       attribution = { dropped: [], refiled: [] };
     }
+    // ZOOM_VERIFIER_V1: a second look at each cosmetic finding beside the opposite
+    // crop and the whole face; printing and photo artifacts are removed.
+    let verifier: ZoomResult['verifier'];
+    if (zoomVerifierEnabled() && defects.some(d => d.category !== 'structural')) {
+      const checked = defects.filter(d => d.category !== 'structural').length;
+      const v = await verifyZoomFindings({
+        findings: defects,
+        crop: (id) => regionById.get(id)?.buf,
+        faces: { front: frontBuf, back: backBuf },
+        cardLabel: cardTypeLabel,
+        model: options?.model,
+      });
+      for (const d of v.dropped) console.log(`[ZOOM] verifier: dropped ${d.severity} ${d.type} at ${d.region} as ${d.cls} (${d.votes}) - ${d.justification}`);
+      if (v.drop.size > 0) {
+        const kept = defects.filter((_, i) => !v.drop.has(i));
+        defects.length = 0;
+        defects.push(...kept);
+      }
+      verifier = { checked, dropped: v.dropped, failedCalls: v.failedCalls };
+    }
     if (backgroundSuppressed > 0) {
       const bgRegions = [...cardAreaVotes.entries()].filter(([id]) => !regionIsCard(id)).map(([id]) => id);
       console.log(`[ZOOM] background gate: ${backgroundSuppressed} cosmetic finding(s) suppressed from ${bgRegions.length} background-dominated region(s): ${bgRegions.join(', ')}`);
@@ -1280,7 +1303,8 @@ export async function runZoomInspection(
 
     return { ok: true, regionsInspected: coverage.inspected, coverage, defects, faceCaps, structuralFindings, centering, capture,
       ...(tolerable ? { uninspectedRegions: missing } : {}),
-      ...(attribution ? { corroboration: attribution } : {}) };
+      ...(attribution ? { corroboration: attribution } : {}),
+      ...(verifier ? { verifier } : {}) };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };
