@@ -999,8 +999,10 @@ export async function upgradeCardLoverToAnnual(
   const creditsToAdd = annualTotal - options.creditsAlreadyGivenThisCycle;
   const newBalance = credits.balance + creditsToAdd;
 
-  // Update user_credits
-  const { error: updateError } = await supabase
+  // Update user_credits. Conditional on the plan still being monthly and the
+  // balance unchanged since we read it, so a double-click (two requests racing
+  // past the route's "already annual" check) can only grant once.
+  const { data: updatedRows, error: updateError } = await supabase
     .from('user_credits')
     .update({
       card_lover_plan: 'annual',
@@ -1010,11 +1012,17 @@ export async function upgradeCardLoverToAnnual(
       balance: newBalance,
       total_purchased: credits.total_purchased + creditsToAdd,
     })
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .neq('card_lover_plan', 'annual')
+    .eq('balance', credits.balance)
+    .select('user_id');
 
   if (updateError) {
     console.error('Error upgrading Card Lovers subscription:', updateError);
     return { success: false, creditsAdded: 0, error: 'Database error' };
+  }
+  if (!updatedRows || updatedRows.length === 0) {
+    return { success: false, creditsAdded: 0, error: 'Already upgraded or balance changed; not granted twice' };
   }
 
   // Record subscription event

@@ -516,6 +516,9 @@ export default function AccountPage() {
 
   // Handle subscription upgrade to annual
   const handleUpgradeSubscription = async () => {
+    // The upgrade charges the card on file right away (Oct 2026), so it needs an
+    // explicit yes; an accidental tap previously switched a family's plan.
+    if (!window.confirm('Upgrade to Card Lovers Annual ($449/year)?\n\nYour card on file is charged now for the difference, less the unused part of this month, and your annual credits are added once the payment goes through.')) return
     setIsUpgradingSubscription(true)
     try {
       const session = getStoredSession()
