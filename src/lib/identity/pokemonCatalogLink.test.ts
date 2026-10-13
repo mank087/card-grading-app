@@ -106,6 +106,54 @@ describe('verifyAndSavePokemonCard', () => {
   });
 });
 
+describe('verifyAndSavePokemonCard: special promos (Ancient Mew)', () => {
+  const ancient = (over: Record<string, any> = {}) => graded({
+    card_name: 'Ancient Mew', featured: null, card_set: null, card_number: null, release_date: '1999-2000', language: 'English',
+    pokemon_api_verified: true, pokemon_api_id: 'svp-232', dcm_selected_product_id: null,
+    conversational_card_info: { card_name: 'Ancient Mew', player_or_character: 'Mew', set_name: null, card_number: null, year: '1999-2000' },
+    ...over,
+  });
+
+  it('never runs the catalog match; writes the canonical identity, clears the link and pins the English product', async () => {
+    const { client, updates } = fakeDb(ancient());
+    const out = await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(v.verify).not.toHaveBeenCalled();
+    expect(out.body).toMatchObject({ success: false, special_promo: 'ancient-mew-2000', verification_method: 'special_promo' });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      card_name: 'Ancient Mew', featured: 'Ancient Mew', card_set: 'Pokemon Movie 2000 Promo', card_number: null, release_date: '2000',
+      pokemon_api_id: null, pokemon_api_verified: false, dcm_selected_product_id: '1958438', dcm_selected_product_name: 'Ancient Mew',
+      dcm_price_estimate: null, dcm_price_product_id: null, validated_source: 'pokemon_special_promos',
+    });
+    expect(updates[0].conversational_card_info).toMatchObject({ player_or_character: 'Ancient Mew', set_name: 'Pokemon Movie 2000 Promo', year: '2000' });
+    expect(updates[0].label_data).toBeTruthy();
+  });
+
+  it("keeps an owner's own product pick", async () => {
+    const { client, updates } = fakeDb(ancient({ dcm_selected_product_id: '999' }));
+    await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(updates[0].dcm_selected_product_id).toBeUndefined();
+    expect(updates[0].dcm_price_estimate).toBeUndefined();
+  });
+
+  it('owner-confirmed: only the stale link is cleared, identity and pin untouched', async () => {
+    const { client, updates } = fakeDb(ancient({ identity_revision: 1, identity_confirmed_revision: 1 }));
+    const out = await verifyAndSavePokemonCard(client, cardId, { force: true, overrideCardInfo: { card_name: 'Ancient Mew' } });
+    expect(v.verify).not.toHaveBeenCalled();
+    expect(out.body.link_only).toBe(true);
+    expect(updates[0]).toMatchObject({ pokemon_api_id: null, pokemon_api_verified: false });
+    for (const key of ['card_name', 'card_set', 'card_number', 'release_date', 'dcm_selected_product_id']) expect(updates[0][key]).toBeUndefined();
+  });
+
+  it('a plain Mew with a number still goes to the catalog', async () => {
+    v.verify.mockResolvedValue(miss());
+    const { client } = fakeDb(graded({ card_name: 'Mew', featured: 'Mew', card_number: '8',
+      conversational_card_info: { card_name: 'Mew', player_or_character: 'Mew', card_number: '8' } }));
+    await verifyAndSavePokemonCard(client, cardId, { force: true });
+    expect(v.verify).toHaveBeenCalled();
+  });
+});
+
 describe('reconcileFirstLookNumber', () => {
   it('re-verifies an unresolved card when first look read a different number', async () => {
     v.verify.mockResolvedValue(miss());

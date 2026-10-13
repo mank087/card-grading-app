@@ -86,6 +86,10 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Report it ONLY when you can see the badge itself; otherwise null. Never infer it from the Pokémon, the artwork or the holo pattern
 • A "30" or "25" badge means the card IS from that anniversary set, even when everything else matches an older card: the Classic Collection reprints keep the ORIGINAL card number (58/102, 4/102, 149/147...) and the ORIGINAL copyright line. Still transcribe the number exactly as printed; when the badge is present, year = the anniversary release year ("2026" for "30", "2021" for "25"), not the reprinted copyright year
 
+**SPECIAL PROMO WITH NO SET NUMBER** — name it; the backend fills set, year and price
+• Ancient Mew (Pokémon the Movie 2000 promo): text in Unown glyph script instead of English, gold glyph border, NO card number, © 1999-2000 Wizards line
+• → card_name and player_or_character "Ancient Mew" (never "Mew" or "Mewtwo"), set_name "Pokemon Movie 2000 Promo", year "2000", card_number null
+
 ════════════════════════════════════════════════════════════════════════
 🚨🚨🚨 CARD NUMBER EXTRACTION - SIMPLIFIED RULES 🚨🚨🚨
 ════════════════════════════════════════════════════════════════════════

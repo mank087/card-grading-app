@@ -36,6 +36,8 @@ export const IDENTITY_COLUMNS: readonly string[] = [
   'conversational_card_info', 'validated_source', 'validation_tier', 'validation_confidence',
   'database_match_confidence', 'api_card_id', 'tcgplayer_url', 'dcm_price_product_id',
   'ai_card_info_original', 'original_card_info',
+  // Pricing pin set with an identity (special promos, pokemonSpecialPromos.ts): kept with it.
+  'dcm_selected_product_id', 'dcm_selected_product_name', 'dcm_selected_at',
   // Pokemon
   'pokemon_featured', 'pokemon_stage', 'pokemon_type', 'trainer_subtype', 'energy_subtype', 'holofoil',
   'set_series', 'set_symbol_url', 'pokemon_tcg_api_id', 'pokemon_tcg_data', 'pokemon_tcg_api_images',

@@ -17,6 +17,7 @@ import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/pr
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 import { anniversarySetIds } from "@/lib/pokemonAnniversary";
 import { applyTrickOrTradeStamp } from "@/lib/pokemonTrickOrTrade";
+import { applySpecialPromo, specialPromoColumns, type SpecialPromoMatch } from "@/lib/pokemonSpecialPromos";
 import { isPokemonPromoSetId, isPokemonPromoSetName, pokemonNumberForSet } from "@/lib/pokemonPromoNumber";
 import { verifyPokemonCard } from "@/lib/pokemonApiVerification";
 // Label data generation for consistent display across all contexts
@@ -858,6 +859,9 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     let conversationalGradingData = null;
     // 🔒 WS7.1: Snapshot of the AI's original card_info, captured BEFORE DB validation mutates it
     let aiCardInfoOriginal: any = null;
+    // Oct 2026: set when the card is a one-off special promo (pokemonSpecialPromos.ts).
+    let specialPromoMatch: SpecialPromoMatch | null = null;
+    const identityOwnerConfirmed = card.identity_confirmed_revision !== null && card.identity_confirmed_revision !== undefined;
     if (conversationalGradingResult) {
       try {
         console.log(`[GET /api/pokemon/${cardId}] Parsing conversational JSON...`);
@@ -1409,10 +1413,30 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           }
         }
 
+        // Oct 2026: a one-off special promo with no catalog row and no printed
+        // number (Ancient Mew, pokemonSpecialPromos.ts). Saved under ONE canonical
+        // identity, its number cleared so no catalog card is linked, and priced by
+        // a pinned PriceCharting product (set on the row below).
+        // Never over an owner-confirmed identity.
+        const specialPromo = cardInfo && !identityOwnerConfirmed ? applySpecialPromo(cardInfo) : null;
+        if (specialPromo) {
+          specialPromoMatch = specialPromo;
+          console.log(`[GET /api/pokemon/${cardId}] 🎟️ Special promo ${specialPromo.promo.id} (${specialPromo.language}, by ${specialPromo.via}): "${cardInfo.card_name}", ${cardInfo.set_name}, ${cardInfo.year}`);
+          if (conversationalGradingResult) {
+            try {
+              const promoJson = JSON.parse(conversationalGradingResult);
+              if (promoJson.card_info) {
+                promoJson.card_info = { ...promoJson.card_info, ...cardInfo };
+                conversationalGradingResult = JSON.stringify(promoJson);
+              }
+            } catch { /* the column values below still carry the promo */ }
+          }
+        }
+
         // Oct 2026: a Trick or Trade pumpkin stamp (pokemonTrickOrTrade.ts). The
         // validation above read the ORIGINAL printing; the card keeps its number
         // but shows and prices as "Trick or Trade <year>".
-        if (!isJapaneseCard && cardInfo && applyTrickOrTradeStamp(cardInfo)) {
+        if (!isJapaneseCard && !specialPromo && cardInfo && applyTrickOrTradeStamp(cardInfo)) {
           console.log(`[GET /api/pokemon/${cardId}] 🎃 Trick or Trade stamp: set "${cardInfo.set_name}", year ${cardInfo.year}`);
           if (conversationalGradingResult) {
             try {
@@ -1735,6 +1759,20 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       grade: wholeGrade,
       ocr_corrected: !!ocrOverride?.denominator_lookup_used
     });
+
+    // Oct 2026: special promo (pokemonSpecialPromos.ts): featured + the pricing pin.
+    // The pin is written only when the card has none (an owner's pick stands) and
+    // never on an owner-confirmed identity; on a plain regrade the identity guard
+    // below restores the stored identity and pin.
+    if (specialPromoMatch) {
+      const promoCols = specialPromoColumns(specialPromoMatch, conversationalGradingData?.card_info);
+      (updateData as any).featured = promoCols.featured;
+      if (promoCols.dcm_selected_product_id && !card.dcm_selected_product_id && !identityOwnerConfirmed) {
+        (updateData as any).dcm_selected_product_id = promoCols.dcm_selected_product_id;
+        (updateData as any).dcm_selected_product_name = promoCols.dcm_selected_product_name;
+        (updateData as any).dcm_selected_at = new Date().toISOString();
+      }
+    }
 
     // 🪪 Regrade identity guard: a force-regrade refreshes the condition grade only;
     // the card keeps its stored identification unless ?reidentify=true.

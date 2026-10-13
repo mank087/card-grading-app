@@ -36,6 +36,10 @@ import { isPokemonPromoSetId } from '@/lib/pokemonPromoNumber';
 import { pokemonPrintedNumber, printedBadgeOf } from '@/lib/pokemonAnniversary';
 import { hasTrickOrTradeEvidence, trickOrTradeIdentity } from '@/lib/pokemonTrickOrTrade';
 import { runBadgeNet, type StoredBadgeCheck } from './anniversaryBadgeNet';
+import {
+  applySpecialPromo, matchSpecialPromo, specialPromoColumns, SPECIAL_PROMO_SOURCE, type SpecialPromoMatch,
+} from '@/lib/pokemonSpecialPromos';
+import { PRICING_INVALIDATION_COLUMNS } from './saveCardIdentity';
 
 export interface VerifyPokemonOptions {
   /** Re-verify a card that is already verified. */
@@ -67,7 +71,7 @@ const BASE_COLUMNS = [
   'label_data',
 ];
 /** Newer columns: read when present, tolerated when a database lacks them. */
-const OPTIONAL_COLUMNS = ['first_look', 'identity_revision', 'identity_confirmed_revision', 'grade_status'];
+const OPTIONAL_COLUMNS = ['first_look', 'identity_revision', 'identity_confirmed_revision', 'grade_status', 'language', 'dcm_selected_product_id'];
 
 async function readCard(supabase: SupabaseClient<any, any, any>, cardId: string): Promise<Record<string, any> | null> {
   const full = await supabase.from('cards').select([...BASE_COLUMNS, ...OPTIONAL_COLUMNS].join(', ')).eq('id', cardId).maybeSingle();
@@ -166,6 +170,16 @@ export async function verifyAndSavePokemonCard(
     } as CardInfoForVerification;
 
   console.log(`${tag} card ${cardId}${linkOnly ? ' (link only)' : ''}:`, cardInfo);
+
+  // Oct 2026: a one-off special promo (Ancient Mew, pokemonSpecialPromos.ts) has
+  // no catalog row and no number: any catalog match would be a wrong card.
+  const promo = matchSpecialPromo({
+    ...convInfo, ...override, ...stripNullish(cardInfo as Record<string, any>),
+    featured: linkOnly ? card.featured : (override?.player_or_character || convInfo.player_or_character || card.featured),
+    language: override?.language || convInfo.language || card.language,
+  });
+  if (promo) return saveSpecialPromo(supabase, cardId, card, convInfo, override, promo, { linkOnly, opts, tag, startTime });
+
   let verification: PokemonApiVerificationResult = await verifyPokemonCard(cardInfo);
 
   // The second read: first look's printed number, when the grading read found nothing.
@@ -392,6 +406,102 @@ export async function verifyAndSavePokemonCard(
       processing_time_ms: Date.now() - startTime,
     },
   };
+}
+
+function stripNullish(o: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== ''));
+}
+
+/**
+ * Save a special promo: no catalog link (a stale one is cleared). Link-only (an
+ * owner edit or an owner-confirmed card) changes nothing else. Otherwise the
+ * canonical identity is written, and the PriceCharting pin when the card has
+ * none, through the same regrade identity guard as a catalog match.
+ */
+async function saveSpecialPromo(
+  supabase: SupabaseClient<any, any, any>,
+  cardId: string,
+  card: Record<string, any>,
+  convInfo: Record<string, any>,
+  override: Record<string, any> | null,
+  promo: SpecialPromoMatch,
+  ctx: { linkOnly: boolean; opts: VerifyPokemonOptions; tag: string; startTime: number },
+): Promise<VerifyPokemonOutcome> {
+  const { linkOnly, opts, tag, startTime } = ctx;
+  console.log(`${tag} special promo ${promo.promo.id} (${promo.language}, by ${promo.via}): no catalog match attempted${linkOnly ? ' (link only)' : ''}`);
+  const linkCleared = {
+    ...LINK_CLEARED,
+    tcgplayer_url: null,
+  };
+  const body = {
+    success: false, verified: false, pokemon_api_id: null, verification_method: 'special_promo', confidence: null,
+    corrections: [], candidates: [], used_first_look_number: false, link_only: linkOnly, metadata: null,
+    special_promo: promo.promo.id, error: null, processing_time_ms: 0,
+  };
+
+  if (linkOnly) {
+    const { error } = await supabase.from('cards').update({
+      ...linkCleared,
+      conversational_card_info: {
+        ...withoutCandidates(convInfo), pokemon_api_verified: false, pokemon_api_id: null, tcgplayer_url: null,
+        special_promo: promo.promo.id,
+      },
+    }).eq('id', cardId);
+    if (error) console.error(`${tag} could not clear the link for a special promo:`, error.message);
+    else if (card.pokemon_api_verified) await rebuildLabels(supabase, cardId, tag);
+    return { status: 200, body: { ...body, processing_time_ms: Date.now() - startTime } };
+  }
+
+  const info: Record<string, any> = { ...withoutCandidates(convInfo), ...(override || {}) };
+  applySpecialPromo(info);
+  info.pokemon_api_verified = false;
+  info.pokemon_api_id = null;
+  info.tcgplayer_url = null;
+  const { dcm_selected_product_id: pinId, dcm_selected_product_name: pinName, ...identity } = specialPromoColumns(promo, info);
+  const updateData: Record<string, any> = {
+    ...linkCleared, ...identity, conversational_card_info: info,
+    validated_source: SPECIAL_PROMO_SOURCE, validation_tier: 'exact', validation_confidence: 'high',
+  };
+  // An owner's own price pick stands; otherwise pin the promo's product and drop
+  // the prices of whatever the search matched before (dcm-select does the same).
+  // (Not on a plain regrade: the guard below keeps the stored identity and pin.)
+  const keepsIdentity = opts.regrade === true && opts.reidentify !== true;
+  if (pinId && !card.dcm_selected_product_id && !keepsIdentity) {
+    for (const column of PRICING_INVALIDATION_COLUMNS) updateData[column] = null;
+    updateData.dcm_selected_product_id = pinId;
+    updateData.dcm_selected_product_name = pinName;
+    updateData.dcm_selected_at = new Date().toISOString();
+  }
+  const identityKeys = ['card_name', 'card_set', 'card_number', 'release_date'] as const;
+  if (identityKeys.some(k => (updateData[k] ?? null) !== (card[k] ?? null)) && !card.ai_card_info_original) {
+    updateData.ai_card_info_original = {
+      card_name: card.card_name, card_set: card.card_set, card_number: card.card_number,
+      release_date: card.release_date, ...(convInfo || {}), _snapshot_by: 'pokemon/verify special promo',
+    };
+  }
+  try {
+    updateData.label_data = generateLabelData({
+      id: cardId, category: 'Pokemon', serial: card.serial,
+      conversational_decimal_grade: card.conversational_decimal_grade ?? null,
+      conversational_whole_grade: card.conversational_whole_grade ?? null,
+      conversational_condition_label: card.conversational_condition_label ?? null,
+      conversational_card_info: info,
+      card_name: identity.card_name, card_set: identity.card_set, card_number: identity.card_number,
+      featured: identity.featured, pokemon_featured: identity.featured, release_date: identity.release_date,
+      serial_numbering: card.serial_numbering, first_print_rookie: card.first_print_rookie, holofoil: card.holofoil,
+    } as CardForLabel);
+  } catch (labelErr: any) {
+    console.warn(`${tag} label regeneration failed (row still updated): ${labelErr?.message}`);
+  }
+
+  const idGuard = await preserveIdentityOnRegrade(supabase, cardId, updateData, {
+    forceRegrade: opts.regrade === true, reidentify: opts.reidentify === true, tag: `POST /api/pokemon/verify ${cardId}`,
+  });
+  if (idGuard.abort) throw new Error(`identity guard aborted the save (${idGuard.reason}) — regrade not applied`);
+
+  const { error } = await supabase.from('cards').update(updateData).eq('id', cardId);
+  if (error) console.error(`${tag} failed to save special promo:`, error.message);
+  return { status: 200, body: { ...body, processing_time_ms: Date.now() - startTime } };
 }
 
 /**
