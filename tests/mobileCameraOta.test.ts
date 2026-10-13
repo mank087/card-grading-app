@@ -98,7 +98,21 @@ describe('camera OTA on existing native binaries', () => {
     expect(JSON.stringify(tree.toJSON())).toContain(platform === 'android' ? 'Focus held.' : 'Focus set.');
     await act(async () => { app.shutter().props.onPress(); await vi.advanceTimersByTimeAsync(1); });
     expect(app.focusCamera).toHaveBeenCalledOnce();
-    expect(app.takePictureAsync).toHaveBeenCalledWith({ pictureRef: true, shutterSound: false });
+    // iOS keeps the file capture (the picture reference failed on the Oct 9 iOS build).
+    expect(app.takePictureAsync).toHaveBeenCalledWith(platform === 'android'
+      ? { pictureRef: true, shutterSound: false }
+      : { quality: 1, shutterSound: false });
+  });
+
+  it('falls back to a file capture when the Android picture reference fails', async () => {
+    const app = await mount('android', true, true);
+    app.takePictureAsync.mockRejectedValueOnce(new Error('ref failed'));
+    await act(() => tree.root.findAllByType('View').find((view: any) => view.props.onLayout).props.onLayout({ nativeEvent: { layout: { width: 400, height: 600 } } }));
+    await app.ready();
+    await act(() => app.tap().props.onPress({ nativeEvent: { locationX: 100, locationY: 450 } }));
+    await act(async () => { app.shutter().props.onPress(); await vi.advanceTimersByTimeAsync(1); });
+    expect(app.takePictureAsync).toHaveBeenNthCalledWith(1, { pictureRef: true, shutterSound: false });
+    expect(app.takePictureAsync).toHaveBeenNthCalledWith(2, { quality: 1, shutterSound: false });
   });
 
   it.each(['ios', 'android'])('restores tap-to-refocus on %s and returns to continuous AF without claiming a focus result', async platform => {

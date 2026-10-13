@@ -421,9 +421,24 @@ export default function CaptureScreen() {
         await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 450 : 250))
       }
       if (generation !== captureGeneration.current || !cameraRef.current) return
-      const photo = nativeControls
-        ? (imageRef = await cameraRef.current.takePictureAsync({ pictureRef: true, shutterSound: false }))
-        : await cameraRef.current.takePictureAsync({ quality: 1, shutterSound: false })
+      // Oct 13 2026: the in-memory picture reference failed on iOS from the first
+      // 1.0.3 store build (Oct 9): in-app iPhone captures went from ~200/day to 0 and
+      // customers saw "Capture Failed", while Android's identical path worked. iOS
+      // uses the file capture that worked through Oct 8; any platform whose reference
+      // capture fails or comes back without a size retries once as a file capture.
+      let photo: { width?: number; height?: number; uri?: string } | undefined
+      if (nativeControls && Platform.OS !== 'ios') {
+        try {
+          imageRef = await cameraRef.current.takePictureAsync({ pictureRef: true, shutterSound: false })
+          if (!imageRef?.width || !imageRef?.height) throw new Error('picture reference without a size')
+          photo = imageRef
+        } catch (refErr) {
+          console.warn('Picture reference capture failed; retrying as a file capture:', refErr)
+          imageRef = undefined
+          if (generation !== captureGeneration.current || !cameraRef.current) return
+        }
+      }
+      if (!photo) photo = await cameraRef.current.takePictureAsync({ quality: 1, shutterSound: false })
       if (!photo || !photo.width || !photo.height) throw new Error('Capture failed')
       if (generation !== captureGeneration.current) return
 
