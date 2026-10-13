@@ -50,6 +50,7 @@ import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { repairReportConsistency, reportConsistencyEnabled } from './grading/reportConsistency';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
+import { printedWearLifts, printedWearReconcileEnabled } from './grading/printedWearReconcile';
 import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, isStructuralVintage, evaluationsYear, hasFiberEvidence, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -3555,6 +3556,64 @@ Provide detailed analysis as markdown with all required sections.`
           if (severeRecords.length) jsonData.severe_score_check = severeRecords;
         } catch (e: any) {
           console.warn('[GRADE RECALC] low-score check skipped:', e?.message || e);
+        }
+
+        // Step 3.96 (v9.37): PRINTED-WEAR RECONCILIATION (grading/printedWearReconcile.ts).
+        // When the zoom verifier found this card's printing reads as wear and the
+        // magnified inspection sees no real wear in corners/edges, the evaluations'
+        // low corners/edges score (the same misread) takes what magnification supports.
+        if (printedWearReconcileEnabled()) {
+          const lifts = printedWearLifts({
+            scores: { corners: serverRounded.corners, edges: serverRounded.edges },
+            zoomOk: !!zoom?.ok,
+            zoomDefects: zoom?.defects ?? [],
+            verifierDropped: zoom?.verifier?.dropped ?? [],
+            uninspectedRegions: zoom?.uninspectedRegions ?? [],
+            appliedFaceCaps,
+            rigidCase: !!holderConsensus.rigid,
+            structuralDetected: structuralDetected || structuralUnsureHold,
+          });
+          for (const lift of lifts) {
+            console.log(`[GRADE RECALC] 🖨️ printed-wear reconciliation: ${lift.cat} ${lift.from} → ${lift.to} (zoom verifier read ${lift.printedRegions.length} corner/edge flags as printing; magnified inspection found no moderate or heavy ${lift.cat} wear)`);
+            serverRounded[lift.cat] = lift.to;
+            if (jsonData.raw_sub_scores) {
+              for (const face of ['front', 'back']) {
+                const key = `${lift.cat}_${face}`;
+                if (typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] < lift.to) jsonData.raw_sub_scores[key] = lift.to;
+              }
+            }
+            // The evaluations' serious findings for this category were the printed design.
+            const SERIOUS = ['heavy', 'severe', 'major', 'moderate'];
+            for (const face of ['front', 'back']) {
+              const section = jsonData?.[lift.cat]?.[face];
+              if (!section || !Array.isArray(section.defects)) continue;
+              let touched = false;
+              for (const d of section.defects) {
+                if (d && typeof d === 'object' && d.source !== 'zoom-inspection' && SERIOUS.includes(String(d.severity || '').toLowerCase())) {
+                  d.unconfirmed = true;
+                  d.severity = 'none';
+                  touched = true;
+                }
+              }
+              if (touched) {
+                const note = `Under magnification the wear-like marks on this card's ${lift.cat} are part of its printed design, not handling wear.`;
+                section.summary = note;
+                section.condition = note;
+                if (typeof section.score === 'number' && section.score < lift.to) section.score = lift.to;
+              }
+            }
+            if (jsonData.final_grade && jsonData.final_grade.dominant_defect === lift.cat) {
+              jsonData.final_grade.model_summary = `The ${lift.cat} wear the evaluations reported is printed design on this card; magnified inspection found no moderate or heavy ${lift.cat} wear.`;
+            }
+            serverRounded.final = Math.max(serverRounded.final,
+              Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface));
+            if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(
+                `Printed-design check: ${lift.cat} was scored ${lift.from}, but the magnified inspection identified the wear-like marks on this card as printed design and found no moderate or heavy ${lift.cat} wear, so ${lift.cat} uses the magnified reading of ${lift.to}.`
+              );
+            }
+          }
+          if (lifts.length) jsonData.printed_wear_reconcile = { version: 'printed-wear-v1', lifts };
         }
 
         // Step 4: Apply dominant defect control (weakest subgrade caps the final)
