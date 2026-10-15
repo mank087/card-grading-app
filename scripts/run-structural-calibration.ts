@@ -163,7 +163,7 @@ function installMeter() {
           v2Record: sd.v2 ?? null,
           severe: j.severe_score_check ?? null,
           passFinals: ['pass_1', 'pass_2', 'pass_3'].map(k => j.grading_passes?.[k]?.final ?? null),
-          cardInfo: { name: j.card_info?.card_name, set: j.card_info?.set_name, subset: j.card_info?.subset, year: j.card_info?.year },
+          cardInfo: { name: j.card_info?.card_name, set: j.card_info?.set_name, subset: j.card_info?.subset, year: j.card_info?.year, number: j.card_info?.card_number, confidence: j.card_info?.identification_confidence, name_source: j.card_info?.identification_check?.name_decision },
           log: store.log, summary: String(j.final_grade?.summary || ''),
           costUsd: store.cost, tokens: { p: store.p, c: store.c, calls: store.calls }, secs: Math.round((Date.now() - t0) / 1000),
         };
