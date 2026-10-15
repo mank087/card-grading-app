@@ -4,6 +4,7 @@ import { verifyAuth } from '@/lib/serverAuth';
 import { requireCron } from '@/lib/cronAuth';
 import { resolveSelfOrigin } from '@/lib/selfOrigin';
 import { deductCredit } from '@/lib/credits';
+import { bulkPreflightAll } from '@/lib/submissions/bulkPreflight';
 import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import {
   getOwnedSubmission,
@@ -292,9 +293,31 @@ async function tickSubmission(submission: SubmissionRow, origin: string): Promis
   const charged: typeof queued = [];
   let blocked = false;
 
+  // Phase 0 — the same pre-charge photo check single-card grading runs inside
+  // /api/stripe/deduct, for every item this tick will charge, all at once
+  // (Oct 2026; bulk used to skip it and paid for screenshots and wrong cards).
+  // The gate fails open, so only a database read error defers an item.
+  const preflights = await bulkPreflightAll(
+    queued.map((item) => ({ id: item.id, card_id: item.card_id as string })),
+    submission.user_id
+  );
+
   for (const item of queued) {
     if (!(await claimItem(item.id))) continue; // another drain got there first
     claimed += 1;
+
+    const preflight = preflights.get(item.id);
+    if (preflight?.status === 'blocked') {
+      // Terminal for this item and no charge was taken: nothing to refund, nothing
+      // to dispatch. The owner fixes the photos and submits the card again.
+      console.warn(`${LOG} ${submission.id} item ${item.id} blocked before charge: ${preflight.reason}`);
+      await setItemStatus(item.id, { status: 'failed', error: preflight.reason });
+      continue;
+    }
+    if (preflight?.status === 'defer') {
+      await releaseClaim(item.id, preflight.reason);
+      continue;
+    }
 
     // Charge BEFORE dispatch, keyed on card_id. A retried item that was
     // already charged comes back alreadyCharged:true and costs nothing.

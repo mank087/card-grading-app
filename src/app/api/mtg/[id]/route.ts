@@ -1333,6 +1333,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       .update(updateData)
       .eq("id", cardId);
 
+    // A grade is stored from here on: a later enrichment or response-building
+    // error must not mark the card failed or refund the credit (Oct 2026).
+    if (!updateError) gradingAttempted = false;
+
     if (updateError) {
       console.error(`[GET /api/mtg/${cardId}] Database update failed:`, updateError);
       // Releases the grading lock (grade_status='failed') and refunds the credit

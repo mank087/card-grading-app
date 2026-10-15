@@ -54,6 +54,7 @@ import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, card
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
+import { createHash } from 'crypto';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
@@ -1819,6 +1820,8 @@ export async function gradeCardConversational(
   // Load conversational prompt (supports both markdown and JSON formats, card-type specific)
   const { text: promptText, format: outputFormat } = loadConversationalPrompt(cardType);
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Output format: ${outputFormat.toUpperCase()}`);
+  // Oct 2026 audit record: which prompt text produced this grade (hash, not the text).
+  const promptSha256 = createHash('sha256').update(promptText).digest('hex');
 
   // v8.9 STAGE B: regioned zoom inspection runs IN PARALLEL with the main ensemble call
   // (both need only the image URLs), so it adds ~zero wall-clock. Findings merge into the
@@ -1986,8 +1989,12 @@ export async function gradeCardConversational(
   let structuralV2RecheckNote: string | null = null;
   // A lone evaluation's crease that the v2 verifier confirmed unanimously.
   let structuralV2SingleConfirmed = false;
+  // Oct 2026: the marking re-grade is not a transport retry. It used to share the
+  // MAX_RETRIES budget, so a "printed design" verdict on the last attempt ran off
+  // the end of the loop and failed the grade. It now extends the loop by one.
+  let maxAttempts = MAX_RETRIES;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`[CONVERSATIONAL] Calling Chat Completions API... (attempt ${attempt}/${MAX_RETRIES})`);
 
@@ -2215,6 +2222,7 @@ Provide detailed analysis as markdown with all required sections.`
           console.log(`[INSPECTION] claimed marking → ${verdict.confirmed === true ? 'confirmed added' : verdict.confirmed === false ? 'printed design / photo' : 'undecided'} (${verdict.reason})`);
           if (verdict.confirmed === false) {
             markingRecheckNote = `${verdict.signature ? 'SIGNATURE' : 'PRINTED'}: ${verdict.reason.slice(0, 300)}`;
+            if (attempt >= maxAttempts) maxAttempts = attempt + 1; // the re-grade always gets its turn
             continue; // one re-grade, told what the verification found
           }
           if (verdict.confirmed === true) {
@@ -2647,6 +2655,33 @@ Provide detailed analysis as markdown with all required sections.`
           ensemble_passes: scored.length, zoom_coverage: zoom?.coverage,
           ...(uninspectedRegions.length ? { uninspected_regions: uninspectedRegions } : {}),
           ...(zoom?.verifier ? { zoom_verifier: { version: 'zoom-verifier-v1', ...zoom.verifier } } : {}) };
+        // Oct 2026 AUDIT RECORD: what produced this grade, as hashes and switches
+        // (never raw model output). Lets a dispute be matched to the exact prompt
+        // text, photos and engine settings months later. Best effort.
+        try {
+          const originals = await loadOriginals().catch(() => null);
+          const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+          jsonData.grading_audit = {
+            version: 'audit-v1',
+            model,
+            prompt_version: DCM_PROMPT_VERSION,
+            prompt_sha256: promptSha256,
+            prompt_chars: promptText.length,
+            image_detail: imageDetail(),
+            reasoning_effort: process.env.GRADING_ENSEMBLE_REASONING_EFFORT || 'low',
+            images: originals ? { front_sha256: sha(originals.front), back_sha256: sha(originals.back), orientation: originals.orientation ?? null } : null,
+            switches: {
+              structural_v2: structuralV2Enabled(),
+              zoom_verifier: process.env.ZOOM_VERIFIER_V1 ?? 'default',
+              report_consistency: process.env.REPORT_CONSISTENCY_V1 ?? 'default',
+              centering_r0: process.env.CENTERING_R0 ?? 'default',
+              cv_centering_mode: process.env.CV_CENTERING_MODE ?? 'default',
+              first_look: process.env.FIRST_LOOK_ENABLED ?? 'default',
+            },
+          };
+        } catch (e: any) {
+          console.warn('[CONVERSATIONAL] audit record skipped:', e?.message || e);
+        }
         if (uninspectedRegions.length && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
           jsonData.grading_passes.consensus_notes.push(
             `Magnified inspection could not see ${uninspectedRegions.length} edge or corner area(s) clearly enough (${uninspectedRegions.map(humanizeZoomRegion).join(', ')}); those areas were judged from the whole-card evaluations only.`

@@ -13,23 +13,30 @@
  * sharp .extract from these buffers — nothing about the grading math changes.
  */
 
+import { normalizeOrientation } from './normalizeCardImage';
+
 export interface CardOriginals {
   front: Buffer;
   back: Buffer;
+  /** EXIF orientation each photo carried (1 = none); the buffers above are upright. */
+  orientation?: { front: number; back: number };
 }
 
 /**
  * Download both originals once. Throws with the same message shape the zoom
  * pass used to throw so callers' fail-safe branches behave identically.
+ * Oct 2026: a photo with an EXIF orientation tag is rotated upright here, once,
+ * so every crop and the display copy use the same frame (normalizeCardImage.ts).
  */
 export async function fetchCardOriginals(frontImageUrl: string, backImageUrl: string): Promise<CardOriginals> {
   const [frontRes, backRes] = await Promise.all([fetch(frontImageUrl), fetch(backImageUrl)]);
   if (!frontRes.ok || !backRes.ok) throw new Error(`image download failed (${frontRes.status}/${backRes.status})`);
   const [front, back] = await Promise.all([
-    frontRes.arrayBuffer().then(b => Buffer.from(b)),
-    backRes.arrayBuffer().then(b => Buffer.from(b)),
+    frontRes.arrayBuffer().then(b => Buffer.from(b)).then(normalizeOrientation),
+    backRes.arrayBuffer().then(b => Buffer.from(b)).then(normalizeOrientation),
   ]);
-  return { front, back };
+  if (front.rotated || back.rotated) console.log(`[IMAGES] EXIF orientation applied: front ${front.orientation}, back ${back.orientation}`);
+  return { front: front.buffer, back: back.buffer, orientation: { front: front.orientation, back: back.orientation } };
 }
 
 /**

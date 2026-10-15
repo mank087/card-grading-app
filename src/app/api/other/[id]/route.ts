@@ -1039,6 +1039,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       .update(updateData)
       .eq('id', cardId);
 
+    // A grade is stored from here on: a later enrichment or response-building
+    // error must not mark the card failed or refund the credit (Oct 2026).
+    if (!updateError) gradingAttempted = false;
+
     if (updateError) {
       console.error(`[GET /api/other/${cardId}] ❌ Failed to update card:`, updateError);
       // Previously this logged and FELL THROUGH, returning 200 with a grade the

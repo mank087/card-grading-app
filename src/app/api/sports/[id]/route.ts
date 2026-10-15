@@ -1443,6 +1443,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       .update(updateData)
       .eq("id", cardId);
 
+    // A grade is stored from here on: a later enrichment or response-building
+    // error must not mark the card failed or refund the credit (Oct 2026).
+    if (!updateError) gradingAttempted = false;
+
     if (updateError) {
       console.error(`[GET /api/sports/${cardId}] Database update failed:`, updateError);
       // Release the lock as 'failed' and refund the credit — a save failure

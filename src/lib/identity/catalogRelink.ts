@@ -111,7 +111,22 @@ function parseInfo(raw: unknown): Record<string, any> {
   return info && typeof info === 'object' ? info : {};
 }
 
-const CARD_FIELDS = 'id, category, card_name, featured, card_set, card_number, mtg_set_code, conversational_card_info, conversational_whole_grade, grade_status, identity_confirmed_revision, first_look, mtg_card_id, lorcana_reference_image, onepiece_card_id';
+const CARD_FIELDS = 'id, identity_revision, category, card_name, featured, card_set, card_number, mtg_set_code, conversational_card_info, conversational_whole_grade, grade_status, identity_confirmed_revision, first_look, mtg_card_id, lorcana_reference_image, onepiece_card_id';
+
+/**
+ * Write the link only if the identity is still the one the lookup was made from
+ * (Oct 2026). The lookup is async and can take seconds; an owner edit or a
+ * regrade in that window must not be overwritten by a link to the old identity.
+ */
+export async function writeCatalogLink(supabase: SupabaseClient<any, any, any>, card: any, patch: Record<string, any>): Promise<{ error: { message: string } | null }> {
+  let query = supabase.from('cards').update(patch).eq('id', card.id);
+  for (const field of ['identity_revision', 'identity_confirmed_revision', 'grade_status'] as const) {
+    query = card[field] == null ? query.is(field, null) : query.eq(field, card[field]);
+  }
+  const { data, error } = await query.select('id');
+  if (error) return { error };
+  return { error: data && data.length === 1 ? null : { message: 'identity changed during the catalog lookup; link not saved' } };
+}
 
 /** After an owner save: link from the owner's saved identity. */
 export async function relinkCatalog(supabase: SupabaseClient<any, any, any>, cardId: string): Promise<RelinkOutcome> {
@@ -126,7 +141,7 @@ export async function relinkCatalog(supabase: SupabaseClient<any, any, any>, car
   const setCode = card.category === 'MTG' ? (card.mtg_set_code || (setUnchanged ? info.expansion_code : null)) : (setUnchanged ? info.set_code : null);
   const hit = await matchCatalog(card.category, { name, set: card.card_set || null, number: card.card_number || null, setCode }, info);
   if ('reason' in hit) return { status: 'no_match', reason: hit.reason };
-  const { error: writeError } = await supabase.from('cards').update({ ...hit.columns, conversational_card_info: { ...info, ...hit.info } }).eq('id', cardId);
+  const { error: writeError } = await writeCatalogLink(supabase, card, { ...hit.columns, conversational_card_info: { ...info, ...hit.info } });
   if (writeError) return { status: 'skipped', reason: `link write failed: ${writeError.message}` };
   return { status: 'linked', catalogId: hit.id, name: hit.name, confidence: hit.confidence };
 }
@@ -182,8 +197,8 @@ export async function linkFromFirstLook(
     const fills: Record<string, any> = {};
     if (!card.card_set && hit.set) fills.card_set = hit.set;
     if (!card.card_number && hit.number) fills.card_number = hit.number;
-    const { error: writeError } = await supabase.from('cards').update({ ...hit.columns, ...fills,
-      conversational_card_info: { ...info, ...hit.info, catalog_link_source: 'first_look' } }).eq('id', cardId);
+    const { error: writeError } = await writeCatalogLink(supabase, card, { ...hit.columns, ...fills,
+      conversational_card_info: { ...info, ...hit.info, catalog_link_source: 'first_look' } });
     if (writeError) return { status: 'skipped', reason: `link write failed: ${writeError.message}` };
     return { status: 'linked', catalogId: hit.id, name: hit.name, confidence: hit.confidence };
   } catch (e: any) {
