@@ -50,8 +50,6 @@ import { DownloadReportButton } from '@/components/reports/DownloadReportButton'
 import { GradeReviewButton } from '@/components/grade-review/GradeReviewButton';
 import { ActionLink } from '@/components/design/Primitives';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
-import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
-import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
 import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
@@ -1530,8 +1528,7 @@ export function OnePieceCardDetails() {
   const params = useParams<{ id: string }>();
   const cardId = params?.id;
   const router = useRouter();
-  const { addToQueue, updateCardStatus } = useGradingQueue();
-  const { balance, deductLocalCredit, isFirstPurchase, isLoading: creditsLoading } = useCredits();
+  const { balance, isFirstPurchase, isLoading: creditsLoading } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   // One rule decides the post-result offer, the low-credits banner and the
@@ -1543,8 +1540,6 @@ export function OnePieceCardDetails() {
     orgId: (card as { org_id?: string | null } | null)?.org_id ?? null,
   });
   const [error, setError] = useState<string | null>(null);
-  const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
-  const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
   const [origin, setOrigin] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1612,8 +1607,6 @@ export function OnePieceCardDetails() {
   const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
   const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
   const [showOverlays, setShowOverlays] = useState(true);
-  // 💰 Insufficient credits modal
-  const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   // 📊 Track grade_card_complete event (only once per card)
   const hasTrackedGradeComplete = useRef(false);
   // 🎉 First grade conversion modal state
@@ -1933,119 +1926,6 @@ export function OnePieceCardDetails() {
   };
 
 
-  // Re-grade card - check credits first, then show confirmation modal
-  const handleRegradeClick = () => {
-    // Check if user has enough credits
-    if (balance < 1) {
-      setShowInsufficientCredits(true);
-      return;
-    }
-    setShowRegradeConfirm(true);
-  };
-
-  // Re-grade card function - forces fresh grading with latest model
-  const regradeCard = async () => {
-    let queueId: string | null = null;
-    try {
-      if (!card || !cardId) return;
-
-      setShowRegradeConfirm(false); // Close modal
-      setRegradingImageUrl(card.front_url); // Store image URL before clearing card
-      setLoading(true);
-      setError(null);
-      setCard(null); // Clear current card to show loading screen
-
-      // Add to grading queue for status bar notification
-      queueId = addToQueue({
-        cardId: cardId,
-        category: 'onepiece',
-        categoryLabel: 'One Piece Card (Re-grade)',
-        frontImageUrl: card.front_url,
-        status: 'processing',
-        resultUrl: `/onepiece/${cardId}`
-      });
-      console.log('[REGRADE] Added to queue:', queueId);
-
-      // Call One Piece API with force_regrade parameter to bypass cache
-      console.log('[REGRADE] Forcing fresh grading for One Piece card:', cardId);
-
-      // Re-grading can take 30-60 seconds, so use a longer timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
-
-      const res = await fetch(`/api/onepiece/${cardId}?force_regrade=true&t=${Date.now()}`, {
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to re-grade card');
-      }
-
-      const data = await res.json();
-      console.log('[REGRADE] Fresh grading completed:', data);
-
-      // Deduct credit for re-grade
-      try {
-        const session = getStoredSession();
-        if (session?.access_token) {
-          const deductRes = await fetch('/api/stripe/deduct', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ cardId: cardId }),
-          });
-          if (deductRes.ok) {
-            deductLocalCredit(); // Update local state
-            console.log('[REGRADE] Credit deducted successfully');
-          }
-        }
-      } catch (creditError) {
-        console.error('[REGRADE] Failed to deduct credit:', creditError);
-        // Don't fail the re-grade if credit deduction fails
-      }
-
-      // Update queue status to completed
-      if (queueId) {
-        updateCardStatus(queueId, {
-          status: 'completed',
-          completedAt: Date.now(),
-          resultUrl: `/onepiece/${cardId}`
-        });
-      }
-
-      // Update card state with fresh data (triggers re-render with new grading)
-      setCard(data);
-      setRegradingImageUrl(null); // Clear re-grading state
-      setLoading(false);
-    } catch (error: any) {
-      console.error('Error re-grading card:', error);
-
-      // Update queue status to error
-      if (queueId) {
-        updateCardStatus(queueId, {
-          status: 'error',
-          errorMessage: error.name === 'AbortError'
-            ? 'Re-grading timed out'
-            : (error.message || 'Failed to re-grade card')
-        });
-      }
-
-      // Provide better error message for timeout
-      if (error.name === 'AbortError') {
-        setError('Re-grading is taking longer than expected. Please refresh the page in a moment to see if it completed.');
-      } else {
-        setError(error.message || 'Failed to re-grade card');
-      }
-      setRegradingImageUrl(null); // Clear re-grading state on error
-      setLoading(false);
-    }
-  };
-
   // Delete card function
   const deleteCard = async () => {
     try {
@@ -2133,17 +2013,6 @@ export function OnePieceCardDetails() {
       setIsTogglingVisibility(false);
     }
   };
-
-  // Show full animated re-grade screen ONLY when regradingImageUrl is set
-  if (regradingImageUrl && (loading || isProcessing)) {
-    return (
-      <CardAnalysisAnimation
-        frontImageUrl={regradingImageUrl}
-        cardName="One Piece Card"
-        allowNavigation={true}
-      />
-    );
-  }
 
   // Simple loading state for initial card view (no animation)
   if (loading || isProcessing) {
@@ -2847,7 +2716,7 @@ export function OnePieceCardDetails() {
           <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
             🏴‍☠️ One Piece TCG Card
           </div>
-          {/* Only show visibility toggle and re-grade buttons to card owner */}
+          {/* Only show visibility toggle to card owner */}
           {(() => {
             const session = getStoredSession();
             const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
@@ -5458,7 +5327,7 @@ export function OnePieceCardDetails() {
                             {(professionalGrades.SGC || professionalGrades.TAG)?.notes}
                             {!professionalGrades.SGC && professionalGrades.TAG && (
                               <div className="mt-2 text-xs text-amber-600">
-                                ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
+                                ⚠️ Showing TAG (legacy estimate)
                               </div>
                             )}
                           </div>
@@ -5499,7 +5368,7 @@ export function OnePieceCardDetails() {
                             {(professionalGrades.CGC || professionalGrades.CSG)?.notes}
                             {!professionalGrades.CGC && professionalGrades.CSG && (
                               <div className="mt-2 text-xs text-amber-600">
-                                ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate
+                                ⚠️ Showing CSG (legacy estimate)
                               </div>
                             )}
                           </div>
@@ -6896,42 +6765,6 @@ export function OnePieceCardDetails() {
         </div>
       )}
 
-      {/* Insufficient Credits Modal */}
-      {showInsufficientCredits && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-              Insufficient Credits
-            </h3>
-            <p className="text-sm text-gray-600 text-center mb-4">
-              You need <strong>1 credit</strong> to re-grade this card. Your current balance is <strong>{balance} credits</strong>.
-            </p>
-            <p className="text-sm text-gray-600 text-center mb-6">
-              Purchase more credits to continue grading cards.
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowInsufficientCredits(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => router.push('/credits')}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700"
-              >
-                Buy Credits
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Add this card to a binder — owner-only, hidden pre-migration */}
       {/* Sold it off-platform? Record it here rather than going back to
           the collection. Hidden once sold — SoldBanner takes over. */}
@@ -6947,54 +6780,6 @@ export function OnePieceCardDetails() {
         cardId={card.id}
         isOwner={Boolean(getStoredSession()?.user?.id && card.user_id && getStoredSession()?.user?.id === card.user_id)}
       />
-
-      {/* Re-grade Confirmation Modal */}
-      {showRegradeConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-              Re-grade This Card?
-            </h3>
-            <p className="text-sm text-gray-600 text-center mb-4">
-              This will re-analyze your card using the <strong>same uploaded images</strong> (front and back) with the latest DCM Optic™ grading system.
-            </p>
-            <p className="text-sm text-gray-600 text-center mb-4">
-              The new grade will <strong>replace</strong> the current grade for this card.
-            </p>
-            {/* Credit Warning */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <p className="text-xs text-amber-800 text-center">
-                <strong>This will use 1 credit</strong> (Balance: {balance} credit{balance !== 1 ? 's' : ''})
-              </p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-              <p className="text-xs text-blue-800 text-center">
-                <strong>Want to use different photos?</strong><br />
-                Start a new grading submission instead of re-grading.
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowRegradeConfirm(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={regradeCard}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center justify-center"
-              >
-                Re-grade Card
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* DEBUG PANEL - Development Only */}
       {/* Image Zoom Modal */}

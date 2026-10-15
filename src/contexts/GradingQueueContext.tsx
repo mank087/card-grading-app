@@ -100,7 +100,7 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
 
   const addToQueue = useCallback((card: Omit<GradingCard, 'id' | 'uploadedAt' | 'progress' | 'stage'>) => {
     const id = `grading-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    // Set initial stage based on status - re-grades start as 'processing' not 'uploading'
+    // Set initial stage based on status - a card added already 'processing' starts at 'queued', not 'uploading'
     const initialStage: GradingStage = card.status === 'processing' ? 'queued' : 'uploading'
     const newCard: GradingCard = {
       ...card,

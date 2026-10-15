@@ -9,8 +9,9 @@
  * recomputes anything.
  *
  * Legacy's two legacy-data fallbacks are kept: SGC falls back to a TAG
- * estimate and CGC to a CSG one, each with the "regrade to get the current
- * one" note (5736-5740, 5777-5781). PSA and BGS have no fallback and are
+ * estimate and CGC to a CSG one, each with a "(legacy estimate)" note
+ * (5736-5740, 5777-5781; DCM offers no re-grade, so the note no longer
+ * suggests one). PSA and BGS have no fallback and are
  * rendered unconditionally once the column exists, so a column missing either
  * of them prints an empty card — legacy does the same.
  *
@@ -97,7 +98,7 @@ export function ProEstimatesPanel({ estimates }: { estimates: ProEstimates | nul
           estimate={sgc}
           legacyNote={
             !estimates.SGC && estimates.TAG
-              ? 'Showing a TAG estimate (legacy) — re-grade to get an SGC estimate.'
+              ? 'Showing TAG (legacy estimate).'
               : undefined
           }
         />
@@ -107,7 +108,7 @@ export function ProEstimatesPanel({ estimates }: { estimates: ProEstimates | nul
           estimate={cgc}
           legacyNote={
             !estimates.CGC && estimates.CSG
-              ? 'Showing a CSG estimate (legacy) — re-grade to get a CGC estimate.'
+              ? 'Showing CSG (legacy estimate).'
               : undefined
           }
         />

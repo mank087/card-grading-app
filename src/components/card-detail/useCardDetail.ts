@@ -15,14 +15,16 @@
  *   mount fetch effect            1739-1744   [1893-1900]
  *   org branding logos            1755-1769   [1909-1925]
  *   emblem flags                  1771-1802   [1927-1957]
- *   handleRegradeClick            1915-1921   [2071-2077]
- *   regradeCard                   1924-2031   [2080-2185]
  *   deleteCard                    2032-2073   [2187-2226]
  *   toggleVisibility              2075-2118   [2228-2271]
  *
- * The ONLY differences between the two clients in this region are the category
- * token in the API path and the result URL, and the grading-queue label; both
- * are parameters here.
+ * The ONLY difference between the two clients in this region is the category
+ * token in the API path; it is a parameter here.
+ *
+ * RE-GRADE REMOVED 2026-10-15: DCM does not offer re-grades (a customer
+ * resubmits the card; VIP / Card Lovers can request a grade review). The
+ * handleRegradeClick / regradeCard pair is gone from here and from the legacy
+ * clients; the line ranges above predate that removal.
  *
  * SCOPE: data only. UI state (modals, tabs, zoom, hover, tour/first-grade
  * flags) stays in the component, as does defect parsing.
@@ -40,25 +42,7 @@ import { readIncompleteInspectionMessage } from '@/lib/grading/inspectionMessage
 import { getStoredSession } from '@/lib/directAuth';
 import { fetchBrandingForCard } from '@/lib/orgBranding';
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
-import { useGradingQueue } from '@/contexts/GradingQueueContext';
-import { useCredits } from '@/contexts/CreditsContext';
 import type { CardDetailCategory } from '@/lib/featureFlags/cardDetailV2';
-
-/**
- * The grading-queue label legacy passes for a re-grade. Pokemon sends
- * "Pokemon Card (Re-grade)", sports "Sports Card (Re-grade)"; the rest follow
- * the same shape in their own clients.
- */
-const REGRADE_QUEUE_LABEL: Record<CardDetailCategory, string> = {
-  pokemon: 'Pokemon Card (Re-grade)',
-  sports: 'Sports Card (Re-grade)',
-  mtg: 'MTG Card (Re-grade)',
-  lorcana: 'Lorcana Card (Re-grade)',
-  onepiece: 'One Piece Card (Re-grade)',
-  yugioh: 'Yu-Gi-Oh Card (Re-grade)',
-  starwars: 'Star Wars Card (Re-grade)',
-  other: 'Card (Re-grade)',
-};
 
 /** The fields this hook itself reads. The row carries far more; select('*'). */
 export interface CardDetailRecord {
@@ -112,8 +96,6 @@ export interface UseCardDetailResult {
   /** True while the API is answering 429 and the retry loop is running. */
   isProcessing: boolean;
   error: string | null;
-  /** Front image kept on screen during a re-grade, as the legacy animation does. */
-  regradingImageUrl: string | null;
   refetch: () => Promise<void>;
 
   isOwner: boolean;
@@ -124,10 +106,6 @@ export interface UseCardDetailResult {
   isDeleting: boolean;
   deleteCard: () => Promise<void>;
 
-  /** False when the balance is under 1 credit — legacy's insufficient-credits gate. */
-  canRegrade: boolean;
-  regradeCard: () => Promise<void>;
-
   emblems: EmblemFlags;
   orgLogos: OrgLogos | null;
 }
@@ -137,14 +115,11 @@ export function useCardDetail(
   cardId: string
 ): UseCardDetailResult {
   const router = useRouter();
-  const { addToQueue, updateCardStatus } = useGradingQueue();
-  const { balance, deductLocalCredit } = useCredits();
 
   const [card, setCard] = useState<CardDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -316,108 +291,6 @@ export function useCardDetail(
     }
   }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_vip, card?.owner_show_vip_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
 
-  /**
-   * Re-grade. The credit is deducted AFTER the grade returns, in one POST to
-   * /api/stripe/deduct with { cardId, isRegrade: true } — the deduct API is
-   * idempotent per card since the July 2026 duplicate-charge incident. A failed
-   * deduction is logged and swallowed: the owner keeps the grade they already
-   * received rather than seeing it fail after the work was done. Do not move
-   * the deduction before the fetch, do not retry it, and do not add a second
-   * call site.
-   */
-  const regradeCard = useCallback(async () => {
-    let queueId: string | null = null;
-    try {
-      if (!card || !cardId) return;
-
-      setRegradingImageUrl(card.front_url ?? null); // Store image URL before clearing card
-      setLoading(true);
-      setError(null);
-      setCard(null); // Clear current card to show loading screen
-
-      queueId = addToQueue({
-        cardId: cardId,
-        category,
-        categoryLabel: REGRADE_QUEUE_LABEL[category],
-        frontImageUrl: card.front_url ?? '',
-        status: 'processing',
-        resultUrl: `/${category}/${cardId}`
-      });
-
-      // Re-grading can take 30-60 seconds, so use a longer timeout.
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
-
-      const res = await fetch(`/api/${category}/${cardId}?force_regrade=true&t=${Date.now()}`, {
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to re-grade card');
-      }
-
-      const data = await res.json();
-
-      // Deduct credit after successful re-grade.
-      const session = getStoredSession();
-      if (session?.access_token) {
-        try {
-          const creditResponse = await fetch('/api/stripe/deduct', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ cardId, isRegrade: true }),
-          });
-
-          if (creditResponse.ok) {
-            deductLocalCredit();
-          } else {
-            console.error('[REGRADE] Failed to deduct credit:', await creditResponse.text());
-          }
-        } catch (creditErr) {
-          console.error('[REGRADE] Credit deduction error:', creditErr);
-        }
-      }
-
-      if (queueId) {
-        updateCardStatus(queueId, {
-          status: 'completed',
-          completedAt: Date.now(),
-          resultUrl: `/${category}/${cardId}`
-        });
-      }
-
-      setCard(data);
-      setRegradingImageUrl(null);
-      setLoading(false);
-    } catch (error: any) {
-      console.error('Error re-grading card:', error);
-
-      if (queueId) {
-        updateCardStatus(queueId, {
-          status: 'error',
-          errorMessage: error.name === 'AbortError'
-            ? 'Re-grading timed out'
-            : (error.message || 'Failed to re-grade card')
-        });
-      }
-
-      if (error.name === 'AbortError') {
-        setError('Re-grading timed out (took longer than 2 minutes). Please refresh the page to see if grading completed.');
-      } else {
-        setError(error.message || 'Failed to re-grade card');
-      }
-
-      setRegradingImageUrl(null);
-      setLoading(false);
-    }
-  }, [card, cardId, category, addToQueue, updateCardStatus, deductLocalCredit]);
-
   const deleteCard = useCallback(async () => {
     try {
       if (!card) return;
@@ -506,7 +379,6 @@ export function useCardDetail(
     loading,
     isProcessing,
     error,
-    regradingImageUrl,
     refetch: fetchCardDetails,
 
     isOwner,
@@ -516,9 +388,6 @@ export function useCardDetail(
 
     isDeleting,
     deleteCard,
-
-    canRegrade: balance >= 1,
-    regradeCard,
 
     emblems: { showFounderEmblem, showVipEmblem, showCardLoversEmblem },
     orgLogos,

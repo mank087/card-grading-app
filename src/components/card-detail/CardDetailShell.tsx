@@ -9,9 +9,8 @@
  * search links, the download button, the share payload). Nothing in here reads
  * a category-specific column.
  *
- * LOADING / ERROR / NOT-FOUND / RE-GRADE states follow the legacy pokemon
- * client (CardDetailClient.tsx 2118-2225): the animated re-grade screen when a
- * re-grade is in flight, the private-card page for a 403, the generic
+ * LOADING / ERROR / NOT-FOUND states follow the legacy pokemon client
+ * (CardDetailClient.tsx 2118-2225): the private-card page for a 403, the generic
  * "Card Not Available" page for anything else, and the not-found page when the
  * fetch succeeded with nothing. The one deliberate difference is the initial
  * load: legacy returns `null` (a blank page); this renders a small skeleton,
@@ -44,7 +43,6 @@ import type { MarketRange } from '@/lib/pricing/marketRange';
 import type { LiveValuationInput } from '@/lib/cardDetail/valuation';
 import type { CardSharingData } from '@/lib/socialUtils';
 
-import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import ImageZoomModal from '@/app/pokemon/[id]/ImageZoomModal';
 import { SoldBanner } from '@/components/cards/SoldBanner';
 import { EditCardLabelModal } from '@/components/EditCardLabelModal';
@@ -287,15 +285,13 @@ export function CardDetailShell(props: CardDetailShellProps) {
     shareData,
   } = props;
 
-  const { card, loading, isProcessing, error, regradingImageUrl } = detail;
+  const { card, loading, isProcessing, error } = detail;
   const { balance, isFirstPurchase, totalPurchased, isCardLover, isVip, isLoading: creditsLoading } = useCredits();
 
   const routing = useCardDetailSectionRouting(detail.isOwner);
   const [side, setSide] = useState<CardSide>('front');
   const [zoom, setZoom] = useState({ isOpen: false, imageUrl: '', alt: '', title: '' });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
-  const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // Welcome after the FIRST free grade (a free credit is still left). The
@@ -370,8 +366,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const modalOpen =
     zoom.isOpen ||
     showDeleteModal ||
-    showRegradeConfirm ||
-    showInsufficientCredits ||
     showEditLabelModal ||
     showFirstGradeModal ||
     showFreeGradeWelcome ||
@@ -428,16 +422,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
   const { goToHolder, goToHolderBand } = useGoToHolder(openOverview, setSelectedHolder);
 
   // ── States, in the legacy order ────────────────────────────────────────
-
-  if (regradingImageUrl && (loading || isProcessing)) {
-    return (
-      <CardAnalysisAnimation
-        frontImageUrl={regradingImageUrl}
-        cardName={`${categoryLabel} Card`}
-        allowNavigation
-      />
-    );
-  }
 
   if (loading || isProcessing) return <LoadingSkeleton />;
 
@@ -565,18 +549,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
 
   const openZoom = (imageUrl: string, alt: string, title: string) =>
     setZoom({ isOpen: true, imageUrl, alt, title });
-
-  // No menu item calls this, on purpose. The legacy clients keep the re-grade
-  // handler and modals but removed the button, so V2 offers no re-grade entry
-  // point either. Wiring one up is a product decision, not a parity fix.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleRegradeClick = () => {
-    if (!detail.canRegrade) {
-      setShowInsufficientCredits(true);
-      return;
-    }
-    setShowRegradeConfirm(true);
-  };
 
   const handleVisibilityClick = () => {
     // The confirm exists only in the public → private direction, as legacy.
@@ -947,15 +919,6 @@ export function CardDetailShell(props: CardDetailShellProps) {
         onCloseDelete={() => setShowDeleteModal(false)}
         onConfirmDelete={detail.deleteCard}
         isDeleting={detail.isDeleting}
-        showRegradeConfirm={showRegradeConfirm}
-        onCloseRegrade={() => setShowRegradeConfirm(false)}
-        onConfirmRegrade={() => {
-          setShowRegradeConfirm(false);
-          detail.regradeCard();
-        }}
-        showInsufficientCredits={showInsufficientCredits}
-        onCloseInsufficientCredits={() => setShowInsufficientCredits(false)}
-        balance={balance}
       />
 
       <EditCardLabelModal
