@@ -1,4 +1,5 @@
 import { prechargeBlockedResponse } from '@/lib/grading/prechargeGate';
+import { forceRegradeAllowed } from '@/lib/grading/forceRegradeAuth';
 import { softDeleteOwnedCard } from "@/lib/cards/softDeleteCard";
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
 import { gradeReviewCaptureFields } from '@/lib/gradeReview/captureContext';
@@ -105,7 +106,11 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
   // Check for query parameters
   const { searchParams } = new URL(request.url);
-  const forceRegrade = searchParams.get('force_regrade') === 'true';
+  // Re-grades are not offered to customers (Oct 2026): the flag counts only for an
+  // admin session or the CRON_SECRET bearer (grading/forceRegradeAuth.ts).
+  const forceRegradeRequested = searchParams.get('force_regrade') === 'true';
+  const forceRegrade = forceRegradeRequested && await forceRegradeAllowed(request);
+  if (forceRegradeRequested && !forceRegrade) console.warn(`[force_regrade] ignored for ${cardId}: caller is not an admin`);
   const reidentify = searchParams.get('reidentify') === 'true';
   const statusOnly = searchParams.get('status_only') === 'true';
 

@@ -1,4 +1,5 @@
 import { inspectionFailureResponse } from '@/lib/grading/inspectionCompleteness';
+import { forceRegradeAllowed } from '@/lib/grading/forceRegradeAuth';
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -126,7 +127,11 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
 
   // Check for force_regrade query parameter
   const { searchParams } = new URL(request.url);
-  const forceRegrade = searchParams.get('force_regrade') === 'true';
+  // Re-grades are not offered to customers (Oct 2026): the flag counts only for an
+  // admin session or the CRON_SECRET bearer (grading/forceRegradeAuth.ts).
+  const forceRegradeRequested = searchParams.get('force_regrade') === 'true';
+  const forceRegrade = forceRegradeRequested && await forceRegradeAllowed(request);
+  if (forceRegradeRequested && !forceRegrade) console.warn(`[force_regrade] ignored for ${cardId}: caller is not an admin`);
 
   console.log(`[GRADING API] Starting vision grading for card ${cardId} (force_regrade: ${forceRegrade})`);
 
