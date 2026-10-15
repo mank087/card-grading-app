@@ -17,6 +17,9 @@ export interface DisplayCropFace {
   path: string;
   width: number;
   height: number;
+  /** Owner-requested turn in degrees (0, 90, 180, 270), already applied to `path`. */
+  rotation?: number;
+  rotated_at?: string;
 }
 
 export interface DisplayCropRecord {

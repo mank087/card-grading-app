@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseServer } from '@/lib/supabaseServer';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 /**
  * A `cards` row fetched with an explicit (non-literal) column list.
@@ -42,9 +43,11 @@ function thumbPathFor(path: string): string | null {
  * `openGraph.images` / `twitter.images` entirely (matching prior behaviour).
  */
 export async function getCardOgImageUrl(
-  frontPath: string | null | undefined,
+  /** The card row (preferred: the display copy is used, turned if the owner rotated it) or a bare front path. */
+  cardOrFrontPath: { front_path?: string | null; back_path?: string | null; capture_quality?: unknown; display_crop?: unknown } | string | null | undefined,
   visibility: string | null | undefined
 ): Promise<string | null> {
+  const frontPath = typeof cardOrFrontPath === 'string' ? cardOrFrontPath : displayImagePath(cardOrFrontPath, 'front');
   if (!frontPath) return null;
   if ((visibility || 'private') !== 'public') return null;
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { displayImagePath } from '@/lib/images/displayPath';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyAuth } from '@/lib/serverAuth';
 import { createSignedUrlMap } from '@/lib/signedUrlBatch';
@@ -26,7 +27,7 @@ import { isMissingColumnError } from '@/lib/cards/ownership';
 
 const COLUMNS = `
   id, serial, card_name, featured, pokemon_featured, category, sub_category,
-  card_set, card_number, front_path, conversational_whole_grade,
+  card_set, card_number, front_path, display_crop:capture_quality->display, conversational_whole_grade,
   conversational_condition_label, conversational_card_info,
   sold_at, sold_price, sold_channel, sold_note, created_at
 `;
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ---- thumbnails ----
-    const paths = rows.map(r => r.front_path).filter(Boolean);
+    const paths = rows.map(r => displayImagePath(r, 'front')).filter((p): p is string => !!p);
     let urls = new Map<string, string>();
     if (paths.length) {
       try {
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
         soldPrice: r.sold_price != null ? Number(r.sold_price) : null,
         soldChannel: r.sold_channel,
         soldNote: r.sold_note,
-        frontUrl: r.front_path ? urls.get(r.front_path) ?? null : null,
+        frontUrl: urls.get(displayImagePath(r, 'front') ?? '') ?? null,
       })),
     });
   } catch (error: any) {

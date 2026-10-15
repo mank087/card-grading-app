@@ -55,6 +55,7 @@ import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
 import { imageDetail } from './grading/imageDetail';
 import { createHash } from 'crypto';
+import { isUuid } from './uuid';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
@@ -2635,7 +2636,8 @@ Provide detailed analysis as markdown with all required sections.`
             // for SHOWING the card, from the outline just measured and the bytes
             // already in memory. Originals are untouched; nothing here feeds
             // grading. Bounded and non-throwing, like the record itself.
-            const display = await makeDisplayCropsForGrade(loadOriginals, frontImageUrl, backImageUrl, captureRecord);
+            const display = await makeDisplayCropsForGrade(loadOriginals, frontImageUrl, backImageUrl, captureRecord,
+              isUuid(options?.routingKey) ? options?.routingKey : null);
             if (display) captureRecord.display = display;
             await recordCaptureQuality(options?.routingKey, captureRecord);
             if (captureRecord.zoom_outcome !== 'full') {

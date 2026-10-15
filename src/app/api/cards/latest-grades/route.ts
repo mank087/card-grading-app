@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { displayImagePath } from '@/lib/images/displayPath';
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch'
 
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from('cards')
       .select(`
-        id, serial, card_name, category, front_path, back_path, created_at,
+        id, serial, card_name, category, front_path, back_path, display_crop:capture_quality->display, created_at,
         featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
         conversational_decimal_grade, conversational_whole_grade,
         conversational_condition_label, conversational_card_info,
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     // thumbnails (this is a scrolling showcase strip, not a detail view); the
     // originals stay available as *_full_url. Cards graded before the thumbnail
     // backfill simply fall back to the original.
-    const allPaths = cards.flatMap(card => [card.front_path, card.back_path].filter(Boolean))
+    const allPaths = cards.flatMap(card => [displayImagePath(card, 'front'), displayImagePath(card, 'back')].filter((p): p is string => !!p))
 
     let urlMap: Map<string, SignedImagePair>
     try {
@@ -82,8 +83,8 @@ export async function GET(request: Request) {
 
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
-      const front = pickDisplayUrls(urlMap, card.front_path)
-      const back = pickDisplayUrls(urlMap, card.back_path)
+      const front = pickDisplayUrls(urlMap, displayImagePath(card, 'front') ?? card.front_path)
+      const back = pickDisplayUrls(urlMap, displayImagePath(card, 'back') ?? card.back_path)
       const enrichedCard: any = {
         ...card,
         front_url: front.display,

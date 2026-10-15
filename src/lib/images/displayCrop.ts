@@ -17,6 +17,13 @@
 import sharp from 'sharp';
 import type { DisplayCropRecord, Face } from './displayPath';
 
+/** A JSON column that may arrive as a string or an object. */
+function parseRecord(value: unknown): Record<string, any> | null {
+  if (!value) return null;
+  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return null; } }
+  return typeof value === 'object' ? (value as Record<string, any>) : null;
+}
+
 export const DISPLAY_CROP_VERSION = 'dc-2';
 
 /** Margin around the card, as a share of its width/height. The detected outline is
@@ -202,7 +209,7 @@ export interface DisplayCropStorage {
  */
 export async function createDisplayCrops(
   storage: DisplayCropStorage,
-  faces: Record<Face, { path: string | null | undefined; buffer: Buffer | null | undefined; quad: unknown }>,
+  faces: Record<Face, { path: string | null | undefined; buffer: Buffer | null | undefined; quad: unknown; rotation?: number }>,
 ): Promise<DisplayCropRecord> {
   const record: DisplayCropRecord = { version: DISPLAY_CROP_VERSION, made_at: new Date().toISOString() };
   for (const face of ['front', 'back'] as const) {
@@ -211,17 +218,26 @@ export async function createDisplayCrops(
       if (!path || !buffer) { record[face] = { skipped: 'no_photo' }; continue; }
       const out = await renderDisplayCrop(buffer, quad);
       if (!out.ok) { record[face] = { skipped: out.reason }; continue; }
-      const target = displayPathFor(path);
-      const { error } = await storage.upload(target, out.jpeg, { upsert: true, contentType: 'image/jpeg', cacheControl: '31536000' });
+      // An owner's earlier rotation (rotateDisplay.ts) survives a regrade: the
+      // fresh crop is turned the same way, and keeps the rotated file name so
+      // the previous orientation's cached URL is never shown again.
+      const rotation = ((Number(faces[face].rotation ?? 0) || 0) % 360 + 360) % 360;
+      let jpeg = out.jpeg, width = out.width, height = out.height;
+      if (rotation) {
+        const turned = await sharp(out.jpeg, { failOn: 'none' }).rotate(rotation).jpeg({ quality: 90 }).toBuffer({ resolveWithObject: true });
+        jpeg = turned.data; width = turned.info.width; height = turned.info.height;
+      }
+      const target = rotation ? displayPathFor(path).replace(/\.jpg$/, `_r${Date.now() % 100000}.jpg`) : displayPathFor(path);
+      const { error } = await storage.upload(target, jpeg, { upsert: true, contentType: 'image/jpeg', cacheControl: '31536000' });
       if (error) { record[face] = { skipped: `upload:${String(error.message).slice(0, 60)}` }; continue; }
       // Grid views prefer `<path>_thumb.jpg` (signedUrlBatch.thumbPathFor); write
       // the display copy's thumbnail so the collection shows the trimmed card too.
       // A failed thumbnail only means the grid falls back to the display copy itself.
       try {
         const { makeThumbnail, thumbPath } = await import('./cardThumbnails');
-        await storage.upload(thumbPath(target), await makeThumbnail(out.jpeg), { upsert: true, contentType: 'image/jpeg', cacheControl: '31536000' });
+        await storage.upload(thumbPath(target), await makeThumbnail(jpeg), { upsert: true, contentType: 'image/jpeg', cacheControl: '31536000' });
       } catch { /* display copy still usable */ }
-      record[face] = { path: target, width: out.width, height: out.height };
+      record[face] = { path: target, width, height, ...(rotation ? { rotation } : {}) };
     } catch (e: any) {
       record[face] = { skipped: `error:${String(e?.message || e).slice(0, 60)}` };
     }
@@ -243,6 +259,8 @@ export async function makeDisplayCropsForGrade(
   frontImageUrl: string,
   backImageUrl: string,
   capture: { front: { quad: unknown }; back: { quad: unknown } },
+  /** The card being graded, so an owner's earlier display rotation is kept across a regrade. */
+  cardId?: string | null,
 ): Promise<DisplayCropRecord | null> {
   const work = (async () => {
     const { objectPathFromStorageUrl } = await import('./cardThumbnails');
@@ -255,9 +273,17 @@ export async function makeDisplayCropsForGrade(
     // Lazy for the same reason as the thumbnails: supabaseAdmin throws at load without its env.
     const { supabaseAdmin } = await import('@/lib/supabaseAdmin');
     const storage = supabaseAdmin.storage.from('cards') as unknown as DisplayCropStorage;
+    const rotation: Record<Face, number> = { front: 0, back: 0 };
+    if (cardId) {
+      try {
+        const { data } = await supabaseAdmin.from('cards').select('capture_quality').eq('id', cardId).maybeSingle();
+        const prior = parseRecord(parseRecord(data?.capture_quality)?.display);
+        for (const face of ['front', 'back'] as const) rotation[face] = Number((prior?.[face] as any)?.rotation ?? 0) || 0;
+      } catch { /* no prior rotation */ }
+    }
     return createDisplayCrops(storage, {
-      front: { path: frontPath, buffer: images.front, quad: capture.front.quad },
-      back: { path: backPath, buffer: images.back, quad: capture.back.quad },
+      front: { path: frontPath, buffer: images.front, quad: capture.front.quad, rotation: rotation.front },
+      back: { path: backPath, buffer: images.back, quad: capture.back.quad, rotation: rotation.back },
     });
   })().catch((e: any) => {
     console.warn('[display-crop] skipped:', e?.message || e);

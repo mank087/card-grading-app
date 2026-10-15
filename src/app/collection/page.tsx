@@ -2,6 +2,7 @@
 
 import CollectionConfirmDetailsHost, { requestConfirmDetails } from '@/components/cards/CollectionConfirmDetailsHost';
 import { isNonStandardItemType } from '@/lib/identification/itemType';
+import { rotateCardPhoto } from '@/lib/cards/rotateClient';
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -496,6 +497,8 @@ function CollectionPageContent() {
   const [newBinderFor, setNewBinderFor] = useState<string[] | null>(null)
   const [newBinderBusy, setNewBinderBusy] = useState(false)
   const [removingFromBinderId, setRemovingFromBinderId] = useState<string | null>(null)
+  // Owner "turn this photo" control on a tile (Oct 2026); the id being turned.
+  const [rotatingCardId, setRotatingCardId] = useState<string | null>(null)
   // Binder being renamed / deleted
   const [manageBinder, setManageBinder] = useState<BinderSummary | null>(null)
   const [manageBusy, setManageBusy] = useState(false)
@@ -2112,6 +2115,27 @@ function CollectionPageContent() {
    * Take one card out of the binder currently being viewed.
    * Membership only — the card stays in the collection and in any other binder.
    */
+  // Turn the front photo 90° clockwise. The server writes a new display copy
+  // (every surface reads it); here the tile, the binder list and the per-tab
+  // cache swap to the fresh signed URLs so nothing shows the old orientation.
+  const rotateFront = async (card: Card) => {
+    setRotatingCardId(card.id)
+    try {
+      const r = await rotateCardPhoto(card.id, 'front', 'cw')
+      const patch = (c: Card) => c.id === card.id
+        ? { ...c, front_url: r.thumb_url ?? r.url ?? c.front_url, front_full_url: r.url ?? c.front_full_url }
+        : c
+      setCards(prev => prev.map(patch))
+      setBinderCards(prev => (prev ? prev.map(patch) : prev))
+      for (const [key, entry] of tabCacheRef.current) tabCacheRef.current.set(key, { ...entry, cards: entry.cards.map(patch) })
+      toast.success('Photo turned. It updates everywhere this card is shown.')
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not turn the photo.')
+    } finally {
+      setRotatingCardId(null)
+    }
+  }
+
   const removeFromCurrentBinder = async (card: Card) => {
     if (!selectedBinderId) return
     setRemovingFromBinderId(card.id)
@@ -3113,6 +3137,27 @@ function CollectionPageContent() {
                     ) : (
                       <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M5 9h10a1 1 0 110 2H5a1 1 0 110-2z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+                {/* Turn a sideways photo. Shows on hover like the binder button;
+                    sits below it when both are present. */}
+                {card.front_url && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); rotateFront(card) }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    disabled={rotatingCardId === card.id}
+                    aria-label={`Rotate the photo of ${getPlayerName(card)} 90 degrees clockwise`}
+                    title="Rotate photo (updates everywhere this card is shown)"
+                    className={`absolute ${selectedBinderId && binderReorderable ? 'top-11' : 'top-2'} right-2 z-30 w-7 h-7 rounded-md border-2 border-gray-300 bg-white/90 text-gray-500 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 hover:border-purple-400 hover:text-purple-700 hover:bg-white transition-all disabled:opacity-50`}
+                  >
+                    {rotatingCardId === card.id ? (
+                      <span className="w-3 h-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 10a6 6 0 0 1 10.2-4.3L16 7.5" /><path d="M16 3.5v4h-4" /><path d="M16 10a6 6 0 0 1-10.2 4.3L4 12.5" /><path d="M4 16.5v-4h4" />
                       </svg>
                     )}
                   </button>

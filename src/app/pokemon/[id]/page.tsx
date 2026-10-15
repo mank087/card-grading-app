@@ -383,7 +383,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   console.log('[METADATA] Pokemon card description:', description);
 
   // "cards" is a private bucket: sign the stored path, and only for public cards.
-  const imageUrl = await getCardOgImageUrl(card.front_path, card.visibility);
+  const imageUrl = await getCardOgImageUrl(card, card.visibility);
   const cardUrl = `https://dcmgrading.com/pokemon/${id}`;
   const isPrivate = card.visibility === 'private';
 

@@ -38,7 +38,7 @@
  * (`.cd-hero-download`, card-detail.css); the sheet still renders.
  */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CardDetailViewModel } from '@/lib/cardDetail/viewModel';
 
 export type CardSide = 'front' | 'back';
@@ -67,6 +67,8 @@ export interface CardLabelShowcaseProps {
   downloadAction: ReactNode;
   /** Owner-only "Edit Card Label" entry, wired to EditCardLabelModal. */
   onEditLabel?: () => void;
+  /** Owner-only: turn the shown side's photo 90° clockwise for display (Oct 2026). */
+  onRotate?: (side: CardSide) => Promise<void>;
   isOwner: boolean;
 
   /** "Customize" entry into Label Studio, carrying style and return target. */
@@ -86,11 +88,14 @@ export function CardLabelShowcase({
   renderCardPiece,
   downloadAction,
   onEditLabel,
+  onRotate,
   isOwner,
   customizeHref,
   formatNote,
   shopHref = '/shop',
 }: CardLabelShowcaseProps) {
+  const [rotating, setRotating] = useState(false);
+  const [rotateError, setRotateError] = useState<string | null>(null);
   const image = side === 'front' ? vm.images.front : vm.images.back;
   const sideLabel = side === 'front' ? 'Front' : 'Back';
   const alt = `${vm.identity.displayName} card ${side}`;
@@ -134,7 +139,29 @@ export function CardLabelShowcase({
             Zoom &amp; inspect
           </button>
         )}
+        {isOwner && onRotate && image.present && (
+          <button
+            type="button"
+            className="cd-quiet"
+            disabled={rotating}
+            aria-label={`Rotate the ${side} photo 90 degrees clockwise`}
+            title="Rotate this photo (shows everywhere the card appears)"
+            onClick={async () => {
+              setRotating(true);
+              setRotateError(null);
+              try { await onRotate(side); }
+              catch (e: any) { setRotateError(e?.message || 'Could not turn the photo.'); }
+              finally { setRotating(false); }
+            }}
+          >
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 4 }}>
+              <path d="M4 10a6 6 0 0 1 10.2-4.3L16 7.5" /><path d="M16 3.5v4h-4" /><path d="M16 10a6 6 0 0 1-10.2 4.3L4 12.5" /><path d="M4 16.5v-4h4" />
+            </svg>
+            {rotating ? 'Turning…' : 'Rotate'}
+          </button>
+        )}
       </div>
+      {rotateError && <p className="cd-caption" role="alert" style={{ textAlign: 'center', margin: 0 }}>{rotateError}</p>}
 
       <div className="cd-showcase-row">
         <div>{styleControl}</div>

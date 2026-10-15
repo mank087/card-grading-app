@@ -39,6 +39,7 @@ import {
 } from '@/lib/postGradeEmailTemplates';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { requireCron } from '@/lib/cronAuth';
+import { displayImagePath } from '@/lib/images/displayPath';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -295,7 +296,7 @@ async function fetchUserFirstGradedCard(userId: string): Promise<FirstGradedCard
   try {
     const { data: card, error } = await supabaseAdmin
       .from('cards')
-      .select('id, card_name, category, front_path, conversational_whole_grade, conversational_sub_scores')
+      .select('id, card_name, category, front_path, display_crop:capture_quality->display, conversational_whole_grade, conversational_sub_scores')
       .eq('user_id', userId)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: true })
@@ -310,10 +311,12 @@ async function fetchUserFirstGradedCard(userId: string): Promise<FirstGradedCard
     // Generate a 7-day signed URL for the front image so it's loadable
     // when the user opens the email (Gmail/Apple Mail proxy + cache too).
     let frontImageUrl = '';
-    if (card.front_path) {
+    // The display copy (trimmed, and turned if the owner rotated it), else the original.
+    const emailPhotoPath = displayImagePath(card as any, 'front');
+    if (emailPhotoPath) {
       const { data: signed } = await supabaseAdmin.storage
         .from('cards')
-        .createSignedUrl(card.front_path, 60 * 60 * 24 * 7);
+        .createSignedUrl(emailPhotoPath, 60 * 60 * 24 * 7);
       frontImageUrl = signed?.signedUrl || '';
     }
     if (!frontImageUrl) {

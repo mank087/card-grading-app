@@ -1,4 +1,5 @@
 import { cleanMetaText } from '@/lib/seo/completeMetadata'
+import { displayImagePath } from '@/lib/images/displayPath';
 import { notFound } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getStorefront } from '../../data';
@@ -42,8 +43,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   // OG image: short-lived signed URL is fine here (crawlers fetch at parse time).
   let ogImage: string | undefined;
-  if ((card as any).front_path) {
-    const { data: signed } = await supabase.storage.from('cards').createSignedUrl((card as any).front_path, 60 * 60);
+  const ogPath = displayImagePath(card as any, 'front');
+  if (ogPath) {
+    const { data: signed } = await supabase.storage.from('cards').createSignedUrl(ogPath, 60 * 60);
     ogImage = signed?.signedUrl ?? undefined;
   }
 
@@ -106,7 +108,8 @@ export default async function StorefrontCardPage({
     const { data } = await supabase.storage.from('cards').createSignedUrl(path, 60 * 60);
     return data?.signedUrl ?? null;
   };
-  const [frontUrl, backUrl] = await Promise.all([sign(card.front_path), sign(card.back_path)]);
+  // Display copies (trimmed, turned if the owner rotated them), else the originals.
+  const [frontUrl, backUrl] = await Promise.all([sign(displayImagePath(card, 'front')), sign(displayImagePath(card, 'back'))]);
 
   const label = getLabelData(card);
   // Serial display helper: the org-serial work stream will swap what is shown

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { displayImagePath } from '@/lib/images/displayPath';
 import type { Organization } from '@/lib/organizations';
 import type { OrgLabelDesign } from '@/lib/labels/orgLabelDesign';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
@@ -111,7 +112,7 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
   if (content.show_recent_cards) {
     const { data: cards } = await s
       .from('cards')
-      .select('id, serial, org_serial_display, category, front_path, created_at, ' +
+      .select('id, serial, org_serial_display, category, front_path, display_crop:capture_quality->display, created_at, ' +
         'conversational_card_info, conversational_whole_grade, conversational_decimal_grade, ' +
         'conversational_condition_label, label_data, custom_label_data, card_colors, ' +
         'card_name, card_set, card_number, featured, pokemon_featured')
@@ -134,14 +135,14 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
       imageMap = await createSignedImageMap(
         s.storage,
         'cards',
-        rows.map(c => c.front_path),
+        rows.map(c => displayImagePath(c, 'front')).filter((p): p is string => !!p),
         { expiresIn: SIGN_TTL }
       );
     } catch {
       // The storefront must still render without its card strip images.
     }
     recentCards = rows.map(c => {
-      const front = pickDisplayUrls(imageMap, c.front_path);
+      const front = pickDisplayUrls(imageMap, displayImagePath(c, 'front') ?? c.front_path);
       return {
         card: c as Record<string, unknown>,
         frontUrl: front.display,

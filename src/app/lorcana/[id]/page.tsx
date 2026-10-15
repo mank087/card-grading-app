@@ -282,7 +282,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   console.log('[METADATA] Lorcana card description:', description);
 
   // "cards" is a private bucket: sign the stored path, and only for public cards.
-  const imageUrl = await getCardOgImageUrl(card.front_path, card.visibility);
+  const imageUrl = await getCardOgImageUrl(card, card.visibility);
   const cardUrl = `https://dcmgrading.com/lorcana/${id}`;
   const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || 'Lorcana Card';
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { displayImagePath } from '@/lib/images/displayPath';
 import { verifyAuth } from '@/lib/serverAuth';
 import { isUuid } from '@/lib/uuid';
 import { supabaseServer } from '@/lib/supabaseServer';
@@ -29,7 +30,7 @@ type Params = { params: Promise<{ id: string }> };
  * selecting them for 100 rows every 4 seconds is the production-DB hazard
  * this list exists to avoid.
  */
-const CARD_COLUMNS = 'id, grade_status, conversational_whole_grade, category, front_path';
+const CARD_COLUMNS = 'id, grade_status, conversational_whole_grade, category, front_path, display_crop:capture_quality->display';
 
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const thumbPaths = Array.from(
     new Set(
       items
-        .map((item) => cardsById.get(item.card_id ?? '')?.front_path || item.front_path)
+        .map((item) => { const c = cardsById.get(item.card_id ?? ''); return (c && displayImagePath(c, 'front')) || item.front_path; })
         .filter((p): p is string => typeof p === 'string' && p.length > 0)
     )
   );
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const grid = items.map((item) => {
     const card = item.card_id ? cardsById.get(item.card_id) : null;
-    const path = card?.front_path || item.front_path || null;
+    const path = (card && displayImagePath(card, 'front')) || item.front_path || null;
     return {
       position: item.position,
       status: item.status,

@@ -55,6 +55,7 @@ import { useCredits } from '@/contexts/CreditsContext';
 import { getStoredSession } from '@/lib/directAuth';
 
 import CardLabelShowcase, { type CardSide } from './CardLabelShowcase';
+import { rotateCardPhoto } from '@/lib/cards/rotateClient';
 import {
   LabelsHoldersSection,
   OverviewHoldersBand,
@@ -708,6 +709,12 @@ export function CardDetailShell(props: CardDetailShellProps) {
               holderMenu,
             })}
             onEditLabel={() => setShowEditLabelModal(true)}
+            onRotate={async (rotateSide) => {
+              // The server writes a new display copy; refetching the card picks up
+              // its fresh signed URL on every surface this page renders.
+              await rotateCardPhoto(card.id, rotateSide, 'cw');
+              await detail.refetch();
+            }}
             isOwner={isOwner}
             customizeHref={labelStudioHref()}
             renderCardPiece={({ side: pieceSide }) => (

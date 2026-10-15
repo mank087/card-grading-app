@@ -10,6 +10,7 @@
 // supabase/migrations/20260225_add_pop_report.sql. Nothing selects a JSON blob.
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { displayImagePath } from '@/lib/images/displayPath';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 import {
   POP_CATEGORIES,
@@ -252,7 +253,7 @@ export async function fetchPopCards(opts: {
   if (dbSubCategory) {
     let cardsQuery = supabaseAdmin
       .from('cards')
-      .select('card_name, card_number, featured, card_set, front_path, conversational_whole_grade')
+      .select('card_name, card_number, featured, card_set, front_path, display_crop:capture_quality->display, conversational_whole_grade')
       .eq('category', dbCategory)
       .eq('sub_category', dbSubCategory)
       .not('conversational_whole_grade', 'is', null);
@@ -301,7 +302,7 @@ export async function fetchPopCards(opts: {
           card_number: card.card_number || '',
           featured: card.featured,
           card_set: card.card_set,
-          front_path: card.front_path,
+          front_path: displayImagePath(card as any, 'front'),
           total: 0,
           grades: {},
         };
@@ -310,7 +311,7 @@ export async function fetchPopCards(opts: {
       entry.total++;
       const grade = card.conversational_whole_grade;
       if (grade) entry.grades[grade] = (entry.grades[grade] || 0) + 1;
-      if (!entry.front_path && card.front_path) entry.front_path = card.front_path;
+      if (!entry.front_path && card.front_path) entry.front_path = displayImagePath(card as any, 'front');
     }
 
     const sortedCards = Array.from(cardMap.values())
