@@ -152,7 +152,7 @@ export function GradeReviewButton({ cardId, ownerId }: { cardId: string; ownerId
         {state.review ? 'View Review' : lowConfidence ? 'Fix Card Details' : gradeAllowed ? 'Request Grade Review' : 'Fix Card Details'}
       </button>
       <p className="mt-2 text-xs text-gray-600">
-        {state.review ? `${reviewStatusLabels[state.review.status]} · ${new Date(state.review.requested_at).toLocaleDateString()}` : gradeAllowed ? 'One complimentary manual review included with this grade.' : detailsAllowed ? 'Card-detail corrections are free for every owner. Grade reviews are available to VIP purchasers and active Card Lovers members.' : 'Available on grades completed after the review program launched. Re-grade this card to become eligible.'}
+        {state.review ? `${reviewStatusLabels[state.review.status]} · ${new Date(state.review.requested_at).toLocaleDateString()}` : gradeAllowed ? 'One complimentary manual review included with this grade.' : detailsAllowed ? 'Card-detail corrections are free for every owner. Grade reviews are available to VIP purchasers and active Card Lovers members.' : 'Available on grades completed after the review program launched. Submit the card as a new grade to become eligible.'}
       </p>
       <p className="mt-1 text-xs text-gray-600">Manual reviews can take up to two business days.</p>
       <dialog ref={dialog} aria-labelledby={`grade-review-title-${cardId}`}

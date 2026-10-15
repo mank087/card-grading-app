@@ -175,7 +175,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'unexpected-grade',
     question: 'What if a card scores higher or lower than I expect?',
     answer:
-      'First check the image confidence letter and the defect log. Blur, glare, shadows or a busy background can hide or invent wear, so re-photograph in even light on a plain dark background and re-grade for one credit. VIP purchasers and active Card Lovers can also request a manual review by the DCM team from the card page. If the card name, set, year or number is wrong, anyone can request a card-detail correction for free.',
+      'First check the image confidence letter and the defect log. Blur, glare, shadows or a busy background can hide or invent wear, so re-photograph in even light on a plain dark background and submit the card as a new grade (1 credit). VIP purchasers and active Card Lovers can also request a manual review by the DCM team from the card page. If the card name, set, year or number is wrong, anyone can request a card-detail correction for free.',
     keywords: ['unexpected', 'higher', 'lower', 'expect', 'wrong grade', 'too high', 'too low', 'surprised', 'disagree', 'dispute', 'appeal'],
     category: 'grading-scores',
     links: [{ label: 'Grading limitations', href: '/grading-limitations' }],
@@ -341,7 +341,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'grade-differs',
     question: 'What if my DCM grade differs from a professional grade?',
     answer:
-      'Differences come from photo limits versus physical inspection, from graders applying their own standards, and from the natural spread between any two graders. Check the image confidence letter, re-grade with better photos if it is a C or D, and remember that DCM uses a weakest-link rule that some services do not.',
+      'Differences come from photo limits versus physical inspection, from graders applying their own standards, and from the natural spread between any two graders. Check the image confidence letter, submit the card again with better photos if it is a C or D, and remember that DCM uses a weakest-link rule that some services do not.',
     keywords: ['differ', 'different', 'wrong', 'disagree', 'mismatch', 'inaccurate', 'not match', 'off', 'psa gave'],
     category: 'dcm-vs-mailaway',
     links: [{ label: 'Grading limitations', href: '/grading-limitations' }],
@@ -373,7 +373,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'altered-cards',
     question: 'What happens if my card has been altered?',
     answer:
-      'Cards DCM judges to be trimmed, recolored, rebacked or re-cornered receive an Authentic Altered designation instead of a numeric grade, and the report explains what was seen. If you believe the call is wrong, re-photograph and re-grade, or request a manual review if you are eligible.',
+      'Cards DCM judges to be trimmed, recolored, rebacked or re-cornered receive an Authentic Altered designation instead of a numeric grade, and the report explains what was seen. If you believe the call is wrong, submit the card again with clearer photos, or request a manual review if you are eligible.',
     keywords: ['altered', 'trimmed', 'modified', 'recolored', 'rebacked', 'authentic altered', 'designation'],
     category: 'special-cases',
     links: [],
@@ -433,9 +433,9 @@ export const knowledgeBase: KnowledgeEntry[] = [
   },
   {
     id: 'regrade',
-    question: 'Can I re-grade a card?',
+    question: 'Can I have a card graded again?',
     answer:
-      'Yes. Re-grading costs 1 credit and runs a completely fresh evaluation with new photos if you upload them. It is the right move when the image confidence was C or D, the photos had glare or blur, or the uncertainty range was wide. Your previous grade is replaced by the new one.',
+      'DCM does not re-grade a card in place. To have a card evaluated again, submit it as a new grade with fresh photos (1 credit); the new grade is a separate card in your collection. That is the right move when the image confidence was C or D, the photos had glare or blur, or the uncertainty range was wide. VIP purchasers and active Card Lovers members can also request a grade review of an existing grade from the card page, and anyone can request a card-detail correction for free.',
     keywords: ['regrade', 're-grade', 'again', 'redo', 'retry', 'new grade', 'second opinion', 'new photos'],
     category: 'account-collection',
     links: [{ label: 'Go to collection', href: '/collection' }],
