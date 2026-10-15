@@ -133,7 +133,7 @@ print stats through the season BEFORE the issue year).
 • Many inserts carry no card number at all. `null` is the correct, expected answer.
 • Do NOT recall a number from your knowledge of the set. A wrong number is printed on the
   customer's slab label and looks authoritative; a blank one they can correct.
-• Real failure (2026-08-28): a "Scoring Kings" insert printed "8 OF 12" was stored as "101".
+• Real failure: a "Scoring Kings" insert printed "8 OF 12" was stored as "101".
   Across repeated runs the same card also produced 11, 180, 13, 10, NNO and SK11 — several with
   identification_confidence "high". None were on the card.
 • The back of that card was photographed sideways. Reorient before reading — see the

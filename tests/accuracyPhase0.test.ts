@@ -44,6 +44,12 @@ describe('offline Phase 0 baseline', () => {
     v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 34049, lines: 660, approximateTokensCharsDiv4: 8513 });
     // Seventh deliberate change (Oct 2026): starwars_delta_v5.txt was deleted with the abandoned
     // Star Wars category (Star Wars is an Other sub-category). The frozen probe list drops it; the frozen baseline is filtered to match.
+    // Eighth deliberate change (Oct 2026, v9.37): master rubric contradiction pass; the Pokemon
+    // delta's textured-card example now scores its two minor flaws 8; a date removed from a Sports
+    // delta anecdote. Every prompt's exact text is pinned by hash in src/lib/promptHash.test.ts.
+    v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 284943, lines: 5539, approximateTokensCharsDiv4: 71236 });
+    v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 34067, lines: 660, approximateTokensCharsDiv4: 8517 });
+    v930.set('sports_delta_v5.txt', { file: 'sports_delta_v5.txt', characters: 41906, lines: 738, approximateTokensCharsDiv4: 10477 });
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));

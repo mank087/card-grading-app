@@ -181,7 +181,7 @@ CRITICAL REMINDERS:
 - Follow Evidence-Based Grading Protocol (Section 7) for ALL assessments
 - Every claim (defect OR pristine) requires observable evidence
 - Description-score consistency is MANDATORY
-- No template language - each corner/edge must be unique
+- Identical clean regions may use identical descriptions; never invent a difference
 - Validate your response before submission using the verification checklist
 `;
 
