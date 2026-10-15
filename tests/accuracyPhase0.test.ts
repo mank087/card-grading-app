@@ -50,6 +50,13 @@ describe('offline Phase 0 baseline', () => {
     v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 284943, lines: 5539, approximateTokensCharsDiv4: 71236 });
     v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 34067, lines: 660, approximateTokensCharsDiv4: 8517 });
     v930.set('sports_delta_v5.txt', { file: 'sports_delta_v5.txt', characters: 41906, lines: 738, approximateTokensCharsDiv4: 10477 });
+    // Twelfth deliberate change (Oct 2026, v9.42): category guards in the Pokemon, MTG, One Piece
+    // and Yu-Gi-Oh deltas (back swirl arcs and Trainer header divider; old-frame cracked-stone
+    // frame; nautical-chart back; security seal, whose two contradicting score lines were replaced).
+    v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 35886, lines: 683, approximateTokensCharsDiv4: 8972 });
+    v930.set('mtg_delta_v5.txt', { file: 'mtg_delta_v5.txt', characters: 22907, lines: 490, approximateTokensCharsDiv4: 5727 });
+    v930.set('onepiece_delta_v5.txt', { file: 'onepiece_delta_v5.txt', characters: 20300, lines: 489, approximateTokensCharsDiv4: 5075 });
+    v930.set('yugioh_delta_v5.txt', { file: 'yugioh_delta_v5.txt', characters: 22663, lines: 471, approximateTokensCharsDiv4: 5666 });
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));

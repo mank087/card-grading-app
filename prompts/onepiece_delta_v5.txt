@@ -372,7 +372,7 @@ reflect light as scuff-like streaks in photos.
 
 **Standard Card Surface:**
 • Glossy front surface with character artwork
-• Standard card back with One Piece logo pattern
+• Standard card back with One Piece logo pattern (its chart lines are printed — see section 6)
 
 **Common Issues:**
 • Print lines through artwork
@@ -407,6 +407,20 @@ reflect light as scuff-like streaks in photos.
 • Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
 • Print defects noticeable at normal distance → 7 per the ladder
 • Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
+
+────────────────────────────────────────────────────────────────────────
+6. CARD BACK NAUTICAL-CHART DESIGN — NOT DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+🚨 **THE BACK'S CHART LINES ARE INK:** The back of every genuine One Piece card is printed with
+a nautical-chart design: thin, straight, pale lines that cross the entire blue field and
+intersect one another at angles, behind the gold compass and the ONE PIECE logo. These lines are
+ink and identical on every copy; they run edge to edge in straight paths and do not disturb the
+gloss. Never report them as scratches, scuffs or creases on any part of the back. A back scratch
+is real only when it is clearly NOT part of that line network: it breaks the printed lines or
+crosses them irregularly, is curved or ragged, catches light differently from the print, or
+exposes white paper. Many straight, intersecting pale lines spread across the whole back are the
+chart, not wear.
 
 ═══════════════════════════════════════════════════════════════════════
 D. ONE PIECE CARD GRADING EXAMPLES

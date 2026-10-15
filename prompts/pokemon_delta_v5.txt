@@ -608,6 +608,29 @@ and galaxy patterns inherent to the foil sheet. These are manufacturing characte
 scratches or clouding. Only deduct where damage interrupts the foil (dull dead spots with
 defined edges, scratch lines that ignore the swirl pattern).
 
+────────────────────────────────────────────────────────────────────────
+8. PRINTED LINES THAT ARE NOT DAMAGE (Card Back Swirl, Trainer Header)
+────────────────────────────────────────────────────────────────────────
+
+🚨 **BACK SWIRL ARCS ARE INK:** The standard Pokemon card back prints faint wavy ARC LINES
+inside the pale swirl areas of its blue field, most visibly around the upside-down Pokemon logo
+in the lower half of the back. These arcs are ink and appear on EVERY genuine copy. Never report
+them as a crease, bend, scratch or scuff, and never apply a structural cap for them. Because a
+printed arc can show a light line beside a darker one, a highlight-and-shadow pair along a line
+in the swirl is NOT evidence of damage on its own. A line in the swirl artwork is damage only
+when it (a) breaks the printed ink or shows white paper fibre, (b) reaches the card edge and
+kinks or deforms the outline there, or (c) has a matching line at the corresponding spot on the
+front. A line that follows the curve of the swirl and shows none of these is the printed design.
+(This is separate from the WOTC HOLO SWIRL above, which is in the front holofoil.)
+
+🚨 **TRAINER HEADER DIVIDER IS INK:** Trainer cards (Supporter, Item, Stadium, Pokemon Tool)
+print a curved diagonal divider line in the header bar near the top edge, between the small
+"Supporter" / "Item" / "Stadium" / "Pokemon Tool" label and the word "TRAINER". It is on every
+copy and is ink. Never report it as a crease, bend or scratch, and never apply a structural cap
+for it. A line at the top of a Trainer card that coincides with that divider is damage only when
+it continues past the header bar into the artwork or out to the card edge along the same path,
+breaks the ink or shows white fibre, kinks the top edge, or has a matching line on the back.
+
 ═══════════════════════════════════════════════════════════════════════
 E. POKEMON CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════

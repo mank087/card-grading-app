@@ -348,7 +348,8 @@ check before reporting back-surface scuffs.
 • Surface indentations or pressure marks
 • Ink spots or printing errors
 • Silvering on dark card areas
-• "Hologram" stamp wear (Eye of Anubis on newer cards)
+• Security seal (Eye of Anubis, bottom-right) physically missing or torn out (material gone) —
+  a chip at that corner; the seal's own sparkle or scratched look is never scored (section 6)
 
 **Card Art Considerations:**
 • Defects on monster/character face area more impactful
@@ -359,7 +360,9 @@ check before reporting back-surface scuffs.
 • Hairline/close-inspection scratch or print line → 9/8 per the ladder
 • Scratch noticeable at normal distance → 7 (location — e.g. the monster's face — is described
   in prose but does not change the score)
-• Damaged/scratched square hologram stamp (bottom-right) → Minor 9 / Moderate 8 by visibility
+• Square security seal (bottom-right): its own sparkle or scratched look is NEVER scored. A seal
+  that is physically missing or torn out (material gone) is a chip at that corner — score it via
+  the master CORNER SCORING LADDER (Section 8)
 
 ────────────────────────────────────────────────────────────────────────
 5. PRINTING/MANUFACTURING DEFECTS
@@ -376,6 +379,20 @@ check before reporting back-surface scuffs.
 • Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
 • Print defects noticeable at normal distance → 7 per the ladder
 • Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
+
+────────────────────────────────────────────────────────────────────────
+6. SECURITY SEAL (EYE OF ANUBIS) — NOT A DEFECT
+────────────────────────────────────────────────────────────────────────
+
+🚨 **THE SECURITY SEAL IS A MANUFACTURING FEATURE:** Genuine Yu-Gi-Oh! cards carry a small
+square rainbow/holographic security seal (the "Eye of Anubis" foil) in the FRONT bottom-right
+corner, beside the copyright line. Its bright, speckled, multicolour sparkle is the foil itself
+and looks the same on every copy; in a photo it can look scratched, chipped or like exposed
+material. It is NOT a chip, NOT coating loss and NOT exposed material — never report a surface,
+corner or edge defect at the seal. Judge the bottom-right front corner only by the CARDSTOCK
+outside the seal: report that corner only if the cardstock there shows whitening, white fibre or
+a crushed or blunted tip. The one exception is a seal that is physically missing or torn out
+(material gone, a bare or torn patch where the seal belongs) — that is a chip at that corner.
 
 ═══════════════════════════════════════════════════════════════════════
 D. YU-GI-OH! CARD GRADING EXAMPLES

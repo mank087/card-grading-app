@@ -456,6 +456,23 @@ reporting any etched-foil scratch — only deduct where the expected texture is 
 • A genuinely clean vintage card earns the same grade a modern card would — no pre-emptive
   vintage caps, no vintage leniency; era context belongs in the prose only
 
+────────────────────────────────────────────────────────────────────────
+7. OLD-FRAME CRACKED-STONE FRAME — NOT DAMAGE (pre-2003 cards)
+────────────────────────────────────────────────────────────────────────
+
+🚨 **THE OLD-FRAME TEXTURE IS INK:** Magic cards printed in the original (pre-2003) frame have
+a textured frame around the art box and text box. The RED frame especially is a cracked-stone
+pattern: dark branching crack lines with light edges running across the WHOLE frame, which look
+like cracked ink or creases. The other frame colours carry their own printed textures and are
+judged the same way. These cracks appear on every copy and are ink. Never report them as
+creases, scratches, cracked ink or surface wear, and never apply a structural cap for them.
+Because the printed cracks already have a dark line with light edges, a highlight-and-shadow
+pair along a line inside the frame is NOT evidence of damage on its own. A line inside an
+old-style frame is damage only when it (a) continues out of the frame into the art box or text
+box along the same path, (b) reaches the card edge and kinks or deforms the outline there, or
+(c) has a matching line at the corresponding spot on the other face. A line that starts and
+stops inside the frame and branches like the surrounding network is the printed texture.
+
 ═══════════════════════════════════════════════════════════════════════
 E. MTG CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
