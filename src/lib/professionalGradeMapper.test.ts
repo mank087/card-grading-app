@@ -6,7 +6,7 @@
  * Run with: npm test professionalGradeMapper.test.ts
  */
 
-import { estimateProfessionalGrades, formatAsPhase3Output } from './professionalGradeMapper';
+import { estimateProfessionalGrades, formatAsPhase3Output, proEstimatesV2Enabled } from './professionalGradeMapper';
 import type { DcmGradingInput, ProfessionalGradeEstimates } from './professionalGradeMapper';
 
 describe('Professional Grade Mapper', () => {
@@ -599,5 +599,73 @@ describe('Integration Examples', () => {
     expect(result.BGS.numeric_score).toBe(1);
     expect(result.SGC.numeric_score).toBe(1);
     expect(result.CGC.numeric_score).toBe(2.0);
+  });
+});
+
+// PRO_ESTIMATES_V2 (Oct 2026): PSA reverse limit, SGC crease row, CGC Cards scale.
+describe('PRO_ESTIMATES_V2', () => {
+  const gem: DcmGradingInput = { final_grade: 10, centering: { front_lr: [52, 48], front_tb: [51, 49], back_lr: [80, 20], back_tb: [50, 50] } };
+
+  test('is off unless the switch is explicitly on', () => {
+    expect(proEstimatesV2Enabled({})).toBe(false);
+    expect(proEstimatesV2Enabled({ PRO_ESTIMATES_V2: '0' })).toBe(false);
+    expect(proEstimatesV2Enabled({ PRO_ESTIMATES_V2: 'on' })).toBe(true);
+    expect(proEstimatesV2Enabled({ PRO_ESTIMATES_V2: '1' })).toBe(true);
+    // Default path keeps the v1 tables: a bad reverse does not touch PSA, CGC keeps its old labels.
+    const v1 = estimateProfessionalGrades(gem, { v2: false });
+    expect(v1.PSA.numeric_score).toBe(10);
+    expect(v1.CGC.estimated_grade).toBe('10 Gem Mint');
+  });
+
+  test('PSA: a DCM 10 whose reverse is worse than 75/25 estimates PSA 9', () => {
+    const r = estimateProfessionalGrades(gem, { v2: true });
+    expect(r.PSA.numeric_score).toBe(9);
+    expect(r.PSA.confidence).toBe('medium');
+    expect(r.PSA.notes).toContain('reverse centering');
+    // Exactly 75/25 still passes; an unmeasured back stays unknown and is never read from the front.
+    expect(estimateProfessionalGrades({ ...gem, centering: { ...gem.centering!, back_lr: [75, 25] } }, { v2: true }).PSA.numeric_score).toBe(10);
+    expect(estimateProfessionalGrades({ final_grade: 10, centering: { front_lr: [80, 20], front_tb: [50, 50] } }, { v2: true }).PSA.notes).not.toContain('reverse');
+  });
+
+  test('SGC: the crease cap lands on SGC 5, not the DCM-5 row (SGC 5.5)', () => {
+    const creased: DcmGradingInput = { final_grade: 8, centering: { front_lr: [50, 50], front_tb: [50, 50] }, crease_detected: true };
+    expect(estimateProfessionalGrades(creased, { v2: false }).SGC.numeric_score).toBe(5.5); // the v1 bug
+    const r = estimateProfessionalGrades(creased, { v2: true });
+    expect(r.SGC.numeric_score).toBe(5);
+    expect(r.SGC.estimated_grade).toContain('5');
+    expect(r.SGC.notes).toContain('Capped at 5 EX');
+  });
+
+  test('CGC: card-scale labels in half-point steps, reverse limit, handwriting floor', () => {
+    const at = (final_grade: number) => estimateProfessionalGrades({ final_grade, centering: { front_lr: [50, 50], front_tb: [50, 50], back_lr: [50, 50], back_tb: [50, 50] } }, { v2: true }).CGC;
+    expect(at(9).estimated_grade).toBe('9 Mint');
+    expect(at(8).estimated_grade).toBe('8 NM/Mint');
+    expect(at(7).estimated_grade).toBe('7 NM');
+    expect(at(6).estimated_grade).toBe('6 EX/NM');
+    expect(at(4).estimated_grade).toBe('4 VG/EX');
+    expect(at(1).estimated_grade).toBe('1 Poor');
+    expect(at(10).estimated_grade).toBe('10 Gem Mint');
+    for (const g of [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1]) {
+      expect(/\b(NM\/M|VF|FN|Fa)\b/.test(at(g).estimated_grade)).toBe(false); // no comic-book labels
+    }
+    const badBack = estimateProfessionalGrades(gem, { v2: true }).CGC;
+    expect(badBack.numeric_score).toBe(9.5);
+    expect(badBack.notes).toContain('reverse centering');
+    const offCenter = estimateProfessionalGrades({ final_grade: 10, centering: { front_lr: [65, 35], front_tb: [50, 50] } }, { v2: true }).CGC;
+    expect(offCenter.numeric_score).toBe(9.5);
+    expect(offCenter.confidence).toBe('medium');
+    const written = estimateProfessionalGrades({ final_grade: 9, has_handwriting: true }, { v2: true }).CGC;
+    expect(written.numeric_score).toBe(2);
+    expect(estimateProfessionalGrades({ final_grade: 9, has_handwriting: true, is_authenticated_autograph: true }, { v2: true }).CGC.numeric_score).toBe(9);
+  });
+
+  test('v2 never raises an estimate above v1 on a sample of inputs', () => {
+    const inputs: DcmGradingInput[] = [];
+    for (const g of [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]) for (const lr of [[50, 50], [60, 40], [70, 30]] as [number, number][]) for (const crease of [false, true])
+      inputs.push({ final_grade: g, centering: { front_lr: lr, front_tb: [52, 48], back_lr: [78, 22], back_tb: [50, 50] }, crease_detected: crease });
+    for (const input of inputs) {
+      const a = estimateProfessionalGrades(input, { v2: false }), b = estimateProfessionalGrades(input, { v2: true });
+      for (const k of ['PSA', 'BGS', 'SGC', 'CGC'] as const) expect(b[k].numeric_score).toBeLessThanOrEqual(a[k].numeric_score);
+    }
   });
 });

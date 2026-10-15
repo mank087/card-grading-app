@@ -139,6 +139,40 @@ function calculateCenteringDeviation(centering: CenteringMeasurements | undefine
 }
 
 // =============================================================================
+// PRO_ESTIMATES_V2 (Oct 2026, Step 5 of the candidate14 plan) - default OFF
+// =============================================================================
+// Three corrections to the estimate tables, switched on together once the owner
+// has signed off on a before/after table of live cards:
+//   PSA  - the published Gem Mint limit also applies to the reverse (75/25); a
+//          DCM 10 whose BACK measures worse than 75/25 estimates PSA 9.
+//   SGC  - the crease cap lands on the row whose SGC grade is 5 (the table is
+//          keyed by DCM grade, and DCM 5.0 maps to SGC 5.5, so the old lookup
+//          capped at 5.5 EX+ while saying "capped at 5 EX").
+//   CGC  - the CGC Cards scale (10 Gem Mint ... 1 Poor in half-point steps)
+//          replaces the comic-book labels (9.8 NM/M, VF/NM, Fa/G) the table
+//          carried; the reverse limit for a 10 is 75/25 as for PSA.
+// Nothing here raises an estimate. Missing back measurements stay unknown; the
+// front is never substituted for them.
+export function proEstimatesV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = String(env.PRO_ESTIMATES_V2 ?? '').trim().toLowerCase();
+  return v === '1' || v === 'on' || v === 'true';
+}
+
+/** Worst back-axis major share, or null when either back axis is unmeasured. */
+function backCenteringWorst(centering: CenteringMeasurements | undefined): number | null {
+  const axes = [centering?.back_lr, centering?.back_tb];
+  if (axes.some(a => !a || a.length !== 2 || a.some(n => !Number.isFinite(n)))) return null;
+  return Math.max(...axes.map(a => Math.max(a![0], a![1])));
+}
+
+/** The table row whose company grade is `numeric` (tables are keyed by DCM grade). */
+function rowByNumeric(table: Record<number, GradeMapping>, numeric: number): GradeMapping | undefined {
+  return Object.values(table).find(r => r.numeric === numeric);
+}
+
+const PSA_BACK_GEM_LIMIT = 75;
+
+// =============================================================================
 // PSA Grade Mapping and Logic
 // =============================================================================
 
@@ -247,7 +281,7 @@ const PSA_MAPPING: Record<number, GradeMapping> = {
   },
 };
 
-function estimatePSA(input: DcmGradingInput): GradeEstimate {
+function estimatePSA(input: DcmGradingInput, v2 = false): GradeEstimate {
   // Handwritten marking or alterations = AA (Authentic Altered) or PSA 1
   // BUT: Authenticated autographs are NOT alterations - they're card features
   const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
@@ -285,6 +319,16 @@ function estimatePSA(input: DcmGradingInput): GradeEstimate {
     mapping = PSA_MAPPING[adjustedGrade] || mapping;
     confidence = 'medium';
     notes = `${mapping.notes} (adjusted for centering - PSA weighs centering heavily)`;
+  }
+
+  // PRO_ESTIMATES_V2: PSA's Gem Mint limit on the reverse is 75/25.
+  if (v2 && mapping.numeric === 10) {
+    const back = backCenteringWorst(input.centering);
+    if (back !== null && back > PSA_BACK_GEM_LIMIT) {
+      mapping = rowByNumeric(PSA_MAPPING, 9) || mapping;
+      confidence = 'medium';
+      notes = `${mapping.notes} (reverse centering exceeds the Gem Mint limit of ${PSA_BACK_GEM_LIMIT}/${100 - PSA_BACK_GEM_LIMIT})`;
+    }
   }
 
   return {
@@ -572,7 +616,7 @@ const SGC_MAPPING: Record<number, GradeMapping> = {
   },
 };
 
-function estimateSGC(input: DcmGradingInput): GradeEstimate {
+function estimateSGC(input: DcmGradingInput, v2 = false): GradeEstimate {
   // Handwritten marking = automatic 1 POOR
   // BUT: Authenticated autographs are NOT alterations - they're card features
   const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
@@ -603,7 +647,8 @@ function estimateSGC(input: DcmGradingInput): GradeEstimate {
 
   // ANY creases detected → maximum SGC 5 EX
   if (input.crease_detected && mapping.numeric > 5.0) {
-    mapping = SGC_MAPPING[5.0];
+    // PRO_ESTIMATES_V2: the row whose SGC grade is 5 (SGC_MAPPING[5.0] is DCM 5 -> SGC 5.5).
+    mapping = (v2 && rowByNumeric(SGC_MAPPING, 5)) || SGC_MAPPING[5.0];
     confidence = 'high';
     notes = 'Capped at 5 EX - crease detected (SGC rule)';
   }
@@ -630,6 +675,75 @@ function estimateSGC(input: DcmGradingInput): GradeEstimate {
 // =============================================================================
 // CGC Grade Mapping and Logic
 // =============================================================================
+
+// PRO_ESTIMATES_V2: the CGC Cards scale (cgccards.com/card-grading/grading-scale,
+// read Oct 14 2026): 10 Gem Mint, then half-point steps 9.5 Mint+ ... 1 Poor. Keyed by
+// DCM grade like the other tables. The centering requirements are DCM's heuristic
+// (CGC publishes none per grade), kept one step more lenient than PSA at the top.
+const CGC_CARDS_MAPPING: Record<number, GradeMapping> = {
+  10.0: { grade: '10 Gem Mint', numeric: 10, centeringReq: '60/40', notes: 'Gem Mint - no visible manufacturing or handling defects (DCM-based estimate)' },
+  9.5: { grade: '9.5 Mint+', numeric: 9.5, centeringReq: '60/40', notes: 'Mint+ - a single, barely visible imperfection (DCM-based estimate)' },
+  9.0: { grade: '9 Mint', numeric: 9, centeringReq: '60/40', notes: 'Mint - a few minor imperfections visible on close inspection (DCM-based estimate)' },
+  8.5: { grade: '8.5 NM/Mint+', numeric: 8.5, centeringReq: '65/35', notes: 'Near Mint/Mint+ - light wear at a corner or edge (DCM-based estimate)' },
+  8.0: { grade: '8 NM/Mint', numeric: 8, centeringReq: '65/35', notes: 'Near Mint/Mint - slight wear at corners or edges (DCM-based estimate)' },
+  7.5: { grade: '7.5 NM+', numeric: 7.5, centeringReq: '70/30', notes: 'Near Mint+ - minor wear on corners, edges or surface (DCM-based estimate)' },
+  7.0: { grade: '7 NM', numeric: 7, centeringReq: '70/30', notes: 'Near Mint - minor wear visible without magnification (DCM-based estimate)' },
+  6.5: { grade: '6.5 EX/NM+', numeric: 6.5, centeringReq: '75/25', notes: 'Excellent/Near Mint+ - light wear on several corners or edges (DCM-based estimate)' },
+  6.0: { grade: '6 EX/NM', numeric: 6, centeringReq: '75/25', notes: 'Excellent/Near Mint - moderate wear, no creases (DCM-based estimate)' },
+  5.5: { grade: '5.5 EX+', numeric: 5.5, centeringReq: '80/20', notes: 'Excellent+ - moderate wear, slight surface marks (DCM-based estimate)' },
+  5.0: { grade: '5 EX', numeric: 5, centeringReq: '80/20', notes: 'Excellent - moderate corner, edge and surface wear (DCM-based estimate)' },
+  4.5: { grade: '4.5 VG/EX+', numeric: 4.5, centeringReq: '85/15', notes: 'Very Good/Excellent+ - rounded corners, light creasing possible (DCM-based estimate)' },
+  4.0: { grade: '4 VG/EX', numeric: 4, centeringReq: '85/15', notes: 'Very Good/Excellent - noticeable wear, light crease possible (DCM-based estimate)' },
+  3.5: { grade: '3.5 VG+', numeric: 3.5, centeringReq: '90/10', notes: 'Very Good+ - heavy corner wear, creasing (DCM-based estimate)' },
+  3.0: { grade: '3 VG', numeric: 3, centeringReq: '90/10', notes: 'Very Good - heavy wear, creases, surface damage (DCM-based estimate)' },
+  2.5: { grade: '2.5 Good+', numeric: 2.5, centeringReq: '90/10', notes: 'Good+ - major wear and creasing (DCM-based estimate)' },
+  2.0: { grade: '2 Good', numeric: 2, centeringReq: 'any', notes: 'Good - heavy creasing, rounded corners, surface damage (DCM-based estimate)' },
+  1.5: { grade: '1.5 Fair', numeric: 1.5, centeringReq: 'any', notes: 'Fair - severe damage, card is intact (DCM-based estimate)' },
+  1.0: { grade: '1 Poor', numeric: 1, centeringReq: 'any', notes: 'Poor - severe damage, pieces may be missing (DCM-based estimate)' },
+};
+
+function estimateCGCCards(input: DcmGradingInput): GradeEstimate {
+  // Non-signature handwriting or an alteration: CGC still grades, at the bottom of the scale.
+  const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
+  if (hasUnverifiedHandwriting || input.has_alterations) {
+    return {
+      estimated_grade: '2 Good',
+      numeric_score: 2,
+      confidence: 'high',
+      notes: 'Handwritten marking or alterations detected - CGC assigns 2 Good (most lenient of major companies)'
+    };
+  }
+
+  let mapping = findClosestMapping(input.final_grade, CGC_CARDS_MAPPING);
+  let confidence: 'high' | 'medium' | 'low' = 'high';
+  let notes = mapping.notes;
+
+  // One half-step down when the front misses the row's centering requirement.
+  if (mapping.centeringReq && mapping.centeringReq !== 'any') {
+    if (!meetsCenteringRequirement(input.centering, mapping.centeringReq, 'front')) {
+      mapping = findClosestMapping(input.final_grade - 0.5, CGC_CARDS_MAPPING);
+      confidence = 'medium';
+      notes = `${mapping.notes} (centering adjusted)`;
+    }
+  }
+
+  // The Gem Mint limit on the reverse is 75/25; an unmeasured back stays unknown.
+  if (mapping.numeric === 10) {
+    const back = backCenteringWorst(input.centering);
+    if (back !== null && back > PSA_BACK_GEM_LIMIT) {
+      mapping = rowByNumeric(CGC_CARDS_MAPPING, 9.5) || mapping;
+      confidence = 'medium';
+      notes = `${mapping.notes} (reverse centering exceeds the Gem Mint limit of ${PSA_BACK_GEM_LIMIT}/${100 - PSA_BACK_GEM_LIMIT})`;
+    }
+  }
+
+  return {
+    estimated_grade: mapping.grade,
+    numeric_score: mapping.numeric,
+    confidence,
+    notes
+  };
+}
 
 const CGC_MAPPING: Record<number, GradeMapping> = {
   10.0: {
@@ -784,7 +898,9 @@ const CGC_MAPPING: Record<number, GradeMapping> = {
   },
 };
 
-function estimateCGC(input: DcmGradingInput): GradeEstimate {
+function estimateCGC(input: DcmGradingInput, v2 = false): GradeEstimate {
+  if (v2) return estimateCGCCards(input);
+
   // CGC still assigns numerical grades to handwritten cards (grade 2.0)
   // BUT: Authenticated autographs are NOT alterations - they're card features
   const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
@@ -859,14 +975,20 @@ function estimateCGC(input: DcmGradingInput): GradeEstimate {
  *
  * console.log(estimates.PSA); // { estimated_grade: "9 Mint", numeric_score: 9, ... }
  */
-export function estimateProfessionalGrades(input: DcmGradingInput): ProfessionalGradeEstimates {
+export interface EstimateOptions {
+  /** Force the PRO_ESTIMATES_V2 tables on or off; default reads the environment. */
+  v2?: boolean;
+}
+
+export function estimateProfessionalGrades(input: DcmGradingInput, options: EstimateOptions = {}): ProfessionalGradeEstimates {
   // Add disclaimer to all notes
   const disclaimer = ' | Actual professional grades may vary.';
+  const v2 = options.v2 ?? proEstimatesV2Enabled();
 
-  const psa = estimatePSA(input);
+  const psa = estimatePSA(input, v2);
   const bgs = estimateBGS(input);
-  const sgc = estimateSGC(input);
-  const cgc = estimateCGC(input);
+  const sgc = estimateSGC(input, v2);
+  const cgc = estimateCGC(input, v2);
 
   return {
     PSA: {
