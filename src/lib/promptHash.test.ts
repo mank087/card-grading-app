@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const PROMPTS_DIR = fileURLToPath(new URL('../../prompts/', import.meta.url));
 
 const PINNED: Record<string, string> = {
-  'master_grading_rubric_v5.txt': '1787291a290e5f06a4f9a2b41b6485de443c523a072dea9557e606a089c407da',
+  'master_grading_rubric_v5.txt': 'd0e7bcdf978fd4a1aa81fb7535c75f65d63a9337be1b9eb5a821dd30e8b8b8db',
   'lorcana_delta_v5.txt': '61d54b04268ee9fdf77dbba84bcf251e40302067ed9220ef8a9cf90f43f9ef34',
   'mtg_delta_v5.txt': '07964d905a4de11b7c8843e1fb299ee3d01edf3cc677e97e02095a9efce00196',
   'onepiece_delta_v5.txt': '3663226c318a3cff790e8cb73e456b278eb19df95659f541ad5b272fdde5be47',

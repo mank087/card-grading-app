@@ -2649,13 +2649,14 @@ card's OUTLINE against the background:
 1. Are all four edges straight lines? A bowed/curved edge outline = warp or bend
 2. Do any corners or edge midpoints lift off the surface (shadow gaps under the card,
    corner regions out of the focal plane, background visible under an edge)?
-3. Does lighting shift abruptly across the card face (a bright band next to a dull band
-   along a line = the surface plane changes direction there = fold/crease)?
+3. A lighting band, a cast shadow or a smooth factory curl alone is NOT damage. A real crease,
+   fold or bend shows a ridge or gloss change along the line, cracked ink or whitening along it,
+   a kink where it meets the card's edge, or the same line at the same spot on the other face.
 4. Do the front and back images agree? A crease is almost always visible from BOTH sides
    at the same location — if you suspect a line on one face, check the same location on
    the other face before dismissing it.
-If ANY of these show deviation → structural_damage.detected = true with the matching cap
-(Section 1.11: crease/fold → 4, warp → 4). A card that does not lie flat is NEVER 8+.
+Report a crease or bend in structural_damage only when you can see at least one of the signs in 3;
+a line you cannot place is not a crease.
 
 🚨 **ENUMERATE EVERY FINDING:** finding one crease does NOT end the inspection —
 continue checking the full card and record EVERY distinct crease, bend, and warp as a

@@ -60,6 +60,10 @@ describe('offline Phase 0 baseline', () => {
     // Thirteenth deliberate change (Oct 2026, v9.43): corner silhouette judged by card type (90-degree
     // point on square-cut cards, even factory radius on die-cut TCG cards; the radius is not softening).
     v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 285700, lines: 5547, approximateTokensCharsDiv4: 71425 });
+    // Fourteenth deliberate change (Oct 2026, v9.44): the flatness check needs a physical sign of a crease
+    // or bend (ridge, gloss change, cracked ink, edge kink, same line on the other face); lighting bands
+    // and factory curl are not damage.
+    v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 285788, lines: 5548, approximateTokensCharsDiv4: 71447 });
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));
