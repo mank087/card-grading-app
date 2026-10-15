@@ -51,7 +51,7 @@ const outputs = {
       streamTransform: { scale: 1, offsetX: 0, offsetY: 0 },
     }, 0.05);
   })(),
-  promptSizes: ['master_grading_rubric_v5.txt', ...['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other'].map(t => `${t}_delta_v5.txt`)].map(file => {
+  promptSizes: ['master_grading_rubric_v5.txt', ...['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other'].map(t => `${t}_delta_v5.txt`)].map(file => {
     // Count LF text: a Windows checkout (core.autocrlf) has CRLF, CI has LF, and the
     // character count must not depend on which machine measured it.
     const text = fs.readFileSync(path.join(root, 'prompts', file), 'utf8').replace(/\r\n/g, '\n');

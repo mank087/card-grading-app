@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
-const { buildManifest, RETIRED_PROMPT_FILES } = require('../scripts/accuracy-phase0.cjs');
+const { buildManifest } = require('../scripts/accuracy-phase0.cjs');
+// Prompt deltas deleted since the Sept 16 freeze (Oct 2026: the abandoned Star Wars category).
+const RETIRED_PROMPT_FILES = ['starwars_delta_v5.txt'];
 
 describe('offline Phase 0 baseline', () => {
   it('records actual router defaults, source hashes and frozen observations without unrelated environment values', () => {
@@ -41,8 +43,7 @@ describe('offline Phase 0 baseline', () => {
     // promo (no set number; pokemonSpecialPromos.ts) in a 3-line block (+386 characters, +4 lines).
     v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 34049, lines: 660, approximateTokensCharsDiv4: 8513 });
     // Seventh deliberate change (Oct 2026): starwars_delta_v5.txt was deleted with the abandoned
-    // Star Wars category (Star Wars is an Other sub-category). Retired files leave both sides.
-    expect(RETIRED_PROMPT_FILES).toEqual(['starwars_delta_v5.txt']);
+    // Star Wars category (Star Wars is an Other sub-category). The frozen probe list drops it; the frozen baseline is filtered to match.
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));
