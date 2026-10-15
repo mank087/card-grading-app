@@ -1,0 +1,206 @@
+{
+  "_readme": [
+    "CORNER PROBE (Oct 15 2026): TCG cards whose factory-rounded corners were graded 8 for apex softening by the main evaluations, plus real-wear controls. Metric = corner subgrade per run (jsonl), not final grade."
+  ],
+  "cards": [
+    {
+      "key": "corner-cubone",
+      "label": "Pokemon Cubone: factory-rounded corners graded {\"back\":9,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "pokemon",
+      "card_id": "33a7f880-ef18-47e1-8012-c156f6c22749",
+      "front_path": "db323b99-30f2-487c-b647-868e9ec90848/33a7f880-ef18-47e1-8012-c156f6c22749/front.jpg",
+      "back_path": "db323b99-30f2-487c-b647-868e9ec90848/33a7f880-ef18-47e1-8012-c156f6c22749/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-golem",
+      "label": "Pokemon Golem: factory-rounded corners graded {\"back\":8,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "pokemon",
+      "card_id": "796a25a1-0bf1-4bc6-a0f6-6c4948721e69",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/796a25a1-0bf1-4bc6-a0f6-6c4948721e69/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/796a25a1-0bf1-4bc6-a0f6-6c4948721e69/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-gastly",
+      "label": "Pokemon Gastly: factory-rounded corners graded {\"back\":8,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "pokemon",
+      "card_id": "7ac2fa83-67bb-4162-9f5f-d39a655942d4",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/7ac2fa83-67bb-4162-9f5f-d39a655942d4/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/7ac2fa83-67bb-4162-9f5f-d39a655942d4/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-grimer",
+      "label": "Pokemon Grimer: factory-rounded corners graded {\"back\":7,\"front\":8,\"weighted\":7} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "pokemon",
+      "card_id": "cfe09f0e-08d7-4001-9bc9-6aa17f8d1bf6",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/cfe09f0e-08d7-4001-9bc9-6aa17f8d1bf6/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/cfe09f0e-08d7-4001-9bc9-6aa17f8d1bf6/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-kabuto",
+      "label": "Pokemon Kabuto: factory-rounded corners graded {\"back\":8,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "pokemon",
+      "card_id": "fcccd425-a6bb-452e-9a42-c9cc279dd575",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/fcccd425-a6bb-452e-9a42-c9cc279dd575/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/fcccd425-a6bb-452e-9a42-c9cc279dd575/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-shanks",
+      "label": "One Piece Shanks: factory-rounded corners graded {\"back\":9,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "onepiece",
+      "card_id": "7d0f9895-21fa-4d89-8a0f-d876d60d8325",
+      "front_path": "288684ad-abc1-4c9c-aa2c-d880b41d30cb/7d0f9895-21fa-4d89-8a0f-d876d60d8325/front.jpg",
+      "back_path": "288684ad-abc1-4c9c-aa2c-d880b41d30cb/7d0f9895-21fa-4d89-8a0f-d876d60d8325/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "corner-rhystic-study",
+      "label": "MTG Rhystic Study: factory-rounded corners graded {\"back\":8,\"front\":8,\"weighted\":8} for apex softening (by-eye corner crops Oct 15: factory profile, border intact)",
+      "cardType": "mtg",
+      "card_id": "cdd5d011-d206-4f25-ba80-2509f88f7fa9",
+      "front_path": "a1d32d29-93e5-42e4-8141-da25c768b356/cdd5d011-d206-4f25-ba80-2509f88f7fa9/front.jpg",
+      "back_path": "a1d32d29-93e5-42e4-8141-da25c768b356/cdd5d011-d206-4f25-ba80-2509f88f7fa9/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "corner probe (corners expected >= 9)",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "cal-7f7b17dd",
+      "label": "Xerosic (Pokemon) — customer-reported: graded 10 by v9.3 (Jul 10) despite clear back edge/corner whitening; owner says 6-7",
+      "cardType": "pokemon",
+      "card_id": "7f7b17dd-d022-4815-8835-6911e6f45a0f",
+      "front_path": "c3b81cda-19dc-4126-98ab-6239cbb6b3f1/7f7b17dd-d022-4815-8835-6911e6f45a0f/front.jpg",
+      "back_path": "c3b81cda-19dc-4126-98ab-6239cbb6b3f1/7f7b17dd-d022-4815-8835-6911e6f45a0f/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 7,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": null,
+      "must_detect": {
+        "face": "back",
+        "categories": [
+          "edges",
+          "corners"
+        ],
+        "types": [
+          "whitening",
+          "fiber",
+          "chip"
+        ],
+        "min_severity": "minor",
+        "note": "real back edge/corner whitening"
+      }
+    },
+    {
+      "key": "cal-a9eca6ef",
+      "label": "Espeon-GX 140/149 full art (Sun & Moon) - printed cyan outline read as marker, graded 1",
+      "cardType": "pokemon",
+      "card_id": "a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4",
+      "front_path": "70522c7f-268d-4678-aea8-0a85e35659c3/a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4/front.jpg",
+      "back_path": "70522c7f-268d-4678-aea8-0a85e35659c3/a9eca6ef-d7ba-42b8-83c5-26a41d9b30b4/back.jpg",
+      "engine_grade": null,
+      "expected_grade": 9,
+      "tolerance": 1,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "golden": true,
+      "false_positive": {
+        "face": "any",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "print_line",
+          "handwrit",
+          "marker"
+        ],
+        "min_severity": "minor",
+        "note": "artwork read as marks",
+        "any_source": true
+      }
+    },
+    {
+      "key": "nidoking-base-unl",
+      "label": "1999 Base Set Nidoking, heavy wear (manual review confirmed 4)",
+      "cardType": "pokemon",
+      "card_id": "c2e27f45-4efc-45a4-af15-77a14601a6f6",
+      "front_path": "0cd75ae1-59d4-4ecb-a29a-c29b0a5e9134/c2e27f45-4efc-45a4-af15-77a14601a6f6/front.jpg",
+      "back_path": "0cd75ae1-59d4-4ecb-a29a-c29b0a5e9134/c2e27f45-4efc-45a4-af15-77a14601a6f6/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 4,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "manual review / by eye",
+      "added": "2026-10-15"
+    },
+    {
+      "key": "mew-ex-back-trashed",
+      "label": "Pokemon Mew ex: back genuinely scratched/whitened all over (guard must NOT suppress)",
+      "cardType": "pokemon",
+      "card_id": "c3b99250-0a23-41e1-a551-5540930c7d18",
+      "front_path": "013fc530-81d9-41dc-b93e-a1c796f25798/c3b99250-0a23-41e1-a551-5540930c7d18/front.jpg",
+      "back_path": "013fc530-81d9-41dc-b93e-a1c796f25798/c3b99250-0a23-41e1-a551-5540930c7d18/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 4,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 15 2026)",
+      "added": "2026-10-15",
+      "must_detect": {
+        "note": "Heavy real back wear across swirl and Poke Ball; the swirl guard must still report it.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "scuff",
+          "abrasion",
+          "wear",
+          "whitening"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
+    }
+  ]
+}
