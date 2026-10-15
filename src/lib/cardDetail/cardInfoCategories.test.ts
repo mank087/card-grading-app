@@ -11,9 +11,9 @@ import { describe, it, expect } from 'vitest';
 import { buildCardInfo } from './cardInfo';
 import { isFrameTreatment } from './cardInfoCategories';
 
-/* ── The four JSON-first TCGs ─────────────────────────────────────────── */
+/* ── The three JSON-first TCGs ─────────────────────────────────────────── */
 
-describe('buildCardInfo — mtg / onepiece / yugioh / starwars', () => {
+describe('buildCardInfo — mtg / onepiece / yugioh', () => {
   const tcgCard = {
     card_set: 'COLUMN SET',
     card_number: 'COLUMN NUMBER',
@@ -35,7 +35,7 @@ describe('buildCardInfo — mtg / onepiece / yugioh / starwars', () => {
   });
 
   it('does NOT slice release_date to four characters', () => {
-    // Pokemon prints '1999'; these four print the column as the row holds it.
+    // Pokemon prints '1999'; these three print the column as the row holds it.
     expect(buildCardInfo({ release_date: '1999-01-09' }, 'mtg').year).toBe('1999-01-09');
   });
 
@@ -43,7 +43,6 @@ describe('buildCardInfo — mtg / onepiece / yugioh / starwars', () => {
     expect(buildCardInfo({}, 'mtg').manufacturer).toBe('Wizards of the Coast');
     expect(buildCardInfo({}, 'onepiece').manufacturer).toBe('Bandai');
     expect(buildCardInfo({}, 'yugioh').manufacturer).toBe('Konami');
-    expect(buildCardInfo({}, 'starwars').manufacturer).toBe('Topps');
   });
 
   it('refuses to append a frame treatment to the set name', () => {
@@ -154,7 +153,7 @@ describe('buildCardInfo — mtg / onepiece / yugioh / starwars', () => {
     expect(info.is_sp).toBe(false);
   });
 
-  it('keeps the Pokemon NULL-memorabilia quirk for the four TCGs', () => {
+  it('keeps the Pokemon NULL-memorabilia quirk for the three TCGs', () => {
     // card.memorabilia_type !== 'none'; NULL !== 'none' is true.
     expect(buildCardInfo({}, 'mtg').memorabilia).toBe(true);
     expect(buildCardInfo({ memorabilia_type: 'none' }, 'mtg').memorabilia).toBe(false);

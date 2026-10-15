@@ -40,7 +40,7 @@ describe('categoryUsesRarityBuckets', () => {
     for (const sport of ['Baseball', 'football', 'UFC', 'MMA', 'Hockey']) {
       expect(categoryUsesRarityBuckets(sport), sport).toBe(true);
     }
-    for (const c of ['pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other', null]) {
+    for (const c of ['pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other', null]) {
       expect(categoryUsesRarityBuckets(c), String(c)).toBe(false);
     }
   });

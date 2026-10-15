@@ -36,7 +36,7 @@ export interface ItemSpecific {
  * Derives from DCM_TO_EBAY_CATEGORY in constants.ts — the single source of
  * truth shared with the server listing route — so the client-built aspects
  * and the server-chosen category can never disagree. Lookup is case- and
- * punctuation-insensitive ('onepiece', 'One Piece', 'Yu-Gi-Oh!', 'starwars'
+ * punctuation-insensitive ('onepiece', 'One Piece', 'Yu-Gi-Oh!'
  * all resolve); unknown types fall back to Non-Sport Trading Cards (183050).
  */
 export function getCategoryForCardType(cardType: string): string {
@@ -726,7 +726,7 @@ export function mapLorcanaCardToSpecifics(card: any): ItemSpecific[] {
 
 /**
  * Shared CCG mapping for TCGs that follow the standard CCG aspect set
- * (One Piece, Yu-Gi-Oh, Star Wars Unlimited). Mirrors the shape of the
+ * (One Piece, Yu-Gi-Oh). Mirrors the shape of the
  * Pokemon/MTG/Lorcana mappers so aspect names stay consistent across all
  * CCG Individual Cards (183454) listings: Game (required), Character,
  * Card Name, Set, Card Number, Rarity, Year, Manufacturer, Language,
@@ -877,19 +877,12 @@ export function mapYuGiOhCardToSpecifics(card: any): ItemSpecific[] {
 }
 
 /**
- * Map Star Wars Unlimited card data to eBay item specifics (CCG category 183454)
- */
-export function mapStarWarsCardToSpecifics(card: any): ItemSpecific[] {
-  return mapGenericCcgCardToSpecifics(card, 'Star Wars Unlimited', 'Fantasy Flight Games');
-}
-
-/**
  * Main function to map any card to item specifics based on card type
  */
 export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecific[] {
   let specifics: ItemSpecific[];
 
-  // Normalize so 'One Piece', 'onepiece', 'Yu-Gi-Oh!', 'star wars' etc. all
+  // Normalize so 'One Piece', 'onepiece', 'Yu-Gi-Oh!' etc. all
   // route the same way — mirrors the category lookup in constants.ts.
   const normalizedType = cardType.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -911,9 +904,6 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
       break;
     case 'yugioh':
       specifics = mapYuGiOhCardToSpecifics(card);
-      break;
-    case 'starwars':
-      specifics = mapStarWarsCardToSpecifics(card);
       break;
     case 'other':
     default:

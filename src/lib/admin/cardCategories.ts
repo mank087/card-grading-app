@@ -24,8 +24,7 @@ export function isSportCategory(category: string | null | undefined): boolean {
   return !!category && SPORT_DB_CATEGORIES.includes(category)
 }
 
-/** Public card-page path, matching the sitemap (Star Wars cards render under /other). */
+/** Public card-page path, matching the sitemap. */
 export function adminCardHref(category: string | null | undefined, cardId: string): string {
-  const slug = categoryToRouteSlug(category)
-  return `/${slug === 'starwars' ? 'other' : slug}/${cardId}`
+  return `/${categoryToRouteSlug(category)}/${cardId}`
 }

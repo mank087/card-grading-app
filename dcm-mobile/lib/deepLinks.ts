@@ -15,8 +15,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
  * sync with `src/app/(<cardType>)/[id]/page.tsx` route folders on the web.
  */
 export const CARD_TYPE_PATHS = new Set([
-  'sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other',
+  'sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other',
 ])
+
+/**
+ * Retired card-path segments and the live segment they now mean. Star Wars is
+ * an Other sub-category; the web permanently redirects /starwars/:id to
+ * /other/:id, so an old link still opens the card here.
+ */
+export const LEGACY_CARD_TYPE_PATHS: Record<string, string> = { starwars: 'other' }
 
 /** Web paths that have a dedicated native screen under `app/pages/`. */
 const NATIVE_PAGE_ROUTES: Record<string, string> = {
@@ -80,7 +87,7 @@ export function resolveDeepLink(raw: string): ResolvedDeepLink {
   const cardMatch = path.match(/^\/([a-z]+)\/([0-9a-f-]{8,})$/i)
   if (cardMatch) {
     const seg = cardMatch[1].toLowerCase()
-    if (seg === 'card' || CARD_TYPE_PATHS.has(seg)) {
+    if (seg === 'card' || CARD_TYPE_PATHS.has(seg) || Object.prototype.hasOwnProperty.call(LEGACY_CARD_TYPE_PATHS, seg)) {
       return { kind: 'card', href: `/card/${cardMatch[2]}${search}`, path, search }
     }
   }

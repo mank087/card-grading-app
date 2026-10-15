@@ -51,7 +51,7 @@ describe('resolveCardValue', () => {
     });
     expect(resolveCardValue({ ...thin, card_set: 'Topps Baseball', dcm_price_estimate: 778764 }).source)
       .toBe('withheld');
-    expect(resolveCardValue({ ...thin, category: 'Star Wars', card_set: 'Unknown', dcm_price_estimate: 94854.17 }).source)
+    expect(resolveCardValue({ ...thin, category: 'Other', card_set: 'Unknown', dcm_price_estimate: 94854.17 }).source)
       .toBe('withheld');
   });
 

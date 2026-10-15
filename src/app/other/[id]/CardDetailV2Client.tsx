@@ -7,11 +7,11 @@
  * ./CardDetailClient.tsx, which is not edited for the duration of the project
  * so that `CARD_DETAIL_V2=off` is a complete rollback (plan §4).
  *
- * This route carries every card that is not one of the seven named
- * categories, INCLUDING Star Wars: `/starwars/[id]` has redirected here since
- * March 2026 (commit d41b72f8) and those rows carry
- * `category='Other', sub_category='Star Wars'`. There is no separate Star Wars
- * adapter for that reason.
+ * This route carries every card that is not one of the six named
+ * categories, INCLUDING Star Wars, which is an Other sub-category: those rows
+ * carry `category='Other', sub_category='Star Wars'`, and next.config
+ * permanently redirects old `/starwars/:id` links here. There is no separate
+ * Star Wars adapter for that reason.
  *
  * It is a copy of the Yu-Gi-Oh adapter with only the things 'Other' genuinely
  * does differently changed. Every difference is marked OTHER below.

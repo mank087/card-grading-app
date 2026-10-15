@@ -10,7 +10,7 @@ const ID = 'eb811bce-60b9-4f3d-bea3-a968d7b40850';
 
 describe('isValidCardReturnPath', () => {
   it('accepts every category with a uuid-shaped id', () => {
-    for (const c of ['pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other']) {
+    for (const c of ['pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other']) {
       expect(isValidCardReturnPath(`/${c}/${ID}`)).toBe(true);
     }
   });

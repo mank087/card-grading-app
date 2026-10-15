@@ -10,7 +10,7 @@ import path from 'path'
  * delete button and no next step. Every card detail client now carries an
  * owner-only "Grade another card" block after the DCM Optic version footer.
  *
- * The same files used to link to /upload/starwars, a route that does not
+ * The same files used to link to a Star Wars upload route that does not
  * exist. Only /upload/{mtg,onepiece,pokemon,sports} are real upload routes;
  * everything else goes through /upload?category=<key>, and the key must be one
  * of CARD_TYPES in src/lib/cardTypeConfig.ts or the page silently falls back to
@@ -27,7 +27,6 @@ const CARD_DETAIL_CLIENTS = [
   'app/lorcana/[id]/CardDetailClient.tsx',
   'app/onepiece/[id]/CardDetailClient.tsx',
   'app/yugioh/[id]/CardDetailClient.tsx',
-  'app/starwars/[id]/CardDetailClient.tsx',
   'app/other/[id]/CardDetailClient.tsx',
 ]
 
@@ -55,7 +54,6 @@ describe('grade another card CTA', () => {
         .map((m) => m[1])
         .filter((slug) => !REAL_UPLOAD_ROUTES.includes(slug))
       expect(deadPathLinks).toEqual([])
-      expect(src).not.toContain('/upload/starwars')
       // "Star Wars" is not a CARD_TYPES key, so the upload page would silently
       // reset the picker to Sports.
       expect(src).not.toContain('category=Star Wars')

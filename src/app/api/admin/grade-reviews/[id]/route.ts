@@ -97,7 +97,7 @@ export async function POST(request:NextRequest,{params}:Context){
     let correction;try{correction=buildManualResult(card,run!.snapshot,id,parsed.data);}catch{return reply({error:'The report changed or the proposed scores are invalid. Reload the review; use clarification if the overall grade is unchanged.'},409);}
     const {data,error:saveError}=await db.rpc('complete_manual_grade_review',{p_id:id,p_admin_id:admin.id,p_verdict:parsed.data.verdict,p_notes:parsed.data.notes,p_patch:correction.patch,p_expected:correction.expected});
     if(saveError)throw saveError;if(data?.stale)return reply(await staleReply(db,review),409);
-    for(const category of ['sports','pokemon','mtg','lorcana','onepiece','yugioh','starwars','other'])revalidatePath(`/${category}/${review.card_id}`);
+    for(const category of ['sports','pokemon','mtg','lorcana','onepiece','yugioh','other'])revalidatePath(`/${category}/${review.card_id}`);
     revalidatePath('/collection');
     // Cached market data described the old identity; refresh it now, best-effort.
     // Every field this route can correct (name, set, year, number, manufacturer)

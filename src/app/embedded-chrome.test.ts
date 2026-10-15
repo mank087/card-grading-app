@@ -49,7 +49,6 @@ const CONTENT_FILES = [
   'app/onepiece-database/page.tsx',
   'app/pokemon-database/page.tsx',
   'app/sports-database/page.tsx',
-  'app/starwars-database/page.tsx',
   'app/yugioh-database/page.tsx',
 ]
 

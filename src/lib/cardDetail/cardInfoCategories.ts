@@ -25,12 +25,11 @@ import type { LegacyCardInfo } from './cardInfo';
  * choice, not a new one:
  *
  *   DATABASE-COLUMN FIRST   pokemon (above), lorcana
- *   MODEL-JSON FIRST        sports (above), mtg, onepiece, yugioh, starwars,
- *                           other
+ *   MODEL-JSON FIRST        sports (above), mtg, onepiece, yugioh, other
  *
- * The four JSON-first TCGs (mtg, onepiece, yugioh, starwars) are the SAME
- * chain character for character — the four legacy files were copied from one
- * another, comments and all (yugioh and starwars still carry One Piece's
+ * The three JSON-first TCGs (mtg, onepiece, yugioh) are the SAME chain
+ * character for character — the legacy files were copied from one another,
+ * comments and all (yugioh still carries One Piece's
  * "🏴‍☠️ ONE PIECE CARD INFO" heading). Only the manufacturer default and the
  * category-specific field block differ, so they share one builder here.
  * `other` is close but not identical and keeps its own.
@@ -44,18 +43,17 @@ export function normalizeCategoryKey(category: unknown): string {
 
 /**
  * The manufacturer each JSON-first TCG legacy client falls back to when the
- * record carries none (mtg 2653, onepiece 2604, yugioh 2641, starwars 2617).
+ * record carries none (mtg 2653, onepiece 2604, yugioh 2641).
  * Membership in this map is also what selects the shared builder.
  */
 export const TCG_DEFAULT_MANUFACTURER: Record<string, string> = {
   mtg: 'Wizards of the Coast',
   onepiece: 'Bandai',
   yugioh: 'Konami',
-  starwars: 'Topps',
 };
 
 /**
- * Frame TREATMENTS are not subsets, so the four JSON-first TCG clients refuse
+ * Frame TREATMENTS are not subsets, so the JSON-first TCG clients refuse
  * to append one to the set name (mtg 2635-2643 and its three copies).
  */
 const FRAME_TREATMENTS = [
@@ -75,11 +73,11 @@ export function isFrameTreatment(subset: unknown): boolean {
 }
 
 /**
- * MTG / One Piece / Yu-Gi-Oh / Star Wars.
+ * MTG / One Piece / Yu-Gi-Oh.
  *
  * EXTRACTED FROM `src/app/mtg/[id]/CardDetailClient.tsx` 2628-2698, with
- * onepiece 2578-2650, yugioh 2615-2687 and starwars 2591-2662 diffed against
- * it line for line; the shared half is identical in all four.
+ * onepiece 2578-2650 and yugioh 2615-2687 diffed against it line for line;
+ * the shared half is identical in all three.
  *
  * ONE DELIBERATE DEPARTURE, the V2-wide one already made for Pokemon:
  * `rarity_tier` runs through `pickRarity`, so a grader CLASSIFICATION BUCKET
@@ -108,7 +106,7 @@ export function buildTcgCardInfo(
       dvgCardInfo?.player_or_character,
     set_name: setNameWithSubset,
     set_era: stripMarkdown(conv?.set_era) || dvgCardInfo?.set_era,
-    // NOT sliced to four characters: these four print `release_date` raw.
+    // NOT sliced to four characters: these three print `release_date` raw.
     year: stripMarkdown(conv?.year) || c.release_date || dvgCardInfo?.year,
     manufacturer:
       stripMarkdown(conv?.manufacturer) || c.manufacturer_name || TCG_DEFAULT_MANUFACTURER[key],
@@ -227,28 +225,8 @@ export function buildTcgCardInfo(
     };
   }
 
-  // STARWARS IS CURRENTLY UNREACHABLE FROM A ROUTE. `/starwars/[id]` has
-  // redirected to `/other/[id]` since March 2026 (commit d41b72f8) and every
-  // Star Wars row carries `category='Other', sub_category='Star Wars'`, so a
-  // Star Wars card is built by `buildOtherCardInfo`. This branch is kept
-  // because `buildCardInfo` is a public function that still accepts the
-  // category, and because it records the chain the frozen (also unreachable)
-  // starwars client uses. Nothing in the app reaches it today.
-  //
-  // starwars 2634-2656. The legacy file's own comment records that duplicate
-  // object keys were removed and the LAST value won, so there is no sw_ field
-  // for cost/power at all — `sw_faction` really does read `card_cost`.
-  return {
-    ...shared,
-    sw_faction: conv?.card_cost ?? c.sw_faction ?? null,
-    sw_era: stripMarkdown(conv?.attribute) || c.sw_era || null,
-    sw_rarity: stripMarkdown(conv?.sub_types) || c.sw_rarity || null,
-    sw_card_type: stripMarkdown(conv?.variant_type) || c.sw_card_type || null,
-    is_parallel: conv?.is_parallel ?? (c.sw_card_type?.includes('parallel') ?? false),
-    is_manga_art: conv?.is_manga_art ?? (c.sw_card_type?.includes('manga') ?? false),
-    is_alternate_art: conv?.is_alternate_art ?? (c.sw_card_type === 'alternate_art'),
-    is_sp: conv?.is_sp ?? (c.sw_card_type === 'sp'),
-  };
+  // Unreachable while TCG_DEFAULT_MANUFACTURER holds only the three keys above.
+  return shared;
 }
 
 /**

@@ -15,7 +15,7 @@ import { isUuid } from '@/lib/uuid';
 import { rotateCardFace, type RotateStorage } from '@/lib/images/rotateDisplay';
 import { thumbPath } from '@/lib/images/cardThumbnails';
 
-const CATEGORY_SLUGS = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other'];
+const CATEGORY_SLUGS = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other'];
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -223,7 +223,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Omit lastModified: this schema has no reliable card-content update date.
   const listedCards = cards.slice(0, MAX_SITEMAP_CARDS);
   const cardPages: MetadataRoute.Sitemap = listedCards.map(card => ({
-    url: `${baseUrl}/${categoryToRouteSlug(card.category) === 'starwars' ? 'other' : categoryToRouteSlug(card.category)}/${card.id}`,
+    url: `${baseUrl}/${categoryToRouteSlug(card.category)}/${card.id}`,
     changeFrequency: 'weekly', priority: 0.6,
   }));
   // /verify/:serial redirects to the card; list only canonical destinations.

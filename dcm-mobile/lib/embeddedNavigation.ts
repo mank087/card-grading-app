@@ -26,6 +26,7 @@ export function embeddedDestination(raw: string, base: string, platform: string,
   if (path === '/login' || path === '/register') return { kind: 'native', href: `/(auth)${path}${url.search}` }
   if (path === '/upload') return { kind: 'native', href: '/(tabs)/grade' }
   if (path === '/collection' && signedIn) return { kind: 'native', href: '/(tabs)/collection' }
+  // starwars: legacy alias of /other (Star Wars is an Other sub-category; the web redirects it).
   const card = path.match(/^\/(?:card|sports|pokemon|mtg|lorcana|onepiece|yugioh|starwars|other)\/([0-9a-f-]{36})$/i)
   if (card && signedIn) return { kind: 'native', href: `/card/${card[1]}` }
   return { kind: 'web', url: url.href }

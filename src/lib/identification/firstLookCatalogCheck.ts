@@ -5,7 +5,7 @@
  *
  * Measured Sept 25 on 392 Pokemon search passes: 257 ran although pass 1 had a
  * unique catalog match, and none of them moved to a different card. Categories
- * without a live catalog (Sports, Other, Star Wars, Yu-Gi-Oh) always search.
+ * without a live catalog (Sports, Other incl. Star Wars, Yu-Gi-Oh) always search.
  */
 import type { FirstLook } from './firstLook';
 import { findUniqueCatalogMatch } from '../pokemonApiVerification';

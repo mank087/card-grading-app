@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-const TYPE: Record<string, string> = { Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 'lorcana', 'One Piece': 'onepiece', 'Yu-Gi-Oh': 'yugioh', 'Star Wars': 'starwars', Other: 'other' };
+const TYPE: Record<string, string> = { Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 'lorcana', 'One Piece': 'onepiece', 'Yu-Gi-Oh': 'yugioh', Other: 'other' };
 (async () => {
   const ids = process.env.IDS!.split(',');
   const { data, error } = await sb.from('cards').select('id, category, card_name, front_path, back_path, conversational_whole_grade').in('id', ids);

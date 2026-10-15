@@ -9,7 +9,7 @@ vi.mock('@/lib/supabaseServer', () => ({ supabaseServer: () => ({ from: (table: 
   q.range = (...args: any[]) => table === 'organizations' ? mock.orgRange(...args) : mock.range(...args)
   return q
 } }) }))
-vi.mock('@/lib/postGradeEmailTemplates', () => ({ categoryToRouteSlug: (category: string) => category === 'Star Wars' ? 'starwars' : 'sports' }))
+vi.mock('@/lib/postGradeEmailTemplates', () => ({ categoryToRouteSlug: (category: string) => category === 'Star Wars' ? 'other' : 'sports' }))
 vi.mock('@/lib/cards/ownership', () => ({ withColumnFallback: (primary: () => unknown) => primary() }))
 import sitemap from './sitemap'
 beforeEach(() => { vi.clearAllMocks(); mock.range.mockResolvedValue({ data: [], error: null }); mock.orgRange.mockResolvedValue({ data: [], error: null }); mock.profiles = [] })
@@ -30,7 +30,7 @@ describe('canonical public sitemap', () => {
     const entries = await sitemap()
     expect(entries.find(e => e.url === 'https://dcmgrading.com')?.lastModified).toBeUndefined()
     for (const route of ['vip', 'enterprise', 'instalist-marketplace', 'sports-database']) expect(entries.some(e => e.url.endsWith('/' + route))).toBe(true)
-    // Retired Sept 2026: the page now permanently redirects, so it must not be advertised.
+    // Retired Sept 2026: next.config permanently redirects it, so it must not be advertised.
     expect(entries.some(e => e.url.endsWith('/starwars-database'))).toBe(false)
     expect(entries.some(e => /\/(?:login|account|upload|admin|dev)(?:\/|$)/.test(e.url))).toBe(false)
     expect(new Set(entries.map(e => e.url)).size).toBe(entries.length)

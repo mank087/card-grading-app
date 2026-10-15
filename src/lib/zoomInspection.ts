@@ -862,7 +862,7 @@ export function hasFactoryRoundedCorners(cardType?: string | null): boolean {
 
 const CARD_TYPE_LABEL: Record<string, string> = {
   pokemon: 'Pokemon', mtg: 'Magic: The Gathering', lorcana: 'Disney Lorcana', yugioh: 'Yu-Gi-Oh!',
-  onepiece: 'One Piece', starwars: 'Star Wars Unlimited', other: 'non-sports trading card game',
+  onepiece: 'One Piece', other: 'non-sports trading card game',
 };
 
 /** Evidence words that make a "softening" call on a factory-rounded corner credible. */

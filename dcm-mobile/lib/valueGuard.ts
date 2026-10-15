@@ -97,7 +97,7 @@ function hasOwn(object: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
 
-/** A blank year matters for sports, Other and Star Wars, not for the TCGs. */
+/** A blank year matters for sports and Other, not for the TCGs. */
 function yearMattersFor(category?: string | null): boolean {
   if (!category) return true;
   return !TCG_CATEGORIES.has(category.trim().toLowerCase());

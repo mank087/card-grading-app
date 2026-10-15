@@ -19,7 +19,6 @@ export type ListingCategory =
   | 'lorcana'
   | 'onepiece'
   | 'yugioh'
-  | 'starwars'
   | 'other'
 
 export interface ListingFields {
@@ -68,8 +67,6 @@ export const GAME_WORDS: Record<ListingCategory, string> = {
   lorcana: 'Lorcana',
   onepiece: 'One Piece',
   yugioh: 'Yu-Gi-Oh',
-  // No short form exists; ranked low in the swu token table instead.
-  starwars: 'Star Wars Unlimited',
   other: 'Trading Card',
 }
 
@@ -81,7 +78,6 @@ export const GAME_MANUFACTURERS: Record<ListingCategory, string> = {
   lorcana: 'Ravensburger',
   onepiece: 'Bandai',
   yugioh: 'Konami',
-  starwars: 'Fantasy Flight Games',
   other: '',
 }
 
@@ -215,7 +211,7 @@ export function normalizeListingCategory(value: string | null | undefined): List
   const normalized = (value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
   if (
     normalized === 'pokemon' || normalized === 'mtg' || normalized === 'lorcana' ||
-    normalized === 'onepiece' || normalized === 'yugioh' || normalized === 'starwars' ||
+    normalized === 'onepiece' || normalized === 'yugioh' ||
     normalized === 'sports' || normalized === 'other'
   ) {
     return normalized as ListingCategory

@@ -30,7 +30,7 @@ const APPLY = process.argv.includes('--apply');
 const LIMIT = Number(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] ?? Infinity);
 const PAGE = 100;
 const PAUSE_MS = 400;
-const CATEGORIES = ['Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other', 'Star Wars', 'Yu-Gi-Oh'];
+const CATEGORIES = ['Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other', 'Yu-Gi-Oh'];
 const COLUMNS = 'id, category, serial, conversational_whole_grade, dcm_price_estimate, dcm_price_raw, dcm_cached_prices, identity_revision, pricing_selection_revision';
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

@@ -352,7 +352,7 @@ const FIXTURES: Fixture[] = [
     }),
   },
 
-  // ─── One Piece / Yu-Gi-Oh / Star Wars (generic CCG) ───
+  // ─── One Piece / Yu-Gi-Oh (generic CCG) ───
   {
     label: 'onepiece · alt art secret rare',
     card: card('onepiece', 10, {
@@ -395,27 +395,6 @@ const FIXTURES: Fixture[] = [
       year: '2000',
       language: 'Japanese',
     }),
-  },
-  {
-    label: 'starwars · showcase hyperspace',
-    card: card('starwars', 9, {
-      player_or_character: 'Darth Vader',
-      set_name: 'Spark of Rebellion',
-      card_number: 'SOR-010',
-      rarity: 'Legendary',
-      variety: 'Hyperspace Foil',
-      year: '2024',
-    }, { is_foil: true }),
-  },
-  {
-    label: 'starwars · showcase, autographed',
-    card: card('starwars', 8, {
-      player_or_character: 'Luke Skywalker',
-      set_name: 'Shadows of the Galaxy',
-      card_number: 'SHD-233',
-      rarity: 'Showcase',
-      year: '2024',
-    }, { autographed: true, autograph_type: 'sticker' }),
   },
 
   // ─── Other / non-sport ───

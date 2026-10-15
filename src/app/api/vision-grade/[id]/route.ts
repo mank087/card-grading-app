@@ -460,7 +460,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
         // Derive the engine cardType from the card row's category and pass the processed
         // condition report, mirroring the per-type routes.
         const SPORT_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
-        const categoryToCardType = (category: string | null): 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other' => {
+        const categoryToCardType = (category: string | null): 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other' => {
           if (!category) return 'other';
           if (SPORT_CATEGORIES.includes(category)) return 'sports';
           switch (category) {
@@ -469,7 +469,6 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
             case 'Lorcana': return 'lorcana';
             case 'One Piece': return 'onepiece';
             case 'Yu-Gi-Oh': return 'yugioh';
-            case 'Star Wars': return 'starwars';
             default: return 'other';
           }
         };
@@ -2189,23 +2188,6 @@ EXTRACTION RULES:
                 });
                 if (result.prices) {
                   estimatedValue = estimateOnePieceDcmValue(result.prices, dcmGrade);
-                  matchConfidence = result.matchConfidence;
-                  productId = result.prices.productId;
-                  productName = result.prices.productName;
-                  rawPrice = result.prices.raw;
-                }
-              } else if (category === 'Star Wars' && isOtherPricingEnabled() && cardName) {
-                console.log(`[PRICECHARTING] Fetching Star Wars pricing for card ${cardId}`);
-                const result = await searchOtherCardPrices({
-                  cardName,
-                  setName,
-                  cardNumber,
-                  year,
-                  manufacturer: cardInfo?.manufacturer,
-                  variant,
-                });
-                if (result.prices) {
-                  estimatedValue = estimateOtherDcmValue(result.prices, dcmGrade);
                   matchConfidence = result.matchConfidence;
                   productId = result.prices.productId;
                   productName = result.prices.productName;

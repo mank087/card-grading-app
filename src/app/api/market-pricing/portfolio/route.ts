@@ -9,7 +9,7 @@ import { categoryToRouteSlug } from '@/lib/postGradeEmailTemplates';
 import { createSignedImageMap, pickDisplayUrls, type SignedImagePair } from '@/lib/signedUrlBatch';
 import { displayImagePath } from '@/lib/images/displayPath'
 
-// DB stores: Pokemon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Star Wars, Other, or
+// DB stores: Pokemon, MTG, Lorcana, One Piece, Yu-Gi-Oh, Other, or
 // sport names (Football, Baseball, etc.) — categoryToRouteSlug handles them all.
 
 /**

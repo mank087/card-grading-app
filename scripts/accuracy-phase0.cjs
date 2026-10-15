@@ -43,14 +43,19 @@ function buildManifest(environment = process.env, configSource = 'shell environm
     'src/app/upload/page.tsx', 'dcm-mobile/app/grade/capture.tsx', 'dcm-mobile/lib/imageUtils.ts',
     'docs/dcm-accuracy-audit-2026-09-16-probes.cjs',
     'docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json', 'scripts/accuracy-phase0.cjs',
+    'scripts/accuracy-phase0-retired-prompts.cjs',
     ...fs.readdirSync(path.join(root, 'prompts')).filter(name => /^(master_grading_rubric|.+_delta)_v5\.txt$/.test(name)).map(name => `prompts/${name}`),
   ].sort();
   const hashes = Object.fromEntries(files.map(file => [file,
     crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
   const baselineRequest = { model: router.BASELINE_MODEL, temperature: 0.3, top_p: 0.9,
     max_tokens: 16000, seed: 7, n: 3, response_format: { type: 'json_object' } };
+  const retiredPreload = path.join(root, 'scripts/accuracy-phase0-retired-prompts.cjs');
+  const { RETIRED_PROMPT_FILES } = require(retiredPreload);
   const observed = JSON.parse(execFileSync(process.execPath,
-    [path.join(root, 'docs/dcm-accuracy-audit-2026-09-16-probes.cjs')], { encoding: 'utf8', cwd: root }));
+    ['-r', retiredPreload, path.join(root, 'docs/dcm-accuracy-audit-2026-09-16-probes.cjs')], { encoding: 'utf8', cwd: root }));
+  // Deleted prompt deltas (see the preload) are not measured.
+  observed.promptSizes = observed.promptSizes.filter(p => !RETIRED_PROMPT_FILES.includes(p.file));
   const frozen = JSON.parse(fs.readFileSync(path.join(root, 'docs/DCM_ACCURACY_AUDIT_PROBES_2026-09-16.json'), 'utf8').replace(/^\uFEFF/, ''));
   return {
     schemaVersion: 1, generatedAt: new Date().toISOString(), kind: 'offline-source-baseline',
@@ -97,4 +102,4 @@ if (require.main === module) {
   } else process.stdout.write(json);
   if (!manifest.probes.matchesFrozenBaseline) process.exitCode = 2;
 }
-module.exports = { buildManifest, ENV_KEYS };
+module.exports = { buildManifest, ENV_KEYS, RETIRED_PROMPT_FILES: require('./accuracy-phase0-retired-prompts.cjs').RETIRED_PROMPT_FILES };

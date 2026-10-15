@@ -39,7 +39,7 @@ type TabId = 'list' | 'active' | 'sold' | 'ended' | 'settings';
 // Map DCM category strings to the cardType the EbayListingModal expects.
 // The modal's cardType doubles as the card-detail route slug, so this defers to
 // categoryToRouteSlug — the single source of truth for category → route.
-function categoryToCardType(category: string | null | undefined): 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other' {
+function categoryToCardType(category: string | null | undefined): 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other' {
   return categoryToRouteSlug(category) as ReturnType<typeof categoryToCardType>;
 }
 

@@ -29,7 +29,7 @@ const WONDER_BREAD = [
   { blindId: 'WB4', id: '1d99d141-7769-436f-b85e-1f82ba86c653' },
   { blindId: 'WB5', id: '55bfab9e-fe16-41ec-b41f-db46e3af9698' },
 ];
-const GUARDED = new Set(['sports', 'other', 'starwars', 'yugioh']);
+const GUARDED = new Set(['sports', 'other', 'yugioh']);
 /** cards.category -> the grader's card type, as src/app/api/vision-grade maps it. */
 const engineType = (category: string, sub: string | null): string => {
   const c = (category || '').toLowerCase();

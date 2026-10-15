@@ -4,7 +4,7 @@ import { loadGradingPrompt, type CardType } from '../src/lib/promptLoader_v5';
 // v9.33: printed design (aged art, marble/wood/speckle, foil sparkle, glare, sticker peel-cuts,
 // in-ink specks) read as surface/edge/corner damage was the largest cause of Oct 2026 grade
 // disputes. The rule lives ONCE in the master rubric, so every category's prompt must carry it.
-const CATEGORIES: CardType[] = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'starwars', 'other'];
+const CATEGORIES: CardType[] = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other'];
 const load = (cardType: CardType) => {
   const result = loadGradingPrompt(cardType);
   expect(result.success).toBe(true);

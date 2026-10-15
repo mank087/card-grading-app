@@ -91,7 +91,7 @@ export function fillBlankNumberFromFirstLook(
   if (!evidence) return { filled: false };
   cardInfo.card_number = evidence.value;
   cardInfo.card_number_raw = evidence.value;
-  // The sports, other, Star Wars and Yu-Gi-Oh routes run cardNumberGuard AFTER the
+  // The sports, other and Yu-Gi-Oh routes run cardNumberGuard AFTER the
   // grader returns, and it drops any number that arrives without a transcription or
   // with a source it does not know. Without these two fields the fill is silently
   // undone on exactly the categories that need it most (caught Sept 20 2026, before

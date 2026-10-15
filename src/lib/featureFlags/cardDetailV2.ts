@@ -2,7 +2,7 @@
  * Which card-detail page does this request get — the legacy client or V2?
  *
  * The redesigned card detail page (docs/PLAN_CARD_DETAIL_REDESIGN_2026-09-21.md)
- * ships beside the eight existing CardDetailClient.tsx files rather than
+ * ships beside the seven existing CardDetailClient.tsx files rather than
  * replacing them. Those files are not edited for the whole project, so the
  * rollback path is this flag and nothing else: no revert commit, no redeploy,
  * no data change.
@@ -35,7 +35,7 @@
 
 export type CardDetailVersion = 1 | 2;
 
-/** The eight card categories that have a detail route. */
+/** The seven card categories that have a detail route. */
 export const CARD_DETAIL_CATEGORIES = [
   'pokemon',
   'sports',
@@ -43,7 +43,6 @@ export const CARD_DETAIL_CATEGORIES = [
   'lorcana',
   'onepiece',
   'yugioh',
-  'starwars',
   'other',
 ] as const;
 

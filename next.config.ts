@@ -108,6 +108,22 @@ const nextConfig: NextConfig = {
         destination: 'https://dcmgrading.com/:path',
         permanent: true,
       },
+      {
+        // Star Wars is not a grading category: it is a sub-category of Other
+        // (category='Other', sub_category='Star Wars'). The separate Star Wars
+        // category was abandoned and its route deleted; old card links land on
+        // the Other card page. Query strings (e.g. a reviewer's ?v=2) carry over.
+        source: '/starwars/:id',
+        destination: '/other/:id',
+        permanent: true,
+      },
+      {
+        // The internal Star Wars card catalog was retired in September 2026.
+        // Permanent, because the page was public and indexed.
+        source: '/starwars-database',
+        destination: '/card-grading',
+        permanent: true,
+      },
     ]
   },
   async headers() {

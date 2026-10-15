@@ -8,7 +8,7 @@ import { buildEbayConnectHref } from '@/lib/ebay/connectRedirect';
 
 interface EbayListingButtonProps {
   card: any;
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: string;
   customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null;

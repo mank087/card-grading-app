@@ -79,7 +79,7 @@ const SPORTS_ALIASES = new Set([
  * Whether a DCM category DESCRIBES its cards with the buckets.
  *
  * Only sports does. Everything else (Pokemon, MTG, Lorcana, One Piece,
- * Yu-Gi-Oh, Star Wars, Other) has its own printed rarity names.
+ * Yu-Gi-Oh, Other) has its own printed rarity names.
  */
 export function categoryUsesRarityBuckets(category: unknown): boolean {
   if (typeof category !== 'string') return false;

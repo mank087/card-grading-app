@@ -84,7 +84,7 @@ function triggerBackgroundPriceRefresh() {
 // THAT card's price if it's >7 days stale. Owner + staleness + a 60s
 // per-card cool-down are enforced server-side, so firing on every detail
 // navigation is cheap (a fresh card is a single indexed select).
-const CARD_DETAIL_RE = /^\/(pokemon|mtg|sports|lorcana|onepiece|yugioh|starwars|other)\/([0-9a-f-]{36})$/i
+const CARD_DETAIL_RE = /^\/(pokemon|mtg|sports|lorcana|onepiece|yugioh|other)\/([0-9a-f-]{36})$/i
 
 function CardDetailPriceRefresher() {
   const pathname = usePathname()

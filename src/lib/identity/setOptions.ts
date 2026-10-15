@@ -19,7 +19,6 @@ const SOURCES: Record<string, Source[]> = {
   lorcana: [{ table: 'lorcana_sets', name: 'name', date: 'released_at', code: 'code' }],
   onepiece: [{ table: 'onepiece_sets', name: 'name', date: 'release_date' }],
   yugioh: [{ table: 'yugioh_sets', name: 'set_name', date: 'tcg_date', code: 'set_code' }],
-  starwars: [{ table: 'starwars_sets', name: 'name', date: 'release_date' }],
 };
 
 /** cards.category → a key of SOURCES, or null when DCM has no set list for it. */
@@ -30,7 +29,6 @@ export function setCatalogKey(category: string | null | undefined): string | nul
   if (c === 'lorcana') return 'lorcana';
   if (c === 'onepiece') return 'onepiece';
   if (c === 'yugioh') return 'yugioh';
-  if (c === 'starwars') return 'starwars';
   return null;
 }
 

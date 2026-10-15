@@ -13,8 +13,8 @@ import { createClient } from '@supabase/supabase-js';
 import { fillBlankNumberFromFirstLook as rawFill } from '../src/lib/identification/firstLookNumberFill';
 import { applyCardNumberGuard } from '../src/lib/cardNumberGuard';
 
-/** Fill, then the guard the sports/other/Star Wars/Yu-Gi-Oh routes run afterwards: what a route would KEEP. */
-const GUARDED = new Set(['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Other', 'Star Wars', 'Yu-Gi-Oh']);
+/** Fill, then the guard the sports/other/Yu-Gi-Oh routes run afterwards: what a route would KEEP. */
+const GUARDED = new Set(['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Other', 'Yu-Gi-Oh']);
 let currentCategory = '';
 const quiet = <T,>(fn: () => T): T => { const w = console.warn, l = console.log; console.warn = console.log = () => {}; try { return fn(); } finally { console.warn = w; console.log = l; } };
 function fillBlankNumberFromFirstLook(info: Record<string, any>, look: any) {

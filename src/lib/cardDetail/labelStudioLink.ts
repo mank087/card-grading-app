@@ -24,7 +24,7 @@
  */
 
 export const CARD_RETURN_PATH_RE =
-  /^\/(pokemon|sports|mtg|lorcana|onepiece|yugioh|starwars|other)\/[0-9a-f-]{36}$/;
+  /^\/(pokemon|sports|mtg|lorcana|onepiece|yugioh|other)\/[0-9a-f-]{36}$/;
 
 export type LabelStudioHolder = 'slab' | 'toploader' | 'onetouch';
 

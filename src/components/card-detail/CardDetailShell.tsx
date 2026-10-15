@@ -128,7 +128,7 @@ import {
 } from './CardDetailSections';
 import './card-detail.css';
 
-type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
 
 /** What an adapter needs to render its own Card Information fields. */
 export interface CategoryCardInfoContext {

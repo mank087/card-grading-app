@@ -61,8 +61,8 @@ export interface LegacyCardInfo {
   first_edition?: any;
   reverse_holo?: any;
 
-  /* Shared by the four JSON-first TCG categories (mtg, onepiece, yugioh,
-     starwars) and, where marked, by lorcana. Only the matching adapter and
+  /* Shared by the three JSON-first TCG categories (mtg, onepiece, yugioh)
+     and, where marked, by lorcana. Only the matching adapter and
      `<Cat>CardInfo` read them; they are undefined elsewhere. */
   expansion_code?: any;
   collector_number?: any;
@@ -116,12 +116,6 @@ export interface LegacyCardInfo {
   ygo_race?: any;
   ygo_archetype?: any;
   ygo_frame_type?: any;
-
-  /* Star Wars-only (starwars CardDetailClient.tsx 2608-2662). */
-  sw_faction?: any;
-  sw_era?: any;
-  sw_rarity?: any;
-  sw_card_type?: any;
 
   /* Lorcana-only (lorcana CardDetailClient.tsx 2634-2680). */
   ink_color?: any;

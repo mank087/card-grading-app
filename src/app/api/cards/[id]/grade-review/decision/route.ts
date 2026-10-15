@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     if (!data || data.stale) return json({ error: 'This proposal is no longer available. Refresh the card to see its current result.' }, 409);
     if (data.accepted) {
-      for (const category of ['sports', 'pokemon', 'mtg', 'lorcana', 'other', 'yugioh', 'onepiece', 'starwars']) revalidatePath(`/${category}/${id}`);
+      for (const category of ['sports', 'pokemon', 'mtg', 'lorcana', 'other', 'yugioh', 'onepiece']) revalidatePath(`/${category}/${id}`);
       revalidatePath('/collection');
     }
     return json({ accepted: data.accepted });

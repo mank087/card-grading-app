@@ -30,7 +30,7 @@ import type { InitialListingDraft } from '@/lib/ebay/listingSeed';
 import { listingImageKey } from '@/lib/cardDetail/listingImageKey';
 import { readCachedListingImages } from './sections/InstaListImages';
 
-type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+type EbayCardType = 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
 
 export interface InstaListPanelProps {
   card: any;

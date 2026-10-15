@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
-const { buildManifest } = require('../scripts/accuracy-phase0.cjs');
+const { buildManifest, RETIRED_PROMPT_FILES } = require('../scripts/accuracy-phase0.cjs');
 
 describe('offline Phase 0 baseline', () => {
   it('records actual router defaults, source hashes and frozen observations without unrelated environment values', () => {
@@ -40,7 +40,12 @@ describe('offline Phase 0 baseline', () => {
     // Sixth deliberate change (Oct 2026, v9.35): the Pokemon delta names the Ancient Mew movie
     // promo (no set number; pokemonSpecialPromos.ts) in a 3-line block (+386 characters, +4 lines).
     v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 34049, lines: 660, approximateTokensCharsDiv4: 8513 });
-    expect(promptSizes).toEqual(frozenPromptSizes.map((p: any) => v930.get(p.file) ?? p));
+    // Seventh deliberate change (Oct 2026): starwars_delta_v5.txt was deleted with the abandoned
+    // Star Wars category (Star Wars is an Other sub-category). Retired files leave both sides.
+    expect(RETIRED_PROMPT_FILES).toEqual(['starwars_delta_v5.txt']);
+    expect(promptSizes).toEqual(frozenPromptSizes
+      .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
+      .map((p: any) => v930.get(p.file) ?? p));
     // Second deliberate change (Sept 2026): the web camera guide shrank from 98% to 78% of the
     // screen so cards stop being clipped at the shutter. The crop is the same shape,
     // scaled by 0.78/0.98.

@@ -105,7 +105,7 @@ describe('softDeleteOwnedCard', () => {
 });
 
 describe('every card DELETE route delegates to softDeleteOwnedCard', () => {
-  const routes = ['cards', 'pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'starwars', 'yugioh'];
+  const routes = ['cards', 'pokemon', 'sports', 'mtg', 'lorcana', 'onepiece', 'yugioh'];
   it.each(routes)('/api/%s/[id] DELETE uses the shared soft delete and never hard-deletes', (name) => {
     const src = readFileSync(path.resolve(__dirname, `../../app/api/${name}/[id]/route.ts`), 'utf-8');
     const start = src.indexOf('export async function DELETE(');

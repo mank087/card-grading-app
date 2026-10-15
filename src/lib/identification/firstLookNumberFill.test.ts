@@ -81,10 +81,10 @@ describe('filling a blank number at grading time', () => {
 });
 
 describe('surviving the card number guard the routes run afterwards', () => {
-  // The sports, other, Star Wars and Yu-Gi-Oh routes call applyCardNumberGuard on the
+  // The sports, other and Yu-Gi-Oh routes call applyCardNumberGuard on the
   // grader's card_info. The first version of the fill set a source the guard did not
   // know and no transcription, so the guard silently dropped every filled number.
-  it.each(['Sports', 'Other', 'Star Wars', 'Yu-Gi-Oh'])('keeps a filled number on a %s card', category => {
+  it.each(['Sports', 'Other', 'Yu-Gi-Oh'])('keeps a filled number on a %s card', category => {
     const info: Record<string, any> = { card_name: 'Bobby Orr', card_number: null };
     fillBlankNumberFromFirstLook(info, look({ printed: 'No. 336' }));
     expect(info).toMatchObject({ card_number: '336', card_number_text_seen: 'No. 336', card_number_source: 'first_look' });

@@ -99,19 +99,13 @@ export const TITLE_TOKEN_TABLE: Record<string, { display: TitleTokenKey[]; prior
     display: ['setName', 'cardNumber', 'rarity', 'parallel', 'finish', 'auto', 'serial', 'year', 'language', 'gameWord'],
     priority: ['setName', 'gameWord', 'cardNumber', 'rarity', 'parallel', 'language', 'finish', 'auto', 'serial', 'year'],
   },
-  // Star Wars Unlimited has no short game word, so 22 characters of it rank
-  // BELOW the card's own attributes rather than above them.
-  swu: {
-    display: ['setName', 'cardNumber', 'rarity', 'parallel', 'finish', 'auto', 'serial', 'year', 'language', 'gameWord'],
-    priority: ['setName', 'cardNumber', 'rarity', 'parallel', 'language', 'finish', 'auto', 'serial', 'gameWord', 'year'],
-  },
   other: {
     display: ['subset', 'setName', 'cardNumber', 'year', 'serial', 'auto', 'gameWord', 'language'],
     priority: ['setName', 'cardNumber', 'year', 'subset', 'gameWord', 'language', 'auto', 'serial'],
   },
 }
 
-/** One Piece / Yu-Gi-Oh share the generic CCG token order; SWU has its own. */
+/** One Piece / Yu-Gi-Oh share the generic CCG token order. */
 const CATEGORY_TO_TABLE: Record<string, string> = {
   sports: 'sports',
   pokemon: 'pokemon',
@@ -119,7 +113,6 @@ const CATEGORY_TO_TABLE: Record<string, string> = {
   lorcana: 'lorcana',
   onepiece: 'ccg',
   yugioh: 'ccg',
-  starwars: 'swu',
   other: 'other',
 }
 

@@ -35,7 +35,7 @@ const mantle = {
 
 /** The Wonder Bread Luke: the set is the word "Unknown". */
 const luke = {
-  category: 'Star Wars',
+  category: 'Other',
   card_set: 'Unknown',
   release_date: null,
   dcm_selected_product_id: null,
@@ -86,9 +86,9 @@ describe('assessValueTrust', () => {
     expect(assessValueTrust({ ...pokemon, card_set: null }, 12000).trusted).toBe(false);
   });
 
-  it('does treat a missing year as thin for sports, Other and Star Wars', () => {
+  it('does treat a missing year as thin for sports and Other', () => {
     const base = { card_set: 'Topps', release_date: null, dcm_selected_product_id: null, identity_confirmed_revision: null };
-    for (const category of ['Baseball', 'Football', 'Sports', 'Other', 'Star Wars']) {
+    for (const category of ['Baseball', 'Football', 'Sports', 'Other']) {
       expect(assessValueTrust({ ...base, category }, 9000).reason).toBe('thin_identity');
     }
     // With a year on file the same rows are fine.

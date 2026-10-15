@@ -9,11 +9,11 @@ describe('which internal set catalog a category uses', () => {
     expect(setCatalogKey('One Piece')).toBe('onepiece');
     expect(setCatalogKey('Yu-Gi-Oh')).toBe('yugioh');
     expect(setCatalogKey('Yu-Gi-Oh!')).toBe('yugioh');
-    expect(setCatalogKey('Star Wars')).toBe('starwars');
     expect(setCatalogKey('Lorcana')).toBe('lorcana');
   });
   it('has no set list for sports or Other, so those stay free text', () => {
-    for (const c of ['Sports', 'Baseball', 'Other', '', null, undefined]) expect(setCatalogKey(c)).toBeNull();
+    // 'Star Wars' is an Other sub-category; its internal catalog was retired.
+    for (const c of ['Sports', 'Baseball', 'Other', 'Star Wars', '', null, undefined]) expect(setCatalogKey(c)).toBeNull();
   });
 });
 

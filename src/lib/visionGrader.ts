@@ -2011,10 +2011,10 @@ export async function gradeCardConversational(
                                           // Median consensus computed below. Replaces the fake in-output
                                           // three-pass system (one completion copying itself 3×).
       // v9.3: ONE shared cache key for all card types. The ~72K-token master rubric
-      // precedes the per-type delta in every prompt, so all 8 types share the same
+      // precedes the per-type delta in every prompt, so all types share the same
       // cache prefix — but per-type keys routed each type to its own shard, measured
       // live (2026-07-10) as a 0% cross-type hit right after a 100% same-type hit.
-      // Low-volume types (lorcana/ygo/starwars/mtg) were cold-missing ~every call
+      // Low-volume types (lorcana/ygo/mtg) were cold-missing ~every call
       // (~$0.10/card extra). A shared key lets any grade warm the prefix for all
       // types; the delta suffix past the shared prefix is billed fresh either way.
       // Routing-only: zero effect on model output.

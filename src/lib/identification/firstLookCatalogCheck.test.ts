@@ -25,6 +25,6 @@ describe('first look catalog check (skips the web search)', () => {
     expect(await firstLookCatalogCheck('onepiece')!(read('Roronoa Zoro', 'OP01-025'))).toBe(false);
   });
   it('categories without a live catalog always search', () => {
-    for (const t of ['sports', 'other', 'starwars', 'yugioh', undefined]) expect(firstLookCatalogCheck(t)).toBeUndefined();
+    for (const t of ['sports', 'other', 'yugioh', undefined]) expect(firstLookCatalogCheck(t)).toBeUndefined();
   });
 });

@@ -32,7 +32,7 @@ const CARDS_PER_CATEGORY = 4;
 const DELAY_BETWEEN_CARDS_MS = 4000;
 
 // Engine card types (mirrors promptLoader_v5 CardType; routes pass these exact strings)
-type EngineCardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+type EngineCardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
 
 // Category groups → engine cardType (mirrors the per-category API routes exactly:
 // sports route uses sportCategories list; the others .eq() a single category string)
@@ -43,7 +43,6 @@ const GROUPS: { label: string; categories: string[]; cardType: EngineCardType }[
   { label: 'Lorcana', categories: ['Lorcana'], cardType: 'lorcana' },
   { label: 'One Piece', categories: ['One Piece'], cardType: 'onepiece' },
   { label: 'Yu-Gi-Oh', categories: ['Yu-Gi-Oh'], cardType: 'yugioh' },
-  { label: 'Star Wars', categories: ['Star Wars'], cardType: 'starwars' },
   { label: 'Other', categories: ['Other'], cardType: 'other' },
 ];
 
@@ -291,7 +290,7 @@ async function main() {
       let fresh;
       try {
         // cast: visionGrader's signature union lags promptLoader_v5 (routes pass
-        // 'onepiece'/'yugioh'/'starwars' the same way; runtime accepts all 8)
+        // 'onepiece'/'yugioh' the same way; runtime accepts all 7)
         fresh = await gradeCardConversational(frontUrl, backUrl, cardType as any, {
           userConditionReport: userConditionReport,
         });

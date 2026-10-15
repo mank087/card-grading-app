@@ -20,7 +20,7 @@ const DAYS = Number(process.argv[2] || 14);
 const OUT = '../../grading-work/confidence-review/';
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const QUALITY_WORDS = /soft|blur|focus|glare|reflect|lighting|shadow|resolution|grain/i;
-const PATH: Record<string, string> = { Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 'lorcana', 'One Piece': 'onepiece', 'Yu-Gi-Oh': 'yugioh', Other: 'other', 'Star Wars': 'starwars' };
+const PATH: Record<string, string> = { Pokemon: 'pokemon', MTG: 'mtg', Lorcana: 'lorcana', 'One Piece': 'onepiece', 'Yu-Gi-Oh': 'yugioh', Other: 'other' };
 
 (async () => {
   mkdirSync(OUT, { recursive: true });

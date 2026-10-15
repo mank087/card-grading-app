@@ -41,7 +41,7 @@ const FIXED_CARD_IDS = [
 const POKEMON_NAME_CANDIDATES = ['Pikachu & Charizard', 'Doublade'];
 
 // Engine card types (mirrors promptLoader_v5 CardType; routes pass these exact strings)
-type EngineCardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+type EngineCardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
 
 const SPORT_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
 
@@ -53,7 +53,6 @@ function categoryToCardType(category: string): EngineCardType {
     case 'Lorcana': return 'lorcana';
     case 'One Piece': return 'onepiece';
     case 'Yu-Gi-Oh': return 'yugioh';
-    case 'Star Wars': return 'starwars';
     default: return 'other';
   }
 }
@@ -303,7 +302,7 @@ async function main() {
         let fresh;
         try {
           // cast: visionGrader's signature union lags promptLoader_v5 (routes pass
-          // 'onepiece'/'yugioh'/'starwars' the same way; runtime accepts all 8)
+          // 'onepiece'/'yugioh' the same way; runtime accepts all 7)
           fresh = await gradeCardConversational(frontUrl, backUrl, cardType as any, {
             userConditionReport: userConditionReport,
           });

@@ -292,9 +292,8 @@ export default function AdminDashboardPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stats.recentActivity.map((card) => {
-                  // Get category route for link (same mapping as sitemap; Star Wars cards live under /other)
-                  const slug = categoryToRouteSlug(card.category)
-                  const route = `/${slug === 'starwars' ? 'other' : slug}`
+                  // Get category route for link (same mapping as sitemap)
+                  const route = `/${categoryToRouteSlug(card.category)}`
 
                   return (
                     <tr key={card.id} className="hover:bg-gray-50 transition-colors">

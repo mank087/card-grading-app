@@ -75,7 +75,7 @@ interface EbayListingModalProps {
   isOpen: boolean;
   onClose: () => void;
   card: any;
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: string;
   /** Active saved style config — needed to detect a Heritage custom style. */

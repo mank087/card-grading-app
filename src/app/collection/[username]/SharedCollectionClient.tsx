@@ -28,7 +28,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   Lorcana: 'Lorcana',
   'One Piece': 'One Piece',
   'Yu-Gi-Oh': 'Yu-Gi-Oh',
-  'Star Wars': 'Star Wars',
   Other: 'Other',
 }
 
