@@ -50,6 +50,7 @@ import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 import { repairReportConsistency, reportConsistencyEnabled } from './grading/reportConsistency';
 import { logOpenAIUsage } from './apiUsageLogger';
 import { severeScoreTriggers, verifySevereClaim, resolveSevereScore } from './grading/severeScoreCheck';
+import { consensusInputsEnabled, applyConsensusInputs, gemGateDecision, spreadIgnoredSentence } from './grading/consensusInputs';
 import { structuralV2Enabled, structuralUnsureCap, verifyStructuralClaimV2, cardContextOf, structuralRecheckNote, structuralV2Note, liftRefutedStructural, isStructuralVintage, evaluationsYear, hasFiberEvidence, STRUCTURAL_V2_GRADING_RULE, type StructuralV2Verdict } from './grading/structuralV2';
 import { describeDeclinedEnsemble } from './grading/declinedEnsemble';
 import { resolveGradingModel, applyModelCompat, describeDecision, recordGradingModel } from './grading/modelRouter';
@@ -76,7 +77,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // so yearGuard can cross-check tiny vintage © digits against the much larger
 // stat table — © misreads like "1986" on a card with stats through '87 are
 // corrected or dropped server-side (customer report, Aug 2026).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.37'; // v9.37: master rubric contradiction pass (one centering boundary rule, one structural cap, one grade-9 definition, no unique-wording demands, json_object wording); Pokemon delta example 657 fixed; prompt hash test. v9.36: zoom findings verifier (grading/zoomVerifier.ts; ZOOM_VERIFIER_V1=off kill switch): each cosmetic zoom finding except stains is re-checked beside the opposite crop and the whole face and dropped when a majority calls it printing or a photo artifact. v9.35: Pokemon delta names the Ancient Mew movie promo (Unown-script text, gold glyph border, no set number, © 1999-2000 Wizards): card_name 'Ancient Mew', set 'Pokemon Movie 2000 Promo', year 2000, card_number null; the backend saves one-off promos under one canonical identity and pins their PriceCharting product (pokemonSpecialPromos.ts). v9.33: master rubric PRINTED DESIGN IS NOT DAMAGE (Section 1.10.5): printed aged/distressed art and frames, marble/wood/speckle backgrounds, vintage stock tone, foil/holo sparkle, glare, sticker peel-cuts and in-ink specks are not surface/edge/corner defects; whitening must be exposed stock at the cut edge or tip; Other delta names GPK peel-cuts. v9.32: structural detector v2 (grading/structuralV2.ts; STRUCTURAL_V2=0 kill switch): the grading request and zoom are told factory features and lines that follow the artwork are not creases (cards printed 1980+ only; earlier cards keep the legacy pipeline), and a crease claim is classified (real / printed / factory / photo / cannot tell) before the scores are used - not damage re-runs the ensemble once, cannot tell holds the grade at 6. v9.31: Pokemon card_info.printed_badge ("30" / "25" / "pumpkin" / null): a printed anniversary badge puts the card in the 30th Celebration / Celebrations sets, whose Classic Collection reprints keep the original number and copyright (pokemonAnniversary.ts); the pumpkin stamp marks a Trick or Trade promo (pokemonTrickOrTrade.ts). v9.30: one field schema for Other/non-sport cards (other_delta: card_name = printed title, player_or_character = who is pictured, set_name = product, subset = insert line, card_number = printed code, serial_number = stamped print run); master rubric points Other at it. v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.38'; // v9.38: consensus inputs (grading/consensusInputs.ts; CONSENSUS_INPUTS_V1=0 kill switch): per-face scores, prose sections, the photo-confidence letter and holder detection come from the evaluation(s) that match the consensus instead of the single median-pick completion; a majority-10 whose dissent names no defect is no longer blocked by the pass spread. v9.37: master rubric contradiction pass (one centering boundary rule, one structural cap, one grade-9 definition, no unique-wording demands, json_object wording); Pokemon delta example 657 fixed; prompt hash test. v9.36: zoom findings verifier (grading/zoomVerifier.ts; ZOOM_VERIFIER_V1=off kill switch): each cosmetic zoom finding except stains is re-checked beside the opposite crop and the whole face and dropped when a majority calls it printing or a photo artifact. v9.35: Pokemon delta names the Ancient Mew movie promo (Unown-script text, gold glyph border, no set number, © 1999-2000 Wizards): card_name 'Ancient Mew', set 'Pokemon Movie 2000 Promo', year 2000, card_number null; the backend saves one-off promos under one canonical identity and pins their PriceCharting product (pokemonSpecialPromos.ts). v9.33: master rubric PRINTED DESIGN IS NOT DAMAGE (Section 1.10.5): printed aged/distressed art and frames, marble/wood/speckle backgrounds, vintage stock tone, foil/holo sparkle, glare, sticker peel-cuts and in-ink specks are not surface/edge/corner defects; whitening must be exposed stock at the cut edge or tip; Other delta names GPK peel-cuts. v9.32: structural detector v2 (grading/structuralV2.ts; STRUCTURAL_V2=0 kill switch): the grading request and zoom are told factory features and lines that follow the artwork are not creases (cards printed 1980+ only; earlier cards keep the legacy pipeline), and a crease claim is classified (real / printed / factory / photo / cannot tell) before the scores are used - not damage re-runs the ensemble once, cannot tell holds the grade at 6. v9.31: Pokemon card_info.printed_badge ("30" / "25" / "pumpkin" / null): a printed anniversary badge puts the card in the 30th Celebration / Celebrations sets, whose Classic Collection reprints keep the original number and copyright (pokemonAnniversary.ts); the pumpkin stamp marks a Trick or Trade promo (pokemonTrickOrTrade.ts). v9.30: one field schema for Other/non-sport cards (other_delta: card_name = printed title, player_or_character = who is pictured, set_name = product, subset = insert line, card_number = printed code, serial_number = stamped print run); master rubric points Other at it. v9.29: a surface score of 4 or below is re-inspected when every flaw behind it is a print-like type (grading/severeScoreCheck.ts); declined evaluations act on their stated reason (grading/declinedEnsemble.ts); a zoom-only crease needs one whole-card vote to cap. v9.28: a rigid holder counts only when a majority of the three evaluations report one (grading/caseConsensus.ts). v9.27: out-of-frame flags are checked against the photo's edge pixels. v9.26: held grades record their true cause
 // v9.23 (2026-08-31): AUTOGRAPH POLICY — an autograph is never a surface defect and
 // never an N/A. All four subgrades are scored normally, surface as if the ink were
 // absent (judge the stock/gloss around and beneath the strokes). A manufacturer-
@@ -2556,6 +2557,35 @@ Provide detailed analysis as markdown with all required sections.`
           return v.length === 3 ? med3(v[0], v[1], v[2]) : null;
         };
 
+        // v9.38 CONSENSUS INPUTS (grading/consensusInputs.ts; CONSENSUS_INPUTS_V1=0 kill
+        // switch): per-face scores and prose sections, the photo-confidence letter and the
+        // holder reading come from the evaluation(s) that match the consensus instead of
+        // the single median-pick completion. Runs BEFORE Step 3.5 (which clamps to the
+        // stored faces), the centering policy (which reads the stored ratios and letter)
+        // and the uncertainty gate. The targets are exactly the values serverRounded takes
+        // below. Off, nothing here runs.
+        const consensusInputsOn = consensusInputsEnabled();
+        if (consensusInputsOn) {
+          const applied = applyConsensusInputs({
+            jsonData,
+            completions: passSrc.map(x => x.j),
+            passScores: [pass1, pass2, pass3],
+            targets: {
+              centering: Math.round(boostedAvg.centering),
+              corners: Math.round(boostedAvg.corners),
+              edges: Math.round(boostedAvg.edges),
+              surface: Math.round(boostedAvg.surface),
+            },
+            baseIndex: passSrc.indexOf(base),
+            holderRigid: holderConsensus.rigid,
+          });
+          jsonData.consensus_inputs = applied.record;
+          if (applied.note && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            jsonData.grading_passes.consensus_notes.push(applied.note);
+          }
+          if (applied.note) console.log(`[GRADE RECALC] consensus inputs: ${applied.note}`);
+        }
+
         // Step 3: Round subgrades to whole integers using STANDARD rounding (v8.5)
         // Standard rounding: 9.5 → 10, 9.4 → 9, 8.5 → 9, 8.4 → 8
         // This replaces floor rounding which systematically suppressed grades
@@ -3898,7 +3928,21 @@ Provide detailed analysis as markdown with all required sections.`
             }
           }
         }
-        if (finalGrade === 10 && (uninspectedRegions.length > 0 || uncertaintyValue >= 2 || rigidCase || (!unanimous10 && !majorityTenAwarded))) {
+        // v9.38 GATE ORDER (grading/consensusInputs.ts gemGateDecision): a majority 10 whose
+        // dissent named no defect is not blocked by the pass spread - the spread IS that
+        // dissent, which the check above has just found evidence-free. The letter, clamp and
+        // structural components still hold it, as do uninspected regions and rigid holders.
+        // The displayed range (uncertaintyStr) still includes the spread. Off, gateUncertainty
+        // === uncertaintyValue and this reads exactly as before.
+        const gemGate = gemGateDecision({
+          enabled: consensusInputsOn, finalGrade, uninspectedRegions: uninspectedRegions.length,
+          letterUncertainty, passSpread, clampLowered, structuralUncertainty, rigidCase, unanimous10, majorityTenAwarded,
+        });
+        const gateUncertaintyValue = gemGate.gateUncertainty;
+        if (consensusInputsOn && jsonData.consensus_inputs) {
+          jsonData.consensus_inputs.gate = { majority_award: majorityTenAwarded, spread_ignored: gemGate.spreadIgnored };
+        }
+        if (finalGrade === 10 && (uninspectedRegions.length > 0 || gateUncertaintyValue >= 2 || rigidCase || (!unanimous10 && !majorityTenAwarded))) {
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uninspectedRegions.length > 0) {
@@ -3911,10 +3955,11 @@ Provide detailed analysis as markdown with all required sections.`
               evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
             (threePassData as any).grade_hold = jsonData.grade_hold;
             console.log(`[GRADE RECALC] ⚖️ inspection gate: 10 → 9 (${uninspectedRegions.length} uninspected region(s))`);
-          } else if (uncertaintyValue >= 2) {
+          } else if (gateUncertaintyValue >= 2) {
             // v9.26: say the TRUE reason. This used to read "the photos are not clear enough"
             // even when the cause was a clipped corner, a holder or disagreeing evaluations.
-            const hold = { ...explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread, imageNotes: jsonData.image_quality?.notes }) };
+            // v9.38: a set-aside spread is not the cause (gemGate.explainSpread is 0 then).
+            const hold = { ...explainUncertaintyHold({ ...evidenceInputs, structuralUncertainty, passSpread: gemGate.explainSpread, imageNotes: jsonData.image_quality?.notes }) };
             // Sept 29 2026 (grading/holdNarration.ts): name WHAT disagreed, and say why a
             // reflective finish cannot be confirmed, instead of a generic clause. Words only.
             const finish = hold.cause === 'image_quality' ? reflectiveFinish(jsonData.card_info) : null;
@@ -3926,7 +3971,7 @@ Provide detailed analysis as markdown with all required sections.`
             jsonData.grade_hold = { held: true, from: 10, to: 9, cause: hold.cause, reason: hold.reason, advice: hold.advice,
               evaluations: { pass_1: f1, pass_2: f2, pass_3: f3 }, scored: { ...serverRounded } };
             (threePassData as any).grade_hold = jsonData.grade_hold;
-            console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
+            console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${gateUncertaintyValue})`);
           } else if (rigidCase) {
             gradeCapReason = 'it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection';
             gradeCapNote = `The card presents at Gem Mint level, but ${gradeCapReason} - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
@@ -4010,6 +4055,7 @@ Provide detailed analysis as markdown with all required sections.`
           if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             jsonData.grading_passes.consensus_notes.push(
               `Gem Mint majority (v9.15): pass finals ${f1}/${f2}/${f3} - the lone dissent (${majorityDissentCats}) recorded no defect, its centering measurement was inside tolerance, and zoom found no corroboration, so the 2-of-3 majority awards the 10.`
+              + (gemGate.spreadIgnored ? spreadIgnoredSentence(uncertaintyValue, [f1, f2, f3]) : '')
             );
             if (backRelease) {
               jsonData.grading_passes.consensus_notes.push(
