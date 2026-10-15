@@ -806,6 +806,98 @@
       "expected_limiting": null,
       "verified": "manual review / by eye",
       "added": "2026-10-15"
+    },
+    {
+      "key": "ace-st30-op-back-chart",
+      "label": "One Piece ST30-007 Ace: printed nautical-chart back lines read as moderate scratches (back surface 6)",
+      "cardType": "onepiece",
+      "card_id": "f1b75123-ccc2-4748-b0b6-c96267243a2b",
+      "front_path": "48971fec-9e8d-44d7-88bc-6d4e910b2cff/f1b75123-ccc2-4748-b0b6-c96267243a2b/front.jpg",
+      "back_path": "48971fec-9e8d-44d7-88bc-6d4e910b2cff/f1b75123-ccc2-4748-b0b6-c96267243a2b/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 15 2026)",
+      "added": "2026-10-15",
+      "false_positive": {
+        "note": "Back chart lines / compass rose are ink; zoom found nothing on the back.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "abrasion",
+          "scuff",
+          "line",
+          "hairline",
+          "wear"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "glyph-reincarnation-legends",
+      "label": "MTG Legends 1994 Glyph of Reincarnation: printed cracked-plaster art veins must not be read as front surface damage (back/edge wear is real; grade 6 stands)",
+      "cardType": "mtg",
+      "card_id": "5ce5ae10-6abc-4315-b086-201d1c558a00",
+      "front_path": "73b35cf5-49f8-4c67-86eb-8717448b9703/5ce5ae10-6abc-4315-b086-201d1c558a00/front.jpg",
+      "back_path": "73b35cf5-49f8-4c67-86eb-8717448b9703/5ce5ae10-6abc-4315-b086-201d1c558a00/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 15 2026)",
+      "added": "2026-10-15",
+      "false_positive": {
+        "note": "Old-frame art is drawn with crack-like veins; front surface is clean by eye. Edge wear is real.",
+        "face": "front",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "crack",
+          "scratch",
+          "line",
+          "abrasion",
+          "fracture",
+          "wear"
+        ],
+        "min_severity": "minor",
+        "any_source": true
+      }
+    },
+    {
+      "key": "mew-ex-back-trashed",
+      "label": "Pokemon Mew ex: back genuinely scratched/whitened all over (guard must NOT suppress)",
+      "cardType": "pokemon",
+      "card_id": "c3b99250-0a23-41e1-a551-5540930c7d18",
+      "front_path": "013fc530-81d9-41dc-b93e-a1c796f25798/c3b99250-0a23-41e1-a551-5540930c7d18/front.jpg",
+      "back_path": "013fc530-81d9-41dc-b93e-a1c796f25798/c3b99250-0a23-41e1-a551-5540930c7d18/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 4,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 15 2026)",
+      "added": "2026-10-15",
+      "must_detect": {
+        "note": "Heavy real back wear across swirl and Poke Ball; the swirl guard must still report it.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "scuff",
+          "abrasion",
+          "wear",
+          "whitening"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
     }
   ]
 }
