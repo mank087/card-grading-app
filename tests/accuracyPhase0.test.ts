@@ -57,6 +57,9 @@ describe('offline Phase 0 baseline', () => {
     v930.set('mtg_delta_v5.txt', { file: 'mtg_delta_v5.txt', characters: 22907, lines: 490, approximateTokensCharsDiv4: 5727 });
     v930.set('onepiece_delta_v5.txt', { file: 'onepiece_delta_v5.txt', characters: 20300, lines: 489, approximateTokensCharsDiv4: 5075 });
     v930.set('yugioh_delta_v5.txt', { file: 'yugioh_delta_v5.txt', characters: 22663, lines: 471, approximateTokensCharsDiv4: 5666 });
+    // Thirteenth deliberate change (Oct 2026, v9.43): corner silhouette judged by card type (90-degree
+    // point on square-cut cards, even factory radius on die-cut TCG cards; the radius is not softening).
+    v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 285700, lines: 5547, approximateTokensCharsDiv4: 71425 });
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));

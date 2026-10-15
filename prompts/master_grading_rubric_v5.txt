@@ -2338,18 +2338,26 @@ Severity Levels:
 • Noticeable on multiple corners, or obvious blunting → 6
 
 **🔴 CORNER ROUNDING / SOFTENING**
+Judge every corner against the shape the card was cut with:
+• SPORTS cards and other square-cut cards: the factory corner is a sharp 90° point. Softening =
+  the apex is curved, blunted or rubbed instead of meeting at a point.
+• TCG cards (Pokemon, Magic, Yu-Gi-Oh, One Piece, Lorcana) and any other card die-cut with
+  rounded corners: the factory corner is an even, rounded radius. The radius itself is NOT wear.
+  "Softening" on a TCG corner requires whitening, fibre, a crushed tip, or a radius that is
+  uneven compared with the card's other corners.
+
 Visual Appearance:
-• Corner apex is curved/rounded instead of sharp 90° point
-• Loss of crisp geometric corner shape
+• Loss of the crisp factory shape (a blunted point on a square-cut card; a flattened, crushed
+  or lopsided radius on a TCG card)
 • Corner appears "soft" or "blunted"
 • May look like corner was rubbed or worn down
-• Corner profile is convex curve instead of sharp angle
 
 How to Detect:
-• Compare corner shape to a true 90° angle
-• Sharp corner: Two edges meet at distinct point
-• Rounded corner: Edges blend into curved apex
-• Look at corner silhouette - should be angular, not curved
+• Compare the corner with its factory shape: a true 90° point on a square-cut card; on a TCG
+  card, the even factory radius shared by the card's other three corners
+• Sharp square-cut corner: two edges meet at a distinct point
+• Clean TCG corner: an even curve matching the other corners, with no whitening or fibre
+• Never call a TCG corner soft because it is round
 
 Severity Levels:
 **⚠️ Scoring authority: the CORNER SCORING LADDER (Section 8). Quick reference (market-calibrated):**
@@ -4087,7 +4095,7 @@ FOR corner IN [TL_front, TR_front, BL_front, BR_front, TL_back, TR_back, BL_back
   - If defect found: Use 4-element evidence format (Section 7.5)
     → [LOCATION] → [DESCRIPTION] → [EXTENT] → [COLOR CONTEXT]
   - If no defect: State what you checked and confirmed absent
-    Example: "Zero fiber exposure, apex maintains sharp 90° geometry, no lift/tilt detected"
+    Example: "Zero fiber exposure, apex keeps its factory shape (sharp 90° point, or the even factory radius on a TCG card), no lift/tilt detected"
 
   STEP 4: SCORE
   - Assign 1-10 (whole number) based on findings
