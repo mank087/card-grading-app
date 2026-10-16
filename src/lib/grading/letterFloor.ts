@@ -18,7 +18,7 @@
  */
 
 export const LETTER_FLOOR_MIN_BLUR = 4000;
-export const LETTER_FLOOR_MIN_FILL = 45;
+export const LETTER_FLOOR_MIN_FILL = 40;
 
 export function letterFloorEnabled(env: Record<string, string | undefined> = process.env): boolean {
   const v = String(env.LETTER_A_FLOOR_V1 ?? '').trim().toLowerCase();
