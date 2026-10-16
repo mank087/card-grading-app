@@ -469,6 +469,9 @@ const CENTERING_SAMPLES = 12;
 const MAX_SPREAD_PCT = 30;      // per-side IQR/median above this → unreliable
 const MIN_VALID_SAMPLES = 6;    // of CENTERING_SAMPLES per side
 
+// OWNER DECISION (Oct 16 2026): do not try to fix or extend this measurement. Four CV
+// attempts failed against a by-eye ground truth (scripts/centering/README.md); it runs in
+// shadow only. Centering accuracy work is model-side.
 export async function measureCentering(imageBuf: Buffer, quadNorm: Array<{ x: number; y: number }>): Promise<CenteringMeasurement | null> {
   try {
     const { data, info } = await sharp(imageBuf, { failOn: 'none' }).raw().toBuffer({ resolveWithObject: true });

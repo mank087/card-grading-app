@@ -31,3 +31,11 @@ quad lands inside the card and the ±48 px snap cannot reach the cut edge. Neith
 measurement. Next: a dedicated edge finder scored against this file (cut edge from the
 background side, design-aware inner edge), with `compare-truth.ts` as the scoreboard; until
 then the CV gate can only flag, never re-score (CV_CENTERING_GATE_V1).
+
+## Owner decision (Oct 16 2026): no more CV centering
+
+"CV measuring has been unreliable and/or broken every time we explore it." This directory is the
+record of why. Do not reopen pixel-based centering measurement (edge detection, quad refinement,
+background walking, strip comparison, ruler reading). Centering work is model-side only, scored
+against `truth-set.json` with `compare-truth.ts`. `CV_CENTERING_MODE` stays unset (shadow) and
+`CV_CENTERING_GATE_V1` stays off.

@@ -2072,6 +2072,17 @@ const isJapaneseCard = hasJapaneseText(cardInfo?.card_name) ||
 
 ---
 
+### Do not attempt: computer-vision centering measurement (owner decision, Oct 16 2026)
+
+Pixel-based centering measurement has been tried four times and failed every time; the owner has
+ruled it out for future iterations. Do not propose or build edge detection, quad refinement,
+background walking, strip comparison or ruler reading for centering, and do not spend calibration
+budget on `CV_CENTERING_MODE` / `CV_CENTERING_GATE_V1` (leave them unset/off; the code stays only as
+a shadow log). Evidence and scoreboard: `scripts/centering/README.md` and
+`scripts/centering/truth-set.json` (17 cards measured by eye). Work centering on the model side
+only (measurement discipline in the prompt, consensus of passes, a second whole-card read, human
+review for high-value cards) and use the truth set to score those changes.
+
 ## 11. Credit & Payment System
 
 ### Credit Tiers (One-Time Purchases)
