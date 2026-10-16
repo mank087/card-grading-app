@@ -421,9 +421,15 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       img.crossOrigin = 'anonymous';
 
       img.onload = () => {
+        // Cap the longest edge. The report draws each photo ~180pt (2.5in) tall,
+        // so 1200px is already >300dpi. Embedding the full phone photo (3000-4000px)
+        // makes some printers reject the PDF ("DirectPDF print error: Image in Form,
+        // Type 3 font, or Pattern is too big").
+        const MAX_EDGE = 1200;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -431,10 +437,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           return;
         }
 
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         // Convert to JPEG format (react-pdf compatible)
-        const base64 = canvas.toDataURL('image/jpeg', 0.95);
+        const base64 = canvas.toDataURL('image/jpeg', 0.9);
         resolve(base64);
       };
 

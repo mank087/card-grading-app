@@ -78,16 +78,20 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        // Cap the longest edge so printers don't reject the PDF for an oversized
+        // embedded image (see DownloadReportButton.imageToBase64).
+        const MAX_EDGE = 1200;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Failed to get canvas context'));
           return;
         }
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.95));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = url;
