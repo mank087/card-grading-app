@@ -1,0 +1,32 @@
+{
+  "_readme": [
+    "CENTERING GROUND TRUTH (Oct 16 2026). Front border widths in source-photo pixels, read by eye",
+    "from ruler-overlaid edge strips cut around the engine's detected outline (scripts/_tmp-edge-ruler.ts).",
+    "Each strip: cut edge on the left, interior to the right, 10px ticks, labels every 50px.",
+    "Widths are the distance from the cut edge to the first printed element of the border's inner edge.",
+    "Precision ~5px; confidence: high = clean border and sharp photo, medium = readable, low = glare/sleeve/soft.",
+    "Ratios: left/(left+right), top/(top+bottom). null = that axis has no measurable border on this design.",
+    "Skipped (no border or painted edge): Smaug (borderless), Ace ST30 (full art), Thorpe 94 Ultra (full bleed),",
+    "Berra 50s Bowman (painted), Aaron (inner frame ambiguous), Evans Strata (chrome frame + glare), Mew ex (sleeve),",
+    "GPK x3 (600px photos). Olsen top/bottom agrees with the Aug 26 independent edge-detector read (41/87)."
+  ],
+  "cards": [
+    { "id": "367cfb13-78e4-47bd-8a20-1c87142958d2", "name": "1969 Topps Merlin Olsen", "cardType": "sports", "left": 42, "right": 62, "top": 42, "bottom": 87, "confidence": "high", "note": "customer-verified miss; model called it 48/52 45/55 and graded centering 10" },
+    { "id": "84c6e9f5-4fc6-44e0-9f13-f87fb8e8b97d", "name": "Alex Karras", "cardType": "sports", "left": 45, "right": 48, "top": 60, "bottom": 45, "confidence": "medium" },
+    { "id": "b6447b1d-0c70-4d1e-9a3c-000000000000", "name": "Kevin McHale", "cardType": "sports", "left": 45, "right": 48, "top": 55, "bottom": 45, "confidence": "medium", "id_prefix": "b6447b1d" },
+    { "id_prefix": "bdef109e", "name": "Davante Adams Score", "cardType": "sports", "left": 100, "right": 100, "top": 65, "bottom": 60, "confidence": "medium" },
+    { "id_prefix": "36084907", "name": "Davante Adams 85 Chrome", "cardType": "sports", "left": 45, "right": 50, "top": 35, "bottom": 35, "confidence": "medium", "note": "black border" },
+    { "id_prefix": "6469a057", "name": "Michael Jordan 84 Star", "cardType": "sports", "left": 70, "right": 70, "top": null, "bottom": null, "confidence": "medium", "note": "red border; bottom band is design" },
+    { "id_prefix": "67535a24", "name": "Bo Jackson 86 Topps", "cardType": "sports", "left": 38, "right": 42, "top": null, "bottom": null, "confidence": "medium", "note": "top black band and bottom name band are design" },
+    { "id_prefix": "7c60feb4", "name": "Larry Bird 88 Fleer sticker", "cardType": "sports", "left": 50, "right": 60, "top": null, "bottom": null, "confidence": "low", "note": "white outer border; sticker top/bottom are design" },
+    { "id_prefix": "c2e27f45", "name": "Nidoking Base Set", "cardType": "pokemon", "left": 50, "right": 45, "top": 45, "bottom": 45, "confidence": "medium" },
+    { "id_prefix": "ef1aa921", "name": "Lake of the Dead", "cardType": "mtg", "left": 60, "right": 55, "top": 55, "bottom": 60, "confidence": "medium", "note": "black border" },
+    { "id_prefix": "147f26a7", "name": "Gordie Howe 62 Parkhurst", "cardType": "sports", "left": 30, "right": 30, "top": 30, "bottom": 30, "confidence": "medium" },
+    { "id_prefix": "33a7f880", "name": "Cubone", "cardType": "pokemon", "left": 60, "right": 55, "top": 55, "bottom": 55, "confidence": "medium" },
+    { "id_prefix": "5ce5ae10", "name": "Glyph of Reincarnation Legends", "cardType": "mtg", "left": 80, "right": 70, "top": 50, "bottom": 30, "confidence": "low", "note": "glare on black border" },
+    { "id_prefix": "796a25a1", "name": "Golem", "cardType": "pokemon", "left": 45, "right": 45, "top": 55, "bottom": 40, "confidence": "low", "note": "toploader" },
+    { "id_prefix": "7ac2fa83", "name": "Gastly", "cardType": "pokemon", "left": 30, "right": 30, "top": 30, "bottom": 30, "confidence": "medium" },
+    { "id_prefix": "cdd5d011", "name": "Rhystic Study", "cardType": "mtg", "left": 45, "right": 35, "top": 45, "bottom": 45, "confidence": "medium", "note": "black border" },
+    { "id_prefix": "1eacc6aa", "name": "Jaromir Jagr 95 Signature Rookies", "cardType": "sports", "left": null, "right": null, "top": 50, "bottom": 45, "confidence": "low", "note": "right side of the design is white; L/R not measurable" }
+  ]
+}
