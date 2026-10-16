@@ -60,6 +60,7 @@ import { isUuid } from './uuid';
 import { resolveAutographVerdict } from './grading/autographPolicy';
 import { identifyCardFromImages, type IdentificationResult } from './identification/identifyCard';
 import { hasNameConflict, reconcileIdentity } from './identification/reconcile';
+import { numberWitnessEnabled, pokemonCatalogWitness, printedNumberCandidates, type CatalogWitness } from './identification/catalogNumberWitness';
 import { weakestCategory } from './grading/weakestCategory';
 import { fillBlankNumberFromFirstLook, numberFillEnabled, printedNumberFromFirstLook } from './identification/firstLookNumberFill';
 import { printedBadgeOf } from './pokemonAnniversary';
@@ -2360,7 +2361,26 @@ Provide detailed analysis as markdown with all required sections.`
             if (firstLookPending) await Promise.race([firstLookPending, new Promise(resolve => setTimeout(resolve, 8000))]);
           }
           const firstLookSubject = completedFirstLook()?.result?.identity?.subject?.value ?? null;
-          const rec = reconcileIdentity(jsonData.card_info, independent, categoryHint || cardType, { firstLookSubject });
+          // Pokemon: on a name conflict the printed card number is asked of the
+          // catalog first (identification/catalogNumberWitness.ts) — a deterministic
+          // local lookup, capped so it never delays the grade.
+          let catalogWitness: CatalogWitness | null = null;
+          if (numberWitnessEnabled() && /^pokemon$/i.test(String(categoryHint || cardType || '')) && hasNameConflict(jsonData.card_info, independent)) {
+            try {
+              const ci = jsonData.card_info as Record<string, unknown>;
+              const gradingName = (typeof ci.card_name === 'string' && ci.card_name.trim()) ? ci.card_name : (typeof ci.player_or_character === 'string' ? ci.player_or_character : null);
+              const independentName = independent?.player_or_character || independent?.printed_name_seen || independent?.card_name || null;
+              const candidates = printedNumberCandidates(ci, independent, printedNumberFromFirstLook(completedFirstLook()?.result));
+              catalogWitness = await Promise.race([
+                pokemonCatalogWitness({ gradingName, independentName, printedCandidates: candidates }),
+                new Promise<null>(resolve => setTimeout(() => resolve(null), 4000)),
+              ]);
+              if (catalogWitness) console.log(`[identify] catalog witness at ${catalogWitness.printed}: backs ${catalogWitness.backs} (${catalogWitness.catalog_names.join(', ') || 'no card'})`);
+            } catch (e: any) {
+              console.warn('[identify] catalog witness failed:', e?.message || e);
+            }
+          }
+          const rec = reconcileIdentity(jsonData.card_info, independent, categoryHint || cardType, { firstLookSubject, catalogWitness });
           const nameDecision = (rec.cardInfo.identification_check as any)?.name_decision;
           if (nameDecision) console.log(`[identify] name conflict: ${nameDecision.action} (${nameDecision.reason}) grading="${nameDecision.grading_name}" independent="${independent?.printed_name_seen}" first_look="${nameDecision.first_look_subject ?? '-'}"`);
           jsonData.card_info = rec.cardInfo;

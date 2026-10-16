@@ -26,6 +26,7 @@
  */
 
 import type { IdentificationResult } from './identifyCard';
+import type { CatalogWitness } from './catalogNumberWitness';
 
 export type IdentificationConfidence = 'high' | 'medium' | 'low';
 
@@ -237,6 +238,8 @@ function surnameIn(name: unknown, text: string): boolean {
 
 export type NameDecisionReason =
   | 'caption'
+  | 'catalog_agrees'
+  | 'catalog_disagrees'
   | 'first_look_agrees'
   | 'first_look_disagrees'
   | 'grader_transcription'
@@ -248,11 +251,16 @@ export interface NameDecision {
   /** The grading call's name before any change — lost otherwise. */
   grading_name: string | null;
   first_look_subject: string | null;
+  /** Pokemon only: what the catalog said about the printed number (catalogNumberWitness.ts). */
+  catalog?: CatalogWitness | null;
 }
 
 /**
  * Should the independent read's name replace the grading name? Only on
  * corroboration:
+ *   0. (Pokemon) the catalog row at the printed card number agrees with one
+ *      name and not the other — deterministic, so it outranks the model
+ *      witnesses below (identification/catalogNumberWitness.ts);
  *   1. the first look (full-resolution photos, its own call) names the same
  *      subject as the independent read; or, with no first look,
  *   2. the grading call's OWN transcription of the card's text contains the
@@ -264,10 +272,16 @@ function decideName(
   gradingName: string | null,
   independent: IdentificationResult,
   category: string | null | undefined,
-  firstLookSubject: string | null
+  firstLookSubject: string | null,
+  catalog?: CatalogWitness | null
 ): Omit<NameDecision, 'grading_name' | 'first_look_subject'> {
   const printed = independent.printed_name_seen;
   if (looksLikeCaption(printed, category)) return { action: 'kept_grading', reason: 'caption' };
+
+  if (catalog?.backs === 'independent') return { action: 'override', reason: 'catalog_agrees' };
+  if (catalog?.backs === 'grading') return { action: 'kept_grading', reason: 'catalog_disagrees' };
+  // 'both' (two catalog cards share the number, one per name) and 'neither'
+  // say nothing about which name is right: fall through to the model witnesses.
 
   const independentName = independent.player_or_character || printed;
   if (firstLookSubject) {
@@ -326,6 +340,8 @@ export function hasNameConflict(
 export interface ReconcileOptions {
   /** The first look's identity.subject, when it finished in time. */
   firstLookSubject?: string | null;
+  /** Pokemon: the catalog's answer for the printed number, computed by the caller (async). */
+  catalogWitness?: CatalogWitness | null;
 }
 
 /** The independent result minus token accounting — what we persist. */
@@ -388,9 +404,10 @@ export function reconcileIdentity(
     conflicts.push('name');
     const firstLookSubject = str(options.firstLookSubject);
     nameDecision = {
-      ...decideName(gradingCardInfo || {}, gradingName ?? gradingPlayer, independent, category, firstLookSubject),
+      ...decideName(gradingCardInfo || {}, gradingName ?? gradingPlayer, independent, category, firstLookSubject, options.catalogWitness),
       grading_name: gradingName ?? gradingPlayer,
       first_look_subject: firstLookSubject,
+      ...(options.catalogWitness ? { catalog: options.catalogWitness } : {}),
     };
   }
   if (nameDecision?.action === 'override' && independent.printed_name_seen) {
