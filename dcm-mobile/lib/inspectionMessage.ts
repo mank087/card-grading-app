@@ -52,6 +52,15 @@ const REASONS: Record<string, { title: string; advice: string }> = {
     title: 'This photo is too small to grade accurately.',
     advice: "Please retake it with the card filling the frame. If the in-browser camera keeps producing a small photo, take the picture with your phone's camera app and upload the original instead.",
   },
+  // Oct 2026: distance and focus (photoPrecheck.ts). Both are stopped before the charge.
+  too_far: {
+    title: 'The card is too far from the camera to grade.',
+    advice: 'Move closer so the card fills most of the frame with all four edges just inside it, hold the phone steady, and retake the photo, then try again.',
+  },
+  soft_focus: {
+    title: 'Both photos are too soft to inspect the card closely.',
+    advice: 'Tap the card to focus, use good light, keep the phone steady and close, and if the card is in a holder or sleeve take it out for the photos, then try again.',
+  },
   screenshot: {
     title: 'This looks like a screenshot or a photo of a screen, not a photo of the card itself.',
     advice: 'Photograph the physical card with your camera, front and back, with all four edges in the frame, then try again.',

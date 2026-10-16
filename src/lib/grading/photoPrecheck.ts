@@ -28,7 +28,7 @@ import sharp from 'sharp';
 import { applyModelCompat } from './modelRouter';
 import { logOpenAIUsage } from '../apiUsageLogger';
 
-export const PRECHARGE_CHECK_VERSION = 'pc-1';
+export const PRECHARGE_CHECK_VERSION = 'pc-2';
 
 /** The model is pinned here, not inherited from the grading router: a model change moves block rates. */
 export const PRECHARGE_MODEL = process.env.PRECHARGE_PHOTO_CHECK_MODEL || 'gpt-5.6-luna';
@@ -67,6 +67,28 @@ export const SCREENSHOT_ASPECT_MIN = 1.9;
 /** Below this short side an image is a web thumbnail, not a camera capture. */
 export const LOW_RES_SHORT_SIDE = 600;
 
+// ── Focus and distance (Oct 16 2026) ────────────────────────────────────────
+//
+// WHY. A hand-held top-loader Slowpoke with a heavily scuffed back graded 9:
+// the card filled 35% of the frame, both photos were soft, and every evaluation
+// wrote "no confirmed defect at the submitted resolution" and scored 10.
+// Measured on 673 submissions that passed this check (Oct 8-16): when BOTH
+// photos came back soft_but_legible, 80% of the grades ended at confidence
+// C/D (11% of the rest); with the pixel blur also under 2500 it is 92%. The
+// soft_focus rule needs both photos soft AND the pixels to agree. too_far
+// needs the model to see the card at under a quarter of the frame on a photo
+// it also found soft. Both are stopped before the credit moves, with the
+// same not-charged body as the other reasons. PRECHARGE_FOCUS_GATE=off
+// disables both (pass with signals logged).
+
+/** Laplacian variance (512px long edge) under which soft photos are blocked. */
+export const SOFT_FOCUS_BLUR_MAX = 2500;
+
+export function focusGateEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = String(env.PRECHARGE_FOCUS_GATE ?? '').trim().toLowerCase();
+  return !(v === 'off' || v === '0' || v === 'false');
+}
+
 export type PrechargeReason =
   | 'no_card'
   | 'different_cards'
@@ -75,7 +97,9 @@ export type PrechargeReason =
   | 'framing'
   | 'blurry'
   | 'screenshot'
-  | 'too_small';
+  | 'too_small'
+  | 'too_far'
+  | 'soft_focus';
 
 export type PhotoSide = 'front' | 'back' | 'both';
 
@@ -156,6 +180,8 @@ export interface PhotoAssessment {
   /** How many of the card's four sides run off the edge of the photo (0-4). */
   sides_cut_off: number;
   print_legibility: 'sharp' | 'soft_but_legible' | 'illegible_blur' | 'no_card';
+  /** How much of the photo the card fills (Oct 2026). */
+  card_fill: 'under_a_quarter' | 'quarter_to_half' | 'over_half' | 'no_card';
   note: string;
 }
 
@@ -170,7 +196,7 @@ export interface ModelAssessment {
 const PHOTO_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['subject', 'subject_certain', 'screen_capture', 'screen_capture_certain', 'sides_cut_off', 'print_legibility', 'note'],
+  required: ['subject', 'subject_certain', 'screen_capture', 'screen_capture_certain', 'sides_cut_off', 'print_legibility', 'card_fill', 'note'],
   properties: {
     subject: { type: 'string', enum: ['one_trading_card', 'several_cards', 'person', 'no_card_other', 'comic_magazine_or_book', 'printed_page_or_document'] },
     subject_certain: { type: 'boolean' },
@@ -178,6 +204,7 @@ const PHOTO_SCHEMA = {
     screen_capture_certain: { type: 'boolean' },
     sides_cut_off: { type: 'integer', enum: [0, 1, 2, 3, 4] },
     print_legibility: { type: 'string', enum: ['sharp', 'soft_but_legible', 'illegible_blur', 'no_card'] },
+    card_fill: { type: 'string', enum: ['under_a_quarter', 'quarter_to_half', 'over_half', 'no_card'] },
     note: { type: 'string' },
   },
 } as const;
@@ -210,6 +237,7 @@ For EACH photo:
 - screen_capture_certain: true only if the screen/app elements are unmistakable.
 - sides_cut_off: how many of the CARD's four sides (top, bottom, left, right) have part of the card running PAST the edge of the photo, so that edge of the card is not visible. A card edge that is visible but close to the photo border is NOT cut off. 0 when no card.
 - print_legibility: can the printed text on the card (name, numbers, small print) be read? sharp; soft_but_legible (somewhat soft, glare, or small but readable); illegible_blur (motion/focus blur so strong the large text itself is smeared); no_card.
+- card_fill: how much of the PHOTO's area the card itself covers (a holder or sleeve around it does not count): under_a_quarter (the card is small in a large scene); quarter_to_half; over_half (the card is the photo); no_card.
 - note: at most 12 words on what the photo shows.
 
 same_card: do both photos show the same physical card? Card backs are often generic (every Pokemon or Magic back looks the same) — then answer yes unless something contradicts it. Answer no only on clear contradiction: two different card FRONTS (different names/artwork), a back naming a different player/character/number than the front, backs of different games or brands, or one photo not being a card at all. cannot_tell when unsure. same_card_certain: true only for an obvious contradiction or obvious match. same_card_evidence: at most 15 words.`;
@@ -295,12 +323,13 @@ export interface PrechargeDecision {
   signals: string[];
 }
 
-const PRIORITY: PrechargeReason[] = ['screenshot', 'not_a_card', 'no_card', 'multiple_cards', 'different_cards', 'framing', 'blurry'];
+const PRIORITY: PrechargeReason[] = ['screenshot', 'not_a_card', 'no_card', 'multiple_cards', 'different_cards', 'framing', 'blurry', 'too_far', 'soft_focus'];
 
 function isAssessment(a: any): a is PhotoAssessment {
   return !!a && typeof a === 'object' && typeof a.subject === 'string' && typeof a.subject_certain === 'boolean'
     && typeof a.screen_capture === 'boolean' && typeof a.screen_capture_certain === 'boolean'
-    && Number.isInteger(a.sides_cut_off) && typeof a.print_legibility === 'string';
+    && Number.isInteger(a.sides_cut_off) && typeof a.print_legibility === 'string'
+    && (a.card_fill === undefined || typeof a.card_fill === 'string');
 }
 
 export function isModelAssessment(a: any): a is ModelAssessment {
@@ -315,7 +344,9 @@ export function isModelAssessment(a: any): a is ModelAssessment {
 export function decidePrecharge(
   model: ModelAssessment,
   pixels: { front: ImageSignals | null; back: ImageSignals | null },
+  opts: { focusGate?: boolean } = {},
 ): PrechargeDecision {
+  const focusGate = opts.focusGate ?? focusGateEnabled();
   const hits = new Map<PrechargeReason, Set<'front' | 'back'>>();
   const signals: string[] = [];
   const hit = (reason: PrechargeReason, side: 'front' | 'back') => {
@@ -361,6 +392,22 @@ export function decidePrecharge(
       const v = px?.blurVariance;
       signals.push(`${side}:illegible_blur(lap=${v == null ? 'n/a' : Math.round(v)})`);
       if (typeof v === 'number' && v < BLUR_CORROBORATION_MAX) hit('blurry', side);
+    }
+    // Oct 2026: the card is small in the frame AND that photo is not sharp.
+    // A small but sharp photo still carries the detail (the zoom pass crops it).
+    if (a.subject === 'one_trading_card' && a.card_fill === 'under_a_quarter') {
+      signals.push(`${side}:under_a_quarter${a.print_legibility === 'sharp' ? '(sharp)' : ''}`);
+      if (focusGate && a.print_legibility !== 'sharp') hit('too_far', side);
+    }
+  }
+  // Oct 2026: both photos soft and the pixels agree (SOFT_FOCUS_BLUR_MAX).
+  {
+    const bothSoft = model.front.print_legibility === 'soft_but_legible' && model.back.print_legibility === 'soft_but_legible';
+    const blurs = [pixels.front?.blurVariance, pixels.back?.blurVariance].filter((v): v is number => typeof v === 'number');
+    const minBlur = blurs.length ? Math.min(...blurs) : null;
+    if (bothSoft) {
+      signals.push(`pair:soft_both(lap=${minBlur == null ? 'n/a' : Math.round(minBlur)})`);
+      if (focusGate && minBlur != null && minBlur < SOFT_FOCUS_BLUR_MAX) { hit('soft_focus', 'front'); hit('soft_focus', 'back'); }
     }
   }
 

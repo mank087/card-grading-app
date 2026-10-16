@@ -36,7 +36,7 @@ import {
 /** Stage tag in cards.error_message; the grading routes key off it. */
 export const PRECHARGE_ERROR_TAG = 'Inspection incomplete (precharge).';
 
-const REASONS: readonly PrechargeReason[] = ['no_card', 'different_cards', 'multiple_cards', 'not_a_card', 'framing', 'blurry', 'screenshot', 'too_small'];
+const REASONS: readonly PrechargeReason[] = ['no_card', 'different_cards', 'multiple_cards', 'not_a_card', 'framing', 'blurry', 'screenshot', 'too_small', 'too_far', 'soft_focus'];
 
 /** Reasons the owner cannot fix by photographing again. */
 const SUPPORT_REASONS = new Set<PrechargeReason>(['not_a_card']);
