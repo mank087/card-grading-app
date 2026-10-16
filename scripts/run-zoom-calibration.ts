@@ -259,6 +259,7 @@ function installUsageMeter() {
           faces: j.raw_sub_scores || {},
           hold: j.grade_hold ? { cause: j.grade_hold.cause, reason: j.grade_hold.reason } : null,
           summary: String(j.final_grade?.summary || ''),
+          letter: r.grading_metadata?.image_confidence ?? j.image_quality?.confidence_letter ?? null,
           defects: collectDefects(j),
           corroboration: j.inspection_status?.zoom_corroboration,
           heldNarrationBad: /Magnified inspection adjusted this face/.test(text),

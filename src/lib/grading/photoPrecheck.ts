@@ -255,7 +255,7 @@ export interface ImageSignals {
 }
 
 /** Same math as scripts/_tmp-blur-calibration.ts and src/utils/imageQuality.ts checkBlur. */
-async function laplacianVariance(buf: Buffer): Promise<number | null> {
+export async function laplacianVariance(buf: Buffer): Promise<number | null> {
   try {
     const { data, info } = await sharp(buf, { failOn: 'none' })
       .rotate()
