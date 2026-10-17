@@ -3741,6 +3741,22 @@ Provide detailed analysis as markdown with all required sections.`
         if (firstLookBadge && jsonData?.card_info && typeof jsonData.card_info === 'object') {
           jsonData.card_info.first_look_printed_badge = firstLookBadge;
         }
+        // Evidence only (Oct 2026): the game the first look saw. A Mana Crypt submitted under
+        // Lorcana was graded as Lorcana with no price; the first look had said "mtg". Recorded
+        // for the routes and the admin list; not applied here.
+        {
+          const rawCategory: unknown = completedFirstLook()?.result?.identity?.category;
+          const seenCategory = typeof rawCategory === 'string' ? rawCategory : (rawCategory && typeof rawCategory === 'object' && typeof (rawCategory as any).value === 'string' ? String((rawCategory as any).value) : null);
+          const slugOf: Record<string, string> = { mtg: 'mtg', pokemon: 'pokemon', lorcana: 'lorcana', onepiece: 'onepiece', 'one piece': 'onepiece', yugioh: 'yugioh', 'yu-gi-oh': 'yugioh', sports: 'sports' };
+          const submitted = slugOf[String(cardType || '').toLowerCase()] ?? null;
+          if (seenCategory && jsonData?.card_info && typeof jsonData.card_info === 'object') {
+            jsonData.card_info.first_look_category = seenCategory;
+            if (submitted && (seenCategory in slugOf) && slugOf[seenCategory] !== submitted) {
+              jsonData.card_info.category_mismatch = { submitted, seen: seenCategory };
+              console.warn(`[first-look] category mismatch: submitted ${submitted}, first look saw ${seenCategory}`);
+            }
+          }
+        }
         // Evidence only: first look's year + its source; the sports route may fill a blank year from it (identification/sportsIdentityNormalize.ts).
         const firstLookResult = completedFirstLook()?.result;
         if (firstLookResult?.identity?.year?.value && firstLookResult.photos?.same_item_both_photos !== 'no_different_items' && jsonData?.card_info && typeof jsonData.card_info === 'object') {

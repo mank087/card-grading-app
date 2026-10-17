@@ -1110,6 +1110,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                 is_reprint: dbCard.reprint || false,
                 is_full_art: dbCard.full_art || false,
                 border_color: dbCard.border_color,
+                // Oct 2026 foil witness: a printing the catalog lists as foil-only (Secret Lair,
+                // extended-art and showcase foils) is foil whatever the evaluations read.
+                ...(dbCard.foil === true && dbCard.nonfoil === false ? { is_foil: true, foil_witness: 'catalog_foil_only' } : {}),
                 frame_version: dbCard.frame,
                 // === DATABASE REFERENCE (for future lookups) ===
                 mtg_database_id: dbCard.id,

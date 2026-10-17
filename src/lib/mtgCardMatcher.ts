@@ -9,6 +9,9 @@ import { findUniqueDigitVariant } from './cardNumberUtils';
  * MTG card data from our local database (Scryfall data)
  */
 export interface MtgCard {
+  /** Scryfall finishes available for this printing (Oct 2026 foil witness). */
+  foil?: boolean | null;
+  nonfoil?: boolean | null;
   id: string;                    // Scryfall card UUID
   oracle_id: string | null;      // Oracle ID for grouping all prints
   name: string;                  // Card name (first face for DFCs)
@@ -396,6 +399,57 @@ export async function searchByCollectorNumber(
 }
 
 /**
+ * Oct 2026: a name the grader misspelled by a letter or two ("Silver Overlord" for
+ * Sliver Overlord) finds nothing with the ILIKE searches, and the card then goes
+ * unlinked (34% of MTG cards graded since Sept 1 had no catalog link). Search on
+ * the longest token and keep candidates whose whole name is within a couple of
+ * edits of what was read.
+ */
+export function fuzzyNameScore(read: string, candidate: string): number {
+  return calculateSimilarity(read, candidate);
+}
+
+export async function searchByFuzzyName(name: string, limit: number = 80): Promise<MtgCard[]> {
+  const exact = await searchByName(name, limit);
+  if (exact.length > 0) return exact;
+  const tokens = name.split(/[^A-Za-z0-9']+/).filter(t => t.length >= 4).sort((a, b) => b.length - a.length);
+  if (tokens.length === 0) return [];
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from('mtg_cards')
+    .select('*')
+    .or(`name.ilike.${orPattern(tokens[0])},flavor_name.ilike.${orPattern(tokens[0])}`)
+    .order('released_at', { ascending: false })
+    .limit(200);
+  if (error || !data) return [];
+  return (data as MtgCard[])
+    .filter(c => Math.max(fuzzyNameScore(name, c.name), c.flavor_name ? fuzzyNameScore(name, c.flavor_name) : 0) >= 0.85)
+    .slice(0, limit);
+}
+
+/**
+ * Oct 2026: the printed collector number decides the printing. A Planar Chaos
+ * Damnation read as "85/165" was linked to Time Spiral Remastered #106 because
+ * the name+set search found exactly one Damnation in the claimed set and never
+ * looked at the number. Every printing of the (fuzzily matched) name whose
+ * collector number equals the read one; the caller takes a unique hit over the
+ * claimed set.
+ */
+export async function printingsByNameAndNumber(name: string, collectorNumber: string): Promise<MtgCard[]> {
+  const wanted = normalizeCollectorNumber(collectorNumber);
+  if (!wanted) return [];
+  const candidates = await searchByFuzzyName(name, 120);
+  return candidates.filter(c => normalizeCollectorNumber(String(c.collector_number || '')) === wanted);
+}
+
+function setNamesAgree(a: string | undefined, b: string | null | undefined): boolean {
+  const n = (v: string | null | undefined) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const x = n(a), y = n(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
+}
+
+/**
  * Find best matching card with confidence scoring
  */
 export function findBestMatchWithConfidence(
@@ -694,6 +748,50 @@ export async function lookupMtgCard(
     }
   }
 
+  // Strategy 1n (Oct 2026): name + printed collector number across every set.
+  // Exactly one printing with that number wins, whatever set the grader named;
+  // several printings share the number only when the claimed set picks one.
+  if (name && collectorNumber) {
+    const byNumber = await printingsByNameAndNumber(name, collectorNumber);
+    const chosen = byNumber.length === 1 ? byNumber[0]
+      : byNumber.length > 1 && setName ? (byNumber.filter(c => setNamesAgree(setName, c.set_name)).length === 1 ? byNumber.find(c => setNamesAgree(setName, c.set_name))! : null)
+      : null;
+    // A misread digit must not move the card to another set: when the claimed set holds a
+    // printing of this name whose number is one character off the read, that printing wins
+    // (Lightning Bolt read "149" in Magic 2010 is M10 #146, not Magic 2011 #149).
+    if (chosen && setName && !setNamesAgree(setName, chosen.set_name)) {
+      const inClaimed = (await searchByNameAndSet(name, setName, 25)).filter(c => Math.max(fuzzyNameScore(name, c.name), c.flavor_name ? fuzzyNameScore(name, c.flavor_name) : 0) >= 0.85);
+      const variant = findUniqueDigitVariant(inClaimed, c => normalizeCollectorNumber(String(c.collector_number || '')), normalizeCollectorNumber(collectorNumber));
+      if (variant) {
+        console.log(`[MTG Matcher] Number witness deferred to the claimed set: "${collectorNumber}" is one digit off ${variant.set_name} #${variant.collector_number}`);
+        return {
+          card: variant, score: 0.9,
+          confidence: { setCodeMatched: false, setCodeScore: 0.9, numberMatched: true, numberScore: 0.9, nameMatched: true, nameScore: 1, overallConfidence: 'high', matchedFeatures: 3, totalFeatures: 3,
+            warnings: [`Collector number corrected from "${collectorNumber}" to "${variant.collector_number}" (single-digit misread; name and set matched)`] },
+        };
+      }
+    }
+    if (chosen) {
+      const nameScore = Math.max(fuzzyNameScore(name, chosen.name), chosen.flavor_name ? fuzzyNameScore(name, chosen.flavor_name) : 0);
+      const warnings: string[] = [];
+      if (setName && !setNamesAgree(setName, chosen.set_name)) warnings.push(`AI set "${setName}" was incorrect; collector number ${collectorNumber} names "${chosen.set_name}"`);
+      if (nameScore < 1) warnings.push(`Name corrected from "${name}" to "${chosen.name}" (fuzzy match ${nameScore.toFixed(2)})`);
+      console.log(`[MTG Matcher] Number witness: ${chosen.name} #${chosen.collector_number} (${chosen.set_name})${warnings.length ? ' - ' + warnings.join('; ') : ''}`);
+      return {
+        card: chosen,
+        score: 0.95,
+        confidence: {
+          setCodeMatched: !!setCode && normalizeSetCode(setCode) === chosen.set_code, setCodeScore: setCode ? (normalizeSetCode(setCode) === chosen.set_code ? 1 : 0) : 0,
+          numberMatched: true, numberScore: 1,
+          nameMatched: true, nameScore,
+          overallConfidence: 'high',
+          matchedFeatures: 2 + (setName && setNamesAgree(setName, chosen.set_name) ? 1 : 0), totalFeatures: 3,
+          warnings,
+        },
+      };
+    }
+  }
+
   // Strategy 1c (Sept 2026): no set code, but a name and a set NAME. Old-frame
   // cards (Tempest, Urza's block, Planeshift, Judgment...) print no set code, so
   // the grader and the owner supply the set by name. Searching the collector
@@ -778,8 +876,8 @@ export async function lookupMtgCard(
   }
 
   if (searchResults.length === 0 && name) {
-    // Fall back to name-only search
-    searchResults = await searchByName(name);
+    // Fall back to name-only search (fuzzy when the exact name finds nothing, Oct 2026)
+    searchResults = await searchByFuzzyName(name);
   }
 
   if (searchResults.length === 0) {
