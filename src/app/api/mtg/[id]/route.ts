@@ -27,7 +27,7 @@ import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // 🃏 CARD IDENTIFICATION: Local Supabase database lookup for MTG cards
-import { lookupMtgCard, type MtgCard } from "@/lib/mtgCardMatcher";
+import { lookupMtgCard, applyBorderWitness, type MtgCard } from "@/lib/mtgCardMatcher";
 import { disambiguateMtgPrint } from "@/lib/mtgPrintDisambiguator";
 import { recordGradingFailure, acquireGradingLock } from "@/lib/gradingFailure";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
@@ -1013,6 +1013,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
               card_number: aiCardInfo.collector_number || aiCardInfo.card_number,
               set_name: aiCardInfo.set_name
             });
+            // Oct 2026 border witness: the first look's outer-border colour against the printing's.
+            if (aiCardInfo.first_look_border) {
+              matchResult = await applyBorderWitness(matchResult, aiCardInfo.first_look_border, aiCardInfo.collector_number || aiCardInfo.card_number);
+            }
 
             // Name matched but the specific print is ambiguous (reprints/vintage):
             // pick the print visually against reference images before giving up

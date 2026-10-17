@@ -450,6 +450,61 @@ function setNamesAgree(a: string | undefined, b: string | null | undefined): boo
 }
 
 /**
+ * Oct 2026 border witness. Alpha and Beta are black-bordered; a white-bordered
+ * Animate Dead was linked to Limited Edition Alpha, and two white-bordered cards
+ * were linked to "Fourth Edition Foreign Black Border". The first look now reports
+ * the outer border as an enum; when it contradicts the linked printing's border
+ * colour, the printing is re-picked among the same card's prints with that
+ * border (the read collector number chooses between several). With no
+ * consistent printing the match drops to low and the candidates go to the
+ * visual disambiguation. Only the strong pairs count: white vs black/silver/gold
+ * and black vs white. Borderless prints have a dark edge and are left alone.
+ */
+export type ObservedBorder = 'black' | 'white' | 'silver' | 'gold' | 'borderless' | 'other' | 'unclear';
+
+export function borderContradicts(observed: string | null | undefined, catalog: string | null | undefined): boolean {
+  const o = String(observed || '').toLowerCase(), c = String(catalog || '').toLowerCase();
+  if (!o || !c) return false;
+  if (o === 'white') return c === 'black' || c === 'silver' || c === 'gold';
+  if (o === 'black') return c === 'white';
+  return false;
+}
+
+export async function applyBorderWitness(
+  result: MatchResult,
+  observed: string | null | undefined,
+  readNumber?: string | null,
+  prints: (card: MtgCard) => Promise<MtgCard[]> = c => getAllPrints(c, 60),
+): Promise<MatchResult> {
+  const card = result.card;
+  if (!card || !borderContradicts(observed, card.border_color)) return result;
+  const consistent = (await prints(card)).filter(p => String(p.border_color || '').toLowerCase() === String(observed).toLowerCase());
+  // No printing of this card has the observed border: the observation is the likelier error
+  // (a silver artifact frame read as "white" on a black-bordered Chrome Mox). Keep the link.
+  if (consistent.length === 0) {
+    console.log(`[MTG Matcher] Border witness: photo shows ${observed}, "${card.set_name}" is ${card.border_color}, but no ${observed}-bordered printing exists; link kept`);
+    return { ...result, confidence: { ...result.confidence, warnings: [...result.confidence.warnings, `Border read as ${observed} but no ${observed}-bordered printing of this card exists; link kept`] } };
+  }
+  const wanted = readNumber ? normalizeCollectorNumber(readNumber) : '';
+  const byNumber = wanted ? consistent.filter(p => normalizeCollectorNumber(String(p.collector_number || '')) === wanted) : [];
+  const pick = byNumber.length === 1 ? byNumber[0] : consistent.length === 1 ? consistent[0] : null;
+  const note = `Border witness: the photo shows a ${observed} border, "${card.set_name}" is ${card.border_color}-bordered`;
+  if (pick) {
+    console.log(`[MTG Matcher] ${note}; re-picked ${pick.set_name} #${pick.collector_number}`);
+    return {
+      card: pick, score: 0.9,
+      confidence: { ...result.confidence, setCodeMatched: false, setCodeScore: 0, overallConfidence: byNumber.length === 1 ? 'high' : 'medium', warnings: [...result.confidence.warnings, `${note}; re-picked "${pick.set_name}"`] },
+    };
+  }
+  console.log(`[MTG Matcher] ${note}; ${consistent.length} ${observed}-bordered printings, none chosen`);
+  return {
+    card: null, score: 0.4,
+    confidence: { ...result.confidence, overallConfidence: 'low', warnings: [...result.confidence.warnings, `${note}; ${consistent.length} printings with a ${observed} border`] },
+    printCandidates: consistent.length > 1 ? consistent : undefined,
+  };
+}
+
+/**
  * Find best matching card with confidence scoring
  */
 export function findBestMatchWithConfidence(

@@ -3751,6 +3751,8 @@ Provide detailed analysis as markdown with all required sections.`
           const submitted = slugOf[String(cardType || '').toLowerCase()] ?? null;
           if (seenCategory && jsonData?.card_info && typeof jsonData.card_info === 'object') {
             jsonData.card_info.first_look_category = seenCategory;
+            const seenBorder = completedFirstLook()?.result?.layout?.outer_border ?? null;
+            if (seenBorder) jsonData.card_info.first_look_border = seenBorder;
             if (submitted && (seenCategory in slugOf) && slugOf[seenCategory] !== submitted) {
               jsonData.card_info.category_mismatch = { submitted, seen: seenCategory };
               console.warn(`[first-look] category mismatch: submitted ${submitted}, first look saw ${seenCategory}`);

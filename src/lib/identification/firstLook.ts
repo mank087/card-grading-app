@@ -104,9 +104,10 @@ export const FIRST_LOOK_SCHEMA = {
       layout: {
         type: 'object',
         additionalProperties: false,
-        required: ['border', 'logo_placement', 'name_panel', 'back_layout', 'numbering_style'],
+        required: ['border', 'outer_border', 'logo_placement', 'name_panel', 'back_layout', 'numbering_style'],
         properties: {
           border: { type: 'string', description: 'Border colour and decoration as seen, e.g. "plain black", "blue with white stars and specks", "white", "borderless".' },
+          outer_border: { type: 'string', enum: ['black', 'white', 'silver', 'gold', 'borderless', 'other', 'unclear'], description: 'The colour of the OUTERMOST printed border, the strip between the cut edge and the card frame or artwork. black (Magic Alpha/Beta/modern, most Yu-Gi-Oh), white (Magic Unlimited/Revised/4th-9th, most Pokemon backs are blue so judge the front, many sports cards), silver, gold, borderless (artwork runs to the cut edge, perhaps with a thin dark line), other (any other colour), unclear (cannot see the edge). This is the outer strip only, not the inner frame around the text box.' },
           logo_placement: { type: 'string', description: 'Where the brand/franchise/team logo sits and how, e.g. "STAR WARS logo running vertically down the right side in a blue panel". "none" if there is none.' },
           name_panel: { type: 'string', description: 'How the name/title is presented, e.g. "yellow panel at the bottom, character name in red with the actor name beneath it".' },
           back_layout: { type: 'string', description: 'What the back consists of, e.g. "plain cream stock, one paragraph of story text, no stats", "puzzle piece, no text", "stat table with cartoon".' },
@@ -189,7 +190,7 @@ export const FIRST_LOOK_PROMPT = `You are identifying one trading card from phot
 HOW TO WORK
 1. photos — FIRST decide what the item physically is (item_type) and say what you see that decides it. Not everything submitted is a trading card: deck-box dividers (an index tab cut into the top edge), stickers, tokens and code cards, jumbo box toppers, custom or fan-made cards, items marked REPRINT or REPLICA, a photo of a screen or of a printed picture of a card (moire, pixels, bezel, page edge, glare from a monitor), and cards already sealed in a grading slab all occur. A modern full-art, borderless, showcase, crossover or serial-numbered treatment of a licensed game is still a trading_card, however unusual the artwork; custom_or_fan_made needs positive evidence such as no official copyright line, a hand-drawn original, or home-print quality; an official copyright line plus an official card back means an official card, even when the finish or border looks unusual (official reprints, anniversary sets and stamped promos exist). Also check the two photos are the two faces of the same item. Then say what each photo shows. Many card backs carry NO text (puzzle pieces, artwork, team logos): that is still a complete card back, not a cropped photo.
 2. printed_text — transcribe exactly what is printed. Character for character. Look for small printed STAMPS or BADGES on the front and report them: an anniversary Pikachu-head badge with digits 3 0 or 2 5 (or the Trick or Trade pumpkin) goes in printed_badge; any other stamp (prerelease, staff, league, set-symbol or event stamp) goes in front_other. Do not normalise, translate, complete a partly hidden word, or add anything you merely know. If you cannot read it, use null.
-3. layout — describe the design in plain words: border, logo placement, name panel, back layout, how the number is written. Describe only; do not name a product yet.
+3. layout — describe the design in plain words: border, logo placement, name panel, back layout, how the number is written. Describe only; do not name a product yet. For outer_border give ONLY the colour of the outermost strip between the cut edge and the frame or art (a white strip means white even when the inner frame is black; a card whose art runs to the edge is borderless).
 4. identity — now use everything you know about the hobby. The product you name must be one whose cards have THIS layout; a famous set with a different border, back or numbering style is the wrong answer. For each field give the catalog-standard value and its source:
    - "printed": the value's characters are in your printed_text transcription.
    - "recognized": you know it from the design, artwork, layout or hobby knowledge; it is not printed on the card. (A 1977 Topps Star Wars card never says "Topps" on the front — the manufacturer is still Topps, source "recognized".)
@@ -206,7 +207,7 @@ Never state a serial number, card number or year text you did not read. Never le
 export type FirstLookField = { value: string | null; source: FieldSource };
 export interface FirstLook {
   photos: { item_type: string; item_type_evidence: string; same_item_both_photos: string; front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
-  layout: { border: string; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
+  layout: { border: string; outer_border?: 'black' | 'white' | 'silver' | 'gold' | 'borderless' | 'other' | 'unclear'; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
   printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>
     & { printed_badge?: '30' | '25' | 'pumpkin' | null }; // optional: records before Oct 2026 lack it
   identity: {
