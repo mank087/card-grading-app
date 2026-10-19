@@ -936,6 +936,44 @@
         ],
         "any_source": true
       }
+    },
+    {
+      "key": "shaq-92-topps-gold-nameplate",
+      "label": "Sports 1992-93 Topps Gold Shaquille O'Neal #362: faint hairline across the black of the gold-foil nameplate between the lettering (customer-reported, confirmed at 4x). Graded 10 live with all 28 zoom regions clean; owner-corrected to 9. The hairline on glossy black foil must be reported.",
+      "cardType": "sports",
+      "card_id": "9e3cd875-c6aa-4910-aef9-168af9bbf71b",
+      "front_path": "856d3284-2789-4b1a-92cf-d5a28e0066e6/9e3cd875-c6aa-4910-aef9-168af9bbf71b/front.jpg",
+      "back_path": "856d3284-2789-4b1a-92cf-d5a28e0066e6/9e3cd875-c6aa-4910-aef9-168af9bbf71b/back.jpg",
+      "engine_grade": 10,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": "surface",
+      "verified": "by eye at 4x (Oct 19 2026, owner correction owner-correction-2026-10-19-shaq-262099)",
+      "added": "2026-10-19",
+      "must_detect": {
+        "note": "Hairline scratch across the black of the gold nameplate (front, lower-left name block). Minor is enough; the miss is reporting nothing at all.",
+        "face": "front",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "scratch",
+          "line",
+          "hairline",
+          "scuff",
+          "mark"
+        ],
+        "min_severity": "minor",
+        "regions": [
+          "name",
+          "lower",
+          "bottom",
+          "left",
+          "gold",
+          "foil"
+        ],
+        "any_source": true
+      }
     }
   ]
 }
