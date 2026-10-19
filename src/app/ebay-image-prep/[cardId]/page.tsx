@@ -41,7 +41,7 @@ import { useNativeExportToken } from '@/lib/useNativeExportToken';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { generateCardImages, generateRawCardImages, type CardImageData } from '@/lib/cardImageGenerator';
+import { generateCardImages, generateRawCardImages, LISTING_IMAGE_FOOTNOTE, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
@@ -241,6 +241,7 @@ export default function EbayImagePrepPage() {
             ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
             : undefined,
           orgDesign: orgLogoSet?.design ?? null,
+          footnote: LISTING_IMAGE_FOOTNOTE,
         };
 
         const [{ front, back }, rawImages] = await Promise.all([

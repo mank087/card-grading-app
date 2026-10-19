@@ -124,7 +124,25 @@ export interface CardImageData {
   logoOverrides?: { color?: string; white?: string; black?: string; mark?: string; scale?: number } | null;
   /** Enterprise Label Designer document for org cards; absent = stock layout. */
   orgDesign?: OrgLabelDesign | null;
+  /**
+   * Optional one-line note drawn in a band under the card, inside the slab
+   * frame. InstaList passes LISTING_IMAGE_FOOTNOTE so buyers are not led to
+   * think the photo shows a physically sealed slab; label downloads leave it
+   * unset and render exactly as before.
+   */
+  footnote?: string;
 }
+
+/**
+ * Footnote for eBay / InstaList listing photos. The composite puts a grade
+ * label above the card in a slab-style frame, which reads as an encapsulated
+ * card to a buyer scrolling search results. Say plainly what it is.
+ */
+export const LISTING_IMAGE_FOOTNOTE =
+  'Card shown is not in a physical sealed slab. Label is for condition reporting.';
+
+// Band under the card that holds the footnote (only when one is set).
+const FOOTNOTE_HEIGHT = 48;
 
 /**
  * Format grade - v6.0: Always show whole number (no decimals)
@@ -1088,9 +1106,11 @@ async function generateCardImage(
   logoDataUrl: string | undefined,
   qrCodeDataUrl: string
 ): Promise<Blob> {
+  const footnote = data.footnote?.trim() || '';
+  const footnoteHeight = footnote ? FOOTNOTE_HEIGHT : 0;
   const canvas = document.createElement('canvas');
   canvas.width = CARD_WIDTH + 16; // Add border width
-  canvas.height = TOTAL_HEIGHT + 16;
+  canvas.height = TOTAL_HEIGHT + 16 + footnoteHeight;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
@@ -1162,7 +1182,7 @@ async function generateCardImage(
     const cardImg = await loadImage(cardImageUrl);
 
     // Calculate dimensions to fit card image maintaining aspect ratio
-    const availableHeight = canvas.height - cardImageY - borderWidth;
+    const availableHeight = canvas.height - cardImageY - borderWidth - footnoteHeight;
     const availableWidth = contentWidth;
 
     // Card aspect ratio is typically 2.5:3.5
@@ -1182,7 +1202,8 @@ async function generateCardImage(
   } catch (error) {
     // Draw placeholder if image fails
     ctx.fillStyle = '#f3f4f6';
-    ctx.fillRect(contentX, cardImageY, contentWidth, canvas.height - cardImageY - borderWidth);
+    const placeholderHeight = canvas.height - cardImageY - borderWidth - footnoteHeight;
+    ctx.fillRect(contentX, cardImageY, contentWidth, placeholderHeight);
     ctx.fillStyle = COLORS.textLight;
     ctx.font = '24px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'center';
@@ -1190,8 +1211,18 @@ async function generateCardImage(
     ctx.fillText(
       `Card ${side === 'front' ? 'Front' : 'Back'} Image`,
       canvas.width / 2,
-      cardImageY + (canvas.height - cardImageY - borderWidth) / 2
+      cardImageY + placeholderHeight / 2
     );
+  }
+
+  // Footnote band: small, muted, centred inside the frame below the card.
+  if (footnote) {
+    const bandY = canvas.height - borderWidth - footnoteHeight;
+    ctx.fillStyle = isModern ? MODERN_COLORS.textWhiteMuted : COLORS.textLight;
+    ctx.font = '18px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(footnote, canvas.width / 2, bandY + footnoteHeight / 2, contentWidth - 32);
   }
 
   return new Promise((resolve, reject) => {

@@ -17,7 +17,7 @@
  * only has to call the Trading API.
  */
 
-import { generateCardImages, generateRawCardImages, type CardImageData } from '@/lib/cardImageGenerator';
+import { generateCardImages, generateRawCardImages, LISTING_IMAGE_FOOTNOTE, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { type FoldableLabelData, generateQRCodeWithLogo } from '@/lib/foldableLabelGenerator';
 import { loadLogosForCard, cardQrUrl } from '@/lib/orgBranding';
@@ -188,6 +188,7 @@ export async function prepareListingImages(
       ? { color: orgLogoSet.color, white: orgLogoSet.white, black: orgLogoSet.black, mark: orgLogoSet.mark, scale: orgLogoSet.logoScale }
       : undefined,
     orgDesign: orgLogoSet?.design ?? null,
+    footnote: LISTING_IMAGE_FOOTNOTE,
   };
 
   // The QR only needs the card URL, so it does not have to wait behind the
