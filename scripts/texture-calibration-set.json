@@ -898,6 +898,44 @@
         "min_severity": "moderate",
         "any_source": true
       }
+    },
+    {
+      "key": "bowe-91-kayo-mesh-edge",
+      "label": "Sports 1991 Kayo Riddick Bowe #172: white-stock back on black mesh background. Live run read the mesh beside the left edge as 'moderate whitening and roughness along the dark left card edge' (grade 9); a re-run read it at the bottom-left corner as 'exposed white cardstock and roughness' (corners 7, grade 7). Edges and corners are clean by eye; the 9 rests on a faint diagonal back-surface line.",
+      "cardType": "sports",
+      "card_id": "81d306ec-9e9f-4cec-b633-a4e339ca5e7f",
+      "front_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/81d306ec-9e9f-4cec-b633-a4e339ca5e7f/front.jpg",
+      "back_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/81d306ec-9e9f-4cec-b633-a4e339ca5e7f/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 19 2026, manual review eaafc774)",
+      "added": "2026-10-19",
+      "false_positive": {
+        "note": "Black mesh/fabric background against a white-bordered card: the texture beside the left edge and bottom-left corner is the background, not whitening, roughness or exposed cardstock. Anything moderate or worse on the back left side is a false positive.",
+        "face": "back",
+        "categories": [
+          "corners",
+          "edges",
+          "surface"
+        ],
+        "types": [
+          "whiten",
+          "rough",
+          "chip",
+          "fray",
+          "wear",
+          "cardstock",
+          "exposed",
+          "fiber"
+        ],
+        "min_severity": "moderate",
+        "regions": [
+          "left"
+        ],
+        "any_source": true
+      }
     }
   ]
 }
