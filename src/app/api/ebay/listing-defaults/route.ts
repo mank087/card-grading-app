@@ -15,6 +15,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { getOrgForUser } from '@/lib/organizations'
 import { cleanShippingDefaults } from '@/lib/ebay/shippingDefaults'
 import { containsBlockedGrader, findBlockedGrader } from '@/lib/ebay/gradingCompanyBlocklist'
+import { templateMergeFieldError } from '@/lib/ebay/listingDescription'
 import { isMissingColumnError } from '@/lib/cards/ownership'
 import { POLICY_COLUMNS, prefsFromRow, cleanPolicyId } from '@/lib/ebay/businessPolicies'
 
@@ -212,6 +213,8 @@ export async function PUT(request: NextRequest) {
     } else if (typeof body.descriptionTemplate === 'string' && body.descriptionTemplate.length <= TEMPLATE_MAX) {
       const linkError = templateLinkError(body.descriptionTemplate)
       if (linkError) return NextResponse.json({ error: linkError }, { status: 400 })
+      const mergeError = templateMergeFieldError(body.descriptionTemplate)
+      if (mergeError) return NextResponse.json({ error: mergeError }, { status: 400 })
       if (containsBlockedGrader(body.descriptionTemplate)) {
         return NextResponse.json(
           { error: `Templates may not name another grading company ("${findBlockedGrader(body.descriptionTemplate)}")` },

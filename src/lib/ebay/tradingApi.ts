@@ -1042,3 +1042,39 @@ export async function getItemStatus(
     };
   }
 }
+
+/**
+ * Replace the description of a LIVE fixed-price listing (ReviseFixedPriceItem
+ * with only ItemID + Description, so the price, photos, specifics and shipping
+ * stay exactly as listed). Added Oct 19 2026 for the saved-template repair: a
+ * seller's "Save as my template" had stored one card's rendered description,
+ * and every later listing carried that card's text. Throws on a non-success Ack.
+ */
+export async function reviseItemDescription(
+  config: TradingApiConfig,
+  itemId: string,
+  descriptionHtml: string
+): Promise<{ itemId: string; warnings: Array<{ code: string; message: string }> }> {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<ReviseFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <ItemID>${escapeXml(itemId)}</ItemID>
+    <Description><![CDATA[${descriptionHtml.replace(/\]\]>/g, ']]]]><![CDATA[>')}]]></Description>
+  </Item>
+</ReviseFixedPriceItemRequest>`;
+  const response = await callTradingApi(config, 'ReviseFixedPriceItem', xml);
+  assertTradingSuccess('ReviseFixedPriceItem', response);
+  const tag = (xml: string, name: string): string | null => xml.match(new RegExp(`<${name}>([^<]*)</${name}>`, 'i'))?.[1] ?? null;
+  const warnings: Array<{ code: string; message: string }> = [];
+  for (const m of response.matchAll(/<Errors>([\s\S]*?)<\/Errors>/gi)) {
+    const block = m[1];
+    if ((tag(block, 'SeverityCode') || '') !== 'Warning') continue;
+    warnings.push({ code: tag(block, 'ErrorCode') || '', message: tag(block, 'LongMessage') || tag(block, 'ShortMessage') || '' });
+  }
+  return { itemId: tag(response, 'ItemID') || itemId, warnings };
+}

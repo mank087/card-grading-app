@@ -141,6 +141,22 @@ export const DESCRIPTION_MERGE_FIELDS: { token: string; label: string }[] = [
 ];
 
 /**
+ * A description template is reusable only through its merge fields. One with
+ * none is a finished description of ONE card: saved as the template, every
+ * later listing renders that card's name, grade and serial under its own title
+ * (Oct 19 2026: a seller's 21 listings all carried a 1977 Dale Murphy body).
+ * Returns the message to show the seller, or null when the template is fine.
+ */
+export function templateMergeFieldError(template: string): string | null {
+  const present = DESCRIPTION_MERGE_FIELDS.filter(f => template.includes(f.token));
+  if (present.some(f => ['{cardName}', '{serial}', '{summary}'].includes(f.token))) return null;
+  if (present.length === 0) {
+    return 'This looks like a finished description for one card, not a template. A template is reused on every listing, so it needs merge fields such as {cardName}, {grade} and {serial} where the card details go. Open "Merge fields for templates" for the full list, or use Reset to standard.';
+  }
+  return 'A template needs a merge field that identifies the card ({cardName}, {serial} or {summary}), or every listing will describe the same card.';
+}
+
+/**
  * Starter templates offered in Store settings → Listings. All three obey the
  * eBay links policy (no URLs, no <a>, no external images), stay single-column
  * and use inline styles only, so eBay's mobile-friendly check passes.

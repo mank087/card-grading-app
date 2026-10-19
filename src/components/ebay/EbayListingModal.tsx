@@ -48,6 +48,7 @@ import {
   DESCRIPTION_MERGE_FIELDS,
   type ListingDescriptionFields,
   type ListingBranding,
+  templateMergeFieldError,
 } from '@/lib/ebay/listingDescription';
 // Canonical grade -> condition label, shared with labelDataGenerator.
 //
@@ -196,7 +197,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // A silent failure here is the worst kind: the seller believes their
       // defaults are saved and finds out on the next listing that they aren't.
       if (!res.ok) {
-        setDefaultsError('Couldn’t save your defaults — try again.');
+        const reason = await res.json().then((j: { error?: string }) => j?.error).catch(() => undefined);
+        setDefaultsError(reason || 'Couldn’t save your defaults — try again.');
         return;
       }
       setDefaultsSavedFlash(which === 'shipping' ? 'Shipping defaults saved' : 'Template saved');
@@ -2324,7 +2326,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                         <button
                           type="button"
                           disabled={savingDefaults !== null}
-                          onClick={() => saveListingDefaults({ descriptionTemplate: description }, 'template')}
+                          onClick={() => {
+                            // A rendered description has no merge fields; saved as the template it
+                            // would put THIS card's text on every later listing (Oct 19 2026).
+                            const mergeError = templateMergeFieldError(description);
+                            if (mergeError) { setDefaultsError(mergeError); return; }
+                            saveListingDefaults({ descriptionTemplate: description }, 'template');
+                          }}
                           className="text-xs px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:border-purple-400 disabled:opacity-50"
                           title={defaultsScope === 'org' ? 'Saved for your whole store' : 'Saved to your account'}
                         >
