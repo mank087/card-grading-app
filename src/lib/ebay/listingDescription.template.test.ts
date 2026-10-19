@@ -20,6 +20,13 @@ describe('templateMergeFieldError', () => {
     expect(templateMergeFieldError('<p>{cardName} graded {grade}</p>')).toBeNull();
     expect(templateMergeFieldError('<p>Serial {serial}</p>')).toBeNull();
   });
+  it('refuses a rendered description even after a merge field is typed into it', () => {
+    const rendered = generateHtmlDescription(fields).replace('Dale Murphy', '{cardName}');
+    expect(rendered).toContain('{cardName}');
+    expect(templateMergeFieldError(rendered)).toMatch(/specific card.s serial number/);
+    expect(templateMergeFieldError('<p>{cardName}</p><p>Serial: <b>409780</b></p>')).toMatch(/serial number/);
+    expect(templateMergeFieldError('<p>{cardName}</p><p>Serial: {serial}</p>')).toBeNull();
+  });
   it('refuses a template whose only merge fields do not identify the card', () => {
     expect(templateMergeFieldError('<p>Graded {grade} by {brandName}</p>')).toMatch(/identifies the card/);
   });

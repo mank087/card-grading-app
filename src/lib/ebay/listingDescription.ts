@@ -149,10 +149,14 @@ export const DESCRIPTION_MERGE_FIELDS: { token: string; label: string }[] = [
  */
 export function templateMergeFieldError(template: string): string | null {
   const present = DESCRIPTION_MERGE_FIELDS.filter(f => template.includes(f.token));
-  if (present.some(f => ['{cardName}', '{serial}', '{summary}'].includes(f.token))) return null;
   if (present.length === 0) {
     return 'This looks like a finished description for one card, not a template. A template is reused on every listing, so it needs merge fields such as {cardName}, {grade} and {serial} where the card details go. Open "Merge fields for templates" for the full list, or use Reset to standard.';
   }
+  // A literal serial line is one card's text whatever merge fields sit beside it.
+  if (/Serial:?\s*(<[^>]+>\s*)*[0-9]{5,}/i.test(template.replace(/\{serial\}/g, ''))) {
+    return 'This template contains a specific card’s serial number, so every listing would show it. Replace the serial with {serial} (and the other card details with merge fields), or use Reset to standard.';
+  }
+  if (present.some(f => ['{cardName}', '{serial}', '{summary}'].includes(f.token))) return null;
   return 'A template needs a merge field that identifies the card ({cardName}, {serial} or {summary}), or every listing will describe the same card.';
 }
 
