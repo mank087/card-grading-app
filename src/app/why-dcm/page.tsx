@@ -8,6 +8,7 @@ import AppStoreBadge from '@/components/AppStoreBadge'
 import GooglePlayBadge from '@/components/GooglePlayBadge'
 import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
 import WhyDcmCapabilities from '@/components/marketing/WhyDcmCapabilities'
+import { SoldProofStrip } from '@/components/marketing/SoldProofStrip'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 import { ActionLink, SectionHeading, Icon } from '@/components/design/Primitives'
 
@@ -234,6 +235,7 @@ export default function WhyDcmPage() {
       </div>
     </section>
     <div className="dcm-why-proof dcm-container"><span>{popTotal ? `${popTotal.toLocaleString()} cards graded` : 'Built for trading card collectors'}</span><span>4 condition subgrades</span><span>Verifiable reports</span><span>Your cards stay with you</span></div>
+    <SoldProofStrip />
     <div role="navigation" className="dcm-why-section-nav dcm-container" aria-label="Explore DCM features">{[['grading','Grading'],['reports','Reports'],['portfolio','Portfolio'],['labels','Label Studio'],['instalist','eBay InstaList'],['explore','Card tools'],['walkthrough','Watch the walkthrough'],['plans','Plans & membership']].map(([id,label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div>
     <section id="benefits" className="dcm-section dcm-container">
       <SectionHeading eyebrow="From the first photo to your next decision" title="More than a number on a card.">A connected workflow for understanding, organizing and sharing your collection.</SectionHeading>

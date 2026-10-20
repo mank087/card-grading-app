@@ -12,6 +12,7 @@ import { useShowcaseCards } from '@/components/design/useShowcaseCards'
 import { HeritageCard } from '@/components/design/HeritageCard'
 import { GradingShowreel } from '@/components/design/GradingShowreel'
 import { pricingTiers, VIP_PACKAGE } from '@/lib/creditPackages'
+import { SoldProofStrip } from './SoldProofStrip'
 
 const steps: { title: string; copy: string; icon: IconName }[] = [
   { title: 'Snap two photos', copy: 'Front and back, with your phone or camera. Capture guides and a photo quality check help you get a clear view.', icon: 'camera' },
@@ -66,6 +67,7 @@ export default function HomeExperience() {
       <Link href="/get-started"><Icon name="camera" /><strong>No shipping.</strong> Just two photos.</Link>
       <Link href="#get-the-app"><strong>iOS & Android</strong> apps available</Link>
     </div></div>
+    <SoldProofStrip />
     <section className="dcm-section"><div className="dcm-container">
       <SectionHeading eyebrow="How it works" title="From your camera to your collection.">Three simple steps. A whole new perspective on your cards.</SectionHeading>
       <div className="dcm-three-grid">{steps.map((step, i) => <article className="dcm-step" key={step.title}><div className="dcm-step-top"><Icon name={step.icon} /><span>0{i + 1}</span></div><h3>{step.title}</h3><p>{step.copy}</p></article>)}</div>
