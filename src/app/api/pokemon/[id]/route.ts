@@ -19,6 +19,7 @@ import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 import { anniversarySetIds } from "@/lib/pokemonAnniversary";
 import { applyTrickOrTradeStamp } from "@/lib/pokemonTrickOrTrade";
 import { applySpecialPromo, specialPromoColumns, type SpecialPromoMatch } from "@/lib/pokemonSpecialPromos";
+import { applyJapaneseVintage } from "@/lib/pokemonJapaneseVintage";
 import { isPokemonPromoSetId, isPokemonPromoSetName, pokemonNumberForSet } from "@/lib/pokemonPromoNumber";
 import { verifyPokemonCard } from "@/lib/pokemonApiVerification";
 // Label data generation for consistent display across all contexts
@@ -1435,6 +1436,27 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 conversationalGradingResult = JSON.stringify(promoJson);
               }
             } catch { /* the column values below still carry the promo */ }
+          }
+        }
+
+        // Oct 2026: Japanese old-back vintage set and year from the Japanese
+        // catalog (name + HP) and the expansion symbol (pokemonJapaneseVintage.ts).
+        // The old back's ©1996 is printed on every set from 1996 to 2001.
+        if (isJapaneseCard && !specialPromo && cardInfo && !identityOwnerConfirmed) {
+          const jp = await applyJapaneseVintage(supabase, cardInfo).catch(() => ({ applied: null } as const));
+          if (jp.applied) {
+            console.log(`[GET /api/pokemon/${cardId}] 🇯🇵 Japanese vintage (${jp.applied}): ${'set_name' in jp ? `"${jp.set_name}", ${jp.year}` : jp.applied === 'year_restored' ? 'no symbol, year 1996 kept' : 'year from the ©1996 back cleared'}`);
+            if (conversationalGradingResult) {
+              try {
+                const jpJson = JSON.parse(conversationalGradingResult);
+                if (jpJson.card_info) {
+                  for (const k of ['set_name', 'year', 'year_source', 'year_evidence', 'set_id', 'tcgdex_id', 'tcgdex_image_url'] as const) {
+                    if (k in cardInfo) jpJson.card_info[k] = (cardInfo as any)[k];
+                  }
+                  conversationalGradingResult = JSON.stringify(jpJson);
+                }
+              } catch { /* the column values below still carry the set and year */ }
+            }
           }
         }
 

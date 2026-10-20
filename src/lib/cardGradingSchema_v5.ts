@@ -387,6 +387,9 @@ const PokemonCardInfoSchema = z.object({
   printed_badge: z.enum(['30', '25', 'pumpkin']).nullable().optional().describe(
     'Printed badge on the front: "30" (2026 30th Celebration), "25" (2021 Celebrations), "pumpkin" (Trick or Trade Halloween stamp), null when none is visible'
   ),
+  jp_expansion_symbol: z.enum(['none', 'jungle', 'fossil', 'rocket', 'southern_islands', 'other']).nullable().optional().describe(
+    'Japanese old-back vintage cards only: the expansion symbol at the right end of the height/weight bar (pokemonJapaneseVintage.ts); null for every other card'
+  ),
 
   // Pokemon-specific required fields
   pokemon_stage: z.string().nullable().describe('Evolution stage: Basic, Stage 1, Stage 2, VMAX, ex, etc.'),

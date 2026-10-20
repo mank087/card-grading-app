@@ -85,7 +85,7 @@ export const FIRST_LOOK_SCHEMA = {
       printed_text: {
         type: 'object',
         additionalProperties: false,
-        required: ['front_title_or_name', 'front_other', 'back_header', 'card_number_as_printed', 'copyright_line', 'serial_stamp', 'back_parallel_or_product_text', 'printed_badge'],
+        required: ['front_title_or_name', 'front_other', 'back_header', 'card_number_as_printed', 'copyright_line', 'serial_stamp', 'back_parallel_or_product_text', 'printed_badge', 'jp_expansion_symbol'],
         properties: {
           front_title_or_name: { ...nullableString, description: 'The name/title/caption exactly as printed on the front.' },
           front_other: { ...nullableString, description: 'Other front text: team, position, logos as words, insert name, set logo text. Verbatim, separated by " | ".' },
@@ -96,6 +96,8 @@ export const FIRST_LOOK_SCHEMA = {
           back_parallel_or_product_text: { ...nullableString, description: 'Any back text naming the product line or parallel, e.g. "PRIZM", "REFRACTOR", "1st Edition". Verbatim.' },
           // Oct 2026: Classic Collection reprints keep the original number and copyright; the badge is the only tell.
           printed_badge: { type: ['string', 'null'], enum: ['30', '25', 'pumpkin', null], description: 'Pokémon only: a small printed badge/stamp on the front — a yellow Pikachu-head emblem (black-tipped ears) with two small red digits in its lower corners, "3" "0" ("30", 2026 30th Celebration; on reprints of older cards it overlaps a corner of the art box and the whole card has sparkle foil, border included) or "2" "5" ("25", 2021 Celebrations), or a small orange jack-o-lantern pumpkin with Pikachu ears ("pumpkin", Trick or Trade Halloween promos). null when no such badge is visible, and for every other card.' },
+          // Oct 2026 (v9.47): the old Japanese back reads (c)1996 on every set 1996-2001; the symbol is the only set evidence (pokemonJapaneseVintage.ts).
+          jp_expansion_symbol: { type: ['string', 'null'], enum: ['none', 'jungle', 'fossil', 'rocket', 'southern_islands', 'other', null], description: 'ONLY for a Japanese Pokémon card whose BACK is the old "POCKET MONSTERS CARD GAME" design (Poké Ball with those words arched around it); null for every other card. The expansion symbol is a small black mark at the RIGHT END of the tan height/weight bar under the art box. "jungle" = a flower of five rounded dotted petals; "fossil" = a small bone/claw fossil shape; "rocket" = a bold letter R; "southern_islands" = a palm tree; "none" = the end of that bar is empty, no mark at all; "other" = some other mark (gym/stadium, Poké Ball, Neo-era mark…). null when that spot is hidden or unreadable.' },
         },
       },
       // 3 — the design, in plain words, BEFORE any product is named. Look-alike
@@ -209,7 +211,7 @@ export interface FirstLook {
   photos: { item_type: string; item_type_evidence: string; same_item_both_photos: string; front_shows: string; back_shows: string; card_orientation: string; in_holder: string; text_legibility: string };
   layout: { border: string; outer_border?: 'black' | 'white' | 'silver' | 'gold' | 'borderless' | 'other' | 'unclear'; logo_placement: string; name_panel: string; back_layout: string; numbering_style: string };
   printed_text: Record<'front_title_or_name' | 'front_other' | 'back_header' | 'card_number_as_printed' | 'copyright_line' | 'serial_stamp' | 'back_parallel_or_product_text', string | null>
-    & { printed_badge?: '30' | '25' | 'pumpkin' | null }; // optional: records before Oct 2026 lack it
+    & { printed_badge?: '30' | '25' | 'pumpkin' | null; jp_expansion_symbol?: string | null }; // optional: records before Oct 2026 lack them
   identity: {
     category: string;
     subject: FirstLookField; card_title: FirstLookField; year: FirstLookField; manufacturer: FirstLookField;
@@ -235,7 +237,8 @@ const squash = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 export function normalizeFirstLook(raw: FirstLook): { value: FirstLook; repairs: string[] } {
   const v: FirstLook = JSON.parse(JSON.stringify(raw));
   const repairs: string[] = [];
-  const { printed_badge: badge, ...transcribed } = v.printed_text;
+  const { printed_badge: badge, jp_expansion_symbol: jpSymbol, ...transcribed } = v.printed_text;
+  if (jpSymbol !== undefined && jpSymbol !== null && !['none', 'jungle', 'fossil', 'rocket', 'southern_islands', 'other'].includes(jpSymbol)) { repairs.push(`jp_expansion_symbol "${jpSymbol}" → null`); v.printed_text.jp_expansion_symbol = null; }
   const transcript = squash(Object.values(transcribed).filter(Boolean).join(' '));
   if (badge !== undefined && badge !== null && badge !== '30' && badge !== '25' && badge !== 'pumpkin') { repairs.push(`printed_badge "${badge}" → null`); v.printed_text.printed_badge = null; }
 

@@ -1,0 +1,578 @@
+{
+  "_readme": [
+    "IDENTITY ANCHORS (Oct 20 2026, v9.47). Japanese old-back Pokemon: set + year from the expansion symbol (pokemonJapaneseVintage.ts), verified by eye on the symbol crop; no-symbol Base Set cards must stay 1996; gym-symbol cards must not be dated 1996. Sports: card number vs jersey number. Oct 20 revision: set+year come from the Japanese catalog (name + HP) first; the symbol is a tiebreaker and only the Rocket R / palm tree are trusted alone. Expectations check set_name + year (the symbol is evidence, not the answer).",
+    "Grades are report_only (not scored). Runner prints IDENTITY ANCHORS x/y. Run: npx tsx scripts/run-zoom-calibration.ts --set identity-anchor-set.json --n 2 --tag <tag>"
+  ],
+  "cards": [
+    {
+      "key": "jp-vileplume-si-3e34",
+      "label": "JP Vileplume, palm tree = Southern Islands 1999 (saved Jungle 1996; customer review Oct 20)",
+      "cardType": "pokemon",
+      "card_id": "3e34dd66-1eaa-4c27-92cf-7702abe7db97",
+      "front_path": "03b8b4d8-03d2-4639-95ee-ccce35a78404/3e34dd66-1eaa-4c27-92cf-7702abe7db97/front.jpg",
+      "back_path": "03b8b4d8-03d2-4639-95ee-ccce35a78404/3e34dd66-1eaa-4c27-92cf-7702abe7db97/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Southern Islands",
+        "year": "1999"
+      }
+    },
+    {
+      "key": "jp-mew-si-c3c6",
+      "label": "JP Mew, palm tree = Southern Islands 1999 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "c3c68fd4-a0aa-41bf-9069-c25ae72bb938",
+      "front_path": "2350a512-b502-4360-927a-3d3bbf587572/c3c68fd4-a0aa-41bf-9069-c25ae72bb938/front.jpg",
+      "back_path": "2350a512-b502-4360-927a-3d3bbf587572/c3c68fd4-a0aa-41bf-9069-c25ae72bb938/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Southern Islands",
+        "year": "1999"
+      }
+    },
+    {
+      "key": "jp-vileplume-jungle-219a",
+      "label": "JP Vileplume (Heal / Petal Dance), Jungle flower 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "219a1995-753c-451d-b55f-bb1d6a57dbd5",
+      "front_path": "b3d79041-732a-43db-8cbc-2e1c33136906/219a1995-753c-451d-b55f-bb1d6a57dbd5/front.jpg",
+      "back_path": "b3d79041-732a-43db-8cbc-2e1c33136906/219a1995-753c-451d-b55f-bb1d6a57dbd5/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Jungle",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-cubone-jungle-4da4",
+      "label": "JP Cubone, Jungle flower 1997 (saved Expansion Pack 1996)",
+      "cardType": "pokemon",
+      "card_id": "4da48ef3-ea8a-4c2b-a9a7-ac185b7c68b6",
+      "front_path": "027ee5ab-f221-4801-adc0-a3b837cde99e/4da48ef3-ea8a-4c2b-a9a7-ac185b7c68b6/front.jpg",
+      "back_path": "027ee5ab-f221-4801-adc0-a3b837cde99e/4da48ef3-ea8a-4c2b-a9a7-ac185b7c68b6/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Jungle",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-pikachu-jungle-8eaf",
+      "label": "JP Pikachu (Spark), Jungle flower 1997 (saved Jungle 1999)",
+      "cardType": "pokemon",
+      "card_id": "8eafd97b-97c0-4874-9480-70664c6c0904",
+      "front_path": "92b7c172-9f71-4baa-8755-9581018d998c/8eafd97b-97c0-4874-9480-70664c6c0904/front.jpg",
+      "back_path": "92b7c172-9f71-4baa-8755-9581018d998c/8eafd97b-97c0-4874-9480-70664c6c0904/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Jungle",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-vaporeon-jungle-2528",
+      "label": "JP Vaporeon, Jungle flower 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "25280f39-f9d7-4470-8cce-bbebd2dc8276",
+      "front_path": "40cc8909-cb97-4cd5-8768-b81da462f334/25280f39-f9d7-4470-8cce-bbebd2dc8276/front.jpg",
+      "back_path": "40cc8909-cb97-4cd5-8768-b81da462f334/25280f39-f9d7-4470-8cce-bbebd2dc8276/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Jungle",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-raichu-fossil-0493",
+      "label": "JP Raichu, Fossil symbol 1997 (saved Fossil 1996)",
+      "cardType": "pokemon",
+      "card_id": "0493b09e-b3a2-4b79-a0f6-74860b140376",
+      "front_path": "cbbb42cd-ee5d-44a6-95d9-0668eaa0347f/0493b09e-b3a2-4b79-a0f6-74860b140376/front.jpg",
+      "back_path": "cbbb42cd-ee5d-44a6-95d9-0668eaa0347f/0493b09e-b3a2-4b79-a0f6-74860b140376/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Mystery of the Fossils",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-raichu-fossil-13fd",
+      "label": "JP Raichu, Fossil symbol 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "13fdda1c-e6a7-47a9-a43e-01695a5cd107",
+      "front_path": "357d4fdd-7219-426c-acaf-4ad04e9ab345/13fdda1c-e6a7-47a9-a43e-01695a5cd107/front.jpg",
+      "back_path": "357d4fdd-7219-426c-acaf-4ad04e9ab345/13fdda1c-e6a7-47a9-a43e-01695a5cd107/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Mystery of the Fossils",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-zapdos-fossil-38bb",
+      "label": "JP Zapdos (Thunderstorm), Fossil symbol 1997 (saved 1996; small in frame)",
+      "cardType": "pokemon",
+      "card_id": "38bb7666-6f84-4d54-b53f-24c5a0cc0981",
+      "front_path": "45395470-7d3b-4f63-9109-c27b36f58160/38bb7666-6f84-4d54-b53f-24c5a0cc0981/front.jpg",
+      "back_path": "45395470-7d3b-4f63-9109-c27b36f58160/38bb7666-6f84-4d54-b53f-24c5a0cc0981/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Mystery of the Fossils",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-cloyster-fossil-4ea5",
+      "label": "JP Cloyster, Fossil symbol 1997 (saved Fossil 1996)",
+      "cardType": "pokemon",
+      "card_id": "4ea5e062-03b6-4173-8cb0-20a11187a550",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/4ea5e062-03b6-4173-8cb0-20a11187a550/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/4ea5e062-03b6-4173-8cb0-20a11187a550/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Mystery of the Fossils",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-dark-dragonite-rocket-30e3",
+      "label": "JP Dark Dragonite, Rocket R 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "30e33afc-5665-457a-9005-6af89e7f264e",
+      "front_path": "b3d79041-732a-43db-8cbc-2e1c33136906/30e33afc-5665-457a-9005-6af89e7f264e/front.jpg",
+      "back_path": "b3d79041-732a-43db-8cbc-2e1c33136906/30e33afc-5665-457a-9005-6af89e7f264e/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Rocket Gang",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-dark-blastoise-rocket-e199",
+      "label": "JP Dark Blastoise, Rocket R 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "e1990837-0135-4fcb-a313-e97fbd8dca4a",
+      "front_path": "a9f26d6b-c62c-4afd-a92b-50763bf1abf5/e1990837-0135-4fcb-a313-e97fbd8dca4a/front.jpg",
+      "back_path": "a9f26d6b-c62c-4afd-a92b-50763bf1abf5/e1990837-0135-4fcb-a313-e97fbd8dca4a/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Rocket Gang",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-dark-flareon-rocket-bb9a",
+      "label": "JP Dark Flareon, Rocket R 1997 (saved 1996)",
+      "cardType": "pokemon",
+      "card_id": "bb9ae0ca-dc33-4be7-9c19-1a548618e118",
+      "front_path": "8df691dc-3493-4d6e-ad8a-c9fb07c60410/bb9ae0ca-dc33-4be7-9c19-1a548618e118/front.jpg",
+      "back_path": "8df691dc-3493-4d6e-ad8a-c9fb07c60410/bb9ae0ca-dc33-4be7-9c19-1a548618e118/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "set_name": "Rocket Gang",
+        "year": "1997"
+      }
+    },
+    {
+      "key": "jp-clefairy-base-4bd7",
+      "label": "JP Clefairy, NO symbol = Expansion Pack 1996 (must stay 1996)",
+      "cardType": "pokemon",
+      "card_id": "4bd77499-11c1-4071-92ea-6893a59cd5f4",
+      "front_path": "70cf8015-239b-47cc-8d39-b072701e8a4f/4bd77499-11c1-4071-92ea-6893a59cd5f4/front.jpg",
+      "back_path": "70cf8015-239b-47cc-8d39-b072701e8a4f/4bd77499-11c1-4071-92ea-6893a59cd5f4/back.jpg",
+      "engine_grade": 3,
+      "expected_grade": 3,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1996",
+        "set_name": "Expansion Pack"
+      }
+    },
+    {
+      "key": "jp-diglett-base-ae4b",
+      "label": "JP Diglett, NO symbol = Expansion Pack 1996 (must stay 1996)",
+      "cardType": "pokemon",
+      "card_id": "ae4bc704-6748-4211-969a-a81f88ef36c6",
+      "front_path": "1a93c3dd-83dd-47de-9296-2bd290c7bb7b/ae4bc704-6748-4211-969a-a81f88ef36c6/front.jpg",
+      "back_path": "1a93c3dd-83dd-47de-9296-2bd290c7bb7b/ae4bc704-6748-4211-969a-a81f88ef36c6/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1996",
+        "set_name": "Expansion Pack"
+      }
+    },
+    {
+      "key": "jp-caterpie-base-0487",
+      "label": "JP Caterpie, NO symbol = Expansion Pack 1996 (must stay 1996)",
+      "cardType": "pokemon",
+      "card_id": "04876421-2c1f-4735-860d-383e9766cf0b",
+      "front_path": "770668cf-5241-4f3a-8ab3-2bc73e7f5827/04876421-2c1f-4735-860d-383e9766cf0b/front.jpg",
+      "back_path": "770668cf-5241-4f3a-8ab3-2bc73e7f5827/04876421-2c1f-4735-860d-383e9766cf0b/back.jpg",
+      "engine_grade": 8,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1996",
+        "set_name": "Expansion Pack"
+      }
+    },
+    {
+      "key": "jp-tangela-base-c2cf",
+      "label": "JP Tangela (Bind / Poisonpowder), NO symbol = Expansion Pack 1996 (must stay 1996)",
+      "cardType": "pokemon",
+      "card_id": "c2cf3a4a-13b9-49ab-8ea2-c7780a87dfba",
+      "front_path": "d33357fc-9a7a-445d-a009-cbdb7260b2f6/c2cf3a4a-13b9-49ab-8ea2-c7780a87dfba/front.jpg",
+      "back_path": "d33357fc-9a7a-445d-a009-cbdb7260b2f6/c2cf3a4a-13b9-49ab-8ea2-c7780a87dfba/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1996",
+        "set_name": "Expansion Pack"
+      }
+    },
+    {
+      "key": "jp-koga-zubat-gym-a438",
+      "label": "JP Koga Zubat, gym symbol: year must not be 1996 (blank)",
+      "cardType": "pokemon",
+      "card_id": "a438e1e4-53c0-434f-a4e4-04e534466384",
+      "front_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/a438e1e4-53c0-434f-a4e4-04e534466384/front.jpg",
+      "back_path": "4e39147c-1cb1-4d86-b9c2-8c1e7346dbaa/a438e1e4-53c0-434f-a4e4-04e534466384/back.jpg",
+      "engine_grade": 10,
+      "expected_grade": 10,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1999",
+        "set_name": "Challenge from the Darkness"
+      }
+    },
+    {
+      "key": "jp-koga-pidgeotto-gym-beb3",
+      "label": "JP Koga Pidgeotto, gym symbol: year must not be 1996 (blank)",
+      "cardType": "pokemon",
+      "card_id": "beb3f08c-4974-45bc-b032-6416b0e5dcff",
+      "front_path": "858ecfb7-1a10-4864-9c92-0353fd5bab3e/beb3f08c-4974-45bc-b032-6416b0e5dcff/front.jpg",
+      "back_path": "858ecfb7-1a10-4864-9c92-0353fd5bab3e/beb3f08c-4974-45bc-b032-6416b0e5dcff/back.jpg",
+      "engine_grade": 7,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "year": "1999",
+        "set_name": "Challenge from the Darkness"
+      }
+    },
+    {
+      "key": "jp-persian-modern-e851",
+      "label": "Modern JP Persian (new back): no vintage symbol, untouched",
+      "cardType": "pokemon",
+      "card_id": "e8519e8e-ace7-4b0e-b7fe-817a6ecf449b",
+      "front_path": "8b9219ac-61a8-46e1-a699-b8cda8fa3426/e8519e8e-ace7-4b0e-b7fe-817a6ecf449b/front.jpg",
+      "back_path": "8b9219ac-61a8-46e1-a699-b8cda8fa3426/e8519e8e-ace7-4b0e-b7fe-817a6ecf449b/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "jp_symbol": null
+      }
+    },
+    {
+      "key": "sp-brady-sp-auth-90",
+      "label": "2007 SP Authentic Tom Brady: card number 90 on back, 12 is the jersey (saved 12)",
+      "cardType": "sports",
+      "card_id": "15d97cf1-ca70-4554-8f67-41671aa1e951",
+      "front_path": "529b4392-1c74-43fe-97ea-72e2dd0f1629/15d97cf1-ca70-4554-8f67-41671aa1e951/front.jpg",
+      "back_path": "529b4392-1c74-43fe-97ea-72e2dd0f1629/15d97cf1-ca70-4554-8f67-41671aa1e951/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "90"
+      }
+    },
+    {
+      "key": "sp-aaron-73-100",
+      "label": "1973 Topps Hank Aaron #100",
+      "cardType": "sports",
+      "card_id": "4a605dce-13eb-47c4-ad7f-090f7f4b12b3",
+      "front_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/4a605dce-13eb-47c4-ad7f-090f7f4b12b3/front.jpg",
+      "back_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/4a605dce-13eb-47c4-ad7f-090f7f4b12b3/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 4,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "100"
+      }
+    },
+    {
+      "key": "sp-aaron-76-550",
+      "label": "1976 Topps Hank Aaron #550 (44 on the jersey)",
+      "cardType": "sports",
+      "card_id": "fdac954c-ea6a-453b-94c7-d68a6bea29a3",
+      "front_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/fdac954c-ea6a-453b-94c7-d68a6bea29a3/front.jpg",
+      "back_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/fdac954c-ea6a-453b-94c7-d68a6bea29a3/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 6,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "550"
+      }
+    },
+    {
+      "key": "sp-aaron-76-rb-1",
+      "label": "1976 Topps Record Breaker Hank Aaron #1",
+      "cardType": "sports",
+      "card_id": "d00d272b-d791-4d9d-ae05-bd4f705f8156",
+      "front_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/d00d272b-d791-4d9d-ae05-bd4f705f8156/front.jpg",
+      "back_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/d00d272b-d791-4d9d-ae05-bd4f705f8156/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 4,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "1"
+      }
+    },
+    {
+      "key": "sp-shaq-92-gold-362",
+      "label": "1992-93 Topps Gold Shaquille ONeal #362 (32 on the jersey)",
+      "cardType": "sports",
+      "card_id": "9e3cd875-c6aa-4910-aef9-168af9bbf71b",
+      "front_path": "856d3284-2789-4b1a-92cf-d5a28e0066e6/9e3cd875-c6aa-4910-aef9-168af9bbf71b/front.jpg",
+      "back_path": "856d3284-2789-4b1a-92cf-d5a28e0066e6/9e3cd875-c6aa-4910-aef9-168af9bbf71b/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "362"
+      }
+    },
+    {
+      "key": "sp-bowe-91-kayo-172",
+      "label": "1991 Kayo Riddick Bowe #172 (error number, as printed)",
+      "cardType": "sports",
+      "card_id": "81d306ec-9e9f-4cec-b633-a4e339ca5e7f",
+      "front_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/81d306ec-9e9f-4cec-b633-a4e339ca5e7f/front.jpg",
+      "back_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/81d306ec-9e9f-4cec-b633-a4e339ca5e7f/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "172"
+      }
+    },
+    {
+      "key": "sp-elway-84-63",
+      "label": "1984 Topps John Elway #63",
+      "cardType": "sports",
+      "card_id": "745d7ebe-9af4-4482-9688-5c7b319c66ac",
+      "front_path": "c4a7c9a0-5c5c-43ad-bfa7-f6c65ae966eb/745d7ebe-9af4-4482-9688-5c7b319c66ac/front.jpg",
+      "back_path": "c4a7c9a0-5c5c-43ad-bfa7-f6c65ae966eb/745d7ebe-9af4-4482-9688-5c7b319c66ac/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "63"
+      }
+    },
+    {
+      "key": "sp-winslow-81-150",
+      "label": "1981 Topps Kellen Winslow #150",
+      "cardType": "sports",
+      "card_id": "232b01b3-f3af-481f-8ddd-100b18bb2bcd",
+      "front_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/232b01b3-f3af-481f-8ddd-100b18bb2bcd/front.jpg",
+      "back_path": "c49b4745-90e4-48c9-862e-b3bc520201dd/232b01b3-f3af-481f-8ddd-100b18bb2bcd/back.jpg",
+      "engine_grade": 10,
+      "expected_grade": 10,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "150"
+      }
+    },
+    {
+      "key": "sp-ohtani-smlb-77",
+      "label": "2025 Topps Stars of MLB Ohtani SMLB-77 (17 on the jersey)",
+      "cardType": "sports",
+      "card_id": "588ff7c2-d5f3-4991-9007-d134108fe8e2",
+      "front_path": "c4a7c9a0-5c5c-43ad-bfa7-f6c65ae966eb/588ff7c2-d5f3-4991-9007-d134108fe8e2/front.jpg",
+      "back_path": "c4a7c9a0-5c5c-43ad-bfa7-f6c65ae966eb/588ff7c2-d5f3-4991-9007-d134108fe8e2/back.jpg",
+      "engine_grade": 9,
+      "expected_grade": 9,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "false_positive": null,
+      "report_only": true,
+      "verified": "by eye (Oct 20 2026)",
+      "added": "2026-10-20",
+      "expected_identity": {
+        "card_number": "SMLB-77"
+      }
+    }
+  ]
+}

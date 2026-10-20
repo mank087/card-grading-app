@@ -86,6 +86,18 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Report it ONLY when you can see the badge itself; otherwise null. Never infer it from the Pokémon, the artwork or the holo pattern
 • A "30" or "25" badge means the card IS from that anniversary set, even when everything else matches an older card: the Classic Collection reprints keep the ORIGINAL card number (58/102, 4/102, 149/147...) and the ORIGINAL copyright line. Still transcribe the number exactly as printed; when the badge is present, year = the anniversary release year ("2026" for "30", "2021" for "25"), not the reprinted copyright year
 
+**jp_expansion_symbol**: "none", "jungle", "fossil", "rocket", "southern_islands", "other" or null — JAPANESE VINTAGE CARDS ONLY
+• Report this ONLY for a Japanese card whose BACK is the old "POCKET MONSTERS CARD GAME" design (Poké Ball with the words arched around it). For every other card, English or modern Japanese, return null
+• On these cards the expansion symbol is a small black mark at the RIGHT END of the tan height/weight bar under the art box (the bar reading "…ポケモン：身長…、体重…kg"). Look there:
+  - "jungle" = a FLOWER: a cluster of five rounded petals with dots, like a Vileplume blossom
+  - "fossil" = a FOSSIL: a small bone/claw shape, like a fossilised talon or skull fragment
+  - "rocket" = a bold letter "R"
+  - "southern_islands" = a PALM TREE
+  - "none" = the end of the bar is empty: no symbol at all
+  - "other" = a symbol is there but it is none of the four above (a gym/stadium mark, a Poké Ball, a Neo-era mark, anything else)
+• Report only what you see at that spot. If the spot is hidden by glare, a sleeve edge or blur, return null
+• 🚨 The "©1996 Nintendo / Creatures / GAMEFREAK" line on that old back is printed on EVERY set from 1996 to 2001. It is NOT the card's release year. For these cards set year to null and year_source to "not_visible" unless a year is printed on the FRONT; the backend fills the set and year from jp_expansion_symbol
+
 **SPECIAL PROMO WITH NO SET NUMBER** — name it; the backend fills set, year and price
 • Ancient Mew (Pokémon the Movie 2000 promo): text in Unown glyph script instead of English, gold glyph border, NO card number, © 1999-2000 Wizards line
 • → card_name and player_or_character "Ancient Mew" (never "Mew" or "Mewtwo"), set_name "Pokemon Movie 2000 Promo", year "2000", card_number null
@@ -150,6 +162,7 @@ DO NOT try to identify the set yourself based on your knowledge.
 • 4-digit year format
 • Example: "2024", "2023", "1999"
 • Check card back or bottom front for copyright date (© 2024)
+• 🇯🇵 EXCEPTION: the old Japanese "POCKET MONSTERS CARD GAME" back reads ©1996 on every set from 1996 to 2001. That line is NOT a release year: return year null and report jp_expansion_symbol instead (see above)
 • **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the Pokémon, design era, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher

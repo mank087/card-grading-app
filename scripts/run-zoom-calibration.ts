@@ -64,6 +64,8 @@ interface CalCase {
   hold_must_name_reason?: boolean;
   /** No trusted grade: shown in the table, left out of exact/off-by-one/MAE. */
   report_only?: boolean;
+  /** Identity anchors (Oct 2026): fields the saved identity must have. */
+  expected_identity?: { set_name?: string | null; year?: string | null; card_number?: string | null; jp_symbol?: string | null };
 }
 interface FoundDefect { source: string; category: string; face: string; type: string; severity: string; location: string; description: string }
 interface Row {
@@ -167,7 +169,40 @@ function summarize(t: string) {
   return { rows, n, hit, off1, absErr, fpRuns, fpDen, mdRuns, mdDen, limHit, limDen, holdBad, cost, perCase };
 }
 
+const normId = (field: string, v: unknown) => {
+  let x = String(v ?? '').trim().toLowerCase().replace(/^#/, '').replace(/\s+/g, ' ');
+  if (field === 'card_number' && /^\d+$/.test(x)) x = String(Number(x));
+  return x;
+};
+function identityMatches(c: CalCase, r: Row): { ok: boolean; misses: string[] } {
+  const exp = c.expected_identity || {};
+  const got: any = (r as any).identity || {};
+  const misses: string[] = [];
+  for (const [k, v] of Object.entries(exp)) if (normId(k, got[k]) !== normId(k, v)) misses.push(`${k}=${got[k] ?? 'null'}`);
+  return { ok: misses.length === 0, misses };
+}
+function identityReport(t: string, other?: string) {
+  const idCases = cases.filter(c => c.expected_identity);
+  if (!idCases.length) return;
+  const tally = (tag: string) => {
+    const rows = readRows(tag).filter(r => r.grade != null || (r as any).identity);
+    let ok = 0, n = 0; const per: Record<string, string> = {};
+    for (const c of idCases) {
+      const rs = rows.filter(r => r.key === c.key && (r as any).identity);
+      const res = rs.map(r => identityMatches(c, r));
+      ok += res.filter(x => x.ok).length; n += res.length;
+      per[c.key] = rs.length ? `${res.filter(x => x.ok).length}/${rs.length}${res.some(x => !x.ok) ? ' ' + [...new Set(res.flatMap(x => x.misses))].join(' ').slice(0, 60) : ''}` : '-';
+    }
+    return { ok, n, per };
+  };
+  const a = tally(t), b = other ? tally(other) : null;
+  console.log(`\nIDENTITY ANCHORS (${idCases.length} cases)`);
+  for (const c of idCases) console.log(`${c.key.padEnd(30)} ${JSON.stringify(c.expected_identity).slice(0, 70).padEnd(70)} ${a.per[c.key].padEnd(48)}${b ? ' | ' + b.per[c.key] : ''}`);
+  console.log(`${t}: identity ${a.ok}/${a.n}${b ? `   ${other}: identity ${b.ok}/${b.n}` : ''}`);
+}
+
 function report(t: string, other?: string) {
+  identityReport(t, other);
   const a = summarize(t);
   const b = other ? summarize(other) : null;
   const pct = (x: number, d: number) => d ? `${x}/${d} (${Math.round(100 * x / d)}%)` : '-';
@@ -233,6 +268,17 @@ function installUsageMeter() {
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   installUsageMeter();
   const { gradeCardConversational } = await import('../src/lib/visionGrader');
+  // Identity rows mirror what the Pokemon route saves; the Japanese expansion
+  // symbol step only exists from v9.47 on, so a baseline arm runs without it.
+  let applyJpVintage: ((db: any, info: any) => Promise<any>) | null = null;
+  try { applyJpVintage = (await import('../src/lib/pokemonJapaneseVintage' as string)).applyJapaneseVintage; } catch { /* baseline arm */ }
+  const identityOf = async (j: any, cardType: string) => {
+    const info = { ...(j?.card_info || {}) };
+    const jpSymbol = info.first_look_jp_symbol ?? info.jp_expansion_symbol ?? null;
+    let jp: any = null;
+    if (applyJpVintage && cardType === 'pokemon' && /[\u3040-\u30ff\u4e00-\u9faf]/.test(String(info.card_name || ''))) jp = await applyJpVintage(db, info).catch(() => null);
+    return { name: info.card_name ?? null, hp: info.hp ?? null, set_name: info.set_name ?? null, year: info.year ?? null, year_source: info.year_source ?? null, card_number: info.card_number ?? null, jp_symbol: jpSymbol, jp_applied: jp?.applied ?? null };
+  };
   const { resolveGradingModel, describeDecision } = await import('../src/lib/grading/modelRouter');
   console.log(`zoom regression: N=${N} x ${cases.length} cases, tag=${tag}, ZOOM_CORROBORATION_V1=${flag}, concurrency=${concurrency}`);
   console.log(`model: ${describeDecision(resolveGradingModel(`zoomcal:${cases[0]?.card_id}`))}  -> ${outFile(tag)}  (${done.size} already on file)`);
@@ -260,6 +306,7 @@ function installUsageMeter() {
           hold: j.grade_hold ? { cause: j.grade_hold.cause, reason: j.grade_hold.reason } : null,
           summary: String(j.final_grade?.summary || ''),
           letter: r.grading_metadata?.image_confidence ?? j.image_quality?.confidence_letter ?? null,
+          identity: await identityOf(j, c.cardType),
           defects: collectDefects(j),
           corroboration: j.inspection_status?.zoom_corroboration,
           heldNarrationBad: /Magnified inspection adjusted this face/.test(text),

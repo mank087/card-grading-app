@@ -129,6 +129,17 @@ print stats through the season BEFORE the issue year).
     card_number and that was wrong — a serially numbered card still has its own card number,
     or none at all.
 
+🚨 **THE JERSEY NUMBER IS NOT THE CARD NUMBER:**
+• The card number is normally printed on the BACK: a top corner, a numbered circle or box,
+  or beside the set name / copyright line.
+• A number printed on the FRONT inside the design (in a corner, beside the name, in a
+  shield or block) that matches the number on the player's UNIFORM is the jersey number.
+  A back line like "12 · TOM BRADY" is also the jersey number beside the name.
+• When the back shows a card number and the front shows a different number that matches
+  the jersey, card_number is the BACK number. (2007 SP Authentic Tom Brady: front "12" and
+  "12 · TOM BRADY" are his jersey; the card number is the "90" at the back's top-left.)
+• Use a front number only when the back has none and it is not the uniform number.
+
 🚨 **IF NO NUMBER IS PRINTED, RETURN null:**
 • Many inserts carry no card number at all. `null` is the correct, expected answer.
 • Do NOT recall a number from your knowledge of the set. A wrong number is printed on the
