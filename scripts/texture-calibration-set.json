@@ -974,6 +974,66 @@
         ],
         "any_source": true
       }
+    },
+    {
+      "key": "aaron-76-550-stock",
+      "label": "1976 Topps Hank Aaron #550: one frayed front bottom-right corner; back gray stock read as stain (engine 6, manual review 7)",
+      "cardType": "sports",
+      "card_id": "fdac954c-ea6a-453b-94c7-d68a6bea29a3",
+      "front_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/fdac954c-ea6a-453b-94c7-d68a6bea29a3/front.jpg",
+      "back_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/fdac954c-ea6a-453b-94c7-d68a6bea29a3/back.jpg",
+      "engine_grade": 6,
+      "expected_grade": 7,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 20 2026, manual reviews 72544d02 / a6dec353)",
+      "added": "2026-10-20",
+      "false_positive": {
+        "note": "1976 Topps gray/tan back stock is the card stock, not a stain; both Aaron backs were read as moderate stain across the panel.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "discolor",
+          "toning",
+          "dirt",
+          "aging"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
+    },
+    {
+      "key": "aaron-76-rb1-stock",
+      "label": "1976 Topps Record Breaker Hank Aaron #1: pointed corners read as rounded 4/4, tan stock read as stain (engine 4, manual review 8)",
+      "cardType": "sports",
+      "card_id": "d00d272b-d791-4d9d-ae05-bd4f705f8156",
+      "front_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/d00d272b-d791-4d9d-ae05-bd4f705f8156/front.jpg",
+      "back_path": "2bb521b1-6e3d-4dc7-9566-0440f89056df/d00d272b-d791-4d9d-ae05-bd4f705f8156/back.jpg",
+      "engine_grade": 4,
+      "expected_grade": 8,
+      "expected_subgrades": null,
+      "expected_limiting": null,
+      "verified": "by eye (Oct 20 2026, manual reviews 72544d02 / a6dec353)",
+      "added": "2026-10-20",
+      "false_positive": {
+        "note": "1976 Topps gray/tan back stock is the card stock, not a stain; both Aaron backs were read as moderate stain across the panel.",
+        "face": "back",
+        "categories": [
+          "surface"
+        ],
+        "types": [
+          "stain",
+          "discolor",
+          "toning",
+          "dirt",
+          "aging"
+        ],
+        "min_severity": "moderate",
+        "any_source": true
+      }
     }
   ]
 }
