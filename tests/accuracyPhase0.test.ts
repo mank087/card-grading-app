@@ -64,6 +64,11 @@ describe('offline Phase 0 baseline', () => {
     // or bend (ridge, gloss change, cracked ink, edge kink, same line on the other face); lighting bands
     // and factory curl are not damage.
     v930.set('master_grading_rubric_v5.txt', { file: 'master_grading_rubric_v5.txt', characters: 285788, lines: 5548, approximateTokensCharsDiv4: 71447 });
+    // Fifteenth deliberate change (Oct 2026, v9.47): the Pokemon delta asks for the Japanese old-back
+    // expansion symbol and says the back's (c)1996 is not the release year; the Sports delta says the
+    // jersey number printed on the front is not the card number.
+    v930.set('pokemon_delta_v5.txt', { file: 'pokemon_delta_v5.txt', characters: 37473, lines: 696, approximateTokensCharsDiv4: 9369 });
+    v930.set('sports_delta_v5.txt', { file: 'sports_delta_v5.txt', characters: 42694, lines: 749, approximateTokensCharsDiv4: 10674 });
     expect(promptSizes).toEqual(frozenPromptSizes
       .filter((p: any) => !RETIRED_PROMPT_FILES.includes(p.file))
       .map((p: any) => v930.get(p.file) ?? p));
