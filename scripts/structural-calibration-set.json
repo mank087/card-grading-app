@@ -243,6 +243,13 @@
       "note": "MTG Tempest Jackal Pup: old red frame prints a cracked-stone texture; the crack lines are ink",
       "card_id": "e784495d-1da0-4966-a561-9aaeaf496f4c",
       "cardType": "mtg"
+    },
+    {
+      "key": "640465",
+      "label": "real",
+      "note": "1970 Topps Super Glossy Joe Namath #29: real horizontal crease across the lower front (sharp wavy ridge through football and hands where the gloss breaks); v2 classifier refuted it as a glare band (cannot_tell, not_damage, not_damage) and the card graded 7. Customer-confirmed Oct 21 (manual review 626b9fac).",
+      "card_id": "f072151e-50fd-416b-901d-87ab39293856",
+      "cardType": "sports"
     }
   ]
 }
