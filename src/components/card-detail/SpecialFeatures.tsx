@@ -146,7 +146,7 @@ export function SpecialFeatures({
   return (
     <>
       {visible && (
-        <section className="cd-panel">
+        <section className="cd-panel cd-special-features">
           <h3>Special features</h3>
           <div className="cd-badge-grid">
             {cardInfo.subset && <Badge label="Subset / insert">{cardInfo.subset}</Badge>}

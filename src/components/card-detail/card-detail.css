@@ -885,6 +885,14 @@
 }
 
 /* Special features and report chips. */
+/* Oct 2026: the licensed/unlicensed badge was the only badge on many cards; with it
+   removed, a panel whose grid renders nothing and has no feature chips is hidden
+   rather than shown as a bare heading. Category badges arrive as prebuilt nodes, so
+   emptiness can only be known after render. */
+.dcm-card-detail .cd-special-features:has(> .cd-badge-grid:empty):not(:has(> .cd-chip-list)) {
+  display: none;
+}
+
 .dcm-card-detail .cd-badge-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
