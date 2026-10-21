@@ -208,7 +208,6 @@ export function FullAnalysisJson({
             <Field label="Year" value={info.year} />
             <Field label="Manufacturer" value={info.manufacturer} />
             <Field label="Card Number" value={info.card_number} />
-            <Field label="Authentic" value={info.authentic} />
             <Field label="Player Or Character" value={info.player_or_character} />
             {/* Every category's identity fields are listed together and `Field`
                 draws nothing for one the record does not carry, so this grid is

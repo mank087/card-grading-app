@@ -1,5 +1,7 @@
 # Authenticity flag: plan to stop false "Unlicensed" calls
 
+> **SUPERSEDED Oct 21, 2026 (owner decision).** Photos cannot reliably establish authenticity, so instead of fixing the flag it was removed from every customer-facing surface: the card page Special features badge, the legacy card pages for all seven categories, their full-analysis field lists, and the enterprise card report. `card_info.authentic` is still produced and stored for internal use only. Do not build the phases below unless the owner reopens this. The findings section remains accurate.
+
 Oct 21, 2026. Owner request after the Charizard 16131421 case.
 
 ## What happened

@@ -14,7 +14,7 @@
  *               "no on-card authentication detected" footnote
  *   4295-4302   print finish
  *   4305-4310   variant
- *   4313-4322   authentic / unlicensed
+ *   4313-4322   authentic / unlicensed (NOT ported: hidden from customers, Oct 2026)
  *   4326-4340   additional feature tags
  *   4344-4388   the card description block (`dvg_grading.card_text_blocks`)
  *
@@ -179,9 +179,8 @@ export function SpecialFeatures({
                   <Badge label="Variant">{cardInfo.rarity_or_variant}</Badge>
                 )
               : variantBadge}
-            {typeof cardInfo.authentic === 'boolean' && (
-              <Badge label="Authentic">{cardInfo.authentic ? 'Licensed' : 'Unlicensed'}</Badge>
-            )}
+            {/* Oct 2026: no licensed/unlicensed badge. Photos cannot establish authenticity
+                (docs/AUTHENTICITY_FLAG_PLAN_2026-10-21.md); card_info.authentic stays internal. */}
             {extraBadges}
           </div>
 

@@ -385,7 +385,6 @@ export default function OrgCardReport({
   })();
   const cardBackText = stripMarkdown(info?.card_back_text);
   const specialFeatures = stripMarkdown(info?.special_features);
-  const authentic = typeof info?.authentic === 'boolean' ? info.authentic : null;
 
   // ---- Centering data ----------------------------------------------------------
   const ratios = card.conversational_centering_ratios || {};
@@ -594,7 +593,7 @@ export default function OrgCardReport({
               </div>
             )}
 
-            {(featureChips.length > 0 || serialNumbering || authentic !== null || specialFeatures) && (
+            {(featureChips.length > 0 || serialNumbering || specialFeatures) && (
               <div className={`${infoRows.length > 0 ? 'border-t mt-5 pt-5' : ''}`}>
                 <h3 className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide">Special Features</h3>
                 <div className="flex flex-wrap gap-2">
@@ -608,11 +607,6 @@ export default function OrgCardReport({
                       {chip}
                     </span>
                   ))}
-                  {authentic !== null && (
-                    <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${authentic ? 'text-green-700 border-green-300 bg-green-50' : 'text-red-700 border-red-300 bg-red-50'}`}>
-                      {authentic ? '✓ Licensed / Authentic' : 'Unlicensed'}
-                    </span>
-                  )}
                 </div>
                 {specialFeatures && <p className="text-sm text-gray-600 mt-3">{specialFeatures}</p>}
               </div>

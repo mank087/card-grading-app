@@ -4170,17 +4170,7 @@ export function OnePieceCardDetails() {
                         </div>
                       )}
 
-                      {/* Authentic */}
-                      {typeof cardInfo.authentic === 'boolean' && (
-                        <div className={`rounded-lg p-3 border ${cardInfo.authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <p className={`text-xs font-semibold mb-1 ${cardInfo.authentic ? 'text-green-700' : 'text-red-700'}`}>
-                            AUTHENTIC
-                          </p>
-                          <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
-                            {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
-                          </p>
-                        </div>
-                      )}
+                      {/* Oct 2026: the licensed/unlicensed read is not shown to customers. Photos cannot establish authenticity, and it called an official Celebrations metal Charizard and post-cutoff sets unlicensed (docs/AUTHENTICITY_FLAG_PLAN_2026-10-21.md). The field stays in card_info for internal use. */}
 
                       {/* Promo Card */}
                       {cardInfo.is_promo && (
@@ -6169,7 +6159,6 @@ export function OnePieceCardDetails() {
                                   {opSubTypes && renderField('Affiliations', opSubTypes)}
                                   {opVariantType && renderField('Variant', opVariantType.replace(/_/g, ' '))}
                                   {artistName && renderField('Artist', artistName)}
-                                  {renderField('Authentic', info.authentic)}
                                 </div>
 
                                 {info.card_front_text && (

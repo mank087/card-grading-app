@@ -4021,17 +4021,7 @@ export function OtherCardDetails() {
                         </div>
                       )}
 
-                      {/* Authentic */}
-                      {typeof cardInfo.authentic === 'boolean' && (
-                        <div className={`rounded-lg p-3 border ${cardInfo.authentic ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <p className={`text-xs font-semibold mb-1 ${cardInfo.authentic ? 'text-green-700' : 'text-red-700'}`}>
-                            AUTHENTIC
-                          </p>
-                          <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
-                            {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
-                          </p>
-                        </div>
-                      )}
+                      {/* Oct 2026: the licensed/unlicensed read is not shown to customers. Photos cannot establish authenticity, and it called an official Celebrations metal Charizard and post-cutoff sets unlicensed (docs/AUTHENTICITY_FLAG_PLAN_2026-10-21.md). The field stays in card_info for internal use. */}
                     </div>
 
                     {/* Additional Feature Tags */}
@@ -5914,7 +5904,6 @@ export function OtherCardDetails() {
                                   {renderField('Year', info.year)}
                                   {renderField('Manufacturer', info.manufacturer)}
                                   {renderField('Card Number', info.card_number)}
-                                  {renderField('Authentic', info.authentic)}
                                   {renderField('Player Or Character', info.player_or_character)}
                                   {renderField('Card Type', info.card_type)}
                                   {renderField('Subset', info.subset)}
