@@ -3,6 +3,7 @@
  * Creates a checkout session for purchasing credits
  */
 
+import { getAccountRefCode } from '@/lib/affiliateAccountRef';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe, STRIPE_PRICES, StripePriceTier, CARD_LOVERS_DISCOUNT, FOUNDER_DISCOUNT } from '@/lib/stripe';
@@ -138,8 +139,11 @@ export async function POST(request: NextRequest) {
     // auto-applying the fan discount)
     let affiliateCode: string | undefined;
     let affiliatePromotionCodeId: string | undefined;
-    if (ref_code) {
-      const affiliate = await getAffiliateByCode(ref_code);
+    // Oct 2026: a browser that lost the code (sign-up finished elsewhere) falls
+    // back to the code saved on the account (src/lib/affiliateAccountRef.ts).
+    const effectiveRefCode = ref_code || (await getAccountRefCode(userId)) || undefined;
+    if (effectiveRefCode) {
+      const affiliate = await getAffiliateByCode(effectiveRefCode);
       if (affiliate && affiliate.status === 'active') {
         affiliateCode = affiliate.code;
         affiliatePromotionCodeId = affiliate.stripe_promotion_code_id || undefined;
@@ -160,6 +164,7 @@ export async function POST(request: NextRequest) {
     // Add affiliate ref_code to metadata if present
     if (affiliateCode) {
       sessionMetadata.ref_code = affiliateCode;
+      if (!ref_code) sessionMetadata.ref_source = 'account';
     }
 
     const checkoutOptions: Stripe.Checkout.SessionCreateParams = {

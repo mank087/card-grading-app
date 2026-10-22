@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getOAuthSession, getStoredSession } from '@/lib/directAuth'
+import { getStoredRefCode, storeRefCode, SIGNUP_REF_PARAM } from '@/lib/referralStorage'
 import { syncClickIdsToProfile } from '@/lib/adClickIds'
 import { readRegionCookie } from '@/lib/consentRegion'
 import {
@@ -67,6 +68,11 @@ export default function AuthCallbackPage() {
         } catch (intentErr) {
           console.warn('[Auth Callback] Could not read purchase intent:', intentErr)
         }
+        // Oct 2026: the referral code rides on the confirmation link the same way.
+        try {
+          const refFromUrl = new URLSearchParams(search).get(SIGNUP_REF_PARAM)
+          if (refFromUrl && !getStoredRefCode()) storeRefCode(refFromUrl)
+        } catch { /* best effort */ }
 
         // Check if we have tokens in the URL hash OR search params (Supabase can use either)
         const hasHash = hash && hash.length > 1

@@ -3,6 +3,7 @@
  * Creates a Stripe checkout session for subscription purchases
  */
 
+import { getAccountRefCode } from '@/lib/affiliateAccountRef';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe, CARD_LOVERS_SUBSCRIPTION, CardLoversPlan } from '@/lib/stripe';
@@ -97,8 +98,10 @@ export async function POST(request: NextRequest) {
 
     // Look up affiliate if ref_code provided
     let affiliateCode: string | undefined;
-    if (ref_code) {
-      const affiliate = await getAffiliateByCode(ref_code);
+    // Oct 2026: fall back to the referral code saved on the account (affiliateAccountRef.ts).
+    const effectiveRefCode = ref_code || (await getAccountRefCode(user.id)) || undefined;
+    if (effectiveRefCode) {
+      const affiliate = await getAffiliateByCode(effectiveRefCode);
       if (affiliate && affiliate.status === 'active') {
         affiliateCode = affiliate.code;
       }
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
     };
     if (affiliateCode) {
       sessionMetadata.ref_code = affiliateCode;
+      if (!ref_code) sessionMetadata.ref_source = 'account';
     }
 
     // Ensure we have a Stripe customer ID (prevents duplicate customer creation)

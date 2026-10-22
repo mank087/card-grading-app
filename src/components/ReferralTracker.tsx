@@ -1,33 +1,19 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { getStoredSession } from '@/lib/directAuth'
+import { getStoredRefCode as readStoredRefCode, storeRefCode } from '@/lib/referralStorage'
 
-const REF_CODE_KEY = 'dcm_ref_code'
-const REF_TIMESTAMP_KEY = 'dcm_ref_timestamp'
-const ATTRIBUTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+/** Per-tab marker so a code is bound to the account at most once per session. */
+const BOUND_KEY = 'dcm_ref_bound'
 
 /**
- * Get the stored referral code from localStorage (if still within attribution window)
+ * Get the stored referral code from localStorage (if still within attribution window).
+ * Kept as an export for existing callers; the logic lives in lib/referralStorage.
  */
 export function getStoredRefCode(): string | null {
-  if (typeof window === 'undefined') return null
-
-  const code = localStorage.getItem(REF_CODE_KEY)
-  const timestamp = localStorage.getItem(REF_TIMESTAMP_KEY)
-
-  if (!code || !timestamp) return null
-
-  // Check if the code has expired
-  const storedTime = parseInt(timestamp, 10)
-  if (Date.now() - storedTime > ATTRIBUTION_WINDOW_MS) {
-    // Expired — clean up
-    localStorage.removeItem(REF_CODE_KEY)
-    localStorage.removeItem(REF_TIMESTAMP_KEY)
-    return null
-  }
-
-  return code
+  return readStoredRefCode()
 }
 
 /**
@@ -35,6 +21,7 @@ export function getStoredRefCode(): string | null {
  */
 function ReferralTrackerInner() {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   useEffect(() => {
     const refCode = searchParams.get('ref')
@@ -48,9 +35,7 @@ function ReferralTrackerInner() {
       .then(res => res.json())
       .then(data => {
         if (data.valid) {
-          // Store in localStorage
-          localStorage.setItem(REF_CODE_KEY, code)
-          localStorage.setItem(REF_TIMESTAMP_KEY, Date.now().toString())
+          storeRefCode(code)
 
           // Fire-and-forget: record the click
           fetch('/api/affiliate/click', {
@@ -69,6 +54,30 @@ function ReferralTrackerInner() {
         // Ignore validation errors — don't block user experience
       })
   }, [searchParams])
+
+  // Oct 2026: once this browser holds a referral code AND a signed-in session,
+  // attach the code to the account (POST /api/affiliate/bind), so a purchase
+  // from another browser or device is still attributed. The server refuses
+  // self-referrals, inactive codes and accounts that have already paid, and a
+  // code already on the account wins. Runs on navigation, at most once per tab.
+  useEffect(() => {
+    const code = readStoredRefCode()
+    if (!code) return
+    let marker: string | null = null
+    try { marker = sessionStorage.getItem(BOUND_KEY) } catch { /* private mode */ }
+    if (marker === code) return
+    const session = getStoredSession()
+    const token = (session as { access_token?: string } | null)?.access_token
+    if (!token) return
+    try { sessionStorage.setItem(BOUND_KEY, code) } catch { /* private mode */ }
+    fetch('/api/affiliate/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code }),
+    }).catch(() => {
+      try { sessionStorage.removeItem(BOUND_KEY) } catch { /* ignore */ }
+    })
+  }, [pathname])
 
   return null
 }

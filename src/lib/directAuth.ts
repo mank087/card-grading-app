@@ -4,6 +4,7 @@
 import { isNativeHost, expectsNativeSession, refreshNativeSession } from './nativeAppBridge'
 import { createClient, Session } from '@supabase/supabase-js'
 import { readPurchaseIntent, encodePurchaseIntentParam } from './purchaseIntent'
+import { getStoredRefCode, SIGNUP_REF_PARAM } from './referralStorage'
 
 // Get credentials from environment variables - NO HARDCODED FALLBACKS
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -104,11 +105,15 @@ export function signupEmailRedirectTo(): string {
     ? `${window.location.origin}/auth/callback`
     : 'https://dcmgrading.com/auth/callback'
 
+  const params = new URLSearchParams()
   const intent = readPurchaseIntent()
-  if (!intent) return base
-  const param = encodePurchaseIntentParam(intent)
-  if (!param) return base
-  return `${base}?intent=${encodeURIComponent(param)}`
+  const intentParam = intent ? encodePurchaseIntentParam(intent) : null
+  if (intentParam) params.set('intent', intentParam)
+  // Oct 2026: the referral code makes the same hop (affiliateAccountRef.ts).
+  const refCode = getStoredRefCode()
+  if (refCode) params.set(SIGNUP_REF_PARAM, refCode)
+  const query = params.toString()
+  return query ? `${base}?${query}` : base
 }
 
 export async function signUp(email: string, password: string): Promise<AuthResponse> {
@@ -116,11 +121,16 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
     // Use Supabase client for signup to properly handle emailRedirectTo
     const redirectTo = signupEmailRedirectTo()
 
+    // Oct 2026: a referral code from a ?ref= link is saved on the new account
+    // (user_metadata.ref_code), so checkout from any browser or device is
+    // still attributed (src/lib/affiliateAccountRef.ts).
+    const refCode = getStoredRefCode()
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectTo
+        emailRedirectTo: redirectTo,
+        ...(refCode ? { data: { ref_code: refCode } } : {})
       }
     })
 
