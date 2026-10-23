@@ -42,6 +42,15 @@
 .dcm-hero-grid { display: grid; grid-template-columns: .93fr 1.07fr; gap: 48px; align-items: center; }
 .dcm-hero h1 { font-size: clamp(38px, 4.6vw, 62px); line-height: 1.08; letter-spacing: -.055em; font-weight: 750; margin: 0; }
 .dcm-hero h1 span { color: #bca0e8; }
+.dcm-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.dcm-typer { display: grid; }
+.dcm-typer > .dcm-typer-sizer, .dcm-typer > .dcm-typer-live { grid-area: 1 / 1; }
+.dcm-typer-sizer { visibility: hidden; }
+.dcm-typer-sizer::before, .dcm-typer-live::before { content: attr(data-phrase); }
+.dcm-typer-sizer::after { content: ""; display: inline-block; width: .08em; margin-left: .06em; }
+.dcm-typer-caret { display: inline-block; width: .08em; height: .9em; margin-left: .06em; vertical-align: -.06em; background: currentColor; animation: dcm-typer-blink 1s steps(1) infinite; }
+.dcm-typer-caret.is-static { display: none; }
+@keyframes dcm-typer-blink { 50% { opacity: 0; } }
 .dcm-hero-copy > p.dcm-lead { max-width: 490px; margin-block: 24px 28px; }
 .dcm-fineprint { font-size: 13px; color: var(--dcm-muted); line-height: 1.65; margin-top: 16px; }
 .dcm-fineprint a { text-decoration: underline; text-underline-offset: 3px; }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { HeroTypewriter } from '@/components/marketing/HeroTypewriter'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
 import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
@@ -219,10 +220,8 @@ export default function PokemonGradingLanding() {
             {/* Headline right below logo */}
             <div className="text-center mb-6">
               <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 leading-tight">
-                Grade Your Pokemon Card
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
-                  Instantly
-                </span>
+                Pokémon Card Grading{' '}
+                <HeroTypewriter className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500" />
               </h1>
               <p className="text-base text-gray-300">
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Results in about a minute.
@@ -434,10 +433,8 @@ export default function PokemonGradingLanding() {
                   h2 to keep the page at a single h1. The mobile block keeps the
                   h1 because that is the render Google indexes. */}
               <h2 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                Grade Your Pokemon Card
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
-                  Instantly
-                </span>
+                Pokémon Card Grading{' '}
+                <HeroTypewriter className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500" />
               </h2>
 
               <p className="text-xl text-gray-300 mb-3 max-w-xl">

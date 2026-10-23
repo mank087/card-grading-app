@@ -1,6 +1,7 @@
 'use client'
 
 import { RelatedGuides } from '@/components/design/RelatedGuides'
+import { HeroTypewriter } from '@/components/marketing/HeroTypewriter'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
@@ -153,7 +154,7 @@ export default function WhyDcmPage() {
       <div className="dcm-container dcm-why-hero">
         <div className="dcm-why-intro">
           <p className="dcm-eyebrow">Why DCM · 2 free grades</p>
-          <h1>Why DCM Grading?<br /><span>Your collection, connected.</span></h1>
+          <h1>Card Grading <HeroTypewriter /></h1>
           <p className="dcm-lead">Grade your cards, track your portfolio, create custom labels and prepare eBay listings. Explore everything DCM brings to your collection, without mailing your cards away.</p>
           <div className="dcm-actions"><ActionLink href="/get-started" variant="secondary">How It Works</ActionLink><ActionLink href="#benefits" variant="text">Explore the benefits →</ActionLink></div>
         </div>

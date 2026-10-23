@@ -7,6 +7,7 @@ import AppStoreBadge from '@/components/AppStoreBadge'
 import GooglePlayBadge from '@/components/GooglePlayBadge'
 import { ActionLink, Icon, SectionHeading, type IconName } from '@/components/design/Primitives'
 import { HomeHeroVideo } from './HomeHeroVideo'
+import { HeroTypewriter } from './HeroTypewriter'
 import { showcaseHref } from '@/components/design/featuredCard'
 import { useShowcaseCards } from '@/components/design/useShowcaseCards'
 import { HeritageCard } from '@/components/design/HeritageCard'
@@ -54,7 +55,7 @@ export default function HomeExperience() {
     <section className="dcm-hero dcm-hero--cinema dcm-dark"><div className="dcm-container">
       <div className="dcm-hero-copy">
         <p className="dcm-eyebrow">Your collection. A closer look.</p>
-        <h1>Professional card grading.<br /><span>Instant results.</span></h1>
+        <h1>Card Grading <HeroTypewriter /></h1>
         <p className="dcm-lead">Snap two photos. DCM Optic™ returns a grade, condition report, market value, and printable label in about a minute. Your cards stay with you.</p>
         <div className="dcm-actions"><ActionLink href={gradeHref}>{gradeLabel}<Icon name="arrow" /></ActionLink><ActionLink href="/get-started" variant="secondary">How It Works</ActionLink></div>
         <button type="button" className="dcm-home-watch-link" onClick={() => setFilmOpen(true)} aria-haspopup="dialog" aria-label="Watch DCM in action, 44 seconds with music"><span aria-hidden="true">▶</span> Watch DCM in action <span>· 44 sec</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></svg></button>
