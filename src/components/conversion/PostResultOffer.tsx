@@ -5,6 +5,8 @@ import { ActionButton, ActionLink } from '@/components/design/Primitives'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
 import { GradingOptionsList, creditsHref } from '@/components/conversion/GradingOptions'
+import { SoldProofCallout } from '@/components/conversion/SoldProofCallout'
+import { SOLD_PROOF, soldProofFor } from '@/data/soldProof'
 
 /**
  * Post-result offer (2026-09-09).
@@ -26,6 +28,11 @@ export interface PostResultOfferProps {
   gradeComplete: boolean
   /** cards.org_id, when the card row carries one. Any org means someone else pays. */
   orgId?: string | null
+  /** The card's whole grade and category, to pick a sold-vs-raw stat that fits it. */
+  cardGrade?: number | string | null
+  cardCategory?: string | null
+  /** Where this card's InstaList panel lives. Omit and the sell button is not shown. */
+  instaListHref?: string
 }
 
 const DISMISS_PREFIX = 'dcm.postResultOffer.'
@@ -61,7 +68,7 @@ export function usePostResultOfferEligible({ ownerId, gradeComplete, orgId }: Po
 export function PostResultOffer(props: PostResultOfferProps) {
   const eligible = usePostResultOfferEligible(props)
   const { isFirstPurchase } = useCredits()
-  const { ownerId } = props
+  const { ownerId, cardGrade, cardCategory, instaListHref } = props
   const [dismissed, setDismissed] = useState(true) // start hidden, avoids a flash
 
   useEffect(() => {
@@ -113,10 +120,14 @@ export function PostResultOffer(props: PostResultOfferProps) {
         cost less per card, and credits never expire.
       </p>
 
+      <SoldProofCallout stat={soldProofFor(cardGrade, cardCategory) ?? SOLD_PROOF.stats[0]} className="mb-4" />
+
       <GradingOptionsList showFirstPurchaseBonus={isFirstPurchase} withPromo />
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <ActionLink href={creditsHref(undefined, true)} variant="primary">Compare all options</ActionLink>
+        {/* Selling a graded card is how an owner sees the premium for themselves. */}
+        {instaListHref && <ActionLink href={instaListHref} variant="secondary">Sell this card with InstaList</ActionLink>}
         <ActionButton variant="text" onClick={handleDismiss}>Not now</ActionButton>
       </div>
     </div>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { ActionButton, ActionLink } from '@/components/design/Primitives'
 import { GradingOptionsList, creditsHref } from '@/components/conversion/GradingOptions'
+import { SoldProofCallout } from '@/components/conversion/SoldProofCallout'
+import { SOLD_PROOF, soldProofFor } from '@/data/soldProof'
 
 interface FirstGradeCongratsModalProps {
   isFirstPurchase: boolean
@@ -22,6 +24,9 @@ interface FirstGradeCongratsModalProps {
   freeCreditsLeft?: number
   /** out-of-credits only: true when the account has never bought anything. */
   neverPurchased?: boolean
+  /** The graded card's whole grade and category, to pick a sold-vs-raw stat that fits it. */
+  cardGrade?: number | string | null
+  cardCategory?: string | null
 }
 
 const PROMO_CODE = 'Grade10'
@@ -73,6 +78,8 @@ export function FirstGradeCongratsModal({
   variant = 'first-grade',
   freeCreditsLeft = 1,
   neverPurchased = false,
+  cardGrade,
+  cardCategory,
 }: FirstGradeCongratsModalProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -139,6 +146,9 @@ export function FirstGradeCongratsModal({
   const isSignup = variant === 'signup'
   const isFreeGradeLeft = variant === 'free-grade-left'
   const isOutOfCredits = variant === 'out-of-credits'
+  // After grade 1 the stat must fit this card (none below DCM 8). Out of credits,
+  // the DCM 10 stat is true for anyone deciding whether to keep grading.
+  const cardStat = soldProofFor(cardGrade, cardCategory)
   const freeLeftLabel = freeCreditsLeft === 1 ? '1 free grade' : `${freeCreditsLeft} free grades`
   const headerTitle = isSignup
     ? 'Welcome to DCM Grading'
@@ -189,6 +199,8 @@ export function FirstGradeCongratsModal({
           <div className="p-6">
             {isOutOfCredits ? (
               <>
+                <SoldProofCallout stat={cardStat ?? SOLD_PROOF.stats[0]} className="mb-4" />
+
                 <GradingOptionsList
                   showFirstPurchaseBonus={isFirstPurchase}
                   withPromo={neverPurchased}
@@ -244,6 +256,8 @@ export function FirstGradeCongratsModal({
                     <span>Market value, printable slab labels and eBay InstaList are all on this page</span>
                   </li>
                 </ul>
+
+                <SoldProofCallout stat={cardStat} className="mb-6" />
 
                 <div className="flex flex-col gap-2">
                   <ActionLink href="/upload" variant="primary" onClick={handleDismiss} className="w-full">

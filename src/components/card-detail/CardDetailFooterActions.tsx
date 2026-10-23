@@ -96,6 +96,9 @@ export function CardDetailFooterActions({
         ownerId={card?.user_id ?? null}
         gradeComplete={!loading && isCardGradeComplete(card)}
         orgId={(card as { org_id?: string | null } | null)?.org_id ?? null}
+        cardGrade={card?.dcm_grade_whole ?? card?.conversational_whole_grade}
+        cardCategory={card?.category}
+        instaListHref="#instalist"
       />
       {isOwner && (
         <div className="cd-manage-rows" role="group" aria-label="Manage this card">

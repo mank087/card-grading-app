@@ -47,3 +47,19 @@ export const SOLD_PROOF = {
     { cardId: 'b66c00d8-d1e3-47d2-bc1b-b8d4c2f1a64e', serial: '944921', category: 'sports', name: 'Michael Jordan', setLine: '1992 SkyBox USA #USA11', grade: 10, sold: 108.5, rawAvg: 13.13, rawSales: 30, format: 'Fixed price' },
   ] satisfies SoldProofExample[],
 }
+
+const SPORTS_CATEGORIES = new Set(['sports', 'baseball', 'basketball', 'football', 'hockey', 'soccer', 'wrestling'])
+
+/**
+ * The one stat that honestly applies to a card of this grade and category, or
+ * null. Lower grades get nothing: below DCM 8 the sales data runs below raw.
+ */
+export function soldProofFor(grade: number | string | null | undefined, category?: string | null): SoldProofStat | null {
+  const g = Math.round(Number(grade))
+  if (!Number.isFinite(g)) return null
+  const [tens, sportsEightPlus, ninesAndTens] = SOLD_PROOF.stats
+  if (g === 10) return tens
+  if (g >= 8 && SPORTS_CATEGORIES.has((category ?? '').toLowerCase())) return sportsEightPlus
+  if (g === 9) return ninesAndTens
+  return null
+}

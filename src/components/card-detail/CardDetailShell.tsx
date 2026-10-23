@@ -938,6 +938,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
         <FirstGradeCongratsModal
           variant="out-of-credits"
           neverPurchased={totalPurchased === 0}
+          cardGrade={card.dcm_grade_whole ?? card.conversational_whole_grade}
+          cardCategory={card.category}
           isFirstPurchase={isFirstPurchase}
           onDismiss={() => setShowFirstGradeModal(false)}
           onStartTour={() => {
@@ -951,6 +953,8 @@ export function CardDetailShell(props: CardDetailShellProps) {
         <FirstGradeCongratsModal
           variant="free-grade-left"
           freeCreditsLeft={balance}
+          cardGrade={card.dcm_grade_whole ?? card.conversational_whole_grade}
+          cardCategory={card.category}
           isFirstPurchase={isFirstPurchase}
           onDismiss={() => setShowFreeGradeWelcome(false)}
           onStartTour={() => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { GradingWaitFeatures } from '@/components/grading/GradingWaitFeatures'
+import { SoldProofTicker } from '@/components/grading/SoldProofTicker'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
 
 interface CardAnalysisAnimationProps {
@@ -95,6 +96,7 @@ export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId,
             <p>{failed ? 'We could not confirm a completed grade. Check My Collection before submitting again. If the card is still pending, contact support.' : complete ? 'Your grade and condition report are ready to review.' : uploading ? 'Keep this page open while your photos finish uploading.' : slow ? 'This is taking longer than usual. Check My Collection for the latest status; please avoid submitting the same card again while it is pending.' : 'Your report will open here when grading finishes. Processing time varies by card and demand.'}</p>
           </div>
           <GradingWaitFeatures mode="benefits" active={!failed && !complete && !uploading} />
+          {!failed && !complete && <SoldProofTicker active={!uploading} />}
           {allowNavigation && !uploading && runActive && <div className="dcm-grading-wait__actions">
             <button type="button" className="dcm-button dcm-button--primary" onClick={() => onGradeAnother ? onGradeAnother() : router.push('/upload')}>Grade next card</button>
             <button type="button" className="dcm-button dcm-button--secondary" onClick={() => onFinishRun ? onFinishRun() : router.push('/collection')}>Finished grading</button>
