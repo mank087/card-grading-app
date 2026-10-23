@@ -6,7 +6,8 @@
  *
  *   npx tsx scripts/why-dcm-sold-slabs.ts
  *
- * Writes public/why-dcm/sold/<serial>.webp for each card in SOLD_PROOF.
+ * Writes public/why-dcm/sold/<serial>.webp for each card in SOLD_PROOF, plus
+ * public/why-dcm/sold/email/<serial>.jpg for the post-grade email.
  */
 import * as dotenv from 'dotenv'
 import fs from 'fs'
@@ -80,6 +81,9 @@ async function slab(labelData: any, cardColors: any, photo: Buffer): Promise<Buf
     if (c.visibility !== 'public') throw new Error(`${sale.name} is not public`)
     const buf = await slab(c.label_data, c.card_colors, await cardPhoto(c.front_path))
     fs.writeFileSync(path.join(OUT, `${c.serial}.webp`), buf)
+    // Emails get a flattened JPG: Outlook and older clients do not render WebP.
+    fs.mkdirSync(path.join(OUT, 'email'), { recursive: true })
+    await sharp(buf).flatten({ background: '#ffffff' }).resize(340).jpeg({ quality: 85 }).toFile(path.join(OUT, 'email', `${c.serial}.jpg`))
     console.log(`${sale.name}: ${OUT}/${c.serial}.webp (${Math.round(buf.length / 1024)} KB)`)
   }
 })().catch(e => { console.error(e); process.exit(1) })

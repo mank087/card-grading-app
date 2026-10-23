@@ -1,11 +1,12 @@
 import { emailText, emailUrl } from './emailMarkup'
+import { SOLD_PROOF, type SoldProofExample } from '../data/soldProof'
 
 /**
  * Post-Grade Email Templates
  *
  * Four-email series triggered when a user grades their first card:
  *  - first_grade_education   (T+24h)  — explains sub-grades using the user's actual card
- *  - first_grade_social_proof (T+72h) — featured cards + DCM toolkit, soft Grade10 push
+ *  - first_grade_social_proof (T+72h) — real InstaList sales vs raw + DCM toolkit, soft Grade10 push
  *  - first_grade_last_chance (T+7d)   — GRADE20 urgency push with cost-per-grade breakdown
  *  - winback                 (T+14d)  — daily cron driven, pre-grants 1 free credit on send
  *
@@ -55,7 +56,7 @@ export function getFirstGradeEducationSubject(): string {
 }
 
 export function getSocialProofEmailSubject(): string {
-  return "Explore graded cards and your DCM toolkit";
+  return "What DCM graded cards sold for on eBay";
 }
 
 export function getLastChanceEmailSubject(): string {
@@ -226,7 +227,7 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
-  <title>Explore Graded Cards and Your DCM Toolkit &middot; DCM Grading</title>
+  <title>What DCM Graded Cards Sold For &middot; DCM Grading</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
   <style type="text/css">
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
@@ -244,13 +245,14 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
       .hero-h1 { font-size: 24px !important; }
       .feat-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
       .tool-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
+      .stat-col { display: block !important; width: 100% !important; padding: 0 0 10px 0 !important; }
       .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
       .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
 <body id="body" style="margin: 0; padding: 0; background-color: #f6f5f8; font-family: Arial, Helvetica, sans-serif;">
-  <div style="display: none; max-height: 0; overflow: hidden;">Explore example reports, then review condition across your own collection.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <div style="display: none; max-height: 0; overflow: hidden;">DCM 9s and 10s sold above raw on average. See real eBay sales and your DCM toolkit.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f6f5f8;">
     <tr><td align="center" style="padding: 20px 10px 40px 10px;">
       <!--[if mso]><table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="600"><tr><td width="600"><![endif]-->
@@ -259,7 +261,7 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
             <td width="130" style="padding: 12px 0 12px 20px;" valign="middle"><a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-logo" style="text-decoration: none;"><img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;"></a></td>
             <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-              <a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-featured" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Featured</a>
+              <a href="https://dcmgrading.com/why-dcm?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-sales" style="color: #d8b4fe; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">DCM Sales</a>
               <a href="https://dcmgrading.com/market-pricing?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-market" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Market Pricing</a>
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=nav-credits" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Credits</a>
             </td>
@@ -267,28 +269,17 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
         </td></tr>
         <tr><td align="center" bgcolor="#14233b" class="pad-mobile" style="padding: 0;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding: 40px 15px 35px 15px;">
-            <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#127919; Explore DCM</p>
-            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">The Cards Graders<br><span style="color: #d8b4fe;">Are Listing Now</span></h1>
-            <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Explore example grades and reports.<br>See the tools available for your collection.</p>
+            <p style="color: #d8b4fe; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">Real eBay Sales</p>
+            <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Buyers Pay More for a Card<br><span style="color: #d8b4fe;">They Can Trust</span></h1>
+            <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">What DCM graded cards sold for through InstaList,<br>next to what the same cards sold for ungraded.</p>
           </td></tr></table>
         </td></tr>
-        <tr><td class="pad-mobile" style="padding: 32px 30px 18px 30px;">
+        ${renderSoldProofBlock()}
+        <tr><td class="pad-mobile" style="padding: 32px 30px 18px 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0 0 28px 0;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0; font-weight: 700;">Review Your Collection</p>
           <h2 style="color: #14233b; font-size: 22px; margin: 0 0 12px 0; font-weight: 800;">Compare condition across your collection.</h2>
           <p style="color: #4b5563; font-size: 15px; margin: 0 0 8px 0; line-height: 1.7;">Review the condition evidence in each report before deciding which cards to protect, keep, or list. Clear front and back photos help make the analysis useful.</p>
           <p style="color: #4b5563; font-size: 15px; margin: 0; line-height: 1.7;">If a grade surprises you, start with the subgrades and defect notes to understand the result.</p>
-        </td></tr>
-        <tr><td class="pad-mobile" style="padding: 22px 30px 6px 30px;">
-          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Example DCM Reports</p>
-          <h3 style="color: #14233b; font-size: 18px; margin: 0 0 18px 0; font-weight: 800;">Recently graded by the community</h3>
-        </td></tr>
-        <tr><td class="pad-mobile" style="padding: 0 30px 8px 30px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-            ${renderFeaturedCard('https://dcmgrading.com/onepiece/4239dbe8-0da9-405e-8f23-8724c87c8e20', 'https://dcmgrading.com/why-dcm/one-piece-graded-card.png', 'Monkey.D.Luffy', 'One Piece TCG', '9', 'featured-1')}
-            ${renderFeaturedCard('https://dcmgrading.com/pokemon/83abd9b2-c176-4b42-94a7-0a6891438d52', 'https://dcmgrading.com/why-dcm/pokemon-graded-card.png', 'Charizard VMAX', 'Pokemon', '10', 'featured-2')}
-            ${renderFeaturedCard('https://dcmgrading.com/sports/2a7caf2c-fe35-48a9-add5-2b130ad8ba70', 'https://dcmgrading.com/why-dcm/football-graded-card.png', 'Jaxson Dart, QB', 'Football', '9', 'featured-3')}
-          </tr></table>
-          <p align="center" style="margin: 18px 0 0 0;"><a href="https://dcmgrading.com/featured?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=see-all" style="color: #7624b5; font-size: 13px; font-weight: 700; text-decoration: none;">See all featured cards &rarr;</a></p>
         </td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 6px 30px;">
@@ -650,13 +641,51 @@ function renderFeatureRow(emoji: string, title: string, body: string): string {
   </tr>`;
 }
 
-function renderFeaturedCard(url: string, image: string, name: string, subtitle: string, grade: string, utmContent: string): string {
+const SOLD_EMAIL_UTM = 'utm_source=email&utm_medium=email&utm_campaign=post_grade_social'
+// Three of the site's six sales, one per category, so the email is not all sports.
+const SOLD_EMAIL_SERIALS = ['411728', '325047', '495385']
+
+/**
+ * Real InstaList sales vs raw, from the same data as the homepage section
+ * (src/data/soldProof.ts) so the email and site never disagree. Images are
+ * the JPG copies in public/why-dcm/sold/email/ (Outlook does not render WebP).
+ * Each sale links to the InstaList page, not the seller's card page.
+ */
+function renderSoldProofBlock(): string {
+  const stats = SOLD_PROOF.stats.map(stat => `<td width="33%" valign="top" class="stat-col" style="padding: 0 5px;">
+      <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 14px 12px;">
+        <p style="color: #047857; font-size: 26px; font-weight: 800; margin: 0 0 4px 0; line-height: 1;">+${Math.round(stat.premium * 100)}%</p>
+        <p style="color: #14233b; font-size: 12px; margin: 0; line-height: 1.5;">${stat.claim}</p>
+      </div>
+    </td>`).join('')
+  const examples: SoldProofExample[] = SOLD_PROOF.examples
+  const sales = SOLD_EMAIL_SERIALS
+    .flatMap(serial => examples.filter(e => e.serial === serial))
+    .map(renderSoldCard).join('')
+  return `<tr><td class="pad-mobile" style="padding: 32px 30px 6px 30px;">
+          <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px 0; font-weight: 700;">Sold With a DCM Grade</p>
+          <h2 style="color: #14233b; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">On average, compared with raw:</h2>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>${stats}</tr></table>
+        </td></tr>
+        <tr><td class="pad-mobile" style="padding: 22px 30px 8px 30px;">
+          <h3 style="color: #14233b; font-size: 18px; margin: 0 0 16px 0; font-weight: 800;">Real sales through InstaList</h3>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>${sales}</tr></table>
+          <p align="center" style="margin: 18px 0 0 0;"><a href="https://dcmgrading.com/why-dcm?${SOLD_EMAIL_UTM}&utm_content=sold-see-more" style="color: #7624b5; font-size: 13px; font-weight: 700; text-decoration: none;">See more DCM sales &rarr;</a></p>
+          <p style="color: #9ca3af; font-size: 11px; margin: 14px 0 0 0; line-height: 1.6;">Raw average is the trimmed mean of ungraded eBay sales of the same card within 180 days of the DCM sale, from PriceCharting and SportsCardsPro. Averages compare total DCM sale prices with the total raw average of the same cards. Premiums tend to be largest on lower-priced cards. Results vary by card and grade, and lower grades often sell below raw.</p>
+        </td></tr>`
+}
+
+function renderSoldCard(sale: SoldProofExample): string {
+  const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
+  const premium = Math.round((sale.sold / sale.rawAvg - 1) * 100)
   return `<td width="33%" align="center" valign="top" class="feat-col" style="padding: 0 6px;">
-    <a href="${url}?utm_source=email&utm_medium=email&utm_campaign=post_grade_social&utm_content=${utmContent}" style="text-decoration: none; color: inherit;">
-      <img src="${image}" alt="${name} graded card" width="170" style="display: block; width: 100%; max-width: 170px; height: auto; border-radius: 8px;">
-      <p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 10px 0 2px 0;">${name}</p>
-      <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0 0;">${subtitle}</p>
-      <p style="color: #7624b5; font-size: 13px; font-weight: 700; margin: 4px 0 0 0;">Grade ${grade}</p>
+    <a href="https://dcmgrading.com/instalist-marketplace?${SOLD_EMAIL_UTM}&utm_content=sold-${sale.serial}" style="text-decoration: none; color: inherit;">
+      <img src="https://dcmgrading.com/why-dcm/sold/email/${sale.serial}.jpg" alt="${sale.name} in a DCM ${sale.grade} slab" width="150" style="display: block; width: 100%; max-width: 150px; height: auto; margin: 0 auto;">
+      <p style="color: #14233b; font-size: 13px; font-weight: 700; margin: 10px 0 2px 0;">${sale.name}</p>
+      <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0 0;">${sale.setLine}</p>
+      <p style="color: #7624b5; font-size: 13px; font-weight: 700; margin: 6px 0 0 0;">DCM ${sale.grade} sold ${money(sale.sold)}</p>
+      <p style="color: #6b7280; font-size: 12px; margin: 2px 0 6px 0;">Raw average ${money(sale.rawAvg)}</p>
+      <span style="display: inline-block; background-color: #d1fae5; color: #065f46; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;">+${premium}% over raw</span>
     </a>
   </td>`;
 }
