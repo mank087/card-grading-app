@@ -1,10 +1,10 @@
 /**
  * Store first-party ad click IDs on the signed-in user's profile.
- * POST { gclid?, gbraid?, wbraid?, msclkid?, landing?, captured_at?, consent?, region? }
+ * POST { gclid?, gbraid?, wbraid?, msclkid?, fbclid?, fbc?, fbp?, landing?, captured_at?, consent?, region? }
  *
  * The IDs are captured client-side from the landing URL (src/lib/adClickIds.ts)
  * and only ever sent for a user who is signed in. They exist so purchases can
- * later be reported to Google Ads and Microsoft Advertising server-side, which
+ * later be reported to Google Ads, Microsoft Advertising and Meta server-side, which
  * catches iOS / Android purchases and any web purchase where the success page
  * never fired a pixel. The consent value stored alongside is what the future
  * upload job must check before sending anything to an ad platform.
@@ -16,8 +16,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/serverAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-const ID_KEYS = ['gclid', 'gbraid', 'wbraid', 'msclkid'] as const
+const ID_KEYS = ['gclid', 'gbraid', 'wbraid', 'msclkid', 'fbclid', 'fbc', 'fbp'] as const
 const ID_RE = /^[A-Za-z0-9_.-]{1,200}$/
+// Meta: fbclid (and the fbc built from it) run longer; fbc/fbp carry Meta's
+// "fb.<n>.<unix ms>." prefix.
+const KEY_RE: Partial<Record<(typeof ID_KEYS)[number], RegExp>> = {
+  fbclid: /^[A-Za-z0-9_.-]{1,500}$/,
+  fbc: /^fb\.\d\.\d{10,13}\.[A-Za-z0-9_.-]{1,500}$/,
+  fbp: /^fb\.\d\.\d{10,13}\.[A-Za-z0-9_.-]{1,100}$/,
+}
 
 /**
  * Opt-out: forget the stored click IDs. Called by the consent banner when a
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
     const ids: Record<string, string> = {}
     for (const k of ID_KEYS) {
       const v = body?.[k]
-      if (typeof v === 'string' && ID_RE.test(v)) ids[k] = v
+      if (typeof v === 'string' && (KEY_RE[k] ?? ID_RE).test(v)) ids[k] = v
     }
     if (!Object.keys(ids).length) {
       return NextResponse.json({ error: 'No click IDs supplied' }, { status: 400 })

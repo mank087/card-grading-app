@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
+import { registrationEventId } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -149,7 +150,7 @@ export default function CardGradingLanding() {
             window.gtag('event', 'sign_up_submitted', { method: 'email' })
           }
           if (window.fbq) {
-            window.fbq('track', 'CompleteRegistration', { content_name: 'Card Landing Email Signup' })
+            window.fbq('track', 'CompleteRegistration', { content_name: 'Card Landing Email Signup' }, result.user?.id ? { eventID: registrationEventId(result.user.id) } : undefined)
           }
           if ((window as any).uetq) {
             (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'card_landing_email' })

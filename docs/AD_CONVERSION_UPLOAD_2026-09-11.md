@@ -56,3 +56,55 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://dcmgrading.com/api/cron/upl
 ```
 
 The JSON response reports sent / skipped / failed / pending / pruned and which platforms are configured.
+
+## Meta Conversions API (2026-10-22)
+
+Meta is a third platform on the same queue and cron. It stays dormant until both required variables exist; until then Meta rows sit `pending` with `credentials not configured`, like Google and Microsoft.
+
+**Apply first:** `supabase/migrations/20261022_ad_conversion_uploads_meta.sql` (adds platform `meta`, click kinds `fbc` / `fbp`, source `web`, and the `event_name` column). Without it the cron errors on the `event_name` read (rows stay pending) and Meta / registration rows fail to insert; Google and Microsoft purchase enqueues keep working.
+
+### Environment variables (Vercel, Production)
+
+| Variable | Value |
+|---|---|
+| `META_PIXEL_ID` | `2308558869571917` (the dataset / pixel ConsentManager loads) |
+| `META_CAPI_ACCESS_TOKEN` | Events Manager > the dataset > Settings > Conversions API > Generate access token (a system-user token). |
+| `META_TEST_EVENT_CODE` | Optional. The `TEST…` code from Events Manager > Test events. While set, every event goes to Test events only and is **not** counted. Remove it after verifying. |
+
+### What is sent
+
+- **Purchase** for every purchase (Stripe and in-app), **CompleteRegistration** for a new web account. Google and Microsoft still receive purchases only.
+- `user_data` is `fbc` (built from the landing `fbclid` as `fb.1.<capture ms>.<fbclid>`) or, without a Meta click, the pixel's `_fbp` browser id. No email, phone or name. Hashed email would lift match rate and is a possible later change, deliberately not made.
+- `action_source` is `website` for Stripe and registrations (with `event_source_url` set to the page the pixel fired on), `other` for App Store / Google Play purchases.
+- **Limited Data Use** on every event: `data_processing_options: ['LDU']`, country `0`, state `0` (Meta geolocates and applies LDU where state law requires it).
+- Meta refuses events older than 7 days, so Meta rows past that are marked `skipped` instead of retried. Turning the sender on later does not backfill older rows.
+- Note: Meta documents `client_user_agent` as expected for `website` events. It is not stored or sent (minimal-payload policy). If Test events shows rejections or a low match-quality warning for it, that is the field to revisit.
+
+### Registrations
+
+`/auth/callback` (new account, both the main and retry paths) syncs click IDs, then calls `POST /api/account/registered`. That route queues a Meta `registration` row with event id `reg_<userId>` for accounts created in the last 7 days. It is idempotent through the `(platform, event_id)` unique index.
+
+### Deduplication contract
+
+Meta merges a browser and a server event that share `event_name` and `event_id` (48-hour window). The browser pixel passes the same id as its `eventID`:
+
+| Event | Browser | Server event_id |
+|---|---|---|
+| CompleteRegistration | `/auth/callback` and every email sign-up form (login, card / pokemon / sports landing, why-dcm, floating CTA) pass `reg_<userId>` | `reg_<userId>` |
+| Purchase, credits / VIP | `/credits/success` passes `analyticsTransactionId(session_id)` | same (Stripe webhook) |
+| Purchase, Founders | `/founders/success` passes `analyticsTransactionId(session_id, 'founders_')` | same |
+| Card Lovers | `/card-lovers/success` fires `Subscribe` with `analyticsTransactionId(session_id, 'card_lovers_')` | sent as `Purchase` with that id. Different names, so not merged; there is no browser Purchase for it to double count. |
+
+In-app purchases have no browser event.
+
+### Consent
+
+Same gate as Google and Microsoft. `fbclid` / `fbc` are captured with the other click IDs (immediately in us-optout, only after Accept in strict regions; opt-out clears `dcm_fbclid` / `dcm_fbc` and the profile record). `_fbp` exists only after the pixel loads, which happens only after Accept. Server-side, a row is queued only when the stored record has `consent = 'granted'`, and consent is re-checked at send. In strict regions this means a Meta click that never reaches Accept on the landing page is not attributable, by design.
+
+### Verifying
+
+1. Set `META_PIXEL_ID`, `META_CAPI_ACCESS_TOKEN` and `META_TEST_EVENT_CODE`; redeploy.
+2. Visit `https://dcmgrading.com/?fbclid=test123`, Accept, sign up with a fresh account; make a purchase if needed.
+3. Run the cron manually (above). The summary should show `configured.meta: true`.
+4. Events Manager > Test events should show the server events (CompleteRegistration / Purchase, "Server") beside the browser ones, marked deduplicated.
+5. Remove `META_TEST_EVENT_CODE` and redeploy.

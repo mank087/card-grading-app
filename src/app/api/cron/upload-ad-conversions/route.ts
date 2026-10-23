@@ -2,7 +2,8 @@
  * Daily server-side conversion upload (2026-09-11).
  *
  * Sends queued purchases (ad_conversion_uploads) to Google Ads and Microsoft
- * Advertising with the buyer's first-party click ID, re-checking consent per
+ * Advertising, and purchases + registrations to the Meta Conversions API
+ * (2026-10-22), with the buyer's first-party click ID, re-checking consent per
  * user first, then prunes click IDs older than the 90-day attribution
  * window. Safe to run with no credentials: rows stay pending and the summary
  * says which platform is unconfigured.

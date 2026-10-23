@@ -72,7 +72,7 @@ function PurchaseSuccessContent() {
           content_type: 'product',
           content_ids: [tier || 'credits'],
           num_items: credits
-        })
+        }, { eventID: analyticsTransactionId(sessionId) }) // = server CAPI event_id (Stripe webhook)
         console.log('[Meta Pixel] Purchase event tracked:', { tier, value, credits })
       }
 

@@ -30,3 +30,12 @@ export function claimPurchaseTracking(sessionId: string | null): boolean {
   }
   return true
 }
+
+/**
+ * Meta event id for a new account. The browser pixel's CompleteRegistration
+ * eventID and the server-side Conversions API event (POST
+ * /api/account/registered) both use it, so Meta counts the signup once.
+ */
+export function registrationEventId(userId: string): string {
+  return `reg_${userId}`
+}

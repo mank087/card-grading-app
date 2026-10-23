@@ -7,6 +7,7 @@ import { signInWithPassword, signUp, getStoredSession, signInWithOAuth, resendSi
 import { readPurchaseIntent, purchaseIntentReturnUrl } from '@/lib/purchaseIntent'
 import { ActionButton, Notice } from '@/components/design/Primitives'
 import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase'
+import { registrationEventId } from '@/lib/analyticsTransactionId'
 
 // Declare rdt, gtag, and fbq for TypeScript
 declare global {
@@ -135,7 +136,7 @@ function LoginPageContent() {
               window.fbq('track', 'CompleteRegistration', {
                 content_name: 'Email Signup',
                 status: true
-              })
+              }, result.user?.id ? { eventID: registrationEventId(result.user.id) } : undefined)
               console.log('[Meta Pixel] CompleteRegistration event tracked')
             }
 

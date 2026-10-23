@@ -1,8 +1,8 @@
 /**
  * First-party ad click-ID capture (2026-09-11).
  *
- * Google (gclid / gbraid / wbraid) and Microsoft (msclkid) append a click ID
- * to the landing URL of every paid click. Keeping it first-party lets us
+ * Google (gclid / gbraid / wbraid), Microsoft (msclkid) and Meta (fbclid)
+ * append a click ID to the landing URL of every paid click. Keeping it first-party lets us
  * report conversions server-side later (Stripe webhook, in-app purchases)
  * instead of relying on a client-side pixel firing on the success page.
  *
@@ -14,15 +14,28 @@
  *   - strict mode: capture only once the visitor has accepted. The IDs are
  *     re-read from the URL at that moment, so a same-page acceptance still
  *     attributes; a later-page acceptance does not, by design.
+ *
+ * Meta (2026-10-22): an fbclid is also stored as `fbc` in Meta's format
+ * (fb.1.<capture ms>.<fbclid>), and the Meta pixel's own `_fbp` browser id is
+ * read at sync time when present. `_fbp` only exists once the pixel loaded,
+ * which ConsentManager does only after Accept, so it adds no new gate.
  */
 
-export const CLICK_ID_PARAMS = ['gclid', 'gbraid', 'wbraid', 'msclkid'] as const
+export const CLICK_ID_PARAMS = ['gclid', 'gbraid', 'wbraid', 'msclkid', 'fbclid'] as const
 export type ClickIdKey = (typeof CLICK_ID_PARAMS)[number]
-export type ClickIds = Partial<Record<ClickIdKey, string>> & { landing?: string; captured_at?: string }
+export type ClickIds = Partial<Record<ClickIdKey, string>> & { fbc?: string; fbp?: string; landing?: string; captured_at?: string }
 
 const COOKIE_PREFIX = 'dcm_'
 const MAX_AGE_DAYS = 90
 const MAX_LEN = 200
+// fbclids are longer than Google/Microsoft ids and keep growing.
+const FB_MAX_LEN = 500
+const ID_CHARS = /^[A-Za-z0-9_.-]+$/
+
+/** Meta's fbc format: fb.<subdomain index 1>.<unix ms at capture>.<fbclid>. */
+export function deriveFbc(fbclid: string, capturedAtMs: number): string {
+  return `fb.1.${Math.floor(capturedAtMs)}.${fbclid}`
+}
 
 function setCookie(name: string, value: string) {
   const expires = new Date(Date.now() + MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toUTCString()
@@ -41,10 +54,14 @@ export function captureClickIdsFromUrl(): ClickIds {
     const params = new URLSearchParams(window.location.search)
     for (const key of CLICK_ID_PARAMS) {
       const v = params.get(key)
-      if (v && /^[A-Za-z0-9_.-]+$/.test(v) && v.length <= MAX_LEN) {
+      if (v && ID_CHARS.test(v) && v.length <= (key === 'fbclid' ? FB_MAX_LEN : MAX_LEN)) {
         found[key] = v
         setCookie(COOKIE_PREFIX + key, v)
       }
+    }
+    if (found.fbclid) {
+      found.fbc = deriveFbc(found.fbclid, Date.now())
+      setCookie(COOKIE_PREFIX + 'fbc', found.fbc)
     }
     if (Object.keys(found).length) {
       const meta = { landing: window.location.pathname, captured_at: new Date().toISOString() }
@@ -64,6 +81,11 @@ export function readClickIds(): ClickIds {
       const v = readCookie(COOKIE_PREFIX + key)
       if (v) out[key] = v
     }
+    // Our derived fbc first; the pixel's own _fbc cookie as a fallback.
+    const fbc = readCookie(COOKIE_PREFIX + 'fbc') || readCookie('_fbc')
+    if (fbc && ID_CHARS.test(fbc) && fbc.length <= FB_MAX_LEN) out.fbc = fbc
+    const fbp = readCookie('_fbp')
+    if (fbp && ID_CHARS.test(fbp) && fbp.length <= MAX_LEN) out.fbp = fbp
     const meta = readCookie(COOKIE_PREFIX + 'click_meta')
     if (meta) {
       try {
@@ -77,7 +99,7 @@ export function readClickIds(): ClickIds {
 }
 
 export function hasClickIds(ids: ClickIds): boolean {
-  return CLICK_ID_PARAMS.some((k) => !!ids[k])
+  return CLICK_ID_PARAMS.some((k) => !!ids[k]) || !!ids.fbc || !!ids.fbp
 }
 
 /**
@@ -86,7 +108,7 @@ export function hasClickIds(ids: ClickIds): boolean {
  */
 export function clearClickIds() {
   try {
-    for (const key of [...CLICK_ID_PARAMS, 'click_meta']) {
+    for (const key of [...CLICK_ID_PARAMS, 'fbc', 'click_meta']) {
       document.cookie = `${COOKIE_PREFIX}${key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
     }
     localStorage.removeItem('dcm_click_ids_synced')
@@ -104,17 +126,19 @@ export function clearClickIds() {
 
 /**
  * Persist the stored click IDs onto the signed-in user's profile so the
- * server can attribute later purchases. Fire-and-forget; never throws.
+ * server can attribute later purchases. Fire-and-forget; never throws or
+ * rejects. The returned promise settles once the write finished (or was
+ * skipped), so a caller can enqueue a server-side registration after it.
  */
-export function syncClickIdsToProfile(accessToken: string | null | undefined, extra?: { consent?: string; region?: string }) {
+export function syncClickIdsToProfile(accessToken: string | null | undefined, extra?: { consent?: string; region?: string }): Promise<void> {
   try {
-    if (!accessToken) return
+    if (!accessToken) return Promise.resolve()
     const ids = readClickIds()
-    if (!hasClickIds(ids)) return
+    if (!hasClickIds(ids)) return Promise.resolve()
     const marker = 'dcm_click_ids_synced'
-    const fingerprint = CLICK_ID_PARAMS.map((k) => ids[k] || '').join('|')
-    if (localStorage.getItem(marker) === fingerprint) return
-    fetch('/api/account/click-ids', {
+    const fingerprint = [...CLICK_ID_PARAMS.map((k) => ids[k] || ''), ids.fbc || '', ids.fbp || ''].join('|')
+    if (localStorage.getItem(marker) === fingerprint) return Promise.resolve()
+    return fetch('/api/account/click-ids', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ ...ids, ...extra }),
@@ -122,5 +146,5 @@ export function syncClickIdsToProfile(accessToken: string | null | undefined, ex
     })
       .then((r) => { if (r.ok) localStorage.setItem(marker, fingerprint) })
       .catch(() => { })
-  } catch { /* ignore */ }
+  } catch { return Promise.resolve() }
 }

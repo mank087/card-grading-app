@@ -8,6 +8,7 @@ import { ReferenceCardShowcase } from '@/components/design/ReferenceCardShowcase
 import LatestGradesCarousel from '@/components/marketing/LatestGradesCarousel'
 import FloatingCtaBar from '@/components/marketing/FloatingCtaBar'
 import EbayListingMonitor from '@/components/EbayListingMonitor'
+import { registrationEventId } from '@/lib/analyticsTransactionId'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -173,7 +174,7 @@ export default function PokemonGradingLanding() {
             window.gtag('event', 'sign_up_submitted', { method: 'email' })
           }
           if (window.fbq) {
-            window.fbq('track', 'CompleteRegistration', { content_name: 'Pokemon Landing Email Signup' })
+            window.fbq('track', 'CompleteRegistration', { content_name: 'Pokemon Landing Email Signup' }, result.user?.id ? { eventID: registrationEventId(result.user.id) } : undefined)
           }
           if ((window as any).uetq) {
             (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: 'pokemon_landing_email' })

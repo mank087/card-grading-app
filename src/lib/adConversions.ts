@@ -18,6 +18,13 @@
  * Payload is minimal: click ID, time, value, currency, order ID. No email, no
  * enhanced conversions.
  *
+ * Meta Conversions API (2026-10-22): a 'meta' row is queued when the stored
+ * record has an fbc (from an fbclid) or the pixel's fbp. Meta also receives
+ * registrations (CompleteRegistration, event id reg_<userId>); Google and
+ * Microsoft only ever receive purchases, which is what they bid on. Event ids
+ * match the browser pixel's eventID so Meta deduplicates the pair. Sent with
+ * Limited Data Use (LDU, geolocated by Meta).
+ *
  * Retention: click IDs older than 90 days (both platforms' attribution
  * window) are pruned from profiles by the same cron.
  *
@@ -28,8 +35,9 @@
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-export type ConversionSource = 'stripe' | 'apple' | 'google_play'
-export type ConversionPlatform = 'google' | 'microsoft'
+export type ConversionSource = 'stripe' | 'apple' | 'google_play' | 'web'
+export type ConversionPlatform = 'google' | 'microsoft' | 'meta'
+export type ConversionEvent = 'purchase' | 'registration'
 
 export interface EnqueueInput {
   userId: string
@@ -39,6 +47,8 @@ export interface EnqueueInput {
   value: number
   currency?: string
   occurredAt?: Date
+  /** Defaults to 'purchase'. Registrations go to Meta only and may have value 0. */
+  event?: ConversionEvent
 }
 
 interface StoredClickIds {
@@ -46,6 +56,9 @@ interface StoredClickIds {
   gbraid?: string
   wbraid?: string
   msclkid?: string
+  fbclid?: string
+  fbc?: string
+  fbp?: string
   consent?: string | null
   region?: string | null
   captured_at?: string | null
@@ -65,42 +78,55 @@ async function readClickIds(userId: string): Promise<StoredClickIds | null> {
 }
 
 /**
- * Queue a purchase for upload. Never throws; a failure here must not affect
- * the purchase itself. Returns the number of rows queued (0, 1 or 2).
+ * Queue a conversion for upload. Never throws; a failure here must not affect
+ * the purchase or signup itself. Returns the number of rows queued (0-3).
  */
 export async function enqueueAdConversion(input: EnqueueInput): Promise<number> {
   try {
-    if (!input.userId || !input.eventId || !(input.value > 0)) return 0
+    const event: ConversionEvent = input.event ?? 'purchase'
+    if (!input.userId || !input.eventId) return 0
+    if (event === 'purchase' ? !(input.value > 0) : !(input.value >= 0)) return 0
     const ids = await readClickIds(input.userId)
     if (!ids || ids.consent !== 'granted') return 0
 
     const rows: Array<Record<string, unknown>> = []
+    const metaRows: Array<Record<string, unknown>> = []
     const base = {
       user_id: input.userId,
       source: input.source,
       event_id: input.eventId,
+      // Purchases rely on the column default so Google/Microsoft keep working
+      // even before migration 20261022_ad_conversion_uploads_meta.sql lands.
+      ...(event === 'purchase' ? {} : { event_name: event }),
       value: Number(input.value.toFixed(2)),
       currency: (input.currency || 'USD').toUpperCase(),
       occurred_at: (input.occurredAt || new Date()).toISOString(),
       status: 'pending',
     }
+    // Google and Microsoft bid on purchases only.
     const googleId = ids.gclid || ids.gbraid || ids.wbraid
-    if (googleId) {
+    if (event === 'purchase' && googleId) {
       rows.push({ ...base, platform: 'google', click_id: googleId, click_id_kind: ids.gclid ? 'gclid' : ids.gbraid ? 'gbraid' : 'wbraid' })
     }
-    if (ids.msclkid) {
+    if (event === 'purchase' && ids.msclkid) {
       rows.push({ ...base, platform: 'microsoft', click_id: ids.msclkid, click_id_kind: 'msclkid' })
     }
-    if (!rows.length) return 0
-
-    const { error } = await supabaseAdmin
-      .from('ad_conversion_uploads')
-      .upsert(rows, { onConflict: 'platform,event_id', ignoreDuplicates: true })
-    if (error) {
-      console.error('[adConversions] enqueue failed:', error.message)
-      return 0
+    if (ids.fbc || ids.fbp) {
+      metaRows.push({ ...base, platform: 'meta', click_id: ids.fbc || ids.fbp, click_id_kind: ids.fbc ? 'fbc' : 'fbp' })
     }
-    return rows.length
+
+    // Meta is written separately so a failed Meta insert can never drop the
+    // Google/Microsoft rows of the same purchase.
+    let queued = 0
+    for (const group of [rows, metaRows]) {
+      if (!group.length) continue
+      const { error } = await supabaseAdmin
+        .from('ad_conversion_uploads')
+        .upsert(group, { onConflict: 'platform,event_id', ignoreDuplicates: true })
+      if (error) console.error('[adConversions] enqueue failed:', error.message)
+      else queued += group.length
+    }
+    return queued
   } catch (e) {
     console.error('[adConversions] enqueue error:', e)
     return 0
@@ -302,13 +328,102 @@ async function uploadMicrosoft(rows: UploadRow[]): Promise<Map<string, string | 
 }
 
 // ---------------------------------------------------------------------------
+// Meta: Conversions API (Graph API events endpoint)
+// ---------------------------------------------------------------------------
+
+interface MetaCreds {
+  pixelId: string
+  accessToken: string
+  testEventCode?: string
+}
+
+function metaCreds(): MetaCreds | null {
+  const e = process.env
+  const c = {
+    pixelId: e.META_PIXEL_ID || '',
+    accessToken: e.META_CAPI_ACCESS_TOKEN || '',
+    testEventCode: e.META_TEST_EVENT_CODE || undefined,
+  }
+  if (!c.pixelId || !c.accessToken) return null
+  return c
+}
+
+const META_BATCH = 100
+/** Meta rejects events whose event_time is more than 7 days old. */
+export const META_MAX_EVENT_AGE_MS = 7 * 864e5
+const SITE_ORIGIN = 'https://dcmgrading.com'
+
+/** Page the browser pixel fired on, so server and browser events line up. */
+function metaEventSourceUrl(r: UploadRow): string | undefined {
+  if (r.source !== 'stripe' && r.source !== 'web') return undefined
+  if (r.event_name === 'registration') return `${SITE_ORIGIN}/auth/callback`
+  if (r.event_id.startsWith('card_lovers_')) return `${SITE_ORIGIN}/card-lovers/success`
+  if (r.event_id.startsWith('founders_')) return `${SITE_ORIGIN}/founders/success`
+  return `${SITE_ORIGIN}/credits/success`
+}
+
+/**
+ * One Conversions API event. user_data is fbc/fbp only, per this file's
+ * minimal-payload policy. (Hashed email would raise Meta's match rate and is
+ * a possible later lift; it is deliberately not sent today.)
+ */
+export function metaEvent(r: UploadRow): Record<string, unknown> {
+  const isRegistration = r.event_name === 'registration'
+  const url = metaEventSourceUrl(r)
+  return {
+    event_name: isRegistration ? 'CompleteRegistration' : 'Purchase',
+    event_time: Math.floor(new Date(r.occurred_at).getTime() / 1000),
+    event_id: r.event_id,
+    // In-app purchases happened in the native app, not on the site.
+    action_source: r.source === 'apple' || r.source === 'google_play' ? 'other' : 'website',
+    ...(url ? { event_source_url: url } : {}),
+    user_data: r.click_id_kind === 'fbc' ? { fbc: r.click_id } : { fbp: r.click_id },
+    ...(isRegistration && !(Number(r.value) > 0) ? {} : { custom_data: { value: Number(r.value), currency: r.currency } }),
+    data_processing_options: ['LDU'],
+    data_processing_options_country: 0,
+    data_processing_options_state: 0,
+  }
+}
+
+async function uploadMeta(rows: UploadRow[]): Promise<Map<string, string | null>> {
+  const c = metaCreds()
+  const out = new Map<string, string | null>()
+  if (!c) { rows.forEach(r => out.set(r.id, 'credentials not configured')); return out }
+  for (let i = 0; i < rows.length; i += META_BATCH) {
+    const chunk = rows.slice(i, i + META_BATCH)
+    let err: string | null = null
+    try {
+      // Token in the body, not the URL, so it never lands in request logs.
+      const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(c.pixelId)}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: chunk.map(metaEvent),
+          ...(c.testEventCode ? { test_event_code: c.testEventCode } : {}),
+          access_token: c.accessToken,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      // All-or-nothing per request: one invalid event fails the whole batch.
+      if (!res.ok || json?.error) err = 'Meta upload HTTP ' + res.status + ': ' + JSON.stringify(json?.error ?? json).slice(0, 400)
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e)
+    }
+    chunk.forEach(r => out.set(r.id, err))
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
 // Cron driver
 // ---------------------------------------------------------------------------
 
-interface UploadRow {
+export interface UploadRow {
   id: string
   user_id: string
   platform: ConversionPlatform
+  source: ConversionSource
+  event_name: ConversionEvent
   click_id: string
   click_id_kind: string
   event_id: string
@@ -324,18 +439,18 @@ export interface SendSummary {
   failed: number
   pending: number
   pruned: number
-  configured: { google: boolean; microsoft: boolean }
+  configured: { google: boolean; microsoft: boolean; meta: boolean }
 }
 
 export async function sendPendingConversions(limit = 200): Promise<SendSummary> {
   const summary: SendSummary = {
     sent: 0, skipped: 0, failed: 0, pending: 0, pruned: 0,
-    configured: { google: !!googleCreds(), microsoft: !!microsoftCreds() },
+    configured: { google: !!googleCreds(), microsoft: !!microsoftCreds(), meta: !!metaCreds() },
   }
 
   const { data: rows, error } = await supabaseAdmin
     .from('ad_conversion_uploads')
-    .select('id, user_id, platform, click_id, click_id_kind, event_id, value, currency, occurred_at, attempts')
+    .select('id, user_id, platform, source, event_name, click_id, click_id_kind, event_id, value, currency, occurred_at, attempts')
     .eq('status', 'pending')
     .lt('attempts', 5)
     .order('occurred_at', { ascending: true })
@@ -360,15 +475,31 @@ export async function sendPendingConversions(limit = 200): Promise<SendSummary> 
       .in('id', skippedRows.map(r => r.id))
     summary.skipped = skippedRows.length
   }
-  const sendable = pending.filter(r => consented.has(r.user_id))
+  // Google and Microsoft receive purchases only. Meta refuses an event_time
+  // older than 7 days, so those rows are skipped rather than retried.
+  const metaCutoff = Date.now() - META_MAX_EVENT_AGE_MS
+  const unsendable = pending.filter(r => consented.has(r.user_id) && (
+    (r.platform !== 'meta' && r.event_name !== 'purchase') ||
+    (r.platform === 'meta' && new Date(r.occurred_at).getTime() < metaCutoff)
+  ))
+  if (unsendable.length) {
+    await supabaseAdmin.from('ad_conversion_uploads')
+      .update({ status: 'skipped', error: 'not sendable (event type, or past the platform event-age limit)', updated_at: new Date().toISOString() })
+      .in('id', unsendable.map(r => r.id))
+    summary.skipped += unsendable.length
+  }
+  const unsendableIds = new Set(unsendable.map(r => r.id))
+  const sendable = pending.filter(r => consented.has(r.user_id) && !unsendableIds.has(r.id))
 
-  for (const platform of ['google', 'microsoft'] as const) {
+  for (const platform of ['google', 'microsoft', 'meta'] as const) {
     const batch = sendable.filter(r => r.platform === platform)
     if (!batch.length) continue
     if (!summary.configured[platform]) { summary.pending += batch.length; continue }
     let results: Map<string, string | null>
     try {
-      results = platform === 'google' ? await uploadGoogle(batch) : await uploadMicrosoft(batch)
+      results = platform === 'google' ? await uploadGoogle(batch)
+        : platform === 'microsoft' ? await uploadMicrosoft(batch)
+          : await uploadMeta(batch)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       results = new Map(batch.map(r => [r.id, msg]))

@@ -84,7 +84,10 @@ function CardLoversSuccessContent() {
           content_type: 'product',
           content_ids: [`card_lovers_${subscriptionStatus.plan}`],
           num_items: credits
-        })
+          // Server CAPI sends this purchase as Purchase with the same id; Meta
+          // dedupes on name + id, so this Subscribe is not merged with it (and
+          // there is no browser Purchase here to double count).
+        }, { eventID: analyticsTransactionId(sessionId, 'card_lovers_') })
         console.log('[Meta Pixel] Card Lovers Subscribe event tracked')
       }
 

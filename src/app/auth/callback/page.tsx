@@ -5,6 +5,7 @@ import { getOAuthSession, getStoredSession } from '@/lib/directAuth'
 import { getStoredRefCode, storeRefCode, SIGNUP_REF_PARAM } from '@/lib/referralStorage'
 import { syncClickIdsToProfile } from '@/lib/adClickIds'
 import { readRegionCookie } from '@/lib/consentRegion'
+import { registrationEventId } from '@/lib/analyticsTransactionId'
 import {
   readPurchaseIntent,
   savePurchaseIntent,
@@ -188,11 +189,12 @@ export default function AuthCallbackPage() {
                   });
                 }
                 if ((window as any).fbq) {
+                  // eventID matches the server-side CAPI event (POST /api/account/registered).
                   (window as any).fbq('track', 'CompleteRegistration', {
                     content_name: `OAuth Signup - ${provider}`,
                     status: true,
                     signup_source: signupSource || 'direct',
-                  });
+                  }, { eventID: registrationEventId(storedSession.user.id) });
                 }
                 if ((window as any).rdt) {
                   (window as any).rdt('track', 'SignUp', { conversionId: signupId });
@@ -215,9 +217,14 @@ export default function AuthCallbackPage() {
               // Persist any first-party ad click IDs (gclid / msclkid) onto the
               // new profile for server-side conversion reporting. First-party
               // only; the stored consent value gates any later upload.
-              syncClickIdsToProfile(storedSession.access_token, {
+              // Then queue the server-side registration conversion (Meta CAPI;
+              // consent-gated on the server against the record just stored).
+              const regToken = storedSession.access_token
+              syncClickIdsToProfile(regToken, {
                 consent: (() => { try { return localStorage.getItem('dcm_consent_v1') || undefined } catch { return undefined } })(),
                 region: readRegionCookie(),
+              }).then(() => {
+                fetch('/api/account/registered', { method: 'POST', headers: { Authorization: `Bearer ${regToken}` }, keepalive: true }).catch(() => { })
               })
 
               // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
@@ -273,7 +280,7 @@ export default function AuthCallbackPage() {
                     (window as any).gtag('event', 'sign_up', { method: provider });
                   }
                   if ((window as any).fbq) {
-                    (window as any).fbq('track', 'CompleteRegistration', { content_name: `OAuth Signup - ${provider}`, status: true });
+                    (window as any).fbq('track', 'CompleteRegistration', { content_name: `OAuth Signup - ${provider}`, status: true }, { eventID: registrationEventId(retrySession.user.id) });
                   }
                   if ((window as any).rdt) {
                     (window as any).rdt('track', 'SignUp', { conversionId: signupId });
@@ -282,6 +289,15 @@ export default function AuthCallbackPage() {
                     (window as any).uetq.push('event', 'signup', { event_category: 'signup', event_label: `oauth_${provider}` });
                   }
                 }
+
+                // Same click-ID sync + server-side registration as the main path.
+                const retryToken = retrySession.access_token
+                syncClickIdsToProfile(retryToken, {
+                  consent: (() => { try { return localStorage.getItem('dcm_consent_v1') || undefined } catch { return undefined } })(),
+                  region: readRegionCookie(),
+                }).then(() => {
+                  fetch('/api/account/registered', { method: 'POST', headers: { Authorization: `Bearer ${retryToken}` }, keepalive: true }).catch(() => { })
+                })
 
                 // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
                 fetch('/api/email/welcome', {

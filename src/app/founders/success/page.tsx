@@ -70,7 +70,7 @@ function FounderSuccessContent() {
           content_type: 'product',
           content_ids: ['founders'],
           num_items: 150
-        })
+        }, { eventID: analyticsTransactionId(sessionId, 'founders_') }) // = server CAPI event_id
         console.log('[Meta Pixel] Founders Purchase event tracked')
       }
 
